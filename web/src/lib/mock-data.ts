@@ -1,0 +1,214 @@
+export const categories = [
+  { id: 1, name: "Electronics", nameFr: "Électronique", icon: "📱", image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=400&h=300&fit=crop" },
+  { id: 2, name: "Fashion", nameFr: "Mode", icon: "👗", image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&h=300&fit=crop" },
+  { id: 3, name: "Home & Living", nameFr: "Maison", icon: "🏠", image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=300&fit=crop" },
+  { id: 4, name: "Beauty", nameFr: "Beauté", icon: "💄", image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=300&fit=crop" },
+  { id: 5, name: "Sports", nameFr: "Sport", icon: "⚽", image: "https://images.unsplash.com/photo-1517643876320-d6cb0646a20e?auto=format&fit=crop&w=400&h=300&q=80" },
+  { id: 6, name: "Books", nameFr: "Livres", icon: "📚", image: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&h=300&fit=crop" },
+  { id: 7, name: "Toys", nameFr: "Jouets", icon: "🧸", image: "https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=400&h=300&fit=crop" },
+  { id: 8, name: "Grocery", nameFr: "Épicerie", icon: "🛒", image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop" },
+];
+
+export const products = [
+  {
+    id: 1,
+    name: "Samsung Galaxy S24 Ultra",
+    nameFr: "Samsung Galaxy S24 Ultra",
+    price: 1199,
+    originalPrice: 1399,
+    discount: 14,
+    rating: 4.8,
+    reviews: 2341,
+    image: "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400&h=400&fit=crop",
+    category: "Electronics",
+    seller: "TechZone Store",
+    stock: 45,
+    deliveryDays: 2,
+  },
+  {
+    id: 2,
+    name: "Apple MacBook Air M3",
+    nameFr: "Apple MacBook Air M3",
+    price: 1099,
+    originalPrice: 1299,
+    discount: 15,
+    rating: 4.9,
+    reviews: 1823,
+    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=400&fit=crop",
+    category: "Electronics",
+    seller: "Apple Official",
+    stock: 23,
+    deliveryDays: 3,
+  },
+  {
+    id: 3,
+    name: "Sony WH-1000XM5 Headphones",
+    nameFr: "Casque Sony WH-1000XM5",
+    price: 349,
+    originalPrice: 399,
+    discount: 13,
+    rating: 4.7,
+    reviews: 5621,
+    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
+    category: "Electronics",
+    seller: "AudioHub",
+    stock: 120,
+    deliveryDays: 1,
+  },
+  {
+    id: 4,
+    name: "Nike Air Max 270",
+    nameFr: "Nike Air Max 270",
+    price: 129,
+    originalPrice: 160,
+    discount: 19,
+    rating: 4.5,
+    reviews: 3421,
+    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop",
+    category: "Fashion",
+    seller: "SportStyle",
+    stock: 89,
+    deliveryDays: 2,
+  },
+  {
+    id: 5,
+    name: "Dyson V15 Vacuum",
+    nameFr: "Aspirateur Dyson V15",
+    price: 649,
+    originalPrice: 749,
+    discount: 13,
+    rating: 4.6,
+    reviews: 892,
+    image: "https://images.unsplash.com/photo-1558317374-067fb5f30029?w=400&h=400&fit=crop",
+    category: "Home & Living",
+    seller: "HomeEssentials",
+    stock: 34,
+    deliveryDays: 4,
+  },
+  {
+    id: 6,
+    name: "Levi's 501 Original Jeans",
+    nameFr: "Jean Levi's 501 Original",
+    price: 79,
+    originalPrice: 99,
+    discount: 20,
+    rating: 4.4,
+    reviews: 2103,
+    image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=400&fit=crop",
+    category: "Fashion",
+    seller: "DenimWorld",
+    stock: 200,
+    deliveryDays: 2,
+  },
+  {
+    id: 7,
+    name: "Instant Pot Duo 7-in-1",
+    nameFr: "Instant Pot Duo 7-en-1",
+    price: 89,
+    originalPrice: 119,
+    discount: 25,
+    rating: 4.7,
+    reviews: 15234,
+    image: "https://images.unsplash.com/photo-1585515320310-259814833e62?w=400&h=400&fit=crop",
+    category: "Home & Living",
+    seller: "KitchenPro",
+    stock: 67,
+    deliveryDays: 1,
+  },
+  {
+    id: 8,
+    name: "PlayStation 5 Console",
+    nameFr: "Console PlayStation 5",
+    price: 499,
+    originalPrice: 549,
+    discount: 9,
+    rating: 4.9,
+    reviews: 8932,
+    image: "https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=400&h=400&fit=crop",
+    category: "Electronics",
+    seller: "GameZone",
+    stock: 12,
+    deliveryDays: 3,
+  },
+];
+
+export const stores = [
+  { id: 1, name: "TechZone Store", rating: 4.8, products: 1240, followers: 45000, image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop", badge: "Gold" },
+  { id: 2, name: "FashionHub", rating: 4.6, products: 3200, followers: 78000, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop", badge: "Silver" },
+  { id: 3, name: "HomeEssentials", rating: 4.7, products: 890, followers: 23000, image: "https://images.unsplash.com/photo-1555529669-e4e7eeef2289?w=200&h=200&fit=crop", badge: "Gold" },
+  { id: 4, name: "SportStyle", rating: 4.5, products: 2100, followers: 56000, image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa0?w=200&h=200&fit=crop", badge: "Bronze" },
+];
+
+export const orders = [
+  { id: "ORD-2024-001", customer: "Marie Dubois", email: "marie@email.com", amount: 1199, status: "delivered", date: "2024-06-01", seller: "TechZone Store" },
+  { id: "ORD-2024-002", customer: "John Smith", email: "john@email.com", amount: 349, status: "processing", date: "2024-06-02", seller: "AudioHub" },
+  { id: "ORD-2024-003", customer: "Sophie Martin", email: "sophie@email.com", amount: 129, status: "pending", date: "2024-06-03", seller: "SportStyle" },
+  { id: "ORD-2024-004", customer: "Ahmed Hassan", email: "ahmed@email.com", amount: 649, status: "delivered", date: "2024-06-03", seller: "HomeEssentials" },
+  { id: "ORD-2024-005", customer: "Emma Wilson", email: "emma@email.com", amount: 89, status: "cancelled", date: "2024-06-04", seller: "KitchenPro" },
+  { id: "ORD-2024-006", customer: "Pierre Laurent", email: "pierre@email.com", amount: 499, status: "processing", date: "2024-06-05", seller: "GameZone" },
+];
+
+export const sellers = [
+  { id: 1, name: "NewTech Solutions", owner: "Jean Dupont", email: "jean@newtech.com", phone: "+33 6 12 34 56 78", status: "pending", date: "2024-06-05", category: "Electronics" },
+  { id: 2, name: "Belle Mode", owner: "Claire Bernard", email: "claire@bellemode.fr", phone: "+33 6 98 76 54 32", status: "pending", date: "2024-06-04", category: "Fashion" },
+  { id: 3, name: "GadgetWorld", owner: "Mike Johnson", email: "mike@gadgetworld.com", phone: "+1 555 123 4567", status: "approved", date: "2024-05-28", category: "Electronics" },
+  { id: 4, name: "Organic Foods Co", owner: "Sarah Lee", email: "sarah@organic.com", phone: "+1 555 987 6543", status: "approved", date: "2024-05-20", category: "Grocery" },
+];
+
+export const warehouseParcels = [
+  { id: "PKG-001", orderId: "ORD-2024-002", seller: "AudioHub", zone: "Zone A", status: "received", arrival: "09:30", priority: "normal" },
+  { id: "PKG-002", orderId: "ORD-2024-006", seller: "GameZone", zone: "Zone B", status: "sorting", arrival: "10:15", priority: "high" },
+  { id: "PKG-003", orderId: "ORD-2024-003", seller: "SportStyle", zone: "Zone A", status: "ready", arrival: "08:45", priority: "normal" },
+  { id: "PKG-004", orderId: "ORD-2024-001", seller: "TechZone", zone: "Zone C", status: "dispatched", arrival: "07:20", priority: "normal" },
+  { id: "PKG-005", orderId: "ORD-2024-004", seller: "HomeEssentials", zone: "Zone B", status: "inbound", arrival: "11:00", priority: "low" },
+];
+
+export const sellerProducts = [
+  { id: 1, name: "Samsung Galaxy S24 Ultra", sku: "SAM-S24U-256", stock: 45, reserved: 5, sold: 120, price: 1199, status: "live", moderation: "approved" },
+  { id: 2, name: "Galaxy Buds Pro", sku: "SAM-BUDS-PRO", stock: 8, reserved: 2, sold: 89, price: 199, status: "live", moderation: "approved" },
+  { id: 3, name: "Galaxy Watch 6", sku: "SAM-WATCH-6", stock: 3, reserved: 0, sold: 45, price: 299, status: "live", moderation: "approved" },
+  { id: 4, name: "Galaxy Tab S9", sku: "SAM-TAB-S9", stock: 0, reserved: 0, sold: 23, price: 799, status: "out_of_stock", moderation: "approved" },
+  { id: 5, name: "New Phone Model X", sku: "SAM-PHONE-X", stock: 0, reserved: 0, sold: 0, price: 899, status: "draft", moderation: "pending" },
+];
+
+export const adminStats = {
+  todayOrders: 1247,
+  revenue: 89432,
+  pendingApprovals: 12,
+  activeSellers: 3421,
+  returnsToday: 34,
+  fraudAlerts: 3,
+};
+
+export const warehouseStats = {
+  parcelsToday: 342,
+  received: 128,
+  pendingSorting: 45,
+  readyDispatch: 67,
+  dispatched: 102,
+  returnsPending: 18,
+  codCollections: 12450,
+};
+
+export const sellerStats = {
+  todaySales: 4521,
+  ordersReceived: 23,
+  ordersProcessing: 8,
+  ordersDelivered: 156,
+  returns: 3,
+  storeRating: 4.8,
+  availableBalance: 12450,
+  pendingEarnings: 3200,
+};
+
+export const banners = [
+  { id: 1, title: "Big Blue Sale", titleFr: "Grande Vente Bleue", subtitle: "Up to 70% off electronics", subtitleFr: "Jusqu'à 70% sur l'électronique", image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=400&fit=crop", color: "from-blue-600 to-indigo-700" },
+  { id: 2, title: "Summer Fashion", titleFr: "Mode d'été", subtitle: "New arrivals from top brands", subtitleFr: "Nouveautés des grandes marques", image: "https://images.unsplash.com/photo-1441984904996-e0b495a859b0?w=1200&h=400&fit=crop", color: "from-sky-500 to-blue-600" },
+];
+
+export const flashSaleProducts = products.slice(0, 4).map((p) => ({
+  ...p,
+  flashPrice: Math.round(p.price * 0.7),
+  flashDiscount: 30,
+  endsIn: "02:45:30",
+}));
