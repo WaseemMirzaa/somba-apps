@@ -131,7 +131,7 @@ export default function HomePage() {
 
               <div className="mt-9 flex flex-wrap gap-3">
                 <Link
-                  href="/shop/products"
+                  href="/get-app"
                   className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-bold text-[var(--primary)] shadow-xl shadow-blue-950/30 transition-all hover:-translate-y-0.5 hover:shadow-2xl"
                 >
                   {fr ? "Acheter maintenant" : "Shop now"}
@@ -168,7 +168,7 @@ export default function HomePage() {
                     </Link>
                   ))}
                 </div>
-                <Link href="/shop/products" className="btn-primary mt-6 flex w-full items-center justify-center gap-2 py-3.5 text-sm">
+                <Link href="/get-app" className="btn-primary mt-6 flex w-full items-center justify-center gap-2 py-3.5 text-sm">
                   {fr ? "Voir toutes les offres" : "Browse all deals"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -213,7 +213,7 @@ export default function HomePage() {
               title={fr ? "Acheter par catégorie" : "Shop by category"}
             />
             <Link
-              href="/shop/products"
+              href="/get-app"
               className="mb-1 hidden shrink-0 items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline sm:inline-flex"
             >
               {fr ? "Tout voir" : "View all"} <ArrowRight className="h-4 w-4" />
@@ -221,7 +221,7 @@ export default function HomePage() {
           </div>
           <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
             {categories.map((cat) => (
-              <Link key={cat.id} href="/shop/products" className="landing-category-card group">
+              <Link key={cat.id} href="/get-app" className="landing-category-card group">
                 <div className="relative aspect-[4/5] overflow-hidden">
                   <Image
                     src={cat.image}
@@ -250,13 +250,13 @@ export default function HomePage() {
               title={fr ? "Produits populaires" : "Popular products"}
               desc={fr ? "Les articles les mieux notés par nos acheteurs cette semaine." : "Top-rated picks from shoppers this week."}
             />
-            <Link href="/shop/products" className="mb-1 shrink-0 text-sm font-semibold text-[var(--primary)] hover:underline">
+            <Link href="/get-app" className="mb-1 shrink-0 text-sm font-semibold text-[var(--primary)] hover:underline">
               {fr ? "Boutique complète →" : "Full shop →"}
             </Link>
           </div>
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {products.slice(0, 4).map((p) => (
-              <Link key={p.id} href={`/shop/products/${p.id}`} className="landing-product-card group">
+              <Link key={p.id} href="/get-app" className="landing-product-card group">
                 <div className="relative aspect-square overflow-hidden bg-slate-100">
                   <Image
                     src={p.image}
@@ -366,7 +366,7 @@ export default function HomePage() {
                 title={fr ? "De la découverte à la livraison en 4 étapes" : "From browse to delivery in 4 steps"}
                 desc={fr ? PRODUCT_HERO.introFr : PRODUCT_HERO.intro}
               />
-              <Link href="/shop/products" className="btn-primary mt-8 inline-flex items-center gap-2 px-6 py-3 text-sm">
+              <Link href="/get-app" className="btn-primary mt-8 inline-flex items-center gap-2 px-6 py-3 text-sm">
                 {fr ? "Commencer à acheter" : "Start shopping"}
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -571,7 +571,7 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
-              href="/shop/products"
+              href="/get-app"
               className="inline-flex items-center gap-2 rounded-xl bg-white px-10 py-4 text-base font-bold text-[var(--primary)] shadow-xl shadow-blue-900/30 transition-all hover:-translate-y-0.5"
             >
               {fr ? "Acheter maintenant" : "Shop now"}

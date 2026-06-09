@@ -32,9 +32,9 @@ export const PORTAL_QUICK_ACCESS = [
 
 /** Marketplace deal highlight cards */
 export const DEAL_HIGHLIGHTS = [
-  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/shop/products" },
-  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/shop/products" },
-  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/shop/products" },
+  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/get-app" },
+  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/get-app" },
+  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/get-app" },
   { title: "Fast Delivery", titleFr: "Livraison rapide", subtitle: "1–3 days", subtitleFr: "1–3 jours", tag: "Nationwide", tagFr: "National", href: "#modules" },
   { title: "Become a Seller", titleFr: "Devenir vendeur", subtitle: "From $49/mo", subtitleFr: "À partir de 49 $/mois", tag: "Open now", tagFr: "Ouvert", href: "/sell-online" },
   { title: "Mobile App", titleFr: "App mobile", subtitle: "iOS & Android", subtitleFr: "iOS et Android", tag: "Download", tagFr: "Télécharger", href: "#apps" },
@@ -82,7 +82,7 @@ export const PORTALS = [
     descFr: "Votre marketplace du quotidien — milliers de produits, offres par catégorie et livraison à domicile.",
     icon: "ShoppingBag",
     image: PORTAL_IMAGES.shop,
-    loginHref: "/shop/products",
+    loginHref: "/get-app",
     appHref: APP_LINKS.customerApp,
     features: ["Categories, search & flash deals", "Guest checkout & Somba wallet", "Order tracking & easy returns"],
     trust: [
@@ -226,7 +226,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Livraison 1–3 jours",
     cta: "Shop with fast delivery",
     ctaFr: "Acheter avec livraison rapide",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Nationwide",
     tagFr: "National",
     icon: "Truck",
@@ -247,7 +247,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "COD + portefeuille",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Buyer safe",
     tagFr: "Acheteur protégé",
     icon: "ShieldCheck",
@@ -268,7 +268,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Retours 30 jours",
     cta: "How returns work",
     ctaFr: "Comment retourner",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Hassle-free",
     tagFr: "Sans tracas",
     icon: "RotateCcw",
@@ -397,7 +397,7 @@ export const CONVERSION_PATHS = [
     descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte, portefeuille ou COD.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
-    href: "/shop/products",
+    href: "/get-app",
     highlight: true,
   },
   {

@@ -75,7 +75,7 @@ export function PortalExplorer({
   const cta = authReady
     ? getPortalCTA(portal.id, role, isAuthenticated, personaPortal)
     : {
-        href: portal.id === "seller" ? "/sell-online" : portal.id === "shop" ? "/shop/products" : "/login",
+        href: portal.id === "seller" ? "/sell-online" : portal.id === "shop" ? "/get-app" : "/login",
         labelEn: portal.id === "shop" ? "Start shopping" : portal.id === "seller" ? "Sell online" : "Staff sign in",
         labelFr: portal.id === "shop" ? "Acheter maintenant" : portal.id === "seller" ? "Vendre en ligne" : "Connexion équipe",
       };

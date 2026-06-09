@@ -32,7 +32,7 @@ export function MarketingFooter() {
               {fr ? "Boutique" : "Shop"}
             </h4>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/shop/products" className="transition-colors hover:text-white">{fr ? "Tous les produits" : "All products"}</Link></li>
+              <li><Link href="/get-app" className="transition-colors hover:text-white">{fr ? "Tous les produits" : "All products"}</Link></li>
               <li><a href="#modules" className="transition-colors hover:text-white">{fr ? "Nos services" : "Our services"}</a></li>
               <li><Link href="/sell-online" className="transition-colors hover:text-white">{fr ? "Vendre en ligne" : "Sell online"}</Link></li>
               <li><a href="#portals" className="transition-colors hover:text-white">{fr ? "À propos" : "About us"}</a></li>
@@ -79,7 +79,7 @@ export function MarketingFooter() {
                   {fr ? "App livreur" : "Rider app"}
                 </a>
               </li>
-              <li><Link href="/shop/products" className="transition-colors hover:text-white">{fr ? "Boutique web" : "Web shop"}</Link></li>
+              <li><Link href="/get-app" className="transition-colors hover:text-white">{fr ? "Acheter sur l'app" : "Shop on the app"}</Link></li>
             </ul>
           </div>
         </div>

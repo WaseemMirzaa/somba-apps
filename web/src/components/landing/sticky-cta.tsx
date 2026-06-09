@@ -37,7 +37,7 @@ export function StickyCta() {
         {fr ? "Livraison rapide · Paiement sécurisé · Retours faciles" : "Fast delivery · Secure checkout · Easy returns"}
       </p>
       <div className="mt-3 flex gap-2">
-        <Link href="/shop/products" className="btn-primary flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm">
+        <Link href="/get-app" className="btn-primary flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm">
           {fr ? "Acheter" : "Shop now"}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
