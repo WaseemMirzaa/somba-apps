@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLocale } from "@/context/locale-context";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { BRAND, MARKET } from "@/lib/config";
 import { APP_LINKS, PORTALS } from "@/lib/product-landing";
 
@@ -10,18 +11,12 @@ export function MarketingFooter() {
   const fr = locale === "fr";
 
   return (
-    <footer className="border-t border-white/5 bg-[var(--sidebar)] text-slate-400">
+    <footer className="relative border-t border-white/5 bg-[var(--sidebar)] text-slate-400">
+      <div className="h-1 w-full bg-gradient-to-r from-[var(--primary)] via-[var(--brand-red)] to-[var(--primary)]" aria-hidden />
       <div className="mx-auto max-w-7xl px-4 py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white">
-                S
-              </div>
-              <span className="font-[family-name:var(--font-display)] text-xl font-bold text-white">
-                {BRAND.fullName}
-              </span>
-            </div>
+            <BrandMark tone="light" full className="mb-5" />
             <p className="max-w-sm text-sm leading-relaxed">
               {fr
                 ? "Votre marketplace en ligne — achetez des milliers de produits ou vendez sur Somba & Tekka."

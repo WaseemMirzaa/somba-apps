@@ -6,7 +6,7 @@ import { Menu, X, LayoutDashboard } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { BRAND } from "@/lib/config";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { getDashboardHref } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
@@ -33,24 +33,14 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
       className={cn(
         "sticky top-0 z-50 border-b",
         overlay
-          ? "border-white/10 bg-slate-900/20 backdrop-blur-xl"
+          ? "border-white/10 bg-[#0a1233]/35 backdrop-blur-xl"
           : "glass border-[var(--border)]"
       )}
     >
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex h-[72px] items-center gap-6">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary)] text-sm font-bold text-white shadow-md shadow-blue-700/20">
-              S
-            </div>
-            <span
-              className={cn(
-                "font-[family-name:var(--font-display)] text-xl font-bold hidden sm:block",
-                overlay ? "text-white" : "gradient-text"
-              )}
-            >
-              {BRAND.name}
-            </span>
+          <Link href="/" className="shrink-0 transition-opacity hover:opacity-90">
+            <BrandMark tone={overlay ? "light" : "dark"} wordClassName="hidden sm:block" />
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
@@ -74,7 +64,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
             {authReady && isAuthenticated && (
               <Link
                 href={dashboardHref}
-                className="hidden items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 sm:inline-flex"
+                className="hidden items-center gap-2 rounded-xl bg-[var(--primary-light)] px-4 py-2 text-sm font-semibold text-[var(--primary)] transition-colors hover:bg-[var(--primary-tint)] sm:inline-flex"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="max-w-[120px] truncate">{persona.name}</span>
@@ -158,7 +148,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                 </a>
               ))}
               {authReady && isAuthenticated ? (
-                <Link href={dashboardHref} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-blue-700">
+                <Link href={dashboardHref} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--primary)]">
                   {fr ? "Mon tableau de bord" : "My Dashboard"} — {persona.name}
                 </Link>
               ) : (

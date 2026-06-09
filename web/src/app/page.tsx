@@ -67,6 +67,7 @@ function SectionIntro({
     <div className={cn("landing-section-header", center && "landing-section-header--center")}>
       <span className="section-label">{label}</span>
       <h2 className="section-title mt-4">{title}</h2>
+      <span className="title-flourish" aria-hidden />
       {desc && <p className="landing-section-desc">{desc}</p>}
     </div>
   );
@@ -99,19 +100,20 @@ export default function HomePage() {
           sizes="100vw"
         />
         <div className="hero-overlay absolute inset-0" aria-hidden />
-        <div className="landing-hero-glow absolute -right-20 top-1/4 h-72 w-72 bg-blue-400/30" aria-hidden />
-        <div className="landing-hero-glow absolute bottom-0 left-1/4 h-56 w-56 bg-indigo-500/20" aria-hidden />
+        <div className="landing-hero-glow absolute -right-24 top-1/4 h-80 w-80 bg-[var(--primary)]/40 animate-float" aria-hidden />
+        <div className="landing-hero-glow absolute bottom-4 left-1/4 h-56 w-56 bg-[var(--brand-red)]/25" aria-hidden />
 
         <div className="relative mx-auto flex min-h-[calc(94vh-72px)] max-w-7xl flex-col justify-center px-4 py-20 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
-            <div className="lg:col-span-7 animate-fade-up">
+            <div className="lg:col-span-7 animate-rise">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white/90 ring-1 ring-white/20 backdrop-blur-sm">
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-3.5 w-3.5 text-[var(--brand-red)]" />
                 {BRAND.fullName}
               </span>
-              <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
+              <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.05] tracking-tight text-balance sm:text-5xl lg:text-[3.5rem]">
                 {fr ? PRODUCT_HERO.titleFr : PRODUCT_HERO.title}
               </h1>
+              <span className="mt-5 block h-1 w-20 rounded-full bg-gradient-to-r from-white to-[var(--brand-red)]" aria-hidden />
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/80 sm:text-xl">
                 {fr ? PRODUCT_HERO.subtitleFr : PRODUCT_HERO.subtitle}
               </p>
@@ -119,8 +121,8 @@ export default function HomePage() {
               <ul className="mt-7 grid gap-3 sm:grid-cols-2">
                 {(fr ? PRODUCT_HERO.bulletsFr : PRODUCT_HERO.bullets).map((b) => (
                   <li key={b} className="flex items-center gap-2.5 text-sm text-white/90">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/25 ring-1 ring-emerald-400/40">
-                      <Check className="h-3.5 w-3.5 text-emerald-200" />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
+                      <Check className="h-3.5 w-3.5 text-white" />
                     </span>
                     {b}
                   </li>
@@ -130,7 +132,7 @@ export default function HomePage() {
               <div className="mt-9 flex flex-wrap gap-3">
                 <Link
                   href="/shop/products"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-bold text-[var(--primary)] shadow-xl shadow-blue-900/25 transition-all hover:-translate-y-0.5 hover:shadow-2xl"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-bold text-[var(--primary)] shadow-xl shadow-blue-950/30 transition-all hover:-translate-y-0.5 hover:shadow-2xl"
                 >
                   {fr ? "Acheter maintenant" : "Shop now"}
                   <ArrowRight className="h-5 w-5" />
@@ -142,13 +144,14 @@ export default function HomePage() {
               <p className="mt-4 text-xs text-white/55">{fr ? PRODUCT_HERO.guaranteeFr : PRODUCT_HERO.guarantee}</p>
             </div>
 
-            <div className="hidden lg:col-span-5 lg:block animate-fade-up">
+            <div className="hidden lg:col-span-5 lg:block animate-rise delay-200">
               <div className="landing-glass-panel p-7 text-slate-900">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     {fr ? "Offres du moment" : "Today's deals"}
                   </p>
-                  <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold text-red-600 ring-1 ring-red-100">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-red-light)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--brand-red)] ring-1 ring-[var(--brand-red-tint)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-red)] animate-pulse" />
                     {fr ? "Limité" : "Limited"}
                   </span>
                 </div>
@@ -191,7 +194,7 @@ export default function HomePage() {
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-5 sm:grid-cols-4">
             {PLATFORM_STATS.map((stat) => (
               <div key={stat.label} className="landing-stat-pill text-center">
-                <strong className="font-[family-name:var(--font-display)] text-xl font-extrabold text-slate-900">
+                <strong className="font-[family-name:var(--font-display)] text-xl font-extrabold text-[var(--primary)]">
                   {stat.value}
                 </strong>
                 <span className="text-xs font-medium text-slate-500">{fr ? stat.labelFr : stat.label}</span>
@@ -324,7 +327,7 @@ export default function HomePage() {
                     <span
                       className={cn(
                         "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide",
-                        path.highlight ? "bg-[var(--primary)] text-white" : "bg-slate-100 text-slate-600"
+                        path.highlight ? "bg-[var(--brand-red)] text-white shadow-sm shadow-[var(--brand-red)]/30" : "bg-slate-100 text-slate-600"
                       )}
                     >
                       {fr ? path.badgeFr : path.badge}
@@ -480,7 +483,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">{plan.name}</h3>
                   {plan.popular && (
-                    <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="rounded-full bg-[var(--brand-red)] px-2 py-0.5 text-[10px] font-bold text-white">
                       {fr ? "Populaire" : "Popular"}
                     </span>
                   )}
