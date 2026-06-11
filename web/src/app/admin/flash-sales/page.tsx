@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,16 +58,18 @@ export default function AdminFlashSalesPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {sales.map((fs) => (
-          <Card key={fs.id}>
-            <CardContent className="p-6">
-              <div className="flex justify-between">
-                <h3 className="font-semibold">{fs.name}</h3>
-                <Badge variant={fs.status === "active" ? "success" : "warning"}>{fs.status}</Badge>
-              </div>
-              <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>
-              <p className="mt-1 text-sm">{fs.discount}% off · {fs.products} products</p>
-            </CardContent>
-          </Card>
+          <Link key={fs.id} href={`/admin/flash-sales/${fs.id}`}>
+            <Card className="transition-colors hover:border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex justify-between">
+                  <h3 className="font-semibold">{fs.name}</h3>
+                  <Badge variant={fs.status === "active" ? "success" : "warning"}>{fs.status}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>
+                <p className="mt-1 text-sm">{fs.discount}% off · {fs.products} products</p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

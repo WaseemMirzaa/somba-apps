@@ -61,6 +61,18 @@ export type RefundRequest = {
   customerName?: string;
 };
 
+export type WalletTransaction = {
+  id: string;
+  type: "cashback" | "debit" | "topup" | "refund" | "withdrawal";
+  amount: number;
+  desc: string;
+  date: string;
+  orderId?: string;
+  returnId?: string;
+  method?: string;
+  balanceAfter: number;
+};
+
 export type AdminPayoutRequest = {
   id: string;
   seller: string;
@@ -269,6 +281,13 @@ export const MOCK_REFUNDS: RefundRequest[] = [
   { id: "REF-002", orderId: "ORD-2024-003", amount: 129, method: "manual", reason: "COD refund via Airtel", status: "pending", customerName: "Patrick Lumumba" },
 ];
 
+export const MOCK_WALLET_TRANSACTIONS: WalletTransaction[] = [
+  { id: "WTX-01", type: "cashback", amount: 12, desc: "Order ORD-2024-881 cashback", date: "08/06/2024", orderId: "ORD-2024-881", balanceAfter: 142.5 },
+  { id: "WTX-02", type: "debit", amount: -49, desc: "Checkout payment", date: "07/06/2024", orderId: "ORD-2024-002", method: "wallet", balanceAfter: 130.5 },
+  { id: "WTX-03", type: "topup", amount: 100, desc: "Airtel Money top-up", date: "05/06/2024", method: "airtel", balanceAfter: 179.5 },
+  { id: "WTX-04", type: "refund", amount: 29, desc: "Return RET-001 refund to wallet", date: "04/06/2024", returnId: "RET-001", orderId: "ORD-2024-001", balanceAfter: 79.5 },
+];
+
 export const MOCK_ADMIN_PAYOUTS: AdminPayoutRequest[] = [
   { id: "PAY-001", seller: "TechZone Store", sellerId: 3, amount: 2450, status: "requested", requestedAt: "2024-06-08", bankAccount: "****4521" },
   { id: "PAY-002", seller: "AudioHub", sellerId: 4, amount: 890, status: "requested", requestedAt: "2024-06-07", bankAccount: "****8890" },
@@ -292,4 +311,8 @@ export function getRefund(id: string): RefundRequest | undefined {
 
 export function getAdminPayout(id: string): AdminPayoutRequest | undefined {
   return MOCK_ADMIN_PAYOUTS.find((p) => p.id === id);
+}
+
+export function getWalletTransaction(id: string): WalletTransaction | undefined {
+  return MOCK_WALLET_TRANSACTIONS.find((t) => t.id === id);
 }

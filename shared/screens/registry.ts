@@ -71,6 +71,11 @@ export const SCREEN_REGISTRY: ScreenEntry[] = [
   { id: "AF-15D", name: "Refund Detail", webRoute: "/admin/refunds/:id", portal: "AF" },
   { id: "AF-16D", name: "Payout Detail", webRoute: "/admin/payouts/:id", portal: "AF" },
   { id: "AF-SUP", name: "Support Ticket Detail", webRoute: "/admin/support/:id", portal: "AF" },
+  { id: "AF-MKT", name: "Marketing Campaign Detail", webRoute: "/admin/marketing/:id", portal: "AF" },
+  { id: "AF-FS-D", name: "Flash Sale Detail", webRoute: "/admin/flash-sales/:id", portal: "AF" },
+  { id: "AF-CMS", name: "CMS Block Detail", webRoute: "/admin/cms/blocks/:id", portal: "AF" },
+  { id: "CF-32D", name: "Wallet Transaction Detail", webRoute: "/shop/wallet/transactions/:id", portal: "CF" },
+  { id: "WF-13D", name: "Hub Detail", webRoute: "/warehouse/hubs/:id", portal: "WF" },
   // WF Warehouse
   { id: "WF-11", name: "Aged/Stuck Parcels", webRoute: "/warehouse/aged", portal: "WF" },
   { id: "WF-12", name: "Shift Reconciliation", webRoute: "/warehouse/reconciliation", portal: "WF" },

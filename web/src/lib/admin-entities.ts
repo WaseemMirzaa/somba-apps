@@ -33,6 +33,42 @@ export const cmsBlocks = [
 ];
 
 export const flashSales = [
-  { id: "FS-01", name: "Summer Electronics", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" },
-  { id: "FS-02", name: "Fashion Weekend", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" },
+  { id: "FS-01", name: "Summer Electronics", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" as const },
+  { id: "FS-02", name: "Fashion Weekend", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" as const },
 ];
+
+export const marketingCampaigns = [
+  { id: "CMP-01", name: "Summer Electronics Sale", type: "flash_sale", status: "active" as const, reach: "124K", budget: 5000, channels: ["homepage", "email", "push"] },
+  { id: "CMP-02", name: "New Seller Onboarding", type: "email", status: "scheduled" as const, reach: "8.2K", budget: 1200, channels: ["email"] },
+  { id: "CMP-03", name: "Free Delivery Weekend", type: "banner", status: "active" as const, reach: "450K", budget: 8000, channels: ["homepage", "app"] },
+];
+
+export function getMarketingCampaign(id: string) {
+  return marketingCampaigns.find((c) => c.id === id);
+}
+
+export function getFlashSale(id: string) {
+  return flashSales.find((f) => f.id === id);
+}
+
+export function getCmsBlock(id: string) {
+  return cmsBlocks.find((b) => b.id === id);
+}
+
+/** Map audit log entity IDs to admin detail routes */
+export function resolveAuditEntityHref(entity: string, entityId: string): string | null {
+  const e = entity.toLowerCase();
+  if (e === "seller") {
+    const num = entityId.replace(/\D/g, "");
+    return num ? `/admin/sellers/${Number(num)}` : null;
+  }
+  if (e === "product") {
+    const num = entityId.replace(/\D/g, "");
+    return num ? `/admin/products/${num}` : null;
+  }
+  if (e === "payout") return `/admin/payouts/${entityId}`;
+  if (e === "campaign") return `/admin/marketing/${entityId}`;
+  if (e === "order") return `/admin/orders/${entityId}`;
+  if (e === "customer") return `/admin/customers/${entityId}`;
+  return null;
+}

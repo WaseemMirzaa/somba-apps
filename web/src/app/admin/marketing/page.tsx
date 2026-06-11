@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,12 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { banners } from "@/lib/mock-data";
-
-const initialCampaigns = [
-  { id: "CMP-01", name: "Summer Electronics Sale", type: "flash_sale", status: "active", reach: "124K" },
-  { id: "CMP-02", name: "New Seller Onboarding", type: "email", status: "scheduled", reach: "8.2K" },
-  { id: "CMP-03", name: "Free Delivery Weekend", type: "banner", status: "active", reach: "450K" },
-];
+import { marketingCampaigns as initialCampaigns } from "@/lib/admin-entities";
 
 export default function AdminMarketingPage() {
   const { t, locale } = useLocale();
@@ -38,7 +34,7 @@ export default function AdminMarketingPage() {
             <div className="flex gap-2">
               <Button size="sm" onClick={() => {
                 const name = (document.getElementById("campaign-name") as HTMLInputElement)?.value || "New Campaign";
-                setCampaigns((c) => [...c, { id: `CMP-0${c.length + 1}`, name, type: "banner", status: "scheduled", reach: "0" }]);
+                setCampaigns((c) => [...c, { id: `CMP-0${c.length + 1}`, name, type: "banner", status: "scheduled", reach: "0", budget: 0, channels: ["homepage"] }]);
                 setShowCreate(false);
                 toast("Campaign created");
               }}>Save Campaign</Button>
@@ -50,16 +46,18 @@ export default function AdminMarketingPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {campaigns.map((c) => (
-          <Card key={c.id}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <Badge variant={c.status === "active" ? "success" : "warning"}>{c.status}</Badge>
-                <span className="text-xs text-slate-400">{c.type}</span>
-              </div>
-              <h3 className="mt-3 font-semibold text-slate-900">{c.name}</h3>
-              <p className="mt-1 text-sm text-slate-500">Reach: {c.reach}</p>
-            </CardContent>
-          </Card>
+          <Link key={c.id} href={`/admin/marketing/${c.id}`}>
+            <Card className="transition-colors hover:border-blue-200">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <Badge variant={c.status === "active" ? "success" : "warning"}>{c.status}</Badge>
+                  <span className="text-xs text-slate-400">{c.type}</span>
+                </div>
+                <h3 className="mt-3 font-semibold text-slate-900">{c.name}</h3>
+                <p className="mt-1 text-sm text-slate-500">Reach: {c.reach}</p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

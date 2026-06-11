@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,7 @@ import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
 import { PAYMENTS } from "@/lib/config";
 import { useToast } from "@/context/toast-context";
-
-const transactions = [
-  { id: "WTX-01", type: "cashback", amount: 12, desc: "Order ORD-2024-881 cashback", date: "08/06/2024" },
-  { id: "WTX-02", type: "debit", amount: -49, desc: "Checkout payment", date: "07/06/2024" },
-  { id: "WTX-03", type: "topup", amount: 100, desc: "Airtel Money top-up", date: "05/06/2024" },
-  { id: "WTX-04", type: "refund", amount: 29, desc: "Return RET-001 refund to wallet", date: "04/06/2024" },
-];
+import { MOCK_WALLET_TRANSACTIONS } from "@/lib/shared-entities";
 
 export default function ShopWalletPage() {
   const { locale } = useLocale();
@@ -57,8 +52,8 @@ export default function ShopWalletPage() {
       <div>
         <h3 className="mb-4 font-semibold text-slate-900">Transaction History</h3>
         <div className="space-y-2">
-          {transactions.map((tx) => (
-            <div key={tx.id} className="card-premium flex items-center justify-between p-4">
+          {MOCK_WALLET_TRANSACTIONS.map((tx) => (
+            <Link key={tx.id} href={`/shop/wallet/transactions/${tx.id}`} className="card-premium flex items-center justify-between p-4 transition-colors hover:border-blue-200">
               <div>
                 <p className="text-sm font-medium text-slate-900">{tx.desc}</p>
                 <p className="text-xs text-slate-500">{tx.date} · {tx.id}</p>
@@ -66,7 +61,7 @@ export default function ShopWalletPage() {
               <span className={`font-semibold ${tx.amount > 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {tx.amount > 0 ? "+" : ""}{formatCurrency(tx.amount, locale)}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

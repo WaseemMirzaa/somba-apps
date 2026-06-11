@@ -87,6 +87,7 @@ const portalConfigs = {
     accent: "from-indigo-500 to-violet-600",
     nav: [
       { href: "/warehouse", label: "dashboard", icon: LayoutDashboard, i18n: true },
+      { href: "/warehouse/hubs", label: "Hubs", icon: Boxes },
       { href: "/warehouse/inbound", label: "inbound", icon: Inbox, i18n: true },
       { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck },
       { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown },
