@@ -1,37 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DualCurrency } from "@/components/ui/dual-currency";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/context/toast-context";
-
-const PAYOUTS = [
-  { id: "PAY-001", seller: "TechZone Store", amount: 2450, status: "requested" },
-  { id: "PAY-002", seller: "AudioHub", amount: 890, status: "requested" },
-];
+import { Badge } from "@/components/ui/badge";
+import { MOCK_ADMIN_PAYOUTS } from "@/lib/shared-entities";
 
 export default function AdminPayoutsPage() {
-  const { toast } = useToast();
-  const [statuses, setStatuses] = useState<Record<string, string>>({});
-
   return (
     <div className="space-y-6">
       <PageHeader title="Payout Approval" subtitle="Δ4 — weekly, $10 min, 48h clearance" />
-      {PAYOUTS.map((p) => (
-        <div key={p.id} className="card-premium flex items-center justify-between p-4">
-          <div>
-            <p className="font-medium">{p.seller}</p>
-            <DualCurrency amount={p.amount} />
-            <p className="text-xs text-slate-500">{statuses[p.id] ?? p.status}</p>
-          </div>
-          {!statuses[p.id] && (
-            <div className="flex gap-2">
-              <Button onClick={() => { setStatuses((s) => ({ ...s, [p.id]: "approved" })); toast("Payout approved"); }}>Approve</Button>
-              <Button variant="secondary" onClick={() => { setStatuses((s) => ({ ...s, [p.id]: "rejected" })); toast("Rejected"); }}>Reject</Button>
+      {MOCK_ADMIN_PAYOUTS.map((p) => (
+        <Link key={p.id} href={`/admin/payouts/${p.id}`} className="card-premium block p-4 transition-colors hover:border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">
+                <Link href={`/admin/sellers/${p.sellerId}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{p.seller}</Link>
+              </p>
+              <DualCurrency amount={p.amount} />
+              <p className="text-xs text-slate-500">{p.requestedAt}</p>
             </div>
-          )}
-        </div>
+            <Badge variant="warning">{p.status}</Badge>
+          </div>
+        </Link>
       ))}
     </div>
   );

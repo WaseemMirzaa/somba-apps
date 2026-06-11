@@ -434,6 +434,7 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
 
 export const sellerProductDetails = sellerProducts.map((sp) => ({
   ...sp,
+  sellerId: 3,
   brand: "Samsung",
   category: "Electronics",
   description: `High-quality ${sp.name} from official distributor.`,

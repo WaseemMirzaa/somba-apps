@@ -21,6 +21,10 @@ export default function RiderTasksPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t("activeTasks")} />
+      <Link href="/rider/batches/B-042" className="card-premium block border-emerald-200 bg-emerald-50/50 p-4 hover:border-emerald-300">
+        <p className="font-semibold text-emerald-800">Batch B-042 — 4 stops</p>
+        <p className="text-sm text-emerald-700">View stop sequence →</p>
+      </Link>
 
       <div className="flex flex-wrap gap-2">
         {(["active", "completed"] as const).map((tabId) => (

@@ -95,6 +95,38 @@ export const riderTasks: RiderTask[] = [
   },
 ];
 
+export type RiderBatchStop = {
+  seq: number;
+  taskId: string;
+  address: string;
+  status: "completed" | "current" | "pending";
+};
+
+export type RiderBatch = {
+  id: string;
+  riderId: string;
+  zone: string;
+  stops: RiderBatchStop[];
+};
+
+export const riderBatches: RiderBatch[] = [
+  {
+    id: "B-042",
+    riderId: "RDR-001",
+    zone: "Kinshasa — Gombe",
+    stops: [
+      { seq: 1, taskId: "TSK-8830", address: "22 Ave Kasa-Vubu, Kinshasa", status: "completed" },
+      { seq: 2, taskId: "TSK-8839", address: "45 Blvd du 30 Juin, Kinshasa", status: "current" },
+      { seq: 3, taskId: "TSK-8841", address: "12 Ave du Commerce, Gombe", status: "pending" },
+      { seq: 4, taskId: "TSK-8842", address: "Zone Industrielle, Limete", status: "pending" },
+    ],
+  },
+];
+
 export function getRiderTask(id: string) {
   return riderTasks.find((t) => t.id === id);
+}
+
+export function getRiderBatch(id: string) {
+  return riderBatches.find((b) => b.id === id);
 }

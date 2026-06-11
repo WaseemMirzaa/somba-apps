@@ -34,6 +34,41 @@ export type ReturnItem = {
   reason: string;
   createdAt: string;
   refundAmount?: number;
+  timeline?: { time: string; label: string; done?: boolean }[];
+};
+
+export type SupportTicket = {
+  id: string;
+  subject: string;
+  orderId?: string;
+  customer: string;
+  sellerName?: string;
+  portal: "customer" | "seller" | "admin";
+  priority: "low" | "medium" | "high";
+  status: "open" | "in_progress" | "resolved";
+  createdAt: string;
+  lastUpdate: string;
+  messages: { author: string; role: "customer" | "seller" | "agent"; text: string; at: string }[];
+};
+
+export type RefundRequest = {
+  id: string;
+  orderId: string;
+  amount: number;
+  method: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  customerName?: string;
+};
+
+export type AdminPayoutRequest = {
+  id: string;
+  seller: string;
+  sellerId: number;
+  amount: number;
+  status: "requested" | "approved" | "rejected";
+  requestedAt: string;
+  bankAccount?: string;
 };
 
 export type PromoCode = {
@@ -145,18 +180,98 @@ export const MOCK_RETURNS: ReturnItem[] = [
     orderId: "ORD-2024-001",
     status: "approved",
     items: ["Samsung Galaxy S24 Ultra"],
-    reason: "defective",
+    reason: "Defective or damaged item",
     createdAt: "2026-06-01",
     refundAmount: 1199,
+    timeline: [
+      { time: "2026-06-01", label: "Return requested", done: true },
+      { time: "2026-06-02", label: "Approved — pickup scheduled", done: true },
+      { time: "2026-06-04", label: "Pickup completed", done: false },
+    ],
   },
   {
     id: "RET-002",
     orderId: "ORD-2024-004",
     status: "requested",
     items: ["Nike Air Max 270"],
-    reason: "wrong_item",
+    reason: "Wrong item received",
     createdAt: "2026-06-07",
+    timeline: [
+      { time: "2026-06-07", label: "Return requested", done: true },
+      { time: "Pending", label: "Seller review", done: false },
+    ],
   },
+];
+
+export const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
+  {
+    id: "TKT-441",
+    subject: "Order not delivered",
+    orderId: "ORD-2024-8841",
+    customer: "Marie Kabila",
+    portal: "customer",
+    priority: "high",
+    status: "open",
+    createdAt: "2024-06-08",
+    lastUpdate: "2024-06-08",
+    messages: [
+      { author: "Marie Kabila", role: "customer", text: "My order shows delivered but I never received it.", at: "2024-06-08T09:00:00Z" },
+    ],
+  },
+  {
+    id: "TKT-440",
+    subject: "Refund delay",
+    orderId: "ORD-2024-003",
+    customer: "Patrick Lumumba",
+    portal: "customer",
+    priority: "medium",
+    status: "in_progress",
+    createdAt: "2024-06-07",
+    lastUpdate: "2024-06-07",
+    messages: [
+      { author: "Patrick Lumumba", role: "customer", text: "Return approved 5 days ago, no refund yet.", at: "2024-06-07T10:00:00Z" },
+      { author: "Support Agent", role: "agent", text: "Refund is queued — expect 24–48h.", at: "2024-06-07T14:00:00Z" },
+    ],
+  },
+  {
+    id: "TKT-439",
+    subject: "Seller verification",
+    customer: "TechZone Store",
+    sellerName: "TechZone Store",
+    portal: "seller",
+    priority: "low",
+    status: "resolved",
+    createdAt: "2024-06-06",
+    lastUpdate: "2024-06-06",
+    messages: [
+      { author: "TechZone Store", role: "seller", text: "Documents resubmitted for KYC review.", at: "2024-06-06T08:00:00Z" },
+      { author: "Support Agent", role: "agent", text: "Account verified.", at: "2024-06-06T16:00:00Z" },
+    ],
+  },
+  {
+    id: "TKT-438",
+    subject: "Payment failed",
+    orderId: "ORD-2024-002",
+    customer: "Sophie Mbuyi",
+    portal: "customer",
+    priority: "high",
+    status: "open",
+    createdAt: "2024-06-06",
+    lastUpdate: "2024-06-06",
+    messages: [
+      { author: "Sophie Mbuyi", role: "customer", text: "Card charged twice at checkout.", at: "2024-06-06T11:00:00Z" },
+    ],
+  },
+];
+
+export const MOCK_REFUNDS: RefundRequest[] = [
+  { id: "REF-001", orderId: "ORD-2024-001", amount: 1199, method: "stripe", reason: "Return approved", status: "pending", customerName: "Marie Kabila" },
+  { id: "REF-002", orderId: "ORD-2024-003", amount: 129, method: "manual", reason: "COD refund via Airtel", status: "pending", customerName: "Patrick Lumumba" },
+];
+
+export const MOCK_ADMIN_PAYOUTS: AdminPayoutRequest[] = [
+  { id: "PAY-001", seller: "TechZone Store", sellerId: 3, amount: 2450, status: "requested", requestedAt: "2024-06-08", bankAccount: "****4521" },
+  { id: "PAY-002", seller: "AudioHub", sellerId: 4, amount: 890, status: "requested", requestedAt: "2024-06-07", bankAccount: "****8890" },
 ];
 
 export function getReturn(id: string): ReturnItem | undefined {
@@ -165,4 +280,16 @@ export function getReturn(id: string): ReturnItem | undefined {
 
 export function getDispute(id: string): DisputeItem | undefined {
   return MOCK_DISPUTES.find((d) => d.id === id);
+}
+
+export function getSupportTicket(id: string): SupportTicket | undefined {
+  return MOCK_SUPPORT_TICKETS.find((t) => t.id === id);
+}
+
+export function getRefund(id: string): RefundRequest | undefined {
+  return MOCK_REFUNDS.find((r) => r.id === id);
+}
+
+export function getAdminPayout(id: string): AdminPayoutRequest | undefined {
+  return MOCK_ADMIN_PAYOUTS.find((p) => p.id === id);
 }

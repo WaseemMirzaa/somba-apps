@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getOrder } from "@/lib/entities";
 import { useLocale } from "@/context/locale-context";
+import { useReturns } from "@/context/return-context";
 
 const reasons = [
   "Defective or damaged item",
@@ -18,35 +19,25 @@ const reasons = [
 
 export default function ShopOrderReturnPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { t } = useLocale();
+  const { createReturn } = useReturns();
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const order = getOrder(id);
 
   if (!order) {
     return <div className="text-center text-slate-500">Order not found</div>;
   }
 
-  if (submitted) {
-    return (
-      <div className="mx-auto max-w-lg space-y-6 text-center">
-        <div className="card-premium p-10">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl">
-            ✓
-          </div>
-          <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">
-            Return Request Submitted
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Reference: RET-{id} — Pickup scheduled within 2 business days.
-          </p>
-          <Link href={`/shop/orders/${id}`} className="mt-6 inline-block text-sm font-semibold text-blue-600">
-            ← Back to order
-          </Link>
-        </div>
-      </div>
-    );
+  function submitReturn() {
+    const created = createReturn({
+      orderId: order!.id,
+      items: order!.items.map((i) => i.name),
+      reason,
+      refundAmount: order!.amount,
+    });
+    router.push(`/shop/returns/${created.id}`);
   }
 
   return (
@@ -121,7 +112,7 @@ export default function ShopOrderReturnPage() {
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => setStep(2)} className="flex-1">Back</Button>
-            <Button onClick={() => setSubmitted(true)} className="flex-1">{t("submitReturn")}</Button>
+            <Button onClick={submitReturn} className="flex-1">{t("submitReturn")}</Button>
           </div>
         </div>
       )}

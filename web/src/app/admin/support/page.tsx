@@ -6,16 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
-
-const tickets = [
-  { id: "TKT-441", subject: "Order not delivered", customer: "Marie Kabila", priority: "high", status: "open", date: "2024-06-08" },
-  { id: "TKT-440", subject: "Refund delay", customer: "Patrick Lumumba", priority: "medium", status: "in_progress", date: "2024-06-07" },
-  { id: "TKT-439", subject: "Seller verification", customer: "TechZone Store", priority: "low", status: "resolved", date: "2024-06-06" },
-  { id: "TKT-438", subject: "Payment failed", customer: "Sophie Mbuyi", priority: "high", status: "open", date: "2024-06-06" },
-];
+import { useSupport } from "@/context/support-context";
 
 export default function AdminSupportPage() {
   const { t } = useLocale();
+  const { tickets } = useSupport();
 
   return (
     <div className="space-y-6">
@@ -30,7 +25,7 @@ export default function AdminSupportPage() {
           <DataTable
             columns={[
               { key: "id", label: "Ticket", render: (row) => (
-                <span className="font-medium text-blue-600">{String(row.id)}</span>
+                <Link href={`/admin/support/${row.id}`} className="font-medium text-blue-600 hover:underline">{String(row.id)}</Link>
               )},
               { key: "subject", label: "Subject" },
               { key: "customer", label: "Customer" },
@@ -42,7 +37,10 @@ export default function AdminSupportPage() {
               { key: "status", label: t("status"), render: (row) => (
                 <Badge variant={row.status === "resolved" ? "success" : "info"}>{String(row.status).replace("_", " ")}</Badge>
               )},
-              { key: "date", label: t("date") },
+              { key: "date", label: t("date"), render: (row) => String(row.lastUpdate ?? row.createdAt) },
+              { key: "actions", label: t("action"), render: (row) => (
+                <Link href={`/admin/support/${row.id}`} className="text-sm text-blue-600 hover:underline">{t("view")}</Link>
+              )},
             ]}
             data={tickets as unknown as Record<string, unknown>[]}
           />

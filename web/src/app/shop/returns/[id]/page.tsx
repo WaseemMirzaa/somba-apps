@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { DualCurrency } from "@/components/ui/dual-currency";
-import { getReturn } from "@/lib/shared-entities";
+import { ActivityTimeline } from "@/components/ui/timeline";
+import { useReturns } from "@/context/return-context";
 import { useLocale } from "@/context/locale-context";
 
 const STATUS_LABELS: Record<string, { en: string; fr: string }> = {
@@ -19,6 +20,7 @@ const STATUS_LABELS: Record<string, { en: string; fr: string }> = {
 
 export default function ReturnStatusPage() {
   const { id } = useParams<{ id: string }>();
+  const { getReturn } = useReturns();
   const { locale } = useLocale();
   const ret = getReturn(id);
   const fr = locale === "fr";
@@ -27,7 +29,7 @@ export default function ReturnStatusPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ret.id} subtitle={ret.orderId} backHref="/shop/orders" />
+      <PageHeader title={ret.id} subtitle={ret.orderId} backHref="/shop/returns" />
       <DetailSection title={fr ? "Statut du retour" : "Return Status"}>
         <InfoGrid items={[
           { label: fr ? "Statut" : "Status", value: fr ? STATUS_LABELS[ret.status]?.fr : STATUS_LABELS[ret.status]?.en },
@@ -39,6 +41,11 @@ export default function ReturnStatusPage() {
           {fr ? "Voir commande →" : "View order →"}
         </Link>
       </DetailSection>
+      {ret.timeline && ret.timeline.length > 0 && (
+        <DetailSection title={fr ? "Suivi" : "Tracking"}>
+          <ActivityTimeline events={ret.timeline.map((e) => ({ time: e.time, label: e.label, done: e.done }))} />
+        </DetailSection>
+      )}
     </div>
   );
 }

@@ -9,12 +9,16 @@ import {
   Headphones,
   ChevronRight,
   User,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
 
 const menuItems = [
   { href: "/shop/orders", icon: Package, label: "myOrders", desc: "Track & manage orders" },
+  { href: "/shop/returns", icon: RotateCcw, label: "returns", desc: "Return requests & status" },
+  { href: "/shop/disputes", icon: AlertTriangle, label: "myAccount", desc: "Order disputes" },
   { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: "Saved items" },
   { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: "Somba Wallet · Airtel top-up" },
   { href: "/shop/refer", icon: Heart, label: "myAccount", desc: "Refer & Earn — $10 bonus" },
@@ -56,7 +60,7 @@ export default function ShopAccountPage() {
       <div className="grid gap-3">
         {menuItems.map((item) => (
           <Link
-            key={item.label}
+            key={item.href}
             href={item.href}
             className="card-premium flex items-center gap-4 p-5 transition-colors hover:border-blue-200"
           >

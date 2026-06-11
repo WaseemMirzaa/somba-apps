@@ -1,36 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection } from "@/components/ui/info-grid";
 import { DualCurrency } from "@/components/ui/dual-currency";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/context/toast-context";
-
-const PENDING_REFUNDS = [
-  { id: "REF-001", orderId: "ORD-2024-001", amount: 1199, method: "stripe", reason: "Return approved" },
-  { id: "REF-002", orderId: "ORD-2024-003", amount: 129, method: "manual", reason: "COD refund via Airtel" },
-];
+import { Badge } from "@/components/ui/badge";
+import { MOCK_REFUNDS } from "@/lib/shared-entities";
 
 export default function AdminRefundsPage() {
-  const { toast } = useToast();
-  const [approved, setApproved] = useState<string[]>([]);
-
   return (
     <div className="space-y-6">
       <PageHeader title="Refund Authorisation" subtitle="AF-15" />
-      {PENDING_REFUNDS.map((r) => (
-        <DetailSection key={r.id} title={r.id}>
-          <p className="text-sm">{r.orderId} · {r.method} · {r.reason}</p>
-          <DualCurrency amount={r.amount} className="mt-2 text-lg font-bold" />
-          {approved.includes(r.id) ? (
-            <span className="mt-2 text-sm text-emerald-600">Approved</span>
-          ) : (
-            <Button onClick={() => { setApproved((a) => [...a, r.id]); toast(`Refund ${r.id} authorised`); }} className="mt-3">
-              Authorise Refund
-            </Button>
-          )}
-        </DetailSection>
+      {MOCK_REFUNDS.map((r) => (
+        <Link key={r.id} href={`/admin/refunds/${r.id}`} className="card-premium block p-4 transition-colors hover:border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">{r.id}</p>
+              <p className="text-sm text-slate-500">
+                <Link href={`/admin/orders/${r.orderId}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{r.orderId}</Link>
+                {" · "}{r.method} · {r.reason}
+              </p>
+              <DualCurrency amount={r.amount} className="mt-2 text-lg font-bold" />
+            </div>
+            <Badge variant="warning">{r.status}</Badge>
+          </div>
+        </Link>
       ))}
     </div>
   );

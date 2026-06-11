@@ -15,6 +15,7 @@ export default function RiderFailedDeliveryPage() {
   const router = useRouter();
   const task = getRiderTask(id);
   const [reason, setReason] = useState(REASONS[0]);
+  const [notes, setNotes] = useState("");
 
   if (!task) return <div>Not found</div>;
 
@@ -25,8 +26,8 @@ export default function RiderFailedDeliveryPage() {
         <select className="input-premium w-full px-4 py-2 text-sm" value={reason} onChange={(e) => setReason(e.target.value)}>
           {REASONS.map((r) => <option key={r}>{r}</option>)}
         </select>
-        <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder="Notes" />
-        <Button onClick={() => { toast("Failed delivery logged — return to warehouse"); router.push("/rider/tasks"); }} className="w-full bg-red-600">
+        <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <Button onClick={() => { toast(notes.trim() ? `Failed delivery logged: ${reason}` : "Failed delivery logged — return to warehouse"); router.push("/rider/tasks"); }} className="w-full bg-red-600">
           Report Failed Delivery
         </Button>
       </div>

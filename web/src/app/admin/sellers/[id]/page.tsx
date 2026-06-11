@@ -24,7 +24,7 @@ export default function AdminSellerDetailPage() {
   }
 
   const sellerOrders = orderEntities.filter((o) => o.sellerId === seller.id);
-  const sellerProducts = sellerProductDetails;
+  const sellerProducts = sellerProductDetails.filter((p) => p.sellerId === seller.id);
 
   return (
     <div className="space-y-6">

@@ -106,7 +106,7 @@ export default function AdminDashboard() {
   const quickActions = [
     { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(k.ordersMtd, locale)} MTD`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
     { href: "/admin/sellers", label: t("activeSellers"), sub: `${k.pendingApprovals} pending`, icon: Users, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/admin/finance/payouts", label: "Payouts", sub: formatCurrency(84200, locale), icon: DollarSign, color: "bg-violet-50 text-violet-700" },
+    { href: "/admin/payouts", label: "Payouts", sub: formatCurrency(84200, locale), icon: DollarSign, color: "bg-violet-50 text-violet-700" },
     { href: "/admin/fraud", label: "Fraud review", sub: `${k.fraudFlags} flags`, icon: Shield, color: "bg-amber-50 text-amber-700" },
   ];
 
