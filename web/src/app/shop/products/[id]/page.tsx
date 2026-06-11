@@ -15,6 +15,7 @@ import { getProductDetail } from "@/lib/entities";
 import { products } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 export default function ShopProductDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const { addToCart, toggleWishlist, isInWishlist, toggleFollowStore, isFollowingStore, addRecentlyViewed } = useShop();
   const { toast } = useToast();
@@ -56,7 +57,7 @@ export default function ShopProductDetailPage() {
     return <div className="text-center text-slate-500">Product not found</div>;
   }
 
-  const name = locale === "fr" ? product.nameFr : product.name;
+  const name = localizedField(locale, product.name, product.nameFr);
   const related = products.filter((p) => p.id !== product.id).slice(0, 4);
 
   return (
@@ -115,7 +116,7 @@ export default function ShopProductDetailPage() {
 
           <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
             <div className="flex gap-2">
-              <input className="input-premium flex-1 px-3 py-2 text-sm" placeholder={locale === "fr" ? "Code postal / zone" : "Pincode / zone"} value={pincode} onChange={(e) => setPincode(e.target.value)} />
+              <input className="input-premium flex-1 px-3 py-2 text-sm" placeholder={t("pincodeZonePlaceholder")} value={pincode} onChange={(e) => setPincode(e.target.value)} />
               <button onClick={checkDelivery} className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"><MapPin className="h-4 w-4" /></button>
             </div>
             {zoneChecked && <p className="text-xs text-emerald-700">{zoneChecked}</p>}

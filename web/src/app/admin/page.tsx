@@ -11,8 +11,6 @@ import {
   Target,
   BarChart3,
   RotateCcw,
-  ArrowUpRight,
-  ArrowDownRight,
   Activity,
   Shield,
 } from "lucide-react";
@@ -26,8 +24,8 @@ import {
   FunnelChart,
   HorizontalBarChart,
   GoalProgress,
-  Sparkline,
 } from "@/components/charts/dashboard-charts";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { orderEntities, sellerEntities } from "@/lib/entities";
@@ -42,6 +40,7 @@ import {
   adminGoals,
 } from "@/lib/admin-analytics";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
+import { localizedField } from "@/lib/locale-helpers";
 
 const PERIODS = ["7D", "30D", "90D"] as const;
 
@@ -53,52 +52,9 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   approved: "success",
 };
 
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-  vsLabel,
-}: {
-  title: string;
-  value: string;
-  change: number;
-  positive?: boolean;
-  spark: number[];
-  icon: React.ComponentType<{ className?: string }>;
-  vsLabel: string;
-}) {
-  const up = change >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
-
-  return (
-    <div className="card-premium p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
-          <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-            {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}{vsLabel}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-xl bg-blue-50 p-2">
-            <Icon className="h-4 w-4 text-[var(--primary)]" />
-          </div>
-          <Sparkline values={spark} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminDashboard() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
-  const fr = locale === "fr";
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
   const k = adminExtendedKpis;
 
@@ -132,14 +88,14 @@ export default function AdminDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={t("gmvMtd")} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} vsLabel={vsLabel} />
-        <KpiCard title={t("ordersMtd")} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} vsLabel={vsLabel} />
-        <KpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} vsLabel={vsLabel} />
-        <KpiCard title={t("activeCustomersKpi")} value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} vsLabel={vsLabel} />
-        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} vsLabel={vsLabel} />
-        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} vsLabel={vsLabel} />
-        <KpiCard title={t("returnRateKpi")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} vsLabel={vsLabel} />
-        <KpiCard title={t("pendingApprovals")} value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} vsLabel={vsLabel} />
+        <KpiCard title={t("gmvMtd")} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} changeSuffix={vsLabel} />
+        <KpiCard title={t("ordersMtd")} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} changeSuffix={vsLabel} />
+        <KpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} changeSuffix={vsLabel} />
+        <KpiCard title={t("activeCustomersKpi")} value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} changeSuffix={vsLabel} />
+        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} changeSuffix={vsLabel} />
+        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} changeSuffix={vsLabel} />
+        <KpiCard title={t("returnRateKpi")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} changeSuffix={vsLabel} />
+        <KpiCard title={t("pendingApprovals")} value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} changeSuffix={vsLabel} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -228,7 +184,7 @@ export default function AdminDashboard() {
           <CardContent>
             <FunnelChart
               stages={adminOrderFunnel.map((f) => ({
-                stage: fr ? f.stageFr : f.stage,
+                stage: localizedField(locale, f.stage, f.stageFr),
                 count: f.count,
                 pct: f.pct,
               }))}
@@ -245,7 +201,7 @@ export default function AdminDashboard() {
             {adminFulfillmentHealth.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
+                  <span className="text-slate-600">{localizedField(locale, h.label, h.labelFr)}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -306,8 +262,8 @@ export default function AdminDashboard() {
           <CardContent className="space-y-4">
             {adminRecentActivity.map((item) => (
               <div key={item.text} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                <p className="text-xs text-slate-400">{fr ? item.timeFr : item.time}</p>
-                <p className="mt-1 text-sm text-slate-700">{fr ? item.textFr : item.text}</p>
+                <p className="text-xs text-slate-400">{localizedField(locale, item.time, item.timeFr)}</p>
+                <p className="mt-1 text-sm text-slate-700">{localizedField(locale, item.text, item.textFr)}</p>
               </div>
             ))}
           </CardContent>

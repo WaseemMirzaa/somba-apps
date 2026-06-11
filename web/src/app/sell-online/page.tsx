@@ -16,6 +16,7 @@ import { MarketingFooter } from "@/components/landing/marketing-footer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { useLocale } from "@/context/locale-context";
 import { BRAND } from "@/lib/config";
+import { localizedField } from "@/lib/locale-helpers";
 import {
   APP_LINKS,
   SELLER_PLANS,
@@ -39,8 +40,7 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
 const sellerTestimonials = TESTIMONIALS.filter((t) => t.role.includes("Store") || t.role.includes("Owner"));
 
 export default function SellOnlinePage() {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
+  const { locale, t } = useLocale();
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -53,24 +53,24 @@ export default function SellOnlinePage() {
         <div className="relative mx-auto max-w-7xl px-4 py-24 lg:py-32">
           <div className="max-w-2xl">
             <span className="section-label !bg-white/15 !text-white ring-1 ring-white/25">
-              {fr ? "Programme vendeur" : "Seller program"}
+              {t("sellerProgram")}
             </span>
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
-              {fr ? SELL_ONLINE_HERO.titleFr : SELL_ONLINE_HERO.title}
+              {localizedField(locale, SELL_ONLINE_HERO.title, SELL_ONLINE_HERO.titleFr)}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-white/88">
-              {fr ? SELL_ONLINE_HERO.subtitleFr : SELL_ONLINE_HERO.subtitle}
+              {localizedField(locale, SELL_ONLINE_HERO.subtitle, SELL_ONLINE_HERO.subtitleFr)}
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
                 href="/login"
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-bold text-[var(--primary)] shadow-xl transition-transform hover:scale-[1.02]"
               >
-                {fr ? SELL_ONLINE_HERO.ctaFr : SELL_ONLINE_HERO.cta}
+                {localizedField(locale, SELL_ONLINE_HERO.cta, SELL_ONLINE_HERO.ctaFr)}
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <a href="#plans" className="btn-outline-light inline-flex items-center gap-2 px-8 py-4 text-base">
-                {fr ? SELL_ONLINE_HERO.secondaryCtaFr : SELL_ONLINE_HERO.secondaryCta}
+                {localizedField(locale, SELL_ONLINE_HERO.secondaryCta, SELL_ONLINE_HERO.secondaryCtaFr)}
               </a>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function SellOnlinePage() {
           {SELL_ONLINE_STATS.map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="font-[family-name:var(--font-display)] text-3xl font-extrabold text-[var(--primary)]">{stat.value}</p>
-              <p className="mt-1 text-sm text-slate-600">{fr ? stat.labelFr : stat.label}</p>
+              <p className="mt-1 text-sm text-slate-600">{localizedField(locale, stat.label, stat.labelFr)}</p>
             </div>
           ))}
         </div>
@@ -93,14 +93,12 @@ export default function SellOnlinePage() {
       <section className="py-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="section-label">{fr ? "Avantages" : "Why sell"}</span>
+            <span className="section-label">{t("whySell")}</span>
             <h2 className="section-title mt-4">
-              {fr ? `Pourquoi vendre sur ${BRAND.fullName} ?` : `Why sell on ${BRAND.fullName}?`}
+              {t("whySellOn")} {BRAND.fullName}?
             </h2>
             <p className="mt-4 text-slate-600">
-              {fr
-                ? "Tout ce dont vous avez besoin pour lancer et développer votre boutique en ligne."
-                : "Everything you need to launch and grow your online store on our marketplace."}
+              {t("whySellDesc")}
             </p>
           </div>
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -113,9 +111,9 @@ export default function SellOnlinePage() {
                   <DynamicIcon name={item.icon} className="h-6 w-6" />
                 </div>
                 <h3 className="mt-5 font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">
-                  {fr ? item.titleFr : item.title}
+                  {localizedField(locale, item.title, item.titleFr)}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{fr ? item.descFr : item.desc}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{localizedField(locale, item.desc, item.descFr)}</p>
               </div>
             ))}
           </div>
@@ -126,9 +124,9 @@ export default function SellOnlinePage() {
       <section className="border-y border-[var(--border)] bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="section-label">{fr ? "Démarrage" : "Get started"}</span>
+            <span className="section-label">{t("getStartedLabel")}</span>
             <h2 className="section-title mt-4">
-              {fr ? "Comment commencer à vendre" : "How to start selling"}
+              {t("howToStartSelling")}
             </h2>
           </div>
           <div className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
@@ -137,14 +135,14 @@ export default function SellOnlinePage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--primary)] font-[family-name:var(--font-display)] text-lg font-bold text-white">
                   {step.step}
                 </div>
-                <h3 className="mt-5 font-bold text-slate-900">{fr ? step.titleFr : step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{fr ? step.descFr : step.desc}</p>
+                <h3 className="mt-5 font-bold text-slate-900">{localizedField(locale, step.title, step.titleFr)}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{localizedField(locale, step.desc, step.descFr)}</p>
               </div>
             ))}
           </div>
           <div className="mt-12 text-center">
             <Link href="/login" className="btn-primary inline-flex items-center gap-2 px-8 py-3.5 text-base">
-              {fr ? "Créer un compte vendeur" : "Create seller account"}
+              {t("createSellerAccount")}
               <ArrowRight className="h-5 w-5" />
             </Link>
           </div>
@@ -155,9 +153,9 @@ export default function SellOnlinePage() {
       <section className="py-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="section-label">{fr ? "Outils" : "Seller tools"}</span>
+            <span className="section-label">{t("sellerToolsLabel")}</span>
             <h2 className="section-title mt-4">
-              {fr ? "Portail vendeur tout-en-un" : "All-in-one seller portal"}
+              {t("allInOneSellerPortal")}
             </h2>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -167,8 +165,8 @@ export default function SellOnlinePage() {
                   <DynamicIcon name={tool.icon} className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">{fr ? tool.nameFr : tool.name}</p>
-                  <p className="mt-1 text-sm text-slate-500">{fr ? tool.descFr : tool.desc}</p>
+                  <p className="font-semibold text-slate-900">{localizedField(locale, tool.name, tool.nameFr)}</p>
+                  <p className="mt-1 text-sm text-slate-500">{localizedField(locale, tool.desc, tool.descFr)}</p>
                 </div>
               </div>
             ))}
@@ -180,10 +178,10 @@ export default function SellOnlinePage() {
       <section id="plans" className="scroll-mt-20 border-y border-[var(--border)] bg-white py-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="mx-auto max-w-2xl text-center">
-            <span className="section-label">{fr ? "Tarifs" : "Pricing"}</span>
-            <h2 className="section-title mt-4">{fr ? "Plans vendeur" : "Seller plans"}</h2>
+            <span className="section-label">{t("pricingLabel")}</span>
+            <h2 className="section-title mt-4">{t("sellerPlans")}</h2>
             <p className="mt-4 text-slate-600">
-              {fr ? "Choisissez le plan adapté à votre activité — changez à tout moment." : "Pick the plan that fits your business — upgrade anytime."}
+              {t("pickPlanDesc")}
             </p>
           </div>
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 lg:grid-cols-3">
@@ -197,13 +195,13 @@ export default function SellOnlinePage() {
               >
                 {plan.popular && (
                   <span className="mb-4 inline-flex w-fit rounded-full bg-[var(--primary)] px-3 py-1 text-[10px] font-bold uppercase text-white">
-                    {fr ? "Populaire" : "Popular"}
+                    {t("popular")}
                   </span>
                 )}
                 <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{plan.name}</h3>
                 <p className="mt-2 text-sm text-slate-500">{plan.desc}</p>
                 <p className="mt-6 font-[family-name:var(--font-display)] text-3xl font-extrabold text-slate-900">
-                  {plan.price !== null ? `$${plan.price}` : fr ? "Sur mesure" : "Custom"}
+                  {plan.price !== null ? `$${plan.price}` : t("custom")}
                   {plan.price !== null && <span className="text-sm font-medium text-slate-500">/mo</span>}
                 </p>
                 <ul className="mt-6 flex-1 space-y-2.5">
@@ -221,7 +219,7 @@ export default function SellOnlinePage() {
                     plan.popular ? "btn-primary" : "border border-slate-200 hover:bg-slate-50"
                   )}
                 >
-                  {plan.id === "enterprise" ? (fr ? "Contact" : "Contact sales") : (fr ? "Commencer" : "Get started")}
+                  {plan.id === "enterprise" ? t("contactSales") : t("getStartedShort")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -234,26 +232,26 @@ export default function SellOnlinePage() {
       <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="text-center">
-            <span className="section-label">{fr ? "Témoignages" : "Success stories"}</span>
-            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba" : "Sellers who grew with us"}</h2>
+            <span className="section-label">{t("successStories")}</span>
+            <h2 className="section-title mt-4">{t("sellersWhoGrew")}</h2>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2">
-            {(sellerTestimonials.length > 0 ? sellerTestimonials : TESTIMONIALS.slice(1, 3)).map((t) => (
-              <div key={t.name} className="relative rounded-2xl border border-[var(--border)] bg-white p-7">
+            {(sellerTestimonials.length > 0 ? sellerTestimonials : TESTIMONIALS.slice(1, 3)).map((item) => (
+              <div key={item.name} className="relative rounded-2xl border border-[var(--border)] bg-white p-7">
                 <Quote className="absolute right-5 top-5 h-8 w-8 text-blue-100" />
                 <div className="flex gap-1 text-amber-400">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star key={i} className="h-3.5 w-3.5 fill-current" />
                   ))}
                 </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{fr ? t.quoteFr : t.quote}&rdquo;</p>
+                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{localizedField(locale, item.quote, item.quoteFr)}&rdquo;</p>
                 <div className="mt-6 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">
-                    {t.initials}
+                    {item.initials}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{fr ? t.roleFr : t.role}</p>
+                    <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                    <p className="text-xs text-slate-500">{localizedField(locale, item.role, item.roleFr)}</p>
                   </div>
                 </div>
               </div>
@@ -267,10 +265,10 @@ export default function SellOnlinePage() {
         <div className="mx-auto max-w-3xl px-4">
           <div className="text-center">
             <span className="section-label">FAQ</span>
-            <h2 className="section-title mt-4">{fr ? "Questions vendeur" : "Seller FAQ"}</h2>
+            <h2 className="section-title mt-4">{t("sellerFaq")}</h2>
           </div>
           <div className="mt-10">
-            <FaqAccordion fr={fr} items={SELL_ONLINE_FAQ} />
+            <FaqAccordion items={SELL_ONLINE_FAQ} />
           </div>
         </div>
       </section>
@@ -282,20 +280,18 @@ export default function SellOnlinePage() {
             <Store className="h-8 w-8 text-white" />
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold lg:text-4xl">
-            {fr ? "Prêt à vendre en ligne ?" : "Ready to sell online?"}
+            {t("readyToSellOnline")}
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-white/80">
-            {fr
-              ? `Rejoignez ${BRAND.fullName} et touchez des milliers d'acheteurs dès cette semaine.`
-              : `Join ${BRAND.fullName} and reach thousands of shoppers this week.`}
+            {t("joinBrandPrefix")} {BRAND.fullName} {t("joinBrandReach")}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link href="/login" className="inline-flex items-center gap-2 rounded-xl bg-white px-10 py-4 text-base font-bold text-[var(--primary)] shadow-xl hover:bg-white/95">
-              {fr ? "Commencer à vendre" : "Start selling now"}
+              {t("startSellingNow")}
               <ArrowRight className="h-5 w-5" />
             </Link>
             <Link href="/" className="btn-outline-light px-10 py-4 text-base">
-              {fr ? "Retour à la boutique" : "Back to shop"}
+              {t("backToShop")}
             </Link>
           </div>
         </div>

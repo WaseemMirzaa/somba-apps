@@ -17,9 +17,9 @@ export default function SellerSubscribePage() {
   const { purchasePlan, getSubscription } = useSellerSubscription();
   const { toast } = useToast();
   const router = useRouter();
-  const { locale } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
   const [planId, setPlanId] = useState<"starter" | "pro" | "enterprise">("pro");
+  const subscriptionDetail = t("subscriptionRequiredMessage").split("—").slice(1).join("—").trim();
 
   const existing = getSubscription(persona.id);
 
@@ -29,10 +29,7 @@ export default function SellerSubscribePage() {
       return;
     }
     purchasePlan(persona.id, planId);
-    toast(
-      fr ? "Abonnement activé — bienvenue sur le portail vendeur !" : "Subscription activated — welcome to the seller portal!",
-      "success"
-    );
+    toast(t("subscriptionActivated"), "success");
     router.push("/seller");
   }
 
@@ -47,7 +44,7 @@ export default function SellerSubscribePage() {
             <span className="font-[family-name:var(--font-display)] font-bold text-slate-900">{BRAND.name}</span>
           </Link>
           <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">
-            {fr ? "Changer de compte" : "Switch account"}
+            {t("switchAccount")}
           </Link>
         </div>
 
@@ -56,16 +53,14 @@ export default function SellerSubscribePage() {
             <Lock className="h-8 w-8" />
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900">
-            {fr ? "Abonnement vendeur requis" : "Seller subscription required"}
+            {t("sellerSubscriptionRequired")}
           </h1>
           <p className="mt-3 text-slate-600">
-            {fr
-              ? `Bonjour ${persona.name} — vous devez souscrire un abonnement pour accéder au portail vendeur.`
-              : `Hi ${persona.name} — you need an active subscription to access the seller portal.`}
+            {persona.name} — {subscriptionDetail}
           </p>
           {existing && !existing.active && (
             <p className="mt-2 text-sm text-amber-700">
-              {fr ? "Votre abonnement précédent a expiré." : "Your previous subscription has expired."}
+              {t("subscriptionExpired")}
             </p>
           )}
         </div>
@@ -83,7 +78,7 @@ export default function SellerSubscribePage() {
             >
               {plan.popular && (
                 <span className="absolute -top-2.5 right-4 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                  {fr ? "Populaire" : "Popular"}
+                  {t("popular")}
                 </span>
               )}
               <h3 className="font-bold text-slate-900">{plan.name}</h3>
@@ -93,7 +88,7 @@ export default function SellerSubscribePage() {
                     ${plan.price}<span className="text-sm font-medium text-slate-500">/mo</span>
                   </p>
                 ) : (
-                  <p className="text-2xl font-extrabold text-slate-900">{fr ? "Sur mesure" : "Custom"}</p>
+                  <p className="text-2xl font-extrabold text-slate-900">{t("custom")}</p>
                 )}
               </div>
               <p className="mt-2 text-xs text-slate-600">{plan.desc}</p>
@@ -112,14 +107,12 @@ export default function SellerSubscribePage() {
         <div className="mx-auto mt-10 max-w-md">
           <button type="button" onClick={handleSubscribe} className="btn-primary flex w-full items-center justify-center gap-2 py-3.5">
             {planId === "enterprise"
-              ? fr ? "Contacter les ventes" : "Contact sales"
-              : fr ? "Activer l'abonnement" : "Activate subscription"}
+              ? t("contactSales")
+              : t("activateSubscription")}
             <ArrowRight className="h-4 w-4" />
           </button>
           <p className="mt-4 text-center text-xs text-slate-500">
-            {fr
-              ? "Paiement simulé pour la démo. En production, redirection vers l'app ou Stripe."
-              : "Mock payment for demo. In production, redirects to app or Stripe."}
+            {t("mockPaymentNote")}
           </p>
         </div>
       </div>

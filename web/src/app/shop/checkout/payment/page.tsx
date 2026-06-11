@@ -13,7 +13,7 @@ import { PAYMENTS } from "@/lib/config";
 import { useToast } from "@/context/toast-context";
 
 function PaymentContent() {
-  const { locale } = useLocale();
+  const { t } = useLocale();
   const { profile } = useMarket();
   const { toast } = useToast();
   const router = useRouter();
@@ -29,7 +29,7 @@ function PaymentContent() {
 
   function placeOrder() {
     if (payment === "cod" && !codEligible) {
-      toast(locale === "fr" ? "Montant COD trop élevé" : "COD amount exceeds limit");
+      toast(t("codAmountExceedsLimit"));
       return;
     }
     if (paymentError && !retrying) {
@@ -40,7 +40,7 @@ function PaymentContent() {
     if (payment === "stripe_card" && retrying) {
       setPaymentError(true);
       setRetrying(false);
-      toast(locale === "fr" ? "Paiement échoué — réessayez" : "Payment failed — retry");
+      toast(t("paymentFailedRetry"));
       return;
     }
     router.push("/shop/orders/ORD-2024-001/confirmed");
@@ -48,19 +48,19 @@ function PaymentContent() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={locale === "fr" ? "Paiement" : "Payment"} breadcrumbs={[{ label: "Checkout", href: "/shop/checkout" }, { label: "Payment" }]} />
+      <PageHeader title={t("payment")} breadcrumbs={[{ label: t("checkout"), href: "/shop/checkout" }, { label: t("payment") }]} />
 
       {paymentError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-800">{locale === "fr" ? "Échec du paiement" : "Payment failed"}</p>
-          <p className="mt-1 text-xs text-red-600">{locale === "fr" ? "Votre réservation est maintenue 15 min." : "Your reservation is held for 15 min."}</p>
+          <p className="text-sm font-medium text-red-800">{t("paymentFailed")}</p>
+          <p className="mt-1 text-xs text-red-600">{t("reservationHeld15Min")}</p>
           <button onClick={() => setPaymentError(false)} className="mt-2 text-sm font-medium text-red-700 underline">
-            {locale === "fr" ? "Réessayer" : "Retry payment"}
+            {t("retryPayment")}
           </button>
         </div>
       )}
 
-      <DetailSection title={locale === "fr" ? "Mode de paiement" : "Payment Method"}>
+      <DetailSection title={t("paymentMethod")}>
         <div className="space-y-3">
           {[
             { id: "stripe_card", label: "Stripe — Card" },
@@ -88,7 +88,7 @@ function PaymentContent() {
         )}
         {payment === "cod" && (
           <div className="mt-4 rounded-xl bg-amber-50 p-4">
-            <p className="text-sm text-amber-800">{locale === "fr" ? "Montant à payer à la livraison" : "Amount due at delivery"}</p>
+            <p className="text-sm text-amber-800">{t("amountDueAtDelivery")}</p>
             <DualCurrency amount={total} className="text-xl font-bold text-amber-900" />
             {PAYMENTS.cod.otpRequired && (
               <input className="input-premium mt-2 w-full px-4 py-2 text-sm" placeholder="OTP at delivery" value={otp} onChange={(e) => setOtp(e.target.value)} />
@@ -96,19 +96,21 @@ function PaymentContent() {
           </div>
         )}
 
-        <p className="mt-4 text-lg font-bold">{locale === "fr" ? "Total" : "Total"}: <DualCurrency amount={total} /></p>
+        <p className="mt-4 text-lg font-bold">{t("total")}: <DualCurrency amount={total} /></p>
         <Button onClick={placeOrder} className="mt-4 w-full">
-          {payment === "cod" ? (locale === "fr" ? "Confirmer commande COD" : "Confirm COD Order") : (locale === "fr" ? "Payer" : "Pay")}
+          {payment === "cod" ? t("confirmCodOrder") : t("pay")}
         </Button>
-        <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">← Back</Link>
+        <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">← {t("back")}</Link>
       </DetailSection>
     </div>
   );
 }
 
 export default function ShopPaymentPage() {
+  const { t } = useLocale();
+
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">{t("loading")}</div>}>
       <PaymentContent />
     </Suspense>
   );

@@ -111,7 +111,7 @@ export type RiderBatch = {
 
 export const riderBatches: RiderBatch[] = [
   {
-    id: "B-042",
+    id: "BATCH-002",
     riderId: "RDR-001",
     zone: "Kinshasa — Gombe",
     stops: [
@@ -128,5 +128,6 @@ export function getRiderTask(id: string) {
 }
 
 export function getRiderBatch(id: string) {
-  return riderBatches.find((b) => b.id === id);
+  const normalized = id === "B-042" ? "BATCH-002" : id;
+  return riderBatches.find((b) => b.id === normalized);
 }

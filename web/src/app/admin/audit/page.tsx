@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { auditLogs, resolveAuditEntityHref } from "@/lib/admin-entities";
 
 export default function AdminAuditPage() {
   const { t } = useLocale();
+  const router = useRouter();
 
   return (
     <div className="space-y-6">
@@ -22,8 +24,19 @@ export default function AdminAuditPage() {
         {auditLogs.map((log) => {
           const entityHref = resolveAuditEntityHref(log.entity, log.entityId);
           return (
-            <Link key={log.id} href={`/admin/audit/${log.id}`}>
-            <Card className="transition-colors hover:border-blue-200">
+            <Card
+              key={log.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => router.push(`/admin/audit/${log.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/admin/audit/${log.id}`);
+                }
+              }}
+              className="cursor-pointer transition-colors hover:border-blue-200"
+            >
               <CardContent className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -34,7 +47,7 @@ export default function AdminAuditPage() {
                     <p className="mt-2 text-sm">
                       <strong>{log.actor}</strong> · {log.entity}{" "}
                       {entityHref ? (
-                        <Link href={entityHref} className="text-blue-600 hover:underline"><code>{log.entityId}</code></Link>
+                        <Link href={entityHref} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}><code>{log.entityId}</code></Link>
                       ) : (
                         <code className="text-slate-600">{log.entityId}</code>
                       )}
@@ -49,7 +62,6 @@ export default function AdminAuditPage() {
                 )}
               </CardContent>
             </Card>
-            </Link>
           );
         })}
       </div>

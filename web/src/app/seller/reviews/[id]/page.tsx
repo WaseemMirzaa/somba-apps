@@ -13,8 +13,7 @@ import { useLocale } from "@/context/locale-context";
 export default function SellerReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { locale, t } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
   const review = getSellerReview(Number(id));
   const [reply, setReply] = useState("");
   const [replied, setReplied] = useState(false);
@@ -34,14 +33,14 @@ export default function SellerReviewDetailPage() {
         ]} />
         {!replied ? (
           <>
-            <textarea className="input-premium mt-4 w-full px-4 py-2 text-sm" rows={3} placeholder={fr ? "Répondre au client..." : "Reply to customer..."} value={reply} onChange={(e) => setReply(e.target.value)} />
+            <textarea className="input-premium mt-4 w-full px-4 py-2 text-sm" rows={3} placeholder={t("replyToCustomer")} value={reply} onChange={(e) => setReply(e.target.value)} />
             <div className="mt-3 flex gap-2">
-              <Button size="sm" onClick={() => { if (!reply.trim()) return; setReplied(true); toast(fr ? "Réponse envoyée" : "Reply sent"); }}>{fr ? "Envoyer" : "Send Reply"}</Button>
-              <Button variant="secondary" size="sm" onClick={() => toast(fr ? "Avis signalé" : "Review reported", "info")}>{fr ? "Signaler" : "Report"}</Button>
+              <Button size="sm" onClick={() => { if (!reply.trim()) return; setReplied(true); toast(t("replySent")); }}>{t("sendReply")}</Button>
+              <Button variant="secondary" size="sm" onClick={() => toast(t("reviewReported"), "info")}>{t("report")}</Button>
             </div>
           </>
         ) : (
-          <p className="mt-4 text-sm text-emerald-600">{fr ? "Répondu ✓" : "Replied ✓"}</p>
+          <p className="mt-4 text-sm text-emerald-600">{t("replied")}</p>
         )}
       </DetailSection>
     </div>

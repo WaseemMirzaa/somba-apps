@@ -5,10 +5,10 @@ import { useLocale } from "@/context/locale-context";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { BRAND, MARKET } from "@/lib/config";
 import { APP_LINKS, PORTALS } from "@/lib/product-landing";
+import { localizedField } from "@/lib/locale-helpers";
 
 export function MarketingFooter() {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
+  const { locale, t } = useLocale();
 
   return (
     <footer className="relative border-t border-white/5 bg-[var(--sidebar)] text-slate-400">
@@ -18,9 +18,7 @@ export function MarketingFooter() {
           <div className="lg:col-span-2">
             <BrandMark tone="light" full className="mb-5" />
             <p className="max-w-sm text-sm leading-relaxed">
-              {fr
-                ? "Votre marketplace en ligne — achetez des milliers de produits ou vendez sur Somba & Tekka."
-                : "Your online marketplace — shop thousands of products or sell on Somba & Tekka."}
+              {t("footerMarketplaceDesc")}
             </p>
             <p className="mt-4 text-xs text-slate-500">
               {BRAND.legalEntity} · {BRAND.legalAddress}
@@ -29,25 +27,25 @@ export function MarketingFooter() {
 
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
-              {fr ? "Boutique" : "Shop"}
+              {t("shop")}
             </h4>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/shop/products" className="transition-colors hover:text-white">{fr ? "Tous les produits" : "All products"}</Link></li>
-              <li><a href="#modules" className="transition-colors hover:text-white">{fr ? "Nos services" : "Our services"}</a></li>
-              <li><Link href="/sell-online" className="transition-colors hover:text-white">{fr ? "Vendre en ligne" : "Sell online"}</Link></li>
-              <li><a href="#portals" className="transition-colors hover:text-white">{fr ? "À propos" : "About us"}</a></li>
+              <li><Link href="/shop/products" className="transition-colors hover:text-white">{t("allProducts")}</Link></li>
+              <li><a href="#modules" className="transition-colors hover:text-white">{t("ourServices")}</a></li>
+              <li><Link href="/sell-online" className="transition-colors hover:text-white">{t("sellOnline")}</Link></li>
+              <li><a href="#portals" className="transition-colors hover:text-white">{t("aboutUs")}</a></li>
             </ul>
           </div>
 
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
-              {fr ? "Portails" : "Portals"}
+              {t("portals")}
             </h4>
             <ul className="space-y-3 text-sm">
               {PORTALS.map((p) => (
                 <li key={p.id}>
                   <Link href="/login" className="transition-colors hover:text-white">
-                    {fr ? p.nameFr : p.name}
+                    {localizedField(locale, p.name, p.nameFr)}
                   </Link>
                 </li>
               ))}
@@ -56,30 +54,30 @@ export function MarketingFooter() {
 
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
-              {fr ? "Applications" : "Apps"}
+              {t("apps")}
             </h4>
             <ul className="space-y-3 text-sm">
               <li>
                 <a href={APP_LINKS.ios} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  iOS — {fr ? "App boutique" : "Shop app"}
+                  iOS — {t("shopApp")}
                 </a>
               </li>
               <li>
                 <a href={APP_LINKS.android} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  Android — {fr ? "App boutique" : "Shop app"}
+                  Android — {t("shopApp")}
                 </a>
               </li>
               <li>
                 <a href={APP_LINKS.customerApp} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  {fr ? "App boutique client" : "Customer shop app"}
+                  {t("customerShopApp")}
                 </a>
               </li>
               <li>
                 <a href={APP_LINKS.riderApp} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  {fr ? "App livreur" : "Rider app"}
+                  {t("riderApp")}
                 </a>
               </li>
-              <li><Link href="/shop/products" className="transition-colors hover:text-white">{fr ? "Boutique web" : "Web shop"}</Link></li>
+              <li><Link href="/shop/products" className="transition-colors hover:text-white">{t("webShop")}</Link></li>
             </ul>
           </div>
         </div>
@@ -87,8 +85,8 @@ export function MarketingFooter() {
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
           <p className="text-sm">{BRAND.copyright}</p>
           <div className="flex gap-6 text-sm">
-            <a href={APP_LINKS.contactSupport} className="hover:text-white">{fr ? "Support" : "Support"}</a>
-            <Link href="/login" className="hover:text-white">{fr ? "Connexion" : "Login"}</Link>
+            <a href={APP_LINKS.contactSupport} className="hover:text-white">{t("support")}</a>
+            <Link href="/login" className="hover:text-white">{t("login")}</Link>
             <span className="text-slate-600">{MARKET.currency}</span>
           </div>
         </div>

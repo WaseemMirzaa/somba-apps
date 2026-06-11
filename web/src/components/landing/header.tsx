@@ -94,12 +94,12 @@ export function LandingHeader() {
             <NotificationBell portal="customer" href="/shop/notifications" className="hidden sm:flex" />
             <ThemeToggle />
             <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 sm:block">
-              Login
+              {t("login")}
             </Link>
             <Link
               href="/shop/account"
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 sm:block"
-              title="Account"
+              title={t("account")}
             >
               <User className="h-5 w-5" />
             </Link>
@@ -160,7 +160,7 @@ export function LandingHeader() {
             </div>
             <div className="mt-3 flex gap-2">
               <Link href="/shop/account" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
-                Account
+                {t("account")}
               </Link>
               <Link href="/seller" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
                 {t("becomeSeller")}
@@ -185,7 +185,7 @@ export function LandingHeader() {
             {t("becomeSeller")}
           </Link>
           <span className="ml-auto whitespace-nowrap text-xs font-medium text-amber-600">
-            ✦ {t("prototype")}
+            ? {t("prototype")}
           </span>
         </div>
       </div>

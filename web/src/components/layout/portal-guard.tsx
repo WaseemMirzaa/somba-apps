@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
 import { canAccessPath, getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 export function PortalGuard({ children }: { children: React.ReactNode }) {
   const { persona, isAuthenticated, authReady } = useAuth();
+  const { t } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const role = persona.role as UserRole;
@@ -16,6 +18,7 @@ export function PortalGuard({ children }: { children: React.ReactNode }) {
     if (!authReady) return;
 
     if (!isAuthenticated && role === "guest") {
+      if (pathname === "/seller/register") return;
       const protectedPrefixes = ["/admin", "/seller", "/warehouse", "/rider"];
       if (protectedPrefixes.some((p) => pathname.startsWith(p))) {
         router.replace("/login");
@@ -31,7 +34,7 @@ export function PortalGuard({ children }: { children: React.ReactNode }) {
   if (!authReady) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Loading…
+        {t("loading")}
       </div>
     );
   }
@@ -39,7 +42,7 @@ export function PortalGuard({ children }: { children: React.ReactNode }) {
   if (isAuthenticated && !canAccessPath(role, pathname)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Redirecting to your portal…
+        {t("redirectingPortal")}
       </div>
     );
   }

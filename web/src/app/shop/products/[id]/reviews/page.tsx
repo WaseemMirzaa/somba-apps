@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { getProductDetail } from "@/lib/entities";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { cn } from "@/lib/utils";
 
 export default function ProductReviewsPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const product = getProductDetail(Number(id));
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
@@ -27,15 +27,15 @@ export default function ProductReviewsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
-        title={`${t("productReviewsTitle")} — ${product.name}`}
+        title={`${t("productReviewsTitle")} — ${localizedField(locale, product.name, product.nameFr)}`}
         subtitle={`${product.rating} ★ · ${product.reviews.toLocaleString()} ${t("review").toLowerCase()}s`}
         backHref={`/shop/products/${id}`}
-        actions={<Button size="sm" onClick={() => setShowForm(true)}>{fr ? "Écrire un avis" : "Write Review"}</Button>}
+        actions={<Button size="sm" onClick={() => setShowForm(true)}>{t("writeReview")}</Button>}
       />
 
       {showForm && (
         <div className="card-premium space-y-4 p-6">
-          <h3 className="font-semibold">{fr ? "Écrire un avis" : "Write a Review"}</h3>
+          <h3 className="font-semibold">{t("writeAReview")}</h3>
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <button key={s} type="button" onClick={() => setRating(s)}>
@@ -43,21 +43,21 @@ export default function ProductReviewsPage() {
               </button>
             ))}
           </div>
-          <textarea className="input-premium w-full px-4 py-3 text-sm" rows={4} placeholder={fr ? "Partagez votre expérience..." : "Share your experience..."} value={reviewText} onChange={(e) => setReviewText(e.target.value)} />
+          <textarea className="input-premium w-full px-4 py-3 text-sm" rows={4} placeholder={t("shareExperiencePlaceholder")} value={reviewText} onChange={(e) => setReviewText(e.target.value)} />
           <div className="rounded-xl border-2 border-dashed border-[var(--border)] p-8 text-center text-sm text-slate-500">
-            {fr ? "Télécharger photos (mock) — glisser-déposer ou cliquer" : "Upload photos (mock) — drag & drop or click"}
+            {t("uploadPhotosMock")}
           </div>
           <Button
             onClick={() => {
-              if (!rating || !reviewText.trim()) { toast(fr ? "Ajoutez une note et un avis" : "Please add a rating and review", "error"); return; }
-              setExtraReviews((r) => [...r, { author: fr ? "Vous" : "You", rating, text: reviewText, date: fr ? "À l'instant" : "Just now" }]);
+              if (!rating || !reviewText.trim()) { toast(t("addRatingAndReview"), "error"); return; }
+              setExtraReviews((r) => [...r, { author: t("you"), rating, text: reviewText, date: t("justNow") }]);
               setShowForm(false);
               setRating(0);
               setReviewText("");
-              toast(fr ? "Avis soumis — merci !" : "Review submitted — thank you!");
+              toast(t("reviewSubmittedThanks"));
             }}
           >
-            {fr ? "Soumettre l'avis" : "Submit Review"}
+            {t("submitReview")}
           </Button>
         </div>
       )}

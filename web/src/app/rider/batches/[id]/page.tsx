@@ -10,7 +10,6 @@ import { statusLabel } from "@/lib/locale-helpers";
 export default function RiderBatchPage() {
   const { id } = useParams<{ id: string }>();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const batch = getRiderBatch(id);
 
   if (!batch) {
@@ -32,7 +31,7 @@ export default function RiderBatchPage() {
               {task && (
                 <p className="mt-1 text-xs text-slate-500">{task.orderId} · {task.customer}</p>
               )}
-              <Link href={`/rider/tasks/${s.taskId}`} className="text-sm text-emerald-600 hover:underline">{fr ? "Ouvrir tâche →" : "Open task →"}</Link>
+              <Link href={`/rider/tasks/${s.taskId}`} className="text-sm text-emerald-600 hover:underline">{t("openTask")}</Link>
             </li>
           );
         })}

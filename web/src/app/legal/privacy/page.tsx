@@ -5,7 +5,6 @@ import { useLocale } from "@/context/locale-context";
 
 export default function PrivacyPage() {
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 prose prose-slate">
@@ -16,7 +15,7 @@ export default function PrivacyPage() {
       <h2>{t("dataSharing")}</h2>
       <p>{t("dataSharingDesc")}</p>
       <h2>{t("yourRights")}</h2>
-      <p>{t("yourRightsDesc")} {fr ? "Contactez" : "Contact"} {BRAND.supportEmail}.</p>
+      <p>{t("yourRightsDesc")} {t("contact")} {BRAND.supportEmail}.</p>
     </div>
   );
 }

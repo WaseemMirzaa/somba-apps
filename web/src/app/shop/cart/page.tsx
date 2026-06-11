@@ -9,10 +9,11 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { useMarket } from "@/context/market-context";
 
 export default function ShopCartPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { profile } = useMarket();
   const { cart, updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, applyPromo, removePromo } = useShop();
   const { toast } = useToast();
@@ -30,19 +31,19 @@ export default function ShopCartPage() {
 
   function handleApplyPromo() {
     if (applyPromo(promoInput)) {
-      toast(locale === "fr" ? "Code promo appliqué" : "Promo code applied");
+      toast(t("promoCodeApplied"));
     } else {
-      toast(locale === "fr" ? "Code invalide" : "Invalid promo code");
+      toast(t("invalidPromoCode"));
     }
   }
 
   if (cart.length === 0) {
     return (
       <div className="space-y-6 py-16 text-center">
-        <PageHeader title={locale === "fr" ? "Panier" : "Shopping Cart"} />
-        <p className="text-slate-500">{locale === "fr" ? "Votre panier est vide" : "Your cart is empty"}</p>
+        <PageHeader title={t("shoppingCart")} />
+        <p className="text-slate-500">{t("cartEmpty")}</p>
         <Link href="/shop/products" className="text-blue-600 hover:underline">
-          {locale === "fr" ? "Continuer vos achats" : "Continue shopping"}
+          {t("continueShopping")}
         </Link>
       </div>
     );
@@ -50,7 +51,7 @@ export default function ShopCartPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={locale === "fr" ? "Panier" : "Shopping Cart"} subtitle={locale === "fr" ? "Groupé par vendeur" : "Grouped by seller"} />
+      <PageHeader title={t("shoppingCart")} subtitle={t("groupedBySeller")} />
 
       {Object.entries(grouped).map(([seller, items]) => (
         <DetailSection key={seller} title={seller}>
@@ -62,7 +63,7 @@ export default function ShopCartPage() {
                 </Link>
                 <div className="flex-1">
                   <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-blue-600">
-                    {locale === "fr" ? item.nameFr : item.name}
+                    {localizedField(locale, item.name, item.nameFr)}
                   </Link>
                   <p className="text-xs text-slate-500">{item.variant}</p>
                   <div className="mt-2 flex items-center gap-3">
@@ -74,10 +75,10 @@ export default function ShopCartPage() {
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                     <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast("Removed"); }}>
-                      {locale === "fr" ? "Supprimer" : "Remove"}
+                      {t("removeItem")}
                     </button>
-                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast("Saved"); }}>
-                      {locale === "fr" ? "Sauvegarder" : "Save for later"}
+                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast(t("saved")); }}>
+                      {t("saveForLater")}
                     </button>
                   </div>
                 </div>
@@ -89,7 +90,7 @@ export default function ShopCartPage() {
       ))}
 
       <div className="card-premium p-4">
-        <p className="mb-2 text-sm font-medium">{locale === "fr" ? "Code promo" : "Promo code"}</p>
+        <p className="mb-2 text-sm font-medium">{t("promoCode")}</p>
         <div className="flex gap-2">
           <input
             className="input-premium flex-1 px-3 py-2 text-sm"
@@ -100,11 +101,11 @@ export default function ShopCartPage() {
           />
           {promoCode ? (
             <button onClick={removePromo} className="rounded-xl border px-4 py-2 text-sm text-red-600">
-              {locale === "fr" ? "Retirer" : "Remove"}
+              {t("removeItem")}
             </button>
           ) : (
             <button onClick={handleApplyPromo} className="btn-primary px-4 py-2 text-sm">
-              {locale === "fr" ? "Appliquer" : "Apply"}
+              {t("apply")}
             </button>
           )}
         </div>
@@ -113,23 +114,23 @@ export default function ShopCartPage() {
 
       <div className="card-premium p-6">
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between"><span>{locale === "fr" ? "Sous-total" : "Subtotal"}</span><DualCurrency amount={subtotal} /></div>
+          <div className="flex justify-between"><span>{t("subtotal")}</span><DualCurrency amount={subtotal} /></div>
           {discount > 0 && (
             <div className="flex justify-between text-emerald-600">
-              <span>{locale === "fr" ? "Réduction" : "Discount"}</span><span>-<DualCurrency amount={discount} /></span>
+              <span>{t("cartDiscount")}</span><span>-<DualCurrency amount={discount} /></span>
             </div>
           )}
           <div className="flex justify-between">
-            <span>{locale === "fr" ? "Livraison (zone)" : "Delivery (zone)"}</span>
-            {delivery === 0 ? "FREE" : <DualCurrency amount={delivery} />}
+            <span>{t("deliveryZone")}</span>
+            {delivery === 0 ? t("free") : <DualCurrency amount={delivery} />}
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">
-            <span>{locale === "fr" ? "Total" : "Total"}</span>
+            <span>{t("total")}</span>
             <DualCurrency amount={total} className="text-blue-700" />
           </div>
         </div>
         <Link href="/shop/checkout" className="btn-primary mt-4 block w-full py-3 text-center">
-          {locale === "fr" ? "Passer à la caisse" : "Continue to Checkout"}
+          {t("continueToCheckout")}
         </Link>
       </div>
     </div>

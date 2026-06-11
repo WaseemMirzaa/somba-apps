@@ -9,20 +9,20 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { getDashboardHref } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
+import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const NAV = [
-  { href: "/shop/products", label: "Shop", labelFr: "Boutique" },
-  { href: "/sell-online", label: "Sell Online", labelFr: "Vendre en ligne" },
-  { href: "#modules", label: "Services", labelFr: "Services" },
-  { href: "#portals", label: "About", labelFr: "À propos" },
+const NAV: { href: string; labelKey: TranslationKey }[] = [
+  { href: "/shop/products", labelKey: "shop" },
+  { href: "/sell-online", labelKey: "navSellOnline" },
+  { href: "#modules", labelKey: "navServices" },
+  { href: "#portals", labelKey: "navAbout" },
 ];
 
 export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
-  const { locale, setLocale } = useLocale();
+  const { locale, setLocale, t } = useLocale();
   const { persona, isAuthenticated, authReady } = useAuth();
   const [open, setOpen] = useState(false);
-  const fr = locale === "fr";
 
   const dashboardHref = isAuthenticated
     ? getDashboardHref(persona.role as UserRole, persona.portal)
@@ -55,7 +55,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
-                {fr ? item.labelFr : item.label}
+                {t(item.labelKey)}
               </a>
             ))}
           </nav>
@@ -107,7 +107,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                     overlay ? "text-white/90 hover:bg-white/10" : "text-slate-700 hover:bg-slate-100"
                   )}
                 >
-                  {fr ? "Mon tableau de bord" : "My Dashboard"}
+                  {t("myDashboard")}
                 </Link>
               ) : (
                 <Link
@@ -117,12 +117,12 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                     overlay ? "text-white/90 hover:bg-white/10" : "text-slate-700 hover:bg-slate-100"
                   )}
                 >
-                  {fr ? "Connexion" : "Login"}
+                  {t("login")}
                 </Link>
               )
             )}
             <Link href="/shop/products" className="btn-primary hidden px-5 py-2.5 text-sm sm:inline-flex">
-              {fr ? "Acheter" : "Shop Now"}
+              {t("shopNow")}
             </Link>
             <button
               onClick={() => setOpen(!open)}
@@ -144,20 +144,20 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                   onClick={() => setOpen(false)}
                   className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700"
                 >
-                  {fr ? item.labelFr : item.label}
+                  {t(item.labelKey)}
                 </a>
               ))}
               {authReady && isAuthenticated ? (
                 <Link href={dashboardHref} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--primary)]">
-                  {fr ? "Mon tableau de bord" : "My Dashboard"} — {persona.name}
+                  {t("myDashboard")} — {persona.name}
                 </Link>
               ) : (
                 <Link href="/login" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700">
-                  {fr ? "Connexion équipe" : "Staff login"}
+                  {t("staffLogin")}
                 </Link>
               )}
               <Link href="/shop/products" onClick={() => setOpen(false)} className="btn-primary mt-2 px-5 py-2.5 text-sm text-center">
-                {fr ? "Acheter maintenant" : "Shop now"}
+                {t("shopNowCta")}
               </Link>
             </nav>
           </div>

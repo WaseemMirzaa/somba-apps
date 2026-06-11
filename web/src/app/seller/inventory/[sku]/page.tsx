@@ -13,8 +13,7 @@ import { useLocale } from "@/context/locale-context";
 export default function SellerInventoryDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const { toast } = useToast();
-  const { locale, t } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
   const item = getSellerInventory(decodeURIComponent(sku));
 
   if (!item) {
@@ -39,40 +38,40 @@ export default function SellerInventoryDetailPage() {
           <InfoGrid items={[
             { label: "SKU", value: item.sku },
             { label: t("products"), value: <Link href={`/seller/products/${item.productId}`} className="text-sky-600 hover:underline">{item.product}</Link> },
-            { label: fr ? "Entrepôt" : "Warehouse", value: item.warehouse },
-            { label: fr ? "Fournisseur" : "Supplier", value: item.supplier },
+            { label: t("roleWarehouse"), value: item.warehouse },
+            { label: t("supplier"), value: item.supplier },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Résumé stock" : "Stock Summary"}>
+        <DetailGridSection title={t("stockSummary")}>
           <InfoGrid columns={3} items={[
-            { label: fr ? "Disponible" : "Available", value: item.available },
-            { label: fr ? "Réservé" : "Reserved", value: item.reserved },
-            { label: fr ? "Alloué" : "Allocated", value: item.allocated },
-            { label: fr ? "Vendu" : "Sold", value: item.sold },
-            { label: fr ? "Endommagé" : "Damaged", value: item.damaged },
-            { label: fr ? "Retourné" : "Returned", value: item.returned },
+            { label: t("available"), value: item.available },
+            { label: t("reserved"), value: item.reserved },
+            { label: t("allocated"), value: item.allocated },
+            { label: t("sold"), value: item.sold },
+            { label: t("damaged"), value: item.damaged },
+            { label: t("returned"), value: item.returned },
           ]} />
-          <button onClick={() => toast(fr ? `Stock ajusté pour ${item.sku}` : `Stock adjusted for ${item.sku}`)} className="mt-4 rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">{fr ? "Ajuster stock" : "Adjust Stock"}</button>
+          <button onClick={() => toast(`${t("stockAdjustedFor")} ${item.sku}`)} className="mt-4 rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">{t("adjustStock")}</button>
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Navigation" : "Related Navigation"}>
+        <DetailGridSection title={t("relatedNavigation")}>
           <div className="flex flex-wrap gap-3 text-sm">
-            <Link href={`/seller/products/${item.productId}`} className="text-sky-600 hover:underline">→ {fr ? "Détail produit" : "Product Detail"}</Link>
+            <Link href={`/seller/products/${item.productId}`} className="text-sky-600 hover:underline">→ {t("productDetail")}</Link>
             <Link href="/seller/orders" className="text-sky-600 hover:underline">→ {t("orders")}</Link>
             <Link href="/seller/returns" className="text-sky-600 hover:underline">→ {t("returns")}</Link>
             <Link href="/seller/replacements" className="text-sky-600 hover:underline">→ {t("replacements")}</Link>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Historique mouvements" : "Stock Movement History"} span={3}>
+        <DetailGridSection title={t("stockMovementHistory")} span={3}>
           <DataTable
             columns={[
               { key: "date", label: t("date") },
               { key: "type", label: t("type") },
-              { key: "quantity", label: fr ? "Quantité" : "Quantity" },
+              { key: "quantity", label: t("quantity") },
               { key: "reference", label: t("reference") },
-              { key: "user", label: fr ? "Utilisateur" : "User" },
+              { key: "user", label: t("user") },
             ]}
             data={item.movements as unknown as Record<string, unknown>[]}
           />

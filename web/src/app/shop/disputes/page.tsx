@@ -5,27 +5,27 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { useDisputes } from "@/context/dispute-context";
 import { useLocale } from "@/context/locale-context";
+import { localizedField, statusLabel } from "@/lib/locale-helpers";
 
 export default function ShopDisputesListPage() {
   const { disputes } = useDisputes();
-  const { locale } = useLocale();
-  const fr = locale === "fr";
+  const { locale, t } = useLocale();
   const customerDisputes = disputes.filter((d) => d.buyerName === "Marie Dupont" || d.buyerId === "cust-1");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Litiges" : "Disputes"}
-        subtitle={fr ? "Suivez vos litiges de commande" : "Track order disputes"}
+        title={t("disputes")}
+        subtitle={t("trackOrderDisputes")}
         breadcrumbs={[
-          { label: fr ? "Compte" : "Account", href: "/shop/account" },
-          { label: fr ? "Litiges" : "Disputes" },
+          { label: t("account"), href: "/shop/account" },
+          { label: t("disputes") },
         ]}
       />
 
       {customerDisputes.length === 0 ? (
         <div className="card-premium p-8 text-center text-slate-500">
-          {fr ? "Aucun litige ouvert." : "No open disputes."}
+          {t("noOpenDisputes")}
         </div>
       ) : (
         <div className="space-y-3">
@@ -39,9 +39,9 @@ export default function ShopDisputesListPage() {
                 <div>
                   <p className="font-semibold text-slate-900">{d.id}</p>
                   <p className="text-sm text-slate-500">{d.orderId} · {d.sellerName}</p>
-                  <p className="mt-1 text-sm text-slate-600">{d.description}</p>
+                  <p className="mt-1 text-sm text-slate-600">{localizedField(locale, d.description, d.descriptionFr)}</p>
                 </div>
-                <Badge variant={d.status === "resolved" ? "success" : "warning"}>{d.status.replace("_", " ")}</Badge>
+                <Badge variant={d.status === "resolved" ? "success" : "warning"}>{statusLabel(locale, d.status)}</Badge>
               </div>
             </Link>
           ))}

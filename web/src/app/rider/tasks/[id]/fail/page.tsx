@@ -9,16 +9,15 @@ import { getRiderTask } from "@/lib/rider-entities";
 import { useLocale } from "@/context/locale-context";
 import type { TranslationKey } from "@/lib/i18n";
 
-const REASON_KEYS: TranslationKey[] = ["customerUnavailable", "wrongAddress", "refusedDelivery"];
+const REASON_KEYS: TranslationKey[] = ["customerUnavailable", "wrongAddress", "refusedDelivery", "paymentIssue"];
 
 export default function RiderFailedDeliveryPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const router = useRouter();
-  const { locale, t } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
   const task = getRiderTask(id);
-  const reasons = [...REASON_KEYS.map((key) => t(key)), fr ? "Problème de paiement" : "Payment issue"];
+  const reasons = REASON_KEYS.map((key) => t(key));
   const [reason, setReason] = useState(reasons[0]);
   const [notes, setNotes] = useState("");
 
@@ -33,7 +32,14 @@ export default function RiderFailedDeliveryPage() {
           {reasons.map((r) => <option key={r}>{r}</option>)}
         </select>
         <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder={t("notes")} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        <Button onClick={() => { toast(notes.trim() ? (fr ? `Échec livraison : ${reason}` : `Failed delivery logged: ${reason}`) : (fr ? "Échec livraison — retour entrepôt" : "Failed delivery logged — return to warehouse")); router.push("/rider/tasks"); }} className="w-full bg-red-600">
+        <Button onClick={() => {
+          toast(
+            notes.trim()
+              ? `${t("failedDeliveryLoggedWithReason")} ${reason}`
+              : t("failedDeliveryReturnToWarehouse")
+          );
+          router.push("/rider/tasks");
+        }} className="w-full bg-red-600">
           {t("failDelivery")}
         </Button>
       </div>

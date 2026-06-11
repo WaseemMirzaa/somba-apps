@@ -7,7 +7,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
-import { statusLabel } from "@/lib/locale-helpers";
+import { localizedField, statusLabel } from "@/lib/locale-helpers";
 import { getFlashSale } from "@/lib/admin-entities";
 
 export default function AdminFlashSaleDetailPage() {
@@ -20,14 +20,15 @@ export default function AdminFlashSaleDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={sale.name}
-        subtitle={`${sale.start} → ${sale.end}`}
+        title={sale.id}
+        subtitle={`${localizedField(locale, sale.name, sale.nameFr)} · ${sale.start} → ${sale.end}`}
         backHref="/admin/flash-sales"
         actions={<Badge variant={sale.status === "active" ? "success" : "warning"}>{statusLabel(locale, sale.status)}</Badge>}
       />
       <DetailGrid>
         <DetailGridSection title={t("flashSaleDetail")}>
           <InfoGrid items={[
+            { label: t("idCol"), value: sale.id },
             { label: t("discountPct"), value: `${sale.discount}%` },
             { label: t("products"), value: sale.products },
             { label: t("startDate"), value: sale.start },

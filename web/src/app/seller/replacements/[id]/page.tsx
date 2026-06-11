@@ -12,7 +12,6 @@ import { statusLabel, timelineLabel } from "@/lib/locale-helpers";
 export default function SellerReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const rep = getSellerReplacement(id);
 
   if (!rep) {
@@ -26,27 +25,27 @@ export default function SellerReplacementDetailPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailSection title={t("overview")}>
           <InfoGrid items={[
-            { label: fr ? "N° remplacement" : "Replacement ID", value: rep.id },
+            { label: t("replacementId"), value: rep.id },
             { label: t("order"), value: <Link href={`/seller/orders/${rep.orderId}`} className="text-sky-600 hover:underline">{rep.orderId}</Link> },
             { label: t("customer"), value: rep.customer },
           ]} />
         </DetailSection>
 
-        <DetailSection title={fr ? "Produit retourné" : "Returned Product"}>
+        <DetailSection title={t("returnedProduct")}>
           <InfoGrid items={[
             { label: "SKU", value: rep.returnedProduct.sku },
-            { label: fr ? "État" : "Condition", value: rep.returnedProduct.condition },
-            { label: fr ? "Inspection" : "Inspection", value: rep.returnedProduct.inspection },
+            { label: t("condition"), value: rep.returnedProduct.condition },
+            { label: t("inspection"), value: rep.returnedProduct.inspection },
           ]} />
         </DetailSection>
 
-        <DetailSection title={fr ? "Nouveau produit" : "New Product"}>
+        <DetailSection title={t("newProduct")}>
           <InfoGrid items={[
-            { label: fr ? "SKU remplacement" : "Replacement SKU", value: rep.newProduct.sku },
-            { label: fr ? "Alloué" : "Allocated", value: rep.newProduct.allocated ? (fr ? "Oui" : "Yes") : (fr ? "Non" : "No") },
-            { label: fr ? "Statut expédition" : "Dispatch Status", value: statusLabel(locale, rep.newProduct.dispatchStatus) },
+            { label: t("replacementSku"), value: rep.newProduct.sku },
+            { label: t("allocated"), value: rep.newProduct.allocated ? t("yes") : t("no") },
+            { label: t("dispatchStatus"), value: statusLabel(locale, rep.newProduct.dispatchStatus) },
           ]} />
-          <Link href="/seller/inventory" className="mt-4 inline-block text-sm text-sky-600 hover:underline">{fr ? "Vérifier inventaire →" : "Check Inventory →"}</Link>
+          <Link href="/seller/inventory" className="mt-4 inline-block text-sm text-sky-600 hover:underline">{t("checkInventory")}</Link>
         </DetailSection>
 
         <DetailSection title={t("timeline")}>

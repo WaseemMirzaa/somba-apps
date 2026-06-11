@@ -12,7 +12,7 @@ import { useToast } from "@/context/toast-context";
 
 export default function RiderPodPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t } = useLocale();
   const { toast } = useToast();
   const router = useRouter();
   const task = getRiderTask(id);
@@ -21,53 +21,53 @@ export default function RiderPodPage() {
   const [notes, setNotes] = useState("");
   const [codCollected, setCodCollected] = useState(false);
 
-  if (!task) return <div className="text-center text-slate-500">Task not found</div>;
+  if (!task) return <div className="text-center text-slate-500">{t("notFound")}</div>;
 
   const currentTask = task;
 
   function confirmDelivery() {
     if (currentTask.codAmount && !codCollected) {
-      toast(locale === "fr" ? "Confirmez la collecte COD" : "Confirm COD collection");
+      toast(t("confirmCodCollection"));
       return;
     }
-    toast(locale === "fr" ? "Livraison confirmée" : "Delivery confirmed");
+    toast(t("deliveryConfirmed"));
     router.push("/rider/tasks");
   }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <PageHeader title={locale === "fr" ? "Preuve de livraison" : "Proof of Delivery"} subtitle={task.id} backHref={`/rider/tasks/${id}`} />
+      <PageHeader title={t("proofOfDelivery")} subtitle={task.id} backHref={`/rider/tasks/${id}`} />
 
-      <DetailSection title={locale === "fr" ? "Détails" : "Details"}>
+      <DetailSection title={t("details")}>
         <InfoGrid items={[
-          { label: "Customer", value: task.customer },
-          { label: "Order", value: task.orderId },
-          { label: locale === "fr" ? "Destinataire" : "Recipient", value: recipient || "—" },
+          { label: t("customer"), value: task.customer },
+          { label: t("order"), value: task.orderId },
+          { label: t("recipient"), value: recipient || "—" },
         ]} />
       </DetailSection>
 
       {task.codAmount && (
         <div className="card-premium border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-sm font-medium text-emerald-800">{locale === "fr" ? "Montant COD dû" : "COD Amount Due"}</p>
+          <p className="text-sm font-medium text-emerald-800">{t("codAmountDue")}</p>
           <DualCurrency amount={task.codAmount} className="text-2xl font-bold text-emerald-700" />
           <label className="mt-3 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={codCollected} onChange={(e) => setCodCollected(e.target.checked)} />
-            {locale === "fr" ? "Espèces collectées" : "Cash collected"}
+            {t("cashCollected")}
           </label>
         </div>
       )}
 
-      <DetailSection title="Verification">
+      <DetailSection title={t("verification")}>
         <div className="space-y-3">
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder="OTP" value={otp} onChange={(e) => setOtp(e.target.value)} />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={locale === "fr" ? "Nom du destinataire" : "Recipient name"} value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-          <textarea className="input-premium w-full px-4 py-2 text-sm" placeholder={locale === "fr" ? "Notes" : "Notes"} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("recipientName")} value={recipient} onChange={(e) => setRecipient(e.target.value)} />
+          <textarea className="input-premium w-full px-4 py-2 text-sm" placeholder={t("notes")} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            {locale === "fr" ? "Photo / Signature (mock)" : "Photo / Signature (mock upload)"}
+            {t("photoSignatureMock")}
           </div>
         </div>
         <Button onClick={confirmDelivery} className="mt-4 w-full bg-emerald-600">
-          {locale === "fr" ? "Confirmer livraison" : "Confirm Delivered"}
+          {t("confirmDelivered")}
         </Button>
       </DetailSection>
     </div>

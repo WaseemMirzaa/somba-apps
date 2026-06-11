@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Heart, Star } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { useShop } from "@/context/shop-context";
 import { cn } from "@/lib/utils";
 
@@ -27,9 +28,9 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, flash }: ProductCardProps) {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toggleWishlist, isInWishlist } = useShop();
-  const name = locale === "fr" ? product.nameFr : product.name;
+  const name = localizedField(locale, product.name, product.nameFr);
   const price = flash && product.flashPrice ? product.flashPrice : product.price;
   const discount = flash && product.flashDiscount ? product.flashDiscount : product.discount;
 
@@ -92,9 +93,7 @@ export function ProductCard({ product, flash }: ProductCardProps) {
 
           {product.deliveryDays && (
             <p className="mt-2 text-xs font-medium text-emerald-600">
-              {locale === "fr"
-                ? `Livraison en ${product.deliveryDays}j`
-                : `Delivery in ${product.deliveryDays} days`}
+              {t("deliveryInDays").replace("{{days}}", String(product.deliveryDays))}
             </p>
           )}
         </div>

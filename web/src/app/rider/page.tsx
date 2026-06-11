@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Bike, CheckCircle, DollarSign, Clock,
-  ArrowUpRight, ArrowDownRight, Activity, Target, Banknote,
+  Activity, Target, Banknote,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -13,9 +13,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import {
   DualMetricChart,
   SegmentDonut,
-  Sparkline,
 } from "@/components/charts/dashboard-charts";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { riderProfile, riderTasks } from "@/lib/rider-entities";
 import {
   riderEarningsTrend,
@@ -24,51 +25,10 @@ import {
   riderZonePerformance,
   riderRecentActivity,
 } from "@/lib/rider-analytics";
-import { formatCurrency, cn } from "@/lib/utils";
-
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  change: number;
-  positive?: boolean;
-  spark: number[];
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  const up = change >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
-
-  return (
-    <div className="card-premium p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{value}</p>
-          <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-            {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}%
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-xl bg-emerald-50 p-2">
-            <Icon className="h-4 w-4 text-emerald-600" />
-          </div>
-          <Sparkline values={spark} color="#059669" />
-        </div>
-      </div>
-    </div>
-  );
-}
+import { formatCurrency } from "@/lib/utils";
 
 export default function RiderDashboardPage() {
   const { t, locale } = useLocale();
-  const fr = locale === "fr";
   const [period] = useState("7D");
   const k = riderExtendedKpis;
   const activeTasks = riderTasks.filter((task) => task.status !== "delivered");
@@ -85,12 +45,12 @@ export default function RiderDashboardPage() {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard title={t("activeTasks")} value={String(activeTasks.length)} change={k.deliveriesChange} spark={deliveriesSpark} icon={Bike} />
-        <KpiCard title={t("completedToday")} value={String(completed)} change={k.deliveriesChange} spark={deliveriesSpark} icon={CheckCircle} />
-        <KpiCard title={t("earnings")} value={formatCurrency(k.earningsToday, locale)} change={k.earningsChange} spark={earningsSpark} icon={DollarSign} />
-        <KpiCard title="COD collected" value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[320, 340, 360, 380, 400, 410, 420]} icon={Banknote} />
-        <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
-        <KpiCard title="Avg delivery" value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
+        <KpiCard compact title={t("activeTasks")} value={String(activeTasks.length)} change={k.deliveriesChange} spark={deliveriesSpark} icon={Bike} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
+        <KpiCard compact title={t("completedToday")} value={String(completed)} change={k.deliveriesChange} spark={deliveriesSpark} icon={CheckCircle} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
+        <KpiCard compact title={t("earnings")} value={formatCurrency(k.earningsToday, locale)} change={k.earningsChange} spark={earningsSpark} icon={DollarSign} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
+        <KpiCard compact title={t("codCollectedKpi")} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[320, 340, 360, 380, 400, 410, 420]} icon={Banknote} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
+        <KpiCard compact title={t("onTimeRateKpi")} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
+        <KpiCard compact title={t("avgDeliveryKpi")} value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} iconBgClassName="bg-emerald-50" iconClassName="text-emerald-600" sparkColor="#059669" />
       </div>
 
       <Card>
@@ -115,7 +75,7 @@ export default function RiderDashboardPage() {
           <CardContent>
             <SegmentDonut
               segments={riderTaskBreakdown.map((seg) => ({
-                label: fr ? seg.typeFr : seg.type,
+                label: localizedField(locale, seg.type, seg.typeFr),
                 pct: seg.pct,
                 color: seg.type === "Standard delivery" ? "#059669" : seg.type === "COD collection" ? "#2563eb" : seg.type === "Returns pickup" ? "#d97706" : "#7c3aed",
               }))}
@@ -131,8 +91,8 @@ export default function RiderDashboardPage() {
           <CardContent className="space-y-4">
             {riderRecentActivity.map((item) => (
               <div key={item.text} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                <p className="text-xs text-slate-400">{fr ? item.timeFr : item.time}</p>
-                <p className="mt-1 text-sm text-slate-700">{fr ? item.textFr : item.text}</p>
+                <p className="text-xs text-slate-400">{localizedField(locale, item.time, item.timeFr)}</p>
+                <p className="mt-1 text-sm text-slate-700">{localizedField(locale, item.text, item.textFr)}</p>
               </div>
             ))}
           </CardContent>
@@ -160,14 +120,14 @@ export default function RiderDashboardPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="font-semibold text-slate-900">{t("activeTasks")}</h2>
-          <Link href="/rider/tasks" className="text-sm text-emerald-600 hover:underline">View all</Link>
+          <Link href="/rider/tasks" className="text-sm text-emerald-600 hover:underline">{t("viewAll")}</Link>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
             columns={[
               {
                 key: "id",
-                label: "Task",
+                label: t("task"),
                 render: (row) => (
                   <Link href={`/rider/tasks/${row.id}`} className="font-medium text-emerald-600 hover:underline">
                     {String(row.id)}
@@ -176,12 +136,12 @@ export default function RiderDashboardPage() {
               },
               {
                 key: "type",
-                label: "Type",
+                label: t("type"),
                 render: (row) => <Badge variant="primary">{String(row.type)}</Badge>,
               },
-              { key: "customer", label: "Customer" },
-              { key: "distance", label: "Distance" },
-              { key: "eta", label: "ETA" },
+              { key: "customer", label: t("customer") },
+              { key: "distance", label: t("distance") },
+              { key: "eta", label: t("eta") },
               {
                 key: "status",
                 label: t("status"),

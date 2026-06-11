@@ -13,7 +13,6 @@ import { storeNameLabel } from "@/lib/locale-helpers";
 export default function ShopStoreDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const seller = getSeller(Number(id));
   const store = stores.find((s) => s.name === seller?.storeName) ?? stores[0];
   const storeProducts = products.filter((p) => p.seller === seller?.storeName || p.seller === store.name);
@@ -22,30 +21,32 @@ export default function ShopStoreDetailPage() {
     return <div className="text-center text-slate-500">{t("notFound")}</div>;
   }
 
+  const displayName = storeNameLabel(locale, seller.storeName, seller.storeNameFr);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-6 rounded-2xl border border-blue-100 bg-white p-6">
         <div className="relative h-20 w-20 overflow-hidden rounded-full">
-          <Image src={store.image} alt={seller.storeName} fill className="object-cover" sizes="80px" />
+          <Image src={store.image} alt={displayName} fill className="object-cover" sizes="80px" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{storeNameLabel(locale, seller.storeName, seller.storeNameFr)}</h1>
-          <p className="text-slate-500">⭐ {seller.rating || store.rating} · {store.followers.toLocaleString()} {fr ? "abonnés" : "followers"} · {store.products} {t("productsCount")}</p>
+          <h1 className="text-2xl font-bold">{displayName}</h1>
+          <p className="text-slate-500">⭐ {seller.rating || store.rating} · {store.followers.toLocaleString()} {t("followers")} · {store.products} {t("productsCount")}</p>
           <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{store.badge} {t("seller")}</span>
         </div>
       </div>
 
       <DetailGrid>
-        <DetailGridSection title={fr ? "À propos" : "About"}>
-          <p className="text-sm text-slate-600">{seller.storeName} — {fr ? "spécialiste" : "specialist"} {seller.category} {fr ? "basé à" : "based in"} {seller.city}, {seller.country}.</p>
+        <DetailGridSection title={t("about")}>
+          <p className="text-sm text-slate-600">{displayName} — {t("specialist")} {seller.category} {t("basedIn")} {seller.city}, {seller.country}.</p>
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Avis boutique" : "Store Reviews"}>
-          <p className="text-sm text-slate-500">{fr ? "Note boutique" : "Store rating"}: ⭐ {seller.rating || store.rating}</p>
+        <DetailGridSection title={t("storeReviews")}>
+          <p className="text-sm text-slate-500">{t("storeRatingLabel")}: ⭐ {seller.rating || store.rating}</p>
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Politiques" : "Policies"}>
-          <p className="text-sm text-slate-600">{fr ? "Politique de retour 7 jours. Livraison gratuite dès 50 $." : "7-day return policy. Free shipping on orders over $50."}</p>
+        <DetailGridSection title={t("policies")}>
+          <p className="text-sm text-slate-600">{t("storeReturnPolicy")}</p>
         </DetailGridSection>
 
         <DetailGridSection title={t("products")} span={3}>

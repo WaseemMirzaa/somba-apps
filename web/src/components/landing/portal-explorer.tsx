@@ -17,6 +17,9 @@ import * as LucideIcons from "lucide-react";
 import { PORTALS, PORTAL_GROUPS, PORTAL_SECTION } from "@/lib/product-landing";
 import { getPortalCTA } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { localizedField } from "@/lib/locale-helpers";
 import { cn } from "@/lib/utils";
 
 const ICONS = { Shield, Store, Warehouse, Bike, ShoppingBag } as const;
@@ -30,7 +33,7 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
 }
 
 type Props = {
-  fr: boolean;
+  locale: Locale;
   role: UserRole;
   isAuthenticated: boolean;
   authReady: boolean;
@@ -39,7 +42,7 @@ type Props = {
 };
 
 export function PortalExplorer({
-  fr,
+  locale,
   role,
   isAuthenticated,
   authReady,
@@ -76,15 +79,15 @@ export function PortalExplorer({
     ? getPortalCTA(portal.id, role, isAuthenticated, personaPortal)
     : {
         href: portal.id === "seller" ? "/sell-online" : portal.id === "shop" ? "/shop/products" : "/login",
-        labelEn: portal.id === "shop" ? "Start shopping" : portal.id === "seller" ? "Sell online" : "Staff sign in",
-        labelFr: portal.id === "shop" ? "Acheter maintenant" : portal.id === "seller" ? "Vendre en ligne" : "Connexion équipe",
+        labelEn: portal.id === "shop" ? t("en", "startShopping") : portal.id === "seller" ? t("en", "sellOnline") : t("en", "staffLogin"),
+        labelFr: portal.id === "shop" ? t("fr", "startShopping") : portal.id === "seller" ? t("fr", "sellOnline") : t("fr", "staffLogin"),
       };
 
   return (
     <div id="portal-explorer" className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-xl">
       <div className="border-b border-[var(--border)] bg-slate-50/80 px-4 py-3">
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          {fr ? PORTAL_SECTION.explorerLabelFr : PORTAL_SECTION.explorerLabel}
+          {localizedField(locale, PORTAL_SECTION.explorerLabel, PORTAL_SECTION.explorerLabelFr)}
         </p>
       </div>
 
@@ -106,7 +109,7 @@ export function PortalExplorer({
               )}
             >
               <GroupIcon className="h-4 w-4" />
-              {fr ? g.labelFr : g.label}
+              {localizedField(locale, g.label, g.labelFr)}
             </button>
           );
         })}
@@ -131,7 +134,7 @@ export function PortalExplorer({
                 )}
               >
                 <TabIcon className="h-3.5 w-3.5" />
-                {fr ? p.nameFr : p.name}
+                {localizedField(locale, p.name, p.nameFr)}
               </button>
             );
           })}
@@ -146,41 +149,41 @@ export function PortalExplorer({
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/95 via-slate-900/40 to-slate-900/10 lg:bg-gradient-to-r" />
             <div className="absolute inset-0 flex flex-col justify-end p-8 text-white">
               <span className="inline-flex w-fit rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-white/25">
-                {fr ? portal.audienceLabelFr : portal.audienceLabel}
+                {localizedField(locale, portal.audienceLabel, portal.audienceLabelFr)}
               </span>
               <div className="mt-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-xl">
                 <Icon className="h-7 w-7" />
               </div>
               <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-white/70">
-                {fr ? portal.taglineFr : portal.tagline}
+                {localizedField(locale, portal.tagline, portal.taglineFr)}
               </p>
               <h3 className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold">
-                {fr ? portal.nameFr : portal.name}
+                {localizedField(locale, portal.name, portal.nameFr)}
               </h3>
-              <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/85">{fr ? portal.descFr : portal.desc}</p>
+              <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/85">{localizedField(locale, portal.desc, portal.descFr)}</p>
 
               {"subscription" in portal && portal.subscription && (
                 <span className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-400/90 px-3 py-1 text-xs font-bold text-amber-950">
                   <DynamicIcon name="CreditCard" className="h-3.5 w-3.5" />
-                  {fr ? "Abonnement vendeur requis" : "Seller subscription required"}
+                  {t(locale, "sellerSubscriptionRequired")}
                 </span>
               )}
 
               <div className="mt-5 flex flex-wrap gap-2">
-                {portal.trust.map((t) => (
+                {portal.trust.map((trustItem) => (
                   <span
-                    key={t.label}
+                    key={trustItem.label}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1.5 text-[11px] font-semibold text-white ring-1 ring-white/20 backdrop-blur"
                   >
-                    <DynamicIcon name={t.icon} className="h-3.5 w-3.5" />
-                    {fr ? t.labelFr : t.label}
+                    <DynamicIcon name={trustItem.icon} className="h-3.5 w-3.5" />
+                    {localizedField(locale, trustItem.label, trustItem.labelFr)}
                   </span>
                 ))}
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
                 <Link href={cta.href} className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-[var(--primary)] shadow-lg hover:bg-white/95">
-                  {fr ? cta.labelFr : cta.labelEn}
+                  {localizedField(locale, cta.labelEn, cta.labelFr)}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 {"appHref" in portal && portal.appHref && (
@@ -190,7 +193,7 @@ export function PortalExplorer({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-5 py-2.5 text-sm font-semibold text-white ring-1 ring-white/25 hover:bg-white/25"
                   >
-                    {fr ? "Télécharger l'app" : "Get the app"}
+                    {t(locale, "getTheApp")}
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 )}
@@ -201,7 +204,7 @@ export function PortalExplorer({
 
         <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 p-6 lg:col-span-3 lg:p-8">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            {fr ? "Fonctionnalités incluses" : "What's included"}
+            {t(locale, "whatsIncluded")}
           </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {portal.modules.map((mod) => (
@@ -213,7 +216,7 @@ export function PortalExplorer({
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary-light)] text-[var(--primary)] transition-colors group-hover:bg-[var(--primary)] group-hover:text-white">
                     <DynamicIcon name={mod.icon} className="h-5 w-5" />
                   </div>
-                  <h4 className="font-semibold text-slate-900">{fr ? mod.nameFr : mod.name}</h4>
+                  <h4 className="font-semibold text-slate-900">{localizedField(locale, mod.name, mod.nameFr)}</h4>
                 </div>
                 <ul className="mt-4 space-y-2">
                   {mod.items.map((item, i) => (

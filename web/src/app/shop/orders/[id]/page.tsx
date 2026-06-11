@@ -28,7 +28,7 @@ export default function ShopOrderDetailPage() {
     order?.items.forEach((item) => {
       addToCart({ id: item.productId, name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: order!.seller, variant: item.variant });
     });
-    toast(locale === "fr" ? "Articles ajoutés au panier" : "Items added to cart");
+    toast(t("itemsAddedToCart"));
     router.push("/shop/cart");
   }
 
@@ -53,7 +53,7 @@ export default function ShopOrderDetailPage() {
               <Link href={`/shop/products/${order.items[0]?.productId}/reviews`} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium">{t("review")}</Link>
             </div>
           ) : order.status !== "cancelled" && !cancelled ? (
-            <button onClick={() => { setCancelled(true); toast(locale === "fr" ? "Commande annulée" : "Order cancelled"); }} className="rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600">{t("cancel")}</button>
+            <button onClick={() => { setCancelled(true); toast(t("orderCancelled")); }} className="rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600">{t("cancel")}</button>
           ) : null
         }
       />

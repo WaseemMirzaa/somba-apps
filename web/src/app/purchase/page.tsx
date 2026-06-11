@@ -8,8 +8,7 @@ import { BRAND } from "@/lib/config";
 
 /** Legacy route — redirects sellers to homepage pricing; shoppers to shop */
 export default function PurchasePage() {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -20,22 +19,18 @@ export default function PurchasePage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4 text-center">
-      <p className="text-sm text-slate-500">{fr ? "Redirection…" : "Redirecting…"}</p>
+      <p className="text-sm text-slate-500">{t("redirecting")}</p>
       <h1 className="mt-4 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
-        {fr ? `Vendre sur ${BRAND.fullName}` : `Sell on ${BRAND.fullName}`}
+        {t("sellOnBrand")} {BRAND.fullName}
       </h1>
-      <p className="mt-2 max-w-md text-slate-600">
-        {fr
-          ? "Somba & Tekka est une marketplace — consultez nos plans vendeur pour ouvrir votre boutique."
-          : "Somba & Tekka is a marketplace — see our seller plans to open your store."}
-      </p>
+      <p className="mt-2 max-w-md text-slate-600">{t("purchaseMarketplaceDesc")}</p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/sell-online" className="btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">
-          {fr ? "Vendre en ligne" : "Sell online"}
+          {t("sellOnline")}
           <ArrowRight className="h-4 w-4" />
         </Link>
         <Link href="/shop/products" className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold hover:bg-slate-50">
-          {fr ? "Acheter" : "Shop instead"}
+          {t("shopInstead")}
         </Link>
       </div>
     </div>

@@ -13,7 +13,6 @@ import { statusLabel, timelineLabel } from "@/lib/locale-helpers";
 export default function SellerShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const shipment = getShipment(id);
 
   if (!shipment) {
@@ -31,7 +30,7 @@ export default function SellerShipmentDetailPage() {
       <DetailGrid>
         <DetailGridSection title={t("overview")}>
           <InfoGrid items={[
-            { label: fr ? "N° expédition" : "Shipment ID", value: shipment.id },
+            { label: t("shipmentId"), value: shipment.id },
             { label: t("order"), value: <Link href={`/seller/orders/${shipment.orderId}`} className="text-sky-600 hover:underline">{shipment.orderId}</Link> },
             { label: t("status"), value: statusLabel(locale, shipment.status) },
           ]} />
@@ -41,20 +40,20 @@ export default function SellerShipmentDetailPage() {
           <InfoGrid items={[
             { label: t("name"), value: shipment.rider },
             { label: t("phone"), value: shipment.riderPhone },
-            { label: fr ? "Véhicule" : "Vehicle", value: shipment.vehicle },
+            { label: t("vehicle"), value: shipment.vehicle },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Entrepôt" : "Warehouse"}>
+        <DetailGridSection title={t("roleWarehouse")}>
           <InfoGrid items={[
-            { label: fr ? "Entrepôt" : "Warehouse", value: <Link href={`/warehouse/hubs/${shipment.warehouseId}`} className="text-sky-600 hover:underline">{shipment.warehouse}</Link> },
+            { label: t("roleWarehouse"), value: <Link href={`/warehouse/hubs/${shipment.warehouseId}`} className="text-sky-600 hover:underline">{shipment.warehouse}</Link> },
             { label: t("parcel"), value: <Link href={`/warehouse/parcels/${shipment.parcelId}`} className="text-sky-600 hover:underline">{shipment.parcelId}</Link> },
             { label: t("zone"), value: shipment.zone },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Suivi" : "Tracking"} span={3}>
-          <p className="mb-4 text-sm text-slate-500">{fr ? "Statut actuel" : "Current Status"}: {statusLabel(locale, shipment.status)}</p>
+        <DetailGridSection title={t("liveTracking")} span={3}>
+          <p className="mb-4 text-sm text-slate-500">{t("currentStatus")}: {statusLabel(locale, shipment.status)}</p>
           <ActivityTimeline events={shipment.timeline.map((e) => ({ ...e, label: timelineLabel(locale, e.label) }))} />
         </DetailGridSection>
       </DetailGrid>

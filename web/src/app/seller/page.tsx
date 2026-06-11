@@ -15,7 +15,6 @@ import {
   Wallet,
   Truck,
   ArrowUpRight,
-  ArrowDownRight,
   Activity,
   BarChart3,
 } from "lucide-react";
@@ -30,9 +29,10 @@ import {
   FunnelChart,
   HorizontalBarChart,
   GoalProgress,
-  Sparkline,
 } from "@/components/charts/dashboard-charts";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import {
   sellerStore,
   sellerDashboardStats,
@@ -59,51 +59,8 @@ import { cn } from "@/lib/utils";
 
 const PERIODS = ["7D", "30D", "90D"] as const;
 
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-  vsLabel,
-}: {
-  title: string;
-  value: string;
-  change: number;
-  positive?: boolean;
-  spark: number[];
-  icon: React.ComponentType<{ className?: string }>;
-  vsLabel: string;
-}) {
-  const up = change >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
-
-  return (
-    <div className="card-premium p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
-          <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-            {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}{vsLabel}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-xl bg-blue-50 p-2">
-            <Icon className="h-4 w-4 text-[var(--primary)]" />
-          </div>
-          <Sparkline values={spark} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SellerDashboard() {
   const { t, locale } = useLocale();
-  const fr = locale === "fr";
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
   const k = sellerExtendedKpis;
   const s = sellerDashboardStats;
@@ -139,14 +96,14 @@ export default function SellerDashboard() {
 
       {/* KPI grid with sparklines */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={t("revenueMtd")} value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} vsLabel={vsLabel} />
-        <KpiCard title={t("ordersMtd")} value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} vsLabel={vsLabel} />
-        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} vsLabel={vsLabel} />
-        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} vsLabel={vsLabel} />
-        <KpiCard title={t("customerRetention")} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} vsLabel={vsLabel} />
-        <KpiCard title={t("repeatCustomers")} value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} vsLabel={vsLabel} />
-        <KpiCard title={t("customerLtv")} value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} vsLabel={vsLabel} />
-        <KpiCard title={t("refundRateKpi")} value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} vsLabel={vsLabel} />
+        <KpiCard title={t("revenueMtd")} value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} changeSuffix={vsLabel} />
+        <KpiCard title={t("ordersMtd")} value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} changeSuffix={vsLabel} />
+        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} changeSuffix={vsLabel} />
+        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} changeSuffix={vsLabel} />
+        <KpiCard title={t("customerRetention")} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} changeSuffix={vsLabel} />
+        <KpiCard title={t("repeatCustomers")} value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} changeSuffix={vsLabel} />
+        <KpiCard title={t("customerLtv")} value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} changeSuffix={vsLabel} />
+        <KpiCard title={t("refundRateKpi")} value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} changeSuffix={vsLabel} />
       </div>
 
       {/* Main charts row */}
@@ -240,7 +197,7 @@ export default function SellerDashboard() {
           <CardContent>
             <SegmentDonut
               segments={sellerCustomerSegments.map((seg) => ({
-                label: fr ? seg.labelFr : seg.label,
+                label: localizedField(locale, seg.label, seg.labelFr),
                 pct: seg.pct,
                 color: seg.color,
               }))}
@@ -248,7 +205,7 @@ export default function SellerDashboard() {
             <div className="mt-6 grid grid-cols-2 gap-3">
               {sellerCustomerSegments.map((seg) => (
                 <div key={seg.id} className="rounded-lg border border-slate-100 p-3">
-                  <p className="text-xs text-slate-500">{fr ? seg.labelFr : seg.label}</p>
+                  <p className="text-xs text-slate-500">{localizedField(locale, seg.label, seg.labelFr)}</p>
                   <p className="text-lg font-bold text-slate-900">{seg.value.toLocaleString()}</p>
                 </div>
               ))}
@@ -267,7 +224,7 @@ export default function SellerDashboard() {
           <CardContent>
             <FunnelChart
               stages={sellerOrderFunnel.map((f) => ({
-                stage: fr ? f.stageFr : f.stage,
+                stage: localizedField(locale, f.stage, f.stageFr),
                 count: f.count,
                 pct: f.pct,
               }))}
@@ -302,7 +259,7 @@ export default function SellerDashboard() {
             {sellerHealthBreakdown.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
+                  <span className="text-slate-600">{localizedField(locale, h.label, h.labelFr)}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -389,8 +346,8 @@ export default function SellerDashboard() {
                 <li key={i} className="flex gap-3 border-b border-slate-50 pb-3 last:border-0 last:pb-0">
                   <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
                   <div>
-                    <p className="text-sm text-slate-800">{fr ? a.textFr : a.text}</p>
-                    <p className="text-xs text-slate-400">{fr ? a.timeFr : a.time}</p>
+                    <p className="text-sm text-slate-800">{localizedField(locale, a.text, a.textFr)}</p>
+                    <p className="text-xs text-slate-400">{localizedField(locale, a.time, a.timeFr)}</p>
                   </div>
                 </li>
               ))}
@@ -492,21 +449,21 @@ export default function SellerDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-blue-50 p-4">
-                  <p className="text-xs text-slate-500">{t("availableBalance")}</p>
-                  <p className="text-xl font-bold text-[var(--primary)]">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
+                <div className="min-w-0 rounded-xl bg-blue-50 p-4">
+                  <p className="truncate text-xs text-slate-500">{t("availableBalance")}</p>
+                  <p className="money-value text-lg font-bold text-[var(--primary)] sm:text-xl">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">{t("pendingRevenue")}</p>
-                  <p className="text-xl font-bold text-slate-900">{formatCurrency(sellerFinanceStats.pendingRevenue, locale)}</p>
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
+                  <p className="truncate text-xs text-slate-500">{t("pendingRevenue")}</p>
+                  <p className="money-value text-lg font-bold text-slate-900 sm:text-xl">{formatCurrency(sellerFinanceStats.pendingRevenue, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">{t("commissionPaid")}</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(sellerFinanceStats.commissionPaid, locale)}</p>
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
+                  <p className="truncate text-xs text-slate-500">{t("commissionPaid")}</p>
+                  <p className="money-value text-base font-bold text-slate-900 sm:text-lg">{formatCurrency(sellerFinanceStats.commissionPaid, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">{t("refundsMtd")}</p>
-                  <p className="text-lg font-bold text-amber-600">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
+                  <p className="truncate text-xs text-slate-500">{t("refundsMtd")}</p>
+                  <p className="money-value text-base font-bold text-amber-600 sm:text-lg">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
                 </div>
               </div>
               <Link href="/seller/finance" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline">

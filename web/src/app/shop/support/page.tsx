@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useSupport } from "@/context/support-context";
+import { statusLabel } from "@/lib/locale-helpers";
 
 function ShopSupportContent() {
   const { t, locale } = useLocale();
@@ -15,10 +16,9 @@ function ShopSupportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderFromQuery = searchParams.get("order") ?? "";
-  const fr = locale === "fr";
 
   const [showForm, setShowForm] = useState(!!orderFromQuery);
-  const [subject, setSubject] = useState(orderFromQuery ? (fr ? "Problème de commande" : "Order issue") : "");
+  const [subject, setSubject] = useState(orderFromQuery ? t("orderIssue") : "");
   const [orderId, setOrderId] = useState(orderFromQuery);
   const [message, setMessage] = useState("");
 
@@ -34,14 +34,14 @@ function ShopSupportContent() {
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
         title={t("support")}
-        subtitle={fr ? "Nous sommes là pour vous aider" : "We're here to help"}
+        subtitle={t("supportSubtitle")}
         breadcrumbs={[
-          { label: "Shop", href: "/" },
+          { label: t("shop"), href: "/" },
           { label: t("support") },
         ]}
         actions={
           <Button variant="secondary" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? (fr ? "Mes tickets" : "My tickets") : (fr ? "Nouveau ticket" : "New ticket")}
+            {showForm ? t("myTickets") : t("newTicket")}
           </Button>
         }
       />
@@ -50,7 +50,7 @@ function ShopSupportContent() {
         <div className="space-y-3">
           {myTickets.length === 0 ? (
             <div className="card-premium p-8 text-center text-slate-500">
-              {fr ? "Aucun ticket. Créez-en un ci-dessus." : "No tickets yet. Create one above."}
+              {t("noTicketsYet")}
             </div>
           ) : (
             myTickets.map((ticket) => (
@@ -61,7 +61,7 @@ function ShopSupportContent() {
                     {ticket.orderId && <p className="text-sm text-slate-500">{ticket.orderId}</p>}
                     <p className="mt-1 text-xs text-slate-400">{ticket.lastUpdate}</p>
                   </div>
-                  <Badge variant={ticket.status === "resolved" ? "success" : "info"}>{ticket.status.replace("_", " ")}</Badge>
+                  <Badge variant={ticket.status === "resolved" ? "success" : "info"}>{statusLabel(locale, ticket.status)}</Badge>
                 </div>
               </Link>
             ))
@@ -91,8 +91,10 @@ function ShopSupportContent() {
 }
 
 export default function ShopSupportPage() {
+  const { t } = useLocale();
+
   return (
-    <Suspense fallback={<div className="text-center text-slate-500">Loading...</div>}>
+    <Suspense fallback={<div className="text-center text-slate-500">{t("loading")}</div>}>
       <ShopSupportContent />
     </Suspense>
   );

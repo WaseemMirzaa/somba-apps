@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { useReturns } from "@/context/return-context";
 import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 
 const STATUS_VARIANT: Record<string, "success" | "warning" | "info" | "danger" | "default"> = {
   requested: "warning",
@@ -18,22 +19,21 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "info" | "danger" |
 export default function ShopReturnsListPage() {
   const { returns } = useReturns();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("returns")}
-        subtitle={fr ? "Suivez vos demandes de retour" : "Track your return requests"}
+        subtitle={t("trackReturnRequests")}
         breadcrumbs={[
-          { label: fr ? "Compte" : "Account", href: "/shop/account" },
+          { label: t("account"), href: "/shop/account" },
           { label: t("returns") },
         ]}
       />
 
       {returns.length === 0 ? (
         <div className="card-premium p-8 text-center text-slate-500">
-          {fr ? "Aucun retour pour le moment." : "No returns yet."}
+          {t("noReturnsYet")}
         </div>
       ) : (
         <div className="space-y-3">
@@ -48,7 +48,7 @@ export default function ShopReturnsListPage() {
                 <p className="text-sm text-slate-500">{ret.orderId} · {ret.items.join(", ")}</p>
                 <p className="mt-1 text-xs text-slate-400">{ret.createdAt}</p>
               </div>
-              <Badge variant={STATUS_VARIANT[ret.status] ?? "default"}>{ret.status.replace("_", " ")}</Badge>
+              <Badge variant={STATUS_VARIANT[ret.status] ?? "default"}>{statusLabel(locale, ret.status)}</Badge>
             </Link>
           ))}
         </div>

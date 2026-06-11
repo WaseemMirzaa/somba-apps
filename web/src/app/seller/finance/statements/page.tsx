@@ -6,12 +6,11 @@ import { sellerStatementList } from "@/lib/seller-entities";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerStatementsPage() {
-  const { locale, t } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("statementsList")} subtitle={fr ? "Relevés financiers mensuels" : "Monthly financial statements"} backHref="/seller/finance" />
+      <PageHeader title={t("statementsList")} subtitle={t("monthlyFinancialStatements")} backHref="/seller/finance" />
       <div className="space-y-3">
         {sellerStatementList.map((stmt) => (
           <Link key={stmt.id} href={`/seller/finance/statements/${stmt.id}`} className="card-premium flex items-center justify-between p-5 hover:border-sky-200">

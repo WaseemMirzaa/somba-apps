@@ -37,6 +37,8 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
+import { localizedField } from "@/lib/locale-helpers";
+import type { TranslationKey } from "@/lib/i18n";
 import {
   APP_LINKS,
   SELLER_PLANS,
@@ -62,15 +64,15 @@ const MODULE_ICONS = {
   subscription: Store,
 } as const;
 
-const MARQUEE_ITEMS = [
-  { icon: Truck, en: "1–3 day delivery", fr: "Livraison 1–3 jours" },
-  { icon: ShieldCheck, en: "Buyer protection", fr: "Protection acheteur" },
-  { icon: RotateCcw, en: "30-day returns", fr: "Retours 30 jours" },
-  { icon: Wallet, en: "Card · COD · Wallet", fr: "Carte · COD · Portefeuille" },
-  { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
-  { icon: Headphones, en: "24/7 support", fr: "Support 24/7" },
-  { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },
-] as const;
+const MARQUEE_ITEMS: { icon: typeof Truck; key: TranslationKey }[] = [
+  { icon: Truck, key: "marqueeDelivery13" },
+  { icon: ShieldCheck, key: "marqueeBuyerProtection" },
+  { icon: RotateCcw, key: "marquee30DayReturns" },
+  { icon: Wallet, key: "marqueePaymentMethods" },
+  { icon: BadgeCheck, key: "verifiedSellers" },
+  { icon: Headphones, key: "marquee247Support" },
+  { icon: Globe, key: "marqueeBilingual" },
+];
 
 function SectionIntro({
   label,
@@ -94,10 +96,9 @@ function SectionIntro({
 }
 
 export default function HomePage() {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const { persona, isAuthenticated, authReady } = useAuth();
   const router = useRouter();
-  const fr = locale === "fr";
   const role = persona.role as UserRole;
   const [explorePortal, setExplorePortal] = useState<string | undefined>(undefined);
   const [query, setQuery] = useState("");
@@ -118,6 +119,7 @@ export default function HomePage() {
   const sellPath = CONVERSION_PATHS.find((p) => p.id === "seller")!;
   const staffPath = CONVERSION_PATHS.find((p) => p.id === "staff")!;
   const heroProducts = products.slice(0, 2);
+  const heroBullets = locale === "fr" ? PRODUCT_HERO.bulletsFr : PRODUCT_HERO.bullets;
 
   return (
     <div className="min-h-screen bg-white">
@@ -126,9 +128,9 @@ export default function HomePage() {
         <div className="announce-bar relative z-[60]">
           <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-10 py-2 text-center text-xs font-medium sm:text-sm">
             <Sparkles className="hidden h-4 w-4 sm:block" />
-            <span>{fr ? "Livraison gratuite sur votre première commande" : "Free delivery on your first order"}</span>
+            <span>{t("freeDeliveryFirstOrder")}</span>
             <Link href="/shop/products" className="font-bold underline underline-offset-2">
-              {fr ? "Acheter →" : "Shop now →"}
+              {t("shopNowArrow")}
             </Link>
             <button
               onClick={() => setShowBar(false)}
@@ -152,15 +154,15 @@ export default function HomePage() {
           <div className="animate-rise">
             <span className="inline-flex items-center gap-2 rounded-full border border-[var(--primary-tint)] bg-[var(--primary-light)] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
               <Sparkles className="h-3.5 w-3.5 text-[var(--brand-red)]" />
-              {BRAND.fullName} · {fr ? "Marketplace en ligne" : "Online marketplace"}
+              {BRAND.fullName} · {t("onlineMarketplace")}
             </span>
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-5xl font-extrabold leading-[1.02] tracking-tight text-slate-900 text-balance sm:text-6xl lg:text-[4.25rem]">
-              {fr ? "Achetez malin," : "Shop smarter,"}
+              {t("shopSmarter")}
               <br />
-              <span className="text-gradient-brand">{fr ? "livré plus vite." : "delivered faster."}</span>
+              <span className="text-gradient-brand">{t("deliveredFaster")}</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
-              {fr ? PRODUCT_HERO.subtitleFr : PRODUCT_HERO.subtitle}
+              {localizedField(locale, PRODUCT_HERO.subtitle, PRODUCT_HERO.subtitleFr)}
             </p>
 
             {/* Search */}
@@ -170,13 +172,13 @@ export default function HomePage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={fr ? "Rechercher produits, marques, catégories…" : "Search products, brands and categories…"}
+                  placeholder={t("searchCategoriesPlaceholder")}
                   className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  aria-label={fr ? "Rechercher" : "Search"}
+                  aria-label={t("search")}
                 />
                 <button type="submit" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
                   <Search className="h-4 w-4 sm:hidden" />
-                  <span className="hidden sm:inline">{fr ? "Rechercher" : "Search"}</span>
+                  <span className="hidden sm:inline">{t("search")}</span>
                 </button>
               </div>
               <SearchAutocomplete query={query} onSelect={() => setQuery("")} />
@@ -184,14 +186,14 @@ export default function HomePage() {
 
             {/* Quick categories */}
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400">{fr ? "Populaire :" : "Popular:"}</span>
+              <span className="text-xs font-semibold text-slate-400">{t("popularColon")}</span>
               {categories.slice(0, 5).map((c) => (
                 <Link
                   key={c.id}
                   href="/shop/products"
                   className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-[var(--primary-tint)] hover:text-[var(--primary)]"
                 >
-                  {fr ? c.nameFr : c.name}
+                  {localizedField(locale, c.name, c.nameFr)}
                 </Link>
               ))}
             </div>
@@ -199,14 +201,14 @@ export default function HomePage() {
             {/* CTAs */}
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/shop/products" className="btn-primary inline-flex items-center gap-2 px-7 py-3.5 text-base">
-                {fr ? "Tout parcourir" : "Browse products"}
+                {t("browseProducts")}
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 href="/sell-online"
                 className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold text-slate-700 transition-colors hover:bg-slate-100"
               >
-                {fr ? "Vendre sur Somba" : "Sell on Somba"}
+                {t("sellOnSomba")}
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
@@ -231,12 +233,12 @@ export default function HomePage() {
                   <span className="flex items-center gap-1 font-bold text-slate-900">
                     4.8 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                   </span>
-                  <span className="text-xs text-slate-500">{fr ? "48K+ acheteurs satisfaits" : "48K+ happy shoppers"}</span>
+                  <span className="text-xs text-slate-500">{t("happyShoppers48k")}</span>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
                 <BadgeCheck className="h-4 w-4 text-[var(--primary)]" />
-                {fr ? "Vendeurs vérifiés" : "Verified sellers"}
+                {t("verifiedSellers")}
               </span>
             </div>
           </div>
@@ -249,7 +251,7 @@ export default function HomePage() {
                 <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
                     src={heroProducts[1].image}
-                    alt={fr ? heroProducts[1].nameFr : heroProducts[1].name}
+                    alt={localizedField(locale, heroProducts[1].name, heroProducts[1].nameFr)}
                     fill
                     preload
                     sizes="320px"
@@ -260,7 +262,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <div className="p-4">
-                  <p className="line-clamp-1 text-sm font-bold text-slate-900">{fr ? heroProducts[1].nameFr : heroProducts[1].name}</p>
+                  <p className="line-clamp-1 text-sm font-bold text-slate-900">{localizedField(locale, heroProducts[1].name, heroProducts[1].nameFr)}</p>
                   <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-extrabold text-[var(--primary)]">
                     {formatCurrency(heroProducts[1].price, locale)}
                   </p>
@@ -272,14 +274,14 @@ export default function HomePage() {
                 <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
                     src={heroProducts[0].image}
-                    alt={fr ? heroProducts[0].nameFr : heroProducts[0].name}
+                    alt={localizedField(locale, heroProducts[0].name, heroProducts[0].nameFr)}
                     fill
                     sizes="240px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
                 <div className="p-3">
-                  <p className="line-clamp-1 text-xs font-bold text-slate-900">{fr ? heroProducts[0].nameFr : heroProducts[0].name}</p>
+                  <p className="line-clamp-1 text-xs font-bold text-slate-900">{localizedField(locale, heroProducts[0].name, heroProducts[0].nameFr)}</p>
                   <p className="mt-0.5 text-sm font-extrabold text-[var(--primary)]">{formatCurrency(heroProducts[0].price, locale)}</p>
                 </div>
               </Link>
@@ -291,13 +293,13 @@ export default function HomePage() {
               >
                 <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-white/25">
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-red)] animate-pulse" />
-                  {fr ? "Offres flash" : "Flash deals"}
+                  {t("flashDeals")}
                 </span>
                 <div>
-                  <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold">{fr ? "−50%" : "−50%"}</p>
-                  <p className="text-sm text-white/80">{fr ? "sur une sélection" : "on selected items"}</p>
+                  <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold">−50%</p>
+                  <p className="text-sm text-white/80">{t("onSelectedItems")}</p>
                   <span className="mt-2 inline-flex items-center gap-1 text-sm font-bold">
-                    {fr ? "Voir" : "Shop"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    {t("shopCta")} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </span>
                 </div>
               </Link>
@@ -310,7 +312,7 @@ export default function HomePage() {
               </span>
               <div>
                 <p className="text-sm font-extrabold leading-none text-slate-900">4.8 / 5</p>
-                <p className="text-[11px] text-slate-500">{fr ? "12k+ avis" : "12k+ reviews"}</p>
+                <p className="text-[11px] text-slate-500">{t("reviews12k")}</p>
               </div>
             </div>
             <div className="showcase-chip float-b absolute -bottom-5 right-6 flex items-center gap-2 px-3.5 py-2.5">
@@ -318,8 +320,8 @@ export default function HomePage() {
                 <Truck className="h-4 w-4 text-[var(--primary)]" />
               </span>
               <div>
-                <p className="text-sm font-extrabold leading-none text-slate-900">{fr ? "Livraison rapide" : "Fast delivery"}</p>
-                <p className="text-[11px] text-slate-500">{fr ? "1–3 jours" : "1–3 days"}</p>
+                <p className="text-sm font-extrabold leading-none text-slate-900">{t("fastDelivery")}</p>
+                <p className="text-[11px] text-slate-500">{t("days13")}</p>
               </div>
             </div>
           </div>
@@ -332,7 +334,7 @@ export default function HomePage() {
               {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((m, i) => (
                 <span key={i} className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-500">
                   <m.icon className="h-4 w-4 text-[var(--primary)]" />
-                  {fr ? m.fr : m.en}
+                  {t(m.key)}
                 </span>
               ))}
             </div>
@@ -345,11 +347,11 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <span className="section-label">{fr ? "Catégories" : "Categories"}</span>
-              <h2 className="section-title mt-3 text-3xl">{fr ? "Acheter par catégorie" : "Shop by category"}</h2>
+              <span className="section-label">{t("categories")}</span>
+              <h2 className="section-title mt-3 text-3xl">{t("shopByCategory")}</h2>
             </div>
             <Link href="/shop/products" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline sm:inline-flex">
-              {fr ? "Tout voir" : "View all"} <ArrowRight className="h-4 w-4" />
+              {t("viewAll")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="cat-rail mt-8">
@@ -358,7 +360,7 @@ export default function HomePage() {
                 <div className="relative aspect-[5/4] overflow-hidden">
                   <Image
                     src={cat.image}
-                    alt={fr ? cat.nameFr : cat.name}
+                    alt={localizedField(locale, cat.name, cat.nameFr)}
                     fill
                     sizes="160px"
                     className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -369,7 +371,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <p className="px-3 py-2.5 text-sm font-bold text-slate-900 group-hover:text-[var(--primary)]">
-                  {fr ? cat.nameFr : cat.name}
+                  {localizedField(locale, cat.name, cat.nameFr)}
                 </p>
               </Link>
             ))}
@@ -382,12 +384,12 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex items-end justify-between gap-4">
             <SectionIntro
-              label={fr ? "Sélection" : "Trending"}
-              title={fr ? "Produits populaires" : "Trending this week"}
-              desc={fr ? "Les articles les mieux notés par nos acheteurs." : "Top-rated picks loved by shoppers right now."}
+              label={t("trendingSelection")}
+              title={t("trendingThisWeek")}
+              desc={t("trendingDesc")}
             />
             <Link href="/shop/products" className="mb-1 hidden shrink-0 items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline sm:inline-flex">
-              {fr ? "Boutique complète" : "Full shop"} <ArrowRight className="h-4 w-4" />
+              {t("fullShop")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
@@ -396,7 +398,7 @@ export default function HomePage() {
                 <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
                     src={p.image}
-                    alt={fr ? p.nameFr : p.name}
+                    alt={localizedField(locale, p.name, p.nameFr)}
                     fill
                     sizes="(max-width: 1024px) 50vw, 280px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -412,7 +414,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <div className="p-4">
-                  <p className="line-clamp-1 text-sm font-bold text-slate-900 group-hover:text-[var(--primary)]">{fr ? p.nameFr : p.name}</p>
+                  <p className="line-clamp-1 text-sm font-bold text-slate-900 group-hover:text-[var(--primary)]">{localizedField(locale, p.name, p.nameFr)}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{p.seller}</p>
                   <div className="mt-2.5 flex items-baseline gap-2">
                     <span className="font-[family-name:var(--font-display)] text-lg font-extrabold text-[var(--primary)]">
@@ -434,9 +436,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Services" : "Why Somba"}
-            title={fr ? MODULES_SECTION.titleFr : MODULES_SECTION.title}
-            desc={fr ? MODULES_SECTION.subtitleFr : MODULES_SECTION.subtitle}
+            label={t("whySomba")}
+            title={localizedField(locale, MODULES_SECTION.title, MODULES_SECTION.titleFr)}
+            desc={localizedField(locale, MODULES_SECTION.subtitle, MODULES_SECTION.subtitleFr)}
           />
 
           <div className="mt-12 grid gap-4 lg:grid-cols-4 lg:grid-rows-2 lg:auto-rows-fr">
@@ -454,7 +456,7 @@ export default function HomePage() {
                     <div className="relative flex w-full flex-col justify-end overflow-hidden p-7 text-white">
                       <Image
                         src={mod.image}
-                        alt={fr ? mod.nameFr : mod.name}
+                        alt={localizedField(locale, mod.name, mod.nameFr)}
                         fill
                         sizes="(max-width: 1024px) 100vw, 560px"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -465,12 +467,12 @@ export default function HomePage() {
                           <Icon className="h-6 w-6" />
                         </span>
                         <span className="mt-4 inline-flex rounded-full bg-[var(--brand-red)] px-3 py-1 text-[11px] font-bold uppercase tracking-wide">
-                          {fr ? mod.highlightFr : mod.highlight}
+                          {localizedField(locale, mod.highlight, mod.highlightFr)}
                         </span>
-                        <h3 className="mt-3 font-[family-name:var(--font-display)] text-2xl font-extrabold">{fr ? mod.nameFr : mod.name}</h3>
-                        <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">{fr ? mod.descFr : mod.desc}</p>
+                        <h3 className="mt-3 font-[family-name:var(--font-display)] text-2xl font-extrabold">{localizedField(locale, mod.name, mod.nameFr)}</h3>
+                        <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">{localizedField(locale, mod.desc, mod.descFr)}</p>
                         <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold">
-                          {fr ? mod.ctaFr : mod.cta}
+                          {localizedField(locale, mod.cta, mod.ctaFr)}
                           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                         </span>
                       </div>
@@ -482,15 +484,15 @@ export default function HomePage() {
                       </span>
                       <div className="mt-4 flex items-center gap-2">
                         <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 group-hover:text-[var(--primary)]">
-                          {fr ? mod.nameFr : mod.name}
+                          {localizedField(locale, mod.name, mod.nameFr)}
                         </h3>
                         <span className="rounded-full bg-[var(--brand-red-light)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand-red)]">
-                          {fr ? mod.highlightFr : mod.highlight}
+                          {localizedField(locale, mod.highlight, mod.highlightFr)}
                         </span>
                       </div>
-                      <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{fr ? mod.descFr : mod.desc}</p>
+                      <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{localizedField(locale, mod.desc, mod.descFr)}</p>
                       <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary)]">
-                        {fr ? mod.ctaFr : mod.cta}
+                        {localizedField(locale, mod.cta, mod.ctaFr)}
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </span>
                     </div>
@@ -507,9 +509,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Par où commencer" : "Where to start"}
-            title={fr ? "Acheter ou vendre — au même endroit" : "Shop or sell — all in one place"}
-            desc={fr ? "Que vous achetiez ou développiez votre activité, tout commence ici." : "Whether you're buying or growing a business, it starts here."}
+            label={t("whereToStart")}
+            title={t("shopOrSellTitle")}
+            desc={t("shopOrSellDesc")}
           />
 
           <div className="mt-12 grid gap-6 lg:grid-cols-2">
@@ -519,11 +521,11 @@ export default function HomePage() {
                 <ShoppingBag className="h-6 w-6" />
               </span>
               <h3 className="mt-6 font-[family-name:var(--font-display)] text-2xl font-extrabold text-slate-900">
-                {fr ? shopPath.titleFr : shopPath.title}
+                {localizedField(locale, shopPath.title, shopPath.titleFr)}
               </h3>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-600">{fr ? shopPath.descFr : shopPath.desc}</p>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-600">{localizedField(locale, shopPath.desc, shopPath.descFr)}</p>
               <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
-                {(fr ? PRODUCT_HERO.bulletsFr : PRODUCT_HERO.bullets).map((b) => (
+                {heroBullets.map((b) => (
                   <li key={b} className="flex items-start gap-2 text-sm text-slate-700">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--primary)]" />
                     {b}
@@ -531,7 +533,7 @@ export default function HomePage() {
                 ))}
               </ul>
               <Link href={shopPath.href} className="btn-primary mt-8 inline-flex w-fit items-center gap-2 px-7 py-3.5 text-base">
-                {fr ? shopPath.ctaFr : shopPath.cta}
+                {localizedField(locale, shopPath.cta, shopPath.ctaFr)}
                 <ArrowRight className="h-5 w-5" />
               </Link>
             </div>
@@ -542,18 +544,18 @@ export default function HomePage() {
                 <Store className="h-6 w-6" />
               </span>
               <h3 className="mt-6 font-[family-name:var(--font-display)] text-2xl font-extrabold">
-                {fr ? sellPath.titleFr : sellPath.title}
+                {localizedField(locale, sellPath.title, sellPath.titleFr)}
               </h3>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/80">{fr ? sellPath.descFr : sellPath.desc}</p>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/80">{localizedField(locale, sellPath.desc, sellPath.descFr)}</p>
               <div className="mt-6 flex flex-wrap gap-2.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <Clock className="h-3.5 w-3.5" /> {fr ? "En ligne en 24 h" : "Live in 24 hours"}
+                  <Clock className="h-3.5 w-3.5" /> {t("liveIn24h")}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <Users className="h-3.5 w-3.5" /> {fr ? "48K+ clients" : "48K+ customers"}
+                  <Users className="h-3.5 w-3.5" /> {t("customers48k")}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <TrendingUp className="h-3.5 w-3.5" /> {fr ? "Dès 49 $/mois" : "From $49/mo"}
+                  <TrendingUp className="h-3.5 w-3.5" /> {t("from49mo")}
                 </span>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -561,11 +563,11 @@ export default function HomePage() {
                   href={sellPath.href}
                   className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-bold text-[var(--primary)] shadow-lg transition-all hover:-translate-y-0.5"
                 >
-                  {fr ? sellPath.ctaFr : sellPath.cta}
+                  {localizedField(locale, sellPath.cta, sellPath.ctaFr)}
                   <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link href="/sell-online" className="text-sm font-semibold text-white/80 underline-offset-4 hover:text-white hover:underline">
-                  {fr ? "Voir les plans →" : "View plans →"}
+                  {t("viewPlans")}
                 </Link>
               </div>
             </div>
@@ -581,12 +583,12 @@ export default function HomePage() {
                 <Shield className="h-5 w-5" />
               </span>
               <div>
-                <p className="font-bold text-slate-900">{fr ? staffPath.titleFr : staffPath.title}</p>
-                <p className="text-sm text-slate-500">{fr ? staffPath.descFr : staffPath.desc}</p>
+                <p className="font-bold text-slate-900">{localizedField(locale, staffPath.title, staffPath.titleFr)}</p>
+                <p className="text-sm text-slate-500">{localizedField(locale, staffPath.desc, staffPath.descFr)}</p>
               </div>
             </div>
             <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-[var(--primary)]">
-              {fr ? staffPath.ctaFr : staffPath.cta}
+              {localizedField(locale, staffPath.cta, staffPath.ctaFr)}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </span>
           </Link>
@@ -598,9 +600,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Processus" : "How it works"}
-            title={fr ? "De la découverte à la livraison" : "From browse to doorstep"}
-            desc={fr ? PRODUCT_HERO.introFr : PRODUCT_HERO.intro}
+            label={t("howItWorks")}
+            title={t("fromBrowseToDoorstep")}
+            desc={localizedField(locale, PRODUCT_HERO.intro, PRODUCT_HERO.introFr)}
           />
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {HOW_IT_WORKS.map((step) => (
@@ -612,9 +614,9 @@ export default function HomePage() {
                   <span className="h-2 w-2 rounded-full bg-[var(--brand-red)]" />
                 </div>
                 <h3 className="mt-4 font-[family-name:var(--font-display)] text-base font-bold text-slate-900">
-                  {fr ? step.titleFr : step.title}
+                  {localizedField(locale, step.title, step.titleFr)}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{fr ? step.descFr : step.desc}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{localizedField(locale, step.desc, step.descFr)}</p>
               </div>
             ))}
           </div>
@@ -626,13 +628,13 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Écosystème" : "Ecosystem"}
-            title={fr ? PORTAL_SECTION.titleFr : PORTAL_SECTION.title}
-            desc={fr ? PORTAL_SECTION.subtitleFr : PORTAL_SECTION.subtitle}
+            label={t("ecosystem")}
+            title={localizedField(locale, PORTAL_SECTION.title, PORTAL_SECTION.titleFr)}
+            desc={localizedField(locale, PORTAL_SECTION.subtitle, PORTAL_SECTION.subtitleFr)}
           />
           <div className="mt-14">
             <PortalOverviewCards
-              fr={fr}
+              locale={locale}
               role={role}
               isAuthenticated={isAuthenticated}
               authReady={authReady}
@@ -642,7 +644,7 @@ export default function HomePage() {
           </div>
           <div className="mt-16">
             <PortalExplorer
-              fr={fr}
+              locale={locale}
               role={role}
               isAuthenticated={isAuthenticated}
               authReady={authReady}
@@ -660,7 +662,7 @@ export default function HomePage() {
             {PLATFORM_STATS.map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className="big-stat text-gradient-brand text-5xl lg:text-6xl">{stat.value}</p>
-                <p className="mt-3 text-sm font-semibold text-slate-500">{fr ? stat.labelFr : stat.label}</p>
+                <p className="mt-3 text-sm font-semibold text-slate-500">{localizedField(locale, stat.label, stat.labelFr)}</p>
               </div>
             ))}
           </div>
@@ -672,13 +674,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Vendeurs" : "For sellers"}
-            title={fr ? "Vendez sur Somba & Tekka" : "Sell on Somba & Tekka"}
-            desc={
-              fr
-                ? "Ouvrez votre boutique — choisissez un plan et commencez à vendre."
-                : "Open your store — pick a plan and start selling to customers nationwide."
-            }
+            label={t("forSellers")}
+            title={t("sellOnSombaTekka")}
+            desc={t("sellPlansDesc")}
           />
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-3">
             {SELLER_PLANS.map((plan) => (
@@ -687,13 +685,13 @@ export default function HomePage() {
                   <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">{plan.name}</h3>
                   {plan.popular && (
                     <span className="rounded-full bg-[var(--brand-red)] px-2 py-0.5 text-[10px] font-bold text-white">
-                      {fr ? "Populaire" : "Popular"}
+                      {t("popular")}
                     </span>
                   )}
                 </div>
                 <p className="mt-2 text-sm text-slate-500">{plan.desc}</p>
                 <p className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900">
-                  {plan.price !== null ? `$${plan.price}` : fr ? "Sur mesure" : "Custom"}
+                  {plan.price !== null ? `$${plan.price}` : t("custom")}
                   {plan.price !== null && <span className="text-sm font-medium text-slate-500">/mo</span>}
                 </p>
                 <ul className="mt-6 flex-1 space-y-2.5">
@@ -711,13 +709,13 @@ export default function HomePage() {
                     plan.popular ? "btn-primary" : "border border-slate-200 text-slate-800 hover:bg-slate-50"
                   )}
                 >
-                  {plan.id === "enterprise" ? (fr ? "Nous contacter" : "Contact sales") : fr ? "S'abonner" : "Get started"}
+                  {plan.id === "enterprise" ? t("contactSales") : t("subscribe")}
                 </Link>
               </div>
             ))}
           </div>
           <Link href="/sell-online" className="mx-auto mt-8 flex w-fit items-center gap-1.5 text-sm font-bold text-[var(--primary)] hover:underline">
-            {fr ? "En savoir plus sur la vente en ligne" : "Learn more about selling online"}
+            {t("learnMoreSelling")}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -728,26 +726,26 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Témoignages" : "Testimonials"}
-            title={fr ? "Ce que disent nos clients" : "Loved by shoppers & sellers"}
+            label={t("testimonials")}
+            title={t("lovedByShoppers")}
           />
           <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="landing-testimonial p-7">
+            {TESTIMONIALS.map((item) => (
+              <div key={item.name} className="landing-testimonial p-7">
                 <Quote className="absolute right-5 top-5 h-9 w-9 text-[var(--primary-tint)]" />
                 <div className="flex gap-1 text-amber-400">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star key={i} className="h-3.5 w-3.5 fill-current" />
                   ))}
                 </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{fr ? t.quoteFr : t.quote}&rdquo;</p>
+                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{localizedField(locale, item.quote, item.quoteFr)}&rdquo;</p>
                 <div className="mt-6 flex items-center gap-3 border-t border-[var(--border)] pt-5">
                   <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-xs font-bold text-white shadow-md">
-                    {t.initials}
+                    {item.initials}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{fr ? t.roleFr : t.role}</p>
+                    <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                    <p className="text-xs text-slate-500">{localizedField(locale, item.role, item.roleFr)}</p>
                   </div>
                 </div>
               </div>
@@ -759,9 +757,9 @@ export default function HomePage() {
       {/* ── FAQ ── */}
       <section className="landing-section-alt border-t border-[var(--border)] py-20">
         <div className="mx-auto max-w-3xl px-4">
-          <SectionIntro center label="FAQ" title={fr ? "Questions fréquentes" : "Common questions"} />
+          <SectionIntro center label="FAQ" title={t("commonQuestions")} />
           <div className="mt-10">
-            <FaqAccordion fr={fr} />
+            <FaqAccordion />
           </div>
         </div>
       </section>
@@ -773,23 +771,21 @@ export default function HomePage() {
             <ShoppingBag className="h-7 w-7 text-white" />
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight text-balance lg:text-5xl">
-            {fr ? "Prêt à acheter ou vendre ?" : "Ready to shop or sell?"}
+            {t("readyToShopOrSell")}
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-lg text-white/75">
-            {fr
-              ? "Parcourez des milliers de produits ou ouvrez votre boutique sur Somba & Tekka."
-              : "Browse thousands of products or open your seller store on Somba & Tekka."}
+            {t("readyToShopOrSellDesc")}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/shop/products"
               className="inline-flex items-center gap-2 rounded-xl bg-white px-10 py-4 text-base font-bold text-[var(--primary)] shadow-xl shadow-blue-950/30 transition-all hover:-translate-y-0.5"
             >
-              {fr ? "Acheter maintenant" : "Shop now"}
+              {t("shopNowCta")}
               <ArrowRight className="h-5 w-5" />
             </Link>
             <Link href="/sell-online" className="btn-outline-light inline-flex items-center px-10 py-4 text-base">
-              {fr ? "Vendre en ligne" : "Sell online"}
+              {t("sellOnline")}
             </Link>
           </div>
           <div className="mt-10 flex flex-wrap justify-center gap-4">

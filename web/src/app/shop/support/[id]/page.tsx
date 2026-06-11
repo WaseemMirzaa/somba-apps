@@ -15,11 +15,10 @@ export default function ShopSupportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { getTicket, addMessage } = useSupport();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const ticket = getTicket(id);
   const [reply, setReply] = useState("");
 
-  if (!ticket) return <div className="text-center text-slate-500">Ticket not found</div>;
+  if (!ticket) return <div className="text-center text-slate-500">{t("notFound")}</div>;
 
   return (
     <div className="space-y-6">
@@ -30,17 +29,17 @@ export default function ShopSupportDetailPage() {
         actions={<Badge variant={ticket.status === "resolved" ? "success" : "info"}>{statusLabel(locale, ticket.status)}</Badge>}
       />
 
-      <DetailSection title={fr ? "Détails" : "Details"}>
+      <DetailSection title={t("details")}>
         {ticket.orderId && (
           <p className="text-sm">
-            {fr ? "Commande" : "Order"}:{" "}
+            {t("order")}:{" "}
             <Link href={`/shop/orders/${ticket.orderId}`} className="text-blue-600 hover:underline">{ticket.orderId}</Link>
           </p>
         )}
-        <p className="mt-2 text-sm text-slate-500">{fr ? "Priorité" : "Priority"}: {ticket.priority}</p>
+        <p className="mt-2 text-sm text-slate-500">{t("priority")}: {ticket.priority}</p>
       </DetailSection>
 
-      <DetailSection title={fr ? "Conversation" : "Conversation"}>
+      <DetailSection title={t("messages")}>
         <div className="space-y-3">
           {ticket.messages.map((m, i) => (
             <div key={i} className={`rounded-lg p-4 text-sm ${m.role === "customer" ? "bg-blue-50" : "bg-slate-50"}`}>
@@ -54,7 +53,7 @@ export default function ShopSupportDetailPage() {
             <textarea
               className="input-premium mt-4 w-full px-4 py-2 text-sm"
               rows={3}
-              placeholder={fr ? "Votre message..." : "Your message..."}
+              placeholder={t("yourMessagePlaceholder")}
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
@@ -66,7 +65,7 @@ export default function ShopSupportDetailPage() {
                 setReply("");
               }}
             >
-              {fr ? "Envoyer" : "Send Reply"}
+              {t("sendReply")}
             </Button>
           </>
         )}

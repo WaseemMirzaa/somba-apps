@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { useToast } from "@/context/toast-context";
 import { banners } from "@/lib/mock-data";
 import { marketingCampaigns as initialCampaigns } from "@/lib/admin-entities";
@@ -71,7 +72,7 @@ export default function AdminMarketingPage() {
               <Image src={b.image} alt={b.title} fill className="object-cover" sizes="400px" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <p className="absolute bottom-3 left-3 text-sm font-semibold text-white">
-                {locale === "fr" ? b.titleFr : b.title}
+                {localizedField(locale, b.title, b.titleFr)}
               </p>
             </div>
           ))}

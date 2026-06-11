@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Package, Send, Layers, RotateCcw, RefreshCw, DollarSign,
-  AlertTriangle, Clock, Inbox, ArrowUpDown, ArrowUpRight, ArrowDownRight,
+  AlertTriangle, Clock, Inbox, ArrowUpDown,
   Activity, Truck,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   DualMetricChart,
   HorizontalBarChart,
-  Sparkline,
 } from "@/components/charts/dashboard-charts";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { useLocale } from "@/context/locale-context";
 import { L, localizedField } from "@/lib/locale-helpers";
 import { useAuth } from "@/context/auth-context";
@@ -32,51 +32,8 @@ import {
 import { formatCurrency, cn } from "@/lib/utils";
 import { useOpsPath } from "@/lib/ops-path";
 
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-  vsLabel,
-}: {
-  title: string;
-  value: string;
-  change: number;
-  positive?: boolean;
-  spark: number[];
-  icon: React.ComponentType<{ className?: string }>;
-  vsLabel: string;
-}) {
-  const up = change >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
-
-  return (
-    <div className="card-premium p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
-          <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-            {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}{vsLabel}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-xl bg-indigo-50 p-2">
-            <Icon className="h-4 w-4 text-indigo-600" />
-          </div>
-          <Sparkline values={spark} color="#4f46e5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const { t, locale } = useLocale();
-  const fr = locale === "fr";
   const { persona } = useAuth();
   const { getWarehouse } = useWarehouseAdmin();
   const ops = useOpsPath();
@@ -110,14 +67,14 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={t("receivedToday")} value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} vsLabel={vsLabel} />
-        <KpiCard title={t("dispatchedToday")} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} vsLabel={vsLabel} />
-        <KpiCard title={t("onTimeRate")} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} vsLabel={vsLabel} />
-        <KpiCard title={t("codCollected")} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[15200, 16100, 16800, 17200, 17800, 18100, 18420]} icon={DollarSign} vsLabel={vsLabel} />
-        <KpiCard title={t("returnRate")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} vsLabel={vsLabel} />
-        <KpiCard title={t("avgProcessTime")} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} vsLabel={vsLabel} />
-        <KpiCard title={t("activeBatches")} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} vsLabel={vsLabel} />
-        <KpiCard title={t("agedParcels")} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} vsLabel={vsLabel} />
+        <KpiCard title={t("receivedToday")} value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("dispatchedToday")} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("onTimeRate")} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("codCollected")} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[15200, 16100, 16800, 17200, 17800, 18100, 18420]} icon={DollarSign} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("returnRate")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("avgProcessTime")} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("activeBatches")} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
+        <KpiCard title={t("agedParcels")} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} changeSuffix={vsLabel} iconBgClassName="bg-indigo-50" iconClassName="text-indigo-600" sparkColor="#4f46e5" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -142,8 +99,8 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           <CardContent className="space-y-4">
             {warehouseRecentActivity.map((item) => (
               <div key={item.text} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                <p className="text-xs text-slate-400">{fr ? item.timeFr : item.time}</p>
-                <p className="mt-1 text-sm text-slate-700">{fr ? item.textFr : item.text}</p>
+                <p className="text-xs text-slate-400">{localizedField(locale, item.time, item.timeFr)}</p>
+                <p className="mt-1 text-sm text-slate-700">{localizedField(locale, item.text, item.textFr)}</p>
               </div>
             ))}
           </CardContent>

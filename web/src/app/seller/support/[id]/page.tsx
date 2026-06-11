@@ -18,7 +18,6 @@ export default function SellerSupportDetailPage() {
   const { toast } = useToast();
   const { getTicket, addMessage } = useSupport();
   const { locale, t } = useLocale();
-  const fr = locale === "fr";
   const ticket = getTicket(id);
   const [reply, setReply] = useState("");
 
@@ -36,7 +35,7 @@ export default function SellerSupportDetailPage() {
       />
 
       <DetailGrid>
-        <DetailGridSection title={fr ? "Conversation" : "Conversation"} span={2}>
+        <DetailGridSection title={t("messages")} span={2}>
           <div className="space-y-3">
             {ticket.messages.map((m, i) => (
               <div key={i} className={`rounded-lg p-4 text-sm ${m.role === "seller" ? "bg-sky-50" : "bg-emerald-50"}`}>
@@ -47,17 +46,17 @@ export default function SellerSupportDetailPage() {
           </div>
           {ticket.status !== "resolved" && (
             <>
-              <textarea className="mt-4 w-full rounded-lg border border-sky-200 p-3 text-sm" placeholder={fr ? "Répondre..." : "Reply..."} rows={3} value={reply} onChange={(e) => setReply(e.target.value)} />
-              <Button onClick={() => { if (!reply.trim()) return; addMessage(id, "seller", "TechZone Store", reply); setReply(""); toast(fr ? "Réponse envoyée" : "Reply sent"); }} className="mt-2">{fr ? "Envoyer" : "Send Reply"}</Button>
+              <textarea className="mt-4 w-full rounded-lg border border-sky-200 p-3 text-sm" placeholder={t("replyPlaceholder")} rows={3} value={reply} onChange={(e) => setReply(e.target.value)} />
+              <Button onClick={() => { if (!reply.trim()) return; addMessage(id, "seller", "TechZone Store", reply); setReply(""); toast(t("replySent")); }} className="mt-2">{t("sendReply")}</Button>
             </>
           )}
         </DetailGridSection>
 
         <DetailGridSection title={t("details")}>
-          <p className="text-sm"><strong>{fr ? "Priorité" : "Priority"}:</strong> {ticket.priority}</p>
-          <p className="mt-2 text-sm"><strong>{fr ? "Dernière mise à jour" : "Last update"}:</strong> {ticket.lastUpdate}</p>
+          <p className="text-sm"><strong>{t("priority")}:</strong> {ticket.priority}</p>
+          <p className="mt-2 text-sm"><strong>{t("lastUpdate")}:</strong> {ticket.lastUpdate}</p>
           {ticket.orderId && (
-            <Link href={`/seller/orders/${ticket.orderId}`} className="mt-4 inline-block text-sm text-sky-600 hover:underline">{fr ? "Voir commande →" : "View order →"}</Link>
+            <Link href={`/seller/orders/${ticket.orderId}`} className="mt-4 inline-block text-sm text-sky-600 hover:underline">{t("viewOrderLink")}</Link>
           )}
         </DetailGridSection>
 

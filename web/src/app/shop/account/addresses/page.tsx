@@ -16,8 +16,7 @@ const initialAddresses: Address[] = [
 
 export default function ShopAddressesPage() {
   const { toast } = useToast();
-  const { locale, t } = useLocale();
-  const fr = locale === "fr";
+  const { t } = useLocale();
   const [addresses, setAddresses] = useState(initialAddresses);
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -30,13 +29,13 @@ export default function ShopAddressesPage() {
   }
 
   function saveAddress() {
-    if (!form.line1.trim() || !form.city.trim()) { toast(fr ? "Remplissez les champs requis" : "Fill in required fields", "error"); return; }
+    if (!form.line1.trim() || !form.city.trim()) { toast(t("fillRequiredFields"), "error"); return; }
     if (editingId !== null) {
       setAddresses((a) => a.map((addr) => addr.id === editingId ? { ...addr, ...form } : addr));
-      toast(fr ? "Adresse mise à jour" : "Address updated");
+      toast(t("addressUpdated"));
     } else {
-      setAddresses((a) => [...a, { id: Date.now(), ...form, label: form.label || (fr ? "Nouveau" : "New"), default: false }]);
-      toast(fr ? "Adresse ajoutée" : "Address added");
+      setAddresses((a) => [...a, { id: Date.now(), ...form, label: form.label || t("newLabel"), default: false }]);
+      toast(t("addressAdded"));
     }
     resetForm();
   }
@@ -53,12 +52,12 @@ export default function ShopAddressesPage() {
 
       {(showAdd || editingId !== null) && (
         <div className="card-premium space-y-3 p-6">
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Commune / Quartier" : "Commune / District"} value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("addressLabelPlaceholder")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("streetAddressPlaceholder")} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("cityPlaceholder")} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("communePlaceholder")} value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
           <div className="flex gap-2">
-            <Button onClick={saveAddress}>{editingId !== null ? (fr ? "Mettre à jour" : "Update Address") : (fr ? "Enregistrer adresse" : "Save Address")}</Button>
+            <Button onClick={saveAddress}>{editingId !== null ? t("updateAddress") : t("saveAddress")}</Button>
             <Button variant="ghost" onClick={resetForm}>{t("cancel")}</Button>
           </div>
         </div>
@@ -68,10 +67,10 @@ export default function ShopAddressesPage() {
         {addresses.map((addr) => (
           <div key={addr.id} className="card-premium p-5">
             <div className="flex justify-between">
-              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-blue-600">({fr ? "Par défaut" : "Default"})</span>}</p>
+              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-blue-600">({t("defaultLabel")})</span>}</p>
               <div className="flex gap-3">
                 {!addr.default && (
-                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast(fr ? "Adresse par défaut mise à jour" : "Default address updated"); }} className="text-xs text-slate-500 hover:text-blue-600">{fr ? "Définir par défaut" : "Set default"}</button>
+                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast(t("defaultAddressUpdated")); }} className="text-xs text-slate-500 hover:text-blue-600">{t("setDefault")}</button>
                 )}
                 <button
                   onClick={() => {

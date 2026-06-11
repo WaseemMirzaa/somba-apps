@@ -7,27 +7,27 @@ import { Button } from "@/components/ui/button";
 import { getCategory } from "@/lib/admin-entities";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { localizedField } from "@/lib/locale-helpers";
 
 export default function AdminCategoryDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const { toast } = useToast();
   const category = getCategory(Number(id));
-  const fr = locale === "fr";
 
-  if (!category) return <div className="p-8 text-center text-slate-500">Category not found</div>;
+  if (!category) return <div className="p-8 text-center text-slate-500">{t("categoryNotFound")}</div>;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? category.nameFr : category.name} subtitle={`AF-18 · Category ${category.id}`} backHref="/admin/categories" />
-      <DetailSection title={fr ? "Détails" : "Details"}>
+      <PageHeader title={localizedField(locale, category.name, category.nameFr)} subtitle={`AF-18 · Category ${category.id}`} backHref="/admin/categories" />
+      <DetailSection title={t("details")}>
         <InfoGrid items={[
           { label: "ID", value: category.id },
-          { label: fr ? "Nom EN" : "Name EN", value: category.name },
-          { label: fr ? "Nom FR" : "Name FR", value: category.nameFr },
+          { label: t("nameEn"), value: category.name },
+          { label: t("nameFr"), value: category.nameFr },
           { label: "Icon", value: category.icon },
         ]} />
-        <Button className="mt-4" size="sm" onClick={() => toast(fr ? "Catégorie enregistrée" : "Category saved")}>{fr ? "Enregistrer" : "Save"}</Button>
+        <Button className="mt-4" size="sm" onClick={() => toast(t("categorySaved"))}>{t("save")}</Button>
       </DetailSection>
     </div>
   );

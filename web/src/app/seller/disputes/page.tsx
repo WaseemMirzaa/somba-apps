@@ -7,11 +7,11 @@ import { useLocale } from "@/context/locale-context";
 
 export default function SellerDisputesPage() {
   const { disputes } = useDisputes();
-  const { locale } = useLocale();
+  const { t } = useLocale();
 
   return (
     <div className="space-y-6">
-      <PageHeader title={locale === "fr" ? "Litiges" : "Disputes"} />
+      <PageHeader title={t("disputes")} />
       <div className="space-y-2">
         {disputes.map((d) => (
           <Link key={d.id} href={`/seller/disputes/${d.id}`} className="block rounded-xl border p-4 hover:border-sky-200">

@@ -8,42 +8,32 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { useReturns } from "@/context/return-context";
 import { useLocale } from "@/context/locale-context";
-import { localizedField, timelineLabel } from "@/lib/locale-helpers";
-
-const STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  requested: { en: "Requested", fr: "Demandé" },
-  approved: { en: "Approved — pickup scheduled", fr: "Approuvé — enlèvement planifié" },
-  in_transit: { en: "In transit", fr: "En transit" },
-  received: { en: "Received at warehouse", fr: "Reçu à l'entrepôt" },
-  refunded: { en: "Refunded", fr: "Remboursé" },
-  rejected: { en: "Rejected", fr: "Rejeté" },
-};
+import { localizedField, statusLabel, timelineLabel } from "@/lib/locale-helpers";
 
 export default function ReturnStatusPage() {
   const { id } = useParams<{ id: string }>();
   const { getReturn } = useReturns();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const ret = getReturn(id);
-  const fr = locale === "fr";
 
-  if (!ret) return <div className="text-center text-slate-500">Return not found</div>;
+  if (!ret) return <div className="text-center text-slate-500">{t("notFound")}</div>;
 
   return (
     <div className="space-y-6">
       <PageHeader title={ret.id} subtitle={ret.orderId} backHref="/shop/returns" />
-      <DetailSection title={fr ? "Statut du retour" : "Return Status"}>
+      <DetailSection title={t("returnStatus")}>
         <InfoGrid items={[
-          { label: fr ? "Statut" : "Status", value: fr ? STATUS_LABELS[ret.status]?.fr : STATUS_LABELS[ret.status]?.en },
-          { label: fr ? "Raison" : "Reason", value: localizedField(locale, ret.reason, ret.reasonFr) },
-          { label: fr ? "Articles" : "Items", value: ret.items.join(", "), full: true },
-          ...(ret.refundAmount ? [{ label: fr ? "Remboursement" : "Refund", value: <DualCurrency amount={ret.refundAmount} /> }] : []),
+          { label: t("status"), value: statusLabel(locale, ret.status) },
+          { label: t("reason"), value: localizedField(locale, ret.reason, ret.reasonFr) },
+          { label: t("items"), value: ret.items.join(", "), full: true },
+          ...(ret.refundAmount ? [{ label: t("refundLabel2"), value: <DualCurrency amount={ret.refundAmount} /> }] : []),
         ]} />
         <Link href={`/shop/orders/${ret.orderId}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">
-          {fr ? "Voir commande →" : "View order →"}
+          {t("viewOrderLink")}
         </Link>
       </DetailSection>
       {ret.timeline && ret.timeline.length > 0 && (
-        <DetailSection title={fr ? "Suivi" : "Tracking"}>
+        <DetailSection title={t("track")}>
           <ActivityTimeline events={ret.timeline.map((e) => ({ time: e.time, label: timelineLabel(locale, e.label, e.labelFr), done: e.done }))} />
         </DetailSection>
       )}

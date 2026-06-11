@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { MapPin, Phone, Navigation, CheckCircle } from "lucide-react";
+import { Phone, Navigation, CheckCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,17 +11,16 @@ import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { getRiderTask, riderBatches } from "@/lib/rider-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
+import { statusLabel } from "@/lib/locale-helpers";
 
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
-  const { toast } = useToast();
+  const { locale, t } = useLocale();
   const task = getRiderTask(id);
   const [delivered, setDelivered] = useState(task?.status === "delivered");
 
   if (!task) {
-    return <div className="text-center text-slate-500">Task not found</div>;
+    return <div className="text-center text-slate-500">{t("notFound")}</div>;
   }
 
   const status = delivered ? "delivered" : task.status;
@@ -31,7 +30,7 @@ export default function RiderTaskDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={task.id}
-        subtitle={`${task.type} · ${status.replace("_", " ")}`}
+        subtitle={`${task.type} · ${statusLabel(locale, status)}`}
         backHref="/rider/tasks"
       />
 
@@ -41,19 +40,19 @@ export default function RiderTaskDetailPage() {
         <Badge>{task.distance}</Badge>
       </div>
 
-      <DetailSection title="Customer">
+      <DetailSection title={t("customer")}>
         <InfoGrid items={[
-          { label: "Name", value: task.customer },
-          { label: "Phone", value: task.phone },
-          { label: "Address", value: task.address, full: true },
-          { label: "Order", value: <Link href={`/shop/orders/${task.orderId}/tracking`} className="text-emerald-600 hover:underline">{task.orderId}</Link> },
-          ...(batch ? [{ label: "Batch", value: <Link href={`/rider/batches/${batch.id}`} className="text-emerald-600 hover:underline">{batch.id}</Link> }] : []),
+          { label: t("name"), value: task.customer },
+          { label: t("phone"), value: task.phone },
+          { label: t("address"), value: task.address, full: true },
+          { label: t("order"), value: <Link href={`/shop/orders/${task.orderId}/tracking`} className="text-emerald-600 hover:underline">{task.orderId}</Link> },
+          ...(batch ? [{ label: t("batch"), value: <Link href={`/rider/batches/${batch.id}`} className="text-emerald-600 hover:underline">{batch.id}</Link> }] : []),
         ]} />
       </DetailSection>
 
       {task.codAmount && (
         <div className="card-premium border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-sm font-medium text-emerald-800">COD Collection</p>
+          <p className="text-sm font-medium text-emerald-800">{t("codCollection")}</p>
           <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-emerald-700">
             {formatCurrency(task.codAmount, locale)}
           </p>
@@ -62,7 +61,7 @@ export default function RiderTaskDetailPage() {
 
       {task.notes && (
         <div className="card-premium p-4">
-          <p className="text-xs font-semibold uppercase text-slate-500">Notes</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">{t("notes")}</p>
           <p className="mt-1 text-sm text-slate-700">{task.notes}</p>
         </div>
       )}
@@ -71,7 +70,7 @@ export default function RiderTaskDetailPage() {
         <a href={`tel:${task.phone.replace(/\s/g, "")}`} className="contents">
           <Button variant="secondary" className="w-full">
             <Phone className="h-4 w-4" />
-            Call
+            {t("call")}
           </Button>
         </a>
         <a
@@ -82,7 +81,7 @@ export default function RiderTaskDetailPage() {
         >
           <Button variant="secondary" className="w-full">
             <Navigation className="h-4 w-4" />
-            Navigate
+            {t("navigate")}
           </Button>
         </a>
       </div>
@@ -91,10 +90,10 @@ export default function RiderTaskDetailPage() {
         <div className="flex flex-col gap-2">
           <Link href={`/rider/tasks/${id}/pod`} className="btn-primary flex w-full items-center justify-center gap-2 py-3">
             <CheckCircle className="h-4 w-4" />
-            {locale === "fr" ? "Preuve de livraison" : "Proof of Delivery"}
+            {t("proofOfDelivery")}
           </Link>
           <Link href={`/rider/tasks/${id}/fail`} className="rounded-xl border border-red-200 py-2 text-center text-sm text-red-600">
-            {locale === "fr" ? "Échec livraison" : "Failed Delivery"}
+            {t("failedDelivery")}
           </Link>
         </div>
       )}
