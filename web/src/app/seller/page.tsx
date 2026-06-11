@@ -66,6 +66,7 @@ function KpiCard({
   positive,
   spark,
   icon: Icon,
+  vsLabel,
 }: {
   title: string;
   value: string;
@@ -73,6 +74,7 @@ function KpiCard({
   positive?: boolean;
   spark: number[];
   icon: React.ComponentType<{ className?: string }>;
+  vsLabel: string;
 }) {
   const up = change >= 0;
   const good = positive !== undefined ? (positive ? up : !up) : up;
@@ -85,7 +87,7 @@ function KpiCard({
           <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}% vs last period
+            {Math.abs(change)}{vsLabel}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -109,18 +111,20 @@ export default function SellerDashboard() {
   const revenueSpark = sellerRevenueTrend.map((d) => d.revenue);
   const ordersSpark = sellerRevenueTrend.map((d) => d.orders);
 
+  const vsLabel = t("vsLastPeriod");
+
   const quickActions = [
-    { href: "/seller/orders", label: t("orders"), sub: `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
-    { href: "/seller/products/create", label: t("createProduct"), sub: "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/seller/finance/payouts/request", label: "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
-    { href: "/seller/promotions/create", label: "New promotion", sub: "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
+    { href: "/seller/orders", label: t("orders"), sub: `${s.pendingOrders} ${t("pending").toLowerCase()}`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
+    { href: "/seller/products/create", label: t("createProduct"), sub: t("addListing"), icon: Package, color: "bg-emerald-50 text-emerald-700" },
+    { href: "/seller/finance/payouts/request", label: t("requestPayout"), sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
+    { href: "/seller/promotions/create", label: t("newPromotion"), sub: t("boostSales"), icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={sellerStore.name}
-        subtitle={`${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Seller · ⭐ ${sellerStore.rating} · Health ${sellerStore.healthScore}%`}
+        subtitle={`${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} ${t("sellerBadge")} · ⭐ ${sellerStore.rating} · ${t("healthScoreLabel")} ${sellerStore.healthScore}%`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/seller/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
@@ -135,14 +139,14 @@ export default function SellerDashboard() {
 
       {/* KPI grid with sparklines */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Revenue (MTD)" value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} />
-        <KpiCard title="Orders (MTD)" value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} />
-        <KpiCard title="Avg. order value" value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
-        <KpiCard title="Conversion rate" value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} />
-        <KpiCard title="Customer retention" value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} />
-        <KpiCard title="Repeat customers" value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} />
-        <KpiCard title="Customer LTV" value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} />
-        <KpiCard title="Refund rate" value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} />
+        <KpiCard title={t("revenueMtd")} value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} vsLabel={vsLabel} />
+        <KpiCard title={t("ordersMtd")} value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} vsLabel={vsLabel} />
+        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} vsLabel={vsLabel} />
+        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} vsLabel={vsLabel} />
+        <KpiCard title={t("customerRetention")} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} vsLabel={vsLabel} />
+        <KpiCard title={t("repeatCustomers")} value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} vsLabel={vsLabel} />
+        <KpiCard title={t("customerLtv")} value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} vsLabel={vsLabel} />
+        <KpiCard title={t("refundRateKpi")} value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} vsLabel={vsLabel} />
       </div>
 
       {/* Main charts row */}
@@ -150,8 +154,8 @@ export default function SellerDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">Revenue & orders</h2>
-              <p className="text-xs text-slate-500">Net earnings {formatCurrency(k.netEarnings, locale)} · +{k.netChange}%</p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{t("revenueAndOrders")}</h2>
+              <p className="text-xs text-slate-500">{t("netEarnings")} {formatCurrency(k.netEarnings, locale)} · +{k.netChange}%</p>
             </div>
             <div className="flex rounded-lg border border-slate-200 p-0.5">
               {PERIODS.map((p) => (
@@ -176,19 +180,19 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Monthly goals</h2>
-            <p className="text-xs text-slate-500">Progress toward June targets</p>
+            <h2 className="font-semibold text-slate-900">{t("monthlyGoals")}</h2>
+            <p className="text-xs text-slate-500">{t("progressJuneTargets")}</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <GoalProgress
-              label="Revenue goal"
+              label={t("revenueGoal")}
               current={sellerGoals.revenueCurrent}
               target={sellerGoals.revenueTarget}
               format={(n) => formatCurrency(n, locale)}
             />
-            <GoalProgress label="Orders goal" current={sellerGoals.ordersCurrent} target={sellerGoals.ordersTarget} />
+            <GoalProgress label={t("ordersGoal")} current={sellerGoals.ordersCurrent} target={sellerGoals.ordersTarget} />
             <GoalProgress
-              label="Retention goal"
+              label={t("retentionGoal")}
               current={sellerGoals.retentionCurrent}
               target={sellerGoals.retentionTarget}
               unit="%"
@@ -202,8 +206,8 @@ export default function SellerDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <h2 className="font-semibold text-slate-900">Customer retention</h2>
-              <p className="text-xs text-slate-500">Month-over-month repeat purchase rate</p>
+              <h2 className="font-semibold text-slate-900">{t("customerRetention")}</h2>
+              <p className="text-xs text-slate-500">{t("repeatPurchaseRate")}</p>
             </div>
             <Badge variant="success">+{k.retentionChange}%</Badge>
           </CardHeader>
@@ -212,17 +216,17 @@ export default function SellerDashboard() {
             <div className="mt-4 flex gap-4 rounded-xl bg-slate-50 p-4 text-center text-sm">
               <div className="flex-1">
                 <p className="font-bold text-slate-900">1,478</p>
-                <p className="text-xs text-slate-500">Total customers</p>
+                <p className="text-xs text-slate-500">{t("totalCustomers")}</p>
               </div>
               <div className="w-px bg-slate-200" />
               <div className="flex-1">
                 <p className="font-bold text-emerald-600">891</p>
-                <p className="text-xs text-slate-500">Returning (60d)</p>
+                <p className="text-xs text-slate-500">{t("returning60d")}</p>
               </div>
               <div className="w-px bg-slate-200" />
               <div className="flex-1">
                 <p className="font-bold text-amber-600">156</p>
-                <p className="text-xs text-slate-500">At-risk</p>
+                <p className="text-xs text-slate-500">{t("atRisk")}</p>
               </div>
             </div>
           </CardContent>
@@ -230,8 +234,8 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Customer segments</h2>
-            <p className="text-xs text-slate-500">Breakdown by purchase behavior</p>
+            <h2 className="font-semibold text-slate-900">{t("customerSegments")}</h2>
+            <p className="text-xs text-slate-500">{t("purchaseBehaviorBreakdown")}</p>
           </CardHeader>
           <CardContent>
             <SegmentDonut
@@ -257,8 +261,8 @@ export default function SellerDashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Conversion funnel</h2>
-            <p className="text-xs text-slate-500">Views → delivered (last 30 days)</p>
+            <h2 className="font-semibold text-slate-900">{t("conversionFunnel")}</h2>
+            <p className="text-xs text-slate-500">{t("funnelViewsLast30Days")}</p>
           </CardHeader>
           <CardContent>
             <FunnelChart
@@ -273,8 +277,8 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Revenue by category</h2>
-            <p className="text-xs text-slate-500">MTD breakdown</p>
+            <h2 className="font-semibold text-slate-900">{t("revenueByCategory")}</h2>
+            <p className="text-xs text-slate-500">{t("mtdBreakdown")}</p>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
@@ -291,14 +295,14 @@ export default function SellerDashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Store health score</h2>
+            <h2 className="font-semibold text-slate-900">{t("storeHealthScore")}</h2>
             <p className="text-3xl font-bold text-[var(--primary)]">{s.healthScore}%</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {sellerHealthBreakdown.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{h.label}</span>
+                  <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -311,17 +315,17 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Fulfillment metrics</h2>
+            <h2 className="font-semibold text-slate-900">{t("fulfillmentMetrics")}</h2>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: "On-time delivery", value: `${sellerFulfillmentMetrics.onTimeDelivery}%` },
-                { label: "Avg dispatch", value: `${sellerFulfillmentMetrics.avgDispatchHours}h` },
-                { label: "Return rate", value: `${sellerFulfillmentMetrics.returnRate}%` },
-                { label: "Cancellation", value: `${sellerFulfillmentMetrics.cancellationRate}%` },
-                { label: "Open shipments", value: String(sellerFulfillmentMetrics.openShipments) },
-                { label: "Avg rating", value: `⭐ ${sellerFulfillmentMetrics.avgRating}` },
+                { label: t("onTimeDelivery"), value: `${sellerFulfillmentMetrics.onTimeDelivery}%` },
+                { label: t("avgDispatch"), value: `${sellerFulfillmentMetrics.avgDispatchHours}h` },
+                { label: t("returnRateKpi"), value: `${sellerFulfillmentMetrics.returnRate}%` },
+                { label: t("cancellation"), value: `${sellerFulfillmentMetrics.cancellationRate}%` },
+                { label: t("openShipments"), value: String(sellerFulfillmentMetrics.openShipments) },
+                { label: t("avgRating"), value: `⭐ ${sellerFulfillmentMetrics.avgRating}` },
               ].map((m) => (
                 <div key={m.label} className="rounded-lg bg-slate-50 p-3">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{m.label}</p>
@@ -334,7 +338,7 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Quick actions</h2>
+            <h2 className="font-semibold text-slate-900">{t("quickActions")}</h2>
           </CardHeader>
           <CardContent className="space-y-2">
             {quickActions.map((a) => (
@@ -361,15 +365,15 @@ export default function SellerDashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Top products</h2>
-            <Link href="/seller/analytics/products" className="text-xs text-[var(--primary)] hover:underline">Details</Link>
+            <h2 className="font-semibold text-slate-900">{t("topProducts")}</h2>
+            <Link href="/seller/analytics/products" className="text-xs text-[var(--primary)] hover:underline">{t("details")}</Link>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
               items={sellerTopProductsChart.map((p) => ({ name: p.name, sold: p.sold }))}
               valueKey="sold"
               labelKey="name"
-              formatValue={(v) => `${v} sold`}
+              formatValue={(v) => `${v} ${t("unitsSold")}`}
             />
           </CardContent>
         </Card>
@@ -377,7 +381,7 @@ export default function SellerDashboard() {
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-[var(--primary)]" />
-            <h2 className="font-semibold text-slate-900">Live activity</h2>
+            <h2 className="font-semibold text-slate-900">{t("liveActivity")}</h2>
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
@@ -404,18 +408,18 @@ export default function SellerDashboard() {
               columns={[
                 {
                   key: "name",
-                  label: "Product",
+                  label: t("products"),
                   render: (row) => (
                     <Link href={`/seller/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                       {String(row.name)}
                     </Link>
                   ),
                 },
-                { key: "sku", label: "SKU" },
+                { key: "sku", label: t("sku") },
                 {
                   key: "availableStock",
-                  label: "Stock",
-                  render: (row) => <Badge variant="warning">{String(row.availableStock)} left</Badge>,
+                  label: t("stock"),
+                  render: (row) => <Badge variant="warning">{String(row.availableStock)} {t("stockLeft")}</Badge>,
                 },
               ]}
               data={lowStockProducts as unknown as Record<string, unknown>[]}
@@ -436,7 +440,7 @@ export default function SellerDashboard() {
               columns={[
                 {
                   key: "id",
-                  label: "Order",
+                  label: t("order"),
                   render: (row) => (
                     <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                       {String(row.id)}
@@ -455,7 +459,7 @@ export default function SellerDashboard() {
         <div className="space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <h2 className="font-semibold text-slate-900">Active promotions</h2>
+              <h2 className="font-semibold text-slate-900">{t("activePromotions")}</h2>
               <Link href="/seller/promotions" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
             </CardHeader>
             <CardContent className="p-0">
@@ -463,17 +467,17 @@ export default function SellerDashboard() {
                 columns={[
                   {
                     key: "campaign",
-                    label: "Campaign",
+                    label: t("campaign"),
                     render: (row) => (
                       <Link href={`/seller/promotions/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                         {String(row.campaign)}
                       </Link>
                     ),
                   },
-                  { key: "discount", label: "Discount", render: (row) => `${row.discount}%` },
-                  { key: "orders", label: "Orders" },
-                  { key: "revenue", label: "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
-                  { key: "roi", label: "ROI", render: (row) => <Badge variant="success">{String(row.roi)}x</Badge> },
+                  { key: "discount", label: t("discountPct"), render: (row) => `${row.discount}%` },
+                  { key: "orders", label: t("orders") },
+                  { key: "revenue", label: t("revenue"), render: (row) => formatCurrency(row.revenue as number, locale) },
+                  { key: "roi", label: t("roi"), render: (row) => <Badge variant="success">{String(row.roi)}x</Badge> },
                   { key: "status", label: t("status"), render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
                 ]}
                 data={promotionList.filter((p) => p.status === "active") as unknown as Record<string, unknown>[]}
@@ -484,24 +488,24 @@ export default function SellerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center gap-2">
               <Truck className="h-4 w-4 text-[var(--primary)]" />
-              <h2 className="font-semibold text-slate-900">Finance snapshot</h2>
+              <h2 className="font-semibold text-slate-900">{t("financeSnapshot")}</h2>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-blue-50 p-4">
-                  <p className="text-xs text-slate-500">Available balance</p>
+                  <p className="text-xs text-slate-500">{t("availableBalance")}</p>
                   <p className="text-xl font-bold text-[var(--primary)]">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">Pending revenue</p>
+                  <p className="text-xs text-slate-500">{t("pendingRevenue")}</p>
                   <p className="text-xl font-bold text-slate-900">{formatCurrency(sellerFinanceStats.pendingRevenue, locale)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">Commission paid</p>
+                  <p className="text-xs text-slate-500">{t("commissionPaid")}</p>
                   <p className="text-lg font-bold text-slate-900">{formatCurrency(sellerFinanceStats.commissionPaid, locale)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-xs text-slate-500">Refunds (MTD)</p>
+                  <p className="text-xs text-slate-500">{t("refundsMtd")}</p>
                   <p className="text-lg font-bold text-amber-600">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
                 </div>
               </div>

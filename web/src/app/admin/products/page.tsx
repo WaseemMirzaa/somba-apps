@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 import { moderationQueue } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -29,11 +30,11 @@ export default function AdminProductsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Product Moderation"
-        subtitle="List View — Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"
+        title={t("productModeration")}
+        subtitle={t("listViewProducts")}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: "Product Moderation" },
+          { label: t("adminBreadcrumb"), href: "/admin" },
+          { label: t("productModeration") },
         ]}
       />
 
@@ -47,7 +48,7 @@ export default function AdminProductsPage() {
               tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
             )}
           >
-            {tabId} ({counts[tabId]})
+            {statusLabel(locale, tabId)} ({counts[tabId]})
           </button>
         ))}
       </div>
@@ -56,10 +57,10 @@ export default function AdminProductsPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Product ID" },
+              { key: "id", label: t("productId") },
               {
                 key: "image",
-                label: "Image",
+                label: t("imageCol"),
                 render: (row) => (
                   <div className="relative h-10 w-10 overflow-hidden rounded">
                     <Image src={String(row.image)} alt="" fill className="object-cover" sizes="40px" />
@@ -68,7 +69,7 @@ export default function AdminProductsPage() {
               },
               {
                 key: "name",
-                label: "Name",
+                label: t("name"),
                 render: (row) => (
                   <Link href={`/admin/products/${row.id}`} className="font-medium text-blue-600 hover:underline">
                     {String(row.name)}
@@ -77,31 +78,31 @@ export default function AdminProductsPage() {
               },
               {
                 key: "seller",
-                label: "Seller",
+                label: t("seller"),
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.sellerId}`} className="text-blue-600 hover:underline">
                     {String(row.seller)}
                   </Link>
                 ),
               },
-              { key: "category", label: "Category" },
+              { key: "category", label: t("categories") },
               {
                 key: "price",
-                label: "Price",
+                label: t("amount"),
                 render: (row) => formatCurrency(row.price as number, locale),
               },
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="warning">{String(row.status)}</Badge>,
+                render: (row) => <Badge variant="warning">{statusLabel(locale, String(row.status))}</Badge>,
               },
-              { key: "submittedDate", label: "Submitted" },
+              { key: "submittedDate", label: t("submitted") },
               {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
                   <Link href={`/admin/products/${row.id}`} className="text-sm text-blue-600 hover:underline">
-                    Review
+                    {t("review")}
                   </Link>
                 ),
               },

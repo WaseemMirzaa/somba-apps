@@ -6,10 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 import { flashSales as initialSales } from "@/lib/admin-entities";
 import { useToast } from "@/context/toast-context";
 
 export default function AdminFlashSalesPage() {
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const [sales, setSales] = useState(initialSales);
   const [showCreate, setShowCreate] = useState(false);
@@ -21,6 +24,7 @@ export default function AdminFlashSalesPage() {
     setSales((s) => [...s, {
       id: `FS-${s.length + 1}`,
       name,
+      nameFr: name,
       start: new Date().toISOString().slice(0, 10),
       end: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       discount: Number(discount) || 20,
@@ -30,28 +34,28 @@ export default function AdminFlashSalesPage() {
     setShowCreate(false);
     setName("");
     setDiscount("");
-    toast("Flash sale campaign created");
+    toast(t("create"));
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Flash Sales"
-        subtitle="Schedule campaigns with date picker"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Flash Sales" }]}
-        actions={<Button size="sm" onClick={() => setShowCreate(true)}>Create Flash Sale</Button>}
+        title={t("flashSales")}
+        subtitle={t("flashSale")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("flashSales") }]}
+        actions={<Button size="sm" onClick={() => setShowCreate(true)}>{t("create")} {t("flashSale")}</Button>}
       />
 
       {showCreate && (
         <Card>
           <CardContent className="space-y-4 p-6">
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={t("name")} value={name} onChange={(e) => setName(e.target.value)} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="text-xs font-medium">Start date</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
-              <div><label className="text-xs font-medium">End date</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
+              <div><label className="text-xs font-medium">{t("startDate")}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
+              <div><label className="text-xs font-medium">{t("endDate")}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
             </div>
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder="Discount %" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-            <Button onClick={saveCampaign}>Save Campaign</Button>
+            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={t("discountPct")} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <Button onClick={saveCampaign}>{t("save")}</Button>
           </CardContent>
         </Card>
       )}
@@ -63,10 +67,10 @@ export default function AdminFlashSalesPage() {
               <CardContent className="p-6">
                 <div className="flex justify-between">
                   <h3 className="font-semibold">{fs.name}</h3>
-                  <Badge variant={fs.status === "active" ? "success" : "warning"}>{fs.status}</Badge>
+                  <Badge variant={fs.status === "active" ? "success" : "warning"}>{statusLabel(locale, fs.status)}</Badge>
                 </div>
                 <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>
-                <p className="mt-1 text-sm">{fs.discount}% off · {fs.products} products</p>
+                <p className="mt-1 text-sm">{fs.discount}% {t("off")} · {fs.products} {t("productsCount")}</p>
               </CardContent>
             </Card>
           </Link>

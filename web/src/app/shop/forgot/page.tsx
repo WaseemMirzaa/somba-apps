@@ -1,7 +1,7 @@
 "use client";
 
-import { AuthForm } from "@/components/shop/auth-form";
+import { ShopAuthPage } from "@/components/shop/shop-auth-page";
 
 export default function ShopForgotPage() {
-  return <AuthForm mode="forgot" />;
+  return <ShopAuthPage mode="forgot" />;
 }

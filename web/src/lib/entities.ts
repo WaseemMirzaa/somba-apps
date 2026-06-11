@@ -5,6 +5,7 @@ import { products, orders, sellers, warehouseParcels, sellerProducts } from "./m
 export type SellerEntity = {
   id: number;
   storeName: string;
+  storeNameFr?: string;
   owner: string;
   email: string;
   phone: string;
@@ -24,7 +25,7 @@ export type SellerEntity = {
   pendingBalance: number;
   paidBalance: number;
   commission: number;
-  timeline: { time: string; label: string; detail?: string }[];
+  timeline: { time: string; label: string; labelFr?: string; detail?: string }[];
 };
 
 export type OrderEntity = {
@@ -68,12 +69,13 @@ export type OrderEntity = {
   commission: number;
   sellerEarnings: number;
   refunds: number;
-  timeline: { time: string; label: string; detail?: string; done?: boolean }[];
+  timeline: { time: string; label: string; labelFr?: string; detail?: string; done?: boolean }[];
 };
 
 export type ProductModerationEntity = {
   id: number;
   name: string;
+  nameFr?: string;
   sellerId: number;
   seller: string;
   sellerRating: number;
@@ -82,6 +84,7 @@ export type ProductModerationEntity = {
   price: number;
   discount: number;
   description: string;
+  descriptionFr?: string;
   status: "pending" | "approved" | "rejected";
   submittedDate: string;
   image: string;
@@ -179,49 +182,49 @@ export type ProductDetailEntity = {
 
 export const sellerEntities: SellerEntity[] = [
   {
-    id: 1, storeName: "NewTech Solutions", owner: "Jean Dupont", email: "jean@newtech.com",
+    id: 1, storeName: "NewTech Solutions", storeNameFr: "NewTech Solutions", owner: "Jean Dupont", email: "jean@newtech.com",
     phone: "+33 6 12 34 56 78", city: "Paris", country: "France", address: "12 Rue de Rivoli",
     status: "pending", category: "Electronics", date: "2024-06-05", orders: 0, revenue: 0,
     returns: 0, cancellations: 0, rating: 0, healthScore: 0, availableBalance: 0,
     pendingBalance: 0, paidBalance: 0, commission: 12,
     timeline: [
-      { time: "2024-06-05 10:00", label: "Registered", detail: "Application submitted" },
+      { time: "2024-06-05 10:00", label: "Registered", labelFr: "Inscrit", detail: "Application submitted" },
     ],
   },
   {
-    id: 2, storeName: "Belle Mode", owner: "Claire Bernard", email: "claire@bellemode.fr",
+    id: 2, storeName: "Belle Mode", storeNameFr: "Belle Mode", owner: "Claire Bernard", email: "claire@bellemode.fr",
     phone: "+33 6 98 76 54 32", city: "Lyon", country: "France", address: "8 Avenue Victor Hugo",
     status: "pending", category: "Fashion", date: "2024-06-04", orders: 0, revenue: 0,
     returns: 0, cancellations: 0, rating: 0, healthScore: 0, availableBalance: 0,
     pendingBalance: 0, paidBalance: 0, commission: 15,
     timeline: [
-      { time: "2024-06-04 14:30", label: "Registered", detail: "Application submitted" },
+      { time: "2024-06-04 14:30", label: "Registered", labelFr: "Inscrit", detail: "Application submitted" },
     ],
   },
   {
-    id: 3, storeName: "TechZone Store", owner: "Mike Johnson", email: "mike@gadgetworld.com",
+    id: 3, storeName: "TechZone Store", storeNameFr: "Boutique TechZone", owner: "Mike Johnson", email: "mike@gadgetworld.com",
     phone: "+1 555 123 4567", city: "Kinshasa", country: "DRC", address: "Gombe, Blvd du 30 Juin",
     status: "approved", category: "Electronics", date: "2024-01-15", orders: 1240, revenue: 894320,
     returns: 34, cancellations: 12, rating: 4.8, healthScore: 92, availableBalance: 12450,
     pendingBalance: 3200, paidBalance: 156000, commission: 12,
     timeline: [
-      { time: "2024-01-15", label: "Registered" },
-      { time: "2024-01-18", label: "Approved", detail: "By Admin Sarah" },
-      { time: "2024-02-01", label: "First Product Added" },
-      { time: "2024-02-15", label: "First Order Received" },
-      { time: "2024-05-01", label: "Payout Processed", detail: "$12,000" },
+      { time: "2024-01-15", label: "Registered", labelFr: "Inscrit" },
+      { time: "2024-01-18", label: "Approved", labelFr: "Approuvé", detail: "By Admin Sarah" },
+      { time: "2024-02-01", label: "First Product Added", labelFr: "Premier produit ajouté" },
+      { time: "2024-02-15", label: "First Order Received", labelFr: "Première commande reçue" },
+      { time: "2024-05-01", label: "Payout Processed", labelFr: "Paiement traité", detail: "$12,000" },
     ],
   },
   {
-    id: 4, storeName: "HomeEssentials", owner: "Sarah Lee", email: "sarah@organic.com",
+    id: 4, storeName: "HomeEssentials", storeNameFr: "Essentiels Maison", owner: "Sarah Lee", email: "sarah@organic.com",
     phone: "+1 555 987 6543", city: "Brazzaville", country: "Congo", address: "Centre Ville",
     status: "approved", category: "Home & Living", date: "2024-02-20", orders: 567, revenue: 234500,
     returns: 18, cancellations: 8, rating: 4.7, healthScore: 88, availableBalance: 8900,
     pendingBalance: 1500, paidBalance: 89000, commission: 10,
     timeline: [
-      { time: "2024-02-20", label: "Registered" },
-      { time: "2024-02-22", label: "Approved" },
-      { time: "2024-03-01", label: "Products Added", detail: "45 products" },
+      { time: "2024-02-20", label: "Registered", labelFr: "Inscrit" },
+      { time: "2024-02-22", label: "Approved", labelFr: "Approuvé" },
+      { time: "2024-03-01", label: "Products Added", labelFr: "Produits ajoutés", detail: "45 products" },
     ],
   },
 ];
@@ -274,13 +277,13 @@ export const orderEntities: OrderEntity[] = orders.map((o, i) => {
     sellerEarnings: Math.round(o.amount * 0.88),
     refunds: o.status === "cancelled" ? o.amount : 0,
     timeline: [
-      { time: `${o.date} 09:00`, label: "Placed", done: true },
-      { time: `${o.date} 09:05`, label: "Paid", done: o.status !== "pending" },
-      { time: `${o.date} 11:00`, label: "Packed", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 14:00`, label: "Picked", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 16:00`, label: "Warehouse", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 18:00`, label: "Dispatched", done: o.status === "delivered" },
-      { time: `${o.date} 20:00`, label: "Delivered", done: o.status === "delivered" },
+      { time: `${o.date} 09:00`, label: "Placed", labelFr: "Passée", done: true },
+      { time: `${o.date} 09:05`, label: "Paid", labelFr: "Payée", done: o.status !== "pending" },
+      { time: `${o.date} 11:00`, label: "Packed", labelFr: "Emballée", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 14:00`, label: "Picked", labelFr: "Collectée", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 16:00`, label: "Warehouse", labelFr: "Entrepôt", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 18:00`, label: "Dispatched", labelFr: "Expédiée", done: o.status === "delivered" },
+      { time: `${o.date} 20:00`, label: "Delivered", labelFr: "Livrée", done: o.status === "delivered" },
     ],
   };
 });
@@ -321,23 +324,26 @@ export function resolveWarehouseHubHref(warehouseId?: string) {
 
 export const moderationQueue: ProductModerationEntity[] = [
   {
-    id: 101, name: "New Phone Model X", sellerId: 3, seller: "TechZone Store", sellerRating: 4.8,
+    id: 101, name: "New Phone Model X", nameFr: "Nouveau téléphone Modèle X", sellerId: 3, seller: "TechZone Store", sellerRating: 4.8,
     category: "Electronics", brand: "Samsung", price: 899, discount: 10,
     description: "Latest flagship smartphone with advanced camera system.",
+    descriptionFr: "Dernier smartphone flagship avec système photo avancé.",
     status: "pending", submittedDate: "2024-06-05",
     image: products[0].image, images: [products[0].image],
   },
   {
-    id: 102, name: "Wireless Earbuds Pro", sellerId: 4, seller: "HomeEssentials", sellerRating: 4.7,
+    id: 102, name: "Wireless Earbuds Pro", nameFr: "Écouteurs sans fil Pro", sellerId: 4, seller: "HomeEssentials", sellerRating: 4.7,
     category: "Electronics", brand: "Sony", price: 149, discount: 20,
     description: "Premium noise-cancelling wireless earbuds.",
+    descriptionFr: "Écouteurs sans fil premium à réduction de bruit.",
     status: "pending", submittedDate: "2024-06-04",
     image: products[2].image, images: [products[2].image],
   },
   {
-    id: 103, name: "Summer Dress Collection", sellerId: 2, seller: "Belle Mode", sellerRating: 0,
+    id: 103, name: "Summer Dress Collection", nameFr: "Collection robes d'été", sellerId: 2, seller: "Belle Mode", sellerRating: 0,
     category: "Fashion", brand: "Zara", price: 59, discount: 30,
     description: "Elegant summer dresses in various colors.",
+    descriptionFr: "Robes d'été élégantes en diverses couleurs.",
     status: "pending", submittedDate: "2024-06-03",
     image: products[3].image, images: [products[3].image],
   },

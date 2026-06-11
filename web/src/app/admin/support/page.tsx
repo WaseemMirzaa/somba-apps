@@ -6,36 +6,37 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
+import { statusLabel, severityLabel } from "@/lib/locale-helpers";
 import { useSupport } from "@/context/support-context";
 
 export default function AdminSupportPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { tickets } = useSupport();
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("support")}
-        subtitle="Customer & seller support tickets"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("support") }]}
+        subtitle={t("customerSellerSupport")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("support") }]}
       />
 
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Ticket", render: (row) => (
+              { key: "id", label: t("ticket"), render: (row) => (
                 <Link href={`/admin/support/${row.id}`} className="font-medium text-blue-600 hover:underline">{String(row.id)}</Link>
               )},
-              { key: "subject", label: "Subject" },
-              { key: "customer", label: "Customer" },
-              { key: "priority", label: "Priority", render: (row) => (
+              { key: "subject", label: t("subject") },
+              { key: "customer", label: t("customer") },
+              { key: "priority", label: t("priority"), render: (row) => (
                 <Badge variant={row.priority === "high" ? "danger" : row.priority === "medium" ? "warning" : "default"}>
-                  {String(row.priority)}
+                  {severityLabel(locale, String(row.priority))}
                 </Badge>
               )},
               { key: "status", label: t("status"), render: (row) => (
-                <Badge variant={row.status === "resolved" ? "success" : "info"}>{String(row.status).replace("_", " ")}</Badge>
+                <Badge variant={row.status === "resolved" ? "success" : "info"}>{statusLabel(locale, String(row.status))}</Badge>
               )},
               { key: "date", label: t("date"), render: (row) => String(row.lastUpdate ?? row.createdAt) },
               { key: "actions", label: t("action"), render: (row) => (

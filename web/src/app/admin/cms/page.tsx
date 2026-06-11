@@ -4,16 +4,19 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/context/locale-context";
 import { cmsBlocks } from "@/lib/admin-entities";
 
 export default function AdminCmsPage() {
+  const { t } = useLocale();
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="CMS — Homepage Layout"
-        subtitle="Admin-editable blocks — click to configure"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "CMS" }]}
-        actions={<Link href="/"><span className="inline-flex rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white">Preview Homepage</span></Link>}
+        title={t("cms")}
+        subtitle={t("cmsBlocks")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("cms") }]}
+        actions={<Link href="/"><span className="inline-flex rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white">{t("storefront")}</span></Link>}
       />
 
       <div className="space-y-3">
@@ -28,7 +31,7 @@ export default function AdminCmsPage() {
                     <p className="text-xs text-slate-500">{block.type}</p>
                   </div>
                 </div>
-                <Badge variant={block.active ? "success" : "default"}>{block.active ? "Active" : "Hidden"}</Badge>
+                <Badge variant={block.active ? "success" : "default"}>{block.active ? t("active") : t("draft")}</Badge>
               </CardContent>
             </Card>
           </Link>

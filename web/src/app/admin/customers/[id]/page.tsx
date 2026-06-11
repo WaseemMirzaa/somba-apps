@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { getCustomer, orderEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 import { useToast } from "@/context/toast-context";
 
 export default function AdminCustomerDetailPage() {
@@ -23,7 +24,7 @@ export default function AdminCustomerDetailPage() {
   const [creditAmount, setCreditAmount] = useState("");
 
   if (!customer) {
-    return <div className="p-8 text-center text-slate-500">Customer not found</div>;
+    return <div className="p-8 text-center text-slate-500">{t("notFound")}</div>;
   }
 
   const customerOrders = orderEntities.filter((o) => o.customerId === customer.id);
@@ -32,10 +33,10 @@ export default function AdminCustomerDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={customer.name}
-        subtitle={`${customer.email} · Member since ${customer.joined}`}
+        subtitle={`${customer.email} · ${t("joined")} ${customer.joined}`}
         backHref="/admin/customers"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          { label: t("adminBreadcrumb"), href: "/admin" },
           { label: t("customers"), href: "/admin/customers" },
           { label: customer.name },
         ]}
@@ -45,13 +46,13 @@ export default function AdminCustomerDetailPage() {
               onClick={() => {
                 const next = status === "active" ? "suspended" : "active";
                 setStatus(next);
-                toast(`Customer ${next === "suspended" ? "suspended" : "reactivated"}`, next === "suspended" ? "error" : "success");
+                toast(next === "suspended" ? t("blocked") : t("active"), next === "suspended" ? "error" : "success");
               }}
               className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
             >
-              {status === "active" ? "Suspend" : "Reactivate"}
+              {status === "active" ? t("blocked") : t("active")}
             </button>
-            <button onClick={() => setShowCredit(true)} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">Wallet Credit</button>
+            <button onClick={() => setShowCredit(true)} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">{t("availableBalance")}</button>
           </>
         }
       />
@@ -59,7 +60,7 @@ export default function AdminCustomerDetailPage() {
       {showCredit && (
         <div className="card-premium flex flex-wrap items-end gap-3 p-4">
           <div>
-            <label className="text-xs text-slate-500">Credit amount</label>
+            <label className="text-xs text-slate-500">{t("amount")}</label>
             <input
               type="number"
               className="input-premium mt-1 w-40 px-3 py-2 text-sm"
@@ -68,40 +69,40 @@ export default function AdminCustomerDetailPage() {
               onChange={(e) => setCreditAmount(e.target.value)}
             />
           </div>
-          <Button size="sm" onClick={() => { toast(`Wallet credited ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>Apply Credit</Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>Cancel</Button>
+          <Button size="sm" onClick={() => { toast(`${t("approved")} — ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>{t("approve")}</Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>{t("cancel")}</Button>
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DetailSection title="Customer Information">
+        <DetailSection title={t("customerInformation")}>
           <InfoGrid items={[
-            { label: "Name", value: customer.name },
+            { label: t("name"), value: customer.name },
             { label: t("email"), value: customer.email },
             { label: t("phone"), value: customer.phone },
-            { label: "City", value: customer.city },
-            { label: "Status", value: <Badge variant={status === "active" ? "success" : "danger"}>{status}</Badge> },
-            { label: "Joined", value: customer.joined },
+            { label: t("city"), value: customer.city },
+            { label: t("status"), value: <Badge variant={status === "active" ? "success" : "danger"}>{statusLabel(locale, status)}</Badge> },
+            { label: t("joined"), value: customer.joined },
           ]} />
         </DetailSection>
 
-        <DetailSection title="Activity">
+        <DetailSection title={t("activitySection")}>
           <InfoGrid items={[
-            { label: "Total Orders", value: customer.orders },
-            { label: "Total Spent", value: formatCurrency(customer.totalSpent, locale) },
+            { label: t("totalOrders"), value: customer.orders },
+            { label: t("totalSpent"), value: formatCurrency(customer.totalSpent, locale) },
           ]} />
         </DetailSection>
       </div>
 
-      <DetailSection title="Orders">
+      <DetailSection title={t("orders")}>
         <DataTable
           columns={[
-            { key: "id", label: "Order", render: (row) => (
+            { key: "id", label: t("order"), render: (row) => (
               <Link href={`/admin/orders/${row.id}`} className="text-blue-600 hover:underline">{String(row.id)}</Link>
             )},
             { key: "date", label: t("date") },
             { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-            { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
+            { key: "status", label: t("status"), render: (row) => <Badge>{statusLabel(locale, String(row.status))}</Badge> },
           ]}
           data={customerOrders as unknown as Record<string, unknown>[]}
         />

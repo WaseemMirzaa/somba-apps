@@ -17,6 +17,7 @@ import {
   Sparkline,
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
+import { L, localizedField } from "@/lib/locale-helpers";
 import { useAuth } from "@/context/auth-context";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { warehouseDashboardStats } from "@/lib/warehouse-entities";
@@ -38,6 +39,7 @@ function KpiCard({
   positive,
   spark,
   icon: Icon,
+  vsLabel,
 }: {
   title: string;
   value: string;
@@ -45,6 +47,7 @@ function KpiCard({
   positive?: boolean;
   spark: number[];
   icon: React.ComponentType<{ className?: string }>;
+  vsLabel: string;
 }) {
   const up = change >= 0;
   const good = positive !== undefined ? (positive ? up : !up) : up;
@@ -57,7 +60,7 @@ function KpiCard({
           <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}% vs yesterday
+            {Math.abs(change)}{vsLabel}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -82,16 +85,17 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const [period] = useState("7D");
 
   const warehouse = persona.warehouseId ? getWarehouse(persona.warehouseId) : undefined;
-  const title = hubName ?? warehouse?.name ?? "Fulfillment Operations";
+  const title = hubName ?? warehouse?.name ?? t("fulfillmentOperations");
 
   const throughputSpark = warehouseThroughputTrend.map((d) => d.orders);
 
   const quickLinks = [
-    { path: "/inbound", label: "Inbound Queue", countKey: "inboundQueue" as const, icon: Inbox },
-    { path: "/sorting", label: "Sorting Board", countKey: "sortingQueue" as const, icon: ArrowUpDown },
-    { path: "/dispatch", label: "Dispatch Queue", countKey: "dispatchQueue" as const, icon: Send },
-    { path: "/returns", label: "Returns Queue", countKey: "returnQueue" as const, icon: RotateCcw },
+    { path: "/inbound", label: t("inboundQueue"), countKey: "inboundQueue" as const, icon: Inbox },
+    { path: "/sorting", label: t("sortingBoard"), countKey: "sortingQueue" as const, icon: ArrowUpDown },
+    { path: "/dispatch", label: t("dispatchQueue"), countKey: "dispatchQueue" as const, icon: Send },
+    { path: "/returns", label: t("returnsQueue"), countKey: "returnQueue" as const, icon: RotateCcw },
   ];
+  const vsLabel = t("vsYesterday");
 
   return (
     <div className="space-y-6">
@@ -100,27 +104,27 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         subtitle={`${t("welcome")} · ${k.receivedToday} received · ${k.dispatchedToday} dispatched today · On-time ${k.onTimeRate}%`}
         actions={
           <Link href={ops("/dispatch")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            Open dispatch
+            {t("openDispatchBtn")}
           </Link>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Received today" value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} />
-        <KpiCard title="Dispatched today" value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} />
-        <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        <KpiCard title="COD collected" value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[15200, 16100, 16800, 17200, 17800, 18100, 18420]} icon={DollarSign} />
-        <KpiCard title="Return rate" value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
-        <KpiCard title="Avg process time" value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
-        <KpiCard title="Active batches" value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
-        <KpiCard title="Aged parcels" value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
+        <KpiCard title={t("receivedToday")} value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} vsLabel={vsLabel} />
+        <KpiCard title={t("dispatchedToday")} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} vsLabel={vsLabel} />
+        <KpiCard title={t("onTimeRate")} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} vsLabel={vsLabel} />
+        <KpiCard title={t("codCollected")} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[15200, 16100, 16800, 17200, 17800, 18100, 18420]} icon={DollarSign} vsLabel={vsLabel} />
+        <KpiCard title={t("returnRate")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} vsLabel={vsLabel} />
+        <KpiCard title={t("avgProcessTime")} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} vsLabel={vsLabel} />
+        <KpiCard title={t("activeBatches")} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} vsLabel={vsLabel} />
+        <KpiCard title={t("agedParcels")} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} vsLabel={vsLabel} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">Weekly throughput</h2>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{t("weeklyThroughput")}</h2>
               <p className="text-xs text-slate-500">Parcels received & dispatched · {period}</p>
             </div>
             <Badge variant="info">{s.dispatchedToday - s.failedDeliveries} in transit</Badge>
@@ -133,7 +137,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-indigo-600" />
-            <h2 className="font-semibold text-slate-900">Recent activity</h2>
+            <h2 className="font-semibold text-slate-900">{t("recentActivity")}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {warehouseRecentActivity.map((item) => (
@@ -149,12 +153,12 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Lane utilization</h2>
-            <p className="text-xs text-slate-500">Sort lanes capacity today</p>
+            <h2 className="font-semibold text-slate-900">{t("laneUtilization")}</h2>
+            <p className="text-xs text-slate-500">{L(locale, "Sort lanes capacity today", "Capacité voies de tri aujourd'hui")}</p>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={warehouseLaneUtilization.map((l) => ({ name: l.lane, revenue: l.pct }))}
+              items={warehouseLaneUtilization.map((l) => ({ name: localizedField(locale, l.lane, l.laneFr), revenue: l.pct }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => `${v}%`}
@@ -164,14 +168,14 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Ops health score</h2>
-            <p className="text-xs text-slate-500">Inbound through exceptions</p>
+            <h2 className="font-semibold text-slate-900">{L(locale, "Ops health score", "Score santé ops")}</h2>
+            <p className="text-xs text-slate-500">{L(locale, "Inbound through exceptions", "Entrée jusqu'aux exceptions")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {warehouseHealthBreakdown.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{h.label}</span>
+                  <span className="text-slate-600">{localizedField(locale, h.label, h.labelFr)}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -207,16 +211,16 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-indigo-600" />
-            <h2 className="font-semibold text-slate-900">Top riders today</h2>
+            <h2 className="font-semibold text-slate-900">{t("riders")}</h2>
           </div>
-          <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">View deliveries</Link>
+          <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{t("viewDeliveries")}</Link>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "name", label: "Rider" },
-              { key: "deliveries", label: "Deliveries" },
-              { key: "onTime", label: "On-time %", render: (row) => `${row.onTime}%` },
+              { key: "name", label: t("rider") },
+              { key: "deliveries", label: t("deliveries") },
+              { key: "onTime", label: t("onTimePct"), render: (row) => `${row.onTime}%` },
             ]}
             data={warehouseRiderPerformance as unknown as Record<string, unknown>[]}
           />
@@ -226,22 +230,22 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold">Active deliveries</h2>
-            <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">View all</Link>
+            <h2 className="font-semibold">{t("activeDeliveries")}</h2>
+            <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{t("viewAll")}</Link>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-slate-900">{s.dispatchedToday - s.failedDeliveries}</p>
-            <p className="text-sm text-slate-500">In transit right now</p>
+            <p className="text-sm text-slate-500">{L(locale, "In transit right now", "En transit maintenant")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold">Open exceptions</h2>
-            <Link href={ops("/exceptions")} className="text-sm text-indigo-600 hover:underline">View all</Link>
+            <h2 className="font-semibold">{t("openExceptions")}</h2>
+            <Link href={ops("/exceptions")} className="text-sm text-indigo-600 hover:underline">{t("viewAll")}</Link>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-amber-600">2</p>
-            <p className="text-sm text-slate-500">Require investigation</p>
+            <p className="text-sm text-slate-500">{L(locale, "Require investigation", "Nécessitent investigation")}</p>
           </CardContent>
         </Card>
       </div>

@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { type Locale, type TranslationKey, t } from "@/lib/i18n";
+
+const LOCALE_STORAGE_KEY = "somba-locale";
 
 interface LocaleContextType {
   locale: Locale;
@@ -12,7 +14,17 @@ interface LocaleContextType {
 const LocaleContext = createContext<LocaleContextType | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("en");
+  const [locale, setLocaleState] = useState<Locale>("en");
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored === "en" || stored === "fr") setLocaleState(stored);
+  }, []);
+
+  const setLocale = useCallback((next: Locale) => {
+    setLocaleState(next);
+    localStorage.setItem(LOCALE_STORAGE_KEY, next);
+  }, []);
 
   const translate = useCallback(
     (key: TranslationKey) => t(locale, key),

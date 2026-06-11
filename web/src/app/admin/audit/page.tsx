@@ -4,12 +4,19 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/context/locale-context";
 import { auditLogs, resolveAuditEntityHref } from "@/lib/admin-entities";
 
 export default function AdminAuditPage() {
+  const { t } = useLocale();
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Audit Log" subtitle="Activity feed with before/after diffs" breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Audit" }]} />
+      <PageHeader
+        title={t("auditLog")}
+        subtitle={t("auditSubtitle")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("auditLog") }]}
+      />
 
       <div className="space-y-3">
         {auditLogs.map((log) => {

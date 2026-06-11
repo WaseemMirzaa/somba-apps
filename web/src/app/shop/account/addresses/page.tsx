@@ -5,6 +5,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
 
 type Address = { id: number; label: string; line1: string; city: string; commune: string; country: string; default: boolean };
 
@@ -15,6 +16,8 @@ const initialAddresses: Address[] = [
 
 export default function ShopAddressesPage() {
   const { toast } = useToast();
+  const { locale, t } = useLocale();
+  const fr = locale === "fr";
   const [addresses, setAddresses] = useState(initialAddresses);
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -27,13 +30,13 @@ export default function ShopAddressesPage() {
   }
 
   function saveAddress() {
-    if (!form.line1.trim() || !form.city.trim()) { toast("Fill in required fields", "error"); return; }
+    if (!form.line1.trim() || !form.city.trim()) { toast(fr ? "Remplissez les champs requis" : "Fill in required fields", "error"); return; }
     if (editingId !== null) {
       setAddresses((a) => a.map((addr) => addr.id === editingId ? { ...addr, ...form } : addr));
-      toast("Address updated");
+      toast(fr ? "Adresse mise à jour" : "Address updated");
     } else {
-      setAddresses((a) => [...a, { id: Date.now(), ...form, label: form.label || "New", default: false }]);
-      toast("Address added");
+      setAddresses((a) => [...a, { id: Date.now(), ...form, label: form.label || (fr ? "Nouveau" : "New"), default: false }]);
+      toast(fr ? "Adresse ajoutée" : "Address added");
     }
     resetForm();
   }
@@ -41,22 +44,22 @@ export default function ShopAddressesPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title="Addresses"
-        subtitle="France & global delivery addresses"
+        title={t("addresses")}
+        subtitle={t("globalAddresses")}
         backHref="/shop/account"
-        breadcrumbs={[{ label: "Account", href: "/shop/account" }, { label: "Addresses" }]}
-        actions={<Link href="/shop/account/addresses/new"><Button size="sm">Add Address</Button></Link>}
+        breadcrumbs={[{ label: t("account"), href: "/shop/account" }, { label: t("addresses") }]}
+        actions={<Link href="/shop/account/addresses/new"><Button size="sm">{t("addAddress")}</Button></Link>}
       />
 
       {(showAdd || editingId !== null) && (
         <div className="card-premium space-y-3 p-6">
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder="Label (Home, Office...)" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder="Street address" value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder="Commune / District" value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Commune / Quartier" : "Commune / District"} value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
           <div className="flex gap-2">
-            <Button onClick={saveAddress}>{editingId !== null ? "Update Address" : "Save Address"}</Button>
-            <Button variant="ghost" onClick={resetForm}>Cancel</Button>
+            <Button onClick={saveAddress}>{editingId !== null ? (fr ? "Mettre à jour" : "Update Address") : (fr ? "Enregistrer adresse" : "Save Address")}</Button>
+            <Button variant="ghost" onClick={resetForm}>{t("cancel")}</Button>
           </div>
         </div>
       )}
@@ -65,10 +68,10 @@ export default function ShopAddressesPage() {
         {addresses.map((addr) => (
           <div key={addr.id} className="card-premium p-5">
             <div className="flex justify-between">
-              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-blue-600">(Default)</span>}</p>
+              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-blue-600">({fr ? "Par défaut" : "Default"})</span>}</p>
               <div className="flex gap-3">
                 {!addr.default && (
-                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast("Default address updated"); }} className="text-xs text-slate-500 hover:text-blue-600">Set default</button>
+                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast(fr ? "Adresse par défaut mise à jour" : "Default address updated"); }} className="text-xs text-slate-500 hover:text-blue-600">{fr ? "Définir par défaut" : "Set default"}</button>
                 )}
                 <button
                   onClick={() => {
@@ -78,7 +81,7 @@ export default function ShopAddressesPage() {
                   }}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  Edit
+                  {t("edit")}
                 </button>
               </div>
             </div>

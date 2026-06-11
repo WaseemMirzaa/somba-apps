@@ -1,22 +1,29 @@
+"use client";
+
 import { BRAND, LEGAL_LINKS } from "@/lib/config";
 import Link from "next/link";
+import { useLocale } from "@/context/locale-context";
 
 export default function TermsPage() {
+  const { t } = useLocale();
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 prose prose-slate">
-      <h1>Terms of Use</h1>
+      <h1>{t("termsOfUse")}</h1>
       <p className="text-sm text-slate-500">{BRAND.legalEntity} · {BRAND.legalAddress}</p>
-      <p>Welcome to {BRAND.name}. These Terms of Use govern your access to and use of the {BRAND.fullName} marketplace platform, including our website, mobile applications, and related services.</p>
-      <h2>1. Marketplace Model</h2>
-      <p>{BRAND.name} operates as a marketplace platform. Sellers list and sell their own inventory. {BRAND.legalEntity} facilitates transactions, payments, and logistics in a hybrid fulfillment model.</p>
-      <h2>2. Orders & Payments</h2>
-      <p>We support Stripe card payments, Airtel Money, Somba Wallet, and Cash on Delivery (COD). COD orders may require OTP verification and are subject to fraud prevention limits.</p>
-      <h2>3. Returns & Refunds</h2>
-      <p>Refunds may be issued to the original payment method or Somba Wallet at your choice, subject to our Return Policy.</p>
-      <h2>4. Open Box Delivery</h2>
-      <p>Where available, you may inspect products at delivery before accepting. Refusal triggers return without charge.</p>
+      <p>{t("welcomeTerms")} {BRAND.name}. {t("termsGovern")} {BRAND.fullName} {t("termsPlatform")}</p>
+      <h2>1. {t("marketplaceModel")}</h2>
+      <p>{BRAND.name} {t("marketplaceModelDesc")} {BRAND.legalEntity} {t("facilitatesTransactions")}</p>
+      <h2>2. {t("ordersPayments")}</h2>
+      <p>{t("ordersPaymentsDesc")}</p>
+      <h2>3. {t("returnsRefundsSection")}</h2>
+      <p>{t("returnsRefundsDesc")}</p>
+      <h2>4. {t("openBoxDelivery")}</h2>
+      <p>{t("openBoxDeliveryDesc")}</p>
       <nav className="mt-12 flex flex-wrap gap-4 text-sm">
-        {LEGAL_LINKS.map((l) => <Link key={l.href} href={l.href} className="text-blue-600 hover:underline">{l.label}</Link>)}
+        {LEGAL_LINKS.map((l) => (
+          <Link key={l.href} href={l.href} className="text-blue-600 hover:underline">{l.label}</Link>
+        ))}
       </nav>
     </div>
   );

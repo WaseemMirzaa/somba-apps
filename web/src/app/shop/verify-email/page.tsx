@@ -1,7 +1,7 @@
 "use client";
 
-import { AuthForm } from "@/components/shop/auth-form";
+import { ShopAuthPage } from "@/components/shop/shop-auth-page";
 
 export default function ShopVerifyEmailPage() {
-  return <AuthForm mode="verify-email" />;
+  return <ShopAuthPage mode="verify-email" />;
 }

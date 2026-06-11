@@ -23,7 +23,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("settings")} subtitle="AF-20 / AF-21 — Δ2, Δ3, Δ4, Δ8" />
+      <PageHeader title={t("settings")} subtitle={`${t("settingsSpecRef")} · ${t("settingsSubtitle")}`} />
 
       <div className="card-premium space-y-4 p-6">
         <h3 className="font-semibold">Market Profile</h3>

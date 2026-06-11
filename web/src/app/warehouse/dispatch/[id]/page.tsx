@@ -10,95 +10,98 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { DataTable } from "@/components/ui/data-table";
 import { getBatch } from "@/lib/entities";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
+import { L, mapTimelineEvents, statusLabel } from "@/lib/locale-helpers";
 
 export default function WarehouseBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const batch = getBatch(id);
   const [status, setStatus] = useState(batch?.status ?? "ready");
   const [rider, setRider] = useState(batch?.rider ?? "");
   const suggestedRiders = ["Jean Mukendi (nearest, online)", "Patrick Lumumba (Zone B)", "David Tshisekedi (busy)"];
 
   if (!batch) {
-    return <div className="p-8 text-center text-slate-500">Batch not found</div>;
+    return <div className="p-8 text-center text-slate-500">{t("notFound")}</div>;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={batch.id}
-        subtitle={`${batch.zone} · ${batch.parcelCount} parcels · ${batch.status}`}
+        subtitle={`${batch.zone} · ${batch.parcelCount} ${L(locale, "parcels", "colis")} · ${statusLabel(locale, status)}`}
         backHref="/warehouse/dispatch"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
-          { label: "Dispatch", href: "/warehouse/dispatch" },
+          { label: t("warehouseBreadcrumb"), href: "/warehouse" },
+          { label: t("dispatch"), href: "/warehouse/dispatch" },
           { label: batch.id },
         ]}
         actions={
           status === "ready" ? (
-            <button onClick={() => { setStatus("dispatched"); toast(`Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">Dispatch</button>
+            <button onClick={() => { setStatus("dispatched"); toast(L(locale, `Batch ${batch.id} dispatched`, `Lot ${batch.id} expédié`)); router.push("/warehouse/deliveries"); }} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">{t("dispatch")}</button>
           ) : null
         }
       />
 
       <DetailGrid>
-        <DetailGridSection title="Batch">
+        <DetailGridSection title={t("batchDetail")}>
           <InfoGrid items={[
-            { label: "Batch ID", value: batch.id },
-            { label: "Zone", value: batch.zone },
-            { label: "Parcels", value: batch.parcelCount },
-            { label: "Status", value: status },
+            { label: L(locale, "Batch ID", "ID lot"), value: batch.id },
+            { label: t("zone"), value: batch.zone },
+            { label: t("parcel"), value: batch.parcelCount },
+            { label: t("status"), value: statusLabel(locale, status) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Rider Assignment (Δ6)">
-          <p className="mb-2 text-xs text-indigo-600">Auto-suggested: {suggestedRiders[0]}</p>
+        <DetailGridSection title={L(locale, "Rider Assignment", "Assignation livreur")}>
+          <p className="mb-2 text-xs text-indigo-600">{L(locale, "Auto-suggested", "Suggestion auto")}: {suggestedRiders[0]}</p>
           <select className="input-premium mb-3 w-full px-3 py-2 text-sm" value={rider || batch.rider} onChange={(e) => setRider(e.target.value)}>
             {suggestedRiders.map((r) => <option key={r} value={r.split(" ")[0]}>{r}</option>)}
           </select>
-          <button onClick={() => toast(`Auto-assigned ${suggestedRiders[0].split(" ")[0]}`)} className="text-sm text-indigo-600 hover:underline">Auto-assign nearest rider</button>
+          <button onClick={() => toast(L(locale, `Auto-assigned ${suggestedRiders[0].split(" ")[0]}`, `Assigné auto ${suggestedRiders[0].split(" ")[0]}`))} className="text-sm text-indigo-600 hover:underline">{L(locale, "Auto-assign nearest rider", "Assigner le livreur le plus proche")}</button>
           <InfoGrid items={[
-            { label: "Name", value: rider || batch.rider },
-            { label: "Phone", value: batch.riderPhone },
-            { label: "Vehicle", value: batch.vehicle },
-            { label: "Performance", value: "94%" },
+            { label: t("name"), value: rider || batch.rider },
+            { label: t("phone"), value: batch.riderPhone },
+            { label: L(locale, "Vehicle", "Véhicule"), value: batch.vehicle },
+            { label: L(locale, "Performance", "Performance"), value: "94%" },
           ]} />
           <div className="mt-4 flex gap-3">
-            <Link href={`/warehouse/riders/${batch.riderId}`} className="text-sm text-indigo-600 hover:underline">Open Rider →</Link>
-            <a href={`tel:${batch.riderPhone}`} className="text-sm text-slate-500 hover:text-indigo-600">Call Rider</a>
+            <Link href={`/warehouse/riders/${batch.riderId}`} className="text-sm text-indigo-600 hover:underline">{L(locale, "Open Rider", "Ouvrir livreur")} →</Link>
+            <a href={`tel:${batch.riderPhone}`} className="text-sm text-slate-500 hover:text-indigo-600">{L(locale, "Call Rider", "Appeler livreur")}</a>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Route">
+        <DetailGridSection title={L(locale, "Route", "Itinéraire")}>
           <InfoGrid items={[
-            { label: "Stops", value: batch.stops },
-            { label: "Distance", value: batch.distance },
+            { label: L(locale, "Stops", "Arrêts"), value: batch.stops },
+            { label: L(locale, "Distance", "Distance"), value: batch.distance },
             { label: "ETA", value: batch.eta },
           ]} />
           <div className="mt-4 flex h-32 items-center justify-center rounded-lg bg-blue-50 text-sm text-slate-500">
-            Map preview (mock)
+            {t("liveMapMock")}
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Parcels in Batch" span={3}>
+        <DetailGridSection title={L(locale, "Parcels in Batch", "Colis dans le lot")} span={3}>
           <DataTable
             columns={[
-              { key: "parcelId", label: "Parcel ID", render: (row) => (
+              { key: "parcelId", label: L(locale, "Parcel ID", "ID colis"), render: (row) => (
                 <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-indigo-600 hover:underline">{String(row.parcelId)}</Link>
               )},
-              { key: "orderId", label: "Order ID" },
-              { key: "customer", label: "Customer" },
-              { key: "actions", label: "Action", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-indigo-600 hover:underline">Open</Link>
+              { key: "orderId", label: t("orderId") },
+              { key: "customer", label: t("customer") },
+              { key: "actions", label: t("action"), render: (row) => (
+                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-indigo-600 hover:underline">{t("open")}</Link>
               )},
             ]}
             data={batch.parcels as unknown as Record<string, unknown>[]}
           />
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
-          <ActivityTimeline events={batch.timeline} />
+        <DetailGridSection title={t("timeline")} span={3}>
+          <ActivityTimeline events={mapTimelineEvents(locale, batch.timeline)} />
         </DetailGridSection>
       </DetailGrid>
     </div>

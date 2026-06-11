@@ -28,10 +28,10 @@ export const warehouseExtendedKpis = {
 } as const;
 
 export const warehouseLaneUtilization = [
-  { lane: "Lane A — Express", pct: 92, parcels: 142 },
-  { lane: "Lane B — Standard", pct: 78, parcels: 218 },
-  { lane: "Lane C — Bulk", pct: 64, parcels: 96 },
-  { lane: "Lane D — Returns", pct: 45, parcels: 38 },
+  { lane: "Lane A — Express", laneFr: "Voie A — Express", pct: 92, parcels: 142 },
+  { lane: "Lane B — Standard", laneFr: "Voie B — Standard", pct: 78, parcels: 218 },
+  { lane: "Lane C — Bulk", laneFr: "Voie C — Vrac", pct: 64, parcels: 96 },
+  { lane: "Lane D — Returns", laneFr: "Voie D — Retours", pct: 45, parcels: 38 },
 ] as const;
 
 export const warehouseRiderPerformance = [
@@ -42,11 +42,11 @@ export const warehouseRiderPerformance = [
 ] as const;
 
 export const warehouseHealthBreakdown = [
-  { label: "Inbound SLA", score: 93 },
-  { label: "Sort accuracy", score: 97 },
-  { label: "Dispatch speed", score: 91 },
-  { label: "COD accuracy", score: 98 },
-  { label: "Exception resolution", score: 86 },
+  { label: "Inbound SLA", labelFr: "SLA entrée", score: 93 },
+  { label: "Sort accuracy", labelFr: "Précision tri", score: 97 },
+  { label: "Dispatch speed", labelFr: "Vitesse expédition", score: 91 },
+  { label: "COD accuracy", labelFr: "Précision COD", score: 98 },
+  { label: "Exception resolution", labelFr: "Résolution exceptions", score: 86 },
 ] as const;
 
 export const warehouseRecentActivity = [

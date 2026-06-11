@@ -21,9 +21,11 @@ export type DisputeItem = {
   sellerName: string;
   status: "open" | "seller_responded" | "resolved" | "closed";
   reason: string;
+  reasonFr?: string;
   description: string;
+  descriptionFr?: string;
   createdAt: string;
-  messages: { from: "buyer" | "seller" | "admin"; text: string; at: string }[];
+  messages: { from: "buyer" | "seller" | "admin"; text: string; textFr?: string; at: string }[];
 };
 
 export type ReturnItem = {
@@ -32,14 +34,16 @@ export type ReturnItem = {
   status: "requested" | "approved" | "in_transit" | "received" | "refunded" | "rejected";
   items: string[];
   reason: string;
+  reasonFr?: string;
   createdAt: string;
   refundAmount?: number;
-  timeline?: { time: string; label: string; done?: boolean }[];
+  timeline?: { time: string; label: string; labelFr?: string; done?: boolean }[];
 };
 
 export type SupportTicket = {
   id: string;
   subject: string;
+  subjectFr?: string;
   orderId?: string;
   customer: string;
   sellerName?: string;
@@ -48,7 +52,7 @@ export type SupportTicket = {
   status: "open" | "in_progress" | "resolved";
   createdAt: string;
   lastUpdate: string;
-  messages: { author: string; role: "customer" | "seller" | "agent"; text: string; at: string }[];
+  messages: { author: string; role: "customer" | "seller" | "agent"; text: string; textFr?: string; at: string }[];
 };
 
 export type RefundRequest = {
@@ -66,6 +70,7 @@ export type WalletTransaction = {
   type: "cashback" | "debit" | "topup" | "refund" | "withdrawal";
   amount: number;
   desc: string;
+  descFr?: string;
   date: string;
   orderId?: string;
   returnId?: string;
@@ -162,10 +167,12 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     sellerName: "SportStyle",
     status: "open",
     reason: "not_as_described",
+    reasonFr: "Non conforme à la description",
     description: "Shoes colour does not match listing photos.",
+    descriptionFr: "La couleur des chaussures ne correspond pas aux photos.",
     createdAt: "2026-06-05",
     messages: [
-      { from: "buyer", text: "The white shoes arrived grey.", at: "2026-06-05T10:00:00Z" },
+      { from: "buyer", text: "The white shoes arrived grey.", textFr: "Les chaussures blanches sont arrivées grises.", at: "2026-06-05T10:00:00Z" },
     ],
   },
   {
@@ -177,11 +184,13 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     sellerName: "TechZone Store",
     status: "seller_responded",
     reason: "defective",
+    reasonFr: "Produit défectueux",
     description: "Headphones left speaker crackling.",
+    descriptionFr: "Crépitement sur le haut-parleur gauche.",
     createdAt: "2026-06-03",
     messages: [
-      { from: "buyer", text: "Left speaker has static noise.", at: "2026-06-03T12:00:00Z" },
-      { from: "seller", text: "We can offer replacement or full refund.", at: "2026-06-04T09:00:00Z" },
+      { from: "buyer", text: "Left speaker has static noise.", textFr: "Le haut-parleur gauche grésille.", at: "2026-06-03T12:00:00Z" },
+      { from: "seller", text: "We can offer replacement or full refund.", textFr: "Nous proposons un remplacement ou un remboursement complet.", at: "2026-06-04T09:00:00Z" },
     ],
   },
 ];
@@ -193,12 +202,13 @@ export const MOCK_RETURNS: ReturnItem[] = [
     status: "approved",
     items: ["Samsung Galaxy S24 Ultra"],
     reason: "Defective or damaged item",
+    reasonFr: "Article défectueux ou endommagé",
     createdAt: "2026-06-01",
     refundAmount: 1199,
     timeline: [
-      { time: "2026-06-01", label: "Return requested", done: true },
-      { time: "2026-06-02", label: "Approved — pickup scheduled", done: true },
-      { time: "2026-06-04", label: "Pickup completed", done: false },
+      { time: "2026-06-01", label: "Return requested", labelFr: "Retour demandé", done: true },
+      { time: "2026-06-02", label: "Approved — pickup scheduled", labelFr: "Approuvé — enlèvement planifié", done: true },
+      { time: "2026-06-04", label: "Pickup completed", labelFr: "Enlèvement effectué", done: false },
     ],
   },
   {
@@ -207,10 +217,11 @@ export const MOCK_RETURNS: ReturnItem[] = [
     status: "requested",
     items: ["Nike Air Max 270"],
     reason: "Wrong item received",
+    reasonFr: "Mauvais article reçu",
     createdAt: "2026-06-07",
     timeline: [
-      { time: "2026-06-07", label: "Return requested", done: true },
-      { time: "Pending", label: "Seller review", done: false },
+      { time: "2026-06-07", label: "Return requested", labelFr: "Retour demandé", done: true },
+      { time: "Pending", label: "Seller review", labelFr: "Examen vendeur", done: false },
     ],
   },
 ];
@@ -219,6 +230,7 @@ export const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
   {
     id: "TKT-441",
     subject: "Order not delivered",
+    subjectFr: "Commande non livrée",
     orderId: "ORD-2024-8841",
     customer: "Marie Kabila",
     portal: "customer",
@@ -227,7 +239,7 @@ export const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
     createdAt: "2024-06-08",
     lastUpdate: "2024-06-08",
     messages: [
-      { author: "Marie Kabila", role: "customer", text: "My order shows delivered but I never received it.", at: "2024-06-08T09:00:00Z" },
+      { author: "Marie Kabila", role: "customer", text: "My order shows delivered but I never received it.", textFr: "Ma commande est marquée livrée mais je ne l'ai pas reçue.", at: "2024-06-08T09:00:00Z" },
     ],
   },
   {
@@ -248,6 +260,7 @@ export const MOCK_SUPPORT_TICKETS: SupportTicket[] = [
   {
     id: "TKT-001",
     subject: "Payout delay inquiry",
+    subjectFr: "Retard de paiement vendeur",
     sellerName: "TechZone Store",
     portal: "seller",
     priority: "high",
@@ -326,8 +339,8 @@ export const MOCK_REFUNDS: RefundRequest[] = [
 
 export const MOCK_WALLET_TRANSACTIONS: WalletTransaction[] = [
   { id: "WTX-01", type: "cashback", amount: 12, desc: "Order ORD-2024-881 cashback", date: "08/06/2024", orderId: "ORD-2024-881", balanceAfter: 142.5 },
-  { id: "WTX-02", type: "debit", amount: -49, desc: "Checkout payment", date: "07/06/2024", orderId: "ORD-2024-002", method: "wallet", balanceAfter: 130.5 },
-  { id: "WTX-03", type: "topup", amount: 100, desc: "Airtel Money top-up", date: "05/06/2024", method: "airtel", balanceAfter: 179.5 },
+  { id: "WTX-02", type: "debit", amount: -49, desc: "Checkout payment", descFr: "Paiement commande", date: "07/06/2024", orderId: "ORD-2024-002", method: "wallet", balanceAfter: 130.5 },
+  { id: "WTX-03", type: "topup", amount: 100, desc: "Airtel Money top-up", descFr: "Recharge Airtel Money", date: "05/06/2024", method: "airtel", balanceAfter: 179.5 },
   { id: "WTX-04", type: "refund", amount: 29, desc: "Return RET-001 refund to wallet", date: "04/06/2024", returnId: "RET-001", orderId: "ORD-2024-001", balanceAfter: 79.5 },
 ];
 

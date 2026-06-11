@@ -9,6 +9,7 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { getSellerReturn } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { mapTimelineEvents } from "@/lib/locale-helpers";
 
 export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -60,7 +61,7 @@ export default function SellerReturnDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title="Timeline" span={3}>
-          <ActivityTimeline events={ret.timeline} />
+          <ActivityTimeline events={mapTimelineEvents(locale, ret.timeline)} />
         </DetailGridSection>
       </DetailGrid>
     </div>

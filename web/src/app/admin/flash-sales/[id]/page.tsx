@@ -6,13 +6,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 import { getFlashSale } from "@/lib/admin-entities";
 
 export default function AdminFlashSaleDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t, locale } = useLocale();
   const sale = getFlashSale(id);
 
-  if (!sale) return <div className="p-8 text-center text-slate-500">Flash sale not found</div>;
+  if (!sale) return <div className="p-8 text-center text-slate-500">{t("notFound")}</div>;
 
   return (
     <div className="space-y-6">
@@ -20,17 +23,17 @@ export default function AdminFlashSaleDetailPage() {
         title={sale.name}
         subtitle={`${sale.start} → ${sale.end}`}
         backHref="/admin/flash-sales"
-        actions={<Badge variant={sale.status === "active" ? "success" : "warning"}>{sale.status}</Badge>}
+        actions={<Badge variant={sale.status === "active" ? "success" : "warning"}>{statusLabel(locale, sale.status)}</Badge>}
       />
       <DetailGrid>
-        <DetailGridSection title="Campaign">
+        <DetailGridSection title={t("flashSaleDetail")}>
           <InfoGrid items={[
-            { label: "Discount", value: `${sale.discount}%` },
-            { label: "Products", value: sale.products },
-            { label: "Start", value: sale.start },
-            { label: "End", value: sale.end },
+            { label: t("discountPct"), value: `${sale.discount}%` },
+            { label: t("products"), value: sale.products },
+            { label: t("startDate"), value: sale.start },
+            { label: t("endDate"), value: sale.end },
           ]} />
-          <Link href="/shop/deals" className="mt-4 inline-block text-sm text-blue-600 hover:underline">Preview on storefront →</Link>
+          <Link href="/shop/deals" className="mt-4 inline-block text-sm text-blue-600 hover:underline">{t("storefront")} →</Link>
         </DetailGridSection>
       </DetailGrid>
     </div>

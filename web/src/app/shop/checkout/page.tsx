@@ -20,7 +20,7 @@ const addresses = [
 ];
 
 export default function ShopCheckoutPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { isAuthenticated } = useAuth();
   const { profile, getZoneFee } = useMarket();
   const { cart, promoDiscount } = useShop();
@@ -50,17 +50,17 @@ export default function ShopCheckoutPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={locale === "fr" ? "Caisse" : "Checkout"} breadcrumbs={[{ label: "Cart", href: "/shop/cart" }, { label: "Checkout" }]} />
+      <PageHeader title={t("checkout")} breadcrumbs={[{ label: t("cart"), href: "/shop/cart" }, { label: t("checkout") }]} />
 
       {!isAuthenticated && (
         <div className="card-premium p-4">
-          <p className="text-sm font-medium">{locale === "fr" ? "Achat invité activé" : "Guest checkout enabled"}</p>
-          <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder="Email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
-          <Link href="/shop/login" className="mt-2 inline-block text-xs text-blue-600">{locale === "fr" ? "Se connecter" : "Sign in"}</Link>
+          <p className="text-sm font-medium">{t("guestCheckout")}</p>
+          <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder={t("emailPlaceholder")} value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
+          <Link href="/shop/login" className="mt-2 inline-block text-xs text-blue-600">{t("signIn")}</Link>
         </div>
       )}
 
-      <DetailSection title={locale === "fr" ? "Adresse de livraison" : "Delivery Address"}>
+      <DetailSection title={t("deliveryAddress")}>
         <div className="space-y-3">
           {addresses.map((a) => (
             <label key={a.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${selectedAddress === a.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>
@@ -72,29 +72,29 @@ export default function ShopCheckoutPage() {
               </div>
             </label>
           ))}
-          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-blue-600 hover:underline">+ Add address</button>
+          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-blue-600 hover:underline">+ {t("addAddress")}</button>
         </div>
       </DetailSection>
 
-      <DetailSection title={locale === "fr" ? "Options de livraison" : "Delivery Options"}>
+      <DetailSection title={t("deliveryOptions")}>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={crossCity} onChange={(e) => setCrossCity(e.target.checked)} />
-          <span className="text-sm">Cross-city delivery {BUSINESS.crossCityDelivery ? "(allowed)" : "(blocked)"}</span>
+          <span className="text-sm">{t("crossCityDelivery")} {BUSINESS.crossCityDelivery ? t("crossCityAllowed") : t("crossCityBlocked")}</span>
         </label>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />
-          <span className="text-sm">Open Box Delivery</span>
+          <span className="text-sm">{t("openBoxDelivery")}</span>
         </label>
-        <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={locale === "fr" ? "Note de commande (optionnel)" : "Order note (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
+        <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={t("orderNoteOptional")} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
         <InfoGrid items={[
-          { label: locale === "fr" ? "Frais de zone" : "Zone delivery fee", value: deliveryFee === 0 ? "FREE" : <DualCurrency amount={deliveryFee} /> },
-          { label: "ETA", value: crossCity ? "3-5 days" : "1-2 days" },
-          { label: locale === "fr" ? "Total" : "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
+          { label: t("zoneDeliveryFee"), value: deliveryFee === 0 ? t("free") : <DualCurrency amount={deliveryFee} /> },
+          { label: t("eta"), value: crossCity ? t("days35") : t("days12") },
+          { label: t("amount"), value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>
 
       <Button onClick={continueToPayment} className="w-full">
-        {locale === "fr" ? "Continuer vers le paiement" : "Continue to Payment"}
+        {t("continueToPayment")}
       </Button>
     </div>
   );

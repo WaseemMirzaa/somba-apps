@@ -5,17 +5,24 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/context/locale-context";
+import { localizedField } from "@/lib/locale-helpers";
 import { adminRoles as initialRoles } from "@/lib/admin-entities";
 import { useToast } from "@/context/toast-context";
 
 export default function AdminRolesPage() {
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [roles] = useState(initialRoles);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Roles & Permissions" subtitle="Sub-admin roles — Operations, Finance, Support, Marketing, Moderation, Warehouse" breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Roles" }]} />
+      <PageHeader
+        title={t("roles")}
+        subtitle={t("permissions")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("roles") }]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {roles.map((role) => (
@@ -23,8 +30,8 @@ export default function AdminRolesPage() {
           <Card className="transition-colors hover:border-blue-200">
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
-                <h3 className="font-semibold text-slate-900">{role.name}</h3>
-                <Badge variant="primary">{role.permissions.length} scopes</Badge>
+                <h3 className="font-semibold text-slate-900">{localizedField(locale, role.name, role.nameFr)}</h3>
+                <Badge variant="primary">{role.permissions.length} {t("permissions")}</Badge>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {role.permissions.map((p) => (
@@ -43,15 +50,15 @@ export default function AdminRolesPage() {
                 onClick={() => {
                   if (editingRole === role.id) {
                     setEditingRole(null);
-                    toast(`Permissions saved for ${role.name}`);
+                    toast(t("save"));
                   } else {
                     setEditingRole(role.id);
-                    toast(`Editing ${role.name} permissions`, "info");
+                    toast(t("edit"), "info");
                   }
                 }}
                 className="mt-4 text-sm font-medium text-blue-600 hover:underline"
               >
-                {editingRole === role.id ? "Save permissions" : "Edit permissions"}
+                {editingRole === role.id ? t("save") : t("edit")} {t("permissions")}
               </button>
             </CardContent>
           </Card>

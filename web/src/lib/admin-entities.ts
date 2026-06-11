@@ -17,26 +17,26 @@ export const auditLogs: AuditLogEntry[] = [
 ];
 
 export const adminRoles = [
-  { id: "super", name: "Super Admin", permissions: ["all"] },
-  { id: "operations", name: "Operations", permissions: ["orders", "warehouse", "logistics"] },
-  { id: "finance", name: "Finance", permissions: ["payouts", "refunds", "cod", "reports"] },
-  { id: "support", name: "Support", permissions: ["tickets", "customers", "returns"] },
-  { id: "marketing", name: "Marketing", permissions: ["campaigns", "cms", "coupons", "banners"] },
-  { id: "moderation", name: "Moderation", permissions: ["products", "reviews", "sellers"] },
-  { id: "warehouse", name: "Warehouse Admin", permissions: ["inventory", "dispatch", "hubs"] },
+  { id: "super", name: "Super Admin", nameFr: "Super admin", permissions: ["all"] },
+  { id: "operations", name: "Operations", nameFr: "Opérations", permissions: ["orders", "warehouse", "logistics"] },
+  { id: "finance", name: "Finance", nameFr: "Finance", permissions: ["payouts", "refunds", "cod", "reports"] },
+  { id: "support", name: "Support", nameFr: "Support", permissions: ["tickets", "customers", "returns"] },
+  { id: "marketing", name: "Marketing", nameFr: "Marketing", permissions: ["campaigns", "cms", "coupons", "banners"] },
+  { id: "moderation", name: "Moderation", nameFr: "Modération", permissions: ["products", "reviews", "sellers"] },
+  { id: "warehouse", name: "Warehouse Admin", nameFr: "Admin entrepôt", permissions: ["inventory", "dispatch", "hubs"] },
 ];
 
 export const cmsBlocks = [
-  { id: "hero", type: "hero", title: "Hero Banner", editable: true, active: true },
-  { id: "categories", type: "category_grid", title: "Category Grid", editable: true, active: true },
-  { id: "flash", type: "flash_sale", title: "Flash Sale Strip", editable: true, active: true },
-  { id: "trending", type: "product_carousel", title: "Trending Products", editable: true, active: true },
-  { id: "stores", type: "store_grid", title: "Top Stores", editable: true, active: false },
+  { id: "hero", type: "hero", title: "Hero Banner", titleFr: "Bannière hero", editable: true, active: true },
+  { id: "categories", type: "category_grid", title: "Category Grid", titleFr: "Grille catégories", editable: true, active: true },
+  { id: "flash", type: "flash_sale", title: "Flash Sale Strip", titleFr: "Bandeau vente flash", editable: true, active: true },
+  { id: "trending", type: "product_carousel", title: "Trending Products", titleFr: "Produits tendance", editable: true, active: true },
+  { id: "stores", type: "store_grid", title: "Top Stores", titleFr: "Meilleures boutiques", editable: true, active: false },
 ];
 
 export const flashSales = [
-  { id: "FS-01", name: "Summer Electronics", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" as const },
-  { id: "FS-02", name: "Fashion Weekend", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" as const },
+  { id: "FS-01", name: "Summer Electronics", nameFr: "Électronique été", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" as const },
+  { id: "FS-02", name: "Fashion Weekend", nameFr: "Week-end mode", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" as const },
 ];
 
 export const marketingCampaigns = [

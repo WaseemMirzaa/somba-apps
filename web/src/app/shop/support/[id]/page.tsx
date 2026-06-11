@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSupport } from "@/context/support-context";
 import { useLocale } from "@/context/locale-context";
+import { localizedField, statusLabel } from "@/lib/locale-helpers";
 
 export default function ShopSupportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { getTicket, addMessage } = useSupport();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const fr = locale === "fr";
   const ticket = getTicket(id);
   const [reply, setReply] = useState("");
@@ -24,9 +25,9 @@ export default function ShopSupportDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={ticket.id}
-        subtitle={ticket.subject}
+        subtitle={localizedField(locale, ticket.subject, ticket.subjectFr)}
         backHref="/shop/support"
-        actions={<Badge variant={ticket.status === "resolved" ? "success" : "info"}>{ticket.status.replace("_", " ")}</Badge>}
+        actions={<Badge variant={ticket.status === "resolved" ? "success" : "info"}>{statusLabel(locale, ticket.status)}</Badge>}
       />
 
       <DetailSection title={fr ? "Détails" : "Details"}>
@@ -44,7 +45,7 @@ export default function ShopSupportDetailPage() {
           {ticket.messages.map((m, i) => (
             <div key={i} className={`rounded-lg p-4 text-sm ${m.role === "customer" ? "bg-blue-50" : "bg-slate-50"}`}>
               <p className="text-xs font-medium uppercase text-slate-400">{m.author}</p>
-              <p className="mt-1">{m.text}</p>
+              <p className="mt-1">{localizedField(locale, m.text, m.textFr)}</p>
             </div>
           ))}
         </div>

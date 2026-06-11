@@ -44,12 +44,12 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
 import type { LucideIcon } from "lucide-react";
+import type { TranslationKey } from "@/lib/i18n";
 
 export type NavItem = {
   href: string;
-  label: string;
+  label: TranslationKey;
   icon: LucideIcon;
-  i18n?: boolean;
 };
 
 const portalConfigs = {
@@ -57,54 +57,54 @@ const portalConfigs = {
     title: "adminPanel" as const,
     accent: "from-blue-500 to-indigo-600",
     nav: [
-      { href: "/admin", label: "dashboard", icon: LayoutDashboard, i18n: true },
-      { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
-      { href: "/admin/warehouses", label: "Warehouses", icon: Boxes },
-      { href: "/admin/fulfillment", label: "Fulfillment Ops", icon: Truck },
-      { href: "/admin/moderation", label: "Moderation", icon: Shield },
-      { href: "/admin/products", label: "products", icon: Package, i18n: true },
-      { href: "/admin/orders", label: "orders", icon: ShoppingCart, i18n: true },
-      { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
-      { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
-      { href: "/admin/disputes", label: "Disputes", icon: AlertTriangle },
-      { href: "/admin/refunds", label: "Refunds", icon: DollarSign },
-      { href: "/admin/payouts", label: "Payouts", icon: Wallet },
-      { href: "/admin/categories", label: "Categories", icon: Package },
-      { href: "/admin/finance", label: "finance", icon: DollarSign, i18n: true },
-      { href: "/admin/fraud", label: "Fraud & COD", icon: AlertTriangle },
-      { href: "/admin/support", label: "support", icon: Headphones, i18n: true },
-      { href: "/admin/marketing", label: "marketing", icon: Megaphone, i18n: true },
-      { href: "/admin/flash-sales", label: "flashSale", icon: Zap, i18n: true },
-      { href: "/admin/cms", label: "CMS", icon: FileText },
-      { href: "/admin/analytics", label: "analytics", icon: BarChart3, i18n: true },
-      { href: "/admin/roles", label: "Roles", icon: Users },
-      { href: "/admin/audit", label: "Audit Log", icon: FileText },
-      { href: "/admin/settings", label: "settings", icon: Settings, i18n: true },
+      { href: "/admin", label: "dashboard", icon: LayoutDashboard },
+      { href: "/admin/sellers", label: "sellers", icon: Users },
+      { href: "/admin/warehouses", label: "warehouses", icon: Boxes },
+      { href: "/admin/fulfillment", label: "fulfillmentOps", icon: Truck },
+      { href: "/admin/moderation", label: "moderation", icon: Shield },
+      { href: "/admin/products", label: "products", icon: Package },
+      { href: "/admin/orders", label: "orders", icon: ShoppingCart },
+      { href: "/admin/customers", label: "customers", icon: Users },
+      { href: "/admin/returns", label: "returns", icon: RotateCcw },
+      { href: "/admin/disputes", label: "disputes", icon: AlertTriangle },
+      { href: "/admin/refunds", label: "refunds", icon: DollarSign },
+      { href: "/admin/payouts", label: "payouts", icon: Wallet },
+      { href: "/admin/categories", label: "categories", icon: Package },
+      { href: "/admin/finance", label: "finance", icon: DollarSign },
+      { href: "/admin/fraud", label: "fraudCod", icon: AlertTriangle },
+      { href: "/admin/support", label: "support", icon: Headphones },
+      { href: "/admin/marketing", label: "marketing", icon: Megaphone },
+      { href: "/admin/flash-sales", label: "flashSale", icon: Zap },
+      { href: "/admin/cms", label: "cms", icon: FileText },
+      { href: "/admin/analytics", label: "analytics", icon: BarChart3 },
+      { href: "/admin/roles", label: "roles", icon: Users },
+      { href: "/admin/audit", label: "auditLog", icon: FileText },
+      { href: "/admin/settings", label: "settings", icon: Settings },
     ] as NavItem[],
   },
   warehouse: {
     title: "warehousePortal" as const,
     accent: "from-indigo-500 to-violet-600",
     nav: [
-      { href: "/warehouse", label: "dashboard", icon: LayoutDashboard, i18n: true },
-      { href: "/warehouse/hubs", label: "Hubs", icon: Boxes },
-      { href: "/warehouse/inbound", label: "inbound", icon: Inbox, i18n: true },
+      { href: "/warehouse", label: "dashboard", icon: LayoutDashboard },
+      { href: "/warehouse/hubs", label: "hubs", icon: Boxes },
+      { href: "/warehouse/inbound", label: "inbound", icon: Inbox },
       { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck },
       { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown },
       { href: "/warehouse/inventory", label: "inventory", icon: Boxes },
-      { href: "/warehouse/batch-builder", label: "Batch Builder", icon: Send },
-      { href: "/warehouse/dispatch", label: "dispatch", icon: Send, i18n: true },
+      { href: "/warehouse/batch-builder", label: "batchBuilder", icon: Send },
+      { href: "/warehouse/dispatch", label: "dispatch", icon: Send },
       { href: "/warehouse/riders", label: "riders", icon: Bike },
       { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin },
       { href: "/warehouse/returns", label: "returns", icon: RotateCcw },
       { href: "/warehouse/replacements", label: "replacements", icon: RefreshCw },
       { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight },
       { href: "/warehouse/cod", label: "cod", icon: Banknote },
-      { href: "/warehouse/aged", label: "Aged Parcels", icon: AlertTriangle },
-      { href: "/warehouse/reconciliation", label: "Reconciliation", icon: ClipboardCheck },
+      { href: "/warehouse/aged", label: "agedParcels", icon: AlertTriangle },
+      { href: "/warehouse/reconciliation", label: "reconciliation", icon: ClipboardCheck },
       { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle },
       { href: "/warehouse/analytics", label: "analytics", icon: BarChart3 },
-      { href: "/warehouse/settings", label: "settings", icon: Settings, i18n: true },
+      { href: "/warehouse/settings", label: "settings", icon: Settings },
     ] as NavItem[],
   },
   seller: {
@@ -112,12 +112,12 @@ const portalConfigs = {
     accent: "from-sky-500 to-blue-600",
     nav: [
       { href: "/seller", label: "dashboard", icon: LayoutDashboard },
-      { href: "/seller/storefront", label: "Storefront", icon: Globe },
+      { href: "/seller/storefront", label: "storefront", icon: Globe },
       { href: "/seller/products", label: "products", icon: Package },
       { href: "/seller/inventory", label: "inventory", icon: Boxes },
       { href: "/seller/orders", label: "orders", icon: ShoppingCart },
-      { href: "/seller/disputes", label: "Disputes", icon: AlertTriangle },
-      { href: "/seller/notifications", label: "Notifications", icon: Megaphone },
+      { href: "/seller/disputes", label: "disputes", icon: AlertTriangle },
+      { href: "/seller/notifications", label: "notifications", icon: Megaphone },
       { href: "/seller/shipping", label: "shipping", icon: Truck },
       { href: "/seller/returns", label: "returns", icon: RotateCcw },
       { href: "/seller/replacements", label: "replacements", icon: RefreshCw },
@@ -126,7 +126,7 @@ const portalConfigs = {
       { href: "/seller/finance", label: "finance", icon: Wallet },
       { href: "/seller/analytics", label: "analytics", icon: BarChart3 },
       { href: "/seller/support", label: "support", icon: Headphones },
-      { href: "/seller/settings", label: "settings", icon: Settings, i18n: true },
+      { href: "/seller/settings", label: "settings", icon: Settings },
     ] as NavItem[],
   },
 };
@@ -184,7 +184,7 @@ export function DashboardLayout({
                 )}
               >
                 <item.icon className={cn("h-4 w-4", active && "text-blue-400")} />
-                {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
+                {t(item.label)}
               </Link>
             );
           })}

@@ -12,6 +12,7 @@ import { getSellerOrder } from "@/lib/seller-entities";
 import { resolveWarehouseHubHref } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { mapTimelineEvents } from "@/lib/locale-helpers";
 import { useToast } from "@/context/toast-context";
 
 const UNAVAILABLE_REASONS = [
@@ -22,7 +23,7 @@ const UNAVAILABLE_REASONS = [
 
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const order = getSellerOrder(id);
   const [ready, setReady] = useState(false);
@@ -31,7 +32,7 @@ export default function SellerOrderDetailPage() {
   const [showFlagModal, setShowFlagModal] = useState(false);
 
   if (!order) {
-    return <div className="p-8 text-center text-slate-500">Order not found</div>;
+    return <div className="p-8 text-center text-slate-500">{t("notFound")}</div>;
   }
 
   return (
@@ -57,32 +58,32 @@ export default function SellerOrderDetailPage() {
       />
 
       <DetailGrid>
-        <DetailGridSection title="Order Summary">
+        <DetailGridSection title={t("orderSection")}>
           <InfoGrid items={[
-            { label: "Order Number", value: order.id },
-            { label: "Order Date", value: order.date },
-            { label: "Order Status", value: order.orderStatus },
-            { label: "Total Amount", value: formatCurrency(order.amount, locale) },
+            { label: t("orderId"), value: order.id },
+            { label: t("date"), value: order.date },
+            { label: t("status"), value: order.orderStatus },
+            { label: t("amount"), value: formatCurrency(order.amount, locale) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Customer">
+        <DetailGridSection title={t("customerSection")}>
           <InfoGrid items={[
-            { label: "Name", value: order.customer },
-            { label: "Phone", value: order.customerPhone },
-            { label: "City", value: order.customerCity },
-            { label: "Address", value: order.customerAddress, full: true },
+            { label: t("name"), value: order.customer },
+            { label: t("phone"), value: order.customerPhone },
+            { label: t("city"), value: order.customerCity },
+            { label: t("address"), value: order.customerAddress, full: true },
           ]} />
           <div className="mt-4 flex gap-3">
-            <a href={`tel:${order.customerPhone}`} className="text-sm text-sky-600">Call Customer</a>
-            <Link href="/seller/support" className="text-sm text-slate-500">Open Support</Link>
+            <a href={`tel:${order.customerPhone}`} className="text-sm text-sky-600">{t("callCustomer")}</a>
+            <Link href="/seller/support" className="text-sm text-slate-500">{t("openSupportTicket")}</Link>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Payment">
+        <DetailGridSection title={t("paymentSection")}>
           <InfoGrid items={[
-            { label: "Payment Method", value: order.paymentMethod },
-            { label: "Transaction ID", value: order.transactionId },
+            { label: t("method"), value: order.paymentMethod },
+            { label: t("transaction"), value: order.transactionId },
             { label: "Status", value: order.paymentStatus },
             { label: "Commission", value: formatCurrency(order.commission, locale) },
             { label: "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
@@ -120,8 +121,8 @@ export default function SellerOrderDetailPage() {
           ))}
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
-          <ActivityTimeline events={order.timeline} />
+        <DetailGridSection title={t("timeline")} span={3}>
+          <ActivityTimeline events={mapTimelineEvents(locale, order.timeline)} />
         </DetailGridSection>
       </DetailGrid>
 

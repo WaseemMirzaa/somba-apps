@@ -22,15 +22,15 @@ export default function AdminMarketingPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("marketing")}
-        subtitle="Campaigns, banners & promotions"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("marketing") }]}
-        actions={<Button size="sm" onClick={() => setShowCreate(true)}>Create Campaign</Button>}
+        subtitle={t("marketingSubtitle")}
+        breadcrumbs={[{ label: t("adminBreadcrumb"), href: "/admin" }, { label: t("marketing") }]}
+        actions={<Button size="sm" onClick={() => setShowCreate(true)}>{t("create")} {t("campaign")}</Button>}
       />
 
       {showCreate && (
         <Card>
           <CardContent className="space-y-3 p-5">
-            <input className="input-premium w-full px-4 py-2 text-sm" placeholder="Campaign name" id="campaign-name" />
+            <input className="input-premium w-full px-4 py-2 text-sm" placeholder={t("campaignName")} id="campaign-name" />
             <div className="flex gap-2">
               <Button size="sm" onClick={() => {
                 const name = (document.getElementById("campaign-name") as HTMLInputElement)?.value || "New Campaign";

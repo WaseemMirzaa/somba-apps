@@ -7,14 +7,14 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { MockLiveMap } from "@/components/ui/mock-live-map";
 import { getOrder } from "@/lib/entities";
 import { useLocale } from "@/context/locale-context";
+import { mapTimelineEvents, statusLabel, storeNameLabel } from "@/lib/locale-helpers";
 
 export default function OrderTrackingPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const order = getOrder(id);
-  const fr = locale === "fr";
 
-  if (!order) return <div className="text-center text-slate-500">Order not found</div>;
+  if (!order) return <div className="text-center text-slate-500">{t("notFound")}</div>;
 
   const groups = order.fulfilmentGroups?.length ? order.fulfilmentGroups : [{
     seller: order.seller,
@@ -27,27 +27,27 @@ export default function OrderTrackingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Suivi en direct" : "Live Tracking"} subtitle={id} backHref={`/shop/orders/${id}`} />
+      <PageHeader title={t("liveTracking")} subtitle={id} backHref={`/shop/orders/${id}`} />
 
       {groups.map((group, i) => (
         <div key={group.parcelId} className="space-y-4">
           <h3 className="font-semibold text-slate-900">
-            {groups.length > 1 ? `${fr ? "Colis" : "Parcel"} ${i + 1} — ${group.seller}` : (fr ? "Livraison" : "Delivery")}
+            {groups.length > 1 ? `${t("parcel")} ${i + 1} — ${storeNameLabel(locale, group.seller)}` : t("deliveries")}
           </h3>
-          <MockLiveMap rider={group.rider} eta="18 min" label={fr ? "Carte en direct (mock)" : "Live map (mock)"} />
-          <DetailSection title={fr ? "Détails colis" : "Parcel Details"}>
+          <MockLiveMap rider={group.rider} eta="18 min" label={t("liveMapMock")} />
+          <DetailSection title={t("parcelDetail")}>
             <InfoGrid items={[
-              { label: "Tracking", value: group.trackingNumber },
-              { label: fr ? "Vendeur" : "Seller", value: group.seller },
-              { label: fr ? "Statut" : "Status", value: group.status },
-              { label: fr ? "Livreur" : "Rider", value: group.rider },
+              { label: t("trackingNumber"), value: group.trackingNumber },
+              { label: t("seller"), value: storeNameLabel(locale, group.seller) },
+              { label: t("status"), value: statusLabel(locale, group.status) },
+              { label: t("rider"), value: group.rider },
             ]} />
           </DetailSection>
         </div>
       ))}
 
-      <DetailSection title={fr ? "Chronologie" : "Timeline"}>
-        <ActivityTimeline events={order.timeline} />
+      <DetailSection title={t("timeline")}>
+        <ActivityTimeline events={mapTimelineEvents(locale, order.timeline)} />
       </DetailSection>
     </div>
   );

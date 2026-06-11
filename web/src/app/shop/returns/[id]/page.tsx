@@ -8,6 +8,7 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { useReturns } from "@/context/return-context";
 import { useLocale } from "@/context/locale-context";
+import { localizedField, timelineLabel } from "@/lib/locale-helpers";
 
 const STATUS_LABELS: Record<string, { en: string; fr: string }> = {
   requested: { en: "Requested", fr: "Demandé" },
@@ -33,7 +34,7 @@ export default function ReturnStatusPage() {
       <DetailSection title={fr ? "Statut du retour" : "Return Status"}>
         <InfoGrid items={[
           { label: fr ? "Statut" : "Status", value: fr ? STATUS_LABELS[ret.status]?.fr : STATUS_LABELS[ret.status]?.en },
-          { label: fr ? "Raison" : "Reason", value: ret.reason },
+          { label: fr ? "Raison" : "Reason", value: localizedField(locale, ret.reason, ret.reasonFr) },
           { label: fr ? "Articles" : "Items", value: ret.items.join(", "), full: true },
           ...(ret.refundAmount ? [{ label: fr ? "Remboursement" : "Refund", value: <DualCurrency amount={ret.refundAmount} /> }] : []),
         ]} />
@@ -43,7 +44,7 @@ export default function ReturnStatusPage() {
       </DetailSection>
       {ret.timeline && ret.timeline.length > 0 && (
         <DetailSection title={fr ? "Suivi" : "Tracking"}>
-          <ActivityTimeline events={ret.timeline.map((e) => ({ time: e.time, label: e.label, done: e.done }))} />
+          <ActivityTimeline events={ret.timeline.map((e) => ({ time: e.time, label: timelineLabel(locale, e.label, e.labelFr), done: e.done }))} />
         </DetailSection>
       )}
     </div>

@@ -11,6 +11,7 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { getReturn } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { mapTimelineEvents } from "@/lib/locale-helpers";
 import { useToast } from "@/context/toast-context";
 
 export default function WarehouseReturnDetailPage() {
@@ -81,7 +82,7 @@ export default function WarehouseReturnDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title="Timeline" span={3}>
-          <ActivityTimeline events={ret.timeline} />
+          <ActivityTimeline events={mapTimelineEvents(locale, ret.timeline)} />
         </DetailGridSection>
       </DetailGrid>
     </div>

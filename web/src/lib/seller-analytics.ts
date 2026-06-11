@@ -83,11 +83,11 @@ export const sellerExtendedKpis = {
 } as const;
 
 export const sellerHealthBreakdown = [
-  { label: "Fulfillment speed", score: 94, weight: 25 },
-  { label: "Return rate", score: 88, weight: 20 },
-  { label: "Customer rating", score: 96, weight: 25 },
-  { label: "Stock availability", score: 85, weight: 15 },
-  { label: "Response time", score: 91, weight: 15 },
+  { label: "Fulfillment speed", labelFr: "Vitesse fulfillment", score: 94, weight: 25 },
+  { label: "Return rate", labelFr: "Taux de retour", score: 88, weight: 20 },
+  { label: "Customer rating", labelFr: "Note clients", score: 96, weight: 25 },
+  { label: "Stock availability", labelFr: "Disponibilité stock", score: 85, weight: 15 },
+  { label: "Response time", labelFr: "Temps de réponse", score: 91, weight: 15 },
 ] as const;
 
 export const sellerFulfillmentMetrics = {

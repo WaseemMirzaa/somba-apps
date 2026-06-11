@@ -132,11 +132,29 @@ export const products = [
   },
 ];
 
+/** French display names for store/seller labels (proper nouns kept where identical). */
+export const STORE_NAME_FR: Record<string, string> = {
+  "TechZone Store": "Boutique TechZone",
+  "Apple Official": "Apple Officiel",
+  "AudioHub": "AudioHub",
+  "SportStyle": "SportStyle",
+  "HomeEssentials": "Essentiels Maison",
+  "DenimWorld": "DenimWorld",
+  "KitchenPro": "KitchenPro",
+  "GameZone": "GameZone",
+  "FashionHub": "FashionHub",
+  "GadgetWorld": "GadgetWorld",
+  "NewTech Solutions": "NewTech Solutions",
+  "Belle Mode": "Belle Mode",
+  "Organic Foods Co": "Organic Foods Co",
+  "TechZone": "TechZone",
+};
+
 export const stores = [
-  { id: 1, name: "TechZone Store", rating: 4.8, products: 1240, followers: 45000, image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop", badge: "Gold" },
-  { id: 2, name: "FashionHub", rating: 4.6, products: 3200, followers: 78000, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop", badge: "Silver" },
-  { id: 3, name: "HomeEssentials", rating: 4.7, products: 890, followers: 23000, image: "https://images.unsplash.com/photo-1555529669-e4e7eeef2289?w=200&h=200&fit=crop", badge: "Gold" },
-  { id: 4, name: "SportStyle", rating: 4.5, products: 2100, followers: 56000, image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa0?w=200&h=200&fit=crop", badge: "Bronze" },
+  { id: 1, name: "TechZone Store", nameFr: "Boutique TechZone", rating: 4.8, products: 1240, followers: 45000, image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop", badge: "Gold" },
+  { id: 2, name: "FashionHub", nameFr: "FashionHub", rating: 4.6, products: 3200, followers: 78000, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop", badge: "Silver" },
+  { id: 3, name: "HomeEssentials", nameFr: "Essentiels Maison", rating: 4.7, products: 890, followers: 23000, image: "https://images.unsplash.com/photo-1555529669-e4e7eeef2289?w=200&h=200&fit=crop", badge: "Gold" },
+  { id: 4, name: "SportStyle", nameFr: "SportStyle", rating: 4.5, products: 2100, followers: 56000, image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa0?w=200&h=200&fit=crop", badge: "Bronze" },
 ];
 
 export const orders = [

@@ -5,8 +5,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
+import { useLocale } from "@/context/locale-context";
 
 export default function WarehouseHubsPage() {
+  const { t } = useLocale();
   const { persona } = useAuth();
   const { warehouses } = useWarehouseAdmin();
   const assignedId = persona.warehouseId;
@@ -15,9 +17,9 @@ export default function WarehouseHubsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Hubs"
-        subtitle={assignedId ? "Your assigned fulfillment hub" : "Active fulfillment hubs"}
-        breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: "Hubs" }]}
+        title={t("hubs")}
+        subtitle={assignedId ? t("assignedHub") : t("activeHubs")}
+        breadcrumbs={[{ label: t("warehouseBreadcrumb"), href: "/warehouse" }, { label: t("hubs") }]}
       />
 
       <div className="space-y-3">

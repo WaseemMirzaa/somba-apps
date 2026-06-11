@@ -30,9 +30,9 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("orders")}
-        subtitle="List View — Order ID, Customer, Seller, Amount, Payment, Status, Date"
+        subtitle={t("listViewOrders")}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          { label: t("adminBreadcrumb"), href: "/admin" },
           { label: t("orders") },
         ]}
       />
@@ -47,7 +47,7 @@ export default function AdminOrdersPage() {
               tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
             )}
           >
-            {tabId === "all" ? "All" : t(tabId as Parameters<typeof t>[0])}
+            {tabId === "all" ? t("allTab") : t(tabId as Parameters<typeof t>[0])}
           </button>
         ))}
       </div>
@@ -58,7 +58,7 @@ export default function AdminOrdersPage() {
             columns={[
               {
                 key: "id",
-                label: "Order ID",
+                label: t("orderId"),
                 render: (row) => (
                   <Link href={`/admin/orders/${row.id}`} className="font-medium text-blue-600 hover:underline">
                     {String(row.id)}
@@ -67,7 +67,7 @@ export default function AdminOrdersPage() {
               },
               {
                 key: "customer",
-                label: "Customer",
+                label: t("customer"),
                 render: (row) => (
                   <Link href={`/admin/customers/${row.customerId}`} className="text-blue-600 hover:underline">
                     {String(row.customer)}
@@ -76,7 +76,7 @@ export default function AdminOrdersPage() {
               },
               {
                 key: "seller",
-                label: "Seller",
+                label: t("seller"),
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.sellerId}`} className="text-blue-600 hover:underline">
                     {String(row.seller)}
@@ -88,7 +88,7 @@ export default function AdminOrdersPage() {
                 label: t("amount"),
                 render: (row) => formatCurrency(row.amount as number, locale),
               },
-              { key: "paymentMethod", label: "Payment" },
+              { key: "paymentMethod", label: t("paymentCol") },
               {
                 key: "status",
                 label: t("status"),

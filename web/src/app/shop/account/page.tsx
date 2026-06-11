@@ -14,19 +14,26 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
+import type { TranslationKey } from "@/lib/i18n";
 
-const menuItems: { href: string; icon: typeof Package; label: string; labelText?: string; desc: string }[] = [
-  { href: "/shop/orders", icon: Package, label: "myOrders", desc: "Track & manage orders" },
-  { href: "/shop/returns", icon: RotateCcw, label: "returns", desc: "Return requests & status" },
-  { href: "/shop/disputes", icon: AlertTriangle, label: "myAccount", labelText: "Disputes", desc: "Order disputes" },
-  { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: "Saved items" },
-  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: "Somba Wallet · Airtel top-up" },
-  { href: "/shop/refer", icon: Heart, label: "myAccount", desc: "Refer & Earn — $10 bonus" },
-  { href: "/shop/account/addresses", icon: MapPin, label: "addresses", desc: "France & global addresses" },
-  { href: "/shop/support", icon: Headphones, label: "support", desc: "Help center" },
-  { href: "/shop/notifications", icon: Headphones, label: "myAccount", desc: "Notifications" },
-  { href: "/shop/help", icon: Headphones, label: "support", desc: "Help & account deletion" },
-  { href: "/shop/deals", icon: Package, label: "flashSale", desc: "Flash deals" },
+const menuItems: {
+  href: string;
+  icon: typeof Package;
+  label: TranslationKey;
+  labelOverride?: TranslationKey;
+  desc: TranslationKey;
+}[] = [
+  { href: "/shop/orders", icon: Package, label: "myOrders", desc: "trackManageOrders" },
+  { href: "/shop/returns", icon: RotateCcw, label: "returns", desc: "returnRequestsStatus" },
+  { href: "/shop/disputes", icon: AlertTriangle, label: "disputes", desc: "orderDisputes" },
+  { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: "savedItems" },
+  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: "walletAirtel" },
+  { href: "/shop/refer", icon: Heart, label: "myAccount", desc: "referEarn" },
+  { href: "/shop/account/addresses", icon: MapPin, label: "addresses", desc: "globalAddresses" },
+  { href: "/shop/support", icon: Headphones, label: "support", desc: "helpCenter" },
+  { href: "/shop/notifications", icon: Headphones, label: "notificationsMenu", desc: "notificationsMenu" },
+  { href: "/shop/help", icon: Headphones, label: "support", desc: "helpAccountDeletion" },
+  { href: "/shop/deals", icon: Package, label: "flashSale", desc: "flashDeals" },
 ];
 
 export default function ShopAccountPage() {
@@ -37,7 +44,7 @@ export default function ShopAccountPage() {
       <PageHeader
         title={t("myAccount")}
         breadcrumbs={[
-          { label: "Shop", href: "/" },
+          { label: t("shop"), href: "/" },
           { label: t("myAccount") },
         ]}
       />
@@ -52,7 +59,7 @@ export default function ShopAccountPage() {
           </h2>
           <p className="text-sm text-slate-500">marie.kabila@email.com · +243 998 112 334</p>
           <span className="mt-2 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-            Gold Member
+            {t("goldMember")}
           </span>
         </div>
       </div>
@@ -68,8 +75,8 @@ export default function ShopAccountPage() {
               <item.icon className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-slate-900">{item.labelText ?? t(item.label as Parameters<typeof t>[0])}</p>
-              <p className="text-sm text-slate-500">{item.desc}</p>
+              <p className="font-semibold text-slate-900">{t(item.labelOverride ?? item.label)}</p>
+              <p className="text-sm text-slate-500">{t(item.desc)}</p>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-400" />
           </Link>

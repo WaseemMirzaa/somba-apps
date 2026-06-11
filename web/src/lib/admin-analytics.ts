@@ -56,11 +56,11 @@ export const adminOrderFunnel = [
 ] as const;
 
 export const adminFulfillmentHealth = [
-  { label: "On-time dispatch", score: 94 },
-  { label: "Warehouse capacity", score: 87 },
-  { label: "Rider availability", score: 91 },
-  { label: "COD reconciliation", score: 96 },
-  { label: "Return resolution", score: 89 },
+  { label: "On-time dispatch", labelFr: "Expédition à l'heure", score: 94 },
+  { label: "Warehouse capacity", labelFr: "Capacité entrepôt", score: 87 },
+  { label: "Rider availability", labelFr: "Disponibilité livreurs", score: 91 },
+  { label: "COD reconciliation", labelFr: "Réconciliation COD", score: 96 },
+  { label: "Return resolution", labelFr: "Résolution retours", score: 89 },
 ] as const;
 
 export const adminRecentActivity = [

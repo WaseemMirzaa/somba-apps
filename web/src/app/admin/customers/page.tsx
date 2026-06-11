@@ -6,6 +6,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
+import { statusLabel } from "@/lib/locale-helpers";
 import { customerEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 
@@ -16,9 +17,9 @@ export default function AdminCustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("customers")}
-        subtitle="List View — Name, Email, Phone, City, Orders, Total Spent, Status"
+        subtitle={t("listViewCustomers")}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          { label: t("adminBreadcrumb"), href: "/admin" },
           { label: t("customers") },
         ]}
       />
@@ -39,17 +40,17 @@ export default function AdminCustomersPage() {
               },
               { key: "email", label: t("email") },
               { key: "phone", label: t("phone") },
-              { key: "city", label: "City" },
-              { key: "orders", label: "Orders" },
+              { key: "city", label: t("city") },
+              { key: "orders", label: t("orders") },
               {
                 key: "totalSpent",
-                label: "Total Spent",
+                label: t("totalSpent"),
                 render: (row) => formatCurrency(row.totalSpent as number, locale),
               },
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="success">{String(row.status)}</Badge>,
+                render: (row) => <Badge variant="success">{statusLabel(locale, String(row.status))}</Badge>,
               },
               {
                 key: "actions",

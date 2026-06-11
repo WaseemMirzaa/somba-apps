@@ -60,6 +60,7 @@ function KpiCard({
   positive,
   spark,
   icon: Icon,
+  vsLabel,
 }: {
   title: string;
   value: string;
@@ -67,6 +68,7 @@ function KpiCard({
   positive?: boolean;
   spark: number[];
   icon: React.ComponentType<{ className?: string }>;
+  vsLabel: string;
 }) {
   const up = change >= 0;
   const good = positive !== undefined ? (positive ? up : !up) : up;
@@ -79,7 +81,7 @@ function KpiCard({
           <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}% vs last period
+            {Math.abs(change)}{vsLabel}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -103,47 +105,49 @@ export default function AdminDashboard() {
   const revenueSpark = adminRevenueTrend.map((d) => d.revenue);
   const ordersSpark = adminRevenueTrend.map((d) => d.orders);
 
+  const vsLabel = t("vsLastPeriod");
+
   const quickActions = [
     { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(k.ordersMtd, locale)} MTD`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
-    { href: "/admin/sellers", label: t("activeSellers"), sub: `${k.pendingApprovals} pending`, icon: Users, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/admin/payouts", label: "Payouts", sub: formatCurrency(84200, locale), icon: DollarSign, color: "bg-violet-50 text-violet-700" },
-    { href: "/admin/fraud", label: "Fraud review", sub: `${k.fraudFlags} flags`, icon: Shield, color: "bg-amber-50 text-amber-700" },
+    { href: "/admin/sellers", label: t("activeSellers"), sub: `${k.pendingApprovals} ${t("pending").toLowerCase()}`, icon: Users, color: "bg-emerald-50 text-emerald-700" },
+    { href: "/admin/payouts", label: t("payouts"), sub: formatCurrency(84200, locale), icon: DollarSign, color: "bg-violet-50 text-violet-700" },
+    { href: "/admin/fraud", label: t("fraudReview"), sub: `${k.fraudFlags} ${t("fraudFlags")}`, icon: Shield, color: "bg-amber-50 text-amber-700" },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Tableau de bord marketplace" : "Marketplace dashboard"}
-        subtitle={`${t("welcome")}, Admin · GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} customers`}
+        title={t("marketplaceDashboard")}
+        subtitle={`${t("welcome")}, Admin · GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} ${t("customers").toLowerCase()}`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
               {t("analytics")}
             </Link>
             <Link href="/admin/sellers" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
-              {t("approve")} sellers
+              {t("approve")} {t("sellers").toLowerCase()}
             </Link>
           </div>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="GMV (MTD)" value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} />
-        <KpiCard title="Orders (MTD)" value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} />
-        <KpiCard title="Active sellers" value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} />
-        <KpiCard title="Active customers" value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} />
-        <KpiCard title="Conversion rate" value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} />
-        <KpiCard title="Avg. order value" value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
-        <KpiCard title="Return rate" value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} />
-        <KpiCard title="Pending approvals" value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} />
+        <KpiCard title={t("gmvMtd")} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} vsLabel={vsLabel} />
+        <KpiCard title={t("ordersMtd")} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} vsLabel={vsLabel} />
+        <KpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} vsLabel={vsLabel} />
+        <KpiCard title={t("activeCustomersKpi")} value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} vsLabel={vsLabel} />
+        <KpiCard title={t("conversionRate")} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} vsLabel={vsLabel} />
+        <KpiCard title={t("avgOrderValue")} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} vsLabel={vsLabel} />
+        <KpiCard title={t("returnRateKpi")} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} vsLabel={vsLabel} />
+        <KpiCard title={t("pendingApprovals")} value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} vsLabel={vsLabel} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">GMV & orders</h2>
-              <p className="text-xs text-slate-500">Marketplace revenue trend</p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{t("gmvAndOrders")}</h2>
+              <p className="text-xs text-slate-500">{t("revenueTrend")}</p>
             </div>
             <div className="flex rounded-lg border border-slate-200 p-0.5">
               {PERIODS.map((p) => (
@@ -168,13 +172,13 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">June goals</h2>
-            <p className="text-xs text-slate-500">Progress toward monthly targets</p>
+            <h2 className="font-semibold text-slate-900">{t("juneGoals")}</h2>
+            <p className="text-xs text-slate-500">{t("progressMonthlyTargets")}</p>
           </CardHeader>
           <CardContent className="space-y-6">
-            <GoalProgress label="GMV goal" current={adminGoals.gmvCurrent} target={adminGoals.gmvTarget} format={(n) => formatCurrency(n, locale)} />
-            <GoalProgress label="Orders goal" current={adminGoals.ordersCurrent} target={adminGoals.ordersTarget} />
-            <GoalProgress label="Sellers goal" current={adminGoals.sellersCurrent} target={adminGoals.sellersTarget} />
+            <GoalProgress label={t("gmvGoal")} current={adminGoals.gmvCurrent} target={adminGoals.gmvTarget} format={(n) => formatCurrency(n, locale)} />
+            <GoalProgress label={t("ordersGoal")} current={adminGoals.ordersCurrent} target={adminGoals.ordersTarget} />
+            <GoalProgress label={t("sellersGoal")} current={adminGoals.sellersCurrent} target={adminGoals.sellersTarget} />
           </CardContent>
         </Card>
       </div>
@@ -183,8 +187,8 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <h2 className="font-semibold text-slate-900">Seller growth</h2>
-              <p className="text-xs text-slate-500">Active sellers & retention</p>
+              <h2 className="font-semibold text-slate-900">{t("sellerGrowth")}</h2>
+              <p className="text-xs text-slate-500">{t("activeSellersRetention")}</p>
             </div>
             <Badge variant="success">+{k.sellersChange}%</Badge>
           </CardHeader>
@@ -201,8 +205,8 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">GMV by category</h2>
-            <p className="text-xs text-slate-500">MTD breakdown</p>
+            <h2 className="font-semibold text-slate-900">{t("categoryGmv")}</h2>
+            <p className="text-xs text-slate-500">{t("mtdBreakdown")}</p>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
@@ -218,8 +222,8 @@ export default function AdminDashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Order funnel</h2>
-            <p className="text-xs text-slate-500">Visits → delivered (last 30 days)</p>
+            <h2 className="font-semibold text-slate-900">{t("orderFunnel")}</h2>
+            <p className="text-xs text-slate-500">{t("funnelVisitsLast30Days")}</p>
           </CardHeader>
           <CardContent>
             <FunnelChart
@@ -234,14 +238,14 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Fulfillment health</h2>
-            <p className="text-xs text-slate-500">Ops score breakdown</p>
+            <h2 className="font-semibold text-slate-900">{t("fulfillmentHealth")}</h2>
+            <p className="text-xs text-slate-500">{t("opsScoreBreakdown")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {adminFulfillmentHealth.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{h.label}</span>
+                  <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -278,7 +282,7 @@ export default function AdminDashboard() {
           <CardContent className="p-0">
             <DataTable
               columns={[
-                { key: "id", label: "ID", render: (row) => (
+                { key: "id", label: t("idCol"), render: (row) => (
                   <Link href={`/admin/orders/${row.id}`} className="text-blue-600 hover:underline">{String(row.id)}</Link>
                 )},
                 { key: "customer", label: t("name") },
@@ -297,7 +301,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-[var(--primary)]" />
-            <h2 className="font-semibold text-slate-900">Recent activity</h2>
+            <h2 className="font-semibold text-slate-900">{t("recentActivity")}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {adminRecentActivity.map((item) => (
@@ -320,7 +324,7 @@ export default function AdminDashboard() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "storeName", label: "Store", render: (row) => (
+              { key: "storeName", label: t("store"), render: (row) => (
                 <Link href={`/admin/sellers/${row.id}`} className="text-blue-600 hover:underline">{String(row.storeName)}</Link>
               )},
               { key: "owner", label: t("name") },
