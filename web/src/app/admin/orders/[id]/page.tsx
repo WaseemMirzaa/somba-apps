@@ -8,7 +8,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
-import { getOrder } from "@/lib/entities";
+import { getOrder, resolveAdminWarehouseHref } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -72,7 +72,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title="Logistics">
           <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-blue-600 hover:underline">{order.warehouse}</Link> },
+            { label: "Warehouse", value: <Link href={resolveAdminWarehouseHref(order.warehouseId)} className="text-blue-600 hover:underline">{order.warehouse}</Link> },
             { label: "Rider", value: order.rider },
             { label: "Tracking Number", value: order.trackingNumber },
           ]} />

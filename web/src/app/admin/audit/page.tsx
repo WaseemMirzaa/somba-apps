@@ -15,7 +15,8 @@ export default function AdminAuditPage() {
         {auditLogs.map((log) => {
           const entityHref = resolveAuditEntityHref(log.entity, log.entityId);
           return (
-            <Card key={log.id}>
+            <Link key={log.id} href={`/admin/audit/${log.id}`}>
+            <Card className="transition-colors hover:border-blue-200">
               <CardContent className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -41,6 +42,7 @@ export default function AdminAuditPage() {
                 )}
               </CardContent>
             </Card>
+            </Link>
           );
         })}
       </div>

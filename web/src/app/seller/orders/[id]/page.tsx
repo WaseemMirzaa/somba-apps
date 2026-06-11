@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getSellerOrder } from "@/lib/seller-entities";
+import { resolveWarehouseHubHref } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -90,14 +91,14 @@ export default function SellerOrderDetailPage() {
 
         <DetailGridSection title="Shipping">
           <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-sky-600 hover:underline">{order.warehouse}</Link> },
+            { label: "Warehouse", value: <Link href={resolveWarehouseHubHref("WH-KIN")} className="text-sky-600 hover:underline">{order.warehouse}</Link> },
             { label: "Pickup Rider", value: order.pickupRider },
             { label: "Tracking Status", value: order.trackingStatus },
             { label: "Pickup ETA", value: order.pickupEta },
           ]} />
           <div className="mt-4 flex gap-3">
             <Link href={`/seller/shipping/SHP-${order.id.replace("ORD-", "")}`} className="text-sm text-sky-600 hover:underline">View Shipment →</Link>
-            <Link href="/warehouse" className="text-sm text-sky-600 hover:underline">Warehouse Detail →</Link>
+            <Link href={resolveWarehouseHubHref("WH-KIN")} className="text-sm text-sky-600 hover:underline">Warehouse Detail →</Link>
           </div>
         </DetailGridSection>
 

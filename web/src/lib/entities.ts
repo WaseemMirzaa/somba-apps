@@ -53,8 +53,18 @@ export type OrderEntity = {
     image: string;
   }[];
   warehouse: string;
+  warehouseId?: string;
   rider: string;
   trackingNumber: string;
+  fulfilmentGroups?: {
+    seller: string;
+    sellerId: number;
+    parcelId: string;
+    trackingNumber: string;
+    status: string;
+    rider: string;
+    items: OrderEntity["items"];
+  }[];
   commission: number;
   sellerEarnings: number;
   refunds: number;
@@ -256,7 +266,8 @@ export const orderEntities: OrderEntity[] = orders.map((o, i) => {
       price: product.price,
       image: product.image,
     }],
-    warehouse: "Kinshasa Hub",
+    warehouse: i % 2 === 0 ? "Paris Fulfillment Center" : "Kinshasa Hub",
+    warehouseId: i % 2 === 0 ? "WH-PAR" : "WH-KIN",
     rider: "Jean-Pierre M.",
     trackingNumber: `TRK-${o.id.replace("ORD-", "")}`,
     commission: Math.round(o.amount * 0.12),
@@ -273,6 +284,38 @@ export const orderEntities: OrderEntity[] = orders.map((o, i) => {
     ],
   };
 });
+
+// MF-2: multi-seller split demo on ORD-2024-002
+const multiSellerOrder = orderEntities.find((o) => o.id === "ORD-2024-002");
+if (multiSellerOrder) {
+  const p0 = products[0];
+  const p1 = products[1];
+  multiSellerOrder.itemsCount = 2;
+  multiSellerOrder.items = [
+    { productId: p0.id, name: p0.name, sku: `SKU-${p0.id}`, variant: "256GB", qty: 1, price: p0.price, image: p0.image },
+    { productId: p1.id, name: p1.name, sku: `SKU-${p1.id}`, variant: "512GB", qty: 1, price: p1.price, image: p1.image },
+  ];
+  multiSellerOrder.fulfilmentGroups = [
+    {
+      seller: "TechZone Store", sellerId: 3, parcelId: "PKG-002", trackingNumber: "TRK-2024-002-A",
+      status: "in_transit", rider: "Jean-Pierre M.",
+      items: [multiSellerOrder.items[0]],
+    },
+    {
+      seller: "AudioHub", sellerId: 4, parcelId: "PKG-003", trackingNumber: "TRK-2024-002-B",
+      status: "packed", rider: "Paul Kabongo",
+      items: [multiSellerOrder.items[1]],
+    },
+  ];
+}
+
+export function resolveAdminWarehouseHref(warehouseId?: string) {
+  return warehouseId ? `/admin/warehouses/${warehouseId}` : "/admin/warehouses";
+}
+
+export function resolveWarehouseHubHref(warehouseId?: string) {
+  return warehouseId ? `/warehouse/hubs/${warehouseId}` : "/warehouse/hubs";
+}
 
 // ─── Product moderation ───────────────────────────────────────────────────────
 

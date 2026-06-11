@@ -230,8 +230,8 @@ export const sellerStatementList = [
 ];
 
 export const payoutList = [
-  { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah" },
-  { id: "PAY-002", amount: 8500, method: "Bank Transfer", status: "pending", date: "2024-06-06", bankAccount: "****4521", approvedBy: "—" },
+  { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid" as const, date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah", linkedTransactions: ["TXN-2024-001", "TXN-2024-003", "TXN-2024-005"] },
+  { id: "PAY-002", amount: 8500, method: "Bank Transfer", status: "pending" as const, date: "2024-06-06", bankAccount: "****4521", approvedBy: "—", linkedTransactions: ["TXN-2024-006", "TXN-2024-008"], rejectionReason: "" },
 ];
 
 // ─── Support ─────────────────────────────────────────────────────────────────

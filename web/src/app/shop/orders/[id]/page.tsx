@@ -82,6 +82,25 @@ export default function ShopOrderDetailPage() {
           ]} />
         </DetailGridSection>
 
+        {order.fulfilmentGroups && order.fulfilmentGroups.length > 0 && (
+          <DetailGridSection title="Fulfilment by Seller" span={3}>
+            {order.fulfilmentGroups.map((group) => (
+              <div key={group.parcelId} className="mb-4 rounded-xl border border-blue-100 bg-blue-50/30 p-4 last:mb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-slate-900">{group.seller}</p>
+                    <p className="text-xs text-slate-500">{group.parcelId} · {group.trackingNumber} · {group.status}</p>
+                  </div>
+                  <Link href={`/shop/orders/${id}/tracking`} className="text-xs text-blue-600 hover:underline">Track parcel →</Link>
+                </div>
+                {group.items.map((item) => (
+                  <p key={item.sku} className="mt-2 text-sm text-slate-600">{item.name} × {item.qty}</p>
+                ))}
+              </div>
+            ))}
+          </DetailGridSection>
+        )}
+
         <DetailGridSection title="Products" span={3}>
           {order.items.map((item) => (
             <div key={item.sku} className="mb-4 flex gap-4 last:mb-0">

@@ -27,7 +27,7 @@ export default function WarehouseReplacementDetailPage() {
         actions={
           <>
             <button onClick={() => toast("Inventory allocated for replacement")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">Allocate Inventory</button>
-            <button onClick={() => { toast("Dispatch batch created"); router.push("/warehouse/dispatch/BAT-001"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">Create Dispatch</button>
+            <button onClick={() => { toast("Dispatch batch created"); router.push("/warehouse/batches/BATCH-002"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">Create Dispatch</button>
           </>
         }
       />

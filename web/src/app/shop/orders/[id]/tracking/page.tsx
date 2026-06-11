@@ -4,9 +4,9 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
+import { MockLiveMap } from "@/components/ui/mock-live-map";
 import { getOrder } from "@/lib/entities";
 import { useLocale } from "@/context/locale-context";
-import { MapPin } from "lucide-react";
 
 export default function OrderTrackingPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,31 +16,38 @@ export default function OrderTrackingPage() {
 
   if (!order) return <div className="text-center text-slate-500">Order not found</div>;
 
+  const groups = order.fulfilmentGroups?.length ? order.fulfilmentGroups : [{
+    seller: order.seller,
+    parcelId: order.trackingNumber,
+    trackingNumber: order.trackingNumber,
+    status: order.status,
+    rider: order.rider,
+    items: order.items,
+  }];
+
   return (
     <div className="space-y-6">
       <PageHeader title={fr ? "Suivi en direct" : "Live Tracking"} subtitle={id} backHref={`/shop/orders/${id}`} />
-      <div className="relative aspect-video overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-sky-50">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <MapPin className="mx-auto h-12 w-12 text-blue-600" />
-            <p className="mt-2 text-sm font-medium">{fr ? "Carte en direct (mock)" : "Live map (mock)"}</p>
-            <p className="text-xs text-slate-500">{order.rider} · ETA 18 min</p>
-          </div>
+
+      {groups.map((group, i) => (
+        <div key={group.parcelId} className="space-y-4">
+          <h3 className="font-semibold text-slate-900">
+            {groups.length > 1 ? `${fr ? "Colis" : "Parcel"} ${i + 1} — ${group.seller}` : (fr ? "Livraison" : "Delivery")}
+          </h3>
+          <MockLiveMap rider={group.rider} eta="18 min" label={fr ? "Carte en direct (mock)" : "Live map (mock)"} />
+          <DetailSection title={fr ? "Détails colis" : "Parcel Details"}>
+            <InfoGrid items={[
+              { label: "Tracking", value: group.trackingNumber },
+              { label: fr ? "Vendeur" : "Seller", value: group.seller },
+              { label: fr ? "Statut" : "Status", value: group.status },
+              { label: fr ? "Livreur" : "Rider", value: group.rider },
+            ]} />
+          </DetailSection>
         </div>
-        <div className="absolute bottom-4 left-4 right-4 rounded-xl bg-white/90 p-3 text-sm shadow">
-          <p className="font-medium">{order.rider}</p>
-          <p className="text-slate-500">{order.customerPhone}</p>
-        </div>
-      </div>
+      ))}
+
       <DetailSection title={fr ? "Chronologie" : "Timeline"}>
         <ActivityTimeline events={order.timeline} />
-      </DetailSection>
-      <DetailSection title={fr ? "Colis" : "Parcels"}>
-        <InfoGrid items={[
-          { label: "Tracking", value: order.trackingNumber },
-          { label: fr ? "Entrepôt" : "Warehouse", value: order.warehouse },
-          { label: fr ? "Livreur" : "Rider", value: order.rider },
-        ]} />
       </DetailSection>
     </div>
   );

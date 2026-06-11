@@ -15,10 +15,10 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
 
-const menuItems = [
+const menuItems: { href: string; icon: typeof Package; label: string; labelText?: string; desc: string }[] = [
   { href: "/shop/orders", icon: Package, label: "myOrders", desc: "Track & manage orders" },
   { href: "/shop/returns", icon: RotateCcw, label: "returns", desc: "Return requests & status" },
-  { href: "/shop/disputes", icon: AlertTriangle, label: "myAccount", desc: "Order disputes" },
+  { href: "/shop/disputes", icon: AlertTriangle, label: "myAccount", labelText: "Disputes", desc: "Order disputes" },
   { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: "Saved items" },
   { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: "Somba Wallet · Airtel top-up" },
   { href: "/shop/refer", icon: Heart, label: "myAccount", desc: "Refer & Earn — $10 bonus" },
@@ -68,7 +68,7 @@ export default function ShopAccountPage() {
               <item.icon className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-slate-900">{t(item.label as Parameters<typeof t>[0])}</p>
+              <p className="font-semibold text-slate-900">{item.labelText ?? t(item.label as Parameters<typeof t>[0])}</p>
               <p className="text-sm text-slate-500">{item.desc}</p>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-400" />

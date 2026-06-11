@@ -70,6 +70,21 @@ export function getCategory(id: number) {
   return categories.find((c) => c.id === id);
 }
 
+export const adminFinanceTransactions = [
+  { id: "TXN-901", type: "Order Payment", amount: 119900, status: "completed" as const, date: "2024-06-08", orderId: "ORD-2024-001", reference: "Stripe capture" },
+  { id: "TXN-902", type: "Seller Payout", amount: -45000, status: "completed" as const, date: "2024-06-08", payoutId: "PAY-001", reference: "TechZone Store" },
+  { id: "TXN-903", type: "Refund", amount: -12900, status: "pending" as const, date: "2024-06-07", orderId: "ORD-2024-003", reference: "REF-002" },
+  { id: "TXN-904", type: "COD Settlement", amount: 89000, status: "completed" as const, date: "2024-06-07", codId: "COD-001", reference: "Morning shift" },
+];
+
+export function getAdminFinanceTransaction(id: string) {
+  return adminFinanceTransactions.find((t) => t.id === id);
+}
+
+export function getAuditLog(id: string) {
+  return auditLogs.find((l) => l.id === id);
+}
+
 export function resolveAuditEntityHref(entity: string, entityId: string): string | null {
   const e = entity.toLowerCase();
   if (e === "seller") {
@@ -84,5 +99,7 @@ export function resolveAuditEntityHref(entity: string, entityId: string): string
   if (e === "campaign") return `/admin/marketing/${entityId}`;
   if (e === "order") return `/admin/orders/${entityId}`;
   if (e === "customer") return `/admin/customers/${entityId}`;
+  if (e === "refund") return `/admin/refunds/${entityId}`;
+  if (e === "fraud" || e === "alert") return `/admin/fraud/${entityId}`;
   return null;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { DollarSign, TrendingUp, Wallet, CreditCard } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
@@ -8,13 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
-
-const transactions = [
-  { id: "TXN-901", type: "Order Payment", amount: 119900, status: "completed", date: "2024-06-08" },
-  { id: "TXN-902", type: "Seller Payout", amount: -45000, status: "completed", date: "2024-06-08" },
-  { id: "TXN-903", type: "Refund", amount: -12900, status: "pending", date: "2024-06-07" },
-  { id: "TXN-904", type: "COD Settlement", amount: 89000, status: "completed", date: "2024-06-07" },
-];
+import { adminFinanceTransactions } from "@/lib/admin-entities";
 
 export default function AdminFinancePage() {
   const { t, locale } = useLocale();
@@ -38,7 +33,9 @@ export default function AdminFinancePage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Transaction" },
+              { key: "id", label: "Transaction", render: (row) => (
+                <Link href={`/admin/finance/transactions/${row.id}`} className="font-medium text-blue-600 hover:underline">{String(row.id)}</Link>
+              )},
               { key: "type", label: "Type" },
               { key: "amount", label: t("amount"), render: (row) => {
                 const amt = Number(row.amount);
@@ -48,8 +45,11 @@ export default function AdminFinancePage() {
                 <Badge variant={row.status === "completed" ? "success" : "warning"}>{String(row.status)}</Badge>
               )},
               { key: "date", label: t("date") },
+              { key: "actions", label: t("action"), render: (row) => (
+                <Link href={`/admin/finance/transactions/${row.id}`} className="text-sm text-blue-600 hover:underline">{t("view")}</Link>
+              )},
             ]}
-            data={transactions as unknown as Record<string, unknown>[]}
+            data={adminFinanceTransactions as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>
