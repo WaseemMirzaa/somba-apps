@@ -25,7 +25,7 @@ export default function AdminReturnsPage() {
           <DataTable
             columns={[
               { key: "id", label: "Return ID", render: (row) => (
-                <Link href={`/warehouse/returns/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                <Link href={`/admin/returns/${row.id}`} className="font-medium text-blue-600 hover:underline">
                   {String(row.id)}
                 </Link>
               )},

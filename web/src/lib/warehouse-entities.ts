@@ -120,7 +120,19 @@ export type CodReconciliationEntity = {
   collected: number;
   difference: number;
   status: string;
+  exceptionId?: string;
   orders: { orderId: string; codAmount: number; collected: number }[];
+};
+
+export type ShiftReconciliationEntity = {
+  id: string;
+  date: string;
+  rider: string;
+  riderId: number;
+  codId: string;
+  expected: number;
+  received: number;
+  status: "pending" | "reconciled" | "variance";
 };
 
 export type ExceptionEntity = {
@@ -352,12 +364,17 @@ export const codEntities: CodReconciliationEntity[] = [
   },
   {
     id: "COD-002", riderId: 2, rider: "Paul Kabongo", shift: "Afternoon", vehicle: "Van",
-    expected: 2340, collected: 2280, difference: -60, status: "investigating",
+    expected: 2340, collected: 2280, difference: -60, status: "investigating", exceptionId: "INC-003",
     orders: [
       { orderId: "ORD-2024-003", codAmount: 129, collected: 129 },
       { orderId: "ORD-2024-006", codAmount: 499, collected: 439 },
     ],
   },
+];
+
+export const shiftReconciliationEntities: ShiftReconciliationEntity[] = [
+  { id: "REC-001", date: "2026-06-08", rider: "Jean Mukendi", riderId: 1, codId: "COD-001", expected: 1847, received: 1847, status: "reconciled" },
+  { id: "REC-002", date: "2026-06-07", rider: "Paul Kabongo", riderId: 2, codId: "COD-002", expected: 2340, received: 2280, status: "variance" },
 ];
 
 // ─── Exceptions ──────────────────────────────────────────────────────────────
@@ -419,6 +436,10 @@ export function getCodReconciliation(id: string) {
 
 export function getException(id: string) {
   return exceptionEntities.find((e) => e.id === id);
+}
+
+export function getShiftReconciliation(id: string) {
+  return shiftReconciliationEntities.find((s) => s.id === id);
 }
 
 export { batchEntities, parcelEntities };

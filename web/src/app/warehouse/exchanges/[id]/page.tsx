@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
+import { ActivityTimeline } from "@/components/ui/timeline";
 import { getExchange } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -38,7 +39,7 @@ export default function WarehouseExchangeDetailPage() {
           <InfoGrid items={[
             { label: "Exchange ID", value: exc.id },
             { label: "Order", value: <Link href={`/admin/orders/${exc.orderId}`} className="text-indigo-600 hover:underline">{exc.orderId}</Link> },
-            { label: "Customer", value: exc.customer },
+            { label: "Customer", value: <Link href={`/admin/customers/1`} className="text-indigo-600 hover:underline">{exc.customer}</Link> },
             { label: "Old SKU", value: exc.oldSku },
             { label: "New SKU", value: exc.newSku },
             { label: "Price Difference", value: exc.priceDifference > 0 ? `Collect ${formatCurrency(exc.priceDifference, locale)}` : exc.priceDifference < 0 ? `Refund ${formatCurrency(Math.abs(exc.priceDifference), locale)}` : "No difference" },
@@ -51,6 +52,14 @@ export default function WarehouseExchangeDetailPage() {
             <Link href="/warehouse/inventory" className="text-sm text-indigo-600 hover:underline">Check Inventory</Link>
             <Link href="/warehouse/dispatch" className="text-sm text-indigo-600 hover:underline">Create Dispatch</Link>
           </div>
+        </DetailSection>
+
+        <DetailSection title="Timeline">
+          <ActivityTimeline events={[
+            { time: "2024-06-05", label: "Exchange requested", done: true },
+            { time: "2024-06-06", label: "Old item received", done: exc.status !== "pending" },
+            { time: "Pending", label: "New variant dispatched", done: false },
+          ]} />
         </DetailSection>
       </div>
     </div>

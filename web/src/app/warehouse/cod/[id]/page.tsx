@@ -30,7 +30,7 @@ export default function WarehouseCodDetailPage() {
           cod.status === "investigating" ? (
             <>
               <button onClick={() => toast("COD reconciliation approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">Approve</button>
-              <Link href="/warehouse/exceptions/INC-003" className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white">Investigate</Link>
+              <Link href={`/warehouse/exceptions/${cod.exceptionId ?? "INC-003"}`} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white">Investigate</Link>
             </>
           ) : (
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">Approved</span>

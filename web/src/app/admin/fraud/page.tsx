@@ -26,13 +26,18 @@ export default function AdminFraudPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Alert" },
+              { key: "id", label: "Alert", render: (r) => (
+                <Link href={`/admin/fraud/${r.id}`} className="font-medium text-blue-600 hover:underline">{String(r.id)}</Link>
+              )},
               { key: "type", label: "Type", render: (r) => <Badge>{String(r.type).replace("_", " ")}</Badge> },
               { key: "customer", label: "Customer" },
               { key: "orderId", label: "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-blue-600">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },
               { key: "severity", label: "Severity", render: (r) => <Badge variant={severityVariant[r.severity as keyof typeof severityVariant]}>{String(r.severity)}</Badge> },
               { key: "status", label: "Status", render: (r) => <Badge variant={r.status === "blocked" ? "danger" : "info"}>{String(r.status)}</Badge> },
+              { key: "actions", label: "Action", render: (r) => (
+                <Link href={`/admin/fraud/${r.id}`} className="text-sm text-blue-600 hover:underline">View</Link>
+              )},
             ]}
             data={fraudAlerts as unknown as Record<string, unknown>[]}
           />

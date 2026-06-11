@@ -1,5 +1,7 @@
 import type { AuditLogEntry, FraudAlert } from "../../../shared/types/index";
 
+import { categories } from "./mock-data";
+
 export const fraudAlerts: FraudAlert[] = [
   { id: "FRD-001", type: "cod_risk", severity: "high", customer: "Unknown User", orderId: "ORD-2024-990", score: 87, status: "open", date: "2024-06-08" },
   { id: "FRD-002", type: "otp_fail", severity: "medium", customer: "Patrick L.", orderId: "ORD-2024-988", score: 62, status: "reviewed", date: "2024-06-07" },
@@ -56,6 +58,18 @@ export function getCmsBlock(id: string) {
 }
 
 /** Map audit log entity IDs to admin detail routes */
+export function getFraudAlert(id: string) {
+  return fraudAlerts.find((a) => a.id === id);
+}
+
+export function getAdminRole(id: string) {
+  return adminRoles.find((r) => r.id === id);
+}
+
+export function getCategory(id: number) {
+  return categories.find((c) => c.id === id);
+}
+
 export function resolveAuditEntityHref(entity: string, entityId: string): string | null {
   const e = entity.toLowerCase();
   if (e === "seller") {

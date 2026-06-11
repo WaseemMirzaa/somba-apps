@@ -131,9 +131,11 @@ export const sellerOrderList = orderEntities
 
 export const shipmentList = sellerOrderList
   .filter((o) => o.shippingStatus !== "pending")
-  .map((o, i) => ({
+  .map((o) => ({
     id: `SHP-${o.id.replace("ORD-", "")}`,
     orderId: o.id,
+    parcelId: `PKG-00${o.id.replace("ORD-2024-", "").slice(0, 1)}`,
+    warehouseId: "WH-PAR",
     rider: o.pickupRider,
     riderPhone: "+243 99 111 2233",
     vehicle: "Motorcycle",
@@ -211,6 +213,7 @@ export const sellerFinanceStats = {
 };
 
 export const transactionList = sellerOrderList.map((o) => ({
+  id: `TXN-${o.id.replace("ORD-", "")}`,
   order: o.id,
   customer: o.customer,
   grossAmount: o.amount,
@@ -219,6 +222,12 @@ export const transactionList = sellerOrderList.map((o) => ({
   status: o.paymentStatus,
   date: o.date,
 }));
+
+export const sellerStatementList = [
+  { id: "may-2024", month: "May 2024", revenue: 89432, fees: 4560, payouts: 12000, net: 72872, orders: 234 },
+  { id: "april-2024", month: "April 2024", revenue: 76210, fees: 3890, payouts: 8500, net: 63820, orders: 198 },
+  { id: "march-2024", month: "March 2024", revenue: 68100, fees: 3405, payouts: 8000, net: 56695, orders: 176 },
+];
 
 export const payoutList = [
   { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah" },
@@ -289,4 +298,16 @@ export function getPayout(id: string) {
 
 export function getSupportTicket(id: string) {
   return supportTicketList.find((t) => t.id === id);
+}
+
+export function getSellerReview(id: number) {
+  return sellerReviewList.find((r) => r.id === id);
+}
+
+export function getTransaction(id: string) {
+  return transactionList.find((t) => t.id === id);
+}
+
+export function getSellerStatement(id: string) {
+  return sellerStatementList.find((s) => s.id === id);
 }

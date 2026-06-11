@@ -20,6 +20,9 @@ export default function SellerTransactionsPage() {
         { label: "Transactions" },
       ]}
       columns={[
+        { key: "id", label: "Txn", render: (row) => (
+          <Link href={`/seller/finance/transactions/${row.id}`} className="font-medium text-sky-600 hover:underline">{String(row.id)}</Link>
+        )},
         { key: "order", label: "Order", render: (row) => (
           <Link href={`/seller/orders/${row.order}`} className="text-sky-600 hover:underline">{String(row.order)}</Link>
         )},
@@ -29,6 +32,9 @@ export default function SellerTransactionsPage() {
         { key: "netAmount", label: "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },
         { key: "status", label: "Status", render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
         { key: "date", label: "Date" },
+        { key: "actions", label: "Action", render: (row) => (
+          <Link href={`/seller/finance/transactions/${row.id}`} className="text-xs text-sky-600 hover:underline">View</Link>
+        )},
       ]}
       data={transactionList as unknown as Record<string, unknown>[]}
     />

@@ -89,7 +89,7 @@ export default function WarehouseBatchBuilderPage() {
             </CardContent>
           </Card>
           {batch.length > 0 && (
-            <Button className="w-full" onClick={() => { toast("Batch BAT-NEW created"); router.push("/warehouse/dispatch/BAT-001"); }}>
+            <Button className="w-full" onClick={() => { toast("Batch BATCH-002 created"); router.push("/warehouse/batches/BATCH-002"); }}>
               Create Batch & Assign Rider
             </Button>
           )}

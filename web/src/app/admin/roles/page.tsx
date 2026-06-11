@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +19,8 @@ export default function AdminRolesPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {roles.map((role) => (
-          <Card key={role.id}>
+          <Link key={role.id} href={`/admin/roles/${role.id}`}>
+          <Card className="transition-colors hover:border-blue-200">
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <h3 className="font-semibold text-slate-900">{role.name}</h3>
@@ -53,6 +55,7 @@ export default function AdminRolesPage() {
               </button>
             </CardContent>
           </Card>
+          </Link>
         ))}
       </div>
     </div>

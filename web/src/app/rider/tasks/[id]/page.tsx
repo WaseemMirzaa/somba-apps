@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { getRiderTask } from "@/lib/rider-entities";
+import { getRiderTask, riderBatches } from "@/lib/rider-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -25,6 +25,7 @@ export default function RiderTaskDetailPage() {
   }
 
   const status = delivered ? "delivered" : task.status;
+  const batch = riderBatches.find((b) => b.stops.some((s) => s.taskId === task.id));
 
   return (
     <div className="space-y-6">
@@ -45,7 +46,8 @@ export default function RiderTaskDetailPage() {
           { label: "Name", value: task.customer },
           { label: "Phone", value: task.phone },
           { label: "Address", value: task.address, full: true },
-          { label: "Order", value: task.orderId },
+          { label: "Order", value: <Link href={`/shop/orders/${task.orderId}/tracking`} className="text-emerald-600 hover:underline">{task.orderId}</Link> },
+          ...(batch ? [{ label: "Batch", value: <Link href={`/rider/batches/${batch.id}`} className="text-emerald-600 hover:underline">{batch.id}</Link> }] : []),
         ]} />
       </DetailSection>
 

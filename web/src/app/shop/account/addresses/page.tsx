@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export default function ShopAddressesPage() {
         subtitle="France & global delivery addresses"
         backHref="/shop/account"
         breadcrumbs={[{ label: "Account", href: "/shop/account" }, { label: "Addresses" }]}
-        actions={<Button size="sm" onClick={() => { resetForm(); setShowAdd(true); }}>Add Address</Button>}
+        actions={<Link href="/shop/account/addresses/new"><Button size="sm">Add Address</Button></Link>}
       />
 
       {(showAdd || editingId !== null) && (

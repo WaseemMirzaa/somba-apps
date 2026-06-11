@@ -43,7 +43,8 @@ export default function SellerShipmentDetailPage() {
 
         <DetailGridSection title="Warehouse">
           <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-sky-600 hover:underline">{shipment.warehouse}</Link> },
+            { label: "Warehouse", value: <Link href={`/warehouse/hubs/${shipment.warehouseId}`} className="text-sky-600 hover:underline">{shipment.warehouse}</Link> },
+            { label: "Parcel", value: <Link href={`/warehouse/parcels/${shipment.parcelId}`} className="text-sky-600 hover:underline">{shipment.parcelId}</Link> },
             { label: "Zone", value: shipment.zone },
           ]} />
         </DetailGridSection>

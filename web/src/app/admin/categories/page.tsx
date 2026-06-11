@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,10 @@ export default function AdminCategoriesPage() {
       } />
       <div className="space-y-2">
         {items.map((c) => (
-          <div key={c.id} className="card-premium flex items-center justify-between p-4">
+          <Link key={c.id} href={`/admin/categories/${c.id}`} className="card-premium flex items-center justify-between p-4 hover:border-blue-200">
             <span>{fr ? c.nameFr : c.name} {c.icon}</span>
-            <button onClick={() => toast("Edit")} className="text-sm text-blue-600">{fr ? "Modifier" : "Edit"}</button>
-          </div>
+            <span className="text-sm text-blue-600">{fr ? "Modifier" : "Edit"}</span>
+          </Link>
         ))}
       </div>
     </div>

@@ -9,6 +9,7 @@ import { getDelivery } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { MockLiveMap } from "@/components/ui/mock-live-map";
 
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -72,8 +73,8 @@ export default function WarehouseDeliveryDetailPage() {
             { label: "Current Stop", value: `${delivery.currentStop} of ${delivery.totalStops}` },
             { label: "Status", value: delivery.status },
           ]} />
-          <div className="mt-4 flex h-48 items-center justify-center rounded-lg bg-indigo-50 text-sm text-slate-500">
-            Live map preview (mock)
+          <div className="mt-4">
+            <MockLiveMap rider={delivery.rider} eta={delivery.eta} />
           </div>
         </DetailGridSection>
       </DetailGrid>

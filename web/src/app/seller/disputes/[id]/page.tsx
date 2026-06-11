@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection } from "@/components/ui/info-grid";
+import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { useDisputes } from "@/context/dispute-context";
 import { useLocale } from "@/context/locale-context";
@@ -21,12 +22,20 @@ export default function SellerDisputeDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={dispute.id} subtitle={dispute.orderId} backHref="/seller/disputes" />
+      <DetailSection title={fr ? "Détails" : "Details"}>
+        <InfoGrid items={[
+          { label: "Order", value: <Link href={`/seller/orders/${dispute.orderId}`} className="text-sky-600 hover:underline">{dispute.orderId}</Link> },
+          { label: "Buyer", value: dispute.buyerName },
+          { label: "Reason", value: dispute.reason },
+        ]} />
+        <p className="mt-2 text-sm text-slate-600">{dispute.description}</p>
+      </DetailSection>
       <DetailSection title={fr ? "Messages" : "Messages"}>
         {dispute.messages.map((m, i) => (
           <div key={i} className="mb-2 rounded-lg bg-slate-50 p-3 text-sm"><strong>{m.from}:</strong> {m.text}</div>
         ))}
         <textarea className="input-premium mt-4 w-full px-3 py-2 text-sm" rows={3} value={reply} onChange={(e) => setReply(e.target.value)} placeholder={fr ? "Votre réponse" : "Your response"} />
-        <Button onClick={() => { addMessage(id, "seller", reply); setReply(""); }} className="mt-2">{fr ? "Répondre" : "Respond"}</Button>
+        <Button onClick={() => { if (!reply.trim()) return; addMessage(id, "seller", reply); setReply(""); }} className="mt-2">{fr ? "Répondre" : "Respond"}</Button>
       </DetailSection>
     </div>
   );
