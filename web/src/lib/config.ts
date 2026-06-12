@@ -34,9 +34,10 @@ export const BUSINESS = {
   model: "marketplace" as const,
   inventoryOwner: "seller" as const,
   fulfillment: "hybrid" as const,
-  crossCityDelivery: true,
+  crossCityDelivery: false, // Q2: inter-city orders disabled at launch (single-city; enabled once more warehouses are added)
   openBoxDelivery: true,
   guestCheckout: true,
+  // Q10: commission is per-category (default applies when a category has no override). Rates TBD with client.
   commission: {
     default: 12,
     electronics: 8,
@@ -46,8 +47,22 @@ export const BUSINESS = {
   },
 } as const;
 
+/** Per-category commission overrides, editable in Admin → Settings. */
+export const COMMISSION_CATEGORIES = [
+  { id: "electronics", label: "Electronics", labelFr: "Électronique", rate: 8 },
+  { id: "fashion", label: "Fashion", labelFr: "Mode", rate: 15 },
+  { id: "home", label: "Home & Living", labelFr: "Maison", rate: 12 },
+  { id: "beauty", label: "Beauty", labelFr: "Beauté", rate: 12 },
+  { id: "grocery", label: "Grocery", labelFr: "Épicerie", rate: 10 },
+  { id: "books", label: "Books", labelFr: "Livres", rate: 10 },
+  { id: "toys", label: "Toys", labelFr: "Jouets", rate: 12 },
+  { id: "sports", label: "Sports", labelFr: "Sport", rate: 12 },
+] as const;
+
 export const PAYMENTS = {
-  methods: ["stripe_card", "cod", "airtel_money", "wallet"] as const,
+  // Q8: Cash on Delivery removed. Q7: Airtel + Orange + Vodacom (M-Pesa) mobile money.
+  methods: ["stripe_card", "airtel_money", "orange_money", "vodacom_mpesa", "wallet"] as const,
+  codEnabled: false,
   cod: {
     otpRequired: true,
     maxPerCustomer: 3,
@@ -62,6 +77,29 @@ export const PAYMENTS = {
   },
   stripe: { mock: true, publishableKey: "pk_test_somba_mock" },
   airtel: { mock: true },
+  orange: { mock: true },
+  vodacom: { mock: true },
+} as const;
+
+/** Mobile-money providers (Q7). */
+export const MOBILE_MONEY = [
+  { id: "airtel_money", label: "Airtel Money", operator: "Airtel Congo" },
+  { id: "orange_money", label: "Orange Money", operator: "Orange Telecom" },
+  { id: "vodacom_mpesa", label: "Vodacom M-Pesa", operator: "Vodacom" },
+] as const;
+
+/** Returns policy (Q18, Q19, Q20). */
+export const RETURNS = {
+  windowDays: 7,
+  nonReturnableCategories: [
+    { label: "Food & beverages", labelFr: "Alimentation et boissons" },
+    { label: "Personal care & hygiene", labelFr: "Soins personnels et hygiène" },
+    { label: "Underwear", labelFr: "Sous-vêtements" },
+    { label: "Customized products", labelFr: "Produits personnalisés" },
+    { label: "Digital products", labelFr: "Produits numériques" },
+  ],
+  costBearers: ["seller", "platform"] as const, // Q19
+  refundDestinations: ["original", "store_credit"] as const, // Q20
 } as const;
 
 export const LEGAL_LINKS = [

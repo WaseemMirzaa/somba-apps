@@ -262,10 +262,10 @@ export const PLATFORM_MODULES = [
     id: "returns",
     name: "Easy Returns",
     nameFr: "Retours faciles",
-    desc: "30-day returns from your order page — refund, replacement, or exchange with doorstep pickup arranged for you.",
-    descFr: "Retours sous 30 jours depuis votre commande — remboursement, échange ou remplacement avec collecte à domicile.",
-    highlight: "30-day returns",
-    highlightFr: "Retours 30 jours",
+    desc: "7-day returns from your order page — refund, replacement, or exchange with doorstep pickup arranged for you.",
+    descFr: "Retours sous 7 jours depuis votre commande — remboursement, échange ou remplacement avec collecte à domicile.",
+    highlight: "7-day returns",
+    highlightFr: "Retours 7 jours",
     cta: "How returns work",
     ctaFr: "Comment retourner",
     href: "/get-app",
@@ -375,15 +375,15 @@ export const PRODUCT_HERO = {
     "Livraison en 1–3 jours avec suivi en temps réel",
     "Carte, portefeuille et paiement à la livraison",
   ],
-  guarantee: "Free to browse · Guest checkout · Easy returns within 30 days",
-  guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 30 jours",
+  guarantee: "Free to browse · Guest checkout · Easy returns within 7 days",
+  guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 7 jours",
 };
 
 export const TRUST_SIGNALS = [
   { label: "Verified sellers", labelFr: "Vendeurs vérifiés" },
   { label: "Fast 1–3 day delivery", labelFr: "Livraison 1–3 jours" },
   { label: "Secure checkout", labelFr: "Paiement sécurisé" },
-  { label: "Easy 30-day returns", labelFr: "Retours 30 jours" },
+  { label: "Easy 7-day returns", labelFr: "Retours 7 jours" },
 ] as const;
 
 export const CONVERSION_PATHS = [
@@ -490,8 +490,8 @@ export const FAQ_ITEMS = [
   {
     q: "How do returns work?",
     qFr: "Comment fonctionnent les retours ?",
-    a: "Start a return from your order history within 30 days. Choose refund, replacement, or exchange — pickup can be scheduled from your account.",
-    aFr: "Lancez un retour depuis votre historique sous 30 jours. Remboursement, remplacement ou échange — collecte planifiable depuis votre compte.",
+    a: "Start a return from your order history within 7 days. Choose refund, replacement, or exchange — pickup can be scheduled from your account.",
+    aFr: "Lancez un retour depuis votre historique sous 7 jours. Remboursement, remplacement ou échange — collecte planifiable depuis votre compte.",
   },
 ] as const;
 
