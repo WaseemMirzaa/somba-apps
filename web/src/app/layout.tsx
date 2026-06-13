@@ -3,7 +3,6 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/context/locale-context";
 import { AuthProvider } from "@/context/auth-context";
-import { ThemeProvider } from "@/context/theme-context";
 import { ToastProvider } from "@/context/toast-context";
 import { ShopProvider } from "@/context/shop-context";
 import { WarehouseAdminProvider } from "@/context/warehouse-admin-context";
@@ -34,25 +33,23 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
-        <ThemeProvider>
-          <LocaleProvider>
-            <MarketProvider>
-              <AuthProvider>
-                <NotificationProvider>
-                  <DisputeProvider>
-                    <SellerSubscriptionProvider>
-                      <WarehouseAdminProvider>
-                        <ShopProvider>
-                          <ToastProvider>{children}</ToastProvider>
-                        </ShopProvider>
-                      </WarehouseAdminProvider>
-                    </SellerSubscriptionProvider>
-                  </DisputeProvider>
-                </NotificationProvider>
-              </AuthProvider>
-            </MarketProvider>
-          </LocaleProvider>
-        </ThemeProvider>
+        <LocaleProvider>
+          <MarketProvider>
+            <AuthProvider>
+              <NotificationProvider>
+                <DisputeProvider>
+                  <SellerSubscriptionProvider>
+                    <WarehouseAdminProvider>
+                      <ShopProvider>
+                        <ToastProvider>{children}</ToastProvider>
+                      </ShopProvider>
+                    </WarehouseAdminProvider>
+                  </SellerSubscriptionProvider>
+                </DisputeProvider>
+              </NotificationProvider>
+            </AuthProvider>
+          </MarketProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

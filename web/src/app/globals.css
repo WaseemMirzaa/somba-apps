@@ -469,25 +469,3 @@ body {
   transform: translateY(-2px);
 }
 
-/* Dark mode */
-.dark {
-  --background: #0a1020;
-  --foreground: #f1f5f9;
-  --surface: #111827;
-  --surface-muted: #1e293b;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --primary-light: #18244f;
-  --primary-tint: #243364;
-  --sidebar: #050a1c;
-  --glass: rgba(17, 24, 39, 0.85);
-}
-
-.dark .card-premium {
-  background: var(--surface);
-}
-
-.dark body {
-  background: var(--background);
-  color: var(--foreground);
-}

@@ -5,14 +5,12 @@ import { useState } from "react";
 import { Menu, X, LayoutDashboard } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { getDashboardHref } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/get-app", label: "Shop", labelFr: "Boutique" },
   { href: "/sell-online", label: "Sell Online", labelFr: "Vendre en ligne" },
   { href: "#modules", label: "Services", labelFr: "Services" },
   { href: "#portals", label: "About", labelFr: "À propos" },
@@ -97,7 +95,6 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                 FR
               </button>
             </div>
-            <ThemeToggle />
             {authReady && (
               isAuthenticated ? (
                 <Link

@@ -9,8 +9,6 @@ import { useMarket } from "@/context/market-context";
 import { useState, FormEvent } from "react";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { BRAND } from "@/lib/config";
 import { useShop } from "@/context/shop-context";
 import { cn } from "@/lib/utils";
 
@@ -92,7 +90,6 @@ export function LandingHeader() {
               <option value="drc">DRC</option>
             </select>
             <NotificationBell portal="customer" href="/shop/notifications" className="hidden sm:flex" />
-            <ThemeToggle />
             <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 sm:block">
               Login
             </Link>

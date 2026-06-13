@@ -11,11 +11,9 @@ import { getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 const ROLE_GROUPS = [
-  { label: "Customer", roles: ["customer", "guest"] as UserRole[] },
   { label: "Seller", roles: ["seller"] as UserRole[] },
   { label: "Admin", roles: ["admin"] as UserRole[] },
   { label: "Warehouse", roles: ["warehouse"] as UserRole[] },
-  { label: "Rider", roles: ["rider"] as UserRole[] },
 ];
 
 export default function LoginPage() {

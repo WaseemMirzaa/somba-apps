@@ -40,7 +40,6 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
 import type { LucideIcon } from "lucide-react";
@@ -241,8 +240,6 @@ export function DashboardLayout({
               FR
             </button>
           </div>
-
-          <ThemeToggle />
 
           <Link href="/login" className="hidden text-sm text-slate-600 hover:text-blue-600 sm:block">
             {persona.name}
