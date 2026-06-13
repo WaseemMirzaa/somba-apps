@@ -54,7 +54,7 @@ export type NavItem = {
 const portalConfigs = {
   admin: {
     title: "adminPanel" as const,
-    accent: "from-blue-500 to-indigo-600",
+    accent: "from-red-500 to-red-600",
     nav: [
       { href: "/admin", label: "dashboard", icon: LayoutDashboard, i18n: true },
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
@@ -146,10 +146,10 @@ export function DashboardLayout({
   const config = portalConfigs[portal];
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div data-portal={portal} className="flex min-h-screen bg-[var(--background)]">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-white/5 bg-[var(--sidebar)] transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-white/5 bg-[var(--sidebar)] transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -183,7 +183,7 @@ export function DashboardLayout({
                     : "text-slate-400 hover:bg-[var(--sidebar-hover)] hover:text-white"
                 )}
               >
-                <item.icon className={cn("h-4 w-4", active && "text-blue-400")} />
+                <item.icon className={cn("h-4 w-4", active && (portal === "admin" ? "text-red-400" : "text-blue-400"))} />
                 {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
               </Link>
             );
