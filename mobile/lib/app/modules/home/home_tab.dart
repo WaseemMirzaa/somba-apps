@@ -166,10 +166,26 @@ class HomeTab extends StatelessWidget {
 }
 
 class _Banners extends StatelessWidget {
+  // Gradients mirror the web hero/CTA treatments in globals.css.
   static const _banners = [
-    ('banner1_title', 'banner1_sub', AppColors.primary, 'banner-electronics'),
-    ('banner2_title', 'banner2_sub', AppColors.brandRed, 'banner-fashion'),
-    ('banner3_title', 'banner3_sub', AppColors.primaryDark, 'banner-delivery'),
+    (
+      'banner1_title',
+      'banner1_sub',
+      [AppColors.primary, AppColors.gradientBlueEnd],
+      'banner-electronics'
+    ),
+    (
+      'banner2_title',
+      'banner2_sub',
+      [AppColors.brandRed, Color(0xFFB3101D)],
+      'banner-fashion'
+    ),
+    (
+      'banner3_title',
+      'banner3_sub',
+      [AppColors.primaryDark, AppColors.primary],
+      'banner-delivery'
+    ),
   ];
 
   @override
@@ -182,13 +198,17 @@ class _Banners extends StatelessWidget {
         itemCount: _banners.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, i) {
-          final (title, sub, color, seed) = _banners[i];
+          final (title, sub, colors, seed) = _banners[i];
           return Container(
             width: 300,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors,
+              ),
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
             ),
             child: Row(
               children: [
