@@ -79,3 +79,9 @@ export const adminGoals = {
   ordersTarget: 20000,
   ordersCurrent: 18420,
 } as const;
+
+/** Platform KPIs broken down by launch city (Kinshasa, Lubumbashi). */
+export const adminCityKpis = [
+  { city: "Kinshasa", cityFr: "Kinshasa", gmv: 142500, orders: 3120, sellers: 540, riders: 86, deliveries: 2980, returns: 64 },
+  { city: "Lubumbashi", cityFr: "Lubumbashi", gmv: 78400, orders: 1740, sellers: 290, riders: 44, deliveries: 1650, returns: 38 },
+] as const;

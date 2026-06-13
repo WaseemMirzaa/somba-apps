@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bike, List, User, Wallet, Home, LogOut, Bell, Banknote } from "lucide-react";
+import { Bike, List, User, Home, LogOut, Banknote } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
@@ -10,10 +10,10 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalGuard } from "@/components/layout/portal-guard";
 
+// Riders are salaried (not paid per task) — earnings sections removed.
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
   { href: "/rider/tasks", icon: List, label: "activeTasks" },
-  { href: "/rider/earnings", icon: Wallet, label: "earnings" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
 

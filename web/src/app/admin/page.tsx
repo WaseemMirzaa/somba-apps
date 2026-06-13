@@ -40,6 +40,7 @@ import {
   adminFulfillmentHealth,
   adminRecentActivity,
   adminGoals,
+  adminCityKpis,
 } from "@/lib/admin-analytics";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 
@@ -98,6 +99,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const fr = locale === "fr";
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
+  const [city, setCity] = useState<string>("all");
   const k = adminExtendedKpis;
 
   const revenueSpark = adminRevenueTrend.map((d) => d.revenue);
@@ -137,6 +139,51 @@ export default function AdminDashboard() {
         <KpiCard title="Return rate" value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} />
         <KpiCard title="Pending approvals" value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} />
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Par ville" : "By city"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Performance par ville de lancement" : "Performance across launch cities"}</p>
+          </div>
+          <div className="flex rounded-lg border border-slate-200 p-0.5">
+            {["all", ...adminCityKpis.map((c) => c.city)].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCity(c)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-semibold transition-colors",
+                  city === c ? "bg-[var(--primary)] text-white" : "text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                {c === "all" ? (fr ? "Toutes" : "All") : c}
+              </button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {adminCityKpis
+              .filter((c) => city === "all" || c.city === city)
+              .map((c) => (
+                <div key={c.city} className="rounded-xl border border-[var(--border)] p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900">{fr ? c.cityFr : c.city}</h3>
+                    <Badge variant="primary">{formatCurrency(c.gmv, locale)} GMV</Badge>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-y-4 text-center">
+                    <div><p className="text-lg font-bold text-slate-900">{formatNumber(c.orders, locale)}</p><p className="text-xs text-slate-500">{fr ? "Commandes" : "Orders"}</p></div>
+                    <div><p className="text-lg font-bold text-slate-900">{c.sellers}</p><p className="text-xs text-slate-500">{fr ? "Vendeurs" : "Sellers"}</p></div>
+                    <div><p className="text-lg font-bold text-slate-900">{c.riders}</p><p className="text-xs text-slate-500">{fr ? "Livreurs" : "Riders"}</p></div>
+                    <div><p className="text-lg font-bold text-slate-900">{formatNumber(c.deliveries, locale)}</p><p className="text-xs text-slate-500">{fr ? "Livraisons" : "Deliveries"}</p></div>
+                    <div><p className="text-lg font-bold text-slate-900">{c.returns}</p><p className="text-xs text-slate-500">{fr ? "Retours" : "Returns"}</p></div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

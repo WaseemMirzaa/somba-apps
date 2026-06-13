@@ -22,6 +22,7 @@ export default function AdminSettingsPage() {
   const [fxRate, setFxRate] = useState(String(profile.fxRateUsdCdf ?? 2850));
   const [payoutMin, setPayoutMin] = useState(String(profile.payoutMinUsd));
   const [clearanceHours, setClearanceHours] = useState(String(profile.payoutClearanceHours));
+  const [twoFa, setTwoFa] = useState(true);
 
   function save() {
     toast(fr ? "Paramètres enregistrés (journalisés)" : "Settings saved (audit logged)", "success");
@@ -92,6 +93,27 @@ export default function AdminSettingsPage() {
         <p className="text-xs text-slate-400">
           {fr ? "Mobile money : Airtel Congo, Orange Telecom, Vodacom (M-Pesa)." : "Mobile money via Airtel Congo, Orange Telecom, Vodacom (M-Pesa)."}
         </p>
+      </div>
+
+      {/* Security & access (admin 2FA) */}
+      <div className="card-premium space-y-3 p-6">
+        <h3 className="font-semibold">{fr ? "Sécurité et accès" : "Security & access"}</h3>
+        <div className="flex items-center justify-between rounded-xl border border-[var(--border)] p-4">
+          <div>
+            <p className="text-sm font-medium text-slate-800">{fr ? "Authentification à deux facteurs (2FA)" : "Two-factor authentication (2FA)"}</p>
+            <p className="text-xs text-slate-500">{fr ? "Exiger un code OTP à la connexion admin." : "Require an OTP at admin login."}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTwoFa((v) => !v)}
+            role="switch"
+            aria-checked={twoFa}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${twoFa ? "bg-[var(--primary)]" : "bg-slate-300"}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${twoFa ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+        <p className="text-xs text-slate-400">{fr ? "L'accès par rôle est géré dans Rôles et permissions." : "Role-based access is managed in Roles & permissions."}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
