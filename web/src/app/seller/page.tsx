@@ -5,7 +5,6 @@ import { useState } from "react";
 import {
   DollarSign,
   ShoppingCart,
-  Star,
   Package,
   RotateCcw,
   TrendingUp,
@@ -110,10 +109,10 @@ export default function SellerDashboard() {
   const ordersSpark = sellerRevenueTrend.map((d) => d.orders);
 
   const quickActions = [
-    { href: "/seller/orders", label: t("orders"), sub: `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
-    { href: "/seller/products/create", label: t("createProduct"), sub: "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/seller/finance/payouts/request", label: "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
-    { href: "/seller/promotions/create", label: "New promotion", sub: "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
+    { href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
+    { href: "/seller/products/create", label: t("createProduct"), sub: fr ? "Ajouter une annonce" : "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
+    { href: "/seller/finance/payouts/request", label: fr ? "Demander un paiement" : "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
+    { href: "/seller/promotions/create", label: fr ? "Demander une promotion" : "Request promotion", sub: fr ? "Booster les ventes" : "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
   ];
 
   return (
@@ -135,14 +134,14 @@ export default function SellerDashboard() {
 
       {/* KPI grid with sparklines */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Revenue (MTD)" value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} />
-        <KpiCard title="Orders (MTD)" value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} />
-        <KpiCard title="Avg. order value" value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
-        <KpiCard title="Conversion rate" value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} />
-        <KpiCard title="Customer retention" value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} />
-        <KpiCard title="Repeat customers" value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} />
-        <KpiCard title="Customer LTV" value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} />
-        <KpiCard title="Refund rate" value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} />
+        <KpiCard title={fr ? "Revenu (mois)" : "Revenue (MTD)"} value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} />
+        <KpiCard title={fr ? "Commandes (mois)" : "Orders (MTD)"} value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} />
+        <KpiCard title={fr ? "Panier moyen" : "Avg. order value"} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
+        <KpiCard title={fr ? "Taux de conversion" : "Conversion rate"} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} />
+        <KpiCard title={fr ? "Rétention client" : "Customer retention"} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} />
+        <KpiCard title={fr ? "Clients fidèles" : "Repeat customers"} value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} />
+        <KpiCard title={fr ? "Valeur vie client" : "Customer LTV"} value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} />
+        <KpiCard title={fr ? "Taux de remboursement" : "Refund rate"} value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} />
       </div>
 
       {/* Main charts row */}
@@ -150,8 +149,8 @@ export default function SellerDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">Revenue & orders</h2>
-              <p className="text-xs text-slate-500">Net earnings {formatCurrency(k.netEarnings, locale)} · +{k.netChange}%</p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Revenu et commandes" : "Revenue & orders"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Gains nets" : "Net earnings"} {formatCurrency(k.netEarnings, locale)} · +{k.netChange}%</p>
             </div>
             <div className="flex rounded-lg border border-slate-200 p-0.5">
               {PERIODS.map((p) => (
@@ -176,19 +175,19 @@ export default function SellerDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Monthly goals</h2>
-            <p className="text-xs text-slate-500">Progress toward June targets</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du mois" : "Monthly goals"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Progression vers les objectifs de juin" : "Progress toward June targets"}</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <GoalProgress
-              label="Revenue goal"
+              label={fr ? "Objectif revenu" : "Revenue goal"}
               current={sellerGoals.revenueCurrent}
               target={sellerGoals.revenueTarget}
               format={(n) => formatCurrency(n, locale)}
             />
-            <GoalProgress label="Orders goal" current={sellerGoals.ordersCurrent} target={sellerGoals.ordersTarget} />
+            <GoalProgress label={fr ? "Objectif commandes" : "Orders goal"} current={sellerGoals.ordersCurrent} target={sellerGoals.ordersTarget} />
             <GoalProgress
-              label="Retention goal"
+              label={fr ? "Objectif rétention" : "Retention goal"}
               current={sellerGoals.retentionCurrent}
               target={sellerGoals.retentionTarget}
               unit="%"

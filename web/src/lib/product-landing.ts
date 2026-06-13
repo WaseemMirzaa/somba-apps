@@ -32,9 +32,9 @@ export const PORTAL_QUICK_ACCESS = [
 
 /** Marketplace deal highlight cards */
 export const DEAL_HIGHLIGHTS = [
-  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/shop/products" },
-  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/shop/products" },
-  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/shop/products" },
+  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/get-app" },
+  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/get-app" },
+  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/get-app" },
   { title: "Fast Delivery", titleFr: "Livraison rapide", subtitle: "1–3 days", subtitleFr: "1–3 jours", tag: "Nationwide", tagFr: "National", href: "#modules" },
   { title: "Become a Seller", titleFr: "Devenir vendeur", subtitle: "From $49/mo", subtitleFr: "À partir de 49 $/mois", tag: "Open now", tagFr: "Ouvert", href: "/sell-online" },
   { title: "Mobile App", titleFr: "App mobile", subtitle: "iOS & Android", subtitleFr: "iOS et Android", tag: "Download", tagFr: "Télécharger", href: "#apps" },
@@ -82,7 +82,7 @@ export const PORTALS = [
     descFr: "Votre marketplace du quotidien — milliers de produits, offres par catégorie et livraison à domicile.",
     icon: "ShoppingBag",
     image: PORTAL_IMAGES.shop,
-    loginHref: "/shop/products",
+    loginHref: "/get-app",
     appHref: APP_LINKS.customerApp,
     features: ["Categories, search & flash deals", "Guest checkout & Somba wallet", "Order tracking & easy returns"],
     trust: [
@@ -226,7 +226,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Livraison 1–3 jours",
     cta: "Shop with fast delivery",
     ctaFr: "Acheter avec livraison rapide",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Nationwide",
     tagFr: "National",
     icon: "Truck",
@@ -247,7 +247,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "COD + portefeuille",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Buyer safe",
     tagFr: "Acheteur protégé",
     icon: "ShieldCheck",
@@ -262,13 +262,13 @@ export const PLATFORM_MODULES = [
     id: "returns",
     name: "Easy Returns",
     nameFr: "Retours faciles",
-    desc: "30-day returns from your order page — refund, replacement, or exchange with doorstep pickup arranged for you.",
-    descFr: "Retours sous 30 jours depuis votre commande — remboursement, échange ou remplacement avec collecte à domicile.",
-    highlight: "30-day returns",
-    highlightFr: "Retours 30 jours",
+    desc: "7-day returns from your order page — refund, replacement, or exchange with doorstep pickup arranged for you.",
+    descFr: "Retours sous 7 jours depuis votre commande — remboursement, échange ou remplacement avec collecte à domicile.",
+    highlight: "7-day returns",
+    highlightFr: "Retours 7 jours",
     cta: "How returns work",
     ctaFr: "Comment retourner",
-    href: "/shop/products",
+    href: "/get-app",
     tag: "Hassle-free",
     tagFr: "Sans tracas",
     icon: "RotateCcw",
@@ -375,15 +375,15 @@ export const PRODUCT_HERO = {
     "Livraison en 1–3 jours avec suivi en temps réel",
     "Carte, portefeuille et paiement à la livraison",
   ],
-  guarantee: "Free to browse · Guest checkout · Easy returns within 30 days",
-  guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 30 jours",
+  guarantee: "Free to browse · Guest checkout · Easy returns within 7 days",
+  guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 7 jours",
 };
 
 export const TRUST_SIGNALS = [
   { label: "Verified sellers", labelFr: "Vendeurs vérifiés" },
   { label: "Fast 1–3 day delivery", labelFr: "Livraison 1–3 jours" },
   { label: "Secure checkout", labelFr: "Paiement sécurisé" },
-  { label: "Easy 30-day returns", labelFr: "Retours 30 jours" },
+  { label: "Easy 7-day returns", labelFr: "Retours 7 jours" },
 ] as const;
 
 export const CONVERSION_PATHS = [
@@ -397,7 +397,7 @@ export const CONVERSION_PATHS = [
     descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte, portefeuille ou COD.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
-    href: "/shop/products",
+    href: "/get-app",
     highlight: true,
   },
   {
@@ -490,8 +490,8 @@ export const FAQ_ITEMS = [
   {
     q: "How do returns work?",
     qFr: "Comment fonctionnent les retours ?",
-    a: "Start a return from your order history within 30 days. Choose refund, replacement, or exchange — pickup can be scheduled from your account.",
-    aFr: "Lancez un retour depuis votre historique sous 30 jours. Remboursement, remplacement ou échange — collecte planifiable depuis votre compte.",
+    a: "Start a return from your order history within 7 days. Choose refund, replacement, or exchange — pickup can be scheduled from your account.",
+    aFr: "Lancez un retour depuis votre historique sous 7 jours. Remboursement, remplacement ou échange — collecte planifiable depuis votre compte.",
   },
 ] as const;
 

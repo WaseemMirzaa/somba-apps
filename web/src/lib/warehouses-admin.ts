@@ -1,3 +1,11 @@
+export type WarehouseOperator = {
+  id: string;
+  name: string;
+  email: string;
+  role: "Manager" | "Inbound" | "Sorting" | "Dispatch";
+  status: "active" | "suspended";
+};
+
 export type WarehouseRecord = {
   id: string;
   name: string;
@@ -12,8 +20,19 @@ export type WarehouseRecord = {
   /** Portal login email (credentials issued by admin) */
   portalEmail: string;
   zones: string[];
+  operators?: WarehouseOperator[];
   createdAt: string;
 };
+
+/** Seed operator accounts for a warehouse (manager + sample staff) when none are stored. */
+export function defaultOperators(w: WarehouseRecord): WarehouseOperator[] {
+  const slug = w.id.toLowerCase().replace("wh-", "");
+  return [
+    { id: `${w.id}-OP1`, name: w.managerName, email: w.portalEmail, role: "Manager", status: "active" },
+    { id: `${w.id}-OP2`, name: "Inbound Operator", email: `inbound.${slug}@somba.com`, role: "Inbound", status: "active" },
+    { id: `${w.id}-OP3`, name: "Dispatch Operator", email: `dispatch.${slug}@somba.com`, role: "Dispatch", status: "active" },
+  ];
+}
 
 export const INITIAL_WAREHOUSES: WarehouseRecord[] = [
   {

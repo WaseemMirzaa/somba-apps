@@ -12,7 +12,7 @@ import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/shop/products", label: "Shop", labelFr: "Boutique" },
+  { href: "/get-app", label: "Shop", labelFr: "Boutique" },
   { href: "/sell-online", label: "Sell Online", labelFr: "Vendre en ligne" },
   { href: "#modules", label: "Services", labelFr: "Services" },
   { href: "#portals", label: "About", labelFr: "À propos" },
@@ -121,7 +121,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                 </Link>
               )
             )}
-            <Link href="/shop/products" className="btn-primary hidden px-5 py-2.5 text-sm sm:inline-flex">
+            <Link href="/get-app" className="btn-primary hidden px-5 py-2.5 text-sm sm:inline-flex">
               {fr ? "Acheter" : "Shop Now"}
             </Link>
             <button
@@ -156,7 +156,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                   {fr ? "Connexion équipe" : "Staff login"}
                 </Link>
               )}
-              <Link href="/shop/products" onClick={() => setOpen(false)} className="btn-primary mt-2 px-5 py-2.5 text-sm text-center">
+              <Link href="/get-app" onClick={() => setOpen(false)} className="btn-primary mt-2 px-5 py-2.5 text-sm text-center">
                 {fr ? "Acheter maintenant" : "Shop now"}
               </Link>
             </nav>

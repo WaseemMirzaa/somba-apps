@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const [tab, setTab] = useState("new");
   const [orders, setOrders] = useState(initialOrders);
@@ -39,7 +40,7 @@ export default function SellerOrdersPage() {
   return (
     <SellerListPage
       title={t("orders")}
-      subtitle="List View — Order Number, Customer, Items, Amount, Payment, Order Status, Shipping Status, Date"
+      subtitle={fr ? "N° commande, client, articles, montant, paiement, statut, expédition, date" : "Order Number, Customer, Items, Amount, Payment, Order Status, Shipping Status, Date"}
       breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("orders") }]}
       filters={
         <div className="flex flex-wrap gap-2">
@@ -58,15 +59,15 @@ export default function SellerOrdersPage() {
         </div>
       }
       columns={[
-        { key: "id", label: "Order", render: (row) => (
+        { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
           <Link href={`/seller/orders/${row.id}`} className="font-medium text-sky-600 hover:underline">{String(row.id)}</Link>
         )},
-        { key: "customer", label: "Customer" },
-        { key: "items", label: "Items" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "paymentMethod", label: "Payment" },
-        { key: "orderStatus", label: "Order Status", render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
-        { key: "shippingStatus", label: "Shipping", render: (row) => <Badge>{String(row.shippingStatus)}</Badge> },
+        { key: "paymentMethod", label: fr ? "Paiement" : "Payment" },
+        { key: "orderStatus", label: fr ? "Statut" : "Order Status", render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
+        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge>{String(row.shippingStatus)}</Badge> },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">

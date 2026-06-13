@@ -12,7 +12,8 @@ interface LocaleContextType {
 const LocaleContext = createContext<LocaleContextType | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("en");
+  // Q: the entire UI is delivered in French — default to French (FR/EN toggle remains).
+  const [locale, setLocale] = useState<Locale>("fr");
 
   const translate = useCallback(
     (key: TranslationKey) => t(locale, key),

@@ -8,7 +8,8 @@ import { useToast } from "@/context/toast-context";
 import { sellerInventoryList } from "@/lib/seller-entities";
 
 export default function SellerInventoryPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
 
   function exportCsv() {
@@ -26,22 +27,22 @@ export default function SellerInventoryPage() {
   return (
     <SellerListPage
       title={t("inventory")}
-      subtitle="List View — SKU, Product, Category, Available, Reserved, Allocated, Sold, Location"
+      subtitle={fr ? "SKU, produit, catégorie, disponible, réservé, alloué, vendu, emplacement" : "SKU, Product, Category, Available, Reserved, Allocated, Sold, Location"}
       breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("inventory") }]}
       actions={
         <div className="flex gap-2">
           <label className="cursor-pointer rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">
-            Import CSV
+            {fr ? "Importer CSV" : "Import CSV"}
             <input type="file" accept=".csv" className="hidden" onChange={() => toast("CSV imported (mock)")} />
           </label>
-          <button onClick={exportCsv} className="rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">Export CSV</button>
+          <button onClick={exportCsv} className="rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">{fr ? "Exporter CSV" : "Export CSV"}</button>
         </div>
       }
       columns={[
         { key: "sku", label: "SKU", render: (row) => (
           <Link href={`/seller/inventory/${encodeURIComponent(String(row.sku))}`} className="font-medium text-sky-600 hover:underline">{String(row.sku)}</Link>
         )},
-        { key: "product", label: "Product", render: (row) => (
+        { key: "product", label: fr ? "Produit" : "Product", render: (row) => (
           <div className="flex items-center gap-2">
             <div className="relative h-8 w-8 overflow-hidden rounded">
               <Image src={String(row.image)} alt="" fill className="object-cover" sizes="32px" />
@@ -49,16 +50,16 @@ export default function SellerInventoryPage() {
             <Link href={`/seller/products/${row.productId}`} className="text-sky-600 hover:underline">{String(row.product)}</Link>
           </div>
         )},
-        { key: "category", label: "Category" },
-        { key: "available", label: "Available" },
-        { key: "reserved", label: "Reserved" },
-        { key: "allocated", label: "Allocated" },
-        { key: "sold", label: "Sold" },
-        { key: "location", label: "Location" },
+        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "available", label: fr ? "Disponible" : "Available" },
+        { key: "reserved", label: fr ? "Réservé" : "Reserved" },
+        { key: "allocated", label: fr ? "Alloué" : "Allocated" },
+        { key: "sold", label: fr ? "Vendu" : "Sold" },
+        { key: "location", label: fr ? "Emplacement" : "Location" },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/seller/inventory/${encodeURIComponent(String(row.sku))}`} className="text-sky-600 hover:underline">{t("view")}</Link>
-            <button onClick={() => toast(`Stock adjusted for ${row.sku}`)} className="text-slate-500">Adjust</button>
+            <button onClick={() => toast(`Stock adjusted for ${row.sku}`)} className="text-slate-500">{fr ? "Ajuster" : "Adjust"}</button>
           </div>
         )},
       ]}

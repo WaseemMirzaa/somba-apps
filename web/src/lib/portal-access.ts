@@ -103,7 +103,7 @@ export function getPortalCTA(
   personaPortal?: string
 ): { href: string; labelEn: string; labelFr: string } {
   if (portalId === "shop") {
-    return { href: "/shop/products", labelEn: "Start shopping", labelFr: "Acheter maintenant" };
+    return { href: "/get-app", labelEn: "Start shopping", labelFr: "Acheter maintenant" };
   }
 
   if (portalId === "seller" && !isAuthenticated) {

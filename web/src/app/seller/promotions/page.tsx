@@ -7,16 +7,17 @@ import { useLocale } from "@/context/locale-context";
 import { promotionList } from "@/lib/seller-entities";
 
 export default function SellerPromotionsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   return (
     <SellerListPage
       title={t("promotions")}
-      subtitle="List View — Campaign, Products, Discount, Start/End Date, Status"
+      subtitle={fr ? "Les promotions sont publiées par la plateforme sur demande" : "Promotions are published by the platform on request"}
       breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("promotions") }]}
       actions={
         <Link href="/seller/promotions/create" className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white">
-          Create Campaign
+          {fr ? "Demander une promotion" : "Request promotion"}
         </Link>
       }
       columns={[

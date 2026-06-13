@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
+import { DetailSection } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { useLocale } from "@/context/locale-context";
@@ -19,19 +19,12 @@ function PaymentContent() {
   const router = useRouter();
   const params = useSearchParams();
   const total = Number(params.get("total") || 1498);
-  const [payment, setPayment] = useState("cod");
-  const [otp, setOtp] = useState("");
+  const [payment, setPayment] = useState("stripe_card");
   const [msisdn, setMsisdn] = useState("");
   const [paymentError, setPaymentError] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
-  const codEligible = total <= profile.codMaxOrderValue;
-
   function placeOrder() {
-    if (payment === "cod" && !codEligible) {
-      toast(locale === "fr" ? "Montant COD trop élevé" : "COD amount exceeds limit");
-      return;
-    }
     if (paymentError && !retrying) {
       setPaymentError(false);
       setRetrying(true);
@@ -66,14 +59,12 @@ function PaymentContent() {
             { id: "stripe_card", label: "Stripe — Card" },
             { id: "wallet", label: "Somba Wallet ($142.50)" },
             { id: "airtel_money", label: "Airtel Money" },
-            { id: "cod", label: "Cash on Delivery (COD)", disabled: !codEligible },
+            { id: "orange_money", label: "Orange Money" },
+            { id: "vodacom_mpesa", label: "Vodacom M-Pesa" },
           ].filter((m) => PAYMENTS.methods.includes(m.id as typeof PAYMENTS.methods[number])).map((m) => (
-            <label key={m.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${payment === m.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"} ${m.disabled ? "opacity-50" : ""}`}>
-              <input type="radio" name="payment" checked={payment === m.id} disabled={m.disabled} onChange={() => setPayment(m.id)} />
+            <label key={m.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${payment === m.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>
+              <input type="radio" name="payment" checked={payment === m.id} onChange={() => setPayment(m.id)} />
               <span className="font-medium">{m.label}</span>
-              {m.id === "cod" && !codEligible && (
-                <span className="text-xs text-amber-600">Max <DualCurrency amount={profile.codMaxOrderValue} /></span>
-              )}
             </label>
           ))}
         </div>
@@ -83,22 +74,13 @@ function PaymentContent() {
             [Stripe Card Element — mock]
           </div>
         )}
-        {payment === "airtel_money" && (
+        {["airtel_money", "orange_money", "vodacom_mpesa"].includes(payment) && (
           <input className="input-premium mt-4 w-full px-4 py-2 text-sm" placeholder={`${profile.phonePrefix} XXX XXX XXX`} value={msisdn} onChange={(e) => setMsisdn(e.target.value)} />
-        )}
-        {payment === "cod" && (
-          <div className="mt-4 rounded-xl bg-amber-50 p-4">
-            <p className="text-sm text-amber-800">{locale === "fr" ? "Montant à payer à la livraison" : "Amount due at delivery"}</p>
-            <DualCurrency amount={total} className="text-xl font-bold text-amber-900" />
-            {PAYMENTS.cod.otpRequired && (
-              <input className="input-premium mt-2 w-full px-4 py-2 text-sm" placeholder="OTP at delivery" value={otp} onChange={(e) => setOtp(e.target.value)} />
-            )}
-          </div>
         )}
 
         <p className="mt-4 text-lg font-bold">{locale === "fr" ? "Total" : "Total"}: <DualCurrency amount={total} /></p>
         <Button onClick={placeOrder} className="mt-4 w-full">
-          {payment === "cod" ? (locale === "fr" ? "Confirmer commande COD" : "Confirm COD Order") : (locale === "fr" ? "Payer" : "Pay")}
+          {locale === "fr" ? "Payer" : "Pay"}
         </Button>
         <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">← Back</Link>
       </DetailSection>
