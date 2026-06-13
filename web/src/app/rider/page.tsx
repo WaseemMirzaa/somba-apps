@@ -98,7 +98,7 @@ export default function RiderDashboardPage() {
               segments={riderTaskBreakdown.map((seg) => ({
                 label: fr ? seg.typeFr : seg.type,
                 pct: seg.pct,
-                color: seg.type === "Standard delivery" ? "#059669" : seg.type === "COD collection" ? "#2563eb" : seg.type === "Returns pickup" ? "#d97706" : "#7c3aed",
+                color: seg.type === "Standard delivery" ? "#059669" : seg.type === "Returns pickup" ? "#d97706" : "#7c3aed",
               }))}
             />
           </CardContent>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Package, Send, Layers, RotateCcw, RefreshCw, DollarSign,
+  Package, Send, Layers, RotateCcw, RefreshCw,
   AlertTriangle, Clock, Inbox, ArrowUpDown, ArrowUpRight, ArrowDownRight,
   Activity, Truck,
 } from "lucide-react";
@@ -28,7 +28,7 @@ import {
   warehouseHealthBreakdown,
   warehouseRecentActivity,
 } from "@/lib/warehouse-analytics";
-import { formatCurrency, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useOpsPath } from "@/lib/ops-path";
 
 function KpiCard({
@@ -109,7 +109,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <KpiCard title="Received today" value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} />
         <KpiCard title="Dispatched today" value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} />
         <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        <KpiCard title="COD collected" value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[15200, 16100, 16800, 17200, 17800, 18100, 18420]} icon={DollarSign} />
         <KpiCard title="Return rate" value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
         <KpiCard title="Avg process time" value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
         <KpiCard title="Active batches" value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
