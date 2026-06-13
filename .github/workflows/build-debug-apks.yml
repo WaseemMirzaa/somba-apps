@@ -11,6 +11,13 @@ on:
       - ".github/workflows/build-debug-apks.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-apks
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -56,3 +63,18 @@ jobs:
         with:
           name: somba-rider-debug-apk
           path: dist/somba-rider-debug.apk
+
+      # Publish/refresh a public "debug-builds" release so the APKs have
+      # stable direct download links (no GitHub login needed).
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-builds
+          name: Debug APKs (latest)
+          prerelease: true
+          body: |
+            Latest debug builds of the Somba&Teka mobile apps.
+            - somba-teka-customer-debug.apk — customer shopping app
+            - somba-rider-debug.apk — rider pickup/delivery app
+          files: |
+            dist/somba-teka-customer-debug.apk
+            dist/somba-rider-debug.apk
