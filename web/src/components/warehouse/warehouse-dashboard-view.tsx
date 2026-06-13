@@ -87,42 +87,44 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const throughputSpark = warehouseThroughputTrend.map((d) => d.orders);
 
   const quickLinks = [
-    { path: "/inbound", label: "Inbound Queue", countKey: "inboundQueue" as const, icon: Inbox },
-    { path: "/sorting", label: "Sorting Board", countKey: "sortingQueue" as const, icon: ArrowUpDown },
-    { path: "/dispatch", label: "Dispatch Queue", countKey: "dispatchQueue" as const, icon: Send },
-    { path: "/returns", label: "Returns Queue", countKey: "returnQueue" as const, icon: RotateCcw },
+    { path: "/inbound", label: fr ? "File d'arrivage" : "Inbound Queue", countKey: "inboundQueue" as const, icon: Inbox },
+    { path: "/sorting", label: fr ? "Tableau de tri" : "Sorting Board", countKey: "sortingQueue" as const, icon: ArrowUpDown },
+    { path: "/dispatch", label: fr ? "File d'expédition" : "Dispatch Queue", countKey: "dispatchQueue" as const, icon: Send },
+    { path: "/returns", label: fr ? "File de retours" : "Returns Queue", countKey: "returnQueue" as const, icon: RotateCcw },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={title}
-        subtitle={`${t("welcome")} · ${k.receivedToday} received · ${k.dispatchedToday} dispatched today · On-time ${k.onTimeRate}%`}
+        subtitle={fr
+          ? `${t("welcome")} · ${k.receivedToday} reçus · ${k.dispatchedToday} expédiés aujourd'hui · Ponctualité ${k.onTimeRate}%`
+          : `${t("welcome")} · ${k.receivedToday} received · ${k.dispatchedToday} dispatched today · On-time ${k.onTimeRate}%`}
         actions={
           <Link href={ops("/dispatch")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            Open dispatch
+            {fr ? "Ouvrir l'expédition" : "Open dispatch"}
           </Link>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Received today" value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} />
-        <KpiCard title="Dispatched today" value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} />
-        <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        <KpiCard title="Return rate" value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
-        <KpiCard title="Avg process time" value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
-        <KpiCard title="Active batches" value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
-        <KpiCard title="Aged parcels" value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
+        <KpiCard title={fr ? "Reçus aujourd'hui" : "Received today"} value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} />
+        <KpiCard title={fr ? "Expédiés aujourd'hui" : "Dispatched today"} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} />
+        <KpiCard title={fr ? "Ponctualité" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
+        <KpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
+        <KpiCard title={fr ? "Temps de traitement moyen" : "Avg process time"} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
+        <KpiCard title={fr ? "Lots actifs" : "Active batches"} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
+        <KpiCard title={fr ? "Colis anciens" : "Aged parcels"} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">Weekly throughput</h2>
-              <p className="text-xs text-slate-500">Parcels received & dispatched · {period}</p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Débit hebdomadaire" : "Weekly throughput"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Colis reçus et expédiés" : "Parcels received & dispatched"} · {period}</p>
             </div>
-            <Badge variant="info">{s.dispatchedToday - s.failedDeliveries} in transit</Badge>
+            <Badge variant="info">{s.dispatchedToday - s.failedDeliveries} {fr ? "en transit" : "in transit"}</Badge>
           </CardHeader>
           <CardContent>
             <DualMetricChart data={warehouseThroughputTrend} height={220} />
@@ -132,7 +134,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-indigo-600" />
-            <h2 className="font-semibold text-slate-900">Recent activity</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {warehouseRecentActivity.map((item) => (
@@ -148,8 +150,8 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Lane utilization</h2>
-            <p className="text-xs text-slate-500">Sort lanes capacity today</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Utilisation des voies" : "Lane utilization"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Capacité des voies de tri aujourd'hui" : "Sort lanes capacity today"}</p>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
@@ -163,8 +165,8 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Ops health score</h2>
-            <p className="text-xs text-slate-500">Inbound through exceptions</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Score de santé des opérations" : "Ops health score"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "De la réception aux exceptions" : "Inbound through exceptions"}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {warehouseHealthBreakdown.map((h) => (
@@ -206,16 +208,16 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-indigo-600" />
-            <h2 className="font-semibold text-slate-900">Top riders today</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Meilleurs livreurs aujourd'hui" : "Top riders today"}</h2>
           </div>
-          <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">View deliveries</Link>
+          <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir les livraisons" : "View deliveries"}</Link>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "name", label: "Rider" },
-              { key: "deliveries", label: "Deliveries" },
-              { key: "onTime", label: "On-time %", render: (row) => `${row.onTime}%` },
+              { key: "name", label: fr ? "Livreur" : "Rider" },
+              { key: "deliveries", label: fr ? "Livraisons" : "Deliveries" },
+              { key: "onTime", label: fr ? "Ponctualité %" : "On-time %", render: (row) => `${row.onTime}%` },
             ]}
             data={warehouseRiderPerformance as unknown as Record<string, unknown>[]}
           />
@@ -225,22 +227,22 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold">Active deliveries</h2>
-            <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">View all</Link>
+            <h2 className="font-semibold">{fr ? "Livraisons actives" : "Active deliveries"}</h2>
+            <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir tout" : "View all"}</Link>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-slate-900">{s.dispatchedToday - s.failedDeliveries}</p>
-            <p className="text-sm text-slate-500">In transit right now</p>
+            <p className="text-sm text-slate-500">{fr ? "En transit en ce moment" : "In transit right now"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold">Open exceptions</h2>
-            <Link href={ops("/exceptions")} className="text-sm text-indigo-600 hover:underline">View all</Link>
+            <h2 className="font-semibold">{fr ? "Exceptions ouvertes" : "Open exceptions"}</h2>
+            <Link href={ops("/exceptions")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir tout" : "View all"}</Link>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-amber-600">2</p>
-            <p className="text-sm text-slate-500">Require investigation</p>
+            <p className="text-sm text-slate-500">{fr ? "Nécessitent une enquête" : "Require investigation"}</p>
           </CardContent>
         </Card>
       </div>

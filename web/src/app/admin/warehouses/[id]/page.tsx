@@ -22,7 +22,6 @@ const FULFILLMENT_LINKS = [
   { href: "/admin/fulfillment/returns", label: "Returns" },
   { href: "/admin/fulfillment/inventory", label: "Inventory" },
   { href: "/admin/fulfillment/riders", label: "Riders" },
-  { href: "/admin/fulfillment/cod", label: "COD" },
   { href: "/admin/fulfillment/exceptions", label: "Exceptions" },
 ];
 

@@ -77,7 +77,6 @@ export default function WarehouseExceptionDetailPage() {
             >
               Update Resolution
             </button>
-            <Link href={`/warehouse/cod/COD-002`} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">Related COD Case</Link>
           </div>
         </DetailSection>
       </div>

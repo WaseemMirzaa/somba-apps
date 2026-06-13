@@ -83,15 +83,15 @@ export default function RiderDashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title={t("activeTasks")} value={String(activeTasks.length)} change={k.deliveriesChange} spark={deliveriesSpark} icon={Bike} />
         <KpiCard title={t("completedToday")} value={String(completed)} change={k.deliveriesChange} spark={deliveriesSpark} icon={CheckCircle} />
-        <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
-        <KpiCard title="Avg delivery" value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
+        <KpiCard title={fr ? "Ponctualité" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
+        <KpiCard title={fr ? "Livraison moy." : "Avg delivery"} value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Task breakdown</h2>
-            <p className="text-xs text-slate-500">Today&apos;s delivery types</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Répartition des tâches" : "Task breakdown"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Types de livraison du jour" : "Today's delivery types"}</p>
           </CardHeader>
           <CardContent>
             <SegmentDonut
@@ -107,7 +107,7 @@ export default function RiderDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-emerald-600" />
-            <h2 className="font-semibold text-slate-900">Recent activity</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {riderRecentActivity.map((item) => (
@@ -122,8 +122,8 @@ export default function RiderDashboardPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-slate-900">Zone performance</h2>
-          <p className="text-xs text-slate-500">Deliveries & avg time by zone</p>
+          <h2 className="font-semibold text-slate-900">{fr ? "Performance par zone" : "Zone performance"}</h2>
+          <p className="text-xs text-slate-500">{fr ? "Livraisons et temps moyen par zone" : "Deliveries & avg time by zone"}</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -141,14 +141,14 @@ export default function RiderDashboardPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="font-semibold text-slate-900">{t("activeTasks")}</h2>
-          <Link href="/rider/tasks" className="text-sm text-emerald-600 hover:underline">View all</Link>
+          <Link href="/rider/tasks" className="text-sm text-emerald-600 hover:underline">{fr ? "Voir tout" : "View all"}</Link>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
             columns={[
               {
                 key: "id",
-                label: "Task",
+                label: fr ? "Tâche" : "Task",
                 render: (row) => (
                   <Link href={`/rider/tasks/${row.id}`} className="font-medium text-emerald-600 hover:underline">
                     {String(row.id)}
@@ -160,7 +160,7 @@ export default function RiderDashboardPage() {
                 label: "Type",
                 render: (row) => <Badge variant="primary">{String(row.type)}</Badge>,
               },
-              { key: "customer", label: "Customer" },
+              { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "distance", label: "Distance" },
               { key: "eta", label: "ETA" },
               {

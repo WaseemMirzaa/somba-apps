@@ -70,7 +70,6 @@ export default function WarehouseRiderDetailPage() {
             { label: "Weekly", value: formatCurrency(rider.earningsWeekly, locale) },
             { label: "Monthly", value: formatCurrency(rider.earningsMonthly, locale) },
           ]} />
-          <Link href="/warehouse/cod" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">→ COD Summary</Link>
         </DetailGridSection>
 
         <DetailGridSection title="Assigned Batches" span={2}>
