@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ const ALL_SCOPES = Array.from(new Set(initialRoles.flatMap((r) => r.permissions)
   .filter((p) => p !== "all")
   .sort();
 
+const STORAGE_KEY = "somba_admin_roles";
+
 export default function AdminRolesPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
@@ -20,6 +22,16 @@ export default function AdminRolesPage() {
   const [roles, setRoles] = useState(initialRoles);
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
+
+  // Hydrate persisted roles after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) setRoles(JSON.parse(stored));
+    } catch {
+      /* ignore malformed storage */
+    }
+  }, []);
 
   function startEdit(roleId: string, current: string[], roleName: string) {
     // "all" expands to every scope so the editor shows a concrete, toggleable set
@@ -33,7 +45,13 @@ export default function AdminRolesPage() {
   }
 
   function saveEdit(roleId: string, roleName: string) {
-    setRoles((rs) => rs.map((r) => (r.id === roleId ? { ...r, permissions: [...draft].sort() } : r)));
+    const next = roles.map((r) => (r.id === roleId ? { ...r, permissions: [...draft].sort() } : r));
+    setRoles(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore quota/availability errors */
+    }
     setEditingRole(null);
     setDraft([]);
     toast(fr ? `Permissions enregistrées pour ${roleName}` : `Permissions saved for ${roleName}`, "success");
@@ -44,12 +62,29 @@ export default function AdminRolesPage() {
     setDraft([]);
   }
 
+  function resetRoles() {
+    setRoles(initialRoles);
+    setEditingRole(null);
+    setDraft([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    toast(fr ? "Rôles réinitialisés par défaut" : "Roles reset to defaults", "info");
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Rôles & Permissions" : "Roles & Permissions"}
         subtitle={fr ? "Rôles sous-admin — Opérations, Finance, Support, Marketing, Modération, Entrepôt" : "Sub-admin roles — Operations, Finance, Support, Marketing, Moderation, Warehouse"}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Rôles" : "Roles" }]}
+        actions={
+          <button onClick={resetRoles} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            {fr ? "Réinitialiser" : "Reset to defaults"}
+          </button>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
