@@ -7,19 +7,20 @@ import { useLocale } from "@/context/locale-context";
 import { sellerReplacementList } from "@/lib/seller-entities";
 
 export default function SellerReplacementsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   return (
     <SellerListPage
       title={t("replacements")}
-      subtitle="List View — Replacement ID, Order, Customer, SKU, Status"
+      subtitle={fr ? "N° dossier, commande, client, SKU, statut" : "Replacement ID, Order, Customer, SKU, Status"}
       breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("replacements") }]}
       columns={[
-        { key: "id", label: "Case ID", render: (row) => (
+        { key: "id", label: fr ? "N° dossier" : "Case ID", render: (row) => (
           <Link href={`/seller/replacements/${row.id}`} className="font-medium text-sky-600 hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order" },
-        { key: "customer", label: "Customer" },
+        { key: "orderId", label: fr ? "Commande" : "Order" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
         { key: "sku", label: "SKU" },
         { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
