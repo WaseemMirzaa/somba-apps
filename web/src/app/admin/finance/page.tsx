@@ -13,32 +13,33 @@ const transactions = [
   { id: "TXN-901", type: "Order Payment", amount: 119900, status: "completed", date: "2024-06-08" },
   { id: "TXN-902", type: "Seller Payout", amount: -45000, status: "completed", date: "2024-06-08" },
   { id: "TXN-903", type: "Refund", amount: -12900, status: "pending", date: "2024-06-07" },
-  { id: "TXN-904", type: "COD Settlement", amount: 89000, status: "completed", date: "2024-06-07" },
+  { id: "TXN-904", type: "Mobile Money", amount: 89000, status: "completed", date: "2024-06-07" },
 ];
 
 export default function AdminFinancePage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("finance")}
-        subtitle="Platform revenue, payouts & settlements"
+        subtitle={fr ? "Revenus de la plateforme, paiements & règlements" : "Platform revenue, payouts & settlements"}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("finance") }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title={t("revenue")} value={formatCurrency(2840000, locale)} icon={DollarSign} trend="+8.2% this week" />
-        <StatCard title="Pending Payouts" value={formatCurrency(340000, locale)} icon={Wallet} />
-        <StatCard title="COD Outstanding" value={formatCurrency(125000, locale)} icon={CreditCard} />
-        <StatCard title="Refunds (MTD)" value={formatCurrency(89000, locale)} icon={TrendingUp} />
+        <StatCard title={t("revenue")} value={formatCurrency(2840000, locale)} icon={DollarSign} trend={fr ? "+8,2% cette semaine" : "+8.2% this week"} />
+        <StatCard title={fr ? "Paiements en attente" : "Pending Payouts"} value={formatCurrency(340000, locale)} icon={Wallet} />
+        <StatCard title={fr ? "Mobile Money en attente" : "Mobile Money Pending"} value={formatCurrency(125000, locale)} icon={CreditCard} />
+        <StatCard title={fr ? "Remboursements (MTD)" : "Refunds (MTD)"} value={formatCurrency(89000, locale)} icon={TrendingUp} />
       </div>
 
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Transaction" },
+              { key: "id", label: fr ? "Transaction" : "Transaction" },
               { key: "type", label: "Type" },
               { key: "amount", label: t("amount"), render: (row) => {
                 const amt = Number(row.amount);

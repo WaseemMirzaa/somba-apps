@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [tab, setTab] = useState("all");
 
   const filtered = tab === "all"
@@ -23,7 +24,7 @@ export default function AdminSellersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("sellers")}
-        subtitle="List View — quick scanning only. Full info on detail page."
+        subtitle={fr ? "Vue rapide — informations complètes sur la page détaillée." : "List View — quick scanning only. Full info on detail page."}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("sellers") },
@@ -40,7 +41,7 @@ export default function AdminSellersPage() {
               tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
             )}
           >
-            {tabId === "all" ? "All" : tabId === "suspended" ? "Suspended" : t(tabId as Parameters<typeof t>[0]) || tabId}
+            {tabId === "all" ? t("all") : tabId === "suspended" ? t("suspended") : t(tabId as Parameters<typeof t>[0]) || tabId}
           </button>
         ))}
       </div>
@@ -49,29 +50,29 @@ export default function AdminSellersPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Seller ID" },
+              { key: "id", label: fr ? "N° vendeur" : "Seller ID" },
               {
                 key: "storeName",
-                label: "Store Name",
+                label: fr ? "Boutique" : "Store Name",
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.id}`} className="font-medium text-blue-600 hover:underline">
                     {String(row.storeName)}
                   </Link>
                 ),
               },
-              { key: "owner", label: "Owner" },
+              { key: "owner", label: fr ? "Propriétaire" : "Owner" },
               { key: "phone", label: t("phone") },
               { key: "email", label: t("email") },
-              { key: "city", label: "City" },
-              { key: "orders", label: "Orders" },
+              { key: "city", label: t("city") },
+              { key: "orders", label: t("orders") },
               {
                 key: "revenue",
-                label: "Revenue",
+                label: fr ? "Chiffre d'affaires" : "Revenue",
                 render: (row) => formatCurrency(row.revenue as number, locale),
               },
               {
                 key: "healthScore",
-                label: "Health",
+                label: t("health"),
                 render: (row) => (
                   <span className={Number(row.healthScore) > 0 ? "text-emerald-600" : "text-slate-400"}>
                     {Number(row.healthScore) > 0 ? `${row.healthScore}%` : "—"}
@@ -83,7 +84,7 @@ export default function AdminSellersPage() {
                 label: t("status"),
                 render: (row) => (
                   <Badge variant={row.status === "pending" ? "warning" : row.status === "approved" ? "success" : "danger"}>
-                    {row.status === "suspended" ? "Suspended" : t(row.status as Parameters<typeof t>[0]) || String(row.status)}
+                    {row.status === "suspended" ? t("suspended") : t(row.status as Parameters<typeof t>[0]) || String(row.status)}
                   </Badge>
                 ),
               },

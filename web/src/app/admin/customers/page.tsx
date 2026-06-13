@@ -11,12 +11,13 @@ import { formatCurrency } from "@/lib/utils";
 
 export default function AdminCustomersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("customers")}
-        subtitle="List View — Name, Email, Phone, City, Orders, Total Spent, Status"
+        subtitle={fr ? "Nom, E-mail, Téléphone, Ville, Commandes, Total dépensé, Statut" : "Name, Email, Phone, City, Orders, Total Spent, Status"}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("customers") },
@@ -39,11 +40,11 @@ export default function AdminCustomersPage() {
               },
               { key: "email", label: t("email") },
               { key: "phone", label: t("phone") },
-              { key: "city", label: "City" },
-              { key: "orders", label: "Orders" },
+              { key: "city", label: t("city") },
+              { key: "orders", label: t("orders") },
               {
                 key: "totalSpent",
-                label: "Total Spent",
+                label: t("totalSpent"),
                 render: (row) => formatCurrency(row.totalSpent as number, locale),
               },
               {

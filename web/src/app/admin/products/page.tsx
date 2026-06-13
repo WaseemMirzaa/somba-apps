@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [tab, setTab] = useState("pending");
 
   const counts = {
@@ -29,11 +30,11 @@ export default function AdminProductsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Product Moderation"
-        subtitle="List View — Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"
+        title={fr ? "Modération des produits" : "Product Moderation"}
+        subtitle={fr ? "N° produit, Image, Nom, Vendeur, Catégorie, Prix, Statut, Date de soumission" : "Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
-          { label: "Product Moderation" },
+          { label: fr ? "Modération des produits" : "Product Moderation" },
         ]}
       />
 
@@ -47,7 +48,7 @@ export default function AdminProductsPage() {
               tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
             )}
           >
-            {tabId} ({counts[tabId]})
+            {tabId === "pending" ? t("pending") : tabId === "approved" ? t("approved") : fr ? "Rejeté" : "Rejected"} ({counts[tabId]})
           </button>
         ))}
       </div>
@@ -56,10 +57,10 @@ export default function AdminProductsPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Product ID" },
+              { key: "id", label: fr ? "N° produit" : "Product ID" },
               {
                 key: "image",
-                label: "Image",
+                label: t("image"),
                 render: (row) => (
                   <div className="relative h-10 w-10 overflow-hidden rounded">
                     <Image src={String(row.image)} alt="" fill className="object-cover" sizes="40px" />
@@ -68,7 +69,7 @@ export default function AdminProductsPage() {
               },
               {
                 key: "name",
-                label: "Name",
+                label: t("name"),
                 render: (row) => (
                   <Link href={`/admin/products/${row.id}`} className="font-medium text-blue-600 hover:underline">
                     {String(row.name)}
@@ -77,17 +78,17 @@ export default function AdminProductsPage() {
               },
               {
                 key: "seller",
-                label: "Seller",
+                label: t("seller"),
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.sellerId}`} className="text-blue-600 hover:underline">
                     {String(row.seller)}
                   </Link>
                 ),
               },
-              { key: "category", label: "Category" },
+              { key: "category", label: t("category") },
               {
                 key: "price",
-                label: "Price",
+                label: t("price"),
                 render: (row) => formatCurrency(row.price as number, locale),
               },
               {
@@ -95,13 +96,13 @@ export default function AdminProductsPage() {
                 label: t("status"),
                 render: (row) => <Badge variant="warning">{String(row.status)}</Badge>,
               },
-              { key: "submittedDate", label: "Submitted" },
+              { key: "submittedDate", label: t("submitted") },
               {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
                   <Link href={`/admin/products/${row.id}`} className="text-sm text-blue-600 hover:underline">
-                    Review
+                    {fr ? "Réviser" : "Review"}
                   </Link>
                 ),
               },
