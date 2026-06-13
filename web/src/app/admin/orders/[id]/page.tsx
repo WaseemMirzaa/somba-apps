@@ -63,7 +63,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title="Payment">
           <InfoGrid items={[
-            { label: "Gateway", value: order.paymentMethod === "COD" ? "Cash on Delivery" : "Stripe" },
+            { label: "Method", value: order.paymentMethod },
             { label: "Transaction ID", value: order.transactionId },
             { label: "Status", value: order.paymentStatus },
             { label: "Amount", value: formatCurrency(order.amount, locale) },

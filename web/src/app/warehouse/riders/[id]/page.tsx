@@ -9,12 +9,9 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { getRider } from "@/lib/warehouse-entities";
 import { batchEntities } from "@/lib/entities";
-import { formatCurrency } from "@/lib/utils";
-import { useLocale } from "@/context/locale-context";
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
   const rider = getRider(Number(id));
 
   if (!rider) {
@@ -58,17 +55,8 @@ export default function WarehouseRiderDetailPage() {
           <InfoGrid columns={3} items={[
             { label: "Total Deliveries", value: rider.deliveries },
             { label: "Failed Deliveries", value: rider.failedDeliveries },
-            { label: "COD Collections", value: formatCurrency(rider.codCollections, locale) },
             { label: "Rating", value: `⭐ ${rider.rating}` },
             { label: "Performance Score", value: `${rider.performanceScore}%` },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title="Earnings">
-          <InfoGrid columns={3} items={[
-            { label: "Daily", value: formatCurrency(rider.earningsDaily, locale) },
-            { label: "Weekly", value: formatCurrency(rider.earningsWeekly, locale) },
-            { label: "Monthly", value: formatCurrency(rider.earningsMonthly, locale) },
           ]} />
         </DetailGridSection>
 

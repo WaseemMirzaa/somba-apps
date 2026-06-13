@@ -242,7 +242,7 @@ export const orderEntities: OrderEntity[] = orders.map((o, i) => {
     seller: o.seller,
     amount: o.amount,
     status: o.status,
-    paymentMethod: i % 2 === 0 ? "COD" : "Card",
+    paymentMethod: ["Airtel Money", "Card", "Orange Money", "M-Pesa"][i % 4],
     paymentStatus: o.status === "cancelled" ? "refunded" : "paid",
     transactionId: `TXN-${o.id.replace("ORD-", "")}`,
     date: o.date,
@@ -425,7 +425,7 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     ],
     questions: [
       { q: "Is this original?", a: "Yes, 100% authentic with warranty.", author: "Seller" },
-      { q: "COD available?", a: "Yes, cash on delivery is available.", author: "Seller" },
+      { q: "Which payment methods?", a: "Mobile money (Airtel, Orange, M-Pesa) and cards.", author: "Seller" },
     ],
   };
 });

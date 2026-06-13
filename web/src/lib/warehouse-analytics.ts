@@ -17,8 +17,6 @@ export const warehouseExtendedKpis = {
   dispatchedChange: 12.1,
   onTimeRate: 96.4,
   onTimeChange: 1.2,
-  codCollected: 18420,
-  codChange: 9.8,
   returnRate: 1.8,
   returnChange: -0.4,
   avgProcessHours: 4.2,
@@ -45,7 +43,7 @@ export const warehouseHealthBreakdown = [
   { label: "Inbound SLA", score: 93 },
   { label: "Sort accuracy", score: 97 },
   { label: "Dispatch speed", score: 91 },
-  { label: "COD accuracy", score: 98 },
+  { label: "Scan accuracy", score: 98 },
   { label: "Exception resolution", score: 86 },
 ] as const;
 
@@ -53,5 +51,5 @@ export const warehouseRecentActivity = [
   { time: "5 min ago", timeFr: "Il y a 5 min", text: "Batch BAT-042 dispatched — 48 parcels", textFr: "Lot BAT-042 expédié — 48 colis" },
   { time: "20 min ago", timeFr: "Il y a 20 min", text: "Inbound SHP-881 received — 120 items", textFr: "Réception SHP-881 — 120 articles" },
   { time: "45 min ago", timeFr: "Il y a 45 min", text: "Exception flagged — damaged parcel PRC-229", textFr: "Exception — colis endommagé PRC-229" },
-  { time: "1 hr ago", timeFr: "Il y a 1 h", text: "COD reconciliation — $2,840 collected", textFr: "Rapprochement COD — 2 840 $ encaissés" },
+  { time: "1 hr ago", timeFr: "Il y a 1 h", text: "Cycle count completed — Lane C", textFr: "Comptage cyclique terminé — Voie C" },
 ] as const;

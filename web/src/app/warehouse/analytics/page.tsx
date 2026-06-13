@@ -3,20 +3,19 @@
 import { StatCard } from "@/components/ui/stat-card";
 import { DetailSection } from "@/components/ui/info-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { Package, Send, RotateCcw, DollarSign } from "lucide-react";
+import { Package, Send, RotateCcw, Clock } from "lucide-react";
 import { warehouseDashboardStats } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
 export default function WarehouseAnalyticsPage() {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const s = warehouseDashboardStats;
 
   return (
     <div className="space-y-8">
       <PageHeader
         title={t("analytics")}
-        subtitle="Inbound Volume · Dispatch Volume · Return Volume · COD Volume · SLAs"
+        subtitle="Inbound Volume · Dispatch Volume · Return Volume · Aged Parcels · SLAs"
         breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("analytics") }]}
       />
 
@@ -24,7 +23,7 @@ export default function WarehouseAnalyticsPage() {
         <StatCard title="Inbound Volume" value={s.receivedToday} icon={Package} trend="Receive SLA: 98%" />
         <StatCard title="Dispatch Volume" value={s.dispatchedToday} icon={Send} trend="Dispatch SLA: 94%" />
         <StatCard title="Return Volume" value={s.pendingReturns} icon={RotateCcw} trend="Return SLA: 91%" />
-        <StatCard title="COD Volume" value={formatCurrency(s.codCollected, locale)} icon={DollarSign} />
+        <StatCard title="Aged Parcels" value={s.agedParcels} icon={Clock} trend="> 48h in warehouse" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

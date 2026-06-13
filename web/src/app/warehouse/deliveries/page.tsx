@@ -6,10 +6,9 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { deliveryEntities } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
 
 export default function WarehouseDeliveriesPage() {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { toast } = useToast();
 
   return (
@@ -29,7 +28,6 @@ export default function WarehouseDeliveriesPage() {
           <Badge variant={row.status === "delivered" ? "success" : "info"}>{String(row.status).replace("_", " ")}</Badge>
         )},
         { key: "eta", label: "ETA" },
-        { key: "codAmount", label: "COD", render: (row) => Number(row.codAmount) > 0 ? formatCurrency(row.codAmount as number, locale) : "—" },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/warehouse/deliveries/${row.id}`} className="text-indigo-600 hover:underline">{t("track")}</Link>

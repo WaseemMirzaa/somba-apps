@@ -34,7 +34,7 @@ export default function SellerFinancePage() {
       />
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        COD earnings: payout accrues after warehouse remittance reconciliation (Δ2), then 48h clearance (Δ4).
+        Payout accrues after delivery confirmation, then 48h clearance before withdrawal.
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

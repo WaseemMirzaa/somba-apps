@@ -187,7 +187,6 @@ export const warehouseStats = {
   readyDispatch: 67,
   dispatched: 102,
   returnsPending: 18,
-  codCollections: 12450,
 };
 
 export const sellerStats = {
