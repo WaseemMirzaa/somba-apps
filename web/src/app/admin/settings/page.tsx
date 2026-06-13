@@ -11,7 +11,7 @@ import { BUSINESS, COMMISSION_CATEGORIES, MOBILE_MONEY, RETURNS } from "@/lib/co
 
 export default function AdminSettingsPage() {
   const { locale, t } = useLocale();
-  const { profile, profileId, setProfileId } = useMarket();
+  const { profile } = useMarket();
   const { toast } = useToast();
   const fr = locale === "fr";
 
@@ -34,18 +34,6 @@ export default function AdminSettingsPage() {
         title={t("settings")}
         subtitle={fr ? "Paiements, commissions, retours, devise et zones" : "Payments, commissions, returns, currency & zones"}
       />
-
-      <div className="card-premium space-y-3 p-6">
-        <h3 className="font-semibold">{fr ? "Profil de marché" : "Market Profile"}</h3>
-        <select
-          className="input-premium w-full max-w-xs px-4 py-2 text-sm"
-          value={profileId}
-          onChange={(e) => setProfileId(e.target.value as "france" | "drc")}
-        >
-          <option value="france">France (Demo)</option>
-          <option value="drc">DRC (Production)</option>
-        </select>
-      </div>
 
       {/* Per-category commission (Q10) */}
       <div className="card-premium space-y-4 p-6">
