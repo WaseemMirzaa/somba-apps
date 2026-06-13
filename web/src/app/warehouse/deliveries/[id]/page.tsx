@@ -1,23 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { getDelivery } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const delivery = getDelivery(id);
+  const [escalated, setEscalated] = useState(false);
 
   if (!delivery) {
-    return <div className="p-8 text-center text-slate-500">Delivery not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Livraison introuvable" : "Delivery not found"}</div>;
   }
 
   return (
@@ -28,13 +30,13 @@ export default function WarehouseDeliveryDetailPage() {
         backHref="/warehouse/deliveries"
         breadcrumbs={[
           { label: "Warehouse", href: "/warehouse" },
-          { label: "Deliveries", href: "/warehouse/deliveries" },
+          { label: fr ? "Livraisons" : "Deliveries", href: "/warehouse/deliveries" },
           { label: delivery.orderId },
         ]}
         actions={
           <>
-            <a href={`tel:${delivery.riderPhone}`} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">Call Rider</a>
-            <button onClick={() => toast("Delivery escalated to supervisor", "info")} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white">Escalate</button>
+            <a href={`tel:${delivery.riderPhone}`} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Appeler le livreur" : "Call Rider"}</a>
+            <button onClick={() => { setEscalated(true); toast(fr ? "Livraison transmise au superviseur" : "Delivery escalated to supervisor", "info"); }} disabled={escalated} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-50">{escalated ? (fr ? "Transmise ✓" : "Escalated ✓") : (fr ? "Escalader" : "Escalate")}</button>
           </>
         }
       />
@@ -61,8 +63,8 @@ export default function WarehouseDeliveryDetailPage() {
         <DetailGridSection title="Order">
           <InfoGrid items={[
             { label: "Order ID", value: <Link href={`/admin/orders/${delivery.orderId}`} className="text-indigo-600 hover:underline">{delivery.orderId}</Link> },
-            { label: "Items", value: delivery.itemsCount },
-            { label: "COD Amount", value: delivery.codAmount > 0 ? formatCurrency(delivery.codAmount, locale) : "Prepaid" },
+            { label: fr ? "Articles" : "Items", value: delivery.itemsCount },
+            { label: fr ? "Paiement" : "Payment", value: fr ? "Prépayé (mobile money)" : "Prepaid (mobile money)" },
           ]} />
         </DetailGridSection>
 

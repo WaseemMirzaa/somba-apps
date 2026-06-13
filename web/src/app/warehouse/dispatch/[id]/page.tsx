@@ -57,7 +57,7 @@ export default function WarehouseBatchDetailPage() {
           <select className="input-premium mb-3 w-full px-3 py-2 text-sm" value={rider || batch.rider} onChange={(e) => setRider(e.target.value)}>
             {suggestedRiders.map((r) => <option key={r} value={r.split(" ")[0]}>{r}</option>)}
           </select>
-          <button onClick={() => toast(`Auto-assigned ${suggestedRiders[0].split(" ")[0]}`)} className="text-sm text-indigo-600 hover:underline">Auto-assign nearest rider</button>
+          <button onClick={() => { const nearest = suggestedRiders[0].split(" ")[0]; setRider(nearest); toast(`Auto-assigned ${nearest}`); }} className="text-sm text-indigo-600 hover:underline">Auto-assign nearest rider</button>
           <InfoGrid items={[
             { label: "Name", value: rider || batch.rider },
             { label: "Phone", value: batch.riderPhone },

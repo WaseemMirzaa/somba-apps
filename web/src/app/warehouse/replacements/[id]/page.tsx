@@ -1,21 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getReplacement } from "@/lib/warehouse-entities";
+import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
 export default function WarehouseReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const rep = getReplacement(id);
+  const [allocated, setAllocated] = useState(rep?.newProduct?.allocated ?? false);
 
   if (!rep) {
-    return <div className="p-8 text-center text-slate-500">Replacement not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Remplacement introuvable" : "Replacement not found"}</div>;
   }
 
   return (
@@ -26,8 +31,8 @@ export default function WarehouseReplacementDetailPage() {
         backHref="/warehouse/replacements"
         actions={
           <>
-            <button onClick={() => toast("Inventory allocated for replacement")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">Allocate Inventory</button>
-            <button onClick={() => { toast("Dispatch batch created"); router.push("/warehouse/dispatch/BAT-001"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">Create Dispatch</button>
+            <button onClick={() => { setAllocated(true); toast(fr ? "Inventaire alloué pour le remplacement" : "Inventory allocated for replacement"); }} disabled={allocated} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">{allocated ? (fr ? "Inventaire alloué ✓" : "Inventory Allocated ✓") : (fr ? "Allouer l'inventaire" : "Allocate Inventory")}</button>
+            <button onClick={() => { if (!allocated) { toast(fr ? "Allouez d'abord l'inventaire" : "Allocate inventory first", "error"); return; } toast(fr ? "Lot d'expédition créé" : "Dispatch batch created"); router.push("/warehouse/dispatch/BAT-001"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Créer une expédition" : "Create Dispatch"}</button>
           </>
         }
       />
@@ -51,9 +56,9 @@ export default function WarehouseReplacementDetailPage() {
 
         <DetailSection title="New Product">
           <InfoGrid items={[
-            { label: "Replacement SKU", value: rep.newProduct.sku },
-            { label: "Allocated", value: rep.newProduct.allocated ? "Yes" : "No" },
-            { label: "Dispatch Status", value: rep.newProduct.dispatchStatus },
+            { label: fr ? "SKU de remplacement" : "Replacement SKU", value: rep.newProduct.sku },
+            { label: fr ? "Alloué" : "Allocated", value: allocated ? (fr ? "Oui" : "Yes") : (fr ? "Non" : "No") },
+            { label: fr ? "Statut d'expédition" : "Dispatch Status", value: rep.newProduct.dispatchStatus },
           ]} />
           <Link href="/warehouse/inventory" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">→ Check Inventory</Link>
         </DetailSection>

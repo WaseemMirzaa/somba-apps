@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -14,19 +15,21 @@ import { useToast } from "@/context/toast-context";
 
 export default function WarehouseParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const parcel = getInboundParcel(id);
+  const [status, setStatus] = useState(parcel?.status ?? "inbound");
 
   if (!parcel) {
-    return <div className="p-8 text-center text-slate-500">Parcel not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Colis introuvable" : "Parcel not found"}</div>;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={parcel.id}
-        subtitle={`Order ${parcel.orderId} · ${parcel.status} · ${parcel.zone}`}
+        subtitle={`Order ${parcel.orderId} · ${status} · ${parcel.zone}`}
         backHref="/warehouse/inbound"
         breadcrumbs={[
           { label: "Warehouse", href: "/warehouse" },
@@ -34,10 +37,10 @@ export default function WarehouseParcelDetailPage() {
           { label: parcel.id },
         ]}
         actions={
-          parcel.status === "inbound" ? (
-            <button onClick={() => toast("Parcel received")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">{t("receive")}</button>
+          status === "inbound" ? (
+            <button onClick={() => { setStatus("received"); toast(fr ? "Colis reçu" : "Parcel received"); }} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">{t("receive")}</button>
           ) : (
-            <Badge variant="info">{parcel.status}</Badge>
+            <Badge variant={status === "rejected" ? "danger" : status === "accepted" ? "success" : "info"}>{status}</Badge>
           )
         }
       />
@@ -50,7 +53,7 @@ export default function WarehouseParcelDetailPage() {
             { label: "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-indigo-600 hover:underline">{parcel.orderId}</Link> },
             { label: "Weight", value: parcel.weight },
             { label: "Volume", value: parcel.volume },
-            { label: "Status", value: parcel.status },
+            { label: "Status", value: status },
             { label: "Arrival Time", value: parcel.arrival },
             { label: "Zone", value: parcel.zone },
           ]} />
@@ -89,10 +92,18 @@ export default function WarehouseParcelDetailPage() {
             { label: "Damage Notes", value: parcel.inspectionDetail.damageNotes || "None", full: true },
             { label: "Exceptions", value: parcel.inspectionDetail.exceptions },
           ]} />
-          <div className="mt-4 flex gap-2">
-            <button onClick={() => toast("Parcel accepted")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">Accept</button>
-            <button onClick={() => toast("Parcel rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">Reject</button>
-            <Link href="/warehouse/exceptions" className="rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-700">Create Incident</Link>
+          <div className="mt-4 flex items-center gap-2">
+            {status === "accepted" ? (
+              <Badge variant="success">{fr ? "Accepté" : "Accepted"}</Badge>
+            ) : status === "rejected" ? (
+              <Badge variant="danger">{fr ? "Rejeté" : "Rejected"}</Badge>
+            ) : (
+              <>
+                <button onClick={() => { setStatus("accepted"); toast(fr ? "Colis accepté" : "Parcel accepted"); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Accepter" : "Accept"}</button>
+                <button onClick={() => { setStatus("rejected"); toast(fr ? "Colis rejeté" : "Parcel rejected", "error"); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{fr ? "Rejeter" : "Reject"}</button>
+                <Link href="/warehouse/exceptions" className="rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-700">{fr ? "Créer un incident" : "Create Incident"}</Link>
+              </>
+            )}
           </div>
         </DetailGridSection>
 
@@ -116,7 +127,7 @@ export default function WarehouseParcelDetailPage() {
         <DetailGridSection title="Timeline" span={3}>
           <ActivityTimeline events={[
             ...parcel.timeline,
-            { time: "—", label: "Dispatched", done: parcel.status === "dispatched" },
+            { time: "—", label: "Dispatched", done: status === "dispatched" },
             { time: "—", label: "Delivered", done: false },
           ]} />
         </DetailGridSection>

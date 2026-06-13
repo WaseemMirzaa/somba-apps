@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,11 +17,13 @@ import { useToast } from "@/context/toast-context";
 export default function AdminSellerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const seller = getSeller(Number(id));
+  const [status, setStatus] = useState<string>(seller?.status ?? "pending");
 
   if (!seller) {
-    return <div className="p-8 text-center text-slate-500">Seller not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Vendeur introuvable" : "Seller not found"}</div>;
   }
 
   const sellerOrders = orderEntities.filter((o) => o.sellerId === seller.id);
@@ -38,13 +41,15 @@ export default function AdminSellerDetailPage() {
           { label: seller.storeName },
         ]}
         actions={
-          seller.status === "pending" ? (
+          status === "pending" ? (
             <>
-              <button onClick={() => toast("Seller approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{t("approve")}</button>
-              <button onClick={() => toast("Seller rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{t("reject")}</button>
+              <button onClick={() => { setStatus("approved"); toast(fr ? "Vendeur approuvé" : "Seller approved"); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{t("approve")}</button>
+              <button onClick={() => { setStatus("rejected"); toast(fr ? "Vendeur rejeté" : "Seller rejected", "error"); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{t("reject")}</button>
             </>
-          ) : (
+          ) : status === "approved" ? (
             <Badge variant="success">{t("approved")}</Badge>
+          ) : (
+            <Badge variant="danger">{fr ? "Rejeté" : "Rejected"}</Badge>
           )
         }
       />

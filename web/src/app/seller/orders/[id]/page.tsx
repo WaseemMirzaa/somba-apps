@@ -26,6 +26,7 @@ export default function SellerOrderDetailPage() {
   const order = getSellerOrder(id);
   const [ready, setReady] = useState(false);
   const [flaggedSku, setFlaggedSku] = useState<string | null>(null);
+  const [selectedSku, setSelectedSku] = useState<string>("");
   const [unavailReason, setUnavailReason] = useState(UNAVAILABLE_REASONS[0].id);
   const [showFlagModal, setShowFlagModal] = useState(false);
 
@@ -45,7 +46,7 @@ export default function SellerOrderDetailPage() {
               <button onClick={() => { setReady(true); toast(locale === "fr" ? "Prêt pour enlèvement" : "Marked ready for pickup"); }} className="rounded-lg bg-sky-600 px-4 py-2 text-sm text-white">
                 {locale === "fr" ? "Confirmer prêt" : "Package Ready"}
               </button>
-              <button onClick={() => setShowFlagModal(true)} className="rounded-lg border border-amber-300 px-4 py-2 text-sm text-amber-700">
+              <button onClick={() => { setSelectedSku(order.items_detail[0]?.sku ?? ""); setShowFlagModal(true); }} className="rounded-lg border border-amber-300 px-4 py-2 text-sm text-amber-700">
                 {locale === "fr" ? "Indisponible" : "Flag Unavailable"}
               </button>
             </div>
@@ -128,7 +129,7 @@ export default function SellerOrderDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="card-premium w-full max-w-md p-6">
             <h3 className="font-semibold">{locale === "fr" ? "Article indisponible" : "Flag Item Unavailable"}</h3>
-            <select className="input-premium mt-3 w-full px-3 py-2 text-sm" value={order.items_detail[0]?.sku} onChange={(e) => setFlaggedSku(e.target.value)}>
+            <select className="input-premium mt-3 w-full px-3 py-2 text-sm" value={selectedSku} onChange={(e) => setSelectedSku(e.target.value)}>
               {order.items_detail.map((item) => (
                 <option key={item.sku} value={item.sku}>{item.name}</option>
               ))}
@@ -139,8 +140,8 @@ export default function SellerOrderDetailPage() {
               ))}
             </select>
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setShowFlagModal(false)} className="flex-1 rounded-xl border py-2 text-sm">Cancel</button>
-              <button onClick={() => { setFlaggedSku(order.items_detail[0]?.sku ?? null); setShowFlagModal(false); toast(locale === "fr" ? "Article signalé — remboursement partiel" : "Item flagged — partial refund triggered"); }} className="flex-1 rounded-xl bg-amber-600 py-2 text-sm text-white">Confirm</button>
+              <button onClick={() => setShowFlagModal(false)} className="flex-1 rounded-xl border py-2 text-sm">{locale === "fr" ? "Annuler" : "Cancel"}</button>
+              <button onClick={() => { setFlaggedSku(selectedSku || order.items_detail[0]?.sku || null); setShowFlagModal(false); toast(locale === "fr" ? "Article signalé — remboursement partiel" : "Item flagged — partial refund triggered"); }} className="flex-1 rounded-xl bg-amber-600 py-2 text-sm text-white">{locale === "fr" ? "Confirmer" : "Confirm"}</button>
             </div>
           </div>
         </div>

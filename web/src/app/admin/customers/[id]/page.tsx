@@ -21,6 +21,7 @@ export default function AdminCustomerDetailPage() {
   const [status, setStatus] = useState(customer?.status ?? "active");
   const [showCredit, setShowCredit] = useState(false);
   const [creditAmount, setCreditAmount] = useState("");
+  const [wallet, setWallet] = useState(0);
 
   if (!customer) {
     return <div className="p-8 text-center text-slate-500">Customer not found</div>;
@@ -68,7 +69,7 @@ export default function AdminCustomerDetailPage() {
               onChange={(e) => setCreditAmount(e.target.value)}
             />
           </div>
-          <Button size="sm" onClick={() => { toast(`Wallet credited ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>Apply Credit</Button>
+          <Button size="sm" onClick={() => { const amt = Number(creditAmount) || 0; setWallet((w) => w + amt); toast(`Wallet credited ${formatCurrency(amt, locale)}`); setShowCredit(false); setCreditAmount(""); }}>Apply Credit</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>Cancel</Button>
         </div>
       )}
@@ -89,6 +90,7 @@ export default function AdminCustomerDetailPage() {
           <InfoGrid items={[
             { label: "Total Orders", value: customer.orders },
             { label: "Total Spent", value: formatCurrency(customer.totalSpent, locale) },
+            { label: "Wallet Credit", value: formatCurrency(wallet, locale) },
           ]} />
         </DetailSection>
       </div>
