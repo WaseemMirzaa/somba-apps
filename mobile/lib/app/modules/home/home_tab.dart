@@ -89,9 +89,13 @@ class HomeTab extends StatelessWidget {
                           children: [
                             const Icon(Icons.search, color: AppColors.muted),
                             const SizedBox(width: 8),
-                            Text('search_hint'.tr,
-                                style:
-                                    const TextStyle(color: AppColors.muted)),
+                            Expanded(
+                              child: Text('search_hint'.tr,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: AppColors.muted)),
+                            ),
                           ],
                         ),
                       ),
@@ -215,27 +219,42 @@ class _Banners extends StatelessWidget {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          title.tr,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 170),
+                            child: Text(
+                              title.tr,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          sub.tr,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 13,
+                          const SizedBox(height: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 170),
+                            child: Text(
+                              sub.tr,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -254,7 +273,7 @@ class _CategoryShortcuts extends StatelessWidget {
   Widget build(BuildContext context) {
     final shop = Get.find<ShopService>();
     return SizedBox(
-      height: 96,
+      height: 116,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         scrollDirection: Axis.horizontal,
@@ -266,6 +285,7 @@ class _CategoryShortcuts extends StatelessWidget {
             onTap: () => Get.toNamed(AppRoutes.products,
                 arguments: {'categoryId': category.id}),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
                   radius: 26,

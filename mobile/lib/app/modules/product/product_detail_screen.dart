@@ -149,8 +149,10 @@ class ProductDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Obx(
-                  () => Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  () => Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 10,
+                    runSpacing: 4,
                     children: [
                       Text(
                         session.money(product.price),
@@ -161,19 +163,14 @@ class ProductDetailScreen extends StatelessWidget {
                         ),
                       ),
                       if (product.originalPrice != null) ...[
-                        const SizedBox(width: 10),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
-                          child: Text(
-                            session.money(product.originalPrice!),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: AppColors.muted,
-                              decoration: TextDecoration.lineThrough,
-                            ),
+                        Text(
+                          session.money(product.originalPrice!),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.muted,
+                            decoration: TextDecoration.lineThrough,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
@@ -276,6 +273,8 @@ class ProductDetailScreen extends StatelessWidget {
                       radius: BorderRadius.circular(21),
                     ),
                     title: Text('${'sold_by'.tr} ${store.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontWeight: FontWeight.w700, fontSize: 14)),
                     subtitle: Row(
@@ -358,7 +357,7 @@ class ProductDetailScreen extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   onPressed: product.stock == 0
                       ? null
                       : () {
@@ -369,8 +368,17 @@ class ProductDetailScreen extends StatelessWidget {
                                 duration: const Duration(seconds: 1));
                           }
                         },
-                  icon: const Icon(Icons.add_shopping_cart, size: 18),
-                  label: Text('add_to_cart'.tr),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.add_shopping_cart, size: 18),
+                        const SizedBox(width: 8),
+                        Text('add_to_cart'.tr),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -385,7 +393,10 @@ class ProductDetailScreen extends StatelessWidget {
                             Get.toNamed(AppRoutes.checkout);
                           }
                         },
-                  child: Text('buy_now'.tr),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('buy_now'.tr),
+                  ),
                 ),
               ),
             ],

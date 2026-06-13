@@ -277,13 +277,17 @@ class ProductCard extends StatelessWidget {
           onTap: () => Get.toNamed(AppRoutes.product, arguments: product),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                children: [
+              // Image takes the remaining vertical space so the card adapts to
+              // any rail height or grid cell without overflowing.
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
                   NetImage(
                       seed: product.imageSeeds.first,
-                      width: double.infinity,
-                      height: width * 0.82),
+                      width: double.infinity),
                   if (product.discountPercent > 0)
                     Positioned(
                       top: 8,
@@ -323,11 +327,13 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       product.name,
