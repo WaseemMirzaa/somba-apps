@@ -1,49 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'screens/rider_shell.dart';
+import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() => runApp(const SombaRiderApp());
+import 'app/core/i18n/app_translations.dart';
+import 'app/core/services/session_service.dart';
+import 'app/core/services/task_service.dart';
+import 'app/core/theme/app_theme.dart';
+import 'app/routes/app_pages.dart';
+import 'app/routes/app_routes.dart';
 
-class SombaRiderApp extends StatefulWidget {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting();
+  Get.put(SessionService());
+  Get.put(TaskService());
+  runApp(const SombaRiderApp());
+}
+
+class SombaRiderApp extends StatelessWidget {
   const SombaRiderApp({super.key});
 
   @override
-  State<SombaRiderApp> createState() => _SombaRiderAppState();
-}
-
-class _SombaRiderAppState extends State<SombaRiderApp> {
-  Locale _locale = const Locale('en');
-  ThemeMode _theme = ThemeMode.system;
-
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
       title: 'Somba Rider',
       debugShowCheckedModeBanner: false,
-      locale: _locale,
-      themeMode: _theme,
-      supportedLocales: const [Locale('en'), Locale('fr')],
+      theme: AppTheme.light,
+      translations: AppTranslations(),
+      locale: const Locale('fr'),
+      fallbackLocale: const Locale('en'),
+      supportedLocales: const [Locale('fr'), Locale('en')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF059669), brightness: Brightness.light),
-        textTheme: GoogleFonts.interTextTheme(),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF059669), brightness: Brightness.dark),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-        useMaterial3: true,
-      ),
-      home: RiderShell(
-        locale: _locale,
-        onLocaleChanged: (l) => setState(() => _locale = l),
-        onThemeToggle: () => setState(() => _theme = _theme == ThemeMode.light ? ThemeMode.dark : ThemeMode.light),
-      ),
+      initialRoute: AppRoutes.splash,
+      getPages: AppPages.pages,
     );
   }
 }
