@@ -109,7 +109,7 @@ export default function AdminSellerDetailPage() {
           <DataTable
             columns={[
               { key: "name", label: "Product", render: (row) => (
-                <Link href={`/admin/products/${row.id}`} className="text-blue-600 hover:underline">{String(row.name)}</Link>
+                <Link href={`/seller/products/${row.id}`} className="text-blue-600 hover:underline">{String(row.name)}</Link>
               )},
               { key: "sku", label: "SKU" },
               { key: "stock", label: "Stock" },

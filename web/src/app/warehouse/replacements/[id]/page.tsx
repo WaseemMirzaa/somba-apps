@@ -32,7 +32,7 @@ export default function WarehouseReplacementDetailPage() {
         actions={
           <>
             <button onClick={() => { setAllocated(true); toast(fr ? "Inventaire alloué pour le remplacement" : "Inventory allocated for replacement"); }} disabled={allocated} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">{allocated ? (fr ? "Inventaire alloué ✓" : "Inventory Allocated ✓") : (fr ? "Allouer l'inventaire" : "Allocate Inventory")}</button>
-            <button onClick={() => { if (!allocated) { toast(fr ? "Allouez d'abord l'inventaire" : "Allocate inventory first", "error"); return; } toast(fr ? "Lot d'expédition créé" : "Dispatch batch created"); router.push("/warehouse/dispatch/BAT-001"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Créer une expédition" : "Create Dispatch"}</button>
+            <button onClick={() => { if (!allocated) { toast(fr ? "Allouez d'abord l'inventaire" : "Allocate inventory first", "error"); return; } toast(fr ? "Lot d'expédition créé" : "Dispatch batch created"); router.push("/warehouse/dispatch/BATCH-001"); }} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Créer une expédition" : "Create Dispatch"}</button>
           </>
         }
       />

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection } from "@/components/ui/info-grid";
+import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDisputes } from "@/context/dispute-context";
@@ -24,6 +25,14 @@ export default function AdminDisputeResolutionPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={fr ? "Résolution du litige" : "Dispute Resolution"} subtitle={dispute.id} backHref="/admin/disputes" />
+      <DetailSection title={fr ? "Détails" : "Details"}>
+        <InfoGrid items={[
+          { label: fr ? "Commande" : "Order", value: <Link href={`/admin/orders/${dispute.orderId}`} className="text-blue-600 hover:underline">{dispute.orderId}</Link> },
+          { label: fr ? "Vendeur" : "Seller", value: <Link href={`/admin/sellers/${dispute.sellerId}`} className="text-blue-600 hover:underline">{dispute.sellerName}</Link> },
+          { label: fr ? "Acheteur" : "Buyer", value: dispute.buyerName },
+          { label: fr ? "Motif" : "Reason", value: String(dispute.reason).replace(/_/g, " ") },
+        ]} />
+      </DetailSection>
       <DetailSection title={fr ? "Dossier" : "Case"}>
         <p className="text-sm">{dispute.description}</p>
         {dispute.messages.map((m, i) => (
