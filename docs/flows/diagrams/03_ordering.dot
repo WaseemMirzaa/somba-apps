@@ -1,0 +1,52 @@
+digraph ordering {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.32, ranksep=0.42, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  "o_start" [label="Customer in shop", shape=oval, style="filled", fillcolor="#1d4ed8", color="#1e3a8a", fontcolor="white", fontsize=12, penwidth=1.6];
+  "o_pdp" [label="Product detail (PDP)
+variant · zone/pincode check
+Q&A · reviews · wishlist", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_cart" [label="Cart
+qty · save for later · group by seller", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_promo" [label="Apply promo code?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_promo_y" [label="SOMBA10 (10%, min $50)
+SAVE20 ($20, min $100)
+if min-order met", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_auth" [label="Signed in?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_guest" [label="Guest checkout
+(email only)", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_addr" [label="Step 1 · Delivery address
+→ sets zone delivery fee", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_opts" [label="Step 2 · Delivery options
+cross-city · open-box · note", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_pay" [label="Step 3 · Payment method", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_cod" [label="COD ≤ market cap?
+(FR $500 / DRC $200)", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_methods" [label="Card · Wallet · Airtel Money
+(+ COD if eligible)", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_payok" [label="Payment
+authorised?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_retry" [label="Hold reservation 15 min
+→ retry payment", shape=box, style="rounded,filled", fillcolor="#FEE2E2", color="#dc2626", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_conf" [label="Step 4 · Order confirmed
+status = processing
+→ tracking available", shape=box, style="filled", fillcolor="#D1FAE5", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_start" -> "o_pdp" [style=solid, color="#64748b"];
+  "o_pdp" -> "o_cart" [style=solid, color="#64748b", label="add to cart"];
+  "o_cart" -> "o_promo" [style=solid, color="#64748b"];
+  "o_promo" -> "o_promo_y" [style=solid, color="#64748b", label="yes"];
+  "o_promo" -> "o_auth" [style=solid, color="#64748b", label="no"];
+  "o_promo_y" -> "o_auth" [style=solid, color="#64748b"];
+  "o_auth" -> "o_addr" [style=solid, color="#64748b", label="yes"];
+  "o_auth" -> "o_guest" [style=solid, color="#64748b", label="no"];
+  "o_guest" -> "o_addr" [style=solid, color="#64748b"];
+  "o_addr" -> "o_opts" [style=solid, color="#64748b"];
+  "o_opts" -> "o_pay" [style=solid, color="#64748b"];
+  "o_pay" -> "o_cod" [style=solid, color="#64748b"];
+  "o_cod" -> "o_methods" [style=solid, color="#64748b", label="yes"];
+  "o_cod" -> "o_methods" [style=dashed, color="#64748b", label="no → card only"];
+  "o_methods" -> "o_payok" [style=solid, color="#64748b"];
+  "o_payok" -> "o_conf" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
+  "o_payok" -> "o_retry" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
+  "o_retry" -> "o_payok" [style=dashed, color="#dc2626"];
+}

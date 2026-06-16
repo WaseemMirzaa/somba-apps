@@ -1,0 +1,67 @@
+digraph seller {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.32, ranksep=0.4, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  subgraph cluster_on {
+    label="Onboarding"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#F5F3FF"; color="#7c3aed"; labeljust=l;
+  "se_land" [label="Sell-online landing", shape=oval, style="filled", fillcolor="#1d4ed8", color="#1e3a8a", fontcolor="white", fontsize=12, penwidth=1.6];
+  "se_sub" [label="Choose plan & subscribe
+(Starter/Pro/Enterprise)", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_reg" [label="Register (no KYC)
+business info", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_pend" [label="Pending approval", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_dec" [label="Admin
+approves?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_res" [label="Resubmit
+corrections", shape=box, style="rounded,filled", fillcolor="#FEE2E2", color="#dc2626", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  "se_dash" [label="Seller dashboard
+KPIs · health badge · finance snapshot", shape=box, style="rounded,filled", fillcolor="#EDE9FE", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  subgraph cluster_cat {
+    label="Catalog"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#F5F3FF"; color="#7c3aed"; labeljust=l;
+  "se_wiz" [label="7-step product wizard
+basics·media·variants·stock
+price·shipping·review", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_mod" [label="Submit → moderation
+draft → pending", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_inv" [label="Inventory · CSV
+flag unavailable", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_ful {
+    label="Fulfilment"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#F5F3FF"; color="#7c3aed"; labeljust=l;
+  "se_ord" [label="New order → Accept
+processing → Mark ready", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_ship" [label="Hand off to warehouse
+track shipment", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_rr" [label="Returns · replacements
+disputes", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_fin {
+    label="Money & growth"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#F5F3FF"; color="#7c3aed"; labeljust=l;
+  "se_fin" [label="Finance · transactions
+commission 8–15%", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_clr" [label="Cleared?
+(after delivery +48h)", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_pay" [label="Request payout
+→ admin approval", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "se_mktg" [label="Storefront · promotions
+analytics · reviews", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  "se_land" -> "se_sub" [style=solid, color="#64748b"];
+  "se_sub" -> "se_reg" [style=solid, color="#64748b"];
+  "se_reg" -> "se_pend" [style=solid, color="#64748b"];
+  "se_pend" -> "se_dec" [style=solid, color="#64748b"];
+  "se_dec" -> "se_dash" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
+  "se_dec" -> "se_res" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
+  "se_res" -> "se_pend" [style=dashed, color="#64748b"];
+  "se_dash" -> "se_wiz" [style=solid, color="#64748b"];
+  "se_wiz" -> "se_mod" [style=solid, color="#64748b"];
+  "se_mod" -> "se_inv" [style=dashed, color="#64748b"];
+  "se_dash" -> "se_ord" [style=solid, color="#64748b"];
+  "se_ord" -> "se_ship" [style=solid, color="#64748b"];
+  "se_ship" -> "se_rr" [style=dashed, color="#64748b"];
+  "se_dash" -> "se_fin" [style=dashed, color="#cbd5e1"];
+  "se_fin" -> "se_clr" [style=solid, color="#64748b"];
+  "se_clr" -> "se_pay" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
+  "se_dash" -> "se_mktg" [style=dashed, color="#cbd5e1"];
+}

@@ -1,0 +1,51 @@
+digraph arch {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.3, ranksep=0.55, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  node [fontsize=11];
+  subgraph cluster_pres {
+    label="Presentation layer — 6 portals"; fontname="Helvetica"; fontsize=12; style="rounded,filled"; fillcolor="#F8FAFC"; color="#cbd5e1"; labeljust=l;
+  "p_cust" [label="Customer Shop
+/shop  +  Flutter app", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "p_sell" [label="Seller Portal
+/seller", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "p_admin" [label="Super Admin
+/admin", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "p_ware" [label="Warehouse
+/warehouse", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "p_ride" [label="Rider Portal
+/rider  +  Flutter app", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "p_land" [label="Landing / Auth
+/  ·  /login", shape=box, style="rounded,filled", fillcolor="white", color="#475569", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+    {rank=same; p_cust; p_sell; p_admin; p_ware; p_ride;}
+  }
+  subgraph cluster_shared {
+    label="Shared contracts  (shared/)"; fontname="Helvetica"; fontsize=12; style="rounded,filled"; fillcolor="#EEF2FF"; color="#a5b4fc"; labeljust=l;
+  "s_reg" [label="Screen registry
+CF / SF / AF / WF / RF", shape=box, style="rounded,filled", fillcolor="white", color="#6366f1", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "s_mkt" [label="Market profiles
+France · DRC", shape=box, style="rounded,filled", fillcolor="white", color="#6366f1", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "s_types" [label="Shared types
+order / payout / status enums", shape=box, style="rounded,filled", fillcolor="white", color="#6366f1", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "s_ctx" [label="React contexts
+Auth · Cart · Notify · Dispute", shape=box, style="rounded,filled", fillcolor="white", color="#6366f1", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+    {rank=same; s_reg; s_mkt; s_types; s_ctx;}
+  }
+  subgraph cluster_data {
+    label="Mock data & API"; fontname="Helvetica"; fontsize=12; style="rounded,filled"; fillcolor="#F0FDFA"; color="#5eead4"; labeljust=l;
+  "d_api" [label="NestJS Mock API
+:3001  /api/v1", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_ent" [label="Mock entities
+products · orders · sellers
+parcels · riders · disputes", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+    {rank=same; d_api; d_ent;}
+  }
+  "p_cust" -> "s_ctx" [style=solid, color="#cbd5e1"];
+  "p_sell" -> "s_ctx" [style=solid, color="#cbd5e1"];
+  "p_admin" -> "s_ctx" [style=solid, color="#cbd5e1"];
+  "p_ware" -> "s_ctx" [style=solid, color="#cbd5e1"];
+  "p_ride" -> "s_ctx" [style=solid, color="#cbd5e1"];
+  "s_ctx" -> "d_ent" [style=solid, color="#94a3b8"];
+  "s_types" -> "d_api" [style=solid, color="#94a3b8"];
+  "d_api" -> "d_ent" [style=solid, color="#94a3b8", label="reads"];
+}

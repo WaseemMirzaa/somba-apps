@@ -1,0 +1,67 @@
+digraph life {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.3, ranksep=0.4, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  node [fontsize=11];
+  "L0" [label="Customer places order", shape=oval, style="filled", fillcolor="#1d4ed8", color="#1e3a8a", fontcolor="white", fontsize=12, penwidth=1.6];
+  "L1" [label="CUSTOMER
+Browse → cart → checkout → pay
+Order: pending → confirmed", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L2" [label="SELLER
+New order → Accept → processing
+→ Mark ready for pickup", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L3" [label="WAREHOUSE
+Parcel inbound → receive → sort
+→ ready → batch builder", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L4" [label="WAREHOUSE
+Assign rider → Dispatch batch
+Order: shipped → out_for_delivery", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L5" [label="RIDER
+Pick up → navigate → attempt delivery", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L6" [label="Delivery
+successful?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "L7" [label="RIDER · Proof of Delivery
+OTP + photo + COD cash
+Order: delivered", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L8" [label="RIDER · Failed delivery
+reason logged →
+return to warehouse", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L9" [label="WAREHOUSE
+COD shift reconciliation
+(rider remits cash)", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L10" [label="SELLER
+Earnings accrue → 48h clearance
+→ request payout", shape=box, style="rounded,filled", fillcolor="white", color="#7c3aed", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L11" [label="SUPER ADMIN
+Approve payout → paid
+Audit-logged", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L12" [label="Order complete
+& settled", shape=box, style="filled", fillcolor="#D1FAE5", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "R1" [label="CUSTOMER
+Return / exchange / dispute
+(within return window)", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "R2" [label="SELLER · ADMIN
+Inspect → resolve
+(favor buyer / seller)", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "R3" [label="SUPER ADMIN
+Authorise refund
+(original method / wallet)", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=2.0];
+  "L0" -> "L1" [style=solid, color="#64748b"];
+  "L1" -> "L2" [style=solid, color="#64748b", label="paid"];
+  "L2" -> "L3" [style=solid, color="#64748b", label="handoff"];
+  "L3" -> "L4" [style=solid, color="#64748b"];
+  "L4" -> "L5" [style=solid, color="#64748b", label="in transit"];
+  "L5" -> "L6" [style=solid, color="#64748b"];
+  "L6" -> "L7" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
+  "L6" -> "L8" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
+  "L8" -> "L4" [style=dashed, color="#dc2626", label="re-dispatch"];
+  "L7" -> "L9" [style=solid, color="#64748b", label="COD orders"];
+  "L9" -> "L10" [style=solid, color="#64748b"];
+  "L7" -> "L10" [style=dashed, color="#64748b", label="prepaid"];
+  "L10" -> "L11" [style=solid, color="#64748b"];
+  "L11" -> "L12" [style=solid, color="#64748b"];
+  "L7" -> "R1" [style=dashed, color="#2563eb", label="post-delivery"];
+  "R1" -> "R2" [style=solid, color="#64748b"];
+  "R2" -> "R3" [style=solid, color="#64748b", label="if approved"];
+  "R3" -> "L12" [style=dashed, color="#64748b"];
+}

@@ -1,0 +1,60 @@
+digraph delivery {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.32, ranksep=0.38, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  subgraph cluster_w {
+    label="Warehouse operations"; fontname="Helvetica"; fontsize=12; style="rounded,filled"; fillcolor="#ECFEFF"; color="#0891b2"; labeljust=l;
+  "d_in" [label="Parcel inbound
+(picked up from seller)", shape=oval, style="filled", fillcolor="#1d4ed8", color="#1e3a8a", fontcolor="white", fontsize=12, penwidth=1.6];
+  "d_recv" [label="Receiving
+barcode scan → inspect", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_insp" [label="Inspection OK?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_exc" [label="Exception / incident
+damaged · missing · mismatch", shape=box, style="rounded,filled", fillcolor="#FEE2E2", color="#dc2626", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_sort" [label="Sorting
+assign zone", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_ready" [label="status = ready", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_batch" [label="Batch builder
+add parcels · optimise route", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_assign" [label="Assign rider
+auto-suggest nearest / manual", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_disp" [label="Dispatch batch
+status = dispatched", shape=box, style="rounded,filled", fillcolor="white", color="#0891b2", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_r {
+    label="Rider — last mile"; fontname="Helvetica"; fontsize=12; style="rounded,filled"; fillcolor="#ECFDF5"; color="#059669"; labeljust=l;
+  "d_pick" [label="Rider picks up batch
+in_transit", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_nav" [label="Navigate to stop
+call customer", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_pod" [label="Proof of delivery
+OTP · photo · open-box
+COD cash collected", shape=box, style="rounded,filled", fillcolor="white", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_ok" [label="Delivered?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_fail" [label="Failed delivery
+reason logged", shape=box, style="rounded,filled", fillcolor="#FEE2E2", color="#dc2626", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  "d_done" [label="Order delivered", shape=box, style="filled", fillcolor="#D1FAE5", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_cod" [label="COD shift reconciliation
+expected vs collected
+variance → investigate", shape=box, style="rounded,filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_aged" [label="Aged / stuck parcel
+(>72h) → escalate", shape=box, style="rounded,filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "d_in" -> "d_recv" [style=solid, color="#64748b"];
+  "d_recv" -> "d_insp" [style=solid, color="#64748b"];
+  "d_insp" -> "d_sort" [style=solid, color="#64748b", label="yes"];
+  "d_insp" -> "d_exc" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
+  "d_sort" -> "d_ready" [style=solid, color="#64748b"];
+  "d_ready" -> "d_batch" [style=solid, color="#64748b"];
+  "d_batch" -> "d_assign" [style=solid, color="#64748b"];
+  "d_assign" -> "d_disp" [style=solid, color="#64748b"];
+  "d_disp" -> "d_pick" [style=solid, color="#64748b", label="out for delivery"];
+  "d_pick" -> "d_nav" [style=solid, color="#64748b"];
+  "d_nav" -> "d_pod" [style=solid, color="#64748b"];
+  "d_pod" -> "d_ok" [style=solid, color="#64748b"];
+  "d_ok" -> "d_done" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
+  "d_ok" -> "d_fail" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
+  "d_fail" -> "d_disp" [style=dashed, color="#dc2626", label="re-dispatch"];
+  "d_done" -> "d_cod" [style=dashed, color="#64748b", label="COD orders"];
+  "d_ready" -> "d_aged" [style=dashed, color="#d97706", label="if stuck"];
+}

@@ -1,0 +1,65 @@
+digraph customer {
+  graph [rankdir=TB, bgcolor="white", fontname="Helvetica", nodesep=0.32, ranksep=0.45, pad=0.28, ];
+  node  [fontname="Helvetica", fontsize=12, margin="0.17,0.10", penwidth=1.3];
+  edge  [fontname="Helvetica", fontsize=10, color="#64748b", arrowsize=0.75, penwidth=1.1];
+  "c_root" [label="Customer Portal
+/shop", shape=oval, style="filled", fillcolor="#1d4ed8", color="#1e3a8a", fontcolor="white", fontsize=12, penwidth=1.6];
+  subgraph cluster_auth {
+    label="Account & auth"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563eb"; labeljust=l;
+  "c_reg" [label="Register → OTP →
+verify email", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_log" [label="Login
+forgot / reset", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_disc {
+    label="Discover"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563eb"; labeljust=l;
+  "c_home" [label="Home feed
+buy again · recently viewed", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_search" [label="Search + autocomplete
+categories · filters", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_pdp" [label="Product / store
+Q&A · reviews · follow", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_deals" [label="Flash deals
+· wishlist", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_buy {
+    label="Buy"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563eb"; labeljust=l;
+  "c_cart" [label="Cart · promo", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_check" [label="Checkout (4 steps)
+→ payment", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_order" [label="Order confirmed", shape=box, style="filled", fillcolor="#D1FAE5", color="#059669", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_post {
+    label="After purchase"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563eb"; labeljust=l;
+  "c_track" [label="Orders · live tracking
+reorder", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_ret" [label="Return / exchange
+request", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_disp" [label="Dispute · support
+ticket", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  subgraph cluster_acct {
+    label="Account hub"; fontname="Helvetica"; fontsize=11; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563eb"; labeljust=l;
+  "c_wal" [label="Somba wallet
+top-up · transactions", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_ref" [label="Refer & earn
+$10 / $10", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "c_notif" [label="Addresses · notifications
+help / delete account", shape=box, style="rounded,filled", fillcolor="white", color="#2563eb", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  }
+  "c_root" -> "c_log" [style=solid, color="#64748b"];
+  "c_root" -> "c_home" [style=solid, color="#64748b"];
+  "c_log" -> "c_reg" [style=dashed, color="#64748b"];
+  "c_home" -> "c_search" [style=solid, color="#64748b"];
+  "c_search" -> "c_pdp" [style=solid, color="#64748b"];
+  "c_home" -> "c_deals" [style=dashed, color="#64748b"];
+  "c_pdp" -> "c_cart" [style=solid, color="#64748b", label="add"];
+  "c_cart" -> "c_check" [style=solid, color="#64748b"];
+  "c_check" -> "c_order" [style=solid, color="#64748b"];
+  "c_order" -> "c_track" [style=solid, color="#64748b"];
+  "c_track" -> "c_ret" [style=dashed, color="#64748b", label="if delivered"];
+  "c_ret" -> "c_disp" [style=dashed, color="#64748b"];
+  "c_root" -> "c_wal" [style=dashed, color="#cbd5e1"];
+  "c_wal" -> "c_ref" [style=dashed, color="#cbd5e1"];
+  "c_ref" -> "c_notif" [style=dashed, color="#cbd5e1"];
+}
