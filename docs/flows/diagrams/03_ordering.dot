@@ -19,11 +19,8 @@ if min-order met", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color
 → sets zone delivery fee", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
   "o_opts" [label="Step 2 · Delivery options
 cross-city · open-box · note", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
-  "o_pay" [label="Step 3 · Payment method", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
-  "o_cod" [label="COD ≤ market cap?
-(FR $500 / DRC $200)", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
-  "o_methods" [label="Card · Wallet · Airtel Money
-(+ COD if eligible)", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+  "o_pay" [label="Step 3 · Payment (prepaid)
+card · Somba Wallet · Airtel Money", shape=box, style="rounded,filled", fillcolor="#EAF1FB", color="#1d4ed8", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
   "o_payok" [label="Payment
 authorised?", shape=diamond, style="filled", fillcolor="#FEF3C7", color="#d97706", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
   "o_retry" [label="Hold reservation 15 min
@@ -42,10 +39,7 @@ status = processing
   "o_guest" -> "o_addr" [style=solid, color="#64748b"];
   "o_addr" -> "o_opts" [style=solid, color="#64748b"];
   "o_opts" -> "o_pay" [style=solid, color="#64748b"];
-  "o_pay" -> "o_cod" [style=solid, color="#64748b"];
-  "o_cod" -> "o_methods" [style=solid, color="#64748b", label="yes"];
-  "o_cod" -> "o_methods" [style=dashed, color="#64748b", label="no → card only"];
-  "o_methods" -> "o_payok" [style=solid, color="#64748b"];
+  "o_pay" -> "o_payok" [style=solid, color="#64748b"];
   "o_payok" -> "o_conf" [style=solid, color="#059669", label="yes", fontcolor="#059669"];
   "o_payok" -> "o_retry" [style=solid, color="#dc2626", label="no", fontcolor="#dc2626"];
   "o_retry" -> "o_payok" [style=dashed, color="#dc2626"];

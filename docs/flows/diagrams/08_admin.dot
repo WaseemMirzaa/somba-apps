@@ -41,7 +41,7 @@ flash sales · promotions", shape=box, style="rounded,filled", fillcolor="white"
 campaigns", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
   "ad_set" [label="Settings & zones
 dual-market · FX
-COD cap · fees", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
+delivery fees", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=1.3];
   "ad_ware" [label="Warehouses
 create hub +
 credentials", shape=box, style="rounded,filled", fillcolor="white", color="#b45309", fontcolor="#0f172a", fontsize=12, penwidth=1.3];

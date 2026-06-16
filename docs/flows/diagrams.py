@@ -155,9 +155,8 @@ def g_lifecycle():
     s += actor("L4", "WAREHOUSE\nAssign rider → Dispatch batch\nOrder: shipped → out_for_delivery", A_WARE)
     s += actor("L5", "RIDER\nPick up → navigate → attempt delivery", A_RIDE)
     s += dec("L6", "Delivery\nsuccessful?")
-    s += actor("L7", "RIDER · Proof of Delivery\nOTP + photo + COD cash\nOrder: delivered", A_RIDE)
+    s += actor("L7", "RIDER · Proof of Delivery\nOTP + photo / signature\nOrder: delivered", A_RIDE)
     s += actor("L8", "RIDER · Failed delivery\nreason logged →\nreturn to warehouse", A_RIDE)
-    s += actor("L9", "WAREHOUSE\nCOD shift reconciliation\n(rider remits cash)", A_WARE)
     s += actor("L10", "SELLER\nEarnings accrue → 48h clearance\n→ request payout", A_SELL)
     s += actor("L11", "SUPER ADMIN\nApprove payout → paid\nAudit-logged", A_ADMN)
     s += term("L12", "Order complete\n& settled")
@@ -176,9 +175,7 @@ def g_lifecycle():
     s += edge("L6", "L7", label="yes", color=TERM_LINE, fontcolor=TERM_LINE)
     s += edge("L6", "L8", label="no", color=DANGER, fontcolor=DANGER)
     s += edge("L8", "L4", label="re-dispatch", style="dashed", color=DANGER)
-    s += edge("L7", "L9", label="COD orders")
-    s += edge("L9", "L10")
-    s += edge("L7", "L10", label="prepaid", style="dashed")
+    s += edge("L7", "L10")
     s += edge("L10", "L11")
     s += edge("L11", "L12")
     s += edge("L7", "R1", label="post-delivery", style="dashed", color=A_CUST)
@@ -203,9 +200,7 @@ def g_ordering():
     s += proc("o_guest", "Guest checkout\n(email only)")
     s += proc("o_addr",  "Step 1 · Delivery address\n→ sets zone delivery fee")
     s += proc("o_opts",  "Step 2 · Delivery options\ncross-city · open-box · note")
-    s += proc("o_pay",   "Step 3 · Payment method")
-    s += dec("o_cod",    "COD ≤ market cap?\n(FR $500 / DRC $200)")
-    s += proc("o_methods","Card · Wallet · Airtel Money\n(+ COD if eligible)")
+    s += proc("o_pay",   "Step 3 · Payment (prepaid)\ncard · Somba Wallet · Airtel Money")
     s += dec("o_payok",  "Payment\nauthorised?")
     s += proc("o_retry", "Hold reservation 15 min\n→ retry payment", fill="#FEE2E2", line=DANGER)
     s += term("o_conf",  "Step 4 · Order confirmed\nstatus = processing\n→ tracking available")
@@ -221,10 +216,7 @@ def g_ordering():
     s += edge("o_guest", "o_addr")
     s += edge("o_addr", "o_opts")
     s += edge("o_opts", "o_pay")
-    s += edge("o_pay", "o_cod")
-    s += edge("o_cod", "o_methods", label="yes")
-    s += edge("o_cod", "o_methods", label="no → card only", style="dashed")
-    s += edge("o_methods", "o_payok")
+    s += edge("o_pay", "o_payok")
     s += edge("o_payok", "o_conf", label="yes", color=TERM_LINE, fontcolor=TERM_LINE)
     s += edge("o_payok", "o_retry", label="no", color=DANGER, fontcolor=DANGER)
     s += edge("o_retry", "o_payok", style="dashed", color=DANGER)
@@ -255,13 +247,12 @@ def g_delivery():
     s += f'    label="Rider — last mile"; fontname="{FONT}"; fontsize=12; style="rounded,filled"; fillcolor="#ECFDF5"; color="{A_RIDE}"; labeljust=l;\n'
     s += proc("d_pick", "Rider picks up batch\nin_transit", fill="white", line=A_RIDE)
     s += proc("d_nav",  "Navigate to stop\ncall customer", fill="white", line=A_RIDE)
-    s += proc("d_pod",  "Proof of delivery\nOTP · photo · open-box\nCOD cash collected", fill="white", line=A_RIDE)
+    s += proc("d_pod",  "Proof of delivery\nOTP · photo / signature\nopen-box check", fill="white", line=A_RIDE)
     s += dec("d_ok",    "Delivered?")
     s += proc("d_fail", "Failed delivery\nreason logged", fill="#FEE2E2", line=DANGER)
     s += '  }\n'
 
     s += term("d_done", "Order delivered")
-    s += proc("d_cod",  "COD shift reconciliation\nexpected vs collected\nvariance → investigate", fill="#FEF3C7", line=DEC_LINE)
     s += proc("d_aged", "Aged / stuck parcel\n(>72h) → escalate", fill="#FEF3C7", line=DEC_LINE)
 
     s += edge("d_in", "d_recv")
@@ -279,7 +270,6 @@ def g_delivery():
     s += edge("d_ok", "d_done", label="yes", color=TERM_LINE, fontcolor=TERM_LINE)
     s += edge("d_ok", "d_fail", label="no", color=DANGER, fontcolor=DANGER)
     s += edge("d_fail", "d_disp", label="re-dispatch", style="dashed", color=DANGER)
-    s += edge("d_done", "d_cod", label="COD orders", style="dashed")
     s += edge("d_ready", "d_aged", label="if stuck", style="dashed", color=DEC_LINE)
     s += "}\n"
     return s
@@ -418,21 +408,13 @@ def g_rider():
     s += proc("ri_duty",  "Go on-duty\navailability toggle", fill="#ECFDF5", line=A_RIDE)
     s += proc("ri_notif", "Receive task_assigned\nnotification", fill="#ECFDF5", line=A_RIDE)
     s += proc("ri_tasks", "Task list / batch overview\nordered stops", fill="#ECFDF5", line=A_RIDE)
-    s += proc("ri_detail","Task detail\norder · customer · COD · notes", fill="#ECFDF5", line=A_RIDE)
+    s += proc("ri_detail","Task detail\norder · customer · notes", fill="#ECFDF5", line=A_RIDE)
     s += proc("ri_nav",   "Navigate (map)\ncall customer", fill="#ECFDF5", line=A_RIDE)
     s += proc("ri_pick",  "Pick up\nassigned → picked_up → in_transit", fill="#ECFDF5", line=A_RIDE)
     s += dec("ri_try",    "At customer:\ndeliver?")
-
-    s += '  subgraph cluster_pod {\n'
-    s += f'    label="Proof of delivery (RF-09)"; fontname="{FONT}"; fontsize=11; style="rounded,filled"; fillcolor="#ECFDF5"; color="{A_RIDE}"; labeljust=l;\n'
-    s += proc("ri_otp",  "Enter OTP + recipient\nphoto / signature", fill="white", line=A_RIDE)
-    s += dec("ri_cod",   "COD order?")
-    s += proc("ri_cash", "Collect cash\ntick 'cash collected'", fill="white", line=A_RIDE)
-    s += '  }\n'
-
+    s += proc("ri_pod",   "Proof of delivery (RF-09)\nenter OTP + recipient\nphoto / signature · open-box", fill="white", line=A_RIDE)
     s += term("ri_deliv", "status = delivered")
-    s += proc("ri_fail",  "Failed delivery (RF-10)\nunavailable · wrong address\nrefused · payment issue", fill="#FEE2E2", line=DANGER)
-    s += proc("ri_shift", "COD shift summary\nremit cash to warehouse", fill="#FEF3C7", line=DEC_LINE)
+    s += proc("ri_fail",  "Failed delivery (RF-10)\nunavailable · wrong address\nrefused · other", fill="#FEE2E2", line=DANGER)
     s += proc("ri_earn",  "Earnings & history\nper-delivery + incentives", fill="#ECFDF5", line=A_RIDE)
 
     s += edge("ri_login", "ri_first")
@@ -443,14 +425,10 @@ def g_rider():
     s += edge("ri_detail", "ri_nav")
     s += edge("ri_nav", "ri_pick")
     s += edge("ri_pick", "ri_try")
-    s += edge("ri_try", "ri_otp", label="yes", color=TERM_LINE, fontcolor=TERM_LINE)
+    s += edge("ri_try", "ri_pod", label="yes", color=TERM_LINE, fontcolor=TERM_LINE)
     s += edge("ri_try", "ri_fail", label="no", color=DANGER, fontcolor=DANGER)
-    s += edge("ri_otp", "ri_cod")
-    s += edge("ri_cod", "ri_cash", label="yes")
-    s += edge("ri_cod", "ri_deliv", label="no")
-    s += edge("ri_cash", "ri_deliv")
-    s += edge("ri_deliv", "ri_shift", label="end of shift", style="dashed")
-    s += edge("ri_shift", "ri_earn", style="dashed")
+    s += edge("ri_pod", "ri_deliv")
+    s += edge("ri_deliv", "ri_earn", label="end of shift", style="dashed")
     s += edge("ri_fail", "ri_tasks", label="next task", style="dashed", color=DANGER)
     s += "}\n"
     return s
@@ -489,7 +467,7 @@ def g_admin():
     s += f'    label="Catalog · marketing · platform"; fontname="{FONT}"; fontsize=12; style="rounded,filled"; fillcolor="#FFFBEB"; color="{A_ADMN}"; labeljust=l;\n'
     s += proc("ad_cat",  "Categories & commission\nflash sales · promotions", fill="white", line=A_ADMN)
     s += proc("ad_cms",  "CMS · broadcasts\ncampaigns", fill="white", line=A_ADMN)
-    s += proc("ad_set",  "Settings & zones\ndual-market · FX\nCOD cap · fees", fill="white", line=A_ADMN)
+    s += proc("ad_set",  "Settings & zones\ndual-market · FX\ndelivery fees", fill="white", line=A_ADMN)
     s += proc("ad_ware", "Warehouses\ncreate hub +\ncredentials", fill="white", line=A_ADMN)
     s += '    {rank=same; ad_cat; ad_cms; ad_set; ad_ware;}\n'
     s += '  }\n'

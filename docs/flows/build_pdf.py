@@ -236,7 +236,7 @@ def build():
     story += [
         B("<b>Customer Shop</b> (<font face='DJ-B'>/shop</font>) — browse, buy, track orders, returns, wallet. Also a Flutter mobile app."),
         B("<b>Seller Portal</b> (<font face='DJ-B'>/seller</font>) — list products, fulfil orders, manage finances and payouts."),
-        B("<b>Warehouse Portal</b> (<font face='DJ-B'>/warehouse</font>) — receive, sort, batch and dispatch parcels; reconcile cash."),
+        B("<b>Warehouse Portal</b> (<font face='DJ-B'>/warehouse</font>) — receive, sort, batch and dispatch parcels; handle returns and exceptions."),
         B("<b>Rider Portal</b> (<font face='DJ-B'>/rider</font>) — accept delivery tasks, navigate, capture proof of delivery. Also a Flutter app."),
         B("<b>Super Admin</b> (<font face='DJ-B'>/admin</font>) — govern the whole marketplace: approvals, money, catalog, settings, oversight."),
         B("<b>Landing &amp; Auth</b> (<font face='DJ-B'>/</font>, <font face='DJ-B'>/login</font>) — marketing entry and the shared sign-in for all 11 personas."),
@@ -250,8 +250,9 @@ def build():
           "warehouse. <b>Cross-city</b> and <b>open-box</b> delivery are supported."),
         B("<b>Commission</b> is category-tiered (<b>8–15%</b>) with seller-tier discounts; seller earnings clear "
           "after delivery + warehouse reconciliation + a <b>48-hour</b> hold."),
-        B("<b>Payments</b> — Stripe card, <b>Cash on Delivery</b> (OTP-verified, capped per market), Airtel Money "
-          "and the in-app <b>Somba Wallet</b>. Refunds go back to the original method or to the wallet."),
+        B("<b>Payments are prepaid</b> — Stripe card, Airtel Money (mobile money) and the in-app <b>Somba Wallet</b>. "
+          "<i>Cash on Delivery is not offered</i> — every order is paid before dispatch. Refunds go back to the "
+          "original method or to the wallet."),
         B("<b>Prototype scope</b> — the system runs on realistic <b>mock data</b>; there is no live backend, real "
           "payment capture or push notifications yet. The flows below describe the intended production behaviour."),
     ]
@@ -283,9 +284,8 @@ def build():
           "builds a delivery batch."),
         B("<b>Warehouse</b> assigns a rider and dispatches the batch. Order goes <b>shipped → out for delivery</b>."),
         B("<b>Rider</b> picks up, navigates to the customer and attempts delivery — the key decision point."),
-        B("On success the rider captures <b>proof of delivery</b> (OTP, photo, and cash for COD); order becomes "
+        B("On success the rider captures <b>proof of delivery</b> (OTP and photo / signature); order becomes "
           "<b>delivered</b>. On failure the reason is logged and the parcel returns for re-dispatch."),
-        B("For cash orders, the rider <b>remits collected cash</b> at the warehouse during shift reconciliation."),
         B("<b>Seller</b> earnings clear (48h) and a payout is requested; <b>Super Admin</b> approves it and it is "
           "marked <b>paid</b> — the order is fully settled."),
         B("At any point after delivery the customer may open a <b>return, exchange or dispute</b>, which the seller "
@@ -303,8 +303,8 @@ def build():
     story += [P("3. Ordering Flow", H1), Rule(FW, BRAND, 1.2), Spacer(1, 6)]
     story += [P(
         "The ordering flow is the customer’s purchase funnel — everything from opening a product to a confirmed "
-        "order. The checkout is a guided <b>four-step</b> process and the system quietly enforces market rules "
-        "(delivery fees, cash-on-delivery limits) as the customer proceeds.", LEAD)]
+        "order. The checkout is a guided <b>four-step</b> process and the system applies market rules "
+        "(such as zone delivery fees) as the customer proceeds. Every order is <b>paid up front</b>.", LEAD)]
     story += [P("Step by step", H2)]
     story += [
         B("<b>Discover &amp; add to cart</b> — from a product page the customer can pick a variant, check delivery "
@@ -315,23 +315,22 @@ def build():
         B("<b>Sign in or guest</b> — the customer can log in or check out as a guest with just an email."),
         B("<b>Step 1 · Address</b> — choosing the delivery address sets the <b>zone delivery fee</b> automatically."),
         B("<b>Step 2 · Options</b> — cross-city delivery, open-box delivery and an order note."),
-        B("<b>Step 3 · Payment</b> — card, wallet or Airtel Money. <b>Cash on Delivery</b> is offered only when the "
-          "order total is within the market cap (<b>$500</b> France / <b>$200</b> DRC); above the cap, prepaid only."),
+        B("<b>Step 3 · Payment (prepaid)</b> — the order is paid before dispatch by card, the <b>Somba Wallet</b> or "
+          "<b>Airtel Money</b> (mobile money). There is no cash-on-delivery option, so no order leaves the warehouse unpaid."),
         B("<b>Payment outcome</b> — if a payment fails the reservation is held for <b>15 minutes</b> and the "
           "customer can retry. On success the order is confirmed."),
         B("<b>Step 4 · Confirmation</b> — the order is created with status <b>processing</b> and live tracking "
           "becomes available."),
     ]
-    story += [Spacer(1, 4), P("Payment methods at a glance", H3)]
+    story += [Spacer(1, 4), P("Payment methods at a glance (all prepaid)", H3)]
     story += [chip_table(
-        [["Stripe card", "Card payment (mock Stripe element)", "Any amount"],
-         ["Somba Wallet", "Store credit; top-up via Airtel", "Up to balance"],
-         ["Airtel Money", "Mobile-money, phone-number entry", "Any amount"],
-         ["Cash on Delivery", "OTP-verified, rider collects cash", "≤ market cap"]],
-        ["Method", "Notes", "Limit"], [4.1 * cm, 8.6 * cm, 3.6 * cm])]
+        [["Stripe card", "Card payment (mock Stripe element)", "All orders"],
+         ["Somba Wallet", "Store credit; top-up via Airtel Money", "Up to balance"],
+         ["Airtel Money", "Mobile money, phone-number entry", "All orders"]],
+        ["Method", "How it works", "Availability"], [4.1 * cm, 8.6 * cm, 3.6 * cm])]
     story += [PageBreak()]
     story += fig(os.path.join(DIAG, "03_ordering.png"),
-                 "Ordering flow — browse to confirmed order, with promo, guest, COD-cap and payment-retry branches.",
+                 "Ordering flow — browse to confirmed order, with promo, guest and prepaid payment-retry branches.",
                  FIGW, 21.2 * cm, 3)
     story += [PageBreak()]
 
@@ -357,20 +356,20 @@ def build():
     story += [
         B("<b>Pick up &amp; navigate</b> — the rider collects the batch (status <b>in transit</b>) and is guided "
           "stop-by-stop, able to call the customer."),
-        B("<b>Proof of delivery</b> — on arrival the rider verifies OTP, captures a photo/signature, performs the "
-          "open-box check where required, and collects cash for COD orders."),
+        B("<b>Proof of delivery</b> — on arrival the rider verifies the OTP, captures a photo/signature and performs "
+          "the open-box check where required (orders are already paid, so no cash changes hands)."),
         B("<b>Outcome</b> — success marks the order <b>delivered</b>; a failed attempt logs a reason and the parcel "
           "is returned for re-dispatch."),
     ]
-    story += [P("Cash &amp; exceptions", H2)]
+    story += [P("Exceptions", H2)]
     story += [
-        B("<b>COD reconciliation</b> — at end of shift the rider remits cash; expected vs. collected is compared and "
-          "any <b>variance</b> is investigated and approved by a supervisor."),
+        B("<b>Incidents</b> — damage, missing items or count mismatches raise an exception that is investigated and "
+          "resolved before the parcel continues."),
         B("<b>Aged parcels</b> — anything stuck beyond ~72 hours is flagged and escalated."),
     ]
     story += [PageBreak()]
     story += fig(os.path.join(DIAG, "04_delivery.png"),
-                 "Delivery & fulfilment — warehouse intake to dispatch, then the rider’s last mile and cash reconciliation.",
+                 "Delivery & fulfilment — warehouse intake to dispatch, then the rider’s last mile to a delivered order.",
                  FIGW, 21.2 * cm, 4)
     story += [PageBreak()]
 
@@ -447,26 +446,24 @@ def build():
     story += [P(
         "The rider portal (web at <b>/rider</b> plus a Flutter app) is the delivery agent’s daily tool. It is built "
         "around a clear task lifecycle and a structured <b>proof-of-delivery</b> step that protects both the "
-        "customer and the platform — especially for cash orders.", LEAD)]
+        "customer and the platform. Because every order is prepaid, the rider never handles cash.", LEAD)]
     story += [P("A rider’s day", H2)]
     story += [
         B("<b>Sign in &amp; go on-duty</b> — on first login the rider sets a password, then toggles availability to "
           "start receiving work."),
         B("<b>Receive &amp; open tasks</b> — a <i>task-assigned</i> notification leads to the task list and a "
-          "<b>batch overview</b> showing ordered stops; each task detail shows the order, customer, COD amount and notes."),
+          "<b>batch overview</b> showing ordered stops; each task detail shows the order, customer and notes."),
         B("<b>Navigate &amp; pick up</b> — map navigation and one-tap call; the task moves "
           "<b>assigned → picked&nbsp;up → in&nbsp;transit</b>."),
-        B("<b>Proof of delivery</b> — enter the OTP and recipient, capture photo/signature, and for COD <b>tick "
-          "“cash collected”</b> (the screen will not confirm a COD delivery until cash is acknowledged). The order "
-          "becomes <b>delivered</b>."),
+        B("<b>Proof of delivery</b> — enter the OTP and recipient name, capture a photo/signature and complete the "
+          "open-box check where required. The order becomes <b>delivered</b>."),
         B("<b>Failed delivery</b> — if it cannot be completed, the rider logs a reason (customer unavailable, wrong "
-          "address, refused, payment issue) and the parcel returns to the warehouse."),
-        B("<b>End of shift</b> — a COD shift summary totals collected cash for remittance, and an earnings view shows "
-          "per-delivery pay plus incentives and shift history."),
+          "address, refused, other) and the parcel returns to the warehouse."),
+        B("<b>End of shift</b> — an earnings view shows per-delivery pay plus incentives, with shift history."),
     ]
     story += [PageBreak()]
     story += fig(os.path.join(DIAG, "07_rider.png"),
-                 "Rider portal — from going on-duty through navigation, proof of delivery and cash remittance.",
+                 "Rider portal — from going on-duty through navigation and proof of delivery to a delivered order.",
                  FIGW, 21.2 * cm, 7)
     story += [PageBreak()]
 
@@ -482,12 +479,12 @@ def build():
     story += [
         B("<b>Trust &amp; approvals</b> — approve or reject sellers; moderate products "
           "(<b>approve / reject / request changes</b>) and reviews; and triage fraud &amp; risk alerts "
-          "(COD risk, velocity, address blocks, OTP failures) through <b>open → reviewed → blocked</b>."),
+          "(velocity, address blocks, OTP failures) through <b>open → reviewed → blocked</b>."),
         B("<b>Money</b> — resolve disputes in favour of buyer or seller; authorise refunds (to original method or "
           "wallet); and approve seller payouts (<b>requested → approved → paid</b>, $10 minimum, 48-hour clearance)."),
         B("<b>Catalog, marketing &amp; platform</b> — categories and commission rules, flash sales and "
           "seller-promotion approvals, CMS homepage blocks and broadcasts; plus platform <b>settings</b> "
-          "(dual-market, FX rate, COD cap, delivery fees), delivery <b>zones</b>, and <b>warehouse</b> creation with "
+          "(dual-market, FX rate, delivery fees), delivery <b>zones</b>, and <b>warehouse</b> creation with "
           "auto-generated portal credentials."),
         B("<b>Oversight</b> — the audit log, an analytics suite (GMV, orders, sellers, SLAs, marketplace health), and "
           "read-through into orders, customers and platform finance."),
@@ -495,7 +492,7 @@ def build():
     story += [Spacer(1, 4), P("The six admin sub-roles", H3)]
     story += [chip_table(
         [["Operations", "Orders, warehouse, logistics"],
-         ["Finance", "Payouts, refunds, COD, reports"],
+         ["Finance", "Payouts, refunds, reports"],
          ["Support", "Tickets, customers, returns"],
          ["Marketing", "Campaigns, CMS, coupons, banners"],
          ["Moderation", "Products, reviews, sellers"],
