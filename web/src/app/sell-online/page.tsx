@@ -17,7 +17,6 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { useLocale } from "@/context/locale-context";
 import { BRAND } from "@/lib/config";
 import {
-  APP_LINKS,
   SELLER_PLANS,
   SELL_ONLINE_HERO,
   SELL_ONLINE_STATS,
@@ -215,7 +214,11 @@ export default function SellOnlinePage() {
                   ))}
                 </ul>
                 <Link
-                  href={plan.id === "enterprise" ? APP_LINKS.contactSupport : "/login"}
+                  href={
+                    plan.id === "enterprise"
+                      ? "/sell-online/subscribe?plan=enterprise"
+                      : `/sell-online/subscribe?plan=${plan.id}`
+                  }
                   className={cn(
                     "mt-8 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
                     plan.popular ? "btn-primary" : "border border-slate-200 hover:bg-slate-50"

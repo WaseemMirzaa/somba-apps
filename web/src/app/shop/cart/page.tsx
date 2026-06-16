@@ -41,7 +41,7 @@ export default function ShopCartPage() {
       <div className="space-y-6 py-16 text-center">
         <PageHeader title={locale === "fr" ? "Panier" : "Shopping Cart"} />
         <p className="text-slate-500">{locale === "fr" ? "Votre panier est vide" : "Your cart is empty"}</p>
-        <Link href="/shop/products" className="text-blue-600 hover:underline">
+        <Link href="/shop/products" className="text-[var(--primary)] hover:underline">
           {locale === "fr" ? "Continuer vos achats" : "Continue shopping"}
         </Link>
       </div>
@@ -61,7 +61,7 @@ export default function ShopCartPage() {
                   <Image src={item.image} alt={item.name} fill className="object-cover" sizes="80px" />
                 </Link>
                 <div className="flex-1">
-                  <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-blue-600">
+                  <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
                     {locale === "fr" ? item.nameFr : item.name}
                   </Link>
                   <p className="text-xs text-slate-500">{item.variant}</p>

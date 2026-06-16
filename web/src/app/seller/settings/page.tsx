@@ -61,7 +61,7 @@ export default function SellerSettingsPage() {
         </DetailGridSection>
       </DetailGrid>
 
-      <button onClick={() => toast("Settings saved successfully")} className="rounded-lg bg-sky-600 px-6 py-2 text-sm font-medium text-white">Save Settings</button>
+      <button onClick={() => toast("Settings saved successfully")} className="btn-primary rounded-lg px-6 py-2 text-sm font-medium">Save Settings</button>
     </div>
   );
 }

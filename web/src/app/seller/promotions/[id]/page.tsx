@@ -40,7 +40,7 @@ export default function SellerPromotionDetailPage() {
             { label: "Revenue", value: formatCurrency(promo.revenue, locale) },
             { label: "ROI", value: `${promo.roi}x` },
           ]} />
-          <Link href="/seller/analytics" className="mt-4 inline-block text-sm text-sky-600 hover:underline">Full Analytics →</Link>
+          <Link href="/seller/analytics" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">Full Analytics →</Link>
         </DetailSection>
       </div>
     </div>

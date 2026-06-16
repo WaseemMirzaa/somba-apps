@@ -17,7 +17,7 @@ export default function ShopExchangePage() {
         <div className="card-premium p-8">
           <h2 className="text-xl font-bold text-emerald-700">Exchange Requested</h2>
           <p className="mt-2 text-sm text-slate-500">EXC-2024-001 — Pickup & replacement scheduled</p>
-          <Link href="/shop/orders" className="mt-4 inline-block text-blue-600">View orders</Link>
+          <Link href="/shop/orders" className="mt-4 inline-block text-[var(--primary)]">View orders</Link>
         </div>
       </div>
     );

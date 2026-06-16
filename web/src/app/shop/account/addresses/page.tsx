@@ -64,10 +64,10 @@ export default function ShopAddressesPage() {
         {addresses.map((addr) => (
           <div key={addr.id} className="card-premium p-5">
             <div className="flex justify-between">
-              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-blue-600">(Default)</span>}</p>
+              <p className="font-semibold">{addr.label} {addr.default && <span className="text-xs text-[var(--primary)]">(Default)</span>}</p>
               <div className="flex gap-3">
                 {!addr.default && (
-                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast("Default address updated"); }} className="text-xs text-slate-500 hover:text-blue-600">Set default</button>
+                  <button onClick={() => { setAddresses((a) => a.map((item) => ({ ...item, default: item.id === addr.id }))); toast("Default address updated"); }} className="text-xs text-slate-500 hover:text-[var(--primary)]">Set default</button>
                 )}
                 <button
                   onClick={() => {
@@ -75,7 +75,7 @@ export default function ShopAddressesPage() {
                     setForm({ label: addr.label, line1: addr.line1, city: addr.city, commune: addr.commune, country: addr.country });
                     setShowAdd(false);
                   }}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-xs text-[var(--primary)] hover:underline"
                 >
                   Edit
                 </button>

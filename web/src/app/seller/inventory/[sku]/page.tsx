@@ -35,7 +35,7 @@ export default function SellerInventoryDetailPage() {
         <DetailGridSection title="Overview">
           <InfoGrid items={[
             { label: "SKU", value: item.sku },
-            { label: "Product", value: <Link href={`/seller/products/${item.productId}`} className="text-sky-600 hover:underline">{item.product}</Link> },
+            { label: "Product", value: <Link href={`/seller/products/${item.productId}`} className="text-[var(--primary)] hover:underline">{item.product}</Link> },
             { label: "Warehouse", value: item.warehouse },
             { label: "Supplier", value: item.supplier },
           ]} />
@@ -55,10 +55,10 @@ export default function SellerInventoryDetailPage() {
 
         <DetailGridSection title="Related Navigation">
           <div className="flex flex-wrap gap-3 text-sm">
-            <Link href={`/seller/products/${item.productId}`} className="text-sky-600 hover:underline">→ Product Detail</Link>
-            <Link href="/seller/orders" className="text-sky-600 hover:underline">→ Orders</Link>
-            <Link href="/seller/returns" className="text-sky-600 hover:underline">→ Returns</Link>
-            <Link href="/seller/replacements" className="text-sky-600 hover:underline">→ Replacements</Link>
+            <Link href={`/seller/products/${item.productId}`} className="text-[var(--primary)] hover:underline">→ Product Detail</Link>
+            <Link href="/seller/orders" className="text-[var(--primary)] hover:underline">→ Orders</Link>
+            <Link href="/seller/returns" className="text-[var(--primary)] hover:underline">→ Returns</Link>
+            <Link href="/seller/replacements" className="text-[var(--primary)] hover:underline">→ Replacements</Link>
           </div>
         </DetailGridSection>
 

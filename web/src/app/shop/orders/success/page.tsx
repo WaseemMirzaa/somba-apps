@@ -5,6 +5,7 @@ import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { PageLoader } from "@/components/ui/loader";
 
 function SuccessContent() {
   const params = useSearchParams();
@@ -29,7 +30,7 @@ function SuccessContent() {
 
 export default function OrderSuccessPage() {
   return (
-    <Suspense fallback={<div className="py-16 text-center">Loading...</div>}>
+    <Suspense fallback={<PageLoader className="py-16" />}>
       <SuccessContent />
     </Suspense>
   );

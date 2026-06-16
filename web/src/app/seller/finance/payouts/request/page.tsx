@@ -17,7 +17,7 @@ export default function SellerPayoutRequestPage() {
       <div className="card-premium mx-auto max-w-lg p-8 text-center">
         <h2 className="text-xl font-bold text-emerald-700">Payout Requested</h2>
         <p className="mt-2 text-sm text-slate-500">PAY-REQ-2024-089 — Processing in 2-3 business days</p>
-        <Link href="/seller/finance/payouts" className="mt-4 inline-block text-blue-600">View payouts</Link>
+        <Link href="/seller/finance/payouts" className="mt-4 inline-block text-[var(--primary)]">View payouts</Link>
       </div>
     );
   }

@@ -27,7 +27,7 @@ export default function RiderPodPage() {
 
   function confirmDelivery() {
     if (currentTask.codAmount && !codCollected) {
-      toast(locale === "fr" ? "Confirmez la collecte COD" : "Confirm COD collection");
+      toast(locale === "fr" ? "Confirmez la collecte du paiement" : "Confirm payment collection");
       return;
     }
     toast(locale === "fr" ? "Livraison confirmée" : "Delivery confirmed");
@@ -48,7 +48,7 @@ export default function RiderPodPage() {
 
       {task.codAmount && (
         <div className="card-premium border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-sm font-medium text-emerald-800">{locale === "fr" ? "Montant COD dû" : "COD Amount Due"}</p>
+          <p className="text-sm font-medium text-emerald-800">{locale === "fr" ? "Montant à collecter" : "Amount Due"}</p>
           <DualCurrency amount={task.codAmount} className="text-2xl font-bold text-emerald-700" />
           <label className="mt-3 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={codCollected} onChange={(e) => setCodCollected(e.target.checked)} />

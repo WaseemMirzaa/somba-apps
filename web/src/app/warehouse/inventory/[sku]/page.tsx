@@ -41,7 +41,7 @@ export default function WarehouseInventoryDetailPage() {
           <DetailGridSection title="Overview" span={2}>
             <InfoGrid items={[
               { label: "SKU", value: item.sku },
-              { label: "Product", value: <Link href={`/shop/products/${item.productId}`} className="text-indigo-600 hover:underline">{item.product}</Link> },
+              { label: "Product", value: <Link href={`/shop/products/${item.productId}`} className="text-[var(--primary)] hover:underline">{item.product}</Link> },
               { label: "Category", value: item.category },
               { label: "Warehouse Location", value: item.location },
             ]} />
@@ -49,9 +49,9 @@ export default function WarehouseInventoryDetailPage() {
 
           <DetailGridSection title="Related Navigation">
             <div className="flex flex-wrap gap-3">
-              <Link href={`/shop/products/${item.productId}`} className="text-sm text-indigo-600 hover:underline">→ Product Detail</Link>
-              <Link href="/warehouse/replacements" className="text-sm text-indigo-600 hover:underline">→ Replacement Cases</Link>
-              <Link href="/warehouse/dispatch" className="text-sm text-indigo-600 hover:underline">→ Dispatches</Link>
+              <Link href={`/shop/products/${item.productId}`} className="text-sm text-[var(--primary)] hover:underline">→ Product Detail</Link>
+              <Link href="/warehouse/replacements" className="text-sm text-[var(--primary)] hover:underline">→ Replacement Cases</Link>
+              <Link href="/warehouse/dispatch" className="text-sm text-[var(--primary)] hover:underline">→ Dispatches</Link>
             </div>
           </DetailGridSection>
 

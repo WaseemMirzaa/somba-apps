@@ -1,42 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { riderTasks } from "@/lib/rider-entities";
-import { cn } from "@/lib/utils";
+
+const STATUS_OPTIONS = [
+  { value: "assigned", label: "Assigned", labelFr: "Assigné" },
+  { value: "picked_up", label: "Picked up", labelFr: "Collecté" },
+  { value: "in_transit", label: "In transit", labelFr: "En transit" },
+  { value: "delivered", label: "Delivered", labelFr: "Livré" },
+];
 
 export default function RiderTasksPage() {
   const { t } = useLocale();
-  const [tab, setTab] = useState<"active" | "completed">("active");
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const activeTasks = riderTasks.filter((task) => task.status !== "delivered");
-  const completedTasks = riderTasks.filter((task) => task.status === "delivered");
-  const data = tab === "active" ? activeTasks : completedTasks;
+  const filtered = useMemo(
+    () =>
+      applyListFilters(riderTasks, filters, {
+        searchFields: ["id", "customer", "address", "type"],
+        statusField: "status",
+      }),
+    [filters]
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader title={t("activeTasks")} />
 
-      <div className="flex flex-wrap gap-2">
-        {(["active", "completed"] as const).map((tabId) => (
-          <button
-            key={tabId}
-            type="button"
-            onClick={() => setTab(tabId)}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium capitalize",
-              tab === tabId ? "bg-emerald-600 text-white" : "border border-emerald-200 text-slate-600 hover:bg-emerald-50"
-            )}
-          >
-            {tabId === "active" ? "Active" : t("completedToday")}
-          </button>
-        ))}
-      </div>
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Task ID, customer, address…"
+        showDateFilters={false}
+      />
 
       <Card>
         <CardContent className="p-0">
@@ -76,7 +81,7 @@ export default function RiderTasksPage() {
                 ),
               },
             ]}
-            data={data as unknown as Record<string, unknown>[]}
+            data={filtered as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>

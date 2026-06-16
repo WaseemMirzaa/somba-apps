@@ -8,7 +8,9 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { DataTable } from "@/components/ui/data-table";
+import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { getBatch } from "@/lib/entities";
+import { getRider, type RiderEntity } from "@/lib/warehouse-entities";
 import { useToast } from "@/context/toast-context";
 
 export default function WarehouseBatchDetailPage() {
@@ -17,11 +19,19 @@ export default function WarehouseBatchDetailPage() {
   const { toast } = useToast();
   const batch = getBatch(id);
   const [status, setStatus] = useState(batch?.status ?? "ready");
-  const [rider, setRider] = useState(batch?.rider ?? "");
-  const suggestedRiders = ["Jean Mukendi (nearest, online)", "Patrick Lumumba (Zone B)", "David Tshisekedi (busy)"];
+  const [assignedRider, setAssignedRider] = useState<RiderEntity | null>(null);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   if (!batch) {
     return <div className="p-8 text-center text-slate-500">Batch not found</div>;
+  }
+
+  const rider = assignedRider ?? getRider(batch.riderId);
+
+  function handleAssignRider(selected: RiderEntity) {
+    setAssignedRider(selected);
+    setShowAssignModal(false);
+    toast(`${selected.name} assigned to ${batch.id}`);
   }
 
   return (
@@ -37,7 +47,7 @@ export default function WarehouseBatchDetailPage() {
         ]}
         actions={
           status === "ready" ? (
-            <button onClick={() => { setStatus("dispatched"); toast(`Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">Dispatch</button>
+            <button onClick={() => { setStatus("dispatched"); toast(`Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">Dispatch</button>
           ) : null
         }
       />
@@ -52,22 +62,48 @@ export default function WarehouseBatchDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Rider Assignment (Δ6)">
-          <p className="mb-2 text-xs text-indigo-600">Auto-suggested: {suggestedRiders[0]}</p>
-          <select className="input-premium mb-3 w-full px-3 py-2 text-sm" value={rider || batch.rider} onChange={(e) => setRider(e.target.value)}>
-            {suggestedRiders.map((r) => <option key={r} value={r.split(" ")[0]}>{r}</option>)}
-          </select>
-          <button onClick={() => toast(`Auto-assigned ${suggestedRiders[0].split(" ")[0]}`)} className="text-sm text-indigo-600 hover:underline">Auto-assign nearest rider</button>
+        <DetailGridSection title="Rider Assignment">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAssignModal(true)}
+              className="btn-primary rounded-xl px-4 py-2 text-sm font-medium"
+            >
+              {assignedRider ? "Change rider" : "Assign rider"}
+            </button>
+            {!assignedRider && (
+              <button
+                type="button"
+                onClick={() => {
+                  const nearest = getRider(batch.riderId);
+                  if (nearest) {
+                    setAssignedRider(nearest);
+                    toast(`Auto-assigned ${nearest.name}`);
+                  }
+                }}
+                className="text-sm text-[var(--primary)] hover:underline"
+              >
+                Auto-assign nearest rider
+              </button>
+            )}
+          </div>
+          {rider ? (
+            <>
           <InfoGrid items={[
-            { label: "Name", value: rider || batch.rider },
-            { label: "Phone", value: batch.riderPhone },
-            { label: "Vehicle", value: batch.vehicle },
-            { label: "Performance", value: "94%" },
+            { label: "Name", value: rider.name },
+            { label: "Phone", value: rider.phone },
+            { label: "Vehicle", value: rider.vehicle },
+            { label: "Zone", value: rider.zone },
+            { label: "Performance", value: `${rider.performanceScore}%` },
           ]} />
           <div className="mt-4 flex gap-3">
-            <Link href={`/warehouse/riders/${batch.riderId}`} className="text-sm text-indigo-600 hover:underline">Open Rider →</Link>
-            <a href={`tel:${batch.riderPhone}`} className="text-sm text-slate-500 hover:text-indigo-600">Call Rider</a>
+            <Link href={`/warehouse/riders/${rider.id}`} className="text-sm text-[var(--primary)] hover:underline">Open Rider →</Link>
+            <a href={`tel:${rider.phone}`} className="text-sm text-slate-500 hover:text-[var(--primary)]">Call Rider</a>
           </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">No rider assigned yet. Search and assign a rider.</p>
+          )}
         </DetailGridSection>
 
         <DetailGridSection title="Route">
@@ -85,12 +121,12 @@ export default function WarehouseBatchDetailPage() {
           <DataTable
             columns={[
               { key: "parcelId", label: "Parcel ID", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-indigo-600 hover:underline">{String(row.parcelId)}</Link>
+                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
               )},
               { key: "orderId", label: "Order ID" },
               { key: "customer", label: "Customer" },
               { key: "actions", label: "Action", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-indigo-600 hover:underline">Open</Link>
+                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-[var(--primary)] hover:underline">Open</Link>
               )},
             ]}
             data={batch.parcels as unknown as Record<string, unknown>[]}
@@ -101,6 +137,15 @@ export default function WarehouseBatchDetailPage() {
           <ActivityTimeline events={batch.timeline} />
         </DetailGridSection>
       </DetailGrid>
+
+      <AssignRiderModal
+        open={showAssignModal}
+        title="Assign rider to batch"
+        subtitle={`${batch.id} · ${batch.zone} · ${batch.parcelCount} parcels`}
+        selectedRiderId={assignedRider?.id ?? batch.riderId}
+        onClose={() => setShowAssignModal(false)}
+        onConfirm={handleAssignRider}
+      />
     </div>
   );
 }

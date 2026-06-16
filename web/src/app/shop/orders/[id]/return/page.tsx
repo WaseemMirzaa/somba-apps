@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getOrder } from "@/lib/entities";
 import { useLocale } from "@/context/locale-context";
+import { formatPaymentMethod } from "@/lib/utils";
 
 const reasons = [
   "Defective or damaged item",
@@ -18,7 +19,7 @@ const reasons = [
 
 export default function ShopOrderReturnPage() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -41,7 +42,7 @@ export default function ShopOrderReturnPage() {
           <p className="mt-2 text-sm text-slate-500">
             Reference: RET-{id} — Pickup scheduled within 2 business days.
           </p>
-          <Link href={`/shop/orders/${id}`} className="mt-6 inline-block text-sm font-semibold text-blue-600">
+          <Link href={`/shop/orders/${id}`} className="mt-6 inline-block text-sm font-semibold text-[var(--primary)]">
             ← Back to order
           </Link>
         </div>
@@ -66,7 +67,7 @@ export default function ShopOrderReturnPage() {
         {[1, 2, 3].map((s) => (
           <div
             key={s}
-            className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-blue-600" : "bg-slate-200"}`}
+            className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-[var(--primary)]" : "bg-slate-200"}`}
           />
         ))}
       </div>
@@ -76,7 +77,7 @@ export default function ShopOrderReturnPage() {
           <h3 className="font-semibold text-slate-900">Select items to return</h3>
           {order.items.map((item) => (
             <label key={item.sku} className="flex items-center gap-4 rounded-xl border border-[var(--border)] p-4 cursor-pointer hover:border-blue-200">
-              <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+              <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300 text-[var(--primary)]" />
               <div className="flex-1">
                 <p className="font-medium text-slate-900">{item.name}</p>
                 <p className="text-xs text-slate-500">Qty: {item.qty}</p>
@@ -98,7 +99,7 @@ export default function ShopOrderReturnPage() {
                 value={r}
                 checked={reason === r}
                 onChange={() => setReason(r)}
-                className="h-4 w-4 text-blue-600"
+                className="h-4 w-4 text-[var(--primary)]"
               />
               <span className="text-sm text-slate-700">{r}</span>
             </label>
@@ -116,7 +117,7 @@ export default function ShopOrderReturnPage() {
           <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
             <p><strong>Order:</strong> {order.id}</p>
             <p><strong>Reason:</strong> {reason}</p>
-            <p><strong>Refund method:</strong> Original payment ({order.paymentMethod})</p>
+            <p><strong>Refund method:</strong> Original payment ({formatPaymentMethod(order.paymentMethod, locale)})</p>
             <p className="mt-2 text-xs text-slate-500">Pickup from: {order.customerAddress}</p>
           </div>
           <div className="flex gap-3">

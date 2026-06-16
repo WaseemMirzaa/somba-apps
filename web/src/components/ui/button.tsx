@@ -5,7 +5,7 @@ const variants = {
   secondary: "bg-white border border-[var(--border-strong)] text-slate-700 hover:bg-slate-50 shadow-sm",
   ghost: "text-slate-600 hover:bg-slate-100",
   danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
-  outline: "border-2 border-blue-600 text-blue-700 hover:bg-blue-50",
+  outline: "border-2 border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary-light)]",
 };
 
 const sizes = {

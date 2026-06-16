@@ -425,7 +425,7 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     ],
     questions: [
       { q: "Is this original?", a: "Yes, 100% authentic with warranty.", author: "Seller" },
-      { q: "COD available?", a: "Yes, cash on delivery is available.", author: "Seller" },
+      { q: "Pay at delivery available?", a: "Yes, pay at delivery is available on eligible items.", author: "Seller" },
     ],
   };
 });

@@ -24,7 +24,7 @@ export function PageHeader({
             {backHref && (
               <Link
                 href={backHref}
-                className="mt-1 rounded-xl border border-[var(--border)] bg-white p-2.5 text-slate-500 shadow-sm transition-colors hover:border-blue-200 hover:text-blue-600"
+                className="mt-1 rounded-xl border border-[var(--border)] bg-white p-2.5 text-slate-500 shadow-sm transition-colors hover:border-blue-200 hover:text-[var(--primary)]"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Link>

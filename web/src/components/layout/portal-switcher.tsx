@@ -33,7 +33,7 @@ export function PortalSwitcher({ compact }: { compact?: boolean }) {
             className={cn(
               "whitespace-nowrap rounded-lg px-3 py-1.5 font-medium transition-all duration-150",
               active
-                ? "bg-white text-blue-700 shadow-sm"
+                ? "bg-white text-[var(--primary)] shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
             )}
           >

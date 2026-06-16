@@ -1,7 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 import { INITIAL_WAREHOUSES, warehousePersonaId } from "@/lib/warehouses-admin";
+import {
+  WAREHOUSE_STAFF_ROLE_LABELS,
+  warehouseStaffPersonaId,
+} from "@/lib/admin-entities";
+import { useWarehouseStaff } from "@/context/warehouse-staff-context";
 
 export type Persona = {
   id: string;
@@ -27,7 +32,7 @@ const STATIC_PERSONAS: Persona[] = [
   { id: "rider-1", role: "rider", name: "Jean Mukendi", email: "rider@somba.com", portal: "/rider" },
 ];
 
-function buildWarehousePersonas(): Persona[] {
+function buildWarehouseManagerPersonas(): Persona[] {
   return INITIAL_WAREHOUSES.filter((w) => w.status === "active").map((w) => ({
     id: warehousePersonaId(w.id),
     role: "warehouse" as const,
@@ -39,10 +44,12 @@ function buildWarehousePersonas(): Persona[] {
   }));
 }
 
-export const PERSONAS: Persona[] = [...STATIC_PERSONAS, ...buildWarehousePersonas()];
+/** Static fallback for modules that import PERSONAS before provider mounts */
+export const PERSONAS: Persona[] = [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas()];
 
 type AuthContextType = {
   persona: Persona;
+  personas: Persona[];
   isAuthenticated: boolean;
   authReady: boolean;
   login: (personaId: string) => void;
@@ -54,28 +61,47 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const STORAGE_KEY = "somba-persona-id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [persona, setPersona] = useState<Persona>(PERSONAS[0]);
+  const { staff } = useWarehouseStaff();
+  const [persona, setPersona] = useState<Persona>(STATIC_PERSONAS[0]);
   const [authReady, setAuthReady] = useState(false);
+
+  const personas = useMemo(() => {
+    const staffPersonas: Persona[] = staff
+      .filter((s) => s.status === "active")
+      .map((s) => ({
+        id: warehouseStaffPersonaId(s.id),
+        role: "warehouse" as const,
+        name: s.name,
+        email: s.email,
+        portal: "/warehouse",
+        subRole: WAREHOUSE_STAFF_ROLE_LABELS[s.role],
+        warehouseId: s.warehouseId,
+      }));
+    return [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas(), ...staffPersonas];
+  }, [staff]);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const p = PERSONAS.find((x) => x.id === stored);
+      const p = personas.find((x) => x.id === stored);
       if (p) setPersona(p);
     }
     setAuthReady(true);
-  }, []);
+  }, [personas]);
 
-  const login = useCallback((personaId: string) => {
-    const p = PERSONAS.find((x) => x.id === personaId);
-    if (p) {
-      setPersona(p);
-      localStorage.setItem(STORAGE_KEY, personaId);
-    }
-  }, []);
+  const login = useCallback(
+    (personaId: string) => {
+      const p = personas.find((x) => x.id === personaId);
+      if (p) {
+        setPersona(p);
+        localStorage.setItem(STORAGE_KEY, personaId);
+      }
+    },
+    [personas]
+  );
 
   const logout = useCallback(() => {
-    setPersona(PERSONAS[0]);
+    setPersona(STATIC_PERSONAS[0]);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
@@ -85,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         persona,
+        personas,
         isAuthenticated: persona.role !== "guest",
         authReady,
         login,

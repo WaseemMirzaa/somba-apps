@@ -47,7 +47,7 @@ export default function AdminRolesPage() {
                     toast(`Editing ${role.name} permissions`, "info");
                   }
                 }}
-                className="mt-4 text-sm font-medium text-blue-600 hover:underline"
+                className="mt-4 text-sm font-medium text-[var(--primary)] hover:underline"
               >
                 {editingRole === role.id ? "Save permissions" : "Edit permissions"}
               </button>

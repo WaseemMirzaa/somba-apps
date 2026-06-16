@@ -67,10 +67,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         </Button>
       </div>
       <div className="text-center text-sm text-slate-500">
-        {mode === "login" && <Link href="/shop/forgot" className="text-blue-600">{fr ? "Mot de passe oublié ?" : "Forgot password?"}</Link>}
+        {mode === "login" && <Link href="/shop/forgot" className="text-[var(--primary)]">{fr ? "Mot de passe oublié ?" : "Forgot password?"}</Link>}
         {mode === "login" && " · "}
-        {mode === "login" && <Link href="/shop/register" className="text-blue-600">{fr ? "Créer un compte" : "Create account"}</Link>}
-        {mode === "register" && <Link href="/shop/login" className="text-blue-600">{fr ? "Déjà un compte ?" : "Already have an account?"}</Link>}
+        {mode === "login" && <Link href="/shop/register" className="text-[var(--primary)]">{fr ? "Créer un compte" : "Create account"}</Link>}
+        {mode === "register" && <Link href="/shop/login" className="text-[var(--primary)]">{fr ? "Déjà un compte ?" : "Already have an account?"}</Link>}
       </div>
     </div>
   );

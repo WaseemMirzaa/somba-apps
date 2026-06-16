@@ -20,7 +20,7 @@ type BrandMarkProps = {
 export function BrandMark({ tone = "dark", full = false, iconOnly = false, className, wordClassName }: BrandMarkProps) {
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] shadow-md shadow-[var(--primary)]/25">
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[var(--logo-primary)] to-[var(--logo-primary-dark)] shadow-md shadow-[var(--logo-primary)]/25">
         <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.4} />
         <span className="absolute right-0 top-0 h-full w-[5px] bg-[var(--brand-red)]" aria-hidden />
       </span>
@@ -28,7 +28,7 @@ export function BrandMark({ tone = "dark", full = false, iconOnly = false, class
         <span
           className={cn(
             "font-[family-name:var(--font-display)] text-xl font-extrabold tracking-tight",
-            tone === "light" ? "text-white" : "text-[var(--primary)]",
+            tone === "light" ? "text-white" : "text-[var(--logo-primary)]",
             wordClassName
           )}
         >

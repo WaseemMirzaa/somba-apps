@@ -56,7 +56,7 @@ export default function ShopCheckoutPage() {
         <div className="card-premium p-4">
           <p className="text-sm font-medium">{locale === "fr" ? "Achat invité activé" : "Guest checkout enabled"}</p>
           <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder="Email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
-          <Link href="/shop/login" className="mt-2 inline-block text-xs text-blue-600">{locale === "fr" ? "Se connecter" : "Sign in"}</Link>
+          <Link href="/shop/login" className="mt-2 inline-block text-xs text-[var(--primary)]">{locale === "fr" ? "Se connecter" : "Sign in"}</Link>
         </div>
       )}
 
@@ -68,11 +68,11 @@ export default function ShopCheckoutPage() {
               <div>
                 <p className="font-medium">{a.label}</p>
                 <p className="text-sm text-slate-500">{a.address}, {a.commune}, {a.city}</p>
-                <p className="text-xs text-blue-600">{profile.zones.find((z) => z.id === a.zoneId)?.name ?? a.zoneId}</p>
+                <p className="text-xs text-[var(--primary)]">{profile.zones.find((z) => z.id === a.zoneId)?.name ?? a.zoneId}</p>
               </div>
             </label>
           ))}
-          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-blue-600 hover:underline">+ Add address</button>
+          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-[var(--primary)] hover:underline">+ Add address</button>
         </div>
       </DetailSection>
 

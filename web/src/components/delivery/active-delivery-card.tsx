@@ -1,0 +1,201 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { ChevronDown, Phone } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { InfoGrid } from "@/components/ui/info-grid";
+import { ActivityTimeline } from "@/components/ui/timeline";
+import { formatCurrency } from "@/lib/utils";
+import type { DeliveryDetailData } from "@/lib/delivery-detail";
+import { cn } from "@/lib/utils";
+
+type ActiveDeliveryCardProps = {
+  delivery: DeliveryDetailData;
+  locale: "en" | "fr";
+  defaultExpanded?: boolean;
+  alwaysExpanded?: boolean;
+  showDetailLink?: boolean;
+  linkClass?: string;
+};
+
+export function ActiveDeliveryCard({
+  delivery,
+  locale,
+  defaultExpanded = false,
+  alwaysExpanded = false,
+  showDetailLink = false,
+  linkClass = "text-[var(--primary)]",
+}: ActiveDeliveryCardProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded || alwaysExpanded);
+  const fr = locale === "fr";
+  const productSummary = delivery.products.map((p) => p.name).join(", ");
+  const isExpanded = alwaysExpanded || expanded;
+
+  const phoneLinkClass = cn("inline-flex items-center gap-1 hover:underline", linkClass);
+
+  const detailBody = (
+    <div className={cn("space-y-4", !alwaysExpanded && "border-t border-[var(--border)] px-4 pb-4 pt-4")}>
+      <InfoGrid
+        items={[
+          { label: fr ? "Commande" : "Order ID", value: delivery.orderId },
+          { label: fr ? "Zone" : "Zone", value: delivery.zone },
+          { label: fr ? "Paiement" : "Payment", value: delivery.paymentType },
+          {
+            label: fr ? "Montant à collecter" : "Amount due",
+            value: delivery.codAmount
+              ? formatCurrency(delivery.codAmount, locale)
+              : fr ? "Non applicable" : "N/A",
+          },
+          ...(delivery.currentStop != null && delivery.totalStops != null
+            ? [{
+                label: fr ? "Arrêt" : "Stop",
+                value: `${delivery.currentStop} / ${delivery.totalStops}`,
+              }]
+            : []),
+        ]}
+      />
+
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {fr ? "Client" : "Customer"}
+        </h4>
+        <InfoGrid
+          items={[
+            { label: fr ? "Nom" : "Name", value: delivery.customer.name },
+            {
+              label: fr ? "Téléphone" : "Phone",
+              value: (
+                <a href={`tel:${delivery.customer.phone.replace(/\s/g, "")}`} className={phoneLinkClass}>
+                  <Phone className="h-3.5 w-3.5" />
+                  {delivery.customer.phone}
+                </a>
+              ),
+            },
+            { label: fr ? "Adresse" : "Address", value: delivery.customer.address, full: true },
+            ...(delivery.customer.id != null
+              ? [{ label: "ID", value: delivery.customer.id }]
+              : []),
+          ]}
+        />
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {fr ? "Vendeur" : "Seller"}
+        </h4>
+        <InfoGrid
+          items={[
+            { label: fr ? "Nom" : "Name", value: delivery.seller.name },
+            { label: fr ? "Boutique" : "Store", value: delivery.seller.store },
+            {
+              label: fr ? "Téléphone" : "Phone",
+              value: (
+                <a href={`tel:${delivery.seller.phone.replace(/\s/g, "")}`} className={phoneLinkClass}>
+                  <Phone className="h-3.5 w-3.5" />
+                  {delivery.seller.phone}
+                </a>
+              ),
+            },
+            ...(delivery.seller.id != null
+              ? [{ label: "ID", value: delivery.seller.id }]
+              : []),
+          ]}
+        />
+      </div>
+
+      {delivery.products.length > 0 && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {fr ? "Produits" : "Products"}
+          </h4>
+          <div className="space-y-2">
+            {delivery.products.map((item) => (
+              <div
+                key={item.sku}
+                className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-2"
+              >
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg">
+                  <Image src={item.image} alt={item.name} fill className="object-cover" sizes="48px" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
+                  <p className="text-xs text-slate-500">
+                    SKU: {item.sku} · {item.variant} · Qty {item.qty}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {delivery.timeline.length > 0 && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {fr ? "Suivi" : "Timeline"}
+          </h4>
+          <ActivityTimeline events={delivery.timeline} />
+        </div>
+      )}
+
+      {showDetailLink && delivery.detailHref && (
+        <p className="text-xs text-slate-400">
+          {fr ? "Voir détail complet :" : "Full detail:"}{" "}
+          <Link href={delivery.detailHref} className={cn("hover:underline", linkClass)}>
+            {delivery.id}
+          </Link>
+        </p>
+      )}
+    </div>
+  );
+
+  if (alwaysExpanded) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-white p-4">
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900">{delivery.orderId}</span>
+            <Badge>{delivery.status.replace(/_/g, " ")}</Badge>
+            <Badge variant="primary">ETA {delivery.eta}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">{delivery.customer.name}</p>
+          <p className="text-xs text-slate-500">{delivery.customer.address}</p>
+          {productSummary && (
+            <p className="mt-1 text-xs text-slate-400">{productSummary}</p>
+          )}
+        </div>
+        {detailBody}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-white">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-start gap-3 p-4 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900">{delivery.orderId}</span>
+            <Badge>{delivery.status.replace(/_/g, " ")}</Badge>
+            <Badge variant="primary">ETA {delivery.eta}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">{delivery.customer.name}</p>
+          <p className="text-xs text-slate-500">{delivery.customer.address}</p>
+          {!isExpanded && productSummary && (
+            <p className="mt-1 truncate text-xs text-slate-400">{productSummary}</p>
+          )}
+        </div>
+        <ChevronDown
+          className={cn("mt-1 h-5 w-5 shrink-0 text-slate-400 transition-transform", isExpanded && "rotate-180")}
+        />
+      </button>
+
+      {isExpanded && detailBody}
+    </div>
+  );
+}

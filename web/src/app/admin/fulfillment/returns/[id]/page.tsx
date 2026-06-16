@@ -1,2 +1,2 @@
 "use client";
-export { default } from "@/app/warehouse/returns/[id]/page";
+export { default } from "@/app/admin/returns/[id]/page";

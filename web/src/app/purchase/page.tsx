@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { BRAND } from "@/lib/config";
+import { InlineLoader } from "@/components/ui/loader";
 
 /** Legacy route — redirects sellers to homepage pricing; shoppers to shop */
 export default function PurchasePage() {
@@ -20,7 +21,11 @@ export default function PurchasePage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4 text-center">
-      <p className="text-sm text-slate-500">{fr ? "Redirection…" : "Redirecting…"}</p>
+      <InlineLoader
+        locale={locale}
+        label="Redirecting…"
+        labelFr="Redirection…"
+      />
       <h1 className="mt-4 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
         {fr ? `Vendre sur ${BRAND.fullName}` : `Sell on ${BRAND.fullName}`}
       </h1>

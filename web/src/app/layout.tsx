@@ -3,10 +3,10 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/context/locale-context";
 import { AuthProvider } from "@/context/auth-context";
-import { ThemeProvider } from "@/context/theme-context";
 import { ToastProvider } from "@/context/toast-context";
 import { ShopProvider } from "@/context/shop-context";
 import { WarehouseAdminProvider } from "@/context/warehouse-admin-context";
+import { WarehouseStaffProvider } from "@/context/warehouse-staff-context";
 import { SellerSubscriptionProvider } from "@/context/seller-subscription-context";
 import { MarketProvider } from "@/context/market-context";
 import { NotificationProvider } from "@/context/notification-context";
@@ -34,9 +34,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
-        <ThemeProvider>
-          <LocaleProvider>
-            <MarketProvider>
+        <LocaleProvider>
+          <MarketProvider>
+            <WarehouseStaffProvider>
               <AuthProvider>
                 <NotificationProvider>
                   <DisputeProvider>
@@ -50,9 +50,9 @@ export default function RootLayout({
                   </DisputeProvider>
                 </NotificationProvider>
               </AuthProvider>
-            </MarketProvider>
-          </LocaleProvider>
-        </ThemeProvider>
+            </WarehouseStaffProvider>
+          </MarketProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

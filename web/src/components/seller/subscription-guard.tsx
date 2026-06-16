@@ -3,12 +3,15 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
 import { useSellerSubscription } from "@/context/seller-subscription-context";
+import { PageLoader } from "@/components/ui/loader";
 
 export function SellerSubscriptionGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { persona } = useAuth();
+  const { locale } = useLocale();
   const { hasActiveSubscription, subscriptionReady } = useSellerSubscription();
 
   const isSubscribeRoute = pathname === "/seller/subscribe" || pathname.startsWith("/seller/subscribe/");
@@ -23,18 +26,16 @@ export function SellerSubscriptionGuard({ children }: { children: React.ReactNod
   }, [needsSubscription, subscribed, router, subscriptionReady]);
 
   if (!subscriptionReady) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Loading…
-      </div>
-    );
+    return <PageLoader locale={locale} />;
   }
 
   if (needsSubscription && !subscribed) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Checking subscription…
-      </div>
+      <PageLoader
+        locale={locale}
+        label="Checking subscription…"
+        labelFr="Vérification de l'abonnement…"
+      />
     );
   }
 

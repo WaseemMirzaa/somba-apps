@@ -22,7 +22,7 @@ export default function AdminCategoriesPage() {
         {items.map((c) => (
           <div key={c.id} className="card-premium flex items-center justify-between p-4">
             <span>{fr ? c.nameFr : c.name} {c.icon}</span>
-            <button onClick={() => toast("Edit")} className="text-sm text-blue-600">{fr ? "Modifier" : "Edit"}</button>
+            <button onClick={() => toast("Edit")} className="text-sm text-[var(--primary)]">{fr ? "Modifier" : "Edit"}</button>
           </div>
         ))}
       </div>

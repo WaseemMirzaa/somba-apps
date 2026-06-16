@@ -1,5 +1,6 @@
 import { products } from "./mock-data";
 import { orderEntities, sellerProductDetails } from "./entities";
+import { INITIAL_WAREHOUSES } from "./warehouses-admin";
 
 // ─── Store & Dashboard ───────────────────────────────────────────────────────
 
@@ -113,49 +114,190 @@ export const sellerOrderList = orderEntities
     warehouse: o.warehouse,
     pickupRider: o.rider,
     trackingStatus: o.status,
+    trackingNumber: o.trackingNumber,
     pickupEta: "14:00",
+    deliveryEta: o.status === "delivered" ? "20:00" : "—",
     items_detail: o.items,
     timeline: [
-      { time: `${o.date} 09:00`, label: "Placed", done: true },
-      { time: `${o.date} 09:30`, label: "Confirmed", done: o.status !== "pending" },
-      { time: `${o.date} 11:00`, label: "Packed", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 12:00`, label: "Ready", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 14:00`, label: "Picked Up", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 16:00`, label: "Warehouse", done: ["processing", "delivered"].includes(o.status) },
-      { time: `${o.date} 18:00`, label: "Dispatched", done: o.status === "delivered" },
-      { time: `${o.date} 20:00`, label: "Delivered", done: o.status === "delivered" },
+      { time: `${o.date} 09:00`, label: "Placed", labelFr: "Commandée", done: true },
+      { time: `${o.date} 09:30`, label: "Confirmed", labelFr: "Confirmée", done: o.status !== "pending" },
+      { time: `${o.date} 11:00`, label: "Packed", labelFr: "Emballée", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 12:00`, label: "Ready for pickup", labelFr: "Prête pour enlèvement", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 14:00`, label: "Picked up", labelFr: "Collectée", detail: "Rider collected from seller", detailFr: "Collectée chez le vendeur", done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 16:00`, label: "At warehouse", labelFr: "À l'entrepôt", detail: o.warehouse, done: ["processing", "delivered"].includes(o.status) },
+      { time: `${o.date} 18:00`, label: "Dispatched", labelFr: "Expédiée", done: o.status === "delivered" },
+      { time: `${o.date} 20:00`, label: "Delivered", labelFr: "Livrée", done: o.status === "delivered" },
     ],
   }));
 
 // ─── Shipping ──────────────────────────────────────────────────────────────────
 
-export const shipmentList = sellerOrderList
+const SHIPPING_STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  ready: "Prêt pour enlèvement",
+  picked_up: "Collecté",
+  in_transit: "En transit",
+  delivered: "Livré",
+};
+
+const RIDER_LOCATIONS: Record<string, { en: string; fr: string }> = {
+  ready: { en: "En route to seller — Gombe", fr: "En route vers le vendeur — Gombe" },
+  picked_up: { en: "In transit to warehouse", fr: "En transit vers l'entrepôt" },
+  in_transit: { en: "At Kinshasa Hub — Sorting", fr: "Au Hub Kinshasa — Tri" },
+  delivered: { en: "Kinshasa Hub — Receiving dock", fr: "Hub Kinshasa — Quai réception" },
+};
+
+export type ShipmentTimelineEvent = {
+  time: string;
+  label: string;
+  labelFr: string;
+  detail?: string;
+  detailFr?: string;
+  done?: boolean;
+};
+
+export type ShipmentDetail = {
+  id: string;
+  orderId: string;
+  status: string;
+  statusFr: string;
+  createdDate: string;
+  carrier: string;
+  carrierFr: string;
+  method: string;
+  methodFr: string;
+  trackingNumber: string;
+  pickupEta: string;
+  deliveryEta: string;
+  pickupTime: string;
+  warehouse: {
+    id: string;
+    name: string;
+    address: string;
+    contact: string;
+    phone: string;
+    zone: string;
+  };
+  rider: {
+    name: string;
+    phone: string;
+    vehicle: string;
+    vehicleFr: string;
+    zone: string;
+    currentLocation: string;
+    currentLocationFr: string;
+  };
+  customer: {
+    name: string;
+    phone: string;
+    address: string;
+    city: string;
+  };
+  seller: {
+    storeName: string;
+    phone: string;
+  };
+  products: (typeof sellerOrderList)[number]["items_detail"];
+  timeline: ShipmentTimelineEvent[];
+};
+
+function warehouseInfo(name: string) {
+  const wh = INITIAL_WAREHOUSES.find((w) => w.name === name);
+  if (!wh) {
+    return {
+      id: "—",
+      name,
+      address: "—",
+      contact: "—",
+      phone: "—",
+      zone: "Zone A",
+    };
+  }
+  return {
+    id: wh.id,
+    name: wh.name,
+    address: `${wh.address}, ${wh.city}, ${wh.country}`,
+    contact: wh.managerName,
+    phone: "+243 820 100 200",
+    zone: wh.zones[0] ?? "Zone A",
+  };
+}
+
+function buildShipmentDetail(order: (typeof sellerOrderList)[number]): ShipmentDetail {
+  const status = order.shippingStatus;
+  const riderLoc = RIDER_LOCATIONS[status] ?? RIDER_LOCATIONS.ready;
+  const wh = warehouseInfo(order.warehouse);
+
+  return {
+    id: `SHP-${order.id.replace("ORD-", "")}`,
+    orderId: order.id,
+    status,
+    statusFr: SHIPPING_STATUS_FR[status] ?? status,
+    createdDate: order.date,
+    carrier: "Somba Logistics",
+    carrierFr: "Somba Logistique",
+    method: "Hub pickup → last mile",
+    methodFr: "Collecte hub → dernier km",
+    trackingNumber: order.trackingNumber,
+    pickupEta: order.pickupEta,
+    deliveryEta: order.deliveryEta,
+    pickupTime: `${order.date} ${order.pickupEta}`,
+    warehouse: wh,
+    rider: {
+      name: order.pickupRider,
+      phone: "+243 99 111 2233",
+      vehicle: "Motorcycle — Honda CB150",
+      vehicleFr: "Moto — Honda CB150",
+      zone: "Kinshasa — Gombe",
+      currentLocation: riderLoc.en,
+      currentLocationFr: riderLoc.fr,
+    },
+    customer: {
+      name: order.customer,
+      phone: order.customerPhone,
+      address: order.customerAddress,
+      city: order.customerCity,
+    },
+    seller: {
+      storeName: sellerStore.name,
+      phone: "+1 555 123 4567",
+    },
+    products: order.items_detail,
+    timeline: order.timeline as ShipmentTimelineEvent[],
+  };
+}
+
+export const shipmentList: ShipmentDetail[] = sellerOrderList
   .filter((o) => o.shippingStatus !== "pending")
-  .map((o, i) => ({
-    id: `SHP-${o.id.replace("ORD-", "")}`,
-    orderId: o.id,
-    rider: o.pickupRider,
-    riderPhone: "+243 99 111 2233",
-    vehicle: "Motorcycle",
-    warehouse: o.warehouse,
-    zone: "Zone A",
-    status: o.shippingStatus,
-    pickupTime: o.date + " 14:00",
-    timeline: o.timeline,
-  }));
+  .map(buildShipmentDetail);
 
 // ─── Returns ─────────────────────────────────────────────────────────────────
 
 export const sellerReturnList = [
   {
     id: "RET-001", orderId: "ORD-2024-001", customer: "Marie Dubois", reason: "Wrong size",
-    amount: 129, status: "pending", productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
-    inspection: { warehouseNotes: "Good condition", photos: 2, condition: "Unopened" },
-    refund: { amount: 129, method: "Wallet", status: "pending" },
+    amount: 129, status: "pending_inspection", productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
+    inspection: { warehouseNotes: "Good condition — unopened box", photos: 2, condition: "Unopened" },
+    refund: { amount: 129, method: "Somba Wallet", status: "pending" },
     timeline: [
-      { time: "2024-06-05", label: "Requested", done: true },
-      { time: "2024-06-06", label: "Approved", done: true },
-      { time: "—", label: "Refunded", done: false },
+      { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
+      { time: "2024-06-05 10:15", label: "Return Requested", done: true },
+      { time: "2024-06-05 14:30", label: "Return Approved", done: true },
+      { time: "2024-06-06 09:00", label: "Pickup Scheduled", done: true },
+      { time: "—", label: "Refund Processed", done: false },
+    ],
+  },
+  {
+    id: "RET-002", orderId: "ORD-2024-004", customer: "Ahmed Hassan", reason: "Damaged item",
+    amount: 649, status: "inspecting", productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
+    inspection: { warehouseNotes: "Box crushed, motor noise", photos: 4, condition: "Damaged" },
+    refund: { amount: 649, method: "Original Payment", status: "pending" },
+    timeline: [
+      { time: "2024-06-02 18:30", label: "Order Delivered", done: true },
+      { time: "2024-06-04 11:20", label: "Return Requested", done: true },
+      { time: "2024-06-05 14:20", label: "Received at Warehouse", done: true },
+      { time: "2024-06-06 10:00", label: "Inspecting", done: true },
+      { time: "—", label: "Refund Processed", done: false },
     ],
   },
 ];
@@ -208,7 +350,68 @@ export const sellerFinanceStats = {
   availableBalance: 12450,
   commissionPaid: 45600,
   refundAmount: 890,
+  revenueTrend: "+12.4% MTD",
+  pendingTrend: "3 orders clearing",
+  balanceTrend: "Ready to withdraw",
+  commissionTrend: "12% avg rate",
+  refundTrend: "-4.2% vs last month",
 };
+
+export const sellerFinanceWallet = {
+  availableBalance: 12450,
+  pendingClearance: 2250,
+  pendingPayout: 8500,
+  reservedForRefunds: 320,
+  totalBalance: 23520,
+  currency: "USD",
+  lastUpdated: "2024-06-08 14:32",
+};
+
+export const sellerFinanceTaxSummary = {
+  businessName: "TechZone Solutions SARL",
+  taxId: "CD-123456789",
+  ytdGross: 894320,
+  ytdNet: 786980,
+  ytdCommission: 107340,
+  ytdRefunds: 8900,
+  lastStatement: "2024-05",
+  nextStatement: "2024-07-01",
+};
+
+export const sellerFinanceRevenueByPeriod = [
+  { period: "Today", periodFr: "Aujourd'hui", gross: 4521, net: 3978, commission: 543, orders: 23 },
+  { period: "This week", periodFr: "Cette semaine", gross: 28400, net: 24992, commission: 3408, orders: 186 },
+  { period: "Last week", periodFr: "Semaine dernière", gross: 26100, net: 22968, commission: 3132, orders: 172 },
+  { period: "MTD", periodFr: "Mois en cours", gross: 89432, net: 78698, commission: 10734, orders: 612 },
+  { period: "Last month", periodFr: "Mois dernier", gross: 78200, net: 68816, commission: 9384, orders: 548 },
+];
+
+export const sellerFinanceRevenueByCategory = [
+  { category: "Smartphones", categoryFr: "Smartphones", gross: 412000, net: 362560, commission: 49440, orders: 892, rate: 12 },
+  { category: "Audio", categoryFr: "Audio", gross: 186000, net: 163680, commission: 22320, orders: 1240, rate: 12 },
+  { category: "Accessories", categoryFr: "Accessoires", gross: 142000, net: 124960, commission: 17040, orders: 2100, rate: 12 },
+  { category: "Wearables", categoryFr: "Objets connectés", gross: 98000, net: 86240, commission: 11760, orders: 680, rate: 12 },
+  { category: "Other", categoryFr: "Autre", gross: 56320, net: 49562, commission: 6758, orders: 420, rate: 12 },
+];
+
+export const sellerCommissionByTier = [
+  { tier: "Electronics — Gold", tierFr: "Électronique — Or", category: "Electronics", rate: 10, gross: 412000, commission: 41200, orders: 892 },
+  { tier: "Audio — Gold", tierFr: "Audio — Or", category: "Audio", rate: 10, gross: 186000, commission: 18600, orders: 1240 },
+  { tier: "Accessories — Standard", tierFr: "Accessoires — Standard", category: "Accessories", rate: 12, gross: 142000, commission: 17040, orders: 2100 },
+  { tier: "Wearables — Standard", tierFr: "Objets connectés — Standard", category: "Wearables", rate: 12, gross: 98000, commission: 11760, orders: 680 },
+  { tier: "Other — Standard", tierFr: "Autre — Standard", category: "Other", rate: 12, gross: 56320, commission: 6758, orders: 420 },
+];
+
+export const sellerFinanceNetCommissionTrend = [
+  { label: "Jun 1", net: 2798, commission: 382 },
+  { label: "Jun 5", net: 2543, commission: 347 },
+  { label: "Jun 9", net: 3212, commission: 438 },
+  { label: "Jun 13", net: 3504, commission: 476 },
+  { label: "Jun 17", net: 3309, commission: 451 },
+  { label: "Jun 21", net: 3802, commission: 518 },
+  { label: "Jun 25", net: 4118, commission: 562 },
+  { label: "Jun 29", net: 4326, commission: 584 },
+];
 
 export const transactionList = sellerOrderList.map((o) => ({
   order: o.id,
@@ -221,8 +424,160 @@ export const transactionList = sellerOrderList.map((o) => ({
 }));
 
 export const payoutList = [
-  { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah" },
-  { id: "PAY-002", amount: 8500, method: "Bank Transfer", status: "pending", date: "2024-06-06", bankAccount: "****4521", approvedBy: "—" },
+  { id: "PAY-005", amount: 6200, method: "Bank Transfer", status: "requested", date: "2024-06-08", bankAccount: "****4521", approvedBy: "—", itemCount: 4 },
+  { id: "PAY-004", amount: 9800, method: "Mobile Money", status: "paid", date: "2024-06-01", bankAccount: "+243 99 *** 4521", approvedBy: "Admin Sarah", itemCount: 6 },
+  { id: "PAY-003", amount: 11200, method: "Bank Transfer", status: "paid", date: "2024-05-15", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 9 },
+  { id: "PAY-002", amount: 8500, method: "Bank Transfer", status: "processing", date: "2024-06-06", bankAccount: "****4521", approvedBy: "—", itemCount: 5 },
+  { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 8 },
+];
+
+export type SellerPayoutItemStatus =
+  | "awaiting_delivery"
+  | "pending_clearance"
+  | "ready_for_payout"
+  | "paid_out";
+
+export type SellerPayoutPendingItem = {
+  id: string;
+  orderId: string;
+  productId: number;
+  listingName: string;
+  deliveryDate: string | null;
+  orderAmount: number;
+  commission: number;
+  netEarnings: number;
+  status: SellerPayoutItemStatus;
+  payoutId?: string;
+  clearanceEndsAt?: string;
+};
+
+export const sellerPayoutSummary = {
+  totalPending: 8450,
+  availableForPayout: 6200,
+  nextPayoutDate: "2024-06-10",
+  commissionDeducted: 1890,
+  clearanceHours: 48,
+};
+
+export const sellerPayoutPendingItems: SellerPayoutPendingItem[] = [
+  {
+    id: "POI-001",
+    orderId: "ORD-2024-001",
+    productId: 1,
+    listingName: "Samsung Galaxy S24 Ultra",
+    deliveryDate: "2024-06-01",
+    orderAmount: 1199,
+    commission: 144,
+    netEarnings: 1055,
+    status: "paid_out",
+    payoutId: "PAY-001",
+  },
+  {
+    id: "POI-002",
+    orderId: "ORD-2024-007",
+    productId: 2,
+    listingName: "Galaxy Buds Pro",
+    deliveryDate: "2024-05-28",
+    orderAmount: 349,
+    commission: 42,
+    netEarnings: 307,
+    status: "paid_out",
+    payoutId: "PAY-001",
+  },
+  {
+    id: "POI-003",
+    orderId: "ORD-2024-012",
+    productId: 3,
+    listingName: "Galaxy Watch 6 Classic",
+    deliveryDate: "2024-05-25",
+    orderAmount: 649,
+    commission: 78,
+    netEarnings: 571,
+    status: "paid_out",
+    payoutId: "PAY-001",
+  },
+  {
+    id: "POI-004",
+    orderId: "ORD-2024-018",
+    productId: 1,
+    listingName: "Samsung Galaxy S24 Ultra",
+    deliveryDate: "2024-06-04",
+    orderAmount: 1199,
+    commission: 144,
+    netEarnings: 1055,
+    status: "ready_for_payout",
+    payoutId: "PAY-002",
+  },
+  {
+    id: "POI-005",
+    orderId: "ORD-2024-019",
+    productId: 4,
+    listingName: "Galaxy Tab S9",
+    deliveryDate: "2024-06-05",
+    orderAmount: 899,
+    commission: 108,
+    netEarnings: 791,
+    status: "ready_for_payout",
+    payoutId: "PAY-002",
+  },
+  {
+    id: "POI-006",
+    orderId: "ORD-2024-021",
+    productId: 2,
+    listingName: "Galaxy Buds Pro",
+    deliveryDate: "2024-06-06",
+    orderAmount: 349,
+    commission: 42,
+    netEarnings: 307,
+    status: "pending_clearance",
+    clearanceEndsAt: "2024-06-08",
+  },
+  {
+    id: "POI-007",
+    orderId: "ORD-2024-022",
+    productId: 5,
+    listingName: "Samsung 55\" QLED TV",
+    deliveryDate: "2024-06-06",
+    orderAmount: 1299,
+    commission: 156,
+    netEarnings: 1143,
+    status: "pending_clearance",
+    clearanceEndsAt: "2024-06-08",
+  },
+  {
+    id: "POI-008",
+    orderId: "ORD-2024-024",
+    productId: 3,
+    listingName: "Galaxy Watch 6 Classic",
+    deliveryDate: null,
+    orderAmount: 649,
+    commission: 78,
+    netEarnings: 571,
+    status: "awaiting_delivery",
+  },
+  {
+    id: "POI-009",
+    orderId: "ORD-2024-025",
+    productId: 1,
+    listingName: "Samsung Galaxy S24 Ultra",
+    deliveryDate: null,
+    orderAmount: 1199,
+    commission: 144,
+    netEarnings: 1055,
+    status: "awaiting_delivery",
+  },
+  {
+    id: "POI-010",
+    orderId: "ORD-2024-015",
+    productId: 4,
+    listingName: "Galaxy Tab S9",
+    deliveryDate: "2024-05-30",
+    orderAmount: 899,
+    commission: 108,
+    netEarnings: 791,
+    status: "paid_out",
+    payoutId: "PAY-001",
+  },
 ];
 
 // ─── Support ─────────────────────────────────────────────────────────────────
@@ -271,6 +626,10 @@ export function getShipment(id: string) {
   return shipmentList.find((s) => s.id === id);
 }
 
+export function getShipmentByOrderId(orderId: string) {
+  return shipmentList.find((s) => s.orderId === orderId);
+}
+
 export function getSellerReturn(id: string) {
   return sellerReturnList.find((r) => r.id === id);
 }
@@ -285,6 +644,22 @@ export function getPromotion(id: string) {
 
 export function getPayout(id: string) {
   return payoutList.find((p) => p.id === id);
+}
+
+export function getSellerPayoutItems() {
+  return sellerPayoutPendingItems;
+}
+
+export function getPayoutItemsByPayoutId(payoutId: string) {
+  return sellerPayoutPendingItems.filter((i) => i.payoutId === payoutId);
+}
+
+export function getPendingPayoutItems() {
+  return sellerPayoutPendingItems.filter((i) => i.status !== "paid_out");
+}
+
+export function getPaidOutPayoutItems() {
+  return sellerPayoutPendingItems.filter((i) => i.status === "paid_out");
 }
 
 export function getSupportTicket(id: string) {

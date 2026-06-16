@@ -1,30 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { moderationQueue } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending", labelFr: "En attente" },
+  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
+];
 
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
-  const [tab, setTab] = useState("pending");
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const counts = {
-    pending: moderationQueue.filter((p) => p.status === "pending").length,
-    approved: moderationQueue.filter((p) => p.status === "approved").length,
-    rejected: moderationQueue.filter((p) => p.status === "rejected").length,
-  };
-
-  const filtered = tab === "all"
-    ? moderationQueue
-    : moderationQueue.filter((p) => p.status === tab);
+  const filtered = useMemo(
+    () =>
+      applyListFilters(moderationQueue, filters, {
+        searchFields: ["id", "name", "seller", "category"],
+        dateField: "submittedDate",
+        statusField: "status",
+      }),
+    [filters]
+  );
 
   return (
     <div className="space-y-6">
@@ -37,20 +44,12 @@ export default function AdminProductsPage() {
         ]}
       />
 
-      <div className="flex gap-2">
-        {(["pending", "approved", "rejected"] as const).map((tabId) => (
-          <button
-            key={tabId}
-            onClick={() => setTab(tabId)}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium capitalize",
-              tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
-            )}
-          >
-            {tabId} ({counts[tabId]})
-          </button>
-        ))}
-      </div>
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Product, seller, category…"
+      />
 
       <Card>
         <CardContent className="p-0">
@@ -70,7 +69,7 @@ export default function AdminProductsPage() {
                 key: "name",
                 label: "Name",
                 render: (row) => (
-                  <Link href={`/admin/products/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                  <Link href={`/admin/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.name)}
                   </Link>
                 ),
@@ -79,7 +78,7 @@ export default function AdminProductsPage() {
                 key: "seller",
                 label: "Seller",
                 render: (row) => (
-                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-blue-600 hover:underline">
+                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.seller)}
                   </Link>
                 ),
@@ -100,7 +99,7 @@ export default function AdminProductsPage() {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
-                  <Link href={`/admin/products/${row.id}`} className="text-sm text-blue-600 hover:underline">
+                  <Link href={`/admin/products/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
                     Review
                   </Link>
                 ),

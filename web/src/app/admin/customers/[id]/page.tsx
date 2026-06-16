@@ -97,7 +97,7 @@ export default function AdminCustomerDetailPage() {
         <DataTable
           columns={[
             { key: "id", label: "Order", render: (row) => (
-              <Link href={`/admin/orders/${row.id}`} className="text-blue-600 hover:underline">{String(row.id)}</Link>
+              <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
             )},
             { key: "date", label: t("date") },
             { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },

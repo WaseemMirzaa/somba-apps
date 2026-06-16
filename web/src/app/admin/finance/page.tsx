@@ -13,7 +13,7 @@ const transactions = [
   { id: "TXN-901", type: "Order Payment", amount: 119900, status: "completed", date: "2024-06-08" },
   { id: "TXN-902", type: "Seller Payout", amount: -45000, status: "completed", date: "2024-06-08" },
   { id: "TXN-903", type: "Refund", amount: -12900, status: "pending", date: "2024-06-07" },
-  { id: "TXN-904", type: "COD Settlement", amount: 89000, status: "completed", date: "2024-06-07" },
+  { id: "TXN-904", type: "Payment Settlement", amount: 89000, status: "completed", date: "2024-06-07" },
 ];
 
 export default function AdminFinancePage() {
@@ -30,7 +30,7 @@ export default function AdminFinancePage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title={t("revenue")} value={formatCurrency(2840000, locale)} icon={DollarSign} trend="+8.2% this week" />
         <StatCard title="Pending Payouts" value={formatCurrency(340000, locale)} icon={Wallet} />
-        <StatCard title="COD Outstanding" value={formatCurrency(125000, locale)} icon={CreditCard} />
+        <StatCard title="Payment Outstanding" value={formatCurrency(125000, locale)} icon={CreditCard} />
         <StatCard title="Refunds (MTD)" value={formatCurrency(89000, locale)} icon={TrendingUp} />
       </div>
 

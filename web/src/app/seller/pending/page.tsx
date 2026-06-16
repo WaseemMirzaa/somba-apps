@@ -15,7 +15,7 @@ export default function SellerPendingPage() {
       <p className="mt-2 text-slate-600">
         {fr ? "Votre inscription est en file d'attente. Un administrateur l'examinera sous 24-48h." : "Your registration is in the queue. An admin will review within 24-48h."}
       </p>
-      <Link href="/seller/resubmit" className="mt-6 inline-block text-sm text-blue-600 hover:underline">
+      <Link href="/seller/resubmit" className="mt-6 inline-block text-sm text-[var(--primary)] hover:underline">
         {fr ? "Mettre à jour les informations" : "Update information"}
       </Link>
     </div>

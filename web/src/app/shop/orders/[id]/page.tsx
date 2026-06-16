@@ -9,7 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getOrder } from "@/lib/entities";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
@@ -75,7 +75,7 @@ export default function ShopOrderDetailPage() {
 
         <DetailGridSection title="Payment">
           <InfoGrid items={[
-            { label: "Method", value: order.paymentMethod },
+            { label: "Method", value: formatPaymentMethod(order.paymentMethod, locale) },
             { label: "Transaction", value: order.transactionId },
             { label: "Status", value: order.paymentStatus },
             { label: "Amount", value: formatCurrency(order.amount, locale) },
@@ -89,7 +89,7 @@ export default function ShopOrderDetailPage() {
                 <Image src={item.image} alt={item.name} fill className="object-cover" sizes="64px" />
               </Link>
               <div className="flex-1">
-                <Link href={`/shop/products/${item.productId}`} className="font-medium hover:text-blue-600">{item.name}</Link>
+                <Link href={`/shop/products/${item.productId}`} className="font-medium hover:text-[var(--primary)]">{item.name}</Link>
                 <p className="text-xs text-slate-500">{item.variant} · SKU: {item.sku}</p>
               </div>
               <div className="text-right">
@@ -102,7 +102,7 @@ export default function ShopOrderDetailPage() {
 
         <DetailGridSection title="Order Tracking" span={2}>
           <p className="mb-4 text-sm text-slate-500">Tracking: {order.trackingNumber} · Rider: {order.rider}</p>
-          <Link href={`/shop/orders/${id}/tracking`} className="mb-4 inline-block text-sm text-blue-600 hover:underline">Live map tracking →</Link>
+          <Link href={`/shop/orders/${id}/tracking`} className="mb-4 inline-block text-sm text-[var(--primary)] hover:underline">Live map tracking →</Link>
           <ActivityTimeline events={order.timeline} />
         </DetailGridSection>
 

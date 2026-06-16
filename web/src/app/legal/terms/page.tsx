@@ -10,13 +10,13 @@ export default function TermsPage() {
       <h2>1. Marketplace Model</h2>
       <p>{BRAND.name} operates as a marketplace platform. Sellers list and sell their own inventory. {BRAND.legalEntity} facilitates transactions, payments, and logistics in a hybrid fulfillment model.</p>
       <h2>2. Orders & Payments</h2>
-      <p>We support Stripe card payments, Airtel Money, Somba Wallet, and Cash on Delivery (COD). COD orders may require OTP verification and are subject to fraud prevention limits.</p>
+      <p>We support Stripe card payments, Airtel Money, Somba Wallet, and pay at delivery. Pay-at-delivery orders may require OTP verification and are subject to fraud prevention limits.</p>
       <h2>3. Returns & Refunds</h2>
       <p>Refunds may be issued to the original payment method or Somba Wallet at your choice, subject to our Return Policy.</p>
       <h2>4. Open Box Delivery</h2>
       <p>Where available, you may inspect products at delivery before accepting. Refusal triggers return without charge.</p>
       <nav className="mt-12 flex flex-wrap gap-4 text-sm">
-        {LEGAL_LINKS.map((l) => <Link key={l.href} href={l.href} className="text-blue-600 hover:underline">{l.label}</Link>)}
+        {LEGAL_LINKS.map((l) => <Link key={l.href} href={l.href} className="text-[var(--primary)] hover:underline">{l.label}</Link>)}
       </nav>
     </div>
   );

@@ -66,7 +66,7 @@ export default function AdminProductModerationDetailPage() {
         <div className="space-y-6 lg:col-span-2">
           <DetailSection title="Seller Information">
             <InfoGrid items={[
-              { label: "Seller", value: <Link href={`/admin/sellers/${product.sellerId}`} className="text-blue-600 hover:underline">{product.seller}</Link> },
+              { label: "Seller", value: <Link href={`/admin/sellers/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link> },
               { label: "Store Rating", value: product.sellerRating > 0 ? `⭐ ${product.sellerRating}` : "New seller" },
             ]} />
           </DetailSection>

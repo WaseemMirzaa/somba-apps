@@ -27,7 +27,7 @@ export default function SellerReturnDetailPage() {
         <DetailGridSection title="Overview">
           <InfoGrid items={[
             { label: "Return ID", value: ret.id },
-            { label: "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-sky-600 hover:underline">{ret.orderId}</Link> },
+            { label: "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
             { label: "Customer", value: ret.customer },
             { label: "Reason", value: ret.reason },
             { label: "Status", value: ret.status },
@@ -36,7 +36,7 @@ export default function SellerReturnDetailPage() {
 
         <DetailGridSection title="Product">
           <InfoGrid items={[
-            { label: "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-sky-600 hover:underline">{ret.product}</Link> },
+            { label: "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
             { label: "Variant", value: ret.variant },
             { label: "Quantity", value: ret.qty },
           ]} />
@@ -56,7 +56,7 @@ export default function SellerReturnDetailPage() {
             { label: "Photos", value: `${ret.inspection.photos} attached` },
             { label: "Condition", value: ret.inspection.condition },
           ]} />
-          <Link href="/warehouse/returns" className="mt-4 inline-block text-sm text-sky-600 hover:underline">Warehouse Return Queue →</Link>
+          <Link href="/warehouse/returns" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">Warehouse Return Queue →</Link>
         </DetailGridSection>
 
         <DetailGridSection title="Timeline" span={3}>

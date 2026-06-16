@@ -64,10 +64,7 @@ export function getVisiblePortals(role: UserRole): PortalLink[] {
         { href: "/shop/account", label: "Account", i18nKey: "myAccount" },
       ];
     case "seller":
-      return [
-        { href: "/seller", label: "Seller", i18nKey: "sellerDashboard" },
-        { href: "/shop/products", label: "Shop" },
-      ];
+      return [{ href: "/seller", label: "Seller", i18nKey: "sellerDashboard" }];
     case "admin":
       return [{ href: "/admin", label: "Admin", i18nKey: "adminPanel" }];
     case "warehouse":

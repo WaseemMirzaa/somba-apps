@@ -22,7 +22,7 @@ export default function OrderTrackingPage() {
       <div className="relative aspect-video overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-sky-50">
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <MapPin className="mx-auto h-12 w-12 text-blue-600" />
+            <MapPin className="mx-auto h-12 w-12 text-[var(--primary)]" />
             <p className="mt-2 text-sm font-medium">{fr ? "Carte en direct (mock)" : "Live map (mock)"}</p>
             <p className="text-xs text-slate-500">{order.rider} · ETA 18 min</p>
           </div>

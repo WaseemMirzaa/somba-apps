@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Phone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
@@ -35,7 +36,7 @@ export default function WarehouseParcelDetailPage() {
         ]}
         actions={
           parcel.status === "inbound" ? (
-            <button onClick={() => toast("Parcel received")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white">{t("receive")}</button>
+            <button onClick={() => toast("Parcel received")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("receive")}</button>
           ) : (
             <Badge variant="info">{parcel.status}</Badge>
           )
@@ -47,7 +48,7 @@ export default function WarehouseParcelDetailPage() {
           <InfoGrid items={[
             { label: "Parcel ID", value: parcel.id },
             { label: "Barcode", value: parcel.barcode },
-            { label: "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-indigo-600 hover:underline">{parcel.orderId}</Link> },
+            { label: "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-[var(--primary)] hover:underline">{parcel.orderId}</Link> },
             { label: "Weight", value: parcel.weight },
             { label: "Volume", value: parcel.volume },
             { label: "Status", value: parcel.status },
@@ -60,26 +61,43 @@ export default function WarehouseParcelDetailPage() {
           <InfoGrid items={[
             { label: "Seller Name", value: parcel.seller },
             { label: "Store Name", value: parcel.storeName },
-            { label: "Phone", value: parcel.sellerPhone },
+            {
+              label: "Phone",
+              value: (
+                <a
+                  href={`tel:${parcel.sellerPhone.replace(/\s/g, "")}`}
+                  className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {parcel.sellerPhone}
+                </a>
+              ),
+            },
             { label: "Pickup Rider", value: parcel.pickupRider },
+            { label: "Seller ID", value: parcel.sellerId },
           ]} />
-          <div className="mt-4 flex gap-3">
-            <Link href={`/admin/sellers/${parcel.sellerId}`} className="text-sm text-indigo-600 hover:underline">Open Seller →</Link>
-            <a href={`tel:${parcel.sellerPhone}`} className="text-sm text-slate-500">Call Seller</a>
-          </div>
         </DetailGridSection>
 
         <DetailGridSection title="Customer">
           <InfoGrid items={[
             { label: "Customer Name", value: parcel.customer },
-            { label: "Phone", value: parcel.customerPhone },
+            {
+              label: "Phone",
+              value: (
+                <a
+                  href={`tel:${parcel.customerPhone.replace(/\s/g, "")}`}
+                  className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {parcel.customerPhone}
+                </a>
+              ),
+            },
             { label: "Address", value: parcel.customerAddress, full: true },
             { label: "Delivery Zone", value: parcel.zone },
+            { label: "Order ID", value: parcel.orderId },
+            { label: "Customer ID", value: parcel.customerId },
           ]} />
-          <div className="mt-4 flex gap-3">
-            <Link href={`/admin/orders/${parcel.orderId}`} className="text-sm text-indigo-600 hover:underline">Open Order →</Link>
-            <Link href={`/admin/customers/${parcel.customerId}`} className="text-sm text-indigo-600 hover:underline">Open Customer →</Link>
-          </div>
         </DetailGridSection>
 
         <DetailGridSection title="Inspection">
@@ -104,7 +122,7 @@ export default function WarehouseParcelDetailPage() {
                   <Image src={item.image} alt={item.product} fill className="object-cover" sizes="56px" />
                 </div>
                 <div className="flex-1">
-                  <Link href={`/shop/products/${item.productId}`} className="font-medium text-indigo-600 hover:underline">{item.product}</Link>
+                  <Link href={`/shop/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.product}</Link>
                   <p className="text-xs text-slate-500">SKU: {item.sku} · {item.variant}</p>
                 </div>
                 <span className="text-sm font-medium">Qty: {item.qty}</span>

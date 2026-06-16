@@ -47,7 +47,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title="Customer">
           <InfoGrid items={[
-            { label: "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-blue-600 hover:underline">{order.customer}</Link> },
+            { label: "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{order.customer}</Link> },
             { label: "Phone", value: order.customerPhone },
             { label: "Address", value: order.customerAddress, full: true },
             { label: "City", value: order.customerCity },
@@ -56,14 +56,14 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title="Seller">
           <InfoGrid items={[
-            { label: "Store", value: <Link href={`/admin/sellers/${order.sellerId}`} className="text-blue-600 hover:underline">{order.seller}</Link> },
+            { label: "Store", value: <Link href={`/admin/sellers/${order.sellerId}`} className="text-[var(--primary)] hover:underline">{order.seller}</Link> },
             { label: "Seller ID", value: order.sellerId },
           ]} />
         </DetailGridSection>
 
         <DetailGridSection title="Payment">
           <InfoGrid items={[
-            { label: "Gateway", value: order.paymentMethod === "COD" ? "Cash on Delivery" : "Stripe" },
+            { label: "Gateway", value: order.paymentMethod === "COD" ? (locale === "fr" ? "Paiement à la livraison" : "Pay at delivery") : "Stripe" },
             { label: "Transaction ID", value: order.transactionId },
             { label: "Status", value: order.paymentStatus },
             { label: "Amount", value: formatCurrency(order.amount, locale) },
@@ -72,7 +72,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title="Logistics">
           <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-blue-600 hover:underline">{order.warehouse}</Link> },
+            { label: "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{order.warehouse}</Link> },
             { label: "Rider", value: order.rider },
             { label: "Tracking Number", value: order.trackingNumber },
           ]} />
@@ -95,7 +95,7 @@ export default function AdminOrderDetailPage() {
                   <Image src={item.image} alt={item.name} fill className="object-cover" sizes="64px" />
                 </div>
                 <div className="flex-1">
-                  <Link href={`/shop/products/${item.productId}`} className="font-medium text-blue-600 hover:underline">{item.name}</Link>
+                  <Link href={`/shop/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.name}</Link>
                   <p className="text-xs text-slate-500">SKU: {item.sku} · Variant: {item.variant}</p>
                 </div>
                 <div className="text-right">

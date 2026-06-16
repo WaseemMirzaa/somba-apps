@@ -26,8 +26,8 @@ export function StatCard({
             <p className="mt-2 text-xs font-medium text-emerald-600">{trend}</p>
           )}
         </div>
-        <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 p-3.5 transition-transform group-hover:scale-105">
-          <Icon className="h-5 w-5 text-blue-600" />
+        <div className="rounded-2xl bg-gradient-to-br from-red-50 to-rose-50 p-3.5 transition-transform group-hover:scale-105">
+          <Icon className="h-5 w-5 text-[var(--primary)]" />
         </div>
       </div>
     </div>

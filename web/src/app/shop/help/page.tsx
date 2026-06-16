@@ -27,7 +27,7 @@ export default function ShopHelpPage() {
           {fr ? "Demander la suppression →" : "Request deletion →"}
         </Link>
       </div>
-      <Link href="/shop/support" className="text-sm text-blue-600 hover:underline">{fr ? "Ouvrir un ticket support" : "Open support ticket"}</Link>
+      <Link href="/shop/support" className="text-sm text-[var(--primary)] hover:underline">{fr ? "Ouvrir un ticket support" : "Open support ticket"}</Link>
     </div>
   );
 }

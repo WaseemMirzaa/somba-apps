@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { orderEntities } from "@/lib/entities";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
 export default function ShopOrdersPage() {
@@ -18,18 +18,18 @@ export default function ShopOrdersPage() {
       <DataTable
         columns={[
           { key: "id", label: "Order", render: (row) => (
-            <Link href={`/shop/orders/${row.id}`} className="font-medium text-blue-600 hover:underline">{String(row.id)}</Link>
+            <Link href={`/shop/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
           )},
           { key: "date", label: "Date" },
           { key: "itemsCount", label: "Items" },
           { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
-          { key: "paymentMethod", label: "Payment" },
+          { key: "paymentMethod", label: "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
           { key: "status", label: "Status", render: (row) => <Badge variant="info">{String(row.status)}</Badge> },
           { key: "actions", label: "Actions", render: (row) => (
             <div className="flex gap-2 text-xs">
-              <Link href={`/shop/orders/${row.id}`} className="text-blue-600 hover:underline">View</Link>
+              <Link href={`/shop/orders/${row.id}`} className="text-[var(--primary)] hover:underline">View</Link>
               {row.status === "delivered" && (
-                <Link href={`/shop/orders/${row.id}/return`} className="text-slate-500 hover:text-blue-600">Return</Link>
+                <Link href={`/shop/orders/${row.id}/return`} className="text-slate-500 hover:text-[var(--primary)]">Return</Link>
               )}
             </div>
           )},

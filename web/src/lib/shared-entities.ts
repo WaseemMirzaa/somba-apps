@@ -23,6 +23,13 @@ export type DisputeItem = {
   reason: string;
   description: string;
   createdAt: string;
+  productId: number;
+  productName: string;
+  productImage: string;
+  variant?: string;
+  warehouse: string;
+  warehouseHub: string;
+  warehouseContact: string;
   messages: { from: "buyer" | "seller" | "admin"; text: string; at: string }[];
 };
 
@@ -109,32 +116,50 @@ export const MOCK_DISPUTES: DisputeItem[] = [
   {
     id: "DSP-001",
     orderId: "ORD-2024-003",
-    buyerId: "cust-1",
-    buyerName: "Marie Dupont",
+    buyerId: "cust-3",
+    buyerName: "Sophie Martin",
     sellerId: 2,
     sellerName: "SportStyle",
     status: "open",
     reason: "not_as_described",
-    description: "Shoes colour does not match listing photos.",
-    createdAt: "2026-06-05",
+    description: "Shoes colour does not match listing photos — ordered white, received grey.",
+    createdAt: "2024-06-05",
+    productId: 4,
+    productName: "Nike Air Max 270",
+    productImage: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=400&q=80",
+    variant: "Size 40 · White",
+    warehouse: "Kinshasa Hub",
+    warehouseHub: "WH-KIN-01",
+    warehouseContact: "ops.kinshasa@somba.com",
     messages: [
-      { from: "buyer", text: "The white shoes arrived grey.", at: "2026-06-05T10:00:00Z" },
+      { from: "buyer", text: "The white shoes arrived grey. Photos in the listing clearly show white.", at: "2024-06-05T10:00:00Z" },
+      { from: "seller", text: "Sorry for the inconvenience. Lighting in our studio may differ — can you share a photo of the item received?", at: "2024-06-05T14:30:00Z" },
+      { from: "buyer", text: "Uploaded comparison photos to my order page. The box label also says grey.", at: "2024-06-05T16:15:00Z" },
     ],
   },
   {
     id: "DSP-002",
     orderId: "ORD-2024-002",
     buyerId: "cust-2",
-    buyerName: "Jean Kabila",
+    buyerName: "John Smith",
     sellerId: 1,
     sellerName: "TechZone Store",
     status: "seller_responded",
     reason: "defective",
-    description: "Headphones left speaker crackling.",
-    createdAt: "2026-06-03",
+    description: "Headphones left speaker crackling and cuts out after 10 minutes of use.",
+    createdAt: "2024-06-03",
+    productId: 3,
+    productName: "Galaxy Buds Pro",
+    productImage: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80",
+    variant: "Black",
+    warehouse: "Paris Nord FC",
+    warehouseHub: "WH-PAR-02",
+    warehouseContact: "ops.paris@somba.com",
     messages: [
-      { from: "buyer", text: "Left speaker has static noise.", at: "2026-06-03T12:00:00Z" },
-      { from: "seller", text: "We can offer replacement or full refund.", at: "2026-06-04T09:00:00Z" },
+      { from: "buyer", text: "Left speaker has static noise and drops audio completely.", at: "2024-06-03T12:00:00Z" },
+      { from: "seller", text: "We can offer replacement or full refund. Please confirm your preference.", at: "2024-06-04T09:00:00Z" },
+      { from: "buyer", text: "I'd prefer a replacement if stock is available.", at: "2024-06-04T11:45:00Z" },
+      { from: "admin", text: "Somba support reviewing case — we'll confirm replacement eligibility within 24h.", at: "2024-06-04T15:00:00Z" },
     ],
   },
 ];
@@ -144,18 +169,28 @@ export const MOCK_RETURNS: ReturnItem[] = [
     id: "RET-001",
     orderId: "ORD-2024-001",
     status: "approved",
-    items: ["Samsung Galaxy S24 Ultra"],
-    reason: "defective",
-    createdAt: "2026-06-01",
-    refundAmount: 1199,
+    items: ["Nike Air Max 270"],
+    reason: "Wrong size",
+    createdAt: "2024-06-05",
+    refundAmount: 129,
   },
   {
     id: "RET-002",
     orderId: "ORD-2024-004",
-    status: "requested",
+    status: "in_transit",
+    items: ["Dyson V15 Vacuum"],
+    reason: "Damaged item",
+    createdAt: "2024-06-04",
+    refundAmount: 649,
+  },
+  {
+    id: "RET-003",
+    orderId: "ORD-2024-003",
+    status: "refunded",
     items: ["Nike Air Max 270"],
-    reason: "wrong_item",
-    createdAt: "2026-06-07",
+    reason: "Not as described",
+    createdAt: "2024-06-02",
+    refundAmount: 129,
   },
 ];
 

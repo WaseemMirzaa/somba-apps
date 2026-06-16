@@ -10,9 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { useToast } from "@/context/toast-context";
-import { useLocale } from "@/context/locale-context";
 import { warehouseDashboardStats } from "@/lib/warehouse-entities";
-import { defaultOperators, type WarehouseOperator } from "@/lib/warehouses-admin";
 
 const FULFILLMENT_LINKS = [
   { href: "/admin/fulfillment/inbound", label: "Inbound Queue" },
@@ -22,6 +20,7 @@ const FULFILLMENT_LINKS = [
   { href: "/admin/fulfillment/returns", label: "Returns" },
   { href: "/admin/fulfillment/inventory", label: "Inventory" },
   { href: "/admin/fulfillment/riders", label: "Riders" },
+  { href: "/admin/fulfillment/cod", label: "Payments" },
   { href: "/admin/fulfillment/exceptions", label: "Exceptions" },
 ];
 
@@ -33,30 +32,6 @@ export default function AdminWarehouseDetailPage() {
   const [password, setPassword] = useState(getCredential(id) ?? "—");
   const [showPassword, setShowPassword] = useState(false);
   const stats = warehouseDashboardStats;
-  const { locale } = useLocale();
-  const fr = locale === "fr";
-  const [operators, setOperators] = useState<WarehouseOperator[]>(() =>
-    warehouse ? warehouse.operators ?? defaultOperators(warehouse) : []
-  );
-  const [showAddOp, setShowAddOp] = useState(false);
-  const [newOp, setNewOp] = useState({ name: "", email: "", role: "Inbound" });
-
-  function addOperator() {
-    if (!newOp.name.trim() || !newOp.email.trim()) {
-      toast(fr ? "Nom et e-mail requis" : "Name and email required", "error");
-      return;
-    }
-    setOperators((ops) => [
-      ...ops,
-      { id: `${id}-OP${ops.length + 1}`, name: newOp.name.trim(), email: newOp.email.trim(), role: newOp.role as WarehouseOperator["role"], status: "active" },
-    ]);
-    setNewOp({ name: "", email: "", role: "Inbound" });
-    setShowAddOp(false);
-    toast(fr ? "Opérateur ajouté" : "Operator added", "success");
-  }
-  function toggleOperator(opId: string) {
-    setOperators((ops) => ops.map((o) => (o.id === opId ? { ...o, status: o.status === "active" ? "suspended" : "active" } : o)));
-  }
 
   if (!warehouse) {
     return <div className="p-8 text-center text-slate-500">Warehouse not found</div>;
@@ -121,63 +96,6 @@ export default function AdminWarehouseDetailPage() {
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title={`${fr ? "Opérateurs" : "Operators"} (${operators.length})`} span={3}>
-          <p className="mb-3 text-sm text-slate-600">
-            {fr ? "Gérez les comptes opérateurs liés à cet entrepôt et à cette ville." : "Manage operator accounts tied to this warehouse and city."}
-          </p>
-          <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-2.5">{fr ? "Nom" : "Name"}</th>
-                  <th className="px-4 py-2.5">{fr ? "E-mail" : "Email"}</th>
-                  <th className="px-4 py-2.5">{fr ? "Rôle" : "Role"}</th>
-                  <th className="px-4 py-2.5">{fr ? "Statut" : "Status"}</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {operators.map((op) => (
-                  <tr key={op.id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{op.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{op.email}</td>
-                    <td className="px-4 py-3"><Badge variant="info">{op.role}</Badge></td>
-                    <td className="px-4 py-3"><Badge variant={op.status === "active" ? "success" : "warning"}>{op.status}</Badge></td>
-                    <td className="px-4 py-3 text-right">
-                      {op.role !== "Manager" && (
-                        <button onClick={() => toggleOperator(op.id)} className="text-sm font-medium text-[var(--primary)] hover:underline">
-                          {op.status === "active" ? (fr ? "Suspendre" : "Suspend") : fr ? "Activer" : "Activate"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-3">
-            {showAddOp ? (
-              <div className="grid gap-2 sm:grid-cols-4">
-                <input className="input-premium px-3 py-2 text-sm" placeholder={fr ? "Nom" : "Name"} value={newOp.name} onChange={(e) => setNewOp({ ...newOp, name: e.target.value })} />
-                <input className="input-premium px-3 py-2 text-sm" placeholder={fr ? "E-mail" : "Email"} value={newOp.email} onChange={(e) => setNewOp({ ...newOp, email: e.target.value })} />
-                <select className="input-premium px-3 py-2 text-sm" value={newOp.role} onChange={(e) => setNewOp({ ...newOp, role: e.target.value })}>
-                  <option value="Inbound">Inbound</option>
-                  <option value="Sorting">Sorting</option>
-                  <option value="Dispatch">Dispatch</option>
-                </select>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={addOperator}>{fr ? "Ajouter" : "Add"}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddOp(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-                </div>
-              </div>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={() => setShowAddOp(true)}>
-                {fr ? "+ Ajouter un opérateur" : "+ Add operator"}
-              </Button>
-            )}
-          </div>
-        </DetailGridSection>
-
         <DetailGridSection title="Today's Activity" span={3}>
           <InfoGrid columns={4} items={[
             { label: "Received", value: stats.receivedToday },
@@ -200,7 +118,7 @@ export default function AdminWarehouseDetailPage() {
               </Link>
             ))}
           </div>
-          <Link href="/admin/fulfillment" className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline">
+          <Link href="/admin/fulfillment" className="mt-4 inline-block text-sm font-medium text-[var(--primary)] hover:underline">
             Open Fulfillment Dashboard →
           </Link>
         </DetailGridSection>

@@ -58,7 +58,7 @@ export default function SellerSupportDetailPage() {
               setReply("");
               toast("Reply sent");
             }}
-            className="mt-2 rounded-lg bg-sky-600 px-4 py-2 text-sm text-white"
+            className="mt-2 btn-primary rounded-lg px-4 py-2 text-sm"
           >
             Send Reply
           </button>

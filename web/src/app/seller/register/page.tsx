@@ -44,7 +44,7 @@ export default function SellerRegisterPage() {
         <Button type="submit" className="w-full">{fr ? "Soumettre" : "Submit Registration"}</Button>
         <p className="text-center text-xs text-slate-500">{fr ? "Aucun document requis (Δ1)" : "No documents required (Δ1)"}</p>
       </form>
-      <Link href="/login" className="block text-center text-sm text-blue-600">{fr ? "Déjà inscrit ?" : "Already registered?"}</Link>
+      <Link href="/login" className="block text-center text-sm text-[var(--primary)]">{fr ? "Déjà inscrit ?" : "Already registered?"}</Link>
     </div>
   );
 }

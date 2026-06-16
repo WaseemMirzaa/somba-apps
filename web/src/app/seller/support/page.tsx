@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { supportTicketList as initialTickets } from "@/lib/seller-entities";
@@ -15,12 +17,29 @@ const priorityVariant: Record<string, "success" | "warning" | "danger" | "info" 
   high: "danger",
 };
 
+const STATUS_OPTIONS = [
+  { value: "open", label: "Open", labelFr: "Ouvert" },
+  { value: "in_progress", label: "In progress", labelFr: "En cours" },
+  { value: "resolved", label: "Resolved", labelFr: "Résolu" },
+];
+
 export default function SellerSupportPage() {
   const { t } = useLocale();
   const { toast } = useToast();
   const router = useRouter();
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [tickets, setTickets] = useState(initialTickets);
   const [showNew, setShowNew] = useState(false);
+
+  const filtered = useMemo(
+    () =>
+      applyListFilters(tickets, filters, {
+        searchFields: ["id", "subject", "category"],
+        dateField: "lastUpdate",
+        statusField: "status",
+      }),
+    [tickets, filters]
+  );
 
   return (
     <SellerListPage
@@ -40,14 +59,22 @@ export default function SellerSupportPage() {
               toast("Fill in your issue and submit", "info");
             }
           }}
-          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white"
+          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
         >
           New Ticket
         </button>
       }
+      filters={
+        <ListFilters
+          values={filters}
+          onChange={setFilters}
+          statusOptions={STATUS_OPTIONS}
+          searchPlaceholder="Ticket ID, subject, category…"
+        />
+      }
       columns={[
         { key: "id", label: "Ticket ID", render: (row) => (
-          <Link href={`/seller/support/${row.id}`} className="font-medium text-sky-600 hover:underline">{String(row.id)}</Link>
+          <Link href={`/seller/support/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "category", label: "Category" },
         { key: "subject", label: "Subject" },
@@ -59,10 +86,10 @@ export default function SellerSupportPage() {
         )},
         { key: "lastUpdate", label: "Last Update" },
         { key: "actions", label: t("action"), render: (row) => (
-          <Link href={`/seller/support/${row.id}`} className="text-sm text-sky-600 hover:underline">{t("view")}</Link>
+          <Link href={`/seller/support/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
-      data={tickets as unknown as Record<string, unknown>[]}
+      data={filtered as unknown as Record<string, unknown>[]}
     />
   );
 }

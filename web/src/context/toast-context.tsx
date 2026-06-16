@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               "animate-fade-up rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg",
               t.type === "success" && "bg-emerald-600",
               t.type === "error" && "bg-red-600",
-              t.type === "info" && "bg-blue-600"
+              t.type === "info" && "bg-[var(--primary)]"
             )}
           >
             {t.message}

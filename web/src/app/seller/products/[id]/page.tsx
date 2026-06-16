@@ -68,7 +68,7 @@ export default function SellerProductDetailPage() {
               { label: "Low Stock Threshold", value: product.lowStockThreshold },
             ]} />
             <div className="mt-4 flex gap-2">
-              <Link href={`/seller/inventory/${encodeURIComponent(product.sku)}`} className="rounded-lg bg-sky-600 px-4 py-2 text-sm text-white">View Inventory</Link>
+              <Link href={`/seller/inventory/${encodeURIComponent(product.sku)}`} className="btn-primary rounded-lg px-4 py-2 text-sm">View Inventory</Link>
             </div>
           </DetailGridSection>
 
@@ -112,7 +112,7 @@ export default function SellerProductDetailPage() {
             <DataTable
               columns={[
                 { key: "orderNumber", label: "Order", render: (row) => (
-                  <Link href={`/seller/orders/${row.orderNumber}`} className="text-sky-600 hover:underline">{String(row.orderNumber)}</Link>
+                  <Link href={`/seller/orders/${row.orderNumber}`} className="text-[var(--primary)] hover:underline">{String(row.orderNumber)}</Link>
                 )},
                 { key: "customer", label: "Customer" },
                 { key: "quantity", label: "Qty" },

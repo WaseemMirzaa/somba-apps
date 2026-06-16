@@ -3,11 +3,14 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
+import { PageLoader } from "@/components/ui/loader";
 import { canAccessPath, getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 export function PortalGuard({ children }: { children: React.ReactNode }) {
   const { persona, isAuthenticated, authReady } = useAuth();
+  const { locale } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const role = persona.role as UserRole;
@@ -29,18 +32,16 @@ export function PortalGuard({ children }: { children: React.ReactNode }) {
   }, [role, pathname, router, isAuthenticated, authReady]);
 
   if (!authReady) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Loading…
-      </div>
-    );
+    return <PageLoader locale={locale} />;
   }
 
   if (isAuthenticated && !canAccessPath(role, pathname)) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-        Redirecting to your portal…
-      </div>
+      <PageLoader
+        locale={locale}
+        label="Redirecting to your portal…"
+        labelFr="Redirection vers votre portail…"
+      />
     );
   }
 

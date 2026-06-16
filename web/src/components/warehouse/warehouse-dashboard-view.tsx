@@ -3,9 +3,21 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Package, Send, Layers, RotateCcw, RefreshCw,
-  AlertTriangle, Clock, Inbox, ArrowUpDown, ArrowUpRight, ArrowDownRight,
-  Activity, Truck,
+  Package,
+  Send,
+  Layers,
+  RotateCcw,
+  RefreshCw,
+  AlertTriangle,
+  Clock,
+  Inbox,
+  ArrowUpDown,
+  ArrowUpRight,
+  Activity,
+  Truck,
+  Target,
+  DollarSign,
+  PackageX,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -14,8 +26,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   DualMetricChart,
   HorizontalBarChart,
-  Sparkline,
+  GoalProgress,
 } from "@/components/charts/dashboard-charts";
+import {
+  AnalyticsKpiCard,
+  AnalyticsPeriodControls,
+  EMPTY_ANALYTICS_DATE_RANGE,
+} from "@/components/seller/analytics-kpi";
+import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
@@ -23,53 +41,40 @@ import { warehouseDashboardStats } from "@/lib/warehouse-entities";
 import {
   warehouseThroughputTrend,
   warehouseExtendedKpis,
+  warehouseInboundDispatchTrend,
   warehouseLaneUtilization,
-  warehouseRiderPerformance,
+  warehouseRiderLeaderboard,
   warehouseHealthBreakdown,
   warehouseRecentActivity,
+  warehouseGoals,
+  warehouseDashboardAlerts,
+  warehouseDispatchQueue,
+  warehouseReturnMetrics,
+  warehouseExceptionMetrics,
 } from "@/lib/warehouse-analytics";
-import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useOpsPath } from "@/lib/ops-path";
 
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  change: number;
-  positive?: boolean;
-  spark: number[];
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  const up = change >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
+const alertPriorityVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
+  Critical: "danger",
+  High: "warning",
+  Medium: "info",
+  Low: "default",
+};
 
-  return (
-    <div className="card-premium p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
-          <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-            {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}% vs yesterday
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="rounded-xl bg-indigo-50 p-2">
-            <Icon className="h-4 w-4 text-indigo-600" />
-          </div>
-          <Sparkline values={spark} color="#4f46e5" />
-        </div>
-      </div>
-    </div>
-  );
-}
+const dispatchStatusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
+  Building: "warning",
+  Ready: "info",
+  Dispatched: "success",
+  Delivered: "success",
+};
+
+const alertIcon = {
+  exception: AlertTriangle,
+  returns: RotateCcw,
+  aged: PackageX,
+  cod: DollarSign,
+} as const;
 
 export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const { t, locale } = useLocale();
@@ -79,61 +84,274 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const ops = useOpsPath();
   const s = warehouseDashboardStats;
   const k = warehouseExtendedKpis;
-  const [period] = useState("7D");
+  const [period, setPeriod] = useState<AnalyticsPeriod>("7D");
+  const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
 
   const warehouse = persona.warehouseId ? getWarehouse(persona.warehouseId) : undefined;
-  const title = hubName ?? warehouse?.name ?? "Fulfillment Operations";
+  const title = hubName ?? warehouse?.name ?? (fr ? "Opérations fulfillment" : "Fulfillment Operations");
 
-  const throughputSpark = warehouseThroughputTrend.map((d) => d.orders);
+  const inboundSpark = warehouseInboundDispatchTrend.map((d) => d.inbound);
+  const dispatchSpark = warehouseInboundDispatchTrend.map((d) => d.dispatch);
+  const throughputData = warehouseInboundDispatchTrend.map((d) => ({
+    label: d.label,
+    revenue: d.inbound,
+    orders: d.dispatch,
+  }));
 
   const quickLinks = [
-    { path: "/inbound", label: fr ? "File d'arrivage" : "Inbound Queue", countKey: "inboundQueue" as const, icon: Inbox },
-    { path: "/sorting", label: fr ? "Tableau de tri" : "Sorting Board", countKey: "sortingQueue" as const, icon: ArrowUpDown },
-    { path: "/dispatch", label: fr ? "File d'expédition" : "Dispatch Queue", countKey: "dispatchQueue" as const, icon: Send },
-    { path: "/returns", label: fr ? "File de retours" : "Returns Queue", countKey: "returnQueue" as const, icon: RotateCcw },
+    { path: "/inbound", label: fr ? "File entrante" : "Inbound Queue", countKey: "inboundQueue" as const, icon: Inbox },
+    { path: "/sorting", label: fr ? "Table de tri" : "Sorting Board", countKey: "sortingQueue" as const, icon: ArrowUpDown },
+    { path: "/dispatch", label: fr ? "File expédition" : "Dispatch Queue", countKey: "dispatchQueue" as const, icon: Send },
+    { path: "/returns", label: fr ? "File retours" : "Returns Queue", countKey: "returnQueue" as const, icon: RotateCcw },
+    { path: "/exceptions", label: fr ? "Exceptions" : "Exceptions", countKey: null, count: warehouseExceptionMetrics.openExceptions, icon: AlertTriangle },
+    { path: "/aged", label: fr ? "Colis vieillis" : "Aged Parcels", countKey: null, count: k.agedParcels, icon: PackageX },
+    { path: "/deliveries", label: fr ? "Livraisons" : "Deliveries", countKey: null, count: s.dispatchedToday - s.failedDeliveries, icon: Truck },
+    { path: "/analytics", label: t("analytics"), countKey: null, count: null, icon: Target },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={title}
-        subtitle={fr
-          ? `${t("welcome")} · ${k.receivedToday} reçus · ${k.dispatchedToday} expédiés aujourd'hui · Ponctualité ${k.onTimeRate}%`
-          : `${t("welcome")} · ${k.receivedToday} received · ${k.dispatchedToday} dispatched today · On-time ${k.onTimeRate}%`}
+        subtitle={
+          fr
+            ? `${k.receivedToday} reçus · ${k.dispatchedToday} expédiés · À l'heure ${k.onTimeRate}% · ${warehouseExceptionMetrics.openExceptions} exceptions ouvertes`
+            : `${k.receivedToday} received · ${k.dispatchedToday} dispatched · On-time ${k.onTimeRate}% · ${warehouseExceptionMetrics.openExceptions} open exceptions`
+        }
         actions={
-          <Link href={ops("/dispatch")} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            {fr ? "Ouvrir l'expédition" : "Open dispatch"}
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <AnalyticsPeriodControls
+              period={period}
+              onPeriodChange={setPeriod}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
+            <Link href={ops("/dispatch")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
+              {fr ? "Ouvrir expédition" : "Open dispatch"}
+            </Link>
+          </div>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={fr ? "Reçus aujourd'hui" : "Received today"} value={String(k.receivedToday)} change={k.receivedChange} spark={throughputSpark} icon={Package} />
-        <KpiCard title={fr ? "Expédiés aujourd'hui" : "Dispatched today"} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={throughputSpark} icon={Send} />
-        <KpiCard title={fr ? "Ponctualité" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        <KpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
-        <KpiCard title={fr ? "Temps de traitement moyen" : "Avg process time"} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
-        <KpiCard title={fr ? "Lots actifs" : "Active batches"} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
-        <KpiCard title={fr ? "Colis anciens" : "Aged parcels"} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
+        <AnalyticsKpiCard title={fr ? "Réception (auj.)" : "Received today"} value={String(k.receivedToday)} change={k.receivedChange} spark={inboundSpark} icon={Package} />
+        <AnalyticsKpiCard title={fr ? "Expédition (auj.)" : "Dispatched today"} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={dispatchSpark} icon={Send} />
+        <AnalyticsKpiCard title={fr ? "Livraison à l'heure" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
+        <AnalyticsKpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={warehouseThroughputTrend.map((d) => d.revenue * 30)} icon={DollarSign} />
+        <AnalyticsKpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
+        <AnalyticsKpiCard title={fr ? "Temps traitement moy." : "Avg. process time"} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
+        <AnalyticsKpiCard title={fr ? "Lots actifs" : "Active batches"} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
+        <AnalyticsKpiCard title={fr ? "Colis vieillis" : "Aged parcels"} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Débit hebdomadaire" : "Weekly throughput"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Colis reçus et expédiés" : "Parcels received & dispatched"} · {period}</p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
+                {fr ? "Débit hebdomadaire" : "Weekly throughput"}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {fr ? "Réception & expédition" : "Inbound & dispatch"} · {period}
+              </p>
             </div>
             <Badge variant="info">{s.dispatchedToday - s.failedDeliveries} {fr ? "en transit" : "in transit"}</Badge>
           </CardHeader>
           <CardContent>
-            <DualMetricChart data={warehouseThroughputTrend} height={220} />
+            <DualMetricChart data={throughputData} height={220} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du jour" : "Today's goals"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Cibles opérationnelles" : "Operational targets"}</p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <GoalProgress label={fr ? "Objectif expédition" : "Dispatch target"} current={warehouseGoals.dispatchCurrent} target={warehouseGoals.dispatchTarget} />
+            <GoalProgress label={fr ? "Objectif réception" : "Inbound target"} current={warehouseGoals.inboundCurrent} target={warehouseGoals.inboundTarget} />
+            <GoalProgress label={fr ? "Objectif à l'heure" : "On-time target"} current={warehouseGoals.onTimeCurrent} target={warehouseGoals.onTimeTarget} format={(n) => `${n}%`} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-900">{fr ? "Utilisation des lanes" : "Lane utilization"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Capacité lanes de tri" : "Sort lane capacity today"}</p>
+          </CardHeader>
+          <CardContent>
+            <HorizontalBarChart
+              items={warehouseLaneUtilization.map((l) => ({ name: l.lane, revenue: l.pct }))}
+              valueKey="revenue"
+              labelKey="name"
+              formatValue={(v) => `${v}%`}
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
-            <Activity className="h-4 w-4 text-indigo-600" />
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <div>
+              <h2 className="font-semibold text-slate-900">{fr ? "Alertes opérationnelles" : "Operational alerts"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Exceptions · Retours · Colis vieillis · Paiements" : "Exceptions · Returns · Aged · Payments"}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {warehouseDashboardAlerts.map((alert) => {
+              const Icon = alertIcon[alert.type];
+              return (
+                <Link
+                  key={alert.id}
+                  href={ops(alert.href)}
+                  className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 transition-colors hover:border-indigo-200 hover:bg-indigo-50/50"
+                >
+                  <div className="rounded-lg bg-amber-50 p-2">
+                    <Icon className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{fr ? alert.titleFr : alert.title}</p>
+                      <Badge variant={alertPriorityVariant[alert.priority] ?? "default"}>
+                        {fr ? alert.priorityFr : alert.priority}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">{fr ? alert.detailFr : alert.detail}</p>
+                    <p className="mt-1 text-xs text-slate-400">{fr ? alert.timeFr : alert.time}</p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400" />
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className="h-4 w-4 text-[var(--primary)]" />
+              <div>
+                <h2 className="font-semibold text-slate-900">{fr ? "File d'expédition" : "Dispatch queue"}</h2>
+                <p className="text-xs text-slate-500">{fr ? "Lots en préparation et prêts" : "Batches building & ready"}</p>
+              </div>
+            </div>
+            <Link href={ops("/dispatch")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              columns={[
+                {
+                  key: "id",
+                  label: "Batch",
+                  render: (row) => (
+                    <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">
+                      {String(row.id)}
+                    </Link>
+                  ),
+                },
+                { key: "parcels", label: fr ? "Colis" : "Parcels" },
+                { key: "rider", label: fr ? "Livreur" : "Rider" },
+                { key: "zone", label: fr ? "Zone" : "Zone" },
+                { key: "eta", label: "ETA" },
+                {
+                  key: "status",
+                  label: t("status"),
+                  render: (row) => (
+                    <Badge variant={dispatchStatusVariant[row.status as string] ?? "default"}>
+                      {fr ? row.statusFr : row.status}
+                    </Badge>
+                  ),
+                },
+              ]}
+              data={warehouseDispatchQueue as unknown as Record<string, unknown>[]}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-900">{fr ? "Score ops" : "Ops health score"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Réception aux exceptions" : "Inbound through exceptions"}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {warehouseHealthBreakdown.map((h) => (
+              <div key={h.label}>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="text-slate-600">{h.label}</span>
+                  <span className="font-bold text-slate-900">{h.score}%</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${h.score}%` }} />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {quickLinks.map((link) => (
+          <Link
+            key={link.path}
+            href={ops(link.path)}
+            className="group flex items-center gap-3 rounded-xl border border-indigo-100 bg-white p-4 shadow-sm transition-all hover:border-[var(--primary)] hover:shadow-md"
+          >
+            <div className="rounded-lg bg-indigo-50 p-2">
+              <link.icon className="h-5 w-5 text-[var(--primary)]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-900">{link.label}</p>
+              {(link.countKey ? s[link.countKey] : link.count) != null && (
+                <p className="text-xl font-bold text-indigo-700">{link.countKey ? s[link.countKey] : link.count}</p>
+              )}
+            </div>
+            <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[var(--primary)]" />
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Truck className="h-4 w-4 text-[var(--primary)]" />
+              <div>
+                <h2 className="font-semibold text-slate-900">{fr ? "Performance livreurs" : "Rider performance"}</h2>
+                <p className="text-xs text-slate-500">{fr ? "Classement du jour" : "Today's leaderboard"}</p>
+              </div>
+            </div>
+            <Link href={ops("/riders")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              columns={[
+                {
+                  key: "name",
+                  label: fr ? "Livreur" : "Rider",
+                  render: (row) => (
+                    <Link href={ops(`/riders/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">
+                      {String(row.name)}
+                    </Link>
+                  ),
+                },
+                { key: "deliveries", label: fr ? "Livraisons" : "Deliveries" },
+                { key: "onTime", label: fr ? "À l'heure %" : "On-time %", render: (row) => `${row.onTime}%` },
+                { key: "codCollected", label: fr ? "Paiements" : "Payments", render: (row) => formatCurrency(row.codCollected as number, locale) },
+                { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `★ ${row.rating}` },
+                { key: "exceptions", label: fr ? "Exceptions" : "Exceptions" },
+              ]}
+              data={warehouseRiderLeaderboard.slice(0, 6) as unknown as Record<string, unknown>[]}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Activity className="h-4 w-4 text-[var(--primary)]" />
             <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -149,100 +367,25 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Utilisation des voies" : "Lane utilization"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "Capacité des voies de tri aujourd'hui" : "Sort lanes capacity today"}</p>
-          </CardHeader>
-          <CardContent>
-            <HorizontalBarChart
-              items={warehouseLaneUtilization.map((l) => ({ name: l.lane, revenue: l.pct }))}
-              valueKey="revenue"
-              labelKey="name"
-              formatValue={(v) => `${v}%`}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Score de santé des opérations" : "Ops health score"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "De la réception aux exceptions" : "Inbound through exceptions"}</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {warehouseHealthBreakdown.map((h) => (
-              <div key={h.label}>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{h.label}</span>
-                  <span className="font-bold text-slate-900">{h.score}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-indigo-600" style={{ width: `${h.score}%` }} />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {quickLinks.map((link) => (
-          <Link
-            key={link.path}
-            href={ops(link.path)}
-            className="flex items-center justify-between rounded-xl border border-indigo-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-          >
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-indigo-50 p-2">
-                <link.icon className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div>
-                <p className="font-medium text-slate-900">{link.label}</p>
-                <p className="text-2xl font-bold text-indigo-700">{s[link.countKey]}</p>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-indigo-600" />
-            <h2 className="font-semibold text-slate-900">{fr ? "Meilleurs livreurs aujourd'hui" : "Top riders today"}</h2>
-          </div>
-          <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir les livraisons" : "View deliveries"}</Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            columns={[
-              { key: "name", label: fr ? "Livreur" : "Rider" },
-              { key: "deliveries", label: fr ? "Livraisons" : "Deliveries" },
-              { key: "onTime", label: fr ? "Ponctualité %" : "On-time %", render: (row) => `${row.onTime}%` },
-            ]}
-            data={warehouseRiderPerformance as unknown as Record<string, unknown>[]}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold">{fr ? "Livraisons actives" : "Active deliveries"}</h2>
-            <Link href={ops("/deliveries")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir tout" : "View all"}</Link>
+            <Link href={ops("/deliveries")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-slate-900">{s.dispatchedToday - s.failedDeliveries}</p>
-            <p className="text-sm text-slate-500">{fr ? "En transit en ce moment" : "In transit right now"}</p>
+            <p className="text-sm text-slate-500">{fr ? "En transit maintenant" : "In transit right now"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold">{fr ? "Exceptions ouvertes" : "Open exceptions"}</h2>
-            <Link href={ops("/exceptions")} className="text-sm text-indigo-600 hover:underline">{fr ? "Voir tout" : "View all"}</Link>
+            <h2 className="font-semibold">{fr ? "Retours en attente" : "Pending returns"}</h2>
+            <Link href={ops("/returns")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-amber-600">2</p>
-            <p className="text-sm text-slate-500">{fr ? "Nécessitent une enquête" : "Require investigation"}</p>
+            <p className="text-3xl font-bold text-amber-600">{warehouseReturnMetrics.pendingReturns}</p>
+            <p className="text-sm text-slate-500">
+              {warehouseReturnMetrics.processedToday} {fr ? "traités aujourd'hui" : "processed today"} · {warehouseReturnMetrics.restockRate}% {fr ? "remis en stock" : "restocked"}
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -28,7 +28,7 @@ export function ProductWizard() {
             key={s}
             onClick={() => setStep(i)}
             className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-              i === step ? "bg-blue-600 text-white" : i < step ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+              i === step ? "bg-[var(--primary)] text-white" : i < step ? "bg-red-100 text-[var(--primary)]" : "bg-slate-100 text-slate-500"
             }`}
           >
             {i + 1}. {s}

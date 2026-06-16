@@ -55,7 +55,7 @@ export function ProductCard({ product, flash }: ProductCardProps) {
             sizes="(max-width: 768px) 50vw, 25vw"
           />
           {discount > 0 && (
-            <span className="absolute left-3 top-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
+            <span className="absolute left-3 top-3 rounded-lg bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-lg">
               -{discount}%
             </span>
           )}
@@ -67,7 +67,7 @@ export function ProductCard({ product, flash }: ProductCardProps) {
         </div>
 
         <div className="p-4">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-slate-800 group-hover:text-blue-700">
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-slate-800 group-hover:text-[var(--primary-hover)]">
             {name}
           </h3>
 

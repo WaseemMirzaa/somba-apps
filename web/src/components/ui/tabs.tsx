@@ -22,7 +22,7 @@ export function Tabs({
           className={cn(
             "whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-150",
             active === tab.id
-              ? "bg-white text-blue-700 shadow-sm"
+              ? "bg-white text-[var(--primary)] shadow-sm"
               : "text-slate-500 hover:text-slate-800"
           )}
         >

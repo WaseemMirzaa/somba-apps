@@ -52,6 +52,15 @@ export type InventoryEntity = {
   movements: { time: string; label: string; qty: number }[];
 };
 
+export type DeliveryProduct = {
+  productId: number;
+  name: string;
+  sku: string;
+  variant: string;
+  qty: number;
+  image: string;
+};
+
 export type DeliveryEntity = {
   id: string;
   orderId: string;
@@ -59,6 +68,12 @@ export type DeliveryEntity = {
   customer: string;
   customerPhone: string;
   customerAddress: string;
+  sellerId: number;
+  seller: string;
+  sellerStore: string;
+  sellerPhone: string;
+  zone: string;
+  paymentType: string;
   riderId: number;
   rider: string;
   riderPhone: string;
@@ -69,6 +84,8 @@ export type DeliveryEntity = {
   itemsCount: number;
   currentStop: number;
   totalStops: number;
+  products: DeliveryProduct[];
+  timeline: { time: string; label: string; done?: boolean; detail?: string }[];
 };
 
 export type ReturnEntity = {
@@ -77,7 +94,10 @@ export type ReturnEntity = {
   customerId: number;
   customer: string;
   reason: string;
+  customerComment?: string;
+  returnType: "refund" | "replacement" | "exchange";
   status: string;
+  createdAt: string;
   productId: number;
   product: string;
   variant: string;
@@ -85,7 +105,31 @@ export type ReturnEntity = {
   image: string;
   inspection: { condition: string; photos: number; notes: string };
   refund: { amount: number; method: string; status: string };
-  timeline: { time: string; label: string; done?: boolean }[];
+  timeline: { time: string; label: string; done?: boolean; detail?: string; highlight?: boolean }[];
+};
+
+export type ReplacementProductInfo = {
+  sku: string;
+  productId: number;
+  name: string;
+  nameFr: string;
+  variant: string;
+  variantFr: string;
+  image: string;
+  price: number;
+};
+
+export type ReplacementDispatchInfo = {
+  status: string;
+  statusFr: string;
+  batchId?: string;
+  rider?: string;
+  riderPhone?: string;
+  vehicle?: string;
+  eta?: string;
+  etaFr?: string;
+  window?: string;
+  windowFr?: string;
 };
 
 export type ReplacementEntity = {
@@ -93,21 +137,63 @@ export type ReplacementEntity = {
   orderId: string;
   customerId: number;
   customer: string;
+  sellerId: number;
+  sellerName: string;
   sku: string;
   status: string;
-  returnedProduct: { sku: string; condition: string; inspection: string };
-  newProduct: { sku: string; allocated: boolean; dispatchStatus: string };
-  timeline: { time: string; label: string; done?: boolean }[];
+  reason: string;
+  reasonFr: string;
+  customerComment?: string;
+  customerCommentFr?: string;
+  createdAt: string;
+  warehouse: string;
+  returnedProduct: ReplacementProductInfo & {
+    condition: string;
+    conditionFr: string;
+    inspection: string;
+    inspectionFr: string;
+    inspectionPhotos: number;
+  };
+  newProduct: ReplacementProductInfo & {
+    warehouseLocation: string;
+    warehouseLocationFr: string;
+    allocated: boolean;
+    allocatedAt?: string;
+    dispatch: ReplacementDispatchInfo;
+  };
+  timeline: { time: string; label: string; labelFr: string; done?: boolean; detail?: string; detailFr?: string }[];
+};
+
+export type ExchangeProduct = {
+  sku: string;
+  productId: number;
+  name: string;
+  nameFr: string;
+  variant: string;
+  variantFr: string;
+  image: string;
+  price: number;
 };
 
 export type ExchangeEntity = {
   id: string;
   orderId: string;
+  customerId: number;
   customer: string;
-  oldSku: string;
-  newSku: string;
-  priceDifference: number;
+  sellerId: number;
+  sellerName: string;
+  reason: string;
+  reasonFr: string;
+  customerComment?: string;
+  customerCommentFr?: string;
+  createdAt: string;
   status: string;
+  oldProduct: ExchangeProduct;
+  newProduct: ExchangeProduct;
+  priceDifference: number;
+  photos: string[];
+  warehouse: string;
+  timeline: { time: string; label: string; labelFr: string; done?: boolean }[];
 };
 
 export type CodReconciliationEntity = {
@@ -121,6 +207,38 @@ export type CodReconciliationEntity = {
   difference: number;
   status: string;
   orders: { orderId: string; codAmount: number; collected: number }[];
+};
+
+export type ShiftReconciliationOrder = {
+  orderId: string;
+  customer: string;
+  expected: number;
+  collected: number;
+  status: "collected" | "partial" | "failed" | "pending";
+};
+
+export type ShiftReconciliationEntity = {
+  id: string;
+  shiftDate: string;
+  shiftName: string;
+  shiftNameFr: string;
+  warehouse: string;
+  warehouseFr: string;
+  supervisor: string;
+  riderId: number;
+  rider: string;
+  riderPhone: string;
+  zone: string;
+  vehicle: string;
+  expectedCollections: number;
+  amountReceived: number | null;
+  variance: number;
+  ordersCount: number;
+  status: "pending" | "investigating" | "reconciled" | "approved";
+  varianceNotes?: string;
+  varianceNotesFr?: string;
+  timeline: { time: string; label: string; labelFr: string; done?: boolean }[];
+  orders: ShiftReconciliationOrder[];
 };
 
 export type ExceptionEntity = {
@@ -188,6 +306,103 @@ export const inboundParcels = parcelEntities.map((p, i) => ({
   },
 }));
 
+// ─── Aged / stuck parcels ────────────────────────────────────────────────────
+
+const AGED_STUCK_META: Record<
+  string,
+  { arrivalDate: string; daysStuck: number; stuckReason: string; stuckReasonFr: string; linkedExceptionId?: string }
+> = {
+  "PKG-005": {
+    arrivalDate: "2024-06-04",
+    daysStuck: 2,
+    stuckReason: "Missing item exception — awaiting seller response",
+    stuckReasonFr: "Exception article manquant — en attente réponse vendeur",
+    linkedExceptionId: "INC-002",
+  },
+  "PKG-006": {
+    arrivalDate: "2024-06-03",
+    daysStuck: 3,
+    stuckReason: "Awaiting inbound receiving scan",
+    stuckReasonFr: "En attente du scan de réception entrant",
+  },
+  "PKG-007": {
+    arrivalDate: "2024-06-02",
+    daysStuck: 4,
+    stuckReason: "Low priority — sorting backlog in Zone C",
+    stuckReasonFr: "Priorité basse — retard de tri en Zone C",
+  },
+  "PKG-008": {
+    arrivalDate: "2024-06-01",
+    daysStuck: 5,
+    stuckReason: "Inspection pending — item count mismatch",
+    stuckReasonFr: "Inspection en attente — écart de quantité",
+  },
+};
+
+export type AgedParcelEntity = (typeof inboundParcels)[number] & {
+  arrivalDate: string;
+  daysStuck: number;
+  stuckReason: string;
+  stuckReasonFr: string;
+  warehouse: string;
+  warehouseFr: string;
+  trackingNumber: string;
+  orderStatus: string;
+  orderDate: string;
+  orderAmount: number;
+  linkedExceptionId?: string;
+  agedTimeline: {
+    time: string;
+    label: string;
+    labelFr: string;
+    done?: boolean;
+    detail?: string;
+    highlight?: boolean;
+  }[];
+};
+
+export const agedParcelEntities: AgedParcelEntity[] = inboundParcels
+  .filter((p) => p.status === "inbound" || p.priority === "low")
+  .map((p) => {
+    const order = orderEntities.find((o) => o.id === p.orderId);
+    const meta = AGED_STUCK_META[p.id] ?? {
+      arrivalDate: "2024-06-04",
+      daysStuck: 1,
+      stuckReason: "Parcel stalled in warehouse queue",
+      stuckReasonFr: "Colis bloqué dans la file entrepôt",
+    };
+    return {
+      ...p,
+      ...meta,
+      warehouse: order?.warehouse ?? "Kinshasa Hub",
+      warehouseFr: "Hub Kinshasa",
+      trackingNumber: order ? `TRK-${order.id.replace("ORD-", "")}` : "—",
+      orderStatus: order?.status ?? "unknown",
+      orderDate: order?.date ?? "—",
+      orderAmount: order?.amount ?? 0,
+      agedTimeline: [
+        { time: "07:00", label: "Collected from seller", labelFr: "Collecté chez le vendeur", done: true },
+        {
+          time: `${meta.arrivalDate} ${p.arrival}`,
+          label: "Arrived at hub",
+          labelFr: "Arrivé au hub",
+          done: true,
+        },
+        {
+          time: meta.arrivalDate,
+          label: "Flagged as aged / stuck",
+          labelFr: "Signalé comme bloqué",
+          done: true,
+          detail: meta.stuckReason,
+          highlight: true,
+        },
+        { time: "—", label: "Received", labelFr: "Reçu", done: ["received", "sorting", "ready", "dispatched"].includes(p.status) },
+        { time: "—", label: "Sorted", labelFr: "Trié", done: ["sorting", "ready", "dispatched"].includes(p.status) },
+        { time: "—", label: "Dispatched", labelFr: "Expédié", done: p.status === "dispatched" },
+      ],
+    };
+  });
+
 // ─── Sorting board ───────────────────────────────────────────────────────────
 
 export const sortingParcels: SortingParcel[] = parcelEntities
@@ -250,56 +465,136 @@ export const inventoryEntities: InventoryEntity[] = products.slice(0, 6).map((p,
 
 // ─── Active deliveries ───────────────────────────────────────────────────────
 
-export const deliveryEntities: DeliveryEntity[] = orderEntities
-  .filter((o) => o.status === "processing" || o.status === "delivered")
-  .slice(0, 5)
-  .map((o, i) => ({
-    id: `DEL-${o.id.replace("ORD-", "")}`,
-    orderId: o.id,
-    customerId: o.customerId,
-    customer: o.customer,
-    customerPhone: o.customerPhone,
-    customerAddress: o.customerAddress,
-    riderId: riderEntities[i % riderEntities.length].id,
-    rider: riderEntities[i % riderEntities.length].name,
-    riderPhone: riderEntities[i % riderEntities.length].phone,
-    vehicle: riderEntities[i % riderEntities.length].vehicle,
-    status: o.status === "delivered" ? "delivered" : i % 2 === 0 ? "in_transit" : "out_for_delivery",
-    eta: i % 2 === 0 ? "14:30" : "16:00",
-    codAmount: o.paymentMethod === "COD" ? o.amount : 0,
-    itemsCount: o.itemsCount,
-    currentStop: i + 1,
-    totalStops: 8,
-  }));
+const ETAS = ["13:15", "13:45", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
+
+function buildDeliveryEntity(
+  order: typeof orderEntities[number],
+  rider: RiderEntity,
+  seq: number,
+  status: "in_transit" | "out_for_delivery" | "delivered",
+  totalStops: number,
+): DeliveryEntity {
+  const seller = sellerEntities.find((s) => s.id === order.sellerId) ?? sellerEntities[0];
+  const doneSteps = status === "delivered" ? 5 : seq % 2 === 0 ? 4 : 3;
+
+  return {
+    id: `DEL-${rider.id}-${String(seq).padStart(3, "0")}`,
+    orderId: order.id,
+    customerId: order.customerId,
+    customer: order.customer,
+    customerPhone: order.customerPhone,
+    customerAddress: order.customerAddress,
+    sellerId: seller.id,
+    seller: seller.owner,
+    sellerStore: seller.storeName,
+    sellerPhone: seller.phone,
+    zone: order.customerCity ?? rider.zone,
+    paymentType: order.paymentMethod,
+    riderId: rider.id,
+    rider: rider.name,
+    riderPhone: rider.phone,
+    vehicle: rider.vehicle,
+    status,
+    eta: ETAS[(seq - 1) % ETAS.length],
+    codAmount: order.paymentMethod === "COD" ? order.amount : 0,
+    itemsCount: order.itemsCount,
+    currentStop: seq,
+    totalStops,
+    products: order.items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      sku: item.sku,
+      variant: item.variant,
+      qty: item.qty,
+      image: item.image,
+    })),
+    timeline: [
+      { time: `${order.date} 09:00`, label: "Order placed", done: doneSteps >= 1 },
+      { time: `${order.date} 10:30`, label: "Picked from seller", done: doneSteps >= 2 },
+      { time: `${order.date} 11:45`, label: "At warehouse", done: doneSteps >= 3 },
+      { time: `${order.date} 13:00`, label: "Out for delivery", done: doneSteps >= 4 },
+      {
+        time: status === "delivered" ? `${order.date} 15:30` : "—",
+        label: "Delivered",
+        done: doneSteps >= 5,
+      },
+    ],
+  };
+}
+
+export const deliveryEntities: DeliveryEntity[] = riderEntities.flatMap((rider) => {
+  const active = Array.from({ length: rider.activeDeliveries }, (_, i) => {
+    const order = orderEntities[(rider.id + i) % orderEntities.length];
+    const status: "in_transit" | "out_for_delivery" = i % 2 === 0 ? "in_transit" : "out_for_delivery";
+    return buildDeliveryEntity(order, rider, i + 1, status, rider.activeDeliveries);
+  });
+
+  const completed = buildDeliveryEntity(
+    orderEntities[rider.id % orderEntities.length],
+    rider,
+    rider.activeDeliveries + 1,
+    "delivered",
+    rider.activeDeliveries,
+  );
+
+  return [...active, completed];
+});
 
 // ─── Returns ─────────────────────────────────────────────────────────────────
 
 export const returnEntities: ReturnEntity[] = [
   {
     id: "RET-001", orderId: "ORD-2024-001", customerId: 1, customer: "Marie Dubois",
-    reason: "Wrong size", status: "pending_inspection", productId: 4,
-    product: "Nike Air Max 270", variant: "Size 42", qty: 1,
+    reason: "Wrong size", customerComment: "Ordered size 43 but received size 42. Item is unopened in original packaging.",
+    returnType: "refund", status: "pending_inspection", createdAt: "2024-06-05",
+    productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
     image: products[3].image,
-    inspection: { condition: "Good", photos: 2, notes: "Unopened box" },
-    refund: { amount: 129, method: "Wallet", status: "pending" },
+    inspection: { condition: "Good", photos: 2, notes: "Unopened box — awaiting warehouse receipt" },
+    refund: { amount: 129, method: "Somba Wallet", status: "pending" },
     timeline: [
-      { time: "2024-06-05", label: "Requested", done: true },
-      { time: "2024-06-06", label: "Pickup Scheduled", done: true },
-      { time: "—", label: "Warehouse Received", done: false },
+      { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
+      { time: "2024-06-05 10:15", label: "Return Requested", done: true, detail: "Wrong size", highlight: true },
+      { time: "2024-06-05 14:30", label: "Return Approved", done: true },
+      { time: "2024-06-06 09:00", label: "Pickup Scheduled", done: true },
+      { time: "—", label: "In Transit to Warehouse", done: false },
+      { time: "—", label: "Received at Warehouse", done: false },
       { time: "—", label: "Refund Processed", done: false },
     ],
   },
   {
     id: "RET-002", orderId: "ORD-2024-004", customerId: 4, customer: "Ahmed Hassan",
-    reason: "Damaged item", status: "inspecting", productId: 5,
-    product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
+    reason: "Damaged item", customerComment: "Vacuum motor makes loud noise and box was crushed on arrival.",
+    returnType: "refund", status: "inspecting", createdAt: "2024-06-04",
+    productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
     image: products[4].image,
-    inspection: { condition: "Damaged", photos: 4, notes: "Box crushed, motor noise" },
+    inspection: { condition: "Damaged", photos: 4, notes: "Box crushed, motor noise confirmed during inspection" },
     refund: { amount: 649, method: "Original Payment", status: "pending" },
     timeline: [
-      { time: "2024-06-04", label: "Requested", done: true },
-      { time: "2024-06-05", label: "Received at Warehouse", done: true },
-      { time: "2024-06-06", label: "Inspecting", done: true },
+      { time: "2024-06-02 18:30", label: "Order Delivered", done: true },
+      { time: "2024-06-04 11:20", label: "Return Requested", done: true, detail: "Damaged item", highlight: true },
+      { time: "2024-06-04 16:00", label: "Return Approved", done: true },
+      { time: "2024-06-05 08:45", label: "Pickup Completed", done: true },
+      { time: "2024-06-05 14:20", label: "Received at Warehouse", done: true },
+      { time: "2024-06-06 10:00", label: "Inspecting", done: true },
+      { time: "—", label: "Refund Processed", done: false },
+    ],
+  },
+  {
+    id: "RET-003", orderId: "ORD-2024-003", customerId: 3, customer: "Sophie Martin",
+    reason: "Not as described", customerComment: "Colour on the listing was white but the shoes received are grey.",
+    returnType: "exchange", status: "refunded", createdAt: "2024-06-02",
+    productId: 4, product: "Nike Air Max 270", variant: "Size 40", qty: 1,
+    image: products[3].image,
+    inspection: { condition: "Good", photos: 3, notes: "Item matches customer photos — colour mismatch confirmed" },
+    refund: { amount: 129, method: "Somba Wallet", status: "completed" },
+    timeline: [
+      { time: "2024-05-28 19:00", label: "Order Delivered", done: true },
+      { time: "2024-06-02 09:30", label: "Return Requested", done: true, detail: "Not as described", highlight: true },
+      { time: "2024-06-02 13:00", label: "Return Approved", done: true },
+      { time: "2024-06-03 10:15", label: "Pickup Completed", done: true },
+      { time: "2024-06-03 16:40", label: "Received at Warehouse", done: true },
+      { time: "2024-06-04 11:00", label: "Inspection Passed", done: true },
+      { time: "2024-06-04 15:30", label: "Refund Processed", done: true },
     ],
   },
 ];
@@ -308,26 +603,123 @@ export const returnEntities: ReturnEntity[] = [
 
 export const replacementEntities: ReplacementEntity[] = [
   {
-    id: "REP-001", orderId: "ORD-2024-002", customerId: 2, customer: "John Smith",
-    sku: "SKU-3", status: "allocated",
-    returnedProduct: { sku: "SKU-3", condition: "Defective", inspection: "Audio issue confirmed" },
-    newProduct: { sku: "SKU-3-NEW", allocated: true, dispatchStatus: "ready" },
+    id: "REP-001",
+    orderId: "ORD-2024-002",
+    customerId: 2,
+    customer: "John Smith",
+    sellerId: 5,
+    sellerName: "AudioHub",
+    sku: "SKU-3",
+    status: "allocated",
+    reason: "Defective product — audio failure",
+    reasonFr: "Produit défectueux — panne audio",
+    customerComment: "Left speaker crackles and cuts out after 10 minutes. Requesting a replacement unit.",
+    customerCommentFr: "Le haut-parleur gauche grésille et coupe le son après 10 minutes. Je demande un remplacement.",
+    createdAt: "2024-06-03",
+    warehouse: "Kinshasa Hub",
+    returnedProduct: {
+      sku: "SKU-3",
+      productId: 3,
+      name: "Sony WH-1000XM5 Headphones",
+      nameFr: "Casque Sony WH-1000XM5",
+      variant: "Black · Wireless",
+      variantFr: "Noir · Sans fil",
+      image: products[2].image,
+      price: 349,
+      condition: "Defective",
+      conditionFr: "Défectueux",
+      inspection: "Audio issue confirmed — left driver intermittent, right channel normal. Packaging intact.",
+      inspectionFr: "Problème audio confirmé — driver gauche intermittent, canal droit normal. Emballage intact.",
+      inspectionPhotos: 3,
+    },
+    newProduct: {
+      sku: "SKU-3-NEW",
+      productId: 3,
+      name: "Sony WH-1000XM5 Headphones",
+      nameFr: "Casque Sony WH-1000XM5",
+      variant: "Black · Wireless",
+      variantFr: "Noir · Sans fil",
+      image: products[2].image,
+      price: 349,
+      warehouseLocation: "Kinshasa Hub · Aisle A-12 · Bin 04",
+      warehouseLocationFr: "Hub Kinshasa · Allée A-12 · Casier 04",
+      allocated: true,
+      allocatedAt: "2024-06-06 10:30",
+      dispatch: {
+        status: "Ready for dispatch",
+        statusFr: "Prêt pour expédition",
+        window: "Next batch window today 16:00 · Zone A",
+        windowFr: "Prochaine vague aujourd'hui 16h00 · Zone A",
+        eta: "2024-06-08 (est. upon dispatch)",
+        etaFr: "2024-06-08 (est. à l'expédition)",
+      },
+    },
     timeline: [
-      { time: "2024-06-03", label: "Requested", done: true },
-      { time: "2024-06-04", label: "Approved", done: true },
-      { time: "2024-06-05", label: "Received", done: true },
-      { time: "2024-06-06", label: "Allocated", done: true },
-      { time: "—", label: "Dispatched", done: false },
+      { time: "2024-06-03 09:15", label: "Replacement requested", labelFr: "Remplacement demandé", done: true, detail: "Customer reported audio defect", detailFr: "Client signale un défaut audio" },
+      { time: "2024-06-04 11:00", label: "Seller approved", labelFr: "Approuvé par le vendeur", done: true },
+      { time: "2024-06-05 14:20", label: "Returned item received", labelFr: "Article retourné reçu", done: true, detail: "Inbound scan at Kinshasa Hub", detailFr: "Scan entrant au Hub Kinshasa" },
+      { time: "2024-06-05 16:45", label: "Inspection completed", labelFr: "Inspection terminée", done: true, detail: "Defect confirmed — eligible for replacement", detailFr: "Défaut confirmé — éligible au remplacement" },
+      { time: "2024-06-06 10:30", label: "Replacement allocated", labelFr: "Remplacement alloué", done: true, detail: "SKU-3-NEW reserved from A-12-04", detailFr: "SKU-3-NEW réservé depuis A-12-04" },
+      { time: "—", label: "Dispatched to customer", labelFr: "Expédié au client", done: false },
+      { time: "—", label: "Delivered", labelFr: "Livré", done: false },
     ],
   },
   {
-    id: "REP-002", orderId: "ORD-2024-006", customerId: 3, customer: "Pierre Laurent",
-    sku: "SKU-8", status: "pending",
-    returnedProduct: { sku: "SKU-8", condition: "Pending", inspection: "Awaiting receipt" },
-    newProduct: { sku: "SKU-8-NEW", allocated: false, dispatchStatus: "pending" },
+    id: "REP-002",
+    orderId: "ORD-2024-006",
+    customerId: 3,
+    customer: "Pierre Laurent",
+    sellerId: 6,
+    sellerName: "GameZone",
+    sku: "SKU-8",
+    status: "pending",
+    reason: "Damaged on arrival",
+    reasonFr: "Endommagé à la réception",
+    customerComment: "Console box was crushed on delivery. Disc drive does not read games.",
+    customerCommentFr: "Carton écrasé à la livraison. Le lecteur de disques ne lit plus les jeux.",
+    createdAt: "2024-06-05",
+    warehouse: "Kinshasa Hub",
+    returnedProduct: {
+      sku: "SKU-8",
+      productId: 8,
+      name: "PlayStation 5 Console",
+      nameFr: "Console PlayStation 5",
+      variant: "Standard · White",
+      variantFr: "Standard · Blanc",
+      image: products[7].image,
+      price: 499,
+      condition: "Pending inspection",
+      conditionFr: "Inspection en attente",
+      inspection: "Awaiting receipt at warehouse — customer scheduled pickup for 2024-06-07.",
+      inspectionFr: "En attente de réception à l'entrepôt — enlèvement client prévu le 2024-06-07.",
+      inspectionPhotos: 2,
+    },
+    newProduct: {
+      sku: "SKU-8-NEW",
+      productId: 8,
+      name: "PlayStation 5 Console",
+      nameFr: "Console PlayStation 5",
+      variant: "Standard · White",
+      variantFr: "Standard · Blanc",
+      image: products[7].image,
+      price: 499,
+      warehouseLocation: "Kinshasa Hub · Aisle B-03 · Bin 02",
+      warehouseLocationFr: "Hub Kinshasa · Allée B-03 · Casier 02",
+      allocated: false,
+      dispatch: {
+        status: "Pending allocation",
+        statusFr: "Allocation en attente",
+        window: "Unit reserved once returned item is received and inspected",
+        windowFr: "Unité réservée une fois l'article retourné reçu et inspecté",
+      },
+    },
     timeline: [
-      { time: "2024-06-05", label: "Requested", done: true },
-      { time: "2024-06-06", label: "Approved", done: true },
+      { time: "2024-06-05 08:30", label: "Replacement requested", labelFr: "Remplacement demandé", done: true },
+      { time: "2024-06-06 09:00", label: "Seller approved", labelFr: "Approuvé par le vendeur", done: true },
+      { time: "—", label: "Returned item received", labelFr: "Article retourné reçu", done: false },
+      { time: "—", label: "Inspection completed", labelFr: "Inspection terminée", done: false },
+      { time: "—", label: "Replacement allocated", labelFr: "Remplacement alloué", done: false },
+      { time: "—", label: "Dispatched to customer", labelFr: "Expédié au client", done: false },
     ],
   },
 ];
@@ -335,8 +727,101 @@ export const replacementEntities: ReplacementEntity[] = [
 // ─── Exchanges ───────────────────────────────────────────────────────────────
 
 export const exchangeEntities: ExchangeEntity[] = [
-  { id: "EXC-001", orderId: "ORD-2024-003", customer: "Sophie Martin", oldSku: "SKU-4-42", newSku: "SKU-4-44", priceDifference: 0, status: "pending" },
-  { id: "EXC-002", orderId: "ORD-2024-001", customer: "Marie Dubois", oldSku: "SKU-1-128", newSku: "SKU-1-256", priceDifference: 100, status: "approved" },
+  {
+    id: "EXC-001",
+    orderId: "ORD-2024-003",
+    customerId: 3,
+    customer: "Sophie Martin",
+    sellerId: 2,
+    sellerName: "SportStyle",
+    reason: "Wrong size",
+    reasonFr: "Mauvaise taille",
+    customerComment: "Ordered size 44 but size 42 was delivered. Would like the correct size in exchange.",
+    customerCommentFr: "Taille 44 commandée mais taille 42 reçue. Je souhaite un échange pour la bonne taille.",
+    createdAt: "2024-06-06",
+    status: "pending",
+    oldProduct: {
+      sku: "SKU-4-42",
+      productId: 4,
+      name: "Nike Air Max 270",
+      nameFr: "Nike Air Max 270",
+      variant: "Size 42 · White",
+      variantFr: "Taille 42 · Blanc",
+      image: products[3].image,
+      price: 129,
+    },
+    newProduct: {
+      sku: "SKU-4-44",
+      productId: 4,
+      name: "Nike Air Max 270",
+      nameFr: "Nike Air Max 270",
+      variant: "Size 44 · White",
+      variantFr: "Taille 44 · Blanc",
+      image: products[3].image,
+      price: 129,
+    },
+    priceDifference: 0,
+    photos: [
+      products[3].image,
+      "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=400&h=400&q=80",
+      "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&w=400&h=400&q=80",
+    ],
+    warehouse: "Kinshasa Hub",
+    timeline: [
+      { time: "2024-06-06 09:00", label: "Exchange requested", labelFr: "Échange demandé", done: true },
+      { time: "2024-06-06 11:30", label: "Seller notified", labelFr: "Vendeur notifié", done: true },
+      { time: "—", label: "Old item pickup", labelFr: "Enlèvement article retourné", done: false },
+      { time: "—", label: "Warehouse inspection", labelFr: "Inspection entrepôt", done: false },
+      { time: "—", label: "New variant dispatched", labelFr: "Nouvelle variante expédiée", done: false },
+    ],
+  },
+  {
+    id: "EXC-002",
+    orderId: "ORD-2024-001",
+    customerId: 1,
+    customer: "Marie Dubois",
+    sellerId: 3,
+    sellerName: "TechZone Store",
+    reason: "Prefer different variant",
+    reasonFr: "Variante différente souhaitée",
+    customerComment: "Need more storage — upgrading from 128GB to 256GB on the same model.",
+    customerCommentFr: "Besoin de plus de stockage — passage de 128 Go à 256 Go sur le même modèle.",
+    createdAt: "2024-06-04",
+    status: "approved",
+    oldProduct: {
+      sku: "SKU-1-128",
+      productId: 1,
+      name: "Samsung Galaxy S24 Ultra",
+      nameFr: "Samsung Galaxy S24 Ultra",
+      variant: "128GB · Titanium Black",
+      variantFr: "128 Go · Noir Titanium",
+      image: products[0].image,
+      price: 1199,
+    },
+    newProduct: {
+      sku: "SKU-1-256",
+      productId: 1,
+      name: "Samsung Galaxy S24 Ultra",
+      nameFr: "Samsung Galaxy S24 Ultra",
+      variant: "256GB · Titanium Black",
+      variantFr: "256 Go · Noir Titanium",
+      image: products[0].image,
+      price: 1299,
+    },
+    priceDifference: 100,
+    photos: [
+      products[0].image,
+      "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=400&h=400&q=80",
+    ],
+    warehouse: "Paris Nord FC",
+    timeline: [
+      { time: "2024-06-04 10:00", label: "Exchange requested", labelFr: "Échange demandé", done: true },
+      { time: "2024-06-04 14:00", label: "Approved by seller", labelFr: "Approuvé par le vendeur", done: true },
+      { time: "2024-06-05 09:30", label: "Old item received", labelFr: "Ancien article reçu", done: true },
+      { time: "2024-06-05 15:00", label: "New variant allocated", labelFr: "Nouvelle variante allouée", done: true },
+      { time: "—", label: "Dispatch new item", labelFr: "Expédition nouvel article", done: false },
+    ],
+  },
 ];
 
 // ─── COD reconciliation ──────────────────────────────────────────────────────
@@ -356,6 +841,91 @@ export const codEntities: CodReconciliationEntity[] = [
     orders: [
       { orderId: "ORD-2024-003", codAmount: 129, collected: 129 },
       { orderId: "ORD-2024-006", codAmount: 499, collected: 439 },
+    ],
+  },
+];
+
+// ─── Shift reconciliation ────────────────────────────────────────────────────
+
+export const shiftReconciliationEntities: ShiftReconciliationEntity[] = [
+  {
+    id: "REC-SHIFT-001",
+    shiftDate: "2026-06-08",
+    shiftName: "Afternoon",
+    shiftNameFr: "Après-midi",
+    warehouse: "Kinshasa Hub",
+    warehouseFr: "Hub Kinshasa",
+    supervisor: "Supervisor A · Marie N.",
+    riderId: 2,
+    rider: "Paul Kabongo",
+    riderPhone: "+243 99 444 5566",
+    zone: "Zone B",
+    vehicle: "Van",
+    expectedCollections: 2340,
+    amountReceived: 2280,
+    variance: -60,
+    ordersCount: 8,
+    status: "investigating",
+    varianceNotes: "Rider reported customer on ORD-2024-006 paid $439 instead of $499. Shortfall under review.",
+    varianceNotesFr: "Le livreur signale que le client ORD-2024-006 a payé 439 $ au lieu de 499 $. Écart en cours d'examen.",
+    timeline: [
+      { time: "2026-06-08 14:00", label: "Shift started", labelFr: "Shift démarré", done: true },
+      { time: "2026-06-08 18:45", label: "Last delivery completed", labelFr: "Dernière livraison terminée", done: true },
+      { time: "2026-06-08 19:10", label: "Rider handover at hub", labelFr: "Remise livreur au hub", done: true },
+      { time: "2026-06-08 19:25", label: "Cash counted — variance detected", labelFr: "Comptage espèces — écart détecté", done: true },
+      { time: "—", label: "Supervisor review", labelFr: "Revue superviseur", done: false },
+      { time: "—", label: "Shift approved", labelFr: "Shift approuvé", done: false },
+    ],
+    orders: [
+      { orderId: "ORD-2024-003", customer: "Sophie Martin", expected: 129, collected: 129, status: "collected" },
+      { orderId: "ORD-2024-006", customer: "Pierre Laurent", expected: 499, collected: 439, status: "partial" },
+      { orderId: "ORD-2024-008", customer: "Ahmed Hassan", expected: 349, collected: 349, status: "collected" },
+      { orderId: "ORD-2024-009", customer: "Jean Kambale", expected: 189, collected: 189, status: "collected" },
+      { orderId: "ORD-2024-010", customer: "Claire M.", expected: 275, collected: 275, status: "collected" },
+      { orderId: "ORD-2024-011", customer: "David O.", expected: 420, collected: 420, status: "collected" },
+      { orderId: "ORD-2024-012", customer: "Fatou B.", expected: 229, collected: 229, status: "collected" },
+      { orderId: "ORD-2024-013", customer: "Marc T.", expected: 250, collected: 250, status: "collected" },
+    ],
+  },
+  {
+    id: "REC-SHIFT-002",
+    shiftDate: "2026-06-08",
+    shiftName: "Morning",
+    shiftNameFr: "Matin",
+    warehouse: "Kinshasa Hub",
+    warehouseFr: "Hub Kinshasa",
+    supervisor: "Supervisor B · Jean D.",
+    riderId: 1,
+    rider: "Jean-Pierre M.",
+    riderPhone: "+243 99 111 2233",
+    zone: "Zone A",
+    vehicle: "Motorcycle",
+    expectedCollections: 4520,
+    amountReceived: 4520,
+    variance: 0,
+    ordersCount: 12,
+    status: "approved",
+    timeline: [
+      { time: "2026-06-08 07:00", label: "Shift started", labelFr: "Shift démarré", done: true },
+      { time: "2026-06-08 13:30", label: "Last delivery completed", labelFr: "Dernière livraison terminée", done: true },
+      { time: "2026-06-08 13:50", label: "Rider handover at hub", labelFr: "Remise livreur au hub", done: true },
+      { time: "2026-06-08 14:05", label: "Cash counted — match confirmed", labelFr: "Comptage espèces — correspondance confirmée", done: true },
+      { time: "2026-06-08 14:15", label: "Supervisor review", labelFr: "Revue superviseur", done: true },
+      { time: "2026-06-08 14:20", label: "Shift approved", labelFr: "Shift approuvé", done: true },
+    ],
+    orders: [
+      { orderId: "ORD-2024-001", customer: "Marie Dubois", expected: 1199, collected: 1199, status: "collected" },
+      { orderId: "ORD-2024-004", customer: "Ahmed Hassan", expected: 649, collected: 649, status: "collected" },
+      { orderId: "ORD-2024-014", customer: "Luc P.", expected: 320, collected: 320, status: "collected" },
+      { orderId: "ORD-2024-015", customer: "Nadia S.", expected: 410, collected: 410, status: "collected" },
+      { orderId: "ORD-2024-016", customer: "Eric W.", expected: 285, collected: 285, status: "collected" },
+      { orderId: "ORD-2024-017", customer: "Grace L.", expected: 198, collected: 198, status: "collected" },
+      { orderId: "ORD-2024-018", customer: "Hassan M.", expected: 367, collected: 367, status: "collected" },
+      { orderId: "ORD-2024-019", customer: "Isabelle R.", expected: 292, collected: 292, status: "collected" },
+      { orderId: "ORD-2024-020", customer: "James K.", expected: 175, collected: 175, status: "collected" },
+      { orderId: "ORD-2024-021", customer: "Karim A.", expected: 225, collected: 225, status: "collected" },
+      { orderId: "ORD-2024-022", customer: "Laura B.", expected: 200, collected: 200, status: "collected" },
+      { orderId: "ORD-2024-023", customer: "Michel C.", expected: 200, collected: 200, status: "collected" },
     ],
   },
 ];
@@ -389,6 +959,10 @@ export function getInboundParcel(id: string) {
   return inboundParcels.find((p) => p.id === id);
 }
 
+export function getAgedParcel(id: string) {
+  return agedParcelEntities.find((p) => p.id === id);
+}
+
 export function getRider(id: number) {
   return riderEntities.find((r) => r.id === id);
 }
@@ -399,6 +973,12 @@ export function getInventory(sku: string) {
 
 export function getDelivery(id: string) {
   return deliveryEntities.find((d) => d.id === id);
+}
+
+export function getDeliveriesByRider(riderId: number, activeOnly = true) {
+  return deliveryEntities.filter(
+    (d) => d.riderId === riderId && (!activeOnly || d.status !== "delivered")
+  );
 }
 
 export function getReturn(id: string) {
@@ -415,6 +995,11 @@ export function getExchange(id: string) {
 
 export function getCodReconciliation(id: string) {
   return codEntities.find((c) => c.id === id);
+}
+
+export function getShiftReconciliation(id?: string) {
+  if (id) return shiftReconciliationEntities.find((s) => s.id === id);
+  return shiftReconciliationEntities.find((s) => s.status === "investigating") ?? shiftReconciliationEntities[0];
 }
 
 export function getException(id: string) {

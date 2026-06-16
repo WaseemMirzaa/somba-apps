@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLocale } from "@/context/locale-context";
+import { BrandMark } from "@/components/landing/brand-mark";
 
 export function LandingFooter() {
   const { t } = useLocale();
@@ -11,13 +12,8 @@ export function LandingFooter() {
       <div className="mx-auto max-w-7xl px-4 py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-sky-500 text-sm font-bold text-white">
-                LC
-              </div>
-              <span className="font-[family-name:var(--font-display)] text-xl font-bold text-white">
-                {t("brand")}
-              </span>
+            <div className="mb-5">
+              <BrandMark tone="light" full wordClassName="text-white" />
             </div>
             <p className="max-w-sm text-sm leading-relaxed">{t("tagline")}</p>
             <p className="mt-3 inline-flex rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20">

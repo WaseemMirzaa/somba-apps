@@ -1,25 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import { Check, Lock, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useSellerSubscription } from "@/context/seller-subscription-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { SELLER_PLANS } from "@/lib/product-landing";
-import { BRAND } from "@/lib/config";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { cn } from "@/lib/utils";
 
-export default function SellerSubscribePage() {
+function SellerSubscribeContent() {
   const { persona } = useAuth();
   const { purchasePlan, getSubscription } = useSellerSubscription();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const [planId, setPlanId] = useState<"starter" | "pro" | "enterprise">("pro");
+
+  const initialPlan = (() => {
+    const raw = searchParams.get("plan");
+    if (raw === "professional" || raw === "pro") return "pro" as const;
+    if (raw === "starter") return "starter" as const;
+    if (raw === "enterprise") return "enterprise" as const;
+    return "pro" as const;
+  })();
+
+  const [planId, setPlanId] = useState<"starter" | "pro" | "enterprise">(initialPlan);
 
   const existing = getSubscription(persona.id);
 
@@ -41,10 +51,7 @@ export default function SellerSubscribePage() {
       <div className="mx-auto max-w-5xl px-4 py-16">
         <div className="mb-10 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-xs font-bold text-white">
-              S
-            </div>
-            <span className="font-[family-name:var(--font-display)] font-bold text-slate-900">{BRAND.name}</span>
+            <BrandMark />
           </Link>
           <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">
             {fr ? "Changer de compte" : "Switch account"}
@@ -82,7 +89,7 @@ export default function SellerSubscribePage() {
               )}
             >
               {plan.popular && (
-                <span className="absolute -top-2.5 right-4 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="absolute -top-2.5 right-4 btn-primary rounded-full px-2 py-0.5 text-[10px] font-bold text-white">
                   {fr ? "Populaire" : "Popular"}
                 </span>
               )}
@@ -124,5 +131,13 @@ export default function SellerSubscribePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SellerSubscribePage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>}>
+      <SellerSubscribeContent />
+    </Suspense>
   );
 }

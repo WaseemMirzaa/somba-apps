@@ -17,7 +17,7 @@ export default function SellerStorefrontPage() {
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Paramètres vitrine" : "Storefront Settings"}
-        actions={<Link href="/seller/storefront/preview" className="text-sm text-sky-600">{fr ? "Aperçu →" : "Preview →"}</Link>}
+        actions={<Link href="/seller/storefront/preview" className="text-sm text-[var(--primary)]">{fr ? "Aperçu →" : "Preview →"}</Link>}
       />
       <div className="card-premium space-y-4 p-6">
         <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Nom boutique (FR)" : "Store name (FR)"} defaultValue="TechZone Store" />

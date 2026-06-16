@@ -28,7 +28,7 @@ export default function SellerStorefrontPreviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {storeProducts.map((p) => <ProductCard key={p.id} product={p} />)}
       </div>
-      <Link href="/shop/stores/1" className="text-sm text-sky-600 hover:underline">{fr ? "Voir côté client →" : "View as customer →"}</Link>
+      <Link href="/shop/stores/1" className="text-sm text-[var(--primary)] hover:underline">{fr ? "Voir côté client →" : "View as customer →"}</Link>
     </div>
   );
 }

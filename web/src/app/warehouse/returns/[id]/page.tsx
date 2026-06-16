@@ -44,8 +44,8 @@ export default function WarehouseReturnDetailPage() {
         <DetailGridSection title="Overview">
           <InfoGrid items={[
             { label: "Return ID", value: ret.id },
-            { label: "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-indigo-600 hover:underline">{ret.orderId}</Link> },
-            { label: "Customer", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-indigo-600 hover:underline">{ret.customer}</Link> },
+            { label: "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
+            { label: "Customer", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
             { label: "Reason", value: ret.reason },
             { label: "Status", value: status },
           ]} />
@@ -57,7 +57,7 @@ export default function WarehouseReturnDetailPage() {
               <Image src={ret.image} alt={ret.product} fill className="object-cover" sizes="80px" />
             </div>
             <InfoGrid items={[
-              { label: "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-indigo-600 hover:underline">{ret.product}</Link> },
+              { label: "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
               { label: "Variant", value: ret.variant },
               { label: "Quantity", value: ret.qty },
             ]} />

@@ -2,26 +2,31 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
-import { MapPin, Phone, Navigation, CheckCircle } from "lucide-react";
+import { Phone, Navigation, CheckCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
+import { ActivityTimeline } from "@/components/ui/timeline";
 import { getRiderTask } from "@/lib/rider-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
-  const { toast } = useToast();
+  const fr = locale === "fr";
   const task = getRiderTask(id);
   const [delivered, setDelivered] = useState(task?.status === "delivered");
 
   if (!task) {
-    return <div className="text-center text-slate-500">Task not found</div>;
+    return (
+      <div className="text-center text-slate-500">
+        {fr ? "Tâche introuvable" : "Task not found"}
+      </div>
+    );
   }
 
   const status = delivered ? "delivered" : task.status;
@@ -38,20 +43,93 @@ export default function RiderTaskDetailPage() {
         <Badge variant="primary">{task.type}</Badge>
         <Badge variant={delivered ? "success" : "warning"}>ETA {task.eta}</Badge>
         <Badge>{task.distance}</Badge>
+        <Badge>{task.zone}</Badge>
       </div>
 
-      <DetailSection title="Customer">
-        <InfoGrid items={[
-          { label: "Name", value: task.customer },
-          { label: "Phone", value: task.phone },
-          { label: "Address", value: task.address, full: true },
-          { label: "Order", value: task.orderId },
-        ]} />
+      <DetailSection title={fr ? "Commande" : "Order"}>
+        <InfoGrid
+          items={[
+            { label: fr ? "N° commande" : "Order ID", value: task.orderId },
+            { label: fr ? "Paiement" : "Payment", value: task.paymentType },
+            {
+              label: fr ? "Montant" : "Amount",
+              value: task.amount ? formatCurrency(task.amount, locale) : "—",
+            },
+            { label: fr ? "Articles" : "Items", value: task.items },
+            { label: fr ? "Statut" : "Status", value: status.replace("_", " ") },
+          ]}
+        />
+      </DetailSection>
+
+      <DetailSection title={fr ? "Client" : "Customer"}>
+        <InfoGrid
+          items={[
+            { label: fr ? "Nom" : "Name", value: task.customer },
+            {
+              label: fr ? "Téléphone" : "Phone",
+              value: (
+                <a
+                  href={`tel:${task.phone.replace(/\s/g, "")}`}
+                  className="inline-flex items-center gap-1 text-emerald-600 hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {task.phone}
+                </a>
+              ),
+            },
+            { label: fr ? "Adresse" : "Address", value: task.address, full: true },
+            { label: fr ? "Zone" : "Zone", value: task.zone },
+          ]}
+        />
+      </DetailSection>
+
+      <DetailSection title={fr ? "Vendeur" : "Seller"}>
+        <InfoGrid
+          items={[
+            { label: fr ? "Nom" : "Name", value: task.sellerName },
+            { label: fr ? "Boutique" : "Store", value: task.sellerStore },
+            {
+              label: fr ? "Téléphone" : "Phone",
+              value: (
+                <a
+                  href={`tel:${task.sellerPhone.replace(/\s/g, "")}`}
+                  className="inline-flex items-center gap-1 text-emerald-600 hover:underline"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {task.sellerPhone}
+                </a>
+              ),
+            },
+          ]}
+        />
+      </DetailSection>
+
+      <DetailSection title={fr ? "Produits" : "Products"}>
+        <div className="space-y-3">
+          {task.products.map((item) => (
+            <div
+              key={item.sku}
+              className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3"
+            >
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg">
+                <Image src={item.image} alt={item.name} fill className="object-cover" sizes="56px" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-slate-900">{item.name}</p>
+                <p className="text-xs text-slate-500">
+                  SKU: {item.sku} · {item.variant} · Qty {item.qty}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </DetailSection>
 
       {task.codAmount && (
         <div className="card-premium border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-sm font-medium text-emerald-800">COD Collection</p>
+          <p className="text-sm font-medium text-emerald-800">
+            {fr ? "Paiement à collecter" : "Payment to Collect"}
+          </p>
           <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-emerald-700">
             {formatCurrency(task.codAmount, locale)}
           </p>
@@ -60,16 +138,22 @@ export default function RiderTaskDetailPage() {
 
       {task.notes && (
         <div className="card-premium p-4">
-          <p className="text-xs font-semibold uppercase text-slate-500">Notes</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">
+            {fr ? "Notes" : "Notes"}
+          </p>
           <p className="mt-1 text-sm text-slate-700">{task.notes}</p>
         </div>
       )}
+
+      <DetailSection title={fr ? "Suivi" : "Timeline"}>
+        <ActivityTimeline events={task.timeline} />
+      </DetailSection>
 
       <div className="grid grid-cols-2 gap-3">
         <a href={`tel:${task.phone.replace(/\s/g, "")}`} className="contents">
           <Button variant="secondary" className="w-full">
             <Phone className="h-4 w-4" />
-            Call
+            {fr ? "Appeler client" : "Call customer"}
           </Button>
         </a>
         <a
@@ -80,19 +164,25 @@ export default function RiderTaskDetailPage() {
         >
           <Button variant="secondary" className="w-full">
             <Navigation className="h-4 w-4" />
-            Navigate
+            {fr ? "Naviguer" : "Navigate"}
           </Button>
         </a>
       </div>
 
       {!delivered && (
         <div className="flex flex-col gap-2">
-          <Link href={`/rider/tasks/${id}/pod`} className="btn-primary flex w-full items-center justify-center gap-2 py-3">
+          <Link
+            href={`/rider/tasks/${id}/pod`}
+            className="btn-primary flex w-full items-center justify-center gap-2 py-3"
+          >
             <CheckCircle className="h-4 w-4" />
-            {locale === "fr" ? "Preuve de livraison" : "Proof of Delivery"}
+            {fr ? "Preuve de livraison" : "Proof of Delivery"}
           </Link>
-          <Link href={`/rider/tasks/${id}/fail`} className="rounded-xl border border-red-200 py-2 text-center text-sm text-red-600">
-            {locale === "fr" ? "Échec livraison" : "Failed Delivery"}
+          <Link
+            href={`/rider/tasks/${id}/fail`}
+            className="rounded-xl border border-red-200 py-2 text-center text-sm text-red-600"
+          >
+            {fr ? "Échec livraison" : "Failed Delivery"}
           </Link>
         </div>
       )}

@@ -28,7 +28,7 @@ export default function AdminCmsPage() {
           <Card key={block.id} className={!block.active ? "opacity-60" : ""}>
             <CardContent className="flex items-center justify-between p-5">
               <div className="flex items-center gap-4">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-blue-600">{i + 1}</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-[var(--primary)]">{i + 1}</span>
                 <div>
                   <h3 className="font-semibold">{block.title}</h3>
                   <p className="text-xs text-slate-500">{block.type}</p>

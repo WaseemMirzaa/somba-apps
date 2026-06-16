@@ -35,7 +35,7 @@ export default function ReturnStatusPage() {
           { label: fr ? "Articles" : "Items", value: ret.items.join(", "), full: true },
           ...(ret.refundAmount ? [{ label: fr ? "Remboursement" : "Refund", value: <DualCurrency amount={ret.refundAmount} /> }] : []),
         ]} />
-        <Link href={`/shop/orders/${ret.orderId}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">
+        <Link href={`/shop/orders/${ret.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">
           {fr ? "Voir commande →" : "View order →"}
         </Link>
       </DetailSection>

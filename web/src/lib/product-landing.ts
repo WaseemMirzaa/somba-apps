@@ -3,12 +3,20 @@ import { BRAND } from "./config";
 /** Single brand blue — no gradients */
 export const BRAND_BLUE = "#1d4ed8";
 
-/** Free Unsplash image — online shopping / marketplace (Unsplash License) */
+/** Free Unsplash image — retail marketplace / shopping district (Unsplash License) */
 export const HERO_IMAGE = {
-  src: "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=2400&q=80",
-  alt: "Vibrant online shopping experience with packages and deals",
+  src: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=2400&q=80",
+  alt: "Retail shopping district with storefronts and shoppers",
   credit: "Unsplash",
-  creditUrl: "https://unsplash.com/photos/187342175e2f",
+  creditUrl: "https://unsplash.com/photos/062f824d29cc",
+} as const;
+
+/** Login hero — retail checkout / e-commerce shopping (Unsplash License) */
+export const LOGIN_HERO_IMAGE = {
+  src: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=2400&q=80",
+  alt: "Customer paying at a retail checkout — online marketplace shopping and e-commerce",
+  credit: "Unsplash",
+  creditUrl: "https://unsplash.com/photos/0cfed4f6a45d",
 } as const;
 
 export const APP_LINKS = {
@@ -87,7 +95,7 @@ export const PORTALS = [
     features: ["Categories, search & flash deals", "Guest checkout & Somba wallet", "Order tracking & easy returns"],
     trust: [
       { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
-      { icon: "Banknote", label: "COD available", labelFr: "COD disponible" },
+      { icon: "Banknote", label: "Pay at delivery", labelFr: "Paiement à la livraison" },
       { icon: "Globe", label: "Web + mobile app", labelFr: "Web + app mobile" },
     ],
     modules: [
@@ -148,7 +156,7 @@ export const PORTALS = [
       { name: "Dashboard & Analytics", nameFr: "Tableau de bord et analytics", icon: "LayoutDashboard", items: ["KPI overview", "Revenue charts", "Order funnel", "Audit log"] },
       { name: "Seller & Product Ops", nameFr: "Vendeurs et produits", icon: "Users", items: ["Seller onboarding & KYC", "Product moderation", "Commission rules", "Flash sales"] },
       { name: "Fulfillment & Warehouses", nameFr: "Fulfillment et entrepôts", icon: "Warehouse", items: ["Create warehouses", "Issue portal credentials", "Fulfillment ops mirror", "Cross-city routing"] },
-      { name: "Finance & Trust", nameFr: "Finance et confiance", icon: "ShieldCheck", items: ["Payouts & settlements", "Fraud & COD review", "Returns oversight", "Role-based access"] },
+      { name: "Finance & Trust", nameFr: "Finance et confiance", icon: "ShieldCheck", items: ["Payouts & settlements", "Fraud & payment review", "Returns oversight", "Role-based access"] },
       { name: "Growth & Support", nameFr: "Croissance et support", icon: "Megaphone", items: ["CMS & banners", "Marketing campaigns", "Customer support tickets", "Platform settings"] },
     ],
   },
@@ -161,8 +169,8 @@ export const PORTALS = [
     taglineFr: "Hub fulfillment",
     name: "Warehouse Portal",
     nameFr: "Portail Entrepôt",
-    desc: "Receive seller parcels, sort, batch, and hand off to riders — with COD reconciliation and returns handling.",
-    descFr: "Réception des colis, tri, lots et remise aux livreurs — avec rapprochement COD et retours.",
+    desc: "Receive seller parcels, sort, batch, and hand off to riders — with payment reconciliation and returns handling.",
+    descFr: "Réception des colis, tri, lots et remise aux livreurs — avec rapprochement des paiements et retours.",
     icon: "Warehouse",
     image: PORTAL_IMAGES.warehouse,
     loginHref: "/login",
@@ -176,7 +184,7 @@ export const PORTALS = [
       { name: "Inbound & Receiving", nameFr: "Réception", icon: "Inbox", items: ["Inbound shipments", "Parcel inspection", "Receiving checklist", "Exception flagging"] },
       { name: "Sorting & Inventory", nameFr: "Tri et inventaire", icon: "ArrowUpDown", items: ["Sort lanes", "SKU inventory", "Batch builder", "Hub capacity"] },
       { name: "Dispatch & Delivery", nameFr: "Expédition et livraison", icon: "Send", items: ["Dispatch batches", "Rider assignment", "Live deliveries", "Route tracking"] },
-      { name: "Post-Delivery", nameFr: "Après livraison", icon: "RotateCcw", items: ["Returns processing", "Replacements", "Exchanges", "COD reconciliation"] },
+      { name: "Post-Delivery", nameFr: "Après livraison", icon: "RotateCcw", items: ["Returns processing", "Replacements", "Exchanges", "Payment reconciliation"] },
     ],
   },
   {
@@ -188,13 +196,13 @@ export const PORTALS = [
     taglineFr: "Dernier kilomètre",
     name: "Rider App",
     nameFr: "App Livreur",
-    desc: "Mobile app for delivery partners — task queue, GPS navigation, COD collection, and daily earnings.",
-    descFr: "App mobile pour les livreurs — tâches, GPS, encaissement COD et gains quotidiens.",
+    desc: "Mobile app for delivery partners — task queue, GPS navigation, payment collection, and daily earnings.",
+    descFr: "App mobile pour les livreurs — tâches, GPS, encaissement des paiements et gains quotidiens.",
     icon: "Bike",
     image: PORTAL_IMAGES.rider,
     loginHref: "/login",
     appHref: APP_LINKS.riderApp,
-    features: ["Active delivery queue", "Navigate & call customers", "Proof of delivery & COD"],
+    features: ["Active delivery queue", "Navigate & call customers", "Proof of delivery & payments"],
     trust: [
       { icon: "Smartphone", label: "Mobile-first", labelFr: "Mobile d'abord" },
       { icon: "MapPin", label: "GPS routes", labelFr: "Itinéraires GPS" },
@@ -203,7 +211,7 @@ export const PORTALS = [
     modules: [
       { name: "Tasks", nameFr: "Tâches", icon: "ListChecks", items: ["Active delivery queue", "Pickup & drop details", "Mark delivered", "Failed delivery reasons"] },
       { name: "Navigation & Contact", nameFr: "Navigation et contact", icon: "Navigation", items: ["Map navigation", "Call customer", "Proof of delivery", "Open-box confirmation"] },
-      { name: "Earnings", nameFr: "Gains", icon: "CircleDollarSign", items: ["Daily earnings", "COD collected", "Incentive bonuses", "Payout history"] },
+      { name: "Earnings", nameFr: "Gains", icon: "CircleDollarSign", items: ["Daily earnings", "Payments collected", "Incentive bonuses", "Payout history"] },
     ],
   },
 ] as const;
@@ -241,10 +249,10 @@ export const PLATFORM_MODULES = [
     id: "cod",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Card, Somba wallet, or cash on delivery — fraud-checked checkout with buyer protection on every order.",
-    descFr: "Carte, portefeuille Somba ou COD — paiement vérifié avec protection acheteur sur chaque commande.",
-    highlight: "COD + wallet",
-    highlightFr: "COD + portefeuille",
+    desc: "Card, Somba wallet, or pay at delivery — fraud-checked checkout with buyer protection on every order.",
+    descFr: "Carte, portefeuille Somba ou paiement à la livraison — paiement vérifié avec protection acheteur sur chaque commande.",
+    highlight: "Pay at delivery + wallet",
+    highlightFr: "Paiement à la livraison + portefeuille",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
     href: "/get-app",
@@ -253,7 +261,7 @@ export const PLATFORM_MODULES = [
     icon: "ShieldCheck",
     image: "https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=1200&auto=format&fit=crop",
     trust: [
-      { icon: "Banknote", label: "COD available", labelFr: "COD disponible" },
+      { icon: "Banknote", label: "Pay at delivery", labelFr: "Paiement à la livraison" },
       { icon: "Wallet", label: "Wallet & coupons", labelFr: "Portefeuille & coupons" },
       { icon: "Lock", label: "Encrypted checkout", labelFr: "Paiement chiffré" },
     ],
@@ -304,7 +312,7 @@ export const PLATFORM_MODULES = [
 
 export const PAYMENT_OPTIONS = [
   { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba." },
-  { title: "Cash on Delivery", titleFr: "Paiement à la livraison", desc: "Order now and pay when your package arrives — available on eligible items.", descFr: "Commandez maintenant, payez à la réception — sur articles éligibles." },
+  { title: "Pay at Delivery", titleFr: "Paiement à la livraison", desc: "Order now and pay when your package arrives — available on eligible items.", descFr: "Commandez maintenant, payez à la réception — sur articles éligibles." },
   { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba & Tekka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba & Tekka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
@@ -318,7 +326,7 @@ export const WHY_CHOOSE = [
   { title: "Sell and grow", titleFr: "Vendre et grandir", desc: "Open your store, list products, run promotions, and reach customers across the country.", descFr: "Ouvrez votre boutique, listez vos produits et touchez des clients partout." },
   { title: "Bilingual FR/EN", titleFr: "Bilingue FR/EN", desc: "Shop, sell, and get support in French or English across web and mobile.", descFr: "Achetez, vendez et obtenez de l'aide en français ou en anglais." },
   { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba — même panier, mêmes commandes." },
-  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card, wallet, and COD options with buyer protection on every order.", descFr: "Carte, portefeuille et COD avec protection acheteur sur chaque commande." },
+  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card, wallet, and pay-at-delivery options with buyer protection on every order.", descFr: "Carte, portefeuille et paiement à la livraison avec protection acheteur sur chaque commande." },
 ] as const;
 
 export const SELLER_PLANS = [
@@ -368,7 +376,7 @@ export const PRODUCT_HERO = {
   bullets: [
     "Thousands of products from verified sellers",
     "1–3 day delivery with real-time tracking",
-    "Card, wallet, and cash on delivery",
+    "Card, wallet, and pay at delivery",
   ],
   bulletsFr: [
     "Des milliers de produits de vendeurs vérifiés",
@@ -393,8 +401,8 @@ export const CONVERSION_PATHS = [
     badgeFr: "Le plus populaire",
     title: "I want to shop",
     titleFr: "Je veux acheter",
-    desc: "Browse categories, compare deals, and checkout — guest or account, card, wallet, or COD.",
-    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte, portefeuille ou COD.",
+    desc: "Browse categories, compare deals, and checkout — guest or account, card, wallet, or pay at delivery.",
+    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte, portefeuille ou à la livraison.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
     href: "/get-app",
@@ -430,15 +438,15 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card, Somba wallet, or cash on delivery — guest checkout available on every order.", descFr: "Payez par carte, portefeuille Somba ou à la livraison — paiement invité disponible." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card, Somba wallet, or at delivery — guest checkout available on every order.", descFr: "Payez par carte, portefeuille Somba ou à la livraison — paiement invité disponible." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
 
 export const TESTIMONIALS = [
   {
-    quote: "I ordered a phone on Tuesday and it arrived Thursday — tracking was spot-on. COD made it easy since I prefer paying on delivery.",
-    quoteFr: "J'ai commandé un téléphone mardi et reçu jeudi — le suivi était parfait. Le COD m'a simplifié la vie.",
+    quote: "I ordered a phone on Tuesday and it arrived Thursday — tracking was spot-on. Pay at delivery made it easy since I prefer paying when my package arrives.",
+    quoteFr: "J'ai commandé un téléphone mardi et reçu jeudi — le suivi était parfait. Le paiement à la livraison m'a simplifié la vie.",
     name: "Marie Dupont",
     role: "Customer, Lyon",
     roleFr: "Cliente, Lyon",
@@ -478,8 +486,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept credit/debit cards, Somba wallet balance, and cash on delivery (COD) on eligible orders. Guest checkout is available without creating an account.",
-    aFr: "Cartes bancaires, portefeuille Somba et paiement à la livraison (COD) sur commandes éligibles. Paiement invité sans compte.",
+    a: "We accept credit/debit cards, Somba wallet balance, and pay at delivery on eligible orders. Guest checkout is available without creating an account.",
+    aFr: "Cartes bancaires, portefeuille Somba et paiement à la livraison sur commandes éligibles. Paiement invité sans compte.",
   },
   {
     q: "How long does delivery take?",

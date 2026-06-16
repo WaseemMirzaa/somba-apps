@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Heart, Star, ShoppingCart, Truck, Share2, MapPin } from "lucide-react";
+import { Star, Truck, Share2, MapPin } from "lucide-react";
+import { MobileAppPurchaseCta } from "@/components/shop/mobile-app-purchase-cta";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { useMarket } from "@/context/market-context";
 import { PageHeader } from "@/components/ui/page-header";
@@ -17,14 +18,12 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export default function ShopProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
-  const router = useRouter();
-  const { addToCart, toggleWishlist, isInWishlist, toggleFollowStore, isFollowingStore, addRecentlyViewed } = useShop();
+  const { toggleFollowStore, isFollowingStore, addRecentlyViewed } = useShop();
   const { toast } = useToast();
   const { profile, getZoneFee } = useMarket();
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
@@ -88,7 +87,7 @@ export default function ShopProductDetailPage() {
           <div className="flex items-baseline gap-3">
             <DualCurrency amount={product.price} className="text-3xl font-bold text-blue-700" />
             <span className="text-lg text-slate-400 line-through">{formatCurrency(product.originalPrice, locale)}</span>
-            <span className="rounded bg-blue-600 px-2 py-0.5 text-sm font-bold text-white">-{product.discount}%</span>
+            <span className="rounded bg-[var(--primary)] px-2 py-0.5 text-sm font-bold text-white">-{product.discount}%</span>
           </div>
 
           <p className="text-sm text-emerald-600">Wallet cashback: {formatCurrency(product.walletCashback, locale)}</p>
@@ -116,15 +115,15 @@ export default function ShopProductDetailPage() {
           <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
             <div className="flex gap-2">
               <input className="input-premium flex-1 px-3 py-2 text-sm" placeholder={locale === "fr" ? "Code postal / zone" : "Pincode / zone"} value={pincode} onChange={(e) => setPincode(e.target.value)} />
-              <button onClick={checkDelivery} className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"><MapPin className="h-4 w-4" /></button>
+              <button onClick={checkDelivery} className="btn-primary rounded-lg px-3 py-2 text-sm"><MapPin className="h-4 w-4" /></button>
             </div>
             {zoneChecked && <p className="text-xs text-emerald-700">{zoneChecked}</p>}
             <div className="flex items-center gap-2 text-sm">
-              <Truck className="h-4 w-4 text-blue-600" />
+              <Truck className="h-4 w-4 text-[var(--primary)]" />
               <span>Delivery in {product.deliveryDays} days</span>
             </div>
             <div className="flex gap-4 text-xs text-slate-600">
-              {product.codAvailable && <span>✓ COD Available</span>}
+              {product.codAvailable && <span>✓ {locale === "fr" ? "Paiement à la livraison" : "Pay at Delivery"}</span>}
               {product.openBoxAvailable && <span>✓ Open Box</span>}
               <span>✓ {product.returnWindow}-day returns</span>
             </div>
@@ -140,43 +139,16 @@ export default function ShopProductDetailPage() {
                 <p className="text-xs text-slate-500">⭐ {product.sellerRating} · Health {product.sellerHealthScore}%</p>
               </div>
             </Link>
-            <button onClick={() => { toggleFollowStore(product.seller); toast(isFollowingStore(product.seller) ? "Unfollowed" : "Following store"); }} className="text-sm text-blue-600">
+            <button onClick={() => { toggleFollowStore(product.seller); toast(isFollowingStore(product.seller) ? "Unfollowed" : "Following store"); }} className="text-sm text-[var(--primary)]">
               {isFollowingStore(product.seller) ? "Following" : "Follow"}
             </button>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                const variant = Object.values(selectedVariant).join(" / ") || "Default";
-                addToCart({ id: product.id, name: product.name, nameFr: product.nameFr, price: product.price, image: product.image, seller: product.seller, variant });
-                toast("Added to cart");
-              }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-blue-600 py-3 font-semibold text-blue-700 hover:bg-blue-50"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              Add to Cart
-            </button>
-            <button
-              onClick={() => {
-                const variant = Object.values(selectedVariant).join(" / ") || "Default";
-                addToCart({ id: product.id, name: product.name, nameFr: product.nameFr, price: product.price, image: product.image, seller: product.seller, variant, qty: 1 });
-                router.push("/shop/checkout");
-              }}
-              className="flex flex-1 items-center justify-center rounded-xl bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700"
-            >
-              Buy Now
-            </button>
-            <button
-              onClick={() => { toggleWishlist(product.id); toast(isInWishlist(product.id) ? "Removed from wishlist" : "Added to wishlist"); }}
-              className={cn("rounded-xl border border-blue-200 p-3", isInWishlist(product.id) ? "text-red-500" : "text-slate-500")}
-            >
-              <Heart className={cn("h-5 w-5", isInWishlist(product.id) && "fill-red-500")} />
-            </button>
-            <button onClick={shareProduct} className="rounded-xl border border-blue-200 p-3 text-slate-500">
-              <Share2 className="h-5 w-5" />
-            </button>
-          </div>
+          <MobileAppPurchaseCta />
+          <button onClick={shareProduct} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-blue-50">
+            <Share2 className="h-4 w-4" />
+            {locale === "fr" ? "Partager" : "Share product"}
+          </button>
         </div>
       </div>
 
@@ -190,7 +162,7 @@ export default function ShopProductDetailPage() {
 
         <DetailGridSection title="Seller Information">
           <InfoGrid items={[
-            { label: "Store", value: <Link href={`/shop/stores/${product.sellerId}`} className="text-blue-600 hover:underline">{product.seller}</Link> },
+            { label: "Store", value: <Link href={`/shop/stores/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link> },
             { label: "Rating", value: `⭐ ${product.sellerRating}` },
             { label: "Followers", value: product.sellerFollowers.toLocaleString() },
             { label: "Health Score", value: `${product.sellerHealthScore}%` },
@@ -204,7 +176,7 @@ export default function ShopProductDetailPage() {
 
         <DetailGridSection
           title={`Reviews (${product.reviews})`}
-          action={<Link href={`/shop/products/${product.id}/reviews`} className="text-sm text-blue-600 hover:underline">View all</Link>}
+          action={<Link href={`/shop/products/${product.id}/reviews`} className="text-sm text-[var(--primary)] hover:underline">View all</Link>}
           span={3}
         >
           <div className="grid gap-4 md:grid-cols-2">

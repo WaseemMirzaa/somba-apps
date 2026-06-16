@@ -31,7 +31,7 @@ export default function ShopWalletPage() {
       />
 
       <div className="card-premium overflow-hidden">
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white">
+        <div className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] p-8 text-white">
           <p className="text-sm text-blue-100">Available Balance</p>
           <p className="font-[family-name:var(--font-display)] text-4xl font-bold">{formatCurrency(balance, locale)}</p>
           <div className="mt-4 flex gap-2">

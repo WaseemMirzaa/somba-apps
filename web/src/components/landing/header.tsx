@@ -9,8 +9,7 @@ import { useMarket } from "@/context/market-context";
 import { useState, FormEvent } from "react";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { BRAND } from "@/lib/config";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { useShop } from "@/context/shop-context";
 import { cn } from "@/lib/utils";
 
@@ -34,12 +33,7 @@ export function LandingHeader() {
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex h-[72px] items-center gap-4">
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-500 text-sm font-bold text-white shadow-lg shadow-blue-500/25">
-              S
-            </div>
-            <span className="font-[family-name:var(--font-display)] text-xl font-bold gradient-text hidden sm:block">
-              {t("brand")}
-            </span>
+            <BrandMark wordClassName="hidden sm:block" />
           </Link>
 
           <form onSubmit={handleSearch} className="hidden flex-1 md:flex max-w-2xl">
@@ -66,7 +60,7 @@ export function LandingHeader() {
                 onClick={() => setLocale("en")}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold transition-all",
-                  locale === "en" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
+                  locale === "en" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
                 )}
               >
                 EN
@@ -75,7 +69,7 @@ export function LandingHeader() {
                 onClick={() => setLocale("fr")}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold transition-all",
-                  locale === "fr" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
+                  locale === "fr" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
                 )}
               >
                 FR
@@ -92,13 +86,12 @@ export function LandingHeader() {
               <option value="drc">DRC</option>
             </select>
             <NotificationBell portal="customer" href="/shop/notifications" className="hidden sm:flex" />
-            <ThemeToggle />
-            <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 sm:block">
+            <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-[var(--primary)] hover:bg-blue-50 sm:block">
               Login
             </Link>
             <Link
               href="/shop/account"
-              className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 sm:block"
+              className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)] sm:block"
               title="Account"
             >
               <User className="h-5 w-5" />
@@ -111,11 +104,11 @@ export function LandingHeader() {
             </Link>
             <Link
               href="/shop/cart"
-              className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600"
+              className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)]"
             >
               <ShoppingCart className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white">
                   {cartCount}
                 </span>
               )}
@@ -172,20 +165,20 @@ export function LandingHeader() {
 
       <div className="border-t border-[var(--border)] bg-slate-50/50">
         <div className="mx-auto flex max-w-7xl items-center gap-6 overflow-x-auto px-4 py-2.5 text-sm">
-          <Link href="/shop/categories" className="whitespace-nowrap font-semibold text-slate-800 hover:text-blue-600">
+          <Link href="/shop/categories" className="whitespace-nowrap font-semibold text-slate-800 hover:text-[var(--primary)]">
             {t("categories")}
           </Link>
-          <Link href="/shop/products" className="whitespace-nowrap text-slate-600 hover:text-blue-600">
+          <Link href="/shop/products" className="whitespace-nowrap text-slate-600 hover:text-[var(--primary)]">
             {t("trending")}
           </Link>
-          <Link href="/shop/deals" className="whitespace-nowrap text-slate-600 hover:text-blue-600">
+          <Link href="/shop/deals" className="whitespace-nowrap text-slate-600 hover:text-[var(--primary)]">
             {t("flashSale")}
           </Link>
-          <Link href="/seller" className="whitespace-nowrap text-slate-600 hover:text-blue-600">
+          <Link href="/seller" className="whitespace-nowrap text-slate-600 hover:text-[var(--primary)]">
             {t("becomeSeller")}
           </Link>
           <span className="ml-auto whitespace-nowrap text-xs font-medium text-amber-600">
-            ✦ {t("prototype")}
+            ? {t("prototype")}
           </span>
         </div>
       </div>

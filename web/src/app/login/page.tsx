@@ -1,26 +1,28 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { BRAND } from "@/lib/config";
-import { PERSONAS, useAuth } from "@/context/auth-context";
+import { LOGIN_HERO_IMAGE } from "@/lib/product-landing";
+import { BrandMark } from "@/components/landing/brand-mark";
+import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
+import { FullPageLoader } from "@/components/ui/loader";
 import { getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 const ROLE_GROUPS = [
-  { label: "Customer", roles: ["customer", "guest"] as UserRole[] },
   { label: "Seller", roles: ["seller"] as UserRole[] },
   { label: "Admin", roles: ["admin"] as UserRole[] },
   { label: "Warehouse", roles: ["warehouse"] as UserRole[] },
-  { label: "Rider", roles: ["rider"] as UserRole[] },
 ];
 
 export default function LoginPage() {
-  const { login, isAuthenticated, authReady, persona } = useAuth();
-  const { t } = useLocale();
+  const { login, isAuthenticated, authReady, persona, personas } = useAuth();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "guest">("login");
   const [group, setGroup] = useState("Admin");
@@ -32,37 +34,69 @@ export default function LoginPage() {
   }, [authReady, isAuthenticated, persona, router]);
 
   function enterAs(personaId: string) {
-    const persona = PERSONAS.find((p) => p.id === personaId);
+    const persona = personas.find((p) => p.id === personaId);
     login(personaId);
     router.push(persona?.portal || getHomeForRole((persona?.role ?? "guest") as UserRole));
   }
 
   const activeRoles = ROLE_GROUPS.find((g) => g.label === group)?.roles ?? [];
-  const filteredPersonas = PERSONAS.filter(
+  const filteredPersonas = personas.filter(
     (p) => p.id !== "guest" && activeRoles.includes(p.role as UserRole)
   );
 
   if (authReady && isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
-        Redirecting to your dashboard…
-      </div>
+      <FullPageLoader
+        locale={locale}
+        label="Redirecting to your dashboard…"
+        labelFr="Redirection vers votre tableau de bord…"
+      />
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden flex-1 gradient-hero p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold">{BRAND.fullName}</h1>
-          <p className="mt-2 text-blue-100">{BRAND.tagline}</p>
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* Mobile — compact hero banner */}
+      <div className="relative h-44 shrink-0 overflow-hidden lg:hidden">
+        <Image
+          src={LOGIN_HERO_IMAGE.src}
+          alt={LOGIN_HERO_IMAGE.alt}
+          fill
+          priority
+          className="object-cover object-center"
+          sizes="100vw"
+        />
+        <div className="login-hero-overlay absolute inset-0" aria-hidden />
+        <div className="relative z-10 flex h-full flex-col justify-end p-6 text-white">
+          <BrandMark tone="light" full className="mb-2" />
+          <p className="text-sm text-white/85">{BRAND.tagline}</p>
         </div>
-        <div className="space-y-3 text-sm text-blue-200/90">
-          <p>{t("prototypeDesc")}</p>
-          <p className="rounded-lg bg-white/10 p-4">
-            Each role is isolated: Admin manages warehouses and sees fulfillment inside Admin only.
-            Sellers need an active subscription. Warehouse staff and riders cannot cross into other portals.
-          </p>
+      </div>
+
+      {/* Desktop — full-height branded panel */}
+      <div className="relative hidden flex-1 overflow-hidden lg:flex">
+        <Image
+          src={LOGIN_HERO_IMAGE.src}
+          alt={LOGIN_HERO_IMAGE.alt}
+          fill
+          priority
+          className="object-cover object-center"
+          sizes="50vw"
+        />
+        <div className="login-hero-overlay absolute inset-0" aria-hidden />
+        <div className="relative z-10 flex flex-1 flex-col justify-between p-12 text-white">
+          <div>
+            <BrandMark tone="light" full className="mb-6" />
+            <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold">{BRAND.fullName}</h1>
+            <p className="mt-2 text-white/85">{BRAND.tagline}</p>
+          </div>
+          <div className="space-y-3 text-sm text-white/80">
+            <p>{t("prototypeDesc")}</p>
+            <p className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
+              Each role is isolated: Admin manages warehouses and sees fulfillment inside Admin only.
+              Sellers need an active subscription. Warehouse staff cannot cross into other portals.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -93,7 +127,7 @@ export default function LoginPage() {
                   <button
                     key={g.label}
                     onClick={() => setGroup(g.label)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${group === g.label ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600"}`}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${group === g.label ? "bg-[var(--primary)] text-white" : "border border-red-200 text-slate-600"}`}
                   >
                     {g.label}
                   </button>
@@ -109,9 +143,9 @@ export default function LoginPage() {
                     <div>
                       <p className="font-semibold text-slate-900">{p.name}</p>
                       <p className="text-xs text-slate-500">{p.subRole || p.role} · {p.email}</p>
-                      {p.warehouseId && <p className="text-xs text-indigo-600">{p.warehouseId}</p>}
+                      {p.warehouseId && <p className="text-xs text-[var(--primary)]">{p.warehouseId}</p>}
                     </div>
-                    <span className="text-xs font-medium text-blue-600">Enter →</span>
+                    <span className="text-xs font-medium text-[var(--primary)]">Enter →</span>
                   </button>
                 ))}
               </div>
@@ -126,7 +160,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <Link href="/" className="block text-center text-sm text-blue-600 hover:underline">
+          <Link href="/" className="block text-center text-sm text-[var(--primary)] hover:underline">
             ← Back to {BRAND.name}
           </Link>
         </div>

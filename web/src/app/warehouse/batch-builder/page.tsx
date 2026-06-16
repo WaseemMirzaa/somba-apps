@@ -6,14 +6,17 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/context/toast-context";
 import { batchParcels } from "@/lib/warehouse-hubs";
+import type { RiderEntity } from "@/lib/warehouse-entities";
 
 export default function WarehouseBatchBuilderPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [batch, setBatch] = useState<string[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const available = batchParcels.filter((p) => !batch.includes(p.id));
 
   function add(id: string) {
@@ -89,12 +92,24 @@ export default function WarehouseBatchBuilderPage() {
             </CardContent>
           </Card>
           {batch.length > 0 && (
-            <Button className="w-full" onClick={() => { toast("Batch BAT-NEW created"); router.push("/warehouse/dispatch/BAT-001"); }}>
+            <Button className="w-full" onClick={() => setShowAssignModal(true)}>
               Create Batch & Assign Rider
             </Button>
           )}
         </div>
       </div>
+
+      <AssignRiderModal
+        open={showAssignModal}
+        title="Assign rider to new batch"
+        subtitle={`${batch.length} parcel${batch.length !== 1 ? "s" : ""} in batch`}
+        onClose={() => setShowAssignModal(false)}
+        onConfirm={(rider: RiderEntity) => {
+          toast(`Batch created — ${rider.name} assigned`);
+          setShowAssignModal(false);
+          router.push("/warehouse/dispatch/BATCH-001");
+        }}
+      />
     </div>
   );
 }

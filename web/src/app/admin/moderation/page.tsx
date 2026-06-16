@@ -34,7 +34,7 @@ export default function AdminModerationPage() {
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <div>
-                    <Link href={`/admin/products/${p.id}`} className="font-semibold text-blue-600 hover:underline">{p.name}</Link>
+                    <Link href={`/admin/products/${p.id}`} className="font-semibold text-[var(--primary)] hover:underline">{p.name}</Link>
                     <p className="text-sm text-slate-500">{p.seller} · {p.category}</p>
                   </div>
                   <Badge variant={p.status === "pending" ? "warning" : p.status === "approved" ? "success" : "danger"}>{p.status}</Badge>

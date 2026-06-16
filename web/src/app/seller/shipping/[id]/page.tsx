@@ -1,58 +1,49 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
-import { InfoGrid } from "@/components/ui/info-grid";
-import { ActivityTimeline } from "@/components/ui/timeline";
+import { Badge } from "@/components/ui/badge";
+import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { getShipment } from "@/lib/seller-entities";
+import { useLocale } from "@/context/locale-context";
+
+function formatStatus(status: string) {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function SellerShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const shipment = getShipment(id);
 
   if (!shipment) {
-    return <div className="p-8 text-center text-slate-500">Shipment not found</div>;
+    return (
+      <div className="p-8 text-center text-slate-500">
+        {fr ? "Expédition introuvable" : "Shipment not found"}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={shipment.id}
-        subtitle={`Order ${shipment.orderId} · ${shipment.status}`}
+        subtitle={`${shipment.orderId} · ${fr ? shipment.statusFr : formatStatus(shipment.status)}`}
         backHref="/seller/shipping"
+        breadcrumbs={[
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
+          { label: fr ? "Expéditions" : "Shipping", href: "/seller/shipping" },
+          { label: shipment.id },
+        ]}
+        actions={
+          <Badge variant={shipment.status === "delivered" ? "success" : "info"}>
+            {fr ? shipment.statusFr : formatStatus(shipment.status)}
+          </Badge>
+        }
       />
 
-      <DetailGrid>
-        <DetailGridSection title="Overview">
-          <InfoGrid items={[
-            { label: "Shipment ID", value: shipment.id },
-            { label: "Order", value: <Link href={`/seller/orders/${shipment.orderId}`} className="text-sky-600 hover:underline">{shipment.orderId}</Link> },
-            { label: "Status", value: shipment.status },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title="Rider">
-          <InfoGrid items={[
-            { label: "Name", value: shipment.rider },
-            { label: "Phone", value: shipment.riderPhone },
-            { label: "Vehicle", value: shipment.vehicle },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title="Warehouse">
-          <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-sky-600 hover:underline">{shipment.warehouse}</Link> },
-            { label: "Zone", value: shipment.zone },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title="Tracking" span={3}>
-          <p className="mb-4 text-sm text-slate-500">Current Status: {shipment.status}</p>
-          <ActivityTimeline events={shipment.timeline} />
-        </DetailGridSection>
-      </DetailGrid>
+      <ShipmentDetailGrid shipment={shipment} locale={locale} />
     </div>
   );
 }

@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { orderEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending", labelFr: "En attente" },
+  { value: "processing", label: "Processing", labelFr: "En cours" },
+  { value: "delivered", label: "Delivered", labelFr: "Livré" },
+  { value: "cancelled", label: "Cancelled", labelFr: "Annulé" },
+];
 
 const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
   delivered: "success",
@@ -20,11 +28,17 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
 
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
-  const [tab, setTab] = useState("all");
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const filtered = tab === "all"
-    ? orderEntities
-    : orderEntities.filter((o) => o.status === tab);
+  const filtered = useMemo(
+    () =>
+      applyListFilters(orderEntities, filters, {
+        searchFields: ["id", "customer", "seller", "customerId", "sellerId"],
+        dateField: "date",
+        statusField: "status",
+      }),
+    [filters]
+  );
 
   return (
     <div className="space-y-6">
@@ -37,20 +51,12 @@ export default function AdminOrdersPage() {
         ]}
       />
 
-      <div className="flex gap-2 overflow-x-auto">
-        {["all", "pending", "processing", "delivered", "cancelled"].map((tabId) => (
-          <button
-            key={tabId}
-            onClick={() => setTab(tabId)}
-            className={cn(
-              "whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium",
-              tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
-            )}
-          >
-            {tabId === "all" ? "All" : t(tabId as Parameters<typeof t>[0])}
-          </button>
-        ))}
-      </div>
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Order ID, customer, seller…"
+      />
 
       <Card>
         <CardContent className="p-0">
@@ -60,7 +66,7 @@ export default function AdminOrdersPage() {
                 key: "id",
                 label: "Order ID",
                 render: (row) => (
-                  <Link href={`/admin/orders/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                  <Link href={`/admin/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.id)}
                   </Link>
                 ),
@@ -69,7 +75,7 @@ export default function AdminOrdersPage() {
                 key: "customer",
                 label: "Customer",
                 render: (row) => (
-                  <Link href={`/admin/customers/${row.customerId}`} className="text-blue-600 hover:underline">
+                  <Link href={`/admin/customers/${row.customerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.customer)}
                   </Link>
                 ),
@@ -78,7 +84,7 @@ export default function AdminOrdersPage() {
                 key: "seller",
                 label: "Seller",
                 render: (row) => (
-                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-blue-600 hover:underline">
+                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.seller)}
                   </Link>
                 ),
@@ -103,7 +109,7 @@ export default function AdminOrdersPage() {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
-                  <Link href={`/admin/orders/${row.id}`} className="text-sm text-blue-600 hover:underline">
+                  <Link href={`/admin/orders/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
                     {t("view")}
                   </Link>
                 ),

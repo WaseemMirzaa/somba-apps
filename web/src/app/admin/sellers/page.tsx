@@ -1,23 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { sellerEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending", labelFr: "En attente" },
+  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "suspended", label: "Suspended", labelFr: "Suspendu" },
+];
 
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
-  const [tab, setTab] = useState("all");
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const filtered = tab === "all"
-    ? sellerEntities
-    : sellerEntities.filter((s) => s.status === tab);
+  const filtered = useMemo(
+    () =>
+      applyListFilters(sellerEntities, filters, {
+        searchFields: ["storeName", "owner", "email", "category", "id"],
+        dateField: "date",
+        statusField: "status",
+      }),
+    [filters]
+  );
 
   return (
     <div className="space-y-6">
@@ -30,68 +43,54 @@ export default function AdminSellersPage() {
         ]}
       />
 
-      <div className="flex gap-2">
-        {["all", "pending", "approved", "suspended"].map((tabId) => (
-          <button
-            key={tabId}
-            onClick={() => setTab(tabId)}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium capitalize",
-              tab === tabId ? "bg-blue-600 text-white" : "border border-blue-200 text-slate-600 hover:bg-blue-50"
-            )}
-          >
-            {tabId === "all" ? "All" : tabId === "suspended" ? "Suspended" : t(tabId as Parameters<typeof t>[0]) || tabId}
-          </button>
-        ))}
-      </div>
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Store, owner, email…"
+      />
 
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Seller ID" },
               {
                 key: "storeName",
-                label: "Store Name",
+                label: "Store",
                 render: (row) => (
-                  <Link href={`/admin/sellers/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                  <Link href={`/admin/sellers/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.storeName)}
                   </Link>
                 ),
               },
               { key: "owner", label: "Owner" },
-              { key: "phone", label: t("phone") },
               { key: "email", label: t("email") },
-              { key: "city", label: "City" },
-              { key: "orders", label: "Orders" },
+              { key: "category", label: "Category" },
+              {
+                key: "orders",
+                label: "Orders",
+                render: (row) => Number(row.orders).toLocaleString(),
+              },
               {
                 key: "revenue",
                 label: "Revenue",
                 render: (row) => formatCurrency(row.revenue as number, locale),
               },
               {
-                key: "healthScore",
-                label: "Health",
-                render: (row) => (
-                  <span className={Number(row.healthScore) > 0 ? "text-emerald-600" : "text-slate-400"}>
-                    {Number(row.healthScore) > 0 ? `${row.healthScore}%` : "—"}
-                  </span>
-                ),
-              },
-              {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={row.status === "pending" ? "warning" : row.status === "approved" ? "success" : "danger"}>
-                    {row.status === "suspended" ? "Suspended" : t(row.status as Parameters<typeof t>[0]) || String(row.status)}
+                  <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
+                    {String(row.status)}
                   </Badge>
                 ),
               },
+              { key: "date", label: t("date") },
               {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
-                  <Link href={`/admin/sellers/${row.id}`} className="text-sm text-blue-600 hover:underline">
+                  <Link href={`/admin/sellers/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
                     {t("view")}
                   </Link>
                 ),

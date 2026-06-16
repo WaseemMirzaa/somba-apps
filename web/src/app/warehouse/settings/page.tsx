@@ -42,7 +42,7 @@ export default function WarehouseSettingsPage() {
       </DetailSection>
 
       <div className="flex gap-3">
-        <button onClick={() => toast("Warehouse settings saved")} className="rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white">Save</button>
+        <button onClick={() => toast("Warehouse settings saved")} className="btn-primary rounded-lg px-6 py-2 text-sm font-medium">Save</button>
         <button onClick={() => toast("Settings reset to defaults", "info")} className="rounded-lg border border-indigo-200 px-6 py-2 text-sm font-medium text-slate-600 hover:bg-indigo-50">Reset</button>
       </div>
     </div>

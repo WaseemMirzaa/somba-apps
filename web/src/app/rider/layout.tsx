@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bike, List, User, Home, LogOut } from "lucide-react";
+import { List, User, Wallet, Home, LogOut, Bell, Banknote } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalGuard } from "@/components/layout/portal-guard";
 
-// Riders are salaried (not paid per task) — earnings sections removed.
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
   { href: "/rider/tasks", icon: List, label: "activeTasks" },
+  { href: "/rider/earnings", icon: Wallet, label: "earnings" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
 
@@ -29,9 +30,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
-              <Bike className="h-5 w-5" />
-            </div>
+            <BrandMark iconOnly />
             <div>
               <p className="font-[family-name:var(--font-display)] text-sm font-bold text-slate-900">{BRAND.name}</p>
               <p className="text-[10px] font-medium text-emerald-600">{t("riderApp")}</p>
@@ -42,6 +41,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
               <button onClick={() => setLocale("en")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "en" ? "bg-emerald-600 text-white" : "text-slate-500")}>EN</button>
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>
+            <Link href="/rider/cod/summary" className="rounded-lg p-1.5 text-slate-500 hover:text-emerald-600" title={locale === "fr" ? "Résumé paiements" : "Payment Summary"}><Banknote className="h-4 w-4" /></Link>
             <NotificationBell portal="rider" href="/rider/notifications" />
             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{t("prototype")}</span>
             <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label="Logout">

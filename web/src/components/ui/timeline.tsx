@@ -13,7 +13,7 @@ export function ActivityTimeline({
             <div
               className={cn(
                 "h-3 w-3 rounded-full ring-4 ring-white",
-                event.done !== false ? "bg-blue-600" : "bg-slate-200"
+                event.done !== false ? "bg-[var(--primary)]" : "bg-slate-200"
               )}
             />
             {i < events.length - 1 && (

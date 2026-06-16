@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 
 const tickets = [
@@ -14,8 +16,25 @@ const tickets = [
   { id: "TKT-438", subject: "Payment failed", customer: "Sophie Mbuyi", priority: "high", status: "open", date: "2024-06-06" },
 ];
 
+const STATUS_OPTIONS = [
+  { value: "open", label: "Open", labelFr: "Ouvert" },
+  { value: "in_progress", label: "In progress", labelFr: "En cours" },
+  { value: "resolved", label: "Resolved", labelFr: "Résolu" },
+];
+
 export default function AdminSupportPage() {
   const { t } = useLocale();
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+
+  const filtered = useMemo(
+    () =>
+      applyListFilters(tickets, filters, {
+        searchFields: ["id", "subject", "customer"],
+        dateField: "date",
+        statusField: "status",
+      }),
+    [filters]
+  );
 
   return (
     <div className="space-y-6">
@@ -25,12 +44,19 @@ export default function AdminSupportPage() {
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("support") }]}
       />
 
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Ticket ID, subject, customer…"
+      />
+
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
               { key: "id", label: "Ticket", render: (row) => (
-                <span className="font-medium text-blue-600">{String(row.id)}</span>
+                <span className="font-medium text-[var(--primary)]">{String(row.id)}</span>
               )},
               { key: "subject", label: "Subject" },
               { key: "customer", label: "Customer" },
@@ -44,7 +70,7 @@ export default function AdminSupportPage() {
               )},
               { key: "date", label: t("date") },
             ]}
-            data={tickets as unknown as Record<string, unknown>[]}
+            data={filtered as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>

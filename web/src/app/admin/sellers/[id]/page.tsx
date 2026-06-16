@@ -93,7 +93,7 @@ export default function AdminSellerDetailPage() {
             { label: "Pending", value: formatCurrency(seller.pendingBalance, locale) },
             { label: "Total Paid", value: formatCurrency(seller.paidBalance, locale) },
           ]} />
-          <Link href="/admin/finance" className="mt-3 inline-block text-sm text-blue-600 hover:underline">View all transactions →</Link>
+          <Link href="/admin/finance" className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">View all transactions →</Link>
         </DetailGridSection>
 
         <DetailGridSection title="Support Tickets">
@@ -104,7 +104,7 @@ export default function AdminSellerDetailPage() {
           <DataTable
             columns={[
               { key: "name", label: "Product", render: (row) => (
-                <Link href={`/admin/products/${row.id}`} className="text-blue-600 hover:underline">{String(row.name)}</Link>
+                <Link href={`/admin/products/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.name)}</Link>
               )},
               { key: "sku", label: "SKU" },
               { key: "stock", label: "Stock" },
@@ -120,7 +120,7 @@ export default function AdminSellerDetailPage() {
           <DataTable
             columns={[
               { key: "id", label: "Order ID", render: (row) => (
-                <Link href={`/admin/orders/${row.id}`} className="text-blue-600 hover:underline">{String(row.id)}</Link>
+                <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
               )},
               { key: "customer", label: t("name") },
               { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },

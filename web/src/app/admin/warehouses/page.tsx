@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Plus, Boxes } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -8,13 +8,31 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { useToast } from "@/context/toast-context";
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active", labelFr: "Actif" },
+  { value: "setup", label: "Setup", labelFr: "Configuration" },
+  { value: "inactive", label: "Inactive", labelFr: "Inactif" },
+];
 
 export default function AdminWarehousesPage() {
   const { warehouses } = useWarehouseAdmin();
   const { toast } = useToast();
   const [showCreate, setShowCreate] = useState(false);
+  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+
+  const filtered = useMemo(
+    () =>
+      applyListFilters(warehouses, filters, {
+        searchFields: ["id", "name", "city", "country", "portalEmail"],
+        statusField: "status",
+      }),
+    [warehouses, filters]
+  );
 
   return (
     <div className="space-y-6">
@@ -23,17 +41,22 @@ export default function AdminWarehousesPage() {
         subtitle="Create fulfillment centers and issue portal credentials for warehouse managers"
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Warehouses" }]}
         actions={
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            Create Warehouse
-          </Button>
+          <>
+            <Link href="/admin/warehouses/staff">
+              <Button variant="secondary" size="sm">Warehouse Staff</Button>
+            </Link>
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" />
+              Create Warehouse
+            </Button>
+          </>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-4 p-5">
-            <Boxes className="h-8 w-8 text-blue-600" />
+            <Boxes className="h-8 w-8 text-[var(--primary)]" />
             <div>
               <p className="text-2xl font-bold">{warehouses.length}</p>
               <p className="text-sm text-slate-500">Total warehouses</p>
@@ -58,12 +81,20 @@ export default function AdminWarehousesPage() {
         <CreateWarehouseForm onClose={() => setShowCreate(false)} />
       )}
 
+      <ListFilters
+        values={filters}
+        onChange={setFilters}
+        statusOptions={STATUS_OPTIONS}
+        searchPlaceholder="Warehouse ID, name, city…"
+        showDateFilters={false}
+      />
+
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
               { key: "id", label: "ID", render: (row) => (
-                <Link href={`/admin/warehouses/${row.id}`} className="font-medium text-blue-600 hover:underline">{String(row.id)}</Link>
+                <Link href={`/admin/warehouses/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
               )},
               { key: "name", label: "Warehouse" },
               { key: "city", label: "City" },
@@ -75,10 +106,10 @@ export default function AdminWarehousesPage() {
                 <Badge variant={row.status === "active" ? "success" : row.status === "setup" ? "warning" : "default"}>{String(row.status)}</Badge>
               )},
               { key: "actions", label: "Action", render: (row) => (
-                <Link href={`/admin/warehouses/${row.id}`} className="text-sm text-blue-600 hover:underline">Manage</Link>
+                <Link href={`/admin/warehouses/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">Manage</Link>
               )},
             ]}
-            data={warehouses as unknown as Record<string, unknown>[]}
+            data={filtered as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>
@@ -88,7 +119,7 @@ export default function AdminWarehousesPage() {
           <p className="text-sm text-slate-600">
             Warehouse managers log in with the portal email and password you issue here.
             They only see the <strong>Warehouse portal</strong> — not Admin, Seller, or other portals.
-            As admin, use <Link href="/admin/fulfillment" className="text-blue-600 hover:underline">Fulfillment Ops</Link> to monitor all warehouse activity.
+            As admin, use <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Fulfillment Ops</Link> to monitor all warehouse activity.
           </p>
         </CardContent>
       </Card>

@@ -36,8 +36,8 @@ export default function WarehouseExceptionDetailPage() {
             { label: "Type", value: exc.type },
             { label: "Reported By", value: exc.reportedBy },
             { label: "Created", value: exc.createdDate },
-            { label: "Parcel", value: exc.parcelId !== "—" ? <Link href={`/warehouse/parcels/${exc.parcelId}`} className="text-indigo-600 hover:underline">{exc.parcelId}</Link> : "—" },
-            { label: "Order", value: <Link href={`/admin/orders/${exc.orderId}`} className="text-indigo-600 hover:underline">{exc.orderId}</Link> },
+            { label: "Parcel", value: exc.parcelId !== "—" ? <Link href={`/warehouse/parcels/${exc.parcelId}`} className="text-[var(--primary)] hover:underline">{exc.parcelId}</Link> : "—" },
+            { label: "Order", value: <Link href={`/admin/orders/${exc.orderId}`} className="text-[var(--primary)] hover:underline">{exc.orderId}</Link> },
           ]} />
         </DetailSection>
 
@@ -73,7 +73,7 @@ export default function WarehouseExceptionDetailPage() {
                 if (notes.trim()) setResolution(notes);
                 toast("Resolution updated");
               }}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
+              className="btn-primary rounded-lg px-4 py-2 text-sm"
             >
               Update Resolution
             </button>

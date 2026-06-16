@@ -20,7 +20,7 @@ export default function AdminAuditPage() {
                     <Badge variant="primary">{log.action}</Badge>
                     <span className="text-xs text-slate-400">{log.timestamp}</span>
                   </div>
-                  <p className="mt-2 text-sm"><strong>{log.actor}</strong> · {log.entity} <code className="text-blue-600">{log.entityId}</code></p>
+                  <p className="mt-2 text-sm"><strong>{log.actor}</strong> · {log.entity} <code className="text-[var(--primary)]">{log.entityId}</code></p>
                 </div>
               </div>
               {log.before && log.after && (

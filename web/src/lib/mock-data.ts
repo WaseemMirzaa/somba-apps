@@ -142,7 +142,7 @@ export const stores = [
 export const orders = [
   { id: "ORD-2024-001", customer: "Marie Dubois", email: "marie@email.com", amount: 1199, status: "delivered", date: "2024-06-01", seller: "TechZone Store" },
   { id: "ORD-2024-002", customer: "John Smith", email: "john@email.com", amount: 349, status: "processing", date: "2024-06-02", seller: "AudioHub" },
-  { id: "ORD-2024-003", customer: "Sophie Martin", email: "sophie@email.com", amount: 129, status: "pending", date: "2024-06-03", seller: "SportStyle" },
+  { id: "ORD-2024-003", customer: "Sophie Martin", email: "sophie@email.com", amount: 129, status: "delivered", date: "2024-05-28", seller: "SportStyle" },
   { id: "ORD-2024-004", customer: "Ahmed Hassan", email: "ahmed@email.com", amount: 649, status: "delivered", date: "2024-06-03", seller: "HomeEssentials" },
   { id: "ORD-2024-005", customer: "Emma Wilson", email: "emma@email.com", amount: 89, status: "cancelled", date: "2024-06-04", seller: "KitchenPro" },
   { id: "ORD-2024-006", customer: "Pierre Laurent", email: "pierre@email.com", amount: 499, status: "processing", date: "2024-06-05", seller: "GameZone" },
@@ -156,11 +156,14 @@ export const sellers = [
 ];
 
 export const warehouseParcels = [
-  { id: "PKG-001", orderId: "ORD-2024-002", seller: "AudioHub", zone: "Zone A", status: "received", arrival: "09:30", priority: "normal" },
-  { id: "PKG-002", orderId: "ORD-2024-006", seller: "GameZone", zone: "Zone B", status: "sorting", arrival: "10:15", priority: "high" },
-  { id: "PKG-003", orderId: "ORD-2024-003", seller: "SportStyle", zone: "Zone A", status: "ready", arrival: "08:45", priority: "normal" },
-  { id: "PKG-004", orderId: "ORD-2024-001", seller: "TechZone", zone: "Zone C", status: "dispatched", arrival: "07:20", priority: "normal" },
-  { id: "PKG-005", orderId: "ORD-2024-004", seller: "HomeEssentials", zone: "Zone B", status: "inbound", arrival: "11:00", priority: "low" },
+  { id: "PKG-001", orderId: "ORD-2024-002", seller: "AudioHub", zone: "Zone A", status: "received", arrival: "09:30", priority: "normal", arrivalDate: "2024-06-05" },
+  { id: "PKG-002", orderId: "ORD-2024-006", seller: "GameZone", zone: "Zone B", status: "sorting", arrival: "10:15", priority: "high", arrivalDate: "2024-06-05" },
+  { id: "PKG-003", orderId: "ORD-2024-003", seller: "SportStyle", zone: "Zone A", status: "ready", arrival: "08:45", priority: "normal", arrivalDate: "2024-06-05" },
+  { id: "PKG-004", orderId: "ORD-2024-001", seller: "TechZone", zone: "Zone C", status: "dispatched", arrival: "07:20", priority: "normal", arrivalDate: "2024-06-05" },
+  { id: "PKG-005", orderId: "ORD-2024-004", seller: "HomeEssentials", zone: "Zone B", status: "inbound", arrival: "11:00", priority: "low", arrivalDate: "2024-06-04" },
+  { id: "PKG-006", orderId: "ORD-2024-002", seller: "AudioHub", zone: "Zone A", status: "inbound", arrival: "08:00", priority: "normal", arrivalDate: "2024-06-03" },
+  { id: "PKG-007", orderId: "ORD-2024-006", seller: "GameZone", zone: "Zone C", status: "received", arrival: "14:30", priority: "low", arrivalDate: "2024-06-02" },
+  { id: "PKG-008", orderId: "ORD-2024-001", seller: "TechZone", zone: "Zone B", status: "sorting", arrival: "06:45", priority: "low", arrivalDate: "2024-06-01" },
 ];
 
 export const sellerProducts = [

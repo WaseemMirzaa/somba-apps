@@ -61,7 +61,7 @@ export default function ShopAccountPage() {
             className="card-premium flex items-center gap-4 p-5 transition-colors hover:border-blue-200"
           >
             <div className="rounded-xl bg-blue-50 p-3">
-              <item.icon className="h-5 w-5 text-blue-600" />
+              <item.icon className="h-5 w-5 text-[var(--primary)]" />
             </div>
             <div className="flex-1">
               <p className="font-semibold text-slate-900">{t(item.label as Parameters<typeof t>[0])}</p>

@@ -34,13 +34,12 @@ import {
   Zap,
   Shield,
   FileText,
-  Tag,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useCallback, useLayoutEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
 import type { LucideIcon } from "lucide-react";
@@ -55,54 +54,48 @@ export type NavItem = {
 const portalConfigs = {
   admin: {
     title: "adminPanel" as const,
-    accent: "from-blue-500 to-indigo-600",
+    accent: "from-red-500 to-red-700",
     nav: [
       { href: "/admin", label: "dashboard", icon: LayoutDashboard, i18n: true },
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
       { href: "/admin/warehouses", label: "warehouses", icon: Boxes, i18n: true },
-      { href: "/admin/zones", label: "zones", icon: MapPin, i18n: true },
-      { href: "/admin/fulfillment", label: "fulfillmentOps", icon: Truck, i18n: true },
-      { href: "/admin/moderation", label: "moderation", icon: Shield, i18n: true },
-      { href: "/admin/reviews", label: "reviews", icon: Star, i18n: true },
+      { href: "/admin/warehouses/staff", label: "Warehouse Staff", icon: Users },
+      { href: "/admin/fulfillment", label: "Fulfillment Ops", icon: Truck },
+      { href: "/admin/moderation", label: "Moderation", icon: Shield },
       { href: "/admin/products", label: "products", icon: Package, i18n: true },
       { href: "/admin/orders", label: "orders", icon: ShoppingCart, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
-      { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
-      { href: "/admin/refunds", label: "refunds", icon: DollarSign, i18n: true },
-      { href: "/admin/payouts", label: "payouts", icon: Wallet, i18n: true },
-      { href: "/admin/categories", label: "categories", icon: Package, i18n: true },
+      { href: "/admin/disputes", label: "Disputes", icon: AlertTriangle },
+      { href: "/admin/refunds", label: "Refunds", icon: DollarSign },
+      { href: "/admin/payouts", label: "Payouts", icon: Wallet },
+      { href: "/admin/categories", label: "Categories", icon: Package },
       { href: "/admin/finance", label: "finance", icon: DollarSign, i18n: true },
-      { href: "/admin/fraud", label: "fraudCod", icon: AlertTriangle, i18n: true },
+      { href: "/admin/fraud", label: "Fraud & Payments", icon: AlertTriangle },
       { href: "/admin/support", label: "support", icon: Headphones, i18n: true },
-      { href: "/admin/marketing", label: "marketing", icon: Megaphone, i18n: true },
-      { href: "/admin/broadcasts", label: "broadcasts", icon: Send, i18n: true },
-      { href: "/admin/promotions", label: "promotions", icon: Tag, i18n: true },
       { href: "/admin/flash-sales", label: "flashSale", icon: Zap, i18n: true },
-      { href: "/admin/cms", label: "cms", icon: FileText, i18n: true },
-      { href: "/admin/analytics", label: "analytics", icon: BarChart3, i18n: true },
-      { href: "/admin/roles", label: "roles", icon: Users, i18n: true },
-      { href: "/admin/audit", label: "auditLog", icon: FileText, i18n: true },
+      { href: "/admin/cms", label: "CMS", icon: FileText },
+      { href: "/admin/roles", label: "Roles", icon: Users },
+      { href: "/admin/audit", label: "Audit Log", icon: FileText },
       { href: "/admin/settings", label: "settings", icon: Settings, i18n: true },
     ] as NavItem[],
   },
   warehouse: {
     title: "warehousePortal" as const,
-    accent: "from-indigo-500 to-violet-600",
+    accent: "from-red-500 to-red-700",
     nav: [
       { href: "/warehouse", label: "dashboard", icon: LayoutDashboard, i18n: true },
       { href: "/warehouse/inbound", label: "inbound", icon: Inbox, i18n: true },
       { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck, i18n: true },
       { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown, i18n: true },
-      { href: "/warehouse/inventory", label: "inventory", icon: Boxes, i18n: true },
-      { href: "/warehouse/batch-builder", label: "batchBuilder", icon: Send, i18n: true },
+      { href: "/warehouse/batch-builder", label: "Batch Builder", icon: Send },
       { href: "/warehouse/dispatch", label: "dispatch", icon: Send, i18n: true },
       { href: "/warehouse/riders", label: "riders", icon: Bike, i18n: true },
       { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin, i18n: true },
       { href: "/warehouse/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/warehouse/replacements", label: "replacements", icon: RefreshCw, i18n: true },
       { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
-      { href: "/warehouse/aged", label: "agedParcels", icon: AlertTriangle, i18n: true },
+      { href: "/warehouse/aged", label: "Aged Parcels", icon: AlertTriangle },
       { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle, i18n: true },
       { href: "/warehouse/analytics", label: "analytics", icon: BarChart3, i18n: true },
       { href: "/warehouse/settings", label: "settings", icon: Settings, i18n: true },
@@ -110,15 +103,15 @@ const portalConfigs = {
   },
   seller: {
     title: "sellerDashboard" as const,
-    accent: "from-sky-500 to-blue-600",
+    accent: "from-red-500 to-red-700",
     nav: [
       { href: "/seller", label: "dashboard", icon: LayoutDashboard, i18n: true },
-      { href: "/seller/storefront", label: "storefront", icon: Globe, i18n: true },
+      { href: "/seller/storefront", label: "Storefront", icon: Globe },
       { href: "/seller/products", label: "products", icon: Package, i18n: true },
       { href: "/seller/inventory", label: "inventory", icon: Boxes, i18n: true },
       { href: "/seller/orders", label: "orders", icon: ShoppingCart, i18n: true },
-      { href: "/seller/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
-      { href: "/seller/notifications", label: "notifications", icon: Megaphone, i18n: true },
+      { href: "/seller/disputes", label: "Disputes", icon: AlertTriangle },
+      { href: "/seller/notifications", label: "Notifications", icon: Megaphone },
       { href: "/seller/shipping", label: "shipping", icon: Truck, i18n: true },
       { href: "/seller/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/seller/replacements", label: "replacements", icon: RefreshCw, i18n: true },
@@ -131,6 +124,35 @@ const portalConfigs = {
     ] as NavItem[],
   },
 };
+
+const sidebarScrollPositions = new Map<string, number>();
+
+function usePersistedSidebarScroll(portal: string) {
+  const navRef = useRef<HTMLElement>(null);
+  const pathname = usePathname();
+
+  const saveScroll = useCallback(() => {
+    const nav = navRef.current;
+    if (nav) sidebarScrollPositions.set(portal, nav.scrollTop);
+  }, [portal]);
+
+  const restoreScroll = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const saved = sidebarScrollPositions.get(portal);
+    if (saved !== undefined) nav.scrollTop = saved;
+  }, [portal]);
+
+  useLayoutEffect(() => {
+    restoreScroll();
+  }, [pathname, restoreScroll]);
+
+  useLayoutEffect(() => {
+    restoreScroll();
+  }, [portal, restoreScroll]);
+
+  return { navRef, saveScroll };
+}
 
 export function DashboardLayout({
   portal,
@@ -145,20 +167,19 @@ export function DashboardLayout({
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const config = portalConfigs[portal];
+  const { navRef, saveScroll } = usePersistedSidebarScroll(portal);
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-[var(--background)]">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-white/5 bg-[var(--sidebar)] transition-transform lg:static lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-[272px] flex-col border-r border-white/5 bg-[var(--sidebar)] transition-transform",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="flex h-[72px] items-center gap-3 border-b border-white/5 px-6">
-          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg", config.accent)}>
-            <Truck className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
+        <div className="flex h-[72px] shrink-0 items-center gap-3 border-b border-white/5 px-6">
+          <BrandMark tone="light" iconOnly />
+          <div className="flex-1 min-w-0">
             <p className="font-[family-name:var(--font-display)] text-sm font-bold text-white">{BRAND.name}</p>
             <p className="text-xs text-slate-400">{t(config.title)}</p>
           </div>
@@ -167,7 +188,11 @@ export function DashboardLayout({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-0.5 overflow-y-auto p-4">
+        <nav
+          ref={navRef}
+          onScroll={saveScroll}
+          className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]"
+        >
           {config.nav.map((item) => {
             const active =
               pathname === item.href ||
@@ -176,7 +201,11 @@ export function DashboardLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setSidebarOpen(false)}
+                scroll={false}
+                onClick={() => {
+                  saveScroll();
+                  setSidebarOpen(false);
+                }}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150",
                   active
@@ -184,14 +213,14 @@ export function DashboardLayout({
                     : "text-slate-400 hover:bg-[var(--sidebar-hover)] hover:text-white"
                 )}
               >
-                <item.icon className={cn("h-4 w-4", active && "text-blue-400")} />
+                <item.icon className={cn("h-4 w-4", active && "text-red-400")} />
                 {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-white/5 p-4">
+        <div className="shrink-0 border-t border-white/5 p-4">
           <Link
             href="/"
             className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-[var(--sidebar-hover)] hover:text-white"
@@ -209,7 +238,7 @@ export function DashboardLayout({
         />
       )}
 
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex min-h-screen min-w-0 flex-col lg:pl-[272px]">
         <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-[var(--border)] bg-white/80 px-4 backdrop-blur-xl lg:px-8">
           <button className="rounded-xl border border-[var(--border)] p-2.5 lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5 text-slate-600" />
@@ -226,7 +255,7 @@ export function DashboardLayout({
               onClick={() => setLocale("en")}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
-                locale === "en" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
+                locale === "en" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
               )}
             >
               EN
@@ -235,16 +264,14 @@ export function DashboardLayout({
               onClick={() => setLocale("fr")}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
-                locale === "fr" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
+                locale === "fr" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
               )}
             >
               FR
             </button>
           </div>
 
-          <ThemeToggle />
-
-          <Link href="/login" className="hidden text-sm text-slate-600 hover:text-blue-600 sm:block">
+          <Link href="/login" className="hidden text-sm text-slate-600 hover:text-[var(--primary)] sm:block">
             {persona.name}
           </Link>
 

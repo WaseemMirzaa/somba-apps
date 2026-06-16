@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
+import { PageLoader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
 import { products } from "@/lib/mock-data";
 
@@ -50,7 +51,7 @@ function SearchResults() {
 
 export default function ShopSearchPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-slate-500">Loading...</div>}>
+    <Suspense fallback={<PageLoader className="py-12" />}>
       <SearchResults />
     </Suspense>
   );
