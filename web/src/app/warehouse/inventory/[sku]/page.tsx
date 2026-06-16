@@ -75,7 +75,7 @@ export default function WarehouseInventoryDetailPage() {
           <DetailGridSection title={fr ? "Historique des mouvements" : "Movement History"} span={3}>
             <ActivityTimeline events={item.movements.map((m) => ({
               time: m.time,
-              label: `${m.label} (${m.qty > 0 ? "+" : ""}${m.qty})`,
+              label: `${fr ? m.labelFr : m.label} (${m.qty > 0 ? "+" : ""}${m.qty})`,
               done: true,
             }))} />
           </DetailGridSection>

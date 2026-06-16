@@ -73,7 +73,7 @@ export default function AdminReturnsPage() {
               { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "product", label: fr ? "Produit" : "Product" },
               { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (
-                <span className="font-medium text-amber-700">{String(row.reason)}</span>
+                <span className="font-medium text-amber-700">{fr ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>
               )},
               { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")) : String(row.status).replace(/_/g, " ")}</Badge> },
               { key: "refund", label: fr ? "Remboursement" : "Refund", render: (row) => {

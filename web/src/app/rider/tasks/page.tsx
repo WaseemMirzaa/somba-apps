@@ -18,6 +18,14 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "Delivered", labelFr: "Livré" },
 ];
 
+// Display labels for the task type enum (logic uses the raw value).
+const TYPE_FR: Record<string, string> = {
+  delivery: "Livraison",
+  pickup: "Collecte",
+  return: "Retour",
+  cod: "Paiement à la livraison",
+};
+
 export default function RiderTasksPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -60,7 +68,11 @@ export default function RiderTasksPage() {
               {
                 key: "type",
                 label: "Type",
-                render: (row) => <Badge variant="primary">{String(row.type)}</Badge>,
+                render: (row) => (
+                  <Badge variant="primary">
+                    {fr ? TYPE_FR[String(row.type)] ?? String(row.type) : String(row.type)}
+                  </Badge>
+                ),
               },
               { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "address", label: fr ? "Adresse" : "Address" },

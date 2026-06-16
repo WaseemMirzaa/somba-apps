@@ -62,7 +62,7 @@ export default function WarehouseAnalyticsPage() {
   const dispatchSpark = warehouseInboundDispatchTrend.map((d) => d.dispatch);
 
   const throughputData = warehouseInboundDispatchTrend.map((d) => ({
-    label: d.label,
+    label: fr ? d.labelFr : d.label,
     revenue: d.inbound,
     orders: d.dispatch,
   }));
@@ -168,7 +168,7 @@ export default function WarehouseAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={warehouseLaneUtilization.map((l) => ({ name: l.lane, pct: l.pct }))}
+              items={warehouseLaneUtilization.map((l) => ({ name: fr ? l.laneFr : l.lane, pct: l.pct }))}
               valueKey="pct"
               labelKey="name"
               formatValue={(v) => `${v}%`}
@@ -198,7 +198,7 @@ export default function WarehouseAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <RevenueAreaChart
-              data={warehouseReturnTrend.map((d) => ({ label: d.label, value: d.received }))}
+              data={warehouseReturnTrend.map((d) => ({ label: fr ? d.labelFr : d.label, value: d.received }))}
               valueKey="value"
               height={200}
               color="#d97706"
@@ -365,7 +365,7 @@ export default function WarehouseAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={warehouseHealthBreakdown.map((h) => ({ name: h.label, score: h.score }))}
+              items={warehouseHealthBreakdown.map((h) => ({ name: fr ? h.labelFr : h.label, score: h.score }))}
               valueKey="score"
               labelKey="name"
               formatValue={(v) => `${v}%`}
@@ -379,7 +379,7 @@ export default function WarehouseAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <RevenueAreaChart
-              data={warehouseThroughputTrend.map((d) => ({ label: d.label, value: d.orders }))}
+              data={warehouseThroughputTrend.map((d) => ({ label: fr ? d.labelFr : d.label, value: d.orders }))}
               valueKey="value"
               height={180}
               color="var(--primary)"

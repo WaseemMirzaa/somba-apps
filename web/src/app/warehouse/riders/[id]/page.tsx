@@ -15,6 +15,20 @@ import { batchEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
+const STATUS_FR: Record<string, string> = {
+  active: "Actif",
+  inactive: "Inactif",
+  offline: "Hors ligne",
+};
+
+// Batch status values originate from the shared (non-owned) entities layer.
+const BATCH_STATUS_FR: Record<string, string> = {
+  ready: "Prêt",
+  dispatched: "Expédié",
+  in_transit: "En transit",
+  delivered: "Livré",
+};
+
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -36,7 +50,7 @@ export default function WarehouseRiderDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={rider.name}
-        subtitle={`${rider.zone} · ${rider.vehicle} · ⭐ ${rider.rating}`}
+        subtitle={`${rider.zone} · ${fr ? rider.vehicleFr : rider.vehicle} · ⭐ ${rider.rating}`}
         backHref="/warehouse/riders"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -52,7 +66,7 @@ export default function WarehouseRiderDetailPage() {
               <Phone className="h-3.5 w-3.5" />
               {fr ? "Appeler livreur" : "Call Rider"}
             </a>
-            <Badge variant="success">{rider.status}</Badge>
+            <Badge variant="success">{fr ? STATUS_FR[rider.status] ?? rider.status : rider.status}</Badge>
           </>
         }
       />
@@ -74,9 +88,9 @@ export default function WarehouseRiderDetailPage() {
                   </a>
                 ),
               },
-              { label: fr ? "Véhicule" : "Vehicle", value: rider.vehicle },
+              { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
               { label: fr ? "Zone" : "Zone", value: rider.zone },
-              { label: fr ? "Statut" : "Status", value: rider.status },
+              { label: fr ? "Statut" : "Status", value: fr ? STATUS_FR[rider.status] ?? rider.status : rider.status },
               { label: fr ? "Position" : "Location", value: rider.location },
             ]}
           />
@@ -122,7 +136,7 @@ export default function WarehouseRiderDetailPage() {
               {
                 key: "status",
                 label: fr ? "Statut" : "Status",
-                render: (row) => <Badge>{String(row.status)}</Badge>,
+                render: (row) => <Badge>{fr ? (BATCH_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
             ]}
             data={batches as unknown as Record<string, unknown>[]}

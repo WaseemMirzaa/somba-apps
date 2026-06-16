@@ -20,7 +20,7 @@ export default function SellerPromotionDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={promo.campaign} subtitle={fr ? `${promo.discount}% de remise · ${promo.status}` : `${promo.discount}% off · ${promo.status}`} backHref="/seller/promotions" />
+      <PageHeader title={promo.campaign} subtitle={fr ? `${promo.discount}% de remise · ${promo.statusFr}` : `${promo.discount}% off · ${promo.status}`} backHref="/seller/promotions" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailSection title={fr ? "Aperçu" : "Overview"}>

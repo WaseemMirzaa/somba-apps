@@ -232,7 +232,7 @@ export default function SellerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={sellerCategoryRevenue.map((c) => ({ name: c.category, revenue: c.revenue }))}
+              items={sellerCategoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.revenue }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}

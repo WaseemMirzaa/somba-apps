@@ -16,6 +16,14 @@ const STATUS_OPTIONS = [
   { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
 ];
 
+const STATUS_FR: Record<string, string> = {
+  paid: "Payé",
+  completed: "Terminé",
+  pending: "En attente",
+  refunded: "Remboursé",
+  failed: "Échoué",
+};
+
 export default function SellerTransactionsPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";

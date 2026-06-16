@@ -107,7 +107,7 @@ export default function AdminBroadcastsPage() {
         <DataTable
           data={items as unknown as Record<string, unknown>[]}
           columns={[
-            { key: "channel", label: fr ? "Canal" : "Channel", render: (row) => <Badge variant={channelVariant[row.channel as Broadcast["channel"]]}>{String(row.channel)}</Badge> },
+            { key: "channel", label: fr ? "Canal" : "Channel", render: (row) => { const ch = BROADCAST_CHANNELS.find((c) => c.id === row.channel); return <Badge variant={channelVariant[row.channel as Broadcast["channel"]]}>{ch ? (fr ? ch.labelFr : ch.label) : String(row.channel)}</Badge>; } },
             {
               key: "title",
               label: fr ? "Titre" : "Title",

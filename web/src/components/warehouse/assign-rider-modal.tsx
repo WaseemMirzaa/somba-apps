@@ -116,7 +116,7 @@ export function AssignRiderModal({
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900">{rider.name}</p>
                             <p className="text-xs text-slate-500">
-                              {rider.zone} · {rider.location} · {rider.vehicle}
+                              {rider.zone} · {rider.location} · {fr ? rider.vehicleFr : rider.vehicle}
                             </p>
                             <p className="mt-1 text-xs text-slate-400">
                               {rider.activeDeliveries} {fr ? "actives" : "active"} · {rider.performanceScore}% {fr ? "performance" : "performance"} · ⭐ {rider.rating}
@@ -168,7 +168,7 @@ export function AssignRiderModal({
               <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-700">
                 <p><span className="text-slate-500">{fr ? "Zone :" : "Zone:"}</span> {activeRider.zone}</p>
                 <p className="mt-1"><span className="text-slate-500">{fr ? "Lieu :" : "Location:"}</span> {activeRider.location}</p>
-                <p className="mt-1"><span className="text-slate-500">{fr ? "Véhicule :" : "Vehicle:"}</span> {activeRider.vehicle}</p>
+                <p className="mt-1"><span className="text-slate-500">{fr ? "Véhicule :" : "Vehicle:"}</span> {fr ? activeRider.vehicleFr : activeRider.vehicle}</p>
                 <p className="mt-1"><span className="text-slate-500">{fr ? "Livraisons actives :" : "Active deliveries:"}</span> {activeRider.activeDeliveries}</p>
               </div>
             )}

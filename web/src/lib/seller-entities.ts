@@ -29,7 +29,9 @@ export const sellerProductList = sellerProductDetails.map((p, i) => ({
   ...p,
   brand: "Samsung",
   category: "Electronics",
+  categoryFr: "Électronique",
   subcategory: "Smartphones",
+  subcategoryFr: "Smartphones",
   discountPrice: Math.round(p.price * 0.9),
   availableStock: p.stock,
   reservedStock: p.reserved,
@@ -54,13 +56,14 @@ export const sellerProductList = sellerProductDetails.map((p, i) => ({
     date: o.date,
   })),
   productReviews: [
-    { customer: "Marie D.", rating: 5, review: "Excellent product!", images: 1, date: "2024-05-20" },
-    { customer: "John S.", rating: 4, review: "Good value.", images: 0, date: "2024-05-15" },
+    { customer: "Marie D.", rating: 5, review: "Excellent product!", reviewFr: "Excellent produit !", images: 1, date: "2024-05-20" },
+    { customer: "John S.", rating: 4, review: "Good value.", reviewFr: "Bon rapport qualité-prix.", images: 0, date: "2024-05-15" },
   ],
   variantsDetailed: p.variants.map((v) => ({
     ...v,
     variantName: v.name,
     color: "Black",
+    colorFr: "Noir",
     size: "256GB",
     status: v.stock > 0 ? "active" : "disabled",
   })),
@@ -73,6 +76,7 @@ export const sellerInventoryList = sellerProductList.map((p) => ({
   productId: p.id,
   product: p.name,
   category: p.category,
+  categoryFr: p.categoryFr,
   available: p.availableStock,
   reserved: p.reservedStock,
   allocated: p.allocatedStock,
@@ -84,10 +88,10 @@ export const sellerInventoryList = sellerProductList.map((p) => ({
   damaged: 0,
   returned: 2,
   movements: [
-    { date: "2024-06-05", type: "Received", quantity: 50, reference: "PO-001", user: "System" },
-    { date: "2024-06-04", type: "Reserved", quantity: 5, reference: "ORD-2024-001", user: "System" },
-    { date: "2024-06-03", type: "Sold", quantity: 3, reference: "ORD-2024-002", user: "System" },
-    { date: "2024-06-02", type: "Returned", quantity: 1, reference: "RET-001", user: "Warehouse" },
+    { date: "2024-06-05", type: "Received", typeFr: "Reçu", quantity: 50, reference: "PO-001", user: "System" },
+    { date: "2024-06-04", type: "Reserved", typeFr: "Réservé", quantity: 5, reference: "ORD-2024-001", user: "System" },
+    { date: "2024-06-03", type: "Sold", typeFr: "Vendu", quantity: 3, reference: "ORD-2024-002", user: "System" },
+    { date: "2024-06-02", type: "Returned", typeFr: "Retourné", quantity: 1, reference: "RET-001", user: "Warehouse" },
   ],
 }));
 
@@ -275,10 +279,10 @@ export const shipmentList: ShipmentDetail[] = sellerOrderList
 
 export const sellerReturnList = [
   {
-    id: "RET-001", orderId: "ORD-2024-001", customer: "Marie Dubois", reason: "Wrong size",
+    id: "RET-001", orderId: "ORD-2024-001", customer: "Marie Dubois", reason: "Wrong size", reasonFr: "Mauvaise taille",
     amount: 129, status: "pending_inspection", productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
-    inspection: { warehouseNotes: "Good condition — unopened box", photos: 2, condition: "Unopened" },
-    refund: { amount: 129, method: "Somba Wallet", status: "pending" },
+    inspection: { warehouseNotes: "Good condition — unopened box", warehouseNotesFr: "Bon état — boîte non ouverte", photos: 2, condition: "Unopened", conditionFr: "Non ouvert" },
+    refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "pending" },
     timeline: [
       { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
       { time: "2024-06-05 10:15", label: "Return Requested", done: true },
@@ -288,10 +292,10 @@ export const sellerReturnList = [
     ],
   },
   {
-    id: "RET-002", orderId: "ORD-2024-004", customer: "Ahmed Hassan", reason: "Damaged item",
+    id: "RET-002", orderId: "ORD-2024-004", customer: "Ahmed Hassan", reason: "Damaged item", reasonFr: "Article endommagé",
     amount: 649, status: "inspecting", productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
-    inspection: { warehouseNotes: "Box crushed, motor noise", photos: 4, condition: "Damaged" },
-    refund: { amount: 649, method: "Original Payment", status: "pending" },
+    inspection: { warehouseNotes: "Box crushed, motor noise", warehouseNotesFr: "Boîte écrasée, bruit du moteur", photos: 4, condition: "Damaged", conditionFr: "Endommagé" },
+    refund: { amount: 649, method: "Original Payment", methodFr: "Paiement d'origine", status: "pending" },
     timeline: [
       { time: "2024-06-02 18:30", label: "Order Delivered", done: true },
       { time: "2024-06-04 11:20", label: "Return Requested", done: true },
@@ -324,12 +328,12 @@ export const sellerReplacementList = [
 export const promotionList = [
   {
     id: "PROMO-001", campaign: "Summer Electronics Sale", products: 12, discount: 20,
-    startDate: "2024-06-01", endDate: "2024-06-30", status: "active",
+    startDate: "2024-06-01", endDate: "2024-06-30", status: "active", statusFr: "Actif",
     budget: 5000, views: 12400, clicks: 890, orders: 45, revenue: 12450, roi: 2.4,
   },
   {
     id: "PROMO-002", campaign: "Flash Weekend", products: 5, discount: 30,
-    startDate: "2024-06-08", endDate: "2024-06-09", status: "scheduled",
+    startDate: "2024-06-08", endDate: "2024-06-09", status: "scheduled", statusFr: "Planifié",
     budget: 2000, views: 0, clicks: 0, orders: 0, revenue: 0, roi: 0,
   },
 ];
@@ -337,9 +341,9 @@ export const promotionList = [
 // ─── Reviews ─────────────────────────────────────────────────────────────────
 
 export const sellerReviewList = [
-  { id: 1, customer: "Marie D.", productId: 1, product: "Samsung Galaxy S24 Ultra", rating: 5, review: "Excellent phone, fast delivery!", date: "2024-05-20" },
-  { id: 2, customer: "John S.", productId: 1, product: "Samsung Galaxy S24 Ultra", rating: 4, review: "Good product, packaging could be better.", date: "2024-05-18" },
-  { id: 3, customer: "Sophie M.", productId: 2, product: "Galaxy Buds Pro", rating: 5, review: "Amazing sound quality!", date: "2024-05-15" },
+  { id: 1, customer: "Marie D.", productId: 1, product: "Samsung Galaxy S24 Ultra", rating: 5, review: "Excellent phone, fast delivery!", reviewFr: "Excellent téléphone, livraison rapide !", date: "2024-05-20" },
+  { id: 2, customer: "John S.", productId: 1, product: "Samsung Galaxy S24 Ultra", rating: 4, review: "Good product, packaging could be better.", reviewFr: "Bon produit, l'emballage pourrait être meilleur.", date: "2024-05-18" },
+  { id: 3, customer: "Sophie M.", productId: 2, product: "Galaxy Buds Pro", rating: 5, review: "Amazing sound quality!", reviewFr: "Qualité sonore incroyable !", date: "2024-05-15" },
 ];
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
@@ -424,11 +428,11 @@ export const transactionList = sellerOrderList.map((o) => ({
 }));
 
 export const payoutList = [
-  { id: "PAY-005", amount: 6200, method: "Bank Transfer", status: "requested", date: "2024-06-08", bankAccount: "****4521", approvedBy: "—", itemCount: 4 },
-  { id: "PAY-004", amount: 9800, method: "Mobile Money", status: "paid", date: "2024-06-01", bankAccount: "+243 99 *** 4521", approvedBy: "Admin Sarah", itemCount: 6 },
-  { id: "PAY-003", amount: 11200, method: "Bank Transfer", status: "paid", date: "2024-05-15", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 9 },
-  { id: "PAY-002", amount: 8500, method: "Bank Transfer", status: "processing", date: "2024-06-06", bankAccount: "****4521", approvedBy: "—", itemCount: 5 },
-  { id: "PAY-001", amount: 12000, method: "Bank Transfer", status: "paid", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 8 },
+  { id: "PAY-005", amount: 6200, method: "Bank Transfer", methodFr: "Virement bancaire", status: "requested", statusFr: "Demandé", date: "2024-06-08", bankAccount: "****4521", approvedBy: "—", itemCount: 4 },
+  { id: "PAY-004", amount: 9800, method: "Mobile Money", methodFr: "Mobile Money", status: "paid", statusFr: "Payé", date: "2024-06-01", bankAccount: "+243 99 *** 4521", approvedBy: "Admin Sarah", itemCount: 6 },
+  { id: "PAY-003", amount: 11200, method: "Bank Transfer", methodFr: "Virement bancaire", status: "paid", statusFr: "Payé", date: "2024-05-15", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 9 },
+  { id: "PAY-002", amount: 8500, method: "Bank Transfer", methodFr: "Virement bancaire", status: "processing", statusFr: "En cours", date: "2024-06-06", bankAccount: "****4521", approvedBy: "—", itemCount: 5 },
+  { id: "PAY-001", amount: 12000, method: "Bank Transfer", methodFr: "Virement bancaire", status: "paid", statusFr: "Payé", date: "2024-05-01", bankAccount: "****4521", approvedBy: "Admin Sarah", itemCount: 8 },
 ];
 
 export type SellerPayoutItemStatus =
@@ -583,9 +587,9 @@ export const sellerPayoutPendingItems: SellerPayoutPendingItem[] = [
 // ─── Support ─────────────────────────────────────────────────────────────────
 
 export const supportTicketList = [
-  { id: "TKT-001", category: "Payout", priority: "high", status: "open", lastUpdate: "2024-06-05", subject: "Payout delay inquiry" },
-  { id: "TKT-002", category: "Product", priority: "medium", status: "resolved", lastUpdate: "2024-06-03", subject: "Moderation question" },
-  { id: "TKT-003", category: "Orders", priority: "low", status: "open", lastUpdate: "2024-06-06", subject: "Rider pickup delay" },
+  { id: "TKT-001", category: "Payout", categoryFr: "Versement", priority: "high", status: "open", statusFr: "Ouvert", lastUpdate: "2024-06-05", subject: "Payout delay inquiry", subjectFr: "Demande de retard de versement" },
+  { id: "TKT-002", category: "Product", categoryFr: "Produit", priority: "medium", status: "resolved", statusFr: "Résolu", lastUpdate: "2024-06-03", subject: "Moderation question", subjectFr: "Question de modération" },
+  { id: "TKT-003", category: "Orders", categoryFr: "Commandes", priority: "low", status: "open", statusFr: "Ouvert", lastUpdate: "2024-06-06", subject: "Rider pickup delay", subjectFr: "Retard d'enlèvement du livreur" },
 ];
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -593,14 +597,15 @@ export const supportTicketList = [
 export const storeSettings = {
   storeName: "TechZone Store",
   description: "Official Samsung distributor — electronics specialist in Kinshasa.",
+  descriptionFr: "Distributeur officiel Samsung — spécialiste de l'électronique à Kinshasa.",
   businessName: "TechZone Solutions SARL",
   taxId: "CD-123456789",
   phone: "+1 555 123 4567",
   email: "mike@gadgetworld.com",
   teamMembers: [
-    { name: "Mike Johnson", role: "Owner", email: "mike@gadgetworld.com", status: "active" },
-    { name: "Sarah K.", role: "Manager", email: "sarah@techzone.com", status: "active" },
-    { name: "Jean P.", role: "Staff", email: "jean@techzone.com", status: "active" },
+    { name: "Mike Johnson", role: "Owner", roleFr: "Propriétaire", email: "mike@gadgetworld.com", status: "active" },
+    { name: "Sarah K.", role: "Manager", roleFr: "Gérant", email: "sarah@techzone.com", status: "active" },
+    { name: "Jean P.", role: "Staff", roleFr: "Personnel", email: "jean@techzone.com", status: "active" },
   ],
 };
 

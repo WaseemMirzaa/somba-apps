@@ -27,9 +27,9 @@ export default function SellerSupportDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={ticket.id}
-        subtitle={`${ticket.category} · ${ticket.subject}`}
+        subtitle={`${fr ? ticket.categoryFr : ticket.category} · ${fr ? ticket.subjectFr : ticket.subject}`}
         backHref="/seller/support"
-        actions={<Badge variant={ticket.status === "resolved" ? "success" : "warning"}>{ticket.status}</Badge>}
+        actions={<Badge variant={ticket.status === "resolved" ? "success" : "warning"}>{fr ? ticket.statusFr : ticket.status}</Badge>}
       />
 
       <DetailGrid>
@@ -37,7 +37,7 @@ export default function SellerSupportDetailPage() {
           <div className="space-y-4">
             <div className="rounded-lg bg-sky-50 p-4 text-sm">
               <p className="font-medium">{fr ? "Vous" : "You"}</p>
-              <p className="mt-1">{ticket.subject} {fr ? "— merci de m'indiquer les prochaines étapes." : "— please advise on next steps."}</p>
+              <p className="mt-1">{fr ? ticket.subjectFr : ticket.subject} {fr ? "— merci de m'indiquer les prochaines étapes." : "— please advise on next steps."}</p>
               <p className="mt-1 text-xs text-slate-400">{ticket.lastUpdate}</p>
             </div>
             {ticket.status === "resolved" && (

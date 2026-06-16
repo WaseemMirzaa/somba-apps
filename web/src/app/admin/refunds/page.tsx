@@ -19,7 +19,9 @@ const PENDING_REFUNDS = [
     orderId: "ORD-2024-001",
     amount: 1199,
     method: "Stripe",
+    methodFr: "Stripe",
     reason: "Return approved",
+    reasonFr: "Retour approuvé",
     createdAt: "2024-06-07",
   },
   {
@@ -27,7 +29,9 @@ const PENDING_REFUNDS = [
     orderId: "ORD-2024-003",
     amount: 129,
     method: "Manual — Airtel Money",
+    methodFr: "Manuel — Airtel Money",
     reason: "Pay-at-delivery refund via Airtel",
+    reasonFr: "Remboursement à la livraison via Airtel",
     createdAt: "2024-06-06",
   },
 ];
@@ -132,13 +136,13 @@ export default function AdminRefundsPage() {
               {
                 key: "method",
                 label: locale === "fr" ? "Méthode" : "Method",
-                render: (row) => <Badge variant="info">{String(row.method)}</Badge>,
+                render: (row) => <Badge variant="info">{locale === "fr" ? String(row.methodFr ?? row.method) : String(row.method)}</Badge>,
               },
               {
                 key: "reason",
                 label: locale === "fr" ? "Motif" : "Reason",
                 render: (row) => (
-                  <span className="max-w-[12rem] text-slate-600">{String(row.reason)}</span>
+                  <span className="max-w-[12rem] text-slate-600">{locale === "fr" ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>
                 ),
               },
               {

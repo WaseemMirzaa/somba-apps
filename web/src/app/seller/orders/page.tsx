@@ -19,6 +19,15 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "Delivered", labelFr: "Livré" },
 ];
 
+const ORDER_STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  processing: "En cours",
+  ready: "Prêt",
+  picked: "Collecté",
+  delivered: "Livré",
+  cancelled: "Annulé",
+};
+
 export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -67,8 +76,8 @@ export default function SellerOrdersPage() {
         { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
         { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
-        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
-        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge>{String(row.shippingStatus)}</Badge> },
+        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant="info">{fr ? (ORDER_STATUS_FR[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
+        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge>{fr ? (ORDER_STATUS_FR[String(row.shippingStatus)] ?? String(row.shippingStatus)) : String(row.shippingStatus)}</Badge> },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">

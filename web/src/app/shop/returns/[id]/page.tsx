@@ -31,7 +31,7 @@ export default function ReturnStatusPage() {
       <DetailSection title={fr ? "Statut du retour" : "Return Status"}>
         <InfoGrid items={[
           { label: fr ? "Statut" : "Status", value: fr ? STATUS_LABELS[ret.status]?.fr : STATUS_LABELS[ret.status]?.en },
-          { label: fr ? "Raison" : "Reason", value: ret.reason },
+          { label: fr ? "Raison" : "Reason", value: fr ? (ret.reasonFr ?? ret.reason) : ret.reason },
           { label: fr ? "Articles" : "Items", value: ret.items.join(", "), full: true },
           ...(ret.refundAmount ? [{ label: fr ? "Remboursement" : "Refund", value: <DualCurrency amount={ret.refundAmount} /> }] : []),
         ]} />

@@ -79,7 +79,7 @@ const TIMELINE_LABELS_FR: Record<string, string> = {
 export function ActivityTimeline({
   events,
 }: {
-  events: { time: string; label: string; detail?: string; done?: boolean }[];
+  events: { time: string; label: string; detail?: string; detailFr?: string; done?: boolean }[];
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
@@ -101,7 +101,7 @@ export function ActivityTimeline({
           <div className="flex-1 pt-0">
             <p className="text-sm font-medium text-slate-900">{fr ? (TIMELINE_LABELS_FR[event.label] ?? event.label) : event.label}</p>
             {event.detail && (
-              <p className="text-xs text-slate-500">{event.detail}</p>
+              <p className="text-xs text-slate-500">{fr ? (event.detailFr ?? event.detail) : event.detail}</p>
             )}
             <p className="text-xs text-slate-400">{event.time}</p>
           </div>

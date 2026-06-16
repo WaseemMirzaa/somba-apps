@@ -70,7 +70,7 @@ export default function SellerPayoutDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={payout.id}
-        subtitle={`${formatCurrency(payout.amount, locale)} · ${payout.status}`}
+        subtitle={`${formatCurrency(payout.amount, locale)} · ${fr ? (payout.statusFr ?? payout.status) : payout.status}`}
         backHref="/seller/finance/payouts"
         breadcrumbs={[
           { label: fr ? "Vendeur" : "Seller", href: "/seller" },
@@ -86,7 +86,7 @@ export default function SellerPayoutDetailPage() {
             >
               {fr ? "Voir tous les éléments en attente" : "See all pending items"}
             </Link>
-            <Badge variant={payout.status === "paid" ? "success" : "warning"}>{payout.status}</Badge>
+            <Badge variant={payout.status === "paid" ? "success" : "warning"}>{fr ? (payout.statusFr ?? payout.status) : payout.status}</Badge>
           </div>
         }
       />
@@ -97,9 +97,9 @@ export default function SellerPayoutDetailPage() {
             { label: fr ? "N° demande" : "Request ID", value: payout.id },
             { label: t("amount"), value: formatCurrency(payout.amount, locale) },
             { label: fr ? "Compte bancaire" : "Bank Account", value: payout.bankAccount },
-            { label: fr ? "Méthode" : "Method", value: payout.method },
+            { label: fr ? "Méthode" : "Method", value: fr ? (payout.methodFr ?? payout.method) : payout.method },
             { label: fr ? "Approuvé par" : "Approved By", value: payout.approvedBy },
-            { label: t("status"), value: payout.status },
+            { label: t("status"), value: fr ? (payout.statusFr ?? payout.status) : payout.status },
             { label: t("date"), value: payout.date },
             {
               label: fr ? "Articles inclus" : "Items included",

@@ -12,6 +12,13 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
 const STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", rejected: "Rejeté" };
+const CATEGORY_FR: Record<string, string> = {
+  Electronics: "Électronique",
+  Fashion: "Mode",
+  "Home & Living": "Maison & Décoration",
+  Beauty: "Beauté",
+  Grocery: "Épicerie",
+};
 
 export default function AdminModerationPage() {
   const { toast } = useToast();
@@ -40,7 +47,7 @@ export default function AdminModerationPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <Link href={`/admin/products/${p.id}`} className="font-semibold text-[var(--primary)] hover:underline">{p.name}</Link>
-                    <p className="text-sm text-slate-500">{p.seller} · {p.category}</p>
+                    <p className="text-sm text-slate-500">{p.seller} · {fr ? (CATEGORY_FR[p.category] ?? p.category) : p.category}</p>
                   </div>
                   <Badge variant={p.status === "pending" ? "warning" : p.status === "approved" ? "success" : "danger"}>{fr ? (STATUS_FR[p.status] ?? p.status) : p.status}</Badge>
                 </div>

@@ -12,6 +12,12 @@ import { getSellerProductFull } from "@/lib/seller-entities";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
+const STATUS_FR: Record<string, string> = {
+  active: "Actif", disabled: "Désactivé", live: "En ligne", draft: "Brouillon",
+  pending: "En attente", processing: "En cours", shipped: "Expédié", ready: "Prêt",
+  delivered: "Livré", cancelled: "Annulé", approved: "Approuvé", out_of_stock: "En rupture de stock",
+};
+
 export default function SellerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
@@ -103,7 +109,7 @@ export default function SellerProductDetailPage() {
                 { key: "size", label: fr ? "Taille" : "Size" },
                 { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
                 { key: "stock", label: "Stock" },
-                { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
+                { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
               ]}
               data={product.variantsDetailed as unknown as Record<string, unknown>[]}
             />
@@ -118,7 +124,7 @@ export default function SellerProductDetailPage() {
                 { key: "customer", label: fr ? "Client" : "Customer" },
                 { key: "quantity", label: fr ? "Qté" : "Qty" },
                 { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
-                { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
+                { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
                 { key: "date", label: t("date") },
               ]}
               data={product.productOrders as unknown as Record<string, unknown>[]}

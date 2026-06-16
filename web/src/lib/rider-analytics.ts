@@ -1,13 +1,13 @@
 /** Rider dashboard analytics mock data */
 
 export const riderEarningsTrend = [
-  { label: "Mon", revenue: 68, orders: 12 },
-  { label: "Tue", revenue: 82, orders: 15 },
-  { label: "Wed", revenue: 74, orders: 13 },
-  { label: "Thu", revenue: 96, orders: 18 },
-  { label: "Fri", revenue: 108, orders: 20 },
-  { label: "Sat", revenue: 124, orders: 22 },
-  { label: "Sun", revenue: 58, orders: 10 },
+  { label: "Mon", labelFr: "Lun", revenue: 68, orders: 12 },
+  { label: "Tue", labelFr: "Mar", revenue: 82, orders: 15 },
+  { label: "Wed", labelFr: "Mer", revenue: 74, orders: 13 },
+  { label: "Thu", labelFr: "Jeu", revenue: 96, orders: 18 },
+  { label: "Fri", labelFr: "Ven", revenue: 108, orders: 20 },
+  { label: "Sat", labelFr: "Sam", revenue: 124, orders: 22 },
+  { label: "Sun", labelFr: "Dim", revenue: 58, orders: 10 },
 ] as const;
 
 export const riderExtendedKpis = {

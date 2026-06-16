@@ -17,6 +17,14 @@ const STATUS_OPTIONS = [
   { value: "paused", label: "Paused", labelFr: "En pause" },
 ];
 
+const PRODUCT_STATUS_FR: Record<string, string> = {
+  live: "En ligne", draft: "Brouillon", paused: "En pause", out_of_stock: "En rupture de stock", active: "Actif", disabled: "Désactivé",
+};
+
+const MODERATION_STATUS_FR: Record<string, string> = {
+  approved: "Approuvé", pending: "En attente", rejected: "Rejeté", flagged: "Signalé",
+};
+
 export default function SellerProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -68,8 +76,8 @@ export default function SellerProductsPage() {
         { key: "soldCount", label: fr ? "Vendus" : "Sold" },
         { key: "views", label: fr ? "Vues" : "Views" },
         { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `⭐ ${row.rating}` },
-        { key: "status", label: t("status"), render: (row) => <Badge variant={row.status === "live" ? "success" : "warning"}>{String(row.status)}</Badge> },
-        { key: "moderationStatus", label: fr ? "Modération" : "Moderation", render: (row) => <Badge>{String(row.moderationStatus)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={row.status === "live" ? "success" : "warning"}>{fr ? (PRODUCT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+        { key: "moderationStatus", label: fr ? "Modération" : "Moderation", render: (row) => <Badge>{fr ? (MODERATION_STATUS_FR[String(row.moderationStatus)] ?? String(row.moderationStatus)) : String(row.moderationStatus)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>

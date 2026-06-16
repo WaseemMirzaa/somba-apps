@@ -55,7 +55,9 @@ export default function ShopProductDetailPage() {
     return <div className="text-center text-slate-500">{locale === "fr" ? "Produit introuvable" : "Product not found"}</div>;
   }
 
-  const name = locale === "fr" ? product.nameFr : product.name;
+  const fr = locale === "fr";
+  const name = fr ? product.nameFr : product.name;
+  const category = fr ? product.categoryFr : product.category;
   const related = products.filter((p) => p.id !== product.id).slice(0, 4);
 
   return (
@@ -63,7 +65,7 @@ export default function ShopProductDetailPage() {
       <PageHeader
         breadcrumbs={[
           { label: locale === "fr" ? "Accueil" : "Home", href: "/" },
-          { label: product.category, href: "/shop/products" },
+          { label: category, href: "/shop/products" },
           { label: name },
         ]}
       />
@@ -75,7 +77,7 @@ export default function ShopProductDetailPage() {
 
         <div className="space-y-6">
           <div>
-            <p className="text-sm text-slate-500">{product.brand} · {product.category}</p>
+            <p className="text-sm text-slate-500">{product.brand} · {category}</p>
             <h1 className="mt-1 text-2xl font-bold text-slate-900">{name}</h1>
             <div className="mt-2 flex items-center gap-2">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
@@ -94,9 +96,9 @@ export default function ShopProductDetailPage() {
 
           {product.variants.map((v) => (
             <div key={v.name}>
-              <p className="mb-2 text-sm font-medium text-slate-700">{v.name}</p>
+              <p className="mb-2 text-sm font-medium text-slate-700">{fr ? v.nameFr : v.name}</p>
               <div className="flex flex-wrap gap-2">
-                {v.options.map((opt) => (
+                {v.options.map((opt, oi) => (
                   <button
                     key={opt}
                     onClick={() => setSelectedVariant((s) => ({ ...s, [v.name]: opt }))}
@@ -105,7 +107,7 @@ export default function ShopProductDetailPage() {
                       selectedVariant[v.name] === opt ? "border-blue-600 bg-blue-50 text-blue-700" : "border-blue-200 hover:border-blue-500"
                     )}
                   >
-                    {opt}
+                    {fr ? (v.optionsFr[oi] ?? opt) : opt}
                   </button>
                 ))}
               </div>
@@ -154,9 +156,9 @@ export default function ShopProductDetailPage() {
 
       <DetailGrid>
         <DetailGridSection title={locale === "fr" ? "Description" : "Description"} span={2}>
-          <p className="text-sm text-slate-600">{product.description}</p>
+          <p className="text-sm text-slate-600">{fr ? product.descriptionFr : product.description}</p>
           <ul className="mt-4 list-inside list-disc text-sm text-slate-600">
-            {product.features.map((f) => <li key={f}>{f}</li>)}
+            {(fr ? product.featuresFr : product.features).map((f) => <li key={f}>{f}</li>)}
           </ul>
         </DetailGridSection>
 
@@ -170,8 +172,8 @@ export default function ShopProductDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title={locale === "fr" ? "Spécifications" : "Specifications"} span={2}>
-          <InfoGrid items={Object.entries(product.specifications).map(([k, v]) => ({ label: k, value: v }))} />
-          <p className="mt-4 text-sm text-slate-500">{locale === "fr" ? "Garantie" : "Warranty"}: {product.warranty}</p>
+          <InfoGrid items={Object.entries(fr ? product.specificationsFr : product.specifications).map(([k, v]) => ({ label: k, value: v }))} />
+          <p className="mt-4 text-sm text-slate-500">{locale === "fr" ? "Garantie" : "Warranty"}: {fr ? product.warrantyFr : product.warranty}</p>
         </DetailGridSection>
 
         <DetailGridSection
@@ -186,7 +188,7 @@ export default function ShopProductDetailPage() {
                   <span className="font-medium">{r.author}</span>
                   <span className="text-amber-500">{"★".repeat(r.rating)}</span>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{r.text}</p>
+                <p className="mt-1 text-sm text-slate-600">{fr ? r.textFr : r.text}</p>
                 <p className="text-xs text-slate-400">{r.date}</p>
               </div>
             ))}
@@ -214,7 +216,10 @@ export default function ShopProductDetailPage() {
             </button>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {[...product.questions, ...extraQuestions].map((q, i) => (
+            {[
+              ...product.questions.map((q) => fr ? { q: q.qFr, a: q.aFr, author: q.authorFr } : { q: q.q, a: q.a, author: q.author }),
+              ...extraQuestions,
+            ].map((q, i) => (
               <div key={i} className="rounded-lg border border-[var(--border)] p-4">
                 <p className="font-medium text-slate-900">{locale === "fr" ? "Q :" : "Q:"} {q.q}</p>
                 <p className="mt-1 text-sm text-slate-600">{locale === "fr" ? "R :" : "A:"} {q.a} <span className="text-slate-400">— {q.author}</span></p>

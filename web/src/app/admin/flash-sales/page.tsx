@@ -25,6 +25,7 @@ export default function AdminFlashSalesPage() {
     setSales((s) => [...s, {
       id: `FS-${s.length + 1}`,
       name,
+      nameFr: name,
       start: new Date().toISOString().slice(0, 10),
       end: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       discount: Number(discount) || 20,
@@ -65,7 +66,7 @@ export default function AdminFlashSalesPage() {
           <Card key={fs.id}>
             <CardContent className="p-6">
               <div className="flex justify-between">
-                <h3 className="font-semibold">{fs.name}</h3>
+                <h3 className="font-semibold">{fr ? (fs.nameFr ?? fs.name) : fs.name}</h3>
                 <Badge variant={fs.status === "active" ? "success" : "warning"}>{fr ? (SALE_STATUS_FR[fs.status] ?? fs.status) : fs.status}</Badge>
               </div>
               <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>

@@ -17,6 +17,16 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
 ];
 
+// Return status can be mutated locally; map the live value for the badge.
+const STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  pending_inspection: "Inspection en attente",
+  inspecting: "Inspection en cours",
+  approved: "Approuvé",
+  rejected: "Rejeté",
+  refunded: "Remboursé",
+};
+
 export default function WarehouseReturnsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -58,8 +68,8 @@ export default function WarehouseReturnsPage() {
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "customer", label: fr ? "Client" : "Customer" },
-        { key: "reason", label: fr ? "Motif" : "Reason" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status).replace("_", " ")}</Badge> },
+        { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => String(fr ? row.reasonFr : row.reason) },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status).replace("_", " ")}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/warehouse/returns/${row.id}`} className="text-[var(--primary)] hover:underline">{fr ? "Inspecter" : "Inspect"}</Link>

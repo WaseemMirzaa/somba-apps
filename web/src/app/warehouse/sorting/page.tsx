@@ -20,6 +20,14 @@ const STATUS_OPTIONS = [
   { value: "on_hold", label: "On hold", labelFr: "En attente" },
 ];
 
+// Parcel priority values originate from the shared (non-owned) entities layer.
+const PRIORITY_FR: Record<string, string> = {
+  high: "Élevée",
+  normal: "Normale",
+  medium: "Moyenne",
+  low: "Faible",
+};
+
 export default function WarehouseSortingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -91,7 +99,7 @@ export default function WarehouseSortingPage() {
         { key: "customer", label: fr ? "Client" : "Customer" },
         { key: "zone", label: "Zone" },
         { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
-          <Badge variant={row.priority === "high" ? "danger" : "info"}>{String(row.priority)}</Badge>
+          <Badge variant={row.priority === "high" ? "danger" : "info"}>{fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}</Badge>
         )},
         { key: "route", label: fr ? "Itinéraire" : "Route" },
         { key: "actions", label: t("action"), render: (row) => (

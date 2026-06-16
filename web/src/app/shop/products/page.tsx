@@ -21,6 +21,9 @@ export default function ShopProductsPage() {
 
   const brands = ["all", ...new Set(products.map((p) => p.seller))];
   const categories = ["all", ...new Set(products.map((p) => p.category))];
+  const categoryFrMap = new Map(products.map((p) => [p.category, p.categoryFr]));
+  const categoryLabel = (c: string) =>
+    c === "all" ? (fr ? "Toutes les catégories" : "All categories") : fr ? (categoryFrMap.get(c) ?? c) : c;
 
   const sorted = useMemo(() => {
     let list = [...products];
@@ -62,7 +65,7 @@ export default function ShopProductsPage() {
           <option value="discount">{fr ? "Remise %" : "Discount %"}</option>
         </select>
         <select className="input-premium px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
-          {categories.map((c) => <option key={c} value={c}>{c === "all" ? (fr ? "Toutes les catégories" : "All categories") : c}</option>)}
+          {categories.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
         </select>
         <select className="input-premium px-3 py-2 text-sm" value={brand} onChange={(e) => setBrand(e.target.value)}>
           {brands.map((b) => <option key={b} value={b}>{b === "all" ? (fr ? "Toutes les marques" : "All brands") : b}</option>)}

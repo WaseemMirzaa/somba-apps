@@ -55,22 +55,6 @@ import {
 } from "@/lib/admin-analytics";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
-const CATEGORY_FR: Record<string, string> = {
-  Electronics: "Électronique",
-  Fashion: "Mode",
-  "Home & Living": "Maison & Décoration",
-  Beauty: "Beauté",
-  Grocery: "Épicerie",
-};
-
-const FULFILLMENT_HEALTH_FR: Record<string, string> = {
-  "On-time dispatch": "Expédition à temps",
-  "Warehouse capacity": "Capacité entrepôt",
-  "Rider availability": "Disponibilité livreurs",
-  "Payment reconciliation": "Rapprochement paiements",
-  "Return resolution": "Résolution des retours",
-};
-
 export default function AdminAnalyticsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -239,7 +223,7 @@ export default function AdminAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={adminCategoryGmv.map((c) => ({ name: fr ? (CATEGORY_FR[c.category] ?? c.category) : c.category, gmv: c.gmv }))}
+              items={adminCategoryGmv.map((c) => ({ name: fr ? c.categoryFr : c.category, gmv: c.gmv }))}
               valueKey="gmv"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}
@@ -358,7 +342,7 @@ export default function AdminAnalyticsPage() {
               <p className="text-xs text-slate-500">{fr ? "Score global / 100" : "Overall score / 100"}</p>
             </div>
             <HorizontalBarChart
-              items={adminFulfillmentHealth.map((h) => ({ name: fr ? (FULFILLMENT_HEALTH_FR[h.label] ?? h.label) : h.label, score: h.score }))}
+              items={adminFulfillmentHealth.map((h) => ({ name: fr ? h.labelFr : h.label, score: h.score }))}
               valueKey="score"
               labelKey="name"
               formatValue={(v) => `${v}%`}

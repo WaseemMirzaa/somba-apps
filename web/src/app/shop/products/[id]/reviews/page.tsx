@@ -63,7 +63,10 @@ export default function ProductReviewsPage() {
       )}
 
       <div className="space-y-4">
-        {[...extraReviews, ...product.reviews_list].map((r, i) => (
+        {[
+          ...extraReviews,
+          ...product.reviews_list.map((r) => ({ author: r.author, rating: r.rating, text: fr ? r.textFr : r.text, date: r.date })),
+        ].map((r, i) => (
           <div key={i} className="card-premium p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">

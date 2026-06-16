@@ -27,17 +27,17 @@ export default function WarehouseExceptionDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={exc.id}
-        subtitle={fr ? `${exc.type} · gravité ${exc.severity}` : `${exc.type} · ${exc.severity} severity`}
+        subtitle={fr ? `${exc.typeFr} · gravité ${exc.severityFr}` : `${exc.type} · ${exc.severity} severity`}
         backHref="/warehouse/exceptions"
-        actions={<Badge variant={exc.severity === "critical" ? "danger" : "warning"}>{exc.status}</Badge>}
+        actions={<Badge variant={exc.severity === "critical" ? "danger" : "warning"}>{fr ? exc.statusFr : exc.status}</Badge>}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailSection title={fr ? "Informations" : "Information"}>
           <InfoGrid items={[
             { label: fr ? "ID incident" : "Incident ID", value: exc.id },
-            { label: fr ? "Type" : "Type", value: exc.type },
-            { label: fr ? "Signalé par" : "Reported By", value: exc.reportedBy },
+            { label: fr ? "Type" : "Type", value: fr ? exc.typeFr : exc.type },
+            { label: fr ? "Signalé par" : "Reported By", value: fr ? exc.reportedByFr : exc.reportedBy },
             { label: fr ? "Créé le" : "Created", value: exc.createdDate },
             { label: fr ? "Colis" : "Parcel", value: exc.parcelId !== "—" ? <Link href={`/warehouse/parcels/${exc.parcelId}`} className="text-[var(--primary)] hover:underline">{exc.parcelId}</Link> : "—" },
             { label: fr ? "Commande" : "Order", value: <Link href={`/admin/orders/${exc.orderId}`} className="text-[var(--primary)] hover:underline">{exc.orderId}</Link> },
@@ -47,7 +47,7 @@ export default function WarehouseExceptionDetailPage() {
         <DetailSection title={fr ? "Preuves" : "Evidence"}>
           <InfoGrid items={[
             { label: fr ? "Photos" : "Photos", value: exc.photos > 0 ? `${exc.photos} ${fr ? "jointe(s)" : "attached"}` : (fr ? "Aucune" : "None") },
-            { label: fr ? "Notes" : "Notes", value: exc.notes, full: true },
+            { label: fr ? "Notes" : "Notes", value: fr ? exc.notesFr : exc.notes, full: true },
           ]} />
           {exc.photos > 0 && (
             <div className="mt-4 flex gap-2">
@@ -60,8 +60,8 @@ export default function WarehouseExceptionDetailPage() {
 
         <DetailSection title={fr ? "Résolution" : "Resolution"} className="lg:col-span-2">
           <InfoGrid items={[
-            { label: fr ? "Personnel assigné" : "Assigned Staff", value: exc.assignedStaff },
-            { label: fr ? "Résolution" : "Resolution", value: resolution || exc.resolution, full: true },
+            { label: fr ? "Personnel assigné" : "Assigned Staff", value: fr ? exc.assignedStaffFr : exc.assignedStaff },
+            { label: fr ? "Résolution" : "Resolution", value: resolution || (fr ? exc.resolutionFr : exc.resolution), full: true },
           ]} />
           <textarea
             className="mt-4 w-full rounded-lg border border-indigo-200 p-3 text-sm"

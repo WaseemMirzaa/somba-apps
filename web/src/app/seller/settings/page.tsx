@@ -63,7 +63,7 @@ export default function SellerSettingsPage() {
               { key: "name", label: fr ? "Nom" : "Name" },
               { key: "role", label: fr ? "Rôle" : "Role" },
               { key: "email", label: fr ? "E-mail" : "Email" },
-              { key: "status", label: t("status"), render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
+              { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? (String(row.status) === "active" ? "Actif" : String(row.status)) : String(row.status)}</Badge> },
             ]}
             data={storeSettings.teamMembers as unknown as Record<string, unknown>[]}
           />

@@ -83,9 +83,16 @@ export default function RiderProfilePage() {
               </a>
             ),
           },
-          { label: fr ? "Véhicule" : "Vehicle", value: riderProfile.vehicle },
+          { label: fr ? "Véhicule" : "Vehicle", value: fr ? riderProfile.vehicleFr : riderProfile.vehicle },
           { label: fr ? "Zone" : "Zone", value: riderProfile.zone },
-          { label: fr ? "Statut" : "Status", value: riderProfile.status },
+          {
+            label: fr ? "Statut" : "Status",
+            value: fr
+              ? riderProfile.status === "on_duty"
+                ? "En service"
+                : "Hors service"
+              : riderProfile.status.replace(/_/g, " "),
+          },
         ]} />
       </DetailSection>
     </div>

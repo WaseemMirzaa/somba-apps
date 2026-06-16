@@ -24,7 +24,7 @@ export type SellerEntity = {
   pendingBalance: number;
   paidBalance: number;
   commission: number;
-  timeline: { time: string; label: string; detail?: string }[];
+  timeline: { time: string; label: string; detail?: string; detailFr?: string }[];
 };
 
 export type OrderEntity = {
@@ -58,7 +58,7 @@ export type OrderEntity = {
   commission: number;
   sellerEarnings: number;
   refunds: number;
-  timeline: { time: string; label: string; detail?: string; done?: boolean }[];
+  timeline: { time: string; label: string; detail?: string; detailFr?: string; done?: boolean }[];
 };
 
 export type ProductModerationEntity = {
@@ -135,6 +135,7 @@ export type ProductDetailEntity = {
   nameFr: string;
   brand: string;
   category: string;
+  categoryFr: string;
   subcategory: string;
   price: number;
   originalPrice: number;
@@ -155,14 +156,18 @@ export type ProductDetailEntity = {
   sellerFollowers: number;
   sellerHealthScore: number;
   description: string;
+  descriptionFr: string;
   features: string[];
+  featuresFr: string[];
   specifications: Record<string, string>;
+  specificationsFr: Record<string, string>;
   warranty: string;
+  warrantyFr: string;
   image: string;
   images: string[];
-  variants: { name: string; options: string[] }[];
-  reviews_list: { author: string; rating: number; text: string; date: string }[];
-  questions: { q: string; a: string; author: string }[];
+  variants: { name: string; nameFr: string; options: string[]; optionsFr: string[] }[];
+  reviews_list: { author: string; rating: number; text: string; textFr: string; date: string }[];
+  questions: { q: string; qFr: string; a: string; aFr: string; author: string; authorFr: string }[];
 };
 
 // ─── Seller entities ─────────────────────────────────────────────────────────
@@ -175,7 +180,7 @@ export const sellerEntities: SellerEntity[] = [
     returns: 0, cancellations: 0, rating: 0, healthScore: 0, availableBalance: 0,
     pendingBalance: 0, paidBalance: 0, commission: 12,
     timeline: [
-      { time: "2024-06-05 10:00", label: "Registered", detail: "Application submitted" },
+      { time: "2024-06-05 10:00", label: "Registered", detail: "Application submitted", detailFr: "Demande soumise" },
     ],
   },
   {
@@ -185,7 +190,7 @@ export const sellerEntities: SellerEntity[] = [
     returns: 0, cancellations: 0, rating: 0, healthScore: 0, availableBalance: 0,
     pendingBalance: 0, paidBalance: 0, commission: 15,
     timeline: [
-      { time: "2024-06-04 14:30", label: "Registered", detail: "Application submitted" },
+      { time: "2024-06-04 14:30", label: "Registered", detail: "Application submitted", detailFr: "Demande soumise" },
     ],
   },
   {
@@ -384,6 +389,7 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     nameFr: p.nameFr,
     brand: p.name.split(" ")[0],
     category: p.category,
+    categoryFr: p.categoryFr,
     subcategory: p.category,
     price: p.price,
     originalPrice: p.originalPrice,
@@ -404,7 +410,9 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     sellerFollowers: 45000,
     sellerHealthScore: store.healthScore,
     description: `Premium ${p.name} with excellent build quality and performance. Ideal for everyday use.`,
+    descriptionFr: `${p.nameFr} haut de gamme avec une excellente qualité de fabrication et des performances. Idéal pour un usage quotidien.`,
     features: ["Premium build", "Warranty included", "Fast delivery", "Easy returns"],
+    featuresFr: ["Fabrication haut de gamme", "Garantie incluse", "Livraison rapide", "Retours faciles"],
     specifications: {
       Weight: "250g",
       Dimensions: "15 x 8 x 2 cm",
@@ -412,20 +420,28 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
       Color: "Black",
       Warranty: "1 Year",
     },
+    specificationsFr: {
+      Poids: "250 g",
+      Dimensions: "15 x 8 x 2 cm",
+      Matériau: "Haut de gamme",
+      Couleur: "Noir",
+      Garantie: "1 an",
+    },
     warranty: "1 Year Manufacturer Warranty",
+    warrantyFr: "Garantie fabricant 1 an",
     image: p.image,
     images: [p.image, p.image],
     variants: [
-      { name: "Color", options: ["Black", "Blue", "Silver"] },
-      { name: "Storage", options: ["128GB", "256GB", "512GB"] },
+      { name: "Color", nameFr: "Couleur", options: ["Black", "Blue", "Silver"], optionsFr: ["Noir", "Bleu", "Argent"] },
+      { name: "Storage", nameFr: "Stockage", options: ["128GB", "256GB", "512GB"], optionsFr: ["128 Go", "256 Go", "512 Go"] },
     ],
     reviews_list: [
-      { author: "Marie D.", rating: 5, text: "Excellent product, fast delivery!", date: "2024-05-20" },
-      { author: "John S.", rating: 4, text: "Good value for money.", date: "2024-05-15" },
+      { author: "Marie D.", rating: 5, text: "Excellent product, fast delivery!", textFr: "Excellent produit, livraison rapide !", date: "2024-05-20" },
+      { author: "John S.", rating: 4, text: "Good value for money.", textFr: "Bon rapport qualité-prix.", date: "2024-05-15" },
     ],
     questions: [
-      { q: "Is this original?", a: "Yes, 100% authentic with warranty.", author: "Seller" },
-      { q: "Pay at delivery available?", a: "Yes, pay at delivery is available on eligible items.", author: "Seller" },
+      { q: "Is this original?", qFr: "Est-ce un produit original ?", a: "Yes, 100% authentic with warranty.", aFr: "Oui, 100 % authentique avec garantie.", author: "Seller", authorFr: "Vendeur" },
+      { q: "Pay at delivery available?", qFr: "Paiement à la livraison disponible ?", a: "Yes, pay at delivery is available on eligible items.", aFr: "Oui, le paiement à la livraison est disponible sur les articles éligibles.", author: "Seller", authorFr: "Vendeur" },
     ],
   };
 });
@@ -449,7 +465,7 @@ export const sellerProductDetails = sellerProducts.map((sp) => ({
   ],
   timeline: [
     { time: "2024-01-20", label: "Created" },
-    { time: "2024-01-22", label: "Approved", detail: "Moderation passed" },
+    { time: "2024-01-22", label: "Approved", detail: "Moderation passed", detailFr: "Modération approuvée" },
     { time: "2024-02-01", label: "First Sale" },
   ],
 }));

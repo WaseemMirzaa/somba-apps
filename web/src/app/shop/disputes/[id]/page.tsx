@@ -33,13 +33,13 @@ export default function ShopDisputePage() {
       <PageHeader title={dispute.id} subtitle={`${dispute.orderId} · ${statusLabel}`} backHref="/shop/orders" />
       <DetailSection title={locale === "fr" ? "Détails" : "Details"}>
         <p className="text-sm"><strong>{locale === "fr" ? "Vendeur" : "Seller"}:</strong> {dispute.sellerName}</p>
-        <p className="mt-2 text-sm">{dispute.description}</p>
+        <p className="mt-2 text-sm">{fr ? (dispute.descriptionFr ?? dispute.description) : dispute.description}</p>
       </DetailSection>
       <DetailSection title={locale === "fr" ? "Messages" : "Messages"}>
         <div className="space-y-3">
           {dispute.messages.map((m, i) => (
             <div key={i} className={`rounded-lg p-3 text-sm ${m.from === "buyer" ? "bg-blue-50" : "bg-slate-50"}`}>
-              <p className="text-xs font-medium uppercase text-slate-400">{fr ? (m.from === "buyer" ? "Acheteur" : m.from === "seller" ? "Vendeur" : m.from) : m.from}</p>
+              <p className="text-xs font-medium uppercase text-slate-400">{fr ? (m.from === "buyer" ? "Acheteur" : m.from === "seller" ? "Vendeur" : "Assistance") : m.from}</p>
               <p>{m.text}</p>
             </div>
           ))}

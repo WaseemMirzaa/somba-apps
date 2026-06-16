@@ -16,6 +16,13 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "Delivered", labelFr: "Livré" },
 ];
 
+// Delivery status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  in_transit: "En transit",
+  out_for_delivery: "En livraison",
+  delivered: "Livré",
+};
+
 export default function WarehouseDeliveriesPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -54,7 +61,7 @@ export default function WarehouseDeliveriesPage() {
           <Link href={`/warehouse/riders/${row.riderId}`} className="text-[var(--primary)] hover:underline">{String(row.rider)}</Link>
         )},
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "delivered" ? "success" : "info"}>{String(row.status).replace("_", " ")}</Badge>
+          <Badge variant={row.status === "delivered" ? "success" : "info"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status).replace("_", " ")}</Badge>
         )},
         { key: "eta", label: "ETA" },
         { key: "actions", label: t("action"), render: (row) => (

@@ -64,7 +64,7 @@ export default function WarehouseExchangesPage() {
           return exc.newProduct?.sku ?? "—";
         }},
         { key: "priceDifference", label: fr ? "Diff. prix" : "Price Diff", render: (row) => formatCurrency(row.priceDifference as number, locale) },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(fr ? row.statusFr : row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/exchanges/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

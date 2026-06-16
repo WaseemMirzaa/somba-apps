@@ -93,7 +93,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const inboundSpark = warehouseInboundDispatchTrend.map((d) => d.inbound);
   const dispatchSpark = warehouseInboundDispatchTrend.map((d) => d.dispatch);
   const throughputData = warehouseInboundDispatchTrend.map((d) => ({
-    label: d.label,
+    label: fr ? d.labelFr : d.label,
     revenue: d.inbound,
     orders: d.dispatch,
   }));
@@ -183,7 +183,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={warehouseLaneUtilization.map((l) => ({ name: l.lane, revenue: l.pct }))}
+              items={warehouseLaneUtilization.map((l) => ({ name: fr ? l.laneFr : l.lane, revenue: l.pct }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => `${v}%`}
@@ -281,7 +281,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
             {warehouseHealthBreakdown.map((h) => (
               <div key={h.label}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{h.label}</span>
+                  <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
                   <span className="font-bold text-slate-900">{h.score}%</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">

@@ -23,6 +23,27 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   closed: "default",
 };
 
+const STATUS_LABELS_FR: Record<string, string> = {
+  open: "Ouvert",
+  seller_responded: "Réponse vendeur",
+  resolved: "Résolu",
+  closed: "Fermé",
+};
+
+const REASON_LABELS_FR: Record<string, string> = {
+  not_as_described: "Non conforme à la description",
+  defective: "Défectueux",
+  wrong_item: "Mauvais article",
+  damaged: "Endommagé",
+  late_delivery: "Livraison en retard",
+  not_received: "Non reçu",
+};
+
+function localizeDisputeReason(reason: string, fr: boolean) {
+  if (fr && REASON_LABELS_FR[reason]) return REASON_LABELS_FR[reason];
+  return reason.replace(/_/g, " ");
+}
+
 export default function SellerDisputesPage() {
   const { disputes } = useDisputes();
   const { t, locale } = useLocale();
@@ -92,7 +113,7 @@ export default function SellerDisputesPage() {
           label: locale === "fr" ? "Motif" : "Reason",
           render: (row) => (
             <span className="max-w-[10rem] text-slate-600">
-              {String(row.reason).replace(/_/g, " ")}
+              {localizeDisputeReason(String(row.reason), locale === "fr")}
             </span>
           ),
         },
@@ -101,7 +122,9 @@ export default function SellerDisputesPage() {
           label: t("status"),
           render: (row) => (
             <Badge variant={statusVariant[row.status as string] ?? "default"}>
-              {String(row.status).replace(/_/g, " ")}
+              {locale === "fr"
+                ? STATUS_LABELS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")
+                : String(row.status).replace(/_/g, " ")}
             </Badge>
           ),
         },

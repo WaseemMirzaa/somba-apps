@@ -57,7 +57,7 @@ export default function SellerPromotionsPage() {
         { key: "startDate", label: fr ? "Début" : "Start" },
         { key: "endDate", label: fr ? "Fin" : "End" },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "active" ? "success" : "warning"}>{String(row.status)}</Badge>
+          <Badge variant={row.status === "active" ? "success" : "warning"}>{fr ? String(row.statusFr) : String(row.status)}</Badge>
         )},
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/promotions/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>

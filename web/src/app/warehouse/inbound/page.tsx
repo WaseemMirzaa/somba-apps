@@ -20,6 +20,16 @@ const STATUS_OPTIONS = [
   { value: "ready", label: "Ready", labelFr: "Prêt" },
 ];
 
+// Parcel status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  pending: "En attente",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
 export default function WarehouseInboundPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -73,7 +83,7 @@ export default function WarehouseInboundPage() {
         { key: "arrival", label: fr ? "Heure d'arrivée" : "Arrival Time" },
         { key: "itemsCount", label: fr ? "Articles" : "Items" },
         { key: "weight", label: fr ? "Poids" : "Weight" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>

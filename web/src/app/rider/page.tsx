@@ -77,6 +77,11 @@ export default function RiderDashboardPage() {
 
   const earningsSpark = riderEarningsTrend.map((d) => d.revenue);
   const deliveriesSpark = riderEarningsTrend.map((d) => d.orders);
+  const earningsTrendData = riderEarningsTrend.map((d) => ({
+    label: fr ? d.labelFr : d.label,
+    revenue: d.revenue,
+    orders: d.orders,
+  }));
 
   return (
     <div className="space-y-6">
@@ -103,7 +108,7 @@ export default function RiderDashboardPage() {
           <Badge variant="success">{formatCurrency(k.earningsToday, locale)} {fr ? "aujourd'hui" : "today"}</Badge>
         </CardHeader>
         <CardContent>
-          <DualMetricChart data={riderEarningsTrend} height={180} />
+          <DualMetricChart data={earningsTrendData} height={180} />
         </CardContent>
       </Card>
 

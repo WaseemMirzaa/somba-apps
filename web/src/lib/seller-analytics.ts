@@ -43,11 +43,11 @@ export const sellerOrderFunnel = [
 ] as const;
 
 export const sellerCategoryRevenue = [
-  { category: "Smartphones", revenue: 412000, pct: 46, orders: 892 },
-  { category: "Audio", revenue: 186000, pct: 21, orders: 1240 },
-  { category: "Accessories", revenue: 142000, pct: 16, orders: 2100 },
-  { category: "Wearables", revenue: 98000, pct: 11, orders: 680 },
-  { category: "Other", revenue: 56320, pct: 6, orders: 420 },
+  { category: "Smartphones", categoryFr: "Smartphones", revenue: 412000, pct: 46, orders: 892 },
+  { category: "Audio", categoryFr: "Audio", revenue: 186000, pct: 21, orders: 1240 },
+  { category: "Accessories", categoryFr: "Accessoires", revenue: 142000, pct: 16, orders: 2100 },
+  { category: "Wearables", categoryFr: "Objets connectés", revenue: 98000, pct: 11, orders: 680 },
+  { category: "Other", categoryFr: "Autre", revenue: 56320, pct: 6, orders: 420 },
 ] as const;
 
 export const sellerGoals = {
@@ -135,14 +135,14 @@ export const sellerProductKpis = {
 } as const;
 
 export const sellerProductPerformance = [
-  { id: 1, name: "Galaxy S24 Ultra", sku: "SAM-S24U-256", category: "Smartphones", views: 12400, orders: 342, sold: 342, revenue: 410400, conversion: 2.8, rating: 4.9, returnRate: 0.8, trend: 18.4 },
-  { id: 2, name: "Galaxy Buds Pro", sku: "SAM-BUDS-PRO", category: "Audio", views: 8900, orders: 218, sold: 218, revenue: 43600, conversion: 2.5, rating: 4.7, returnRate: 1.2, trend: 12.1 },
-  { id: 3, name: "Galaxy Watch 6", sku: "SAM-WATCH-6", category: "Wearables", views: 6200, orders: 156, sold: 156, revenue: 46800, conversion: 2.5, rating: 4.8, returnRate: 0.9, trend: 9.8 },
-  { id: 4, name: "USB-C Hub", sku: "ACC-HUB-7P", category: "Accessories", views: 5400, orders: 412, sold: 412, revenue: 12360, conversion: 7.6, rating: 4.5, returnRate: 2.1, trend: 22.3 },
-  { id: 5, name: "Phone Case Pro", sku: "ACC-CASE-PRO", category: "Accessories", views: 9800, orders: 890, sold: 890, revenue: 17800, conversion: 9.1, rating: 4.6, returnRate: 1.8, trend: 15.6 },
-  { id: 6, name: "Wireless Charger", sku: "ACC-WC-15W", category: "Accessories", views: 3200, orders: 186, sold: 186, revenue: 9300, conversion: 5.8, rating: 4.4, returnRate: 2.4, trend: 6.2 },
-  { id: 7, name: "Galaxy Tab S9", sku: "SAM-TAB-S9", category: "Tablets", views: 4100, orders: 89, sold: 89, revenue: 62300, conversion: 2.2, rating: 4.8, returnRate: 1.0, trend: 4.1 },
-  { id: 8, name: "Screen Protector Kit", sku: "ACC-SP-KIT", category: "Accessories", views: 7600, orders: 520, sold: 520, revenue: 7800, conversion: 6.8, rating: 4.3, returnRate: 3.2, trend: -2.4 },
+  { id: 1, name: "Galaxy S24 Ultra", sku: "SAM-S24U-256", category: "Smartphones", categoryFr: "Smartphones", views: 12400, orders: 342, sold: 342, revenue: 410400, conversion: 2.8, rating: 4.9, returnRate: 0.8, trend: 18.4 },
+  { id: 2, name: "Galaxy Buds Pro", sku: "SAM-BUDS-PRO", category: "Audio", categoryFr: "Audio", views: 8900, orders: 218, sold: 218, revenue: 43600, conversion: 2.5, rating: 4.7, returnRate: 1.2, trend: 12.1 },
+  { id: 3, name: "Galaxy Watch 6", sku: "SAM-WATCH-6", category: "Wearables", categoryFr: "Objets connectés", views: 6200, orders: 156, sold: 156, revenue: 46800, conversion: 2.5, rating: 4.8, returnRate: 0.9, trend: 9.8 },
+  { id: 4, name: "USB-C Hub", sku: "ACC-HUB-7P", category: "Accessories", categoryFr: "Accessoires", views: 5400, orders: 412, sold: 412, revenue: 12360, conversion: 7.6, rating: 4.5, returnRate: 2.1, trend: 22.3 },
+  { id: 5, name: "Phone Case Pro", sku: "ACC-CASE-PRO", category: "Accessories", categoryFr: "Accessoires", views: 9800, orders: 890, sold: 890, revenue: 17800, conversion: 9.1, rating: 4.6, returnRate: 1.8, trend: 15.6 },
+  { id: 6, name: "Wireless Charger", sku: "ACC-WC-15W", category: "Accessories", categoryFr: "Accessoires", views: 3200, orders: 186, sold: 186, revenue: 9300, conversion: 5.8, rating: 4.4, returnRate: 2.4, trend: 6.2 },
+  { id: 7, name: "Galaxy Tab S9", sku: "SAM-TAB-S9", category: "Tablets", categoryFr: "Tablettes", views: 4100, orders: 89, sold: 89, revenue: 62300, conversion: 2.2, rating: 4.8, returnRate: 1.0, trend: 4.1 },
+  { id: 8, name: "Screen Protector Kit", sku: "ACC-SP-KIT", category: "Accessories", categoryFr: "Accessoires", views: 7600, orders: 520, sold: 520, revenue: 7800, conversion: 6.8, rating: 4.3, returnRate: 3.2, trend: -2.4 },
 ] as const;
 
 export const sellerWorstProducts = [

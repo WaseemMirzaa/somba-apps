@@ -88,7 +88,7 @@ export default function RiderNotificationsPage() {
                 key: "type",
                 label: "Type",
                 render: (row) => (
-                  <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge>
+                  <Badge variant="info">{String((fr && row.typeFr) ? row.typeFr : row.type).replace(/_/g, " ")}</Badge>
                 ),
               },
               {

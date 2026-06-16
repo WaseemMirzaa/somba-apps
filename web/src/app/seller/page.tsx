@@ -118,6 +118,14 @@ export default function SellerDashboard() {
     "Response time": "Temps de réponse",
   };
 
+  const orderStatusFr: Record<string, string> = {
+    pending: "En attente",
+    processing: "En cours",
+    ready: "Prêt",
+    delivered: "Livré",
+    cancelled: "Annulé",
+  };
+
   const quickActions = [
     { href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
     { href: "/seller/products/create", label: t("createProduct"), sub: fr ? "Ajouter une annonce" : "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
@@ -287,7 +295,7 @@ export default function SellerDashboard() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={sellerCategoryRevenue.map((c) => ({ name: c.category, revenue: c.revenue }))}
+              items={sellerCategoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.revenue }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}
@@ -454,7 +462,7 @@ export default function SellerDashboard() {
                 },
                 { key: "customer", label: t("name") },
                 { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-                { key: "orderStatus", label: t("status"), render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
+                { key: "orderStatus", label: t("status"), render: (row) => <Badge variant="info">{fr ? (orderStatusFr[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
               ]}
               data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
             />
@@ -483,7 +491,7 @@ export default function SellerDashboard() {
                   { key: "orders", label: fr ? "Commandes" : "Orders" },
                   { key: "revenue", label: fr ? "Chiffre d'affaires" : "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
                   { key: "roi", label: "ROI", render: (row) => <Badge variant="success">{String(row.roi)}x</Badge> },
-                  { key: "status", label: t("status"), render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
+                  { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? String(row.statusFr) : String(row.status)}</Badge> },
                 ]}
                 data={promotionList.filter((p) => p.status === "active") as unknown as Record<string, unknown>[]}
               />

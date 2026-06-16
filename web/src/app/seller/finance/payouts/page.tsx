@@ -65,9 +65,9 @@ export default function SellerPayoutsPage() {
           <Link href={`/seller/finance/payouts/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "method", label: fr ? "Méthode" : "Method" },
+        { key: "method", label: fr ? "Méthode" : "Method", render: (row) => (fr ? String(row.methodFr ?? row.method) : String(row.method)) },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "paid" ? "success" : "warning"}>{String(row.status)}</Badge>
+          <Badge variant={row.status === "paid" ? "success" : "warning"}>{fr ? String(row.statusFr ?? row.status) : String(row.status)}</Badge>
         )},
         { key: "date", label: t("date") },
         { key: "items", label: fr ? "Articles" : "Items", render: (row) => String(row.itemCount ?? "—") },

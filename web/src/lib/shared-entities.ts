@@ -3,6 +3,7 @@ export type NotificationItem = {
   userId: string;
   portal: "customer" | "seller" | "rider" | "warehouse" | "admin";
   type: string;
+  typeFr?: string;
   title: string;
   titleFr: string;
   body: string;
@@ -21,7 +22,9 @@ export type DisputeItem = {
   sellerName: string;
   status: "open" | "seller_responded" | "resolved" | "closed";
   reason: string;
+  reasonFr?: string;
   description: string;
+  descriptionFr?: string;
   createdAt: string;
   productId: number;
   productName: string;
@@ -39,6 +42,7 @@ export type ReturnItem = {
   status: "requested" | "approved" | "in_transit" | "received" | "refunded" | "rejected";
   items: string[];
   reason: string;
+  reasonFr?: string;
   createdAt: string;
   refundAmount?: number;
 };
@@ -63,6 +67,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
     userId: "customer",
     portal: "customer",
     type: "order_shipped",
+    typeFr: "commande expédiée",
     title: "Your order is on the way",
     titleFr: "Votre commande est en route",
     body: "ORD-2024-001 has been dispatched.",
@@ -76,6 +81,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
     userId: "customer",
     portal: "customer",
     type: "promo",
+    typeFr: "promo",
     title: "Flash sale starts now",
     titleFr: "Vente flash en cours",
     body: "Up to 40% off electronics.",
@@ -89,6 +95,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
     userId: "seller",
     portal: "seller",
     type: "new_order",
+    typeFr: "nouvelle commande",
     title: "New order received",
     titleFr: "Nouvelle commande",
     body: "ORD-2024-006 needs fulfilment.",
@@ -102,6 +109,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
     userId: "rider",
     portal: "rider",
     type: "task_assigned",
+    typeFr: "tâche assignée",
     title: "New delivery task",
     titleFr: "Nouvelle livraison",
     body: "Batch B-042 assigned to you.",
@@ -122,7 +130,9 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     sellerName: "SportStyle",
     status: "open",
     reason: "not_as_described",
+    reasonFr: "non conforme à la description",
     description: "Shoes colour does not match listing photos — ordered white, received grey.",
+    descriptionFr: "La couleur des chaussures ne correspond pas aux photos de l'annonce — commandées en blanc, reçues en gris.",
     createdAt: "2024-06-05",
     productId: 4,
     productName: "Nike Air Max 270",
@@ -146,7 +156,9 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     sellerName: "TechZone Store",
     status: "seller_responded",
     reason: "defective",
+    reasonFr: "défectueux",
     description: "Headphones left speaker crackling and cuts out after 10 minutes of use.",
+    descriptionFr: "Le haut-parleur gauche du casque grésille et se coupe après 10 minutes d'utilisation.",
     createdAt: "2024-06-03",
     productId: 3,
     productName: "Galaxy Buds Pro",
@@ -171,6 +183,7 @@ export const MOCK_RETURNS: ReturnItem[] = [
     status: "approved",
     items: ["Nike Air Max 270"],
     reason: "Wrong size",
+    reasonFr: "Mauvaise taille",
     createdAt: "2024-06-05",
     refundAmount: 129,
   },
@@ -180,6 +193,7 @@ export const MOCK_RETURNS: ReturnItem[] = [
     status: "in_transit",
     items: ["Dyson V15 Vacuum"],
     reason: "Damaged item",
+    reasonFr: "Article endommagé",
     createdAt: "2024-06-04",
     refundAmount: 649,
   },
@@ -189,6 +203,7 @@ export const MOCK_RETURNS: ReturnItem[] = [
     status: "refunded",
     items: ["Nike Air Max 270"],
     reason: "Not as described",
+    reasonFr: "Non conforme à la description",
     createdAt: "2024-06-02",
     refundAmount: 129,
   },

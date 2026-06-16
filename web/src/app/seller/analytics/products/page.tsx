@@ -178,7 +178,7 @@ export default function SellerProductAnalyticsPage() {
                 ),
               },
               { key: "sku", label: "SKU" },
-              { key: "category", label: fr ? "Catégorie" : "Category" },
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
               { key: "views", label: fr ? "Vues" : "Views", render: (row) => Number(row.views).toLocaleString() },
               { key: "orders", label: t("orders") },
               {

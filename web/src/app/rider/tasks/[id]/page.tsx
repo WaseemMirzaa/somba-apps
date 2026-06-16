@@ -14,6 +14,28 @@ import { getRiderTask } from "@/lib/rider-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
+// Display labels for task enums / payment strings (logic uses raw values).
+const TYPE_FR: Record<string, string> = {
+  delivery: "Livraison",
+  pickup: "Collecte",
+  return: "Retour",
+  cod: "Paiement à la livraison",
+};
+
+const STATUS_FR: Record<string, string> = {
+  assigned: "Assigné",
+  picked_up: "Collecté",
+  in_transit: "En transit",
+  delivered: "Livré",
+  failed: "Échoué",
+};
+
+const PAYMENT_FR: Record<string, string> = {
+  "Pay at delivery": "À la livraison",
+  Prepaid: "Prépayé",
+  Card: "Carte",
+};
+
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -30,17 +52,20 @@ export default function RiderTaskDetailPage() {
   }
 
   const status = delivered ? "delivered" : task.status;
+  const typeLabel = fr ? TYPE_FR[task.type] ?? task.type : task.type;
+  const statusLabel = fr ? STATUS_FR[status] ?? status.replace("_", " ") : status.replace("_", " ");
+  const paymentLabel = fr ? PAYMENT_FR[task.paymentType] ?? task.paymentType : task.paymentType;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={task.id}
-        subtitle={`${task.type} · ${status.replace("_", " ")}`}
+        subtitle={`${typeLabel} · ${statusLabel}`}
         backHref="/rider/tasks"
       />
 
       <div className="flex flex-wrap gap-2">
-        <Badge variant="primary">{task.type}</Badge>
+        <Badge variant="primary">{typeLabel}</Badge>
         <Badge variant={delivered ? "success" : "warning"}>ETA {task.eta}</Badge>
         <Badge>{task.distance}</Badge>
         <Badge>{task.zone}</Badge>
@@ -50,13 +75,13 @@ export default function RiderTaskDetailPage() {
         <InfoGrid
           items={[
             { label: fr ? "N° commande" : "Order ID", value: task.orderId },
-            { label: fr ? "Paiement" : "Payment", value: task.paymentType },
+            { label: fr ? "Paiement" : "Payment", value: paymentLabel },
             {
               label: fr ? "Montant" : "Amount",
               value: task.amount ? formatCurrency(task.amount, locale) : "—",
             },
             { label: fr ? "Articles" : "Items", value: task.items },
-            { label: fr ? "Statut" : "Status", value: status.replace("_", " ") },
+            { label: fr ? "Statut" : "Status", value: statusLabel },
           ]}
         />
       </DetailSection>

@@ -16,6 +16,18 @@ import { useLocale } from "@/context/locale-context";
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
 const STATUS_FR: Record<string, string> = { open: "Ouvert", reviewed: "Examiné", blocked: "Bloqué" };
+const TYPE_FR: Record<string, string> = {
+  cod_risk: "Risque paiement à la livraison",
+  otp_fail: "Échec OTP",
+  velocity: "Vélocité",
+  address_block: "Blocage d'adresse",
+};
+const TYPE_EN: Record<string, string> = {
+  cod_risk: "COD risk",
+  otp_fail: "OTP fail",
+  velocity: "Velocity",
+  address_block: "Address block",
+};
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
@@ -60,7 +72,7 @@ export default function AdminFraudPage() {
           <DataTable
             columns={[
               { key: "id", label: fr ? "Alerte" : "Alert" },
-              { key: "type", label: "Type", render: (r) => <Badge>{String(r.type).replace("_", " ")}</Badge> },
+              { key: "type", label: "Type", render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
               { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "orderId", label: fr ? "Commande" : "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-[var(--primary)]">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },

@@ -16,6 +16,12 @@ const STATUS_OPTIONS = [
   { value: "offline", label: "Offline", labelFr: "Hors ligne" },
 ];
 
+const STATUS_FR: Record<string, string> = {
+  active: "Actif",
+  inactive: "Inactif",
+  offline: "Hors ligne",
+};
+
 export default function WarehouseRidersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -58,7 +64,7 @@ export default function WarehouseRidersPage() {
         { key: "performanceScore", label: fr ? "Performance" : "Performance", render: (row) => (
           <span className="font-medium text-emerald-600">{String(row.performanceScore)}%</span>
         )},
-        { key: "status", label: t("status"), render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>

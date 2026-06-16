@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { ProductCard } from "@/components/landing/product-card";
 import { getSeller } from "@/lib/entities";
-import { products, stores } from "@/lib/mock-data";
+import { products, stores, categories } from "@/lib/mock-data";
 import { useLocale } from "@/context/locale-context";
 
 export default function ShopStoreDetailPage() {
@@ -16,6 +16,7 @@ export default function ShopStoreDetailPage() {
   const seller = getSeller(Number(id));
   const store = stores.find((s) => s.name === seller?.storeName) ?? stores[0];
   const storeProducts = products.filter((p) => p.seller === seller?.storeName || p.seller === store.name);
+  const categoryFr = categories.find((c) => c.name === seller?.category)?.nameFr ?? seller?.category;
 
   if (!seller) {
     return <div className="text-center text-slate-500">{fr ? "Boutique introuvable" : "Store not found"}</div>;
@@ -30,13 +31,13 @@ export default function ShopStoreDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{seller.storeName}</h1>
           <p className="text-slate-500">⭐ {seller.rating || store.rating} · {store.followers.toLocaleString()} {fr ? "abonnés" : "followers"} · {store.products} {fr ? "produits" : "products"}</p>
-          <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{fr ? `Vendeur ${store.badge}` : `${store.badge} Seller`}</span>
+          <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{fr ? `Vendeur ${store.badgeFr}` : `${store.badge} Seller`}</span>
         </div>
       </div>
 
       <DetailGrid>
         <DetailGridSection title={fr ? "À propos" : "About"}>
-          <p className="text-sm text-slate-600">{fr ? `${seller.storeName} — spécialiste ${seller.category} basé à ${seller.city}, ${seller.country}.` : `${seller.storeName} — ${seller.category} specialist based in ${seller.city}, ${seller.country}.`}</p>
+          <p className="text-sm text-slate-600">{fr ? `${seller.storeName} — spécialiste ${categoryFr} basé à ${seller.city}, ${seller.country}.` : `${seller.storeName} — ${seller.category} specialist based in ${seller.city}, ${seller.country}.`}</p>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Avis sur la boutique" : "Store Reviews"}>

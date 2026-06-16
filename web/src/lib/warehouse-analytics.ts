@@ -1,13 +1,13 @@
 /** Warehouse dashboard analytics mock data */
 
 export const warehouseThroughputTrend = [
-  { label: "Mon", revenue: 420, orders: 186 },
-  { label: "Tue", revenue: 512, orders: 224 },
-  { label: "Wed", revenue: 478, orders: 208 },
-  { label: "Thu", revenue: 590, orders: 262 },
-  { label: "Fri", revenue: 640, orders: 288 },
-  { label: "Sat", revenue: 710, orders: 312 },
-  { label: "Sun", revenue: 384, orders: 168 },
+  { label: "Mon", labelFr: "Lun", revenue: 420, orders: 186 },
+  { label: "Tue", labelFr: "Mar", revenue: 512, orders: 224 },
+  { label: "Wed", labelFr: "Mer", revenue: 478, orders: 208 },
+  { label: "Thu", labelFr: "Jeu", revenue: 590, orders: 262 },
+  { label: "Fri", labelFr: "Ven", revenue: 640, orders: 288 },
+  { label: "Sat", labelFr: "Sam", revenue: 710, orders: 312 },
+  { label: "Sun", labelFr: "Dim", revenue: 384, orders: 168 },
 ] as const;
 
 export const warehouseExtendedKpis = {
@@ -28,10 +28,10 @@ export const warehouseExtendedKpis = {
 } as const;
 
 export const warehouseLaneUtilization = [
-  { lane: "Lane A — Express", pct: 92, parcels: 142 },
-  { lane: "Lane B — Standard", pct: 78, parcels: 218 },
-  { lane: "Lane C — Bulk", pct: 64, parcels: 96 },
-  { lane: "Lane D — Returns", pct: 45, parcels: 38 },
+  { lane: "Lane A — Express", laneFr: "Lane A — Express", pct: 92, parcels: 142 },
+  { lane: "Lane B — Standard", laneFr: "Lane B — Standard", pct: 78, parcels: 218 },
+  { lane: "Lane C — Bulk", laneFr: "Lane C — Volumineux", pct: 64, parcels: 96 },
+  { lane: "Lane D — Returns", laneFr: "Lane D — Retours", pct: 45, parcels: 38 },
 ] as const;
 
 export const warehouseRiderPerformance = [
@@ -42,11 +42,11 @@ export const warehouseRiderPerformance = [
 ] as const;
 
 export const warehouseHealthBreakdown = [
-  { label: "Inbound SLA", score: 93 },
-  { label: "Sort accuracy", score: 97 },
-  { label: "Dispatch speed", score: 91 },
-  { label: "Return processing", score: 94 },
-  { label: "Exception resolution", score: 86 },
+  { label: "Inbound SLA", labelFr: "SLA réception", score: 93 },
+  { label: "Sort accuracy", labelFr: "Précision tri", score: 97 },
+  { label: "Dispatch speed", labelFr: "Vitesse expédition", score: 91 },
+  { label: "Return processing", labelFr: "Traitement retours", score: 94 },
+  { label: "Exception resolution", labelFr: "Résolution exceptions", score: 86 },
 ] as const;
 
 export const warehouseRecentActivity = [
@@ -58,13 +58,13 @@ export const warehouseRecentActivity = [
 ] as const;
 
 export const warehouseInboundDispatchTrend = [
-  { label: "Mon", inbound: 342, dispatch: 298 },
-  { label: "Tue", inbound: 368, dispatch: 312 },
-  { label: "Wed", inbound: 310, dispatch: 286 },
-  { label: "Thu", inbound: 402, dispatch: 378 },
-  { label: "Fri", inbound: 448, dispatch: 420 },
-  { label: "Sat", inbound: 284, dispatch: 268 },
-  { label: "Sun", inbound: 198, dispatch: 184 },
+  { label: "Mon", labelFr: "Lun", inbound: 342, dispatch: 298 },
+  { label: "Tue", labelFr: "Mar", inbound: 368, dispatch: 312 },
+  { label: "Wed", labelFr: "Mer", inbound: 310, dispatch: 286 },
+  { label: "Thu", labelFr: "Jeu", inbound: 402, dispatch: 378 },
+  { label: "Fri", labelFr: "Ven", inbound: 448, dispatch: 420 },
+  { label: "Sat", labelFr: "Sam", inbound: 284, dispatch: 268 },
+  { label: "Sun", labelFr: "Dim", inbound: 198, dispatch: 184 },
 ] as const;
 
 export const warehouseSlaBreakdown = [
@@ -106,10 +106,10 @@ export const warehouseReturnMetrics = {
 } as const;
 
 export const warehouseReturnTrend = [
-  { label: "Week 1", received: 82, processed: 78 },
-  { label: "Week 2", received: 94, processed: 88 },
-  { label: "Week 3", received: 88, processed: 84 },
-  { label: "Week 4", received: 102, processed: 96 },
+  { label: "Week 1", labelFr: "Semaine 1", received: 82, processed: 78 },
+  { label: "Week 2", labelFr: "Semaine 2", received: 94, processed: 88 },
+  { label: "Week 3", labelFr: "Semaine 3", received: 88, processed: 84 },
+  { label: "Week 4", labelFr: "Semaine 4", received: 102, processed: 96 },
 ] as const;
 
 export const warehouseTopBatches = [

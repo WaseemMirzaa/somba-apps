@@ -13,6 +13,22 @@ import { getInboundParcel } from "@/lib/warehouse-entities";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+// Parcel status / inspection values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  pending: "En attente",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
+const CONDITION_FR: Record<string, string> = {
+  Good: "Bon",
+  Pending: "En attente",
+  Damaged: "Endommagé",
+};
+
 export default function WarehouseParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
@@ -24,11 +40,22 @@ export default function WarehouseParcelDetailPage() {
     return <div className="p-8 text-center text-slate-500">{fr ? "Colis introuvable" : "Parcel not found"}</div>;
   }
 
+  const statusLabel = fr ? STATUS_FR[parcel.status] ?? parcel.status : parcel.status;
+  const conditionLabel = fr
+    ? CONDITION_FR[parcel.inspectionDetail.condition] ?? parcel.inspectionDetail.condition
+    : parcel.inspectionDetail.condition;
+  const exceptionsLabel =
+    parcel.inspectionDetail.exceptions === "None"
+      ? fr
+        ? "Aucune"
+        : "None"
+      : parcel.inspectionDetail.exceptions;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={parcel.id}
-        subtitle={`${fr ? "Commande" : "Order"} ${parcel.orderId} · ${parcel.status} · ${parcel.zone}`}
+        subtitle={`${fr ? "Commande" : "Order"} ${parcel.orderId} · ${statusLabel} · ${parcel.zone}`}
         backHref="/warehouse/inbound"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -39,7 +66,7 @@ export default function WarehouseParcelDetailPage() {
           parcel.status === "inbound" ? (
             <button onClick={() => toast(fr ? "Colis reçu" : "Parcel received")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("receive")}</button>
           ) : (
-            <Badge variant="info">{parcel.status}</Badge>
+            <Badge variant="info">{statusLabel}</Badge>
           )
         }
       />
@@ -52,7 +79,7 @@ export default function WarehouseParcelDetailPage() {
             { label: fr ? "ID commande" : "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-[var(--primary)] hover:underline">{parcel.orderId}</Link> },
             { label: fr ? "Poids" : "Weight", value: parcel.weight },
             { label: fr ? "Volume" : "Volume", value: parcel.volume },
-            { label: fr ? "Statut" : "Status", value: parcel.status },
+            { label: fr ? "Statut" : "Status", value: statusLabel },
             { label: fr ? "Heure d'arrivée" : "Arrival Time", value: parcel.arrival },
             { label: fr ? "Zone" : "Zone", value: parcel.zone },
           ]} />
@@ -103,10 +130,10 @@ export default function WarehouseParcelDetailPage() {
 
         <DetailGridSection title={fr ? "Inspection" : "Inspection"}>
           <InfoGrid items={[
-            { label: fr ? "État" : "Condition", value: parcel.inspectionDetail.condition },
+            { label: fr ? "État" : "Condition", value: conditionLabel },
             { label: fr ? "Photos" : "Photos", value: `${parcel.inspectionDetail.photos} ${fr ? "téléversées" : "uploaded"}` },
             { label: fr ? "Notes de dommages" : "Damage Notes", value: parcel.inspectionDetail.damageNotes || (fr ? "Aucune" : "None"), full: true },
-            { label: t("exceptions"), value: parcel.inspectionDetail.exceptions },
+            { label: t("exceptions"), value: exceptionsLabel },
           ]} />
           <div className="mt-4 flex gap-2">
             <button onClick={() => toast(fr ? "Colis accepté" : "Parcel accepted")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Accepter" : "Accept"}</button>

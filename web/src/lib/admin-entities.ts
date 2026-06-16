@@ -33,8 +33,8 @@ export const cmsBlocks = [
 ];
 
 export const flashSales = [
-  { id: "FS-01", name: "Summer Electronics", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" },
-  { id: "FS-02", name: "Fashion Weekend", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" },
+  { id: "FS-01", name: "Summer Electronics", nameFr: "Électronique d'été", start: "2024-06-08", end: "2024-06-15", discount: 40, products: 24, status: "active" },
+  { id: "FS-02", name: "Fashion Weekend", nameFr: "Week-end mode", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" },
 ];
 
 export type AdminPayoutStatus = "requested" | "approved" | "rejected" | "paid";

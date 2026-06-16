@@ -20,6 +20,29 @@ const UNAVAILABLE_REASONS = [
   { id: "discontinued", label: "Discontinued", labelFr: "Discontinué" },
 ];
 
+const ORDER_STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  processing: "En cours",
+  ready: "Prêt",
+  picked: "Collecté",
+  delivered: "Livré",
+  cancelled: "Annulé",
+};
+
+const PAYMENT_STATUS_FR: Record<string, string> = {
+  paid: "Payé",
+  pending: "En attente",
+  refunded: "Remboursé",
+  failed: "Échoué",
+};
+
+function localizeOrderStatus(status: string, fr: boolean) {
+  return fr ? ORDER_STATUS_FR[status] ?? status : status;
+}
+function localizePaymentStatus(status: string, fr: boolean) {
+  return fr ? PAYMENT_STATUS_FR[status] ?? status : status;
+}
+
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -45,7 +68,7 @@ export default function SellerOrderDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={order.id}
-        subtitle={`${order.customer} · ${order.orderStatus}`}
+        subtitle={`${order.customer} · ${localizeOrderStatus(order.orderStatus, fr)}`}
         backHref="/seller/orders"
         actions={
           !ready && order.shippingStatus !== "ready" ? (
@@ -68,7 +91,7 @@ export default function SellerOrderDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Numéro de commande" : "Order Number", value: order.id },
             { label: fr ? "Date de commande" : "Order Date", value: order.date },
-            { label: fr ? "Statut de commande" : "Order Status", value: order.orderStatus },
+            { label: fr ? "Statut de commande" : "Order Status", value: localizeOrderStatus(order.orderStatus, fr) },
             { label: fr ? "Montant total" : "Total Amount", value: formatCurrency(order.amount, locale) },
           ]} />
         </DetailGridSection>
@@ -90,7 +113,7 @@ export default function SellerOrderDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Mode de paiement" : "Payment Method", value: formatPaymentMethod(order.paymentMethod, locale) },
             { label: fr ? "ID transaction" : "Transaction ID", value: order.transactionId },
-            { label: fr ? "Statut" : "Status", value: order.paymentStatus },
+            { label: fr ? "Statut" : "Status", value: localizePaymentStatus(order.paymentStatus, fr) },
             { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
             { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
           ]} />
@@ -106,7 +129,7 @@ export default function SellerOrderDetailPage() {
               items={[
                 { label: fr ? "Entrepôt" : "Warehouse", value: order.warehouse },
                 { label: fr ? "Livreur collecte" : "Pickup Rider", value: order.pickupRider ?? "—" },
-                { label: fr ? "Statut suivi" : "Tracking Status", value: order.trackingStatus },
+                { label: fr ? "Statut suivi" : "Tracking Status", value: localizeOrderStatus(order.trackingStatus, fr) },
                 { label: fr ? "ETA collecte" : "Pickup ETA", value: order.pickupEta },
                 { label: fr ? "N° suivi" : "Tracking Number", value: order.trackingNumber ?? "—" },
               ]}

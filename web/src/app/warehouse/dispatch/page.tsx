@@ -17,6 +17,14 @@ const STATUS_OPTIONS = [
   { value: "in_transit", label: "In transit", labelFr: "En transit" },
 ];
 
+// Batch status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  ready: "Prêt",
+  dispatched: "Expédié",
+  in_transit: "En transit",
+  delivered: "Livré",
+};
+
 export default function WarehouseDispatchPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -66,7 +74,7 @@ export default function WarehouseDispatchPage() {
         { key: "parcelCount", label: fr ? "Colis" : "Parcels" },
         { key: "distance", label: fr ? "Distance" : "Distance" },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "dispatched" ? "success" : "warning"}>{String(row.status)}</Badge>
+          <Badge variant={row.status === "dispatched" ? "success" : "warning"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
         )},
         { key: "dispatchTime", label: fr ? "Heure d'expédition" : "Dispatch Time" },
         { key: "actions", label: t("action"), render: (row) => (

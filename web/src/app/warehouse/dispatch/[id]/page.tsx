@@ -14,6 +14,14 @@ import { getRider, type RiderEntity } from "@/lib/warehouse-entities";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+// Batch status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  ready: "Prêt",
+  dispatched: "Expédié",
+  in_transit: "En transit",
+  delivered: "Livré",
+};
+
 export default function WarehouseBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -30,6 +38,7 @@ export default function WarehouseBatchDetailPage() {
   }
 
   const rider = assignedRider ?? getRider(batch.riderId);
+  const statusLabel = fr ? STATUS_FR[status] ?? status : status;
 
   function handleAssignRider(selected: RiderEntity) {
     setAssignedRider(selected);
@@ -41,7 +50,7 @@ export default function WarehouseBatchDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={batch.id}
-        subtitle={`${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"} · ${batch.status}`}
+        subtitle={`${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"} · ${statusLabel}`}
         backHref="/warehouse/dispatch"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -61,7 +70,7 @@ export default function WarehouseBatchDetailPage() {
             { label: fr ? "ID lot" : "Batch ID", value: batch.id },
             { label: fr ? "Zone" : "Zone", value: batch.zone },
             { label: fr ? "Colis" : "Parcels", value: batch.parcelCount },
-            { label: fr ? "Statut" : "Status", value: status },
+            { label: fr ? "Statut" : "Status", value: statusLabel },
           ]} />
         </DetailGridSection>
 
@@ -95,7 +104,7 @@ export default function WarehouseBatchDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: rider.name },
             { label: fr ? "Téléphone" : "Phone", value: rider.phone },
-            { label: fr ? "Véhicule" : "Vehicle", value: rider.vehicle },
+            { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
             { label: fr ? "Zone" : "Zone", value: rider.zone },
             { label: fr ? "Performance" : "Performance", value: `${rider.performanceScore}%` },
           ]} />

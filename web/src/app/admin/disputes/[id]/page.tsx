@@ -46,6 +46,7 @@ const ORDER_STATUS_FR: Record<string, string> = {
   processing: "En cours",
   delivered: "Livré",
   cancelled: "Annulé",
+  shipped: "Expédié",
 };
 
 const PAYMENT_STATUS_FR: Record<string, string> = {
