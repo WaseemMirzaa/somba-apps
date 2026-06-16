@@ -106,7 +106,7 @@ export default function AdminDisputeResolutionPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-red-700">{fr ? "Motif du litige" : "Dispute reason"}</p>
             <p className="mt-1 text-xl font-bold text-red-950">{reasonLabel}</p>
-            <p className="mt-2 text-sm leading-relaxed text-red-900/80">{dispute.description}</p>
+            <p className="mt-2 text-sm leading-relaxed text-red-900/80">{fr ? (dispute.descriptionFr ?? dispute.description) : dispute.description}</p>
           </div>
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function AdminDisputeResolutionPage() {
             { label: fr ? "Ouvert le" : "Opened", value: dispute.createdAt },
             { label: fr ? "Statut" : "Status", value: formatDisputeStatus(dispute.status, fr) },
             { label: fr ? "Motif" : "Reason", value: <span className="font-semibold text-red-700">{reasonLabel}</span> },
-            { label: fr ? "Description" : "Description", value: dispute.description, full: true },
+            { label: fr ? "Description" : "Description", value: fr ? (dispute.descriptionFr ?? dispute.description) : dispute.description, full: true },
           ]} />
         </DetailGridSection>
 

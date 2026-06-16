@@ -18,6 +18,30 @@ const ROLE_NAMES_FR: Record<string, string> = {
   warehouse: "Administrateur d'entrepôt",
 };
 
+const PERMISSION_FR: Record<string, string> = {
+  all: "tout",
+  orders: "commandes",
+  warehouse: "entrepôt",
+  logistics: "logistique",
+  payouts: "versements",
+  refunds: "remboursements",
+  cod: "paiements",
+  reports: "rapports",
+  tickets: "tickets",
+  customers: "clients",
+  returns: "retours",
+  campaigns: "campagnes",
+  cms: "CMS",
+  coupons: "coupons",
+  banners: "bannières",
+  products: "produits",
+  reviews: "avis",
+  sellers: "vendeurs",
+  inventory: "inventaire",
+  dispatch: "expédition",
+  hubs: "hubs",
+};
+
 export default function AdminRolesPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
@@ -46,18 +70,19 @@ export default function AdminRolesPage() {
                       disabled={editingRole !== role.id}
                       className="h-3 w-3 rounded"
                     />
-                    <Badge variant="default">{p}</Badge>
+                    <Badge variant="default">{fr ? (PERMISSION_FR[p] ?? p) : p}</Badge>
                   </label>
                 ))}
               </div>
               <button
                 onClick={() => {
+                  const roleName = fr ? (ROLE_NAMES_FR[role.id] ?? role.name) : role.name;
                   if (editingRole === role.id) {
                     setEditingRole(null);
-                    toast(fr ? `Autorisations enregistrées pour ${role.name}` : `Permissions saved for ${role.name}`);
+                    toast(fr ? `Autorisations enregistrées pour ${roleName}` : `Permissions saved for ${roleName}`);
                   } else {
                     setEditingRole(role.id);
-                    toast(fr ? `Modification des autorisations de ${role.name}` : `Editing ${role.name} permissions`, "info");
+                    toast(fr ? `Modification des autorisations de ${roleName}` : `Editing ${roleName} permissions`, "info");
                   }
                 }}
                 className="mt-4 text-sm font-medium text-[var(--primary)] hover:underline"

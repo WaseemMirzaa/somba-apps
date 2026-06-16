@@ -184,17 +184,38 @@ export function SegmentDonut({
   );
 }
 
+/**
+ * French labels for conversion-funnel stage names. Funnel data arrives in
+ * English from the analytics layer; consumers that don't pre-translate the
+ * stage (or any new dashboard) fall back to this map. Unknown stages render
+ * their original text so nothing is dropped.
+ */
+const FUNNEL_STAGE_FR: Record<string, string> = {
+  "Visits": "Visites",
+  "Site visits": "Visites du site",
+  "Product views": "Vues produit",
+  "Add to cart": "Ajout au panier",
+  "Checkout": "Paiement",
+  "Checkout started": "Paiement démarré",
+  "Purchase": "Achat",
+  "Orders placed": "Commandes",
+  "Orders": "Commandes",
+  "Delivered": "Livrées",
+};
+
 /** Funnel chart */
 export function FunnelChart({
   stages,
 }: {
   stages: readonly { stage: string; count: number; pct: number }[];
 }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   return (
     <div className="space-y-2">
       {stages.map((s, i) => (
         <div key={s.stage} className="flex items-center gap-3">
-          <div className="w-28 shrink-0 text-xs font-medium text-slate-600">{s.stage}</div>
+          <div className="w-28 shrink-0 text-xs font-medium text-slate-600">{fr ? (FUNNEL_STAGE_FR[s.stage] ?? s.stage) : s.stage}</div>
           <div className="flex-1">
             <div
               className={cn(

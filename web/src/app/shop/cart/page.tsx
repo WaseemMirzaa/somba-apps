@@ -11,6 +11,27 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useMarket } from "@/context/market-context";
 
+// Variant strings come from the shop/cart data layer as free-form English tokens
+// (e.g. "256GB Black", "White", "Default"). Translate the known tokens locally.
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Par défaut",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+function localizeVariant(variant: string, fr: boolean) {
+  if (!fr || !variant) return variant;
+  return variant
+    .split(" ")
+    .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+    .join(" ");
+}
+
 export default function ShopCartPage() {
   const { locale } = useLocale();
   const { profile } = useMarket();
@@ -64,7 +85,7 @@ export default function ShopCartPage() {
                   <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
                     {locale === "fr" ? item.nameFr : item.name}
                   </Link>
-                  <p className="text-xs text-slate-500">{item.variant}</p>
+                  <p className="text-xs text-slate-500">{localizeVariant(item.variant, locale === "fr")}</p>
                   <div className="mt-2 flex items-center gap-3">
                     <select
                       className="rounded border border-blue-200 px-2 py-1 text-sm"

@@ -32,7 +32,7 @@ export default function SellerProductDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={product.name}
-        subtitle={`SKU: ${product.sku} · ${product.status}`}
+        subtitle={`SKU: ${product.sku} · ${fr ? (STATUS_FR[product.status] ?? product.status) : product.status}`}
         backHref="/seller/products"
         breadcrumbs={[
           { label: fr ? "Vendeur" : "Seller", href: "/seller" },
@@ -42,7 +42,7 @@ export default function SellerProductDetailPage() {
         actions={
           <div className="flex gap-2">
             <Link href="/seller/products/create" className="rounded-lg border border-sky-200 px-4 py-2 text-sm">{fr ? "Modifier" : "Edit"}</Link>
-            <Badge variant={product.status === "live" ? "success" : "warning"}>{String(product.status)}</Badge>
+            <Badge variant={product.status === "live" ? "success" : "warning"}>{fr ? (STATUS_FR[String(product.status)] ?? String(product.status)) : String(product.status)}</Badge>
           </div>
         }
       />
@@ -57,8 +57,8 @@ export default function SellerProductDetailPage() {
             <InfoGrid items={[
               { label: fr ? "ID produit" : "Product ID", value: product.id },
               { label: "SKU", value: product.sku },
-              { label: fr ? "Catégorie" : "Category", value: product.category },
-              { label: fr ? "Sous-catégorie" : "Subcategory", value: product.subcategory },
+              { label: fr ? "Catégorie" : "Category", value: fr ? product.categoryFr : product.category },
+              { label: fr ? "Sous-catégorie" : "Subcategory", value: fr ? product.subcategoryFr : product.subcategory },
               { label: fr ? "Marque" : "Brand", value: product.brand },
               { label: fr ? "Créé le" : "Created", value: product.createdDate },
               { label: fr ? "Mis à jour le" : "Updated", value: product.updatedDate },
@@ -105,7 +105,7 @@ export default function SellerProductDetailPage() {
               columns={[
                 { key: "variantName", label: fr ? "Variante" : "Variant" },
                 { key: "sku", label: "SKU" },
-                { key: "color", label: fr ? "Couleur" : "Color" },
+                { key: "color", label: fr ? "Couleur" : "Color", render: (row) => fr ? (String(row.colorFr ?? row.color)) : String(row.color) },
                 { key: "size", label: fr ? "Taille" : "Size" },
                 { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
                 { key: "stock", label: "Stock" },

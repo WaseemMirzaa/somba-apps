@@ -36,6 +36,27 @@ const PAYMENT_FR: Record<string, string> = {
   Card: "Carte",
 };
 
+// Product variant tokens arrive in English (e.g. "Default", "256GB Black").
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Standard",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+
+const localizeVariant = (variant: string, fr: boolean) =>
+  !fr || !variant
+    ? variant
+    : variant
+        .split(" ")
+        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+        .join(" ");
+
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -142,7 +163,7 @@ export default function RiderTaskDetailPage() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-slate-900">{item.name}</p>
                 <p className="text-xs text-slate-500">
-                  SKU: {item.sku} · {item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
+                  SKU: {item.sku} · {localizeVariant(item.variant, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
                 </p>
               </div>
             </div>
@@ -166,7 +187,7 @@ export default function RiderTaskDetailPage() {
           <p className="text-xs font-semibold uppercase text-slate-500">
             {fr ? "Notes" : "Notes"}
           </p>
-          <p className="mt-1 text-sm text-slate-700">{task.notes}</p>
+          <p className="mt-1 text-sm text-slate-700">{fr ? (task.notesFr ?? task.notes) : task.notes}</p>
         </div>
       )}
 

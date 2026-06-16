@@ -44,6 +44,7 @@ export type InventoryEntity = {
   productId: number;
   product: string;
   category: string;
+  categoryFr: string;
   available: number;
   reserved: number;
   allocated: number;
@@ -105,6 +106,7 @@ export type ReturnEntity = {
   productId: number;
   product: string;
   variant: string;
+  variantFr: string;
   qty: number;
   image: string;
   inspection: { condition: string; conditionFr: string; photos: number; notes: string; notesFr: string };
@@ -463,6 +465,7 @@ export const inventoryEntities: InventoryEntity[] = products.slice(0, 6).map((p,
   productId: p.id,
   product: p.name,
   category: p.category,
+  categoryFr: p.categoryFr,
   available: [45, 23, 120, 89, 34, 67][i],
   reserved: [5, 2, 10, 4, 3, 8][i],
   allocated: [3, 1, 6, 2, 1, 4][i],
@@ -562,7 +565,7 @@ export const returnEntities: ReturnEntity[] = [
     customerComment: "Ordered size 43 but received size 42. Item is unopened in original packaging.",
     customerCommentFr: "Pointure 43 commandée mais pointure 42 reçue. Article non ouvert dans son emballage d'origine.",
     returnType: "refund", status: "pending_inspection", statusFr: "Inspection en attente", createdAt: "2024-06-05",
-    productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
+    productId: 4, product: "Nike Air Max 270", variant: "Size 42", variantFr: "Taille 42", qty: 1,
     image: products[3].image,
     inspection: { condition: "Good", conditionFr: "Bon", photos: 2, notes: "Unopened box — awaiting warehouse receipt", notesFr: "Boîte non ouverte — en attente de réception entrepôt" },
     refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "pending", statusFr: "En attente" },
@@ -582,7 +585,7 @@ export const returnEntities: ReturnEntity[] = [
     customerComment: "Vacuum motor makes loud noise and box was crushed on arrival.",
     customerCommentFr: "Le moteur de l'aspirateur fait un bruit fort et la boîte était écrasée à l'arrivée.",
     returnType: "refund", status: "inspecting", statusFr: "Inspection en cours", createdAt: "2024-06-04",
-    productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
+    productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", variantFr: "Standard", qty: 1,
     image: products[4].image,
     inspection: { condition: "Damaged", conditionFr: "Endommagé", photos: 4, notes: "Box crushed, motor noise confirmed during inspection", notesFr: "Boîte écrasée, bruit du moteur confirmé lors de l'inspection" },
     refund: { amount: 649, method: "Original Payment", methodFr: "Paiement d'origine", status: "pending", statusFr: "En attente" },
@@ -602,7 +605,7 @@ export const returnEntities: ReturnEntity[] = [
     customerComment: "Colour on the listing was white but the shoes received are grey.",
     customerCommentFr: "La couleur sur l'annonce était blanche mais les chaussures reçues sont grises.",
     returnType: "exchange", status: "refunded", statusFr: "Remboursé", createdAt: "2024-06-02",
-    productId: 4, product: "Nike Air Max 270", variant: "Size 40", qty: 1,
+    productId: 4, product: "Nike Air Max 270", variant: "Size 40", variantFr: "Taille 40", qty: 1,
     image: products[3].image,
     inspection: { condition: "Good", conditionFr: "Bon", photos: 3, notes: "Item matches customer photos — colour mismatch confirmed", notesFr: "Article conforme aux photos du client — écart de couleur confirmé" },
     refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "completed", statusFr: "Terminé" },

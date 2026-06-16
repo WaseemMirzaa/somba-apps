@@ -63,7 +63,7 @@ export default function SellerReturnDetailPage() {
         <DetailGridSection title={fr ? "Produit" : "Product"}>
           <InfoGrid items={[
             { label: fr ? "Produit" : "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-            { label: fr ? "Variante" : "Variant", value: ret.variant },
+            { label: fr ? "Variante" : "Variant", value: fr ? (ret.variantFr ?? ret.variant) : ret.variant },
             { label: fr ? "Quantité" : "Quantity", value: ret.qty },
           ]} />
         </DetailGridSection>

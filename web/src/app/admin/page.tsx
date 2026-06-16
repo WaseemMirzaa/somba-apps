@@ -91,8 +91,8 @@ export default function AdminDashboard() {
     { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: formatCurrency(84200, locale), icon: Wallet },
     { href: "/admin/fraud", label: fr ? "Fraude" : "Fraud", sub: `${k.fraudFlags} ${fr ? "alertes" : "flags"}`, icon: Shield },
     { href: "/admin/returns", label: fr ? "Retours" : "Returns", sub: `${adminReturnMetrics.returnRate}% ${fr ? "taux" : "rate"}`, icon: RotateCcw },
-    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: "5 escalated", icon: Scale },
-    { href: "/admin/products", label: fr ? "Produits" : "Products", sub: "8 moderation", icon: Package },
+    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: fr ? "5 escaladés" : "5 escalated", icon: Scale },
+    { href: "/admin/products", label: fr ? "Produits" : "Products", sub: fr ? "8 en modération" : "8 moderation", icon: Package },
     { href: "/admin/analytics", label: t("analytics"), sub: fr ? "Analyse détaillée" : "Deep dive", icon: BarChart3 },
   ];
 
@@ -372,8 +372,8 @@ export default function AdminDashboard() {
                 render: (row) =>
                   row.status === "pending" ? (
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => toast(`Seller ${row.storeName} approved`)} className="text-xs font-medium text-emerald-600 hover:underline">{t("approve")}</button>
-                      <button type="button" onClick={() => toast(`Seller ${row.storeName} rejected`)} className="text-xs font-medium text-red-600 hover:underline">{t("reject")}</button>
+                      <button type="button" onClick={() => toast(fr ? `Vendeur ${row.storeName} approuvé` : `Seller ${row.storeName} approved`)} className="text-xs font-medium text-emerald-600 hover:underline">{t("approve")}</button>
+                      <button type="button" onClick={() => toast(fr ? `Vendeur ${row.storeName} rejeté` : `Seller ${row.storeName} rejected`)} className="text-xs font-medium text-red-600 hover:underline">{t("reject")}</button>
                     </div>
                   ) : (
                     <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--primary)] hover:underline">{t("view")}</Link>

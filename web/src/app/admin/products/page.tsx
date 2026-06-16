@@ -25,6 +25,14 @@ const STATUS_FR: Record<string, string> = {
   rejected: "Rejeté",
 };
 
+const CATEGORY_FR: Record<string, string> = {
+  Electronics: "Électronique",
+  Fashion: "Mode",
+  "Home & Living": "Maison & Décoration",
+  Beauty: "Beauté",
+  Grocery: "Épicerie",
+};
+
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -90,7 +98,9 @@ export default function AdminProductsPage() {
                   </Link>
                 ),
               },
-              { key: "category", label: fr ? "Catégorie" : "Category" },
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (
+                <span>{fr ? (CATEGORY_FR[String(row.category)] ?? String(row.category)) : String(row.category)}</span>
+              )},
               {
                 key: "price",
                 label: fr ? "Prix" : "Price",

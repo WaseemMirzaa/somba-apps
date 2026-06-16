@@ -24,6 +24,12 @@ const AUDIT_VALUE_FR: Record<string, string> = {
   rejected: "rejeté",
   completed: "terminé",
 };
+const ACTOR_FR: Record<string, string> = {
+  "Admin User": "Administrateur",
+  Moderator: "Modérateur",
+  "Finance Lead": "Responsable finance",
+  "Ops Manager": "Responsable des opérations",
+};
 
 export default function AdminAuditPage() {
   const { locale } = useLocale();
@@ -42,7 +48,7 @@ export default function AdminAuditPage() {
                     <Badge variant="primary">{fr ? (ACTION_FR[log.action] ?? log.action) : log.action}</Badge>
                     <span className="text-xs text-slate-400">{log.timestamp}</span>
                   </div>
-                  <p className="mt-2 text-sm"><strong>{log.actor}</strong> · {fr ? (ENTITY_FR[log.entity] ?? log.entity) : log.entity} <code className="text-[var(--primary)]">{log.entityId}</code></p>
+                  <p className="mt-2 text-sm"><strong>{fr ? (ACTOR_FR[log.actor] ?? log.actor) : log.actor}</strong> · {fr ? (ENTITY_FR[log.entity] ?? log.entity) : log.entity} <code className="text-[var(--primary)]">{log.entityId}</code></p>
                 </div>
               </div>
               {log.before && log.after && (

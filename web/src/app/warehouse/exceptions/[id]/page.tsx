@@ -17,7 +17,7 @@ export default function WarehouseExceptionDetailPage() {
   const { toast } = useToast();
   const exc = getException(id);
   const [notes, setNotes] = useState("");
-  const [resolution, setResolution] = useState(exc?.resolution ?? "");
+  const [resolution, setResolution] = useState(fr ? (exc?.resolutionFr ?? "") : (exc?.resolution ?? ""));
 
   if (!exc) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Exception introuvable" : "Exception not found"}</div>;

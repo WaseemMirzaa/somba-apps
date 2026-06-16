@@ -5,6 +5,12 @@ import { DetailSection } from "@/components/ui/info-grid";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
+const STATEMENT_MONTHS: { en: string; fr: string }[] = [
+  { en: "May 2024", fr: "Mai 2024" },
+  { en: "April 2024", fr: "Avril 2024" },
+  { en: "March 2024", fr: "Mars 2024" },
+];
+
 export default function SellerStatementsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
@@ -24,10 +30,10 @@ export default function SellerStatementsPage() {
     <div className="space-y-6">
       <PageHeader title={fr ? "Relevés" : "Statements"} subtitle={fr ? "Relevés financiers mensuels" : "Monthly financial statements"} backHref="/seller/finance" />
       <DetailSection title={fr ? "Relevés disponibles" : "Available Statements"}>
-        {["May 2024", "April 2024", "March 2024"].map((m) => (
-          <div key={m} className="flex justify-between border-b border-sky-50 py-3 last:border-0">
-            <span className="font-medium">{m}</span>
-            <button onClick={() => downloadPdf(m)} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Télécharger le PDF" : "Download PDF"}</button>
+        {STATEMENT_MONTHS.map((m) => (
+          <div key={m.en} className="flex justify-between border-b border-sky-50 py-3 last:border-0">
+            <span className="font-medium">{fr ? m.fr : m.en}</span>
+            <button onClick={() => downloadPdf(fr ? m.fr : m.en)} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Télécharger le PDF" : "Download PDF"}</button>
           </div>
         ))}
       </DetailSection>

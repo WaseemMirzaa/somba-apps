@@ -69,7 +69,7 @@ export default function SellerInventoryDetailPage() {
           <DataTable
             columns={[
               { key: "date", label: "Date" },
-              { key: "type", label: "Type" },
+              { key: "type", label: "Type", render: (row) => (fr ? String(row.typeFr ?? row.type) : String(row.type)) },
               { key: "quantity", label: fr ? "Quantité" : "Quantity" },
               { key: "reference", label: fr ? "Référence" : "Reference" },
               { key: "user", label: fr ? "Utilisateur" : "User" },

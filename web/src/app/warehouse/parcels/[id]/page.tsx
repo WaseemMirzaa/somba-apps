@@ -29,6 +29,27 @@ const CONDITION_FR: Record<string, string> = {
   Damaged: "Endommagé",
 };
 
+// Product variant tokens arrive in English from the shared (non-owned) entities layer.
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Standard",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+
+const localizeVariant = (variant: string, fr: boolean) =>
+  !fr || !variant
+    ? variant
+    : variant
+        .split(" ")
+        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+        .join(" ");
+
 export default function WarehouseParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
@@ -151,7 +172,7 @@ export default function WarehouseParcelDetailPage() {
                 </div>
                 <div className="flex-1">
                   <Link href={`/shop/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.product}</Link>
-                  <p className="text-xs text-slate-500">SKU: {item.sku} · {item.variant}</p>
+                  <p className="text-xs text-slate-500">SKU: {item.sku} · {localizeVariant(item.variant, fr)}</p>
                 </div>
                 <span className="text-sm font-medium">{fr ? "Qté" : "Qty"}: {item.qty}</span>
               </div>

@@ -48,7 +48,7 @@ export default function WarehouseInventoryPage() {
             <span>{String(row.product)}</span>
           </div>
         )},
-        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => String(fr ? (row.categoryFr ?? row.category) : row.category) },
         { key: "available", label: fr ? "Disponible" : "Available" },
         { key: "reserved", label: fr ? "Réservé" : "Reserved" },
         { key: "allocated", label: fr ? "Alloué" : "Allocated" },

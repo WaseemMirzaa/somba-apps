@@ -280,7 +280,7 @@ export const shipmentList: ShipmentDetail[] = sellerOrderList
 export const sellerReturnList = [
   {
     id: "RET-001", orderId: "ORD-2024-001", customer: "Marie Dubois", reason: "Wrong size", reasonFr: "Mauvaise taille",
-    amount: 129, status: "pending_inspection", productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
+    amount: 129, status: "pending_inspection", productId: 4, product: "Nike Air Max 270", variant: "Size 42", variantFr: "Taille 42", qty: 1,
     inspection: { warehouseNotes: "Good condition — unopened box", warehouseNotesFr: "Bon état — boîte non ouverte", photos: 2, condition: "Unopened", conditionFr: "Non ouvert" },
     refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "pending" },
     timeline: [
@@ -293,7 +293,7 @@ export const sellerReturnList = [
   },
   {
     id: "RET-002", orderId: "ORD-2024-004", customer: "Ahmed Hassan", reason: "Damaged item", reasonFr: "Article endommagé",
-    amount: 649, status: "inspecting", productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
+    amount: 649, status: "inspecting", productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", variantFr: "Standard", qty: 1,
     inspection: { warehouseNotes: "Box crushed, motor noise", warehouseNotesFr: "Boîte écrasée, bruit du moteur", photos: 4, condition: "Damaged", conditionFr: "Endommagé" },
     refund: { amount: 649, method: "Original Payment", methodFr: "Paiement d'origine", status: "pending" },
     timeline: [

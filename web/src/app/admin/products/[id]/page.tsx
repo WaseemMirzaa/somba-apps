@@ -19,6 +19,21 @@ const STATUS_FR: Record<string, string> = {
   changes_requested: "Modifications demandées",
 };
 
+const CATEGORY_FR: Record<string, string> = {
+  Electronics: "Électronique",
+  Fashion: "Mode",
+  "Home & Living": "Maison & Décoration",
+  Beauty: "Beauté",
+  Grocery: "Épicerie",
+};
+
+// moderationQueue lives in entities.ts (not owned) and has no descriptionFr — map locally.
+const DESCRIPTION_FR: Record<string, string> = {
+  "Latest flagship smartphone with advanced camera system.": "Dernier smartphone haut de gamme avec système photo avancé.",
+  "Premium noise-cancelling wireless earbuds.": "Écouteurs sans fil premium à réduction de bruit.",
+  "Elegant summer dresses in various colors.": "Robes d'été élégantes en plusieurs coloris.",
+};
+
 export default function AdminProductModerationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -86,8 +101,8 @@ export default function AdminProductModerationDetailPage() {
           <DetailSection title={fr ? "Informations produit" : "Product Information"}>
             <InfoGrid items={[
               { label: fr ? "Titre" : "Title", value: product.name, full: true },
-              { label: fr ? "Description" : "Description", value: product.description, full: true },
-              { label: fr ? "Catégorie" : "Category", value: product.category },
+              { label: fr ? "Description" : "Description", value: fr ? (DESCRIPTION_FR[product.description] ?? product.description) : product.description, full: true },
+              { label: fr ? "Catégorie" : "Category", value: fr ? (CATEGORY_FR[product.category] ?? product.category) : product.category },
               { label: fr ? "Marque" : "Brand", value: product.brand },
             ]} />
           </DetailSection>

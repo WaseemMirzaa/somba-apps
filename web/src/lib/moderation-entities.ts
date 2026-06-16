@@ -15,8 +15,11 @@ export type ReportItem = {
   id: string;
   type: "review" | "product" | "store";
   target: string;
+  targetFr?: string;
   reporter: string;
+  reporterFr?: string;
   reason: string;
+  reasonFr?: string;
   date: string;
   status: "open" | "resolved" | "dismissed";
 };
@@ -32,9 +35,9 @@ export const REVIEWS: ReviewItem[] = [
 ];
 
 export const REPORTS: ReportItem[] = [
-  { id: "RP-308", type: "review", target: "RV-1039 · Dyson V15", reporter: "HomeEssentials", reason: "Spam / external contact", date: "2026-06-10", status: "open" },
-  { id: "RP-307", type: "product", target: "Counterfeit AirPods Pro", reporter: "Customer · Marie D.", reason: "Counterfeit goods", date: "2026-06-10", status: "open" },
-  { id: "RP-306", type: "store", target: "QuickDeals Store", reporter: "Customer · Ahmed B.", reason: "Misleading store info", date: "2026-06-09", status: "open" },
-  { id: "RP-305", type: "review", target: "RV-1031 · iPhone case", reporter: "AccessoryHub", reason: "Offensive language", date: "2026-06-08", status: "resolved" },
-  { id: "RP-304", type: "product", target: "Unbranded power bank", reporter: "Customer · Sophie L.", reason: "Safety concern", date: "2026-06-07", status: "dismissed" },
+  { id: "RP-308", type: "review", target: "RV-1039 · Dyson V15", reporter: "HomeEssentials", reason: "Spam / external contact", reasonFr: "Spam / contact externe", date: "2026-06-10", status: "open" },
+  { id: "RP-307", type: "product", target: "Counterfeit AirPods Pro", targetFr: "AirPods Pro contrefaits", reporter: "Customer · Marie D.", reporterFr: "Client · Marie D.", reason: "Counterfeit goods", reasonFr: "Produits contrefaits", date: "2026-06-10", status: "open" },
+  { id: "RP-306", type: "store", target: "QuickDeals Store", reporter: "Customer · Ahmed B.", reporterFr: "Client · Ahmed B.", reason: "Misleading store info", reasonFr: "Informations boutique trompeuses", date: "2026-06-09", status: "open" },
+  { id: "RP-305", type: "review", target: "RV-1031 · iPhone case", targetFr: "RV-1031 · coque iPhone", reporter: "AccessoryHub", reason: "Offensive language", reasonFr: "Langage offensant", date: "2026-06-08", status: "resolved" },
+  { id: "RP-304", type: "product", target: "Unbranded power bank", targetFr: "Batterie externe sans marque", reporter: "Customer · Sophie L.", reporterFr: "Client · Sophie L.", reason: "Safety concern", reasonFr: "Problème de sécurité", date: "2026-06-07", status: "dismissed" },
 ];

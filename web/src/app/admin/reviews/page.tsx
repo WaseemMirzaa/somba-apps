@@ -113,9 +113,9 @@ export default function AdminReviewsPage() {
             data={reports as unknown as Record<string, unknown>[]}
             columns={[
               { key: "type", label: "Type", render: (row) => <Badge variant="info">{fr ? (REPORT_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
-              { key: "target", label: fr ? "Cible" : "Target", render: (row) => <span className="font-medium text-slate-900">{String(row.target)}</span> },
-              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => fr ? (REPORT_REASON_FR[String(row.reason)] ?? String(row.reason)) : String(row.reason) },
-              { key: "reporter", label: fr ? "Signalé par" : "Reporter", render: (row) => <span className="text-slate-500">{String(row.reporter)}</span> },
+              { key: "target", label: fr ? "Cible" : "Target", render: (row) => <span className="font-medium text-slate-900">{fr ? String((row as unknown as ReportItem).targetFr ?? row.target) : String(row.target)}</span> },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => fr ? (REPORT_REASON_FR[String(row.reason)] ?? String((row as unknown as ReportItem).reasonFr ?? row.reason)) : String(row.reason) },
+              { key: "reporter", label: fr ? "Signalé par" : "Reporter", render: (row) => <span className="text-slate-500">{fr ? String((row as unknown as ReportItem).reporterFr ?? row.reporter) : String(row.reporter)}</span> },
               { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={reportVariant[row.status as ReportItem["status"]]}>{fr ? (REPORT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
               {
                 key: "actions",

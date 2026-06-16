@@ -14,6 +14,10 @@ function formatStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const VARIANT_FR: Record<string, string> = {
+  Default: "Standard",
+};
+
 type ShipmentDetailGridProps = {
   shipment: ShipmentDetail;
   locale: "en" | "fr";
@@ -191,7 +195,7 @@ export function ShipmentDetailGrid({
                     {item.name}
                   </Link>
                   <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
+                    SKU: {item.sku} · {fr ? (VARIANT_FR[item.variant] ?? item.variant) : item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
                   </p>
                 </div>
                 <p className="text-sm font-medium text-slate-900">{formatCurrency(item.price, locale)}</p>

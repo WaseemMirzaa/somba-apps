@@ -28,6 +28,10 @@ const TYPE_EN: Record<string, string> = {
   velocity: "Velocity",
   address_block: "Address block",
 };
+// Generic (non-person-name) customer labels that need translation.
+const CUSTOMER_FR: Record<string, string> = {
+  "Unknown User": "Utilisateur inconnu",
+};
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
@@ -73,7 +77,7 @@ export default function AdminFraudPage() {
             columns={[
               { key: "id", label: fr ? "Alerte" : "Alert" },
               { key: "type", label: "Type", render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: fr ? "Client" : "Customer", render: (r) => <span>{fr ? (CUSTOMER_FR[String(r.customer)] ?? String(r.customer)) : String(r.customer)}</span> },
               { key: "orderId", label: fr ? "Commande" : "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-[var(--primary)]">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },
               { key: "severity", label: fr ? "Gravité" : "Severity", render: (r) => <Badge variant={severityVariant[r.severity as keyof typeof severityVariant]}>{fr ? (SEVERITY_FR[String(r.severity)] ?? String(r.severity)) : String(r.severity)}</Badge> },

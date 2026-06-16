@@ -56,6 +56,19 @@ const RETURN_TYPE_FR: Record<string, string> = {
   exchange: "Échange",
 };
 
+const TIMELINE_LABEL_FR: Record<string, string> = {
+  "Order Delivered": "Commande livrée",
+  "Return Requested": "Retour demandé",
+  "Return Approved": "Retour approuvé",
+  "Pickup Scheduled": "Enlèvement planifié",
+  "Pickup Completed": "Enlèvement effectué",
+  "In Transit to Warehouse": "En transit vers l'entrepôt",
+  "Received at Warehouse": "Reçu à l'entrepôt",
+  "Inspecting": "Inspection en cours",
+  "Inspection Passed": "Inspection réussie",
+  "Refund Processed": "Remboursement traité",
+};
+
 function formatReturnStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -102,9 +115,9 @@ export default function AdminReturnDetailPage() {
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-amber-700">{t("returnReason")}</p>
-            <p className="mt-1 text-xl font-bold text-amber-950">{ret.reason}</p>
+            <p className="mt-1 text-xl font-bold text-amber-950">{fr ? ret.reasonFr : ret.reason}</p>
             {ret.customerComment && (
-              <p className="mt-2 text-sm leading-relaxed text-amber-900/80">{ret.customerComment}</p>
+              <p className="mt-2 text-sm leading-relaxed text-amber-900/80">{fr ? (ret.customerCommentFr ?? ret.customerComment) : ret.customerComment}</p>
             )}
           </div>
         </div>
@@ -117,7 +130,7 @@ export default function AdminReturnDetailPage() {
             { label: fr ? "Demandé le" : "Requested", value: ret.createdAt },
             { label: "Type", value: fr ? (RETURN_TYPE_FR[ret.returnType] ?? ret.returnType) : ret.returnType.charAt(0).toUpperCase() + ret.returnType.slice(1) },
             { label: fr ? "Statut" : "Status", value: returnStatusLabel(ret.status) },
-            { label: fr ? "Motif" : "Reason", value: <span className="font-semibold text-amber-700">{ret.reason}</span> },
+            { label: fr ? "Motif" : "Reason", value: <span className="font-semibold text-amber-700">{fr ? ret.reasonFr : ret.reason}</span> },
           ]} />
         </DetailGridSection>
 
@@ -155,16 +168,16 @@ export default function AdminReturnDetailPage() {
         <DetailGridSection title={fr ? "Remboursement" : "Refund"}>
           <InfoGrid items={[
             { label: fr ? "Montant" : "Amount", value: formatCurrency(ret.refund.amount, locale) },
-            { label: fr ? "Méthode" : "Method", value: ret.refund.method },
-            { label: fr ? "Statut" : "Status", value: fr ? (REFUND_STATUS_FR[ret.refund.status] ?? ret.refund.status) : ret.refund.status },
+            { label: fr ? "Méthode" : "Method", value: fr ? (ret.refund.methodFr ?? ret.refund.method) : ret.refund.method },
+            { label: fr ? "Statut" : "Status", value: fr ? (ret.refund.statusFr ?? REFUND_STATUS_FR[ret.refund.status] ?? ret.refund.status) : ret.refund.status },
           ]} />
         </DetailGridSection>
 
         <DetailGridSection title="Inspection">
           <InfoGrid items={[
-            { label: fr ? "État" : "Condition", value: fr ? (CONDITION_FR[ret.inspection.condition] ?? ret.inspection.condition) : ret.inspection.condition },
+            { label: fr ? "État" : "Condition", value: fr ? (ret.inspection.conditionFr ?? CONDITION_FR[ret.inspection.condition] ?? ret.inspection.condition) : ret.inspection.condition },
             { label: "Photos", value: fr ? `${ret.inspection.photos} téléversée(s)` : `${ret.inspection.photos} uploaded` },
-            { label: "Notes", value: ret.inspection.notes, full: true },
+            { label: "Notes", value: fr ? (ret.inspection.notesFr ?? ret.inspection.notes) : ret.inspection.notes, full: true },
           ]} />
           <Link href={`/warehouse/returns/${ret.id}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">
             {fr ? "File d'inspection de l'entrepôt →" : "Warehouse inspection queue →"}
@@ -199,8 +212,8 @@ export default function AdminReturnDetailPage() {
             </div>
             <div className="flex-1">
               <Link href={`/shop/products/${ret.productId}`} className="font-medium text-[var(--primary)] hover:underline">{ret.product}</Link>
-              <p className="text-xs text-slate-500">{fr ? "Variante" : "Variant"}: {ret.variant}</p>
-              <p className="mt-1 text-sm font-medium text-amber-700">{fr ? "Motif du retour" : "Return reason"}: {ret.reason}</p>
+              <p className="text-xs text-slate-500">{fr ? "Variante" : "Variant"}: {fr ? (ret.variantFr ?? ret.variant) : ret.variant}</p>
+              <p className="mt-1 text-sm font-medium text-amber-700">{fr ? "Motif du retour" : "Return reason"}: {fr ? ret.reasonFr : ret.reason}</p>
             </div>
             <div className="text-right">
               <p className="font-medium">{formatCurrency(ret.refund.amount, locale)}</p>
@@ -213,9 +226,11 @@ export default function AdminReturnDetailPage() {
           <ActivityTimeline
             events={ret.timeline.map((event) => ({
               time: event.time,
-              label: event.label,
+              label: fr ? (TIMELINE_LABEL_FR[event.label] ?? event.label) : event.label,
               done: event.done,
-              detail: event.highlight ? `${fr ? "Motif" : "Reason"}: ${ret.reason}` : event.detail,
+              detail: event.highlight
+                ? `${fr ? "Motif" : "Reason"}: ${fr ? ret.reasonFr : ret.reason}`
+                : (fr ? (event.detailFr ?? event.detail) : event.detail),
             }))}
           />
         </DetailGridSection>

@@ -10,10 +10,10 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 
 const tickets = [
-  { id: "TKT-441", subject: "Order not delivered", customer: "Marie Kabila", priority: "high", status: "open", date: "2024-06-08" },
-  { id: "TKT-440", subject: "Refund delay", customer: "Patrick Lumumba", priority: "medium", status: "in_progress", date: "2024-06-07" },
-  { id: "TKT-439", subject: "Seller verification", customer: "TechZone Store", priority: "low", status: "resolved", date: "2024-06-06" },
-  { id: "TKT-438", subject: "Payment failed", customer: "Sophie Mbuyi", priority: "high", status: "open", date: "2024-06-06" },
+  { id: "TKT-441", subject: "Order not delivered", subjectFr: "Commande non livrée", customer: "Marie Kabila", priority: "high", status: "open", date: "2024-06-08" },
+  { id: "TKT-440", subject: "Refund delay", subjectFr: "Retard de remboursement", customer: "Patrick Lumumba", priority: "medium", status: "in_progress", date: "2024-06-07" },
+  { id: "TKT-439", subject: "Seller verification", subjectFr: "Vérification vendeur", customer: "TechZone Store", priority: "low", status: "resolved", date: "2024-06-06" },
+  { id: "TKT-438", subject: "Payment failed", subjectFr: "Paiement échoué", customer: "Sophie Mbuyi", priority: "high", status: "open", date: "2024-06-06" },
 ];
 
 const STATUS_OPTIONS = [
@@ -62,7 +62,9 @@ export default function AdminSupportPage() {
               { key: "id", label: "Ticket", render: (row) => (
                 <span className="font-medium text-[var(--primary)]">{String(row.id)}</span>
               )},
-              { key: "subject", label: fr ? "Sujet" : "Subject" },
+              { key: "subject", label: fr ? "Sujet" : "Subject", render: (row) => (
+                <span>{fr ? String(row.subjectFr ?? row.subject) : String(row.subject)}</span>
+              )},
               { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
                 <Badge variant={row.priority === "high" ? "danger" : row.priority === "medium" ? "warning" : "default"}>

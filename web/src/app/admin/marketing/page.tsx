@@ -11,9 +11,9 @@ import { useToast } from "@/context/toast-context";
 import { banners } from "@/lib/mock-data";
 
 const initialCampaigns = [
-  { id: "CMP-01", name: "Summer Electronics Sale", type: "flash_sale", status: "active", reach: "124K" },
-  { id: "CMP-02", name: "New Seller Onboarding", type: "email", status: "scheduled", reach: "8.2K" },
-  { id: "CMP-03", name: "Free Delivery Weekend", type: "banner", status: "active", reach: "450K" },
+  { id: "CMP-01", name: "Summer Electronics Sale", nameFr: "Soldes électronique d'été", type: "flash_sale", status: "active", reach: "124K" },
+  { id: "CMP-02", name: "New Seller Onboarding", nameFr: "Intégration des nouveaux vendeurs", type: "email", status: "scheduled", reach: "8.2K" },
+  { id: "CMP-03", name: "Free Delivery Weekend", nameFr: "Week-end livraison offerte", type: "banner", status: "active", reach: "450K" },
 ];
 
 const CAMPAIGN_STATUS_FR: Record<string, string> = {
@@ -51,7 +51,7 @@ export default function AdminMarketingPage() {
             <div className="flex gap-2">
               <Button size="sm" onClick={() => {
                 const name = (document.getElementById("campaign-name") as HTMLInputElement)?.value || (fr ? "Nouvelle campagne" : "New Campaign");
-                setCampaigns((c) => [...c, { id: `CMP-0${c.length + 1}`, name, type: "banner", status: "scheduled", reach: "0" }]);
+                setCampaigns((c) => [...c, { id: `CMP-0${c.length + 1}`, name, nameFr: name, type: "banner", status: "scheduled", reach: "0" }]);
                 setShowCreate(false);
                 toast(fr ? "Campagne créée" : "Campaign created");
               }}>{fr ? "Enregistrer la campagne" : "Save Campaign"}</Button>
@@ -69,7 +69,7 @@ export default function AdminMarketingPage() {
                 <Badge variant={c.status === "active" ? "success" : "warning"}>{fr ? (CAMPAIGN_STATUS_FR[c.status] ?? c.status) : c.status}</Badge>
                 <span className="text-xs text-slate-400">{fr ? (CAMPAIGN_TYPE_FR[c.type] ?? c.type) : c.type}</span>
               </div>
-              <h3 className="mt-3 font-semibold text-slate-900">{c.name}</h3>
+              <h3 className="mt-3 font-semibold text-slate-900">{fr ? (c.nameFr ?? c.name) : c.name}</h3>
               <p className="mt-1 text-sm text-slate-500">{fr ? "Portée" : "Reach"}: {c.reach}</p>
             </CardContent>
           </Card>

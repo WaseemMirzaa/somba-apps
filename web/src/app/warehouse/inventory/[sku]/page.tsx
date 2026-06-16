@@ -45,7 +45,7 @@ export default function WarehouseInventoryDetailPage() {
             <InfoGrid items={[
               { label: "SKU", value: item.sku },
               { label: fr ? "Produit" : "Product", value: <Link href={`/shop/products/${item.productId}`} className="text-[var(--primary)] hover:underline">{item.product}</Link> },
-              { label: fr ? "Catégorie" : "Category", value: item.category },
+              { label: fr ? "Catégorie" : "Category", value: fr ? item.categoryFr : item.category },
               { label: fr ? "Emplacement entrepôt" : "Warehouse Location", value: item.location },
             ]} />
           </DetailGridSection>

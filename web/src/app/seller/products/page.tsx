@@ -68,7 +68,7 @@ export default function SellerProductsPage() {
           <Link href={`/seller/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
         { key: "brand", label: fr ? "Marque" : "Brand" },
-        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
         { key: "sku", label: "SKU" },
         { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
         { key: "discountPrice", label: fr ? "Promo" : "Sale", render: (row) => formatCurrency(row.discountPrice as number, locale) },

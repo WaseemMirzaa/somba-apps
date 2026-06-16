@@ -10,6 +10,7 @@ const STATUS_LABELS: Record<string, string> = {
   open: "Ouvert",
   "in review": "En cours d'examen",
   in_review: "En cours d'examen",
+  seller_responded: "Vendeur a répondu",
   pending: "En attente",
   resolved: "Résolu",
   approved: "Approuvé",
