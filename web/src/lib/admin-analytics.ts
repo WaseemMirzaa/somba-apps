@@ -40,11 +40,11 @@ export const adminSellerGrowth = [
 ] as const;
 
 export const adminCategoryGmv = [
-  { category: "Electronics", gmv: 890000, pct: 38 },
-  { category: "Fashion", gmv: 420000, pct: 18 },
-  { category: "Home & Living", gmv: 310000, pct: 13 },
-  { category: "Beauty", gmv: 180000, pct: 8 },
-  { category: "Grocery", gmv: 520000, pct: 22 },
+  { category: "Electronics", categoryFr: "Électronique", gmv: 890000, pct: 38 },
+  { category: "Fashion", categoryFr: "Mode", gmv: 420000, pct: 18 },
+  { category: "Home & Living", categoryFr: "Maison & Décoration", gmv: 310000, pct: 13 },
+  { category: "Beauty", categoryFr: "Beauté", gmv: 180000, pct: 8 },
+  { category: "Grocery", categoryFr: "Épicerie", gmv: 520000, pct: 22 },
 ] as const;
 
 export const adminOrderFunnel = [
@@ -56,11 +56,11 @@ export const adminOrderFunnel = [
 ] as const;
 
 export const adminFulfillmentHealth = [
-  { label: "On-time dispatch", score: 94 },
-  { label: "Warehouse capacity", score: 87 },
-  { label: "Rider availability", score: 91 },
-  { label: "Payment reconciliation", score: 96 },
-  { label: "Return resolution", score: 89 },
+  { label: "On-time dispatch", labelFr: "Expédition à temps", score: 94 },
+  { label: "Warehouse capacity", labelFr: "Capacité entrepôt", score: 87 },
+  { label: "Rider availability", labelFr: "Disponibilité livreurs", score: 91 },
+  { label: "Payment reconciliation", labelFr: "Rapprochement paiements", score: 96 },
+  { label: "Return resolution", labelFr: "Résolution des retours", score: 89 },
 ] as const;
 
 export const adminRecentActivity = [

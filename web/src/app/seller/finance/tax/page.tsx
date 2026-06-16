@@ -2,13 +2,16 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection } from "@/components/ui/info-grid";
+import { useLocale } from "@/context/locale-context";
 
 export default function SellerTaxPage() {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   return (
     <div className="space-y-6">
-      <PageHeader title="Tax Reports" subtitle="Tax ID: CD-123456789" backHref="/seller/finance" />
-      <DetailSection title="Tax Reports">
-        <p className="text-sm text-slate-500">Quarterly tax reports will appear here.</p>
+      <PageHeader title={fr ? "Rapports fiscaux" : "Tax Reports"} subtitle={fr ? "N° fiscal : CD-123456789" : "Tax ID: CD-123456789"} backHref="/seller/finance" />
+      <DetailSection title={fr ? "Rapports fiscaux" : "Tax Reports"}>
+        <p className="text-sm text-slate-500">{fr ? "Les rapports fiscaux trimestriels apparaîtront ici." : "Quarterly tax reports will appear here."}</p>
       </DetailSection>
     </div>
   );

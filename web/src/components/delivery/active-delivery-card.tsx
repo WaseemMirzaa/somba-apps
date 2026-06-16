@@ -20,6 +20,35 @@ type ActiveDeliveryCardProps = {
   linkClass?: string;
 };
 
+// French display labels for delivery status / payment values that arrive in
+// English from the data layer (DeliveryDetailData carries the raw enum/string).
+// Logic never reads these; they are display-only fallbacks.
+const STATUS_FR: Record<string, string> = {
+  assigned: "Assigné",
+  picked_up: "Collecté",
+  in_transit: "En transit",
+  delivered: "Livré",
+  failed: "Échoué",
+  pending: "En attente",
+  scheduled: "Planifié",
+  arrived: "Arrivé",
+};
+
+const PAYMENT_FR: Record<string, string> = {
+  "Pay at delivery": "À la livraison",
+  Prepaid: "Prépayé",
+  Card: "Carte",
+  Cash: "Espèces",
+  "Mobile money": "Mobile money",
+  COD: "Paiement à la livraison",
+};
+
+const statusLabel = (status: string, fr: boolean) =>
+  fr ? STATUS_FR[status] ?? status.replace(/_/g, " ") : status.replace(/_/g, " ");
+
+const paymentLabel = (payment: string, fr: boolean) =>
+  fr ? PAYMENT_FR[payment] ?? payment : payment;
+
 export function ActiveDeliveryCard({
   delivery,
   locale,
@@ -41,7 +70,7 @@ export function ActiveDeliveryCard({
         items={[
           { label: fr ? "Commande" : "Order ID", value: delivery.orderId },
           { label: fr ? "Zone" : "Zone", value: delivery.zone },
-          { label: fr ? "Paiement" : "Payment", value: delivery.paymentType },
+          { label: fr ? "Paiement" : "Payment", value: paymentLabel(delivery.paymentType, fr) },
           {
             label: fr ? "Montant à collecter" : "Amount due",
             value: delivery.codAmount
@@ -122,7 +151,7 @@ export function ActiveDeliveryCard({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
                   <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {item.variant} · Qty {item.qty}
+                    SKU: {item.sku} · {item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
                   </p>
                 </div>
               </div>
@@ -157,7 +186,7 @@ export function ActiveDeliveryCard({
         <div className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-900">{delivery.orderId}</span>
-            <Badge>{delivery.status.replace(/_/g, " ")}</Badge>
+            <Badge>{statusLabel(delivery.status, fr)}</Badge>
             <Badge variant="primary">ETA {delivery.eta}</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-600">{delivery.customer.name}</p>
@@ -181,7 +210,7 @@ export function ActiveDeliveryCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-900">{delivery.orderId}</span>
-            <Badge>{delivery.status.replace(/_/g, " ")}</Badge>
+            <Badge>{statusLabel(delivery.status, fr)}</Badge>
             <Badge variant="primary">ETA {delivery.eta}</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-600">{delivery.customer.name}</p>

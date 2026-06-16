@@ -223,7 +223,7 @@ export default function AdminAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={adminCategoryGmv.map((c) => ({ name: c.category, gmv: c.gmv }))}
+              items={adminCategoryGmv.map((c) => ({ name: fr ? c.categoryFr : c.category, gmv: c.gmv }))}
               valueKey="gmv"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}
@@ -342,7 +342,7 @@ export default function AdminAnalyticsPage() {
               <p className="text-xs text-slate-500">{fr ? "Score global / 100" : "Overall score / 100"}</p>
             </div>
             <HorizontalBarChart
-              items={adminFulfillmentHealth.map((h) => ({ name: h.label, score: h.score }))}
+              items={adminFulfillmentHealth.map((h) => ({ name: fr ? h.labelFr : h.label, score: h.score }))}
               valueKey="score"
               labelKey="name"
               formatValue={(v) => `${v}%`}

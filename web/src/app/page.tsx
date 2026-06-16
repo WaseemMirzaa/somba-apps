@@ -133,7 +133,7 @@ export default function HomePage() {
             <button
               onClick={() => setShowBar(false)}
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/80 hover:bg-white/15 hover:text-white"
-              aria-label="Dismiss"
+              aria-label={fr ? "Fermer" : "Dismiss"}
             >
               <X className="h-4 w-4" />
             </button>

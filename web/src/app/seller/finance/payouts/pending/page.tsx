@@ -82,7 +82,7 @@ export default function SellerPayoutPendingPage() {
         }
         backHref="/seller/finance/payouts"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("finance"), href: "/seller/finance" },
           { label: t("payouts"), href: "/seller/finance/payouts" },
           { label: fr ? "Détail" : "Breakdown" },

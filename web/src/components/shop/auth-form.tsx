@@ -51,7 +51,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       <h1 className="text-2xl font-bold">{fr ? titles[mode].fr : titles[mode].en}</h1>
       <div className="card-premium space-y-4 p-6">
         {(mode === "register" || mode === "login" || mode === "forgot") && (
-          <input className="input-premium w-full px-4 py-2.5 text-sm" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="input-premium w-full px-4 py-2.5 text-sm" type="email" placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
         )}
         {(mode === "register" || mode === "login" || mode === "reset") && (
           <input className="input-premium w-full px-4 py-2.5 text-sm" type="password" placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />

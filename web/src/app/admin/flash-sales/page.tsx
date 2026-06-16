@@ -7,9 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { flashSales as initialSales } from "@/lib/admin-entities";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
+
+const SALE_STATUS_FR: Record<string, string> = { active: "Active", scheduled: "Programmée", ended: "Terminée" };
 
 export default function AdminFlashSalesPage() {
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [sales, setSales] = useState(initialSales);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
@@ -20,6 +25,7 @@ export default function AdminFlashSalesPage() {
     setSales((s) => [...s, {
       id: `FS-${s.length + 1}`,
       name,
+      nameFr: name,
       start: new Date().toISOString().slice(0, 10),
       end: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       discount: Number(discount) || 20,
@@ -29,28 +35,28 @@ export default function AdminFlashSalesPage() {
     setShowCreate(false);
     setName("");
     setDiscount("");
-    toast("Flash sale campaign created");
+    toast(fr ? "Campagne de vente flash créée" : "Flash sale campaign created");
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Flash Sales"
-        subtitle="Schedule campaigns with date picker"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Flash Sales" }]}
-        actions={<Button size="sm" onClick={() => setShowCreate(true)}>Create Flash Sale</Button>}
+        title={fr ? "Ventes flash" : "Flash Sales"}
+        subtitle={fr ? "Programmez des campagnes avec un sélecteur de date" : "Schedule campaigns with date picker"}
+        breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Ventes flash" : "Flash Sales" }]}
+        actions={<Button size="sm" onClick={() => setShowCreate(true)}>{fr ? "Créer une vente flash" : "Create Flash Sale"}</Button>}
       />
 
       {showCreate && (
         <Card>
           <CardContent className="space-y-4 p-6">
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Nom de la campagne" : "Campaign name"} value={name} onChange={(e) => setName(e.target.value)} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="text-xs font-medium">Start date</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
-              <div><label className="text-xs font-medium">End date</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
+              <div><label className="text-xs font-medium">{fr ? "Date de début" : "Start date"}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
+              <div><label className="text-xs font-medium">{fr ? "Date de fin" : "End date"}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
             </div>
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder="Discount %" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-            <Button onClick={saveCampaign}>Save Campaign</Button>
+            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Remise %" : "Discount %"} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <Button onClick={saveCampaign}>{fr ? "Enregistrer la campagne" : "Save Campaign"}</Button>
           </CardContent>
         </Card>
       )}
@@ -60,11 +66,11 @@ export default function AdminFlashSalesPage() {
           <Card key={fs.id}>
             <CardContent className="p-6">
               <div className="flex justify-between">
-                <h3 className="font-semibold">{fs.name}</h3>
-                <Badge variant={fs.status === "active" ? "success" : "warning"}>{fs.status}</Badge>
+                <h3 className="font-semibold">{fr ? (fs.nameFr ?? fs.name) : fs.name}</h3>
+                <Badge variant={fs.status === "active" ? "success" : "warning"}>{fr ? (SALE_STATUS_FR[fs.status] ?? fs.status) : fs.status}</Badge>
               </div>
               <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>
-              <p className="mt-1 text-sm">{fs.discount}% off · {fs.products} products</p>
+              <p className="mt-1 text-sm">{fr ? `${fs.discount} % de remise · ${fs.products} produits` : `${fs.discount}% off · ${fs.products} products`}</p>
             </CardContent>
           </Card>
         ))}

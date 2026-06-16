@@ -63,7 +63,7 @@ export default function SellerRevenueAnalyticsPage() {
         subtitle={fr ? "Brut · Net · Commissions · Remboursements · Paiements" : "Gross · Net · Commissions · Refunds · Payments"}
         backHref="/seller/analytics"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("analytics"), href: "/seller/analytics" },
           { label: fr ? "Revenus" : "Revenue" },
         ]}
@@ -220,7 +220,7 @@ export default function SellerRevenueAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={sellerCategoryRevenue.map((c) => ({ name: c.category, revenue: c.revenue }))}
+              items={sellerCategoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.revenue }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}

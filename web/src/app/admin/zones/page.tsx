@@ -12,6 +12,9 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { ADMIN_ZONES, ZONE_RIDERS, ZONE_CITIES, type AdminZone } from "@/lib/zones-admin";
 
+const ZONE_STATUS_FR: Record<string, string> = { active: "Actif", paused: "En pause" };
+const zoneStatusFr = (z: AdminZone) => z.statusFr ?? ZONE_STATUS_FR[z.status] ?? z.status;
+
 export default function AdminZonesPage() {
   const { locale } = useLocale();
   const { toast } = useToast();
@@ -31,7 +34,7 @@ export default function AdminZonesPage() {
       return;
     }
     setZones((z) => [
-      { id: `z-${Date.now()}`, commune: form.commune.trim(), city: form.city, deliveryFeeUsd: Number(form.fee) || 0, riders: [], status: "active" },
+      { id: `z-${Date.now()}`, commune: form.commune.trim(), city: form.city, deliveryFeeUsd: Number(form.fee) || 0, riders: [], status: "active", statusFr: "Actif" },
       ...z,
     ]);
     setForm({ commune: "", city: "Kinshasa", fee: "3" });
@@ -48,7 +51,7 @@ export default function AdminZonesPage() {
     setZones((zs) => zs.map((z) => (z.id === zoneId ? { ...z, riders: z.riders.filter((r) => r !== rider) } : z)));
   }
   function toggleStatus(zoneId: string) {
-    setZones((zs) => zs.map((z) => (z.id === zoneId ? { ...z, status: z.status === "active" ? "paused" : "active" } : z)));
+    setZones((zs) => zs.map((z) => (z.id === zoneId ? { ...z, status: z.status === "active" ? "paused" : "active", statusFr: z.status === "active" ? "En pause" : "Actif" } : z)));
   }
 
   return (
@@ -140,7 +143,7 @@ export default function AdminZonesPage() {
                 );
               },
             },
-            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "active" ? "success" : "warning"}>{String(row.status)}</Badge> },
+            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "active" ? "success" : "warning"}>{fr ? zoneStatusFr(row as unknown as AdminZone) : String(row.status)}</Badge> },
             {
               key: "actions",
               label: "",

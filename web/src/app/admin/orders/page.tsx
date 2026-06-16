@@ -26,8 +26,14 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   cancelled: "danger",
 };
 
+const PAYMENT_METHOD_FR: Record<string, string> = {
+  COD: "Paiement à la livraison",
+  Card: "Carte",
+};
+
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -44,7 +50,7 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("orders")}
-        subtitle="List View — Order ID, Customer, Seller, Amount, Payment, Status, Date"
+        subtitle={fr ? "Vue liste — ID commande, client, vendeur, montant, paiement, statut, date" : "List View — Order ID, Customer, Seller, Amount, Payment, Status, Date"}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("orders") },
@@ -55,7 +61,7 @@ export default function AdminOrdersPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Order ID, customer, seller…"
+        searchPlaceholder={fr ? "ID commande, client, vendeur…" : "Order ID, customer, seller…"}
       />
 
       <Card>
@@ -64,7 +70,7 @@ export default function AdminOrdersPage() {
             columns={[
               {
                 key: "id",
-                label: "Order ID",
+                label: fr ? "ID commande" : "Order ID",
                 render: (row) => (
                   <Link href={`/admin/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.id)}
@@ -73,7 +79,7 @@ export default function AdminOrdersPage() {
               },
               {
                 key: "customer",
-                label: "Customer",
+                label: fr ? "Client" : "Customer",
                 render: (row) => (
                   <Link href={`/admin/customers/${row.customerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.customer)}
@@ -82,7 +88,7 @@ export default function AdminOrdersPage() {
               },
               {
                 key: "seller",
-                label: "Seller",
+                label: fr ? "Vendeur" : "Seller",
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.seller)}
@@ -94,7 +100,11 @@ export default function AdminOrdersPage() {
                 label: t("amount"),
                 render: (row) => formatCurrency(row.amount as number, locale),
               },
-              { key: "paymentMethod", label: "Payment" },
+              {
+                key: "paymentMethod",
+                label: fr ? "Paiement" : "Payment",
+                render: (row) => (fr ? (PAYMENT_METHOD_FR[String(row.paymentMethod)] ?? String(row.paymentMethod)) : String(row.paymentMethod)),
+              },
               {
                 key: "status",
                 label: t("status"),

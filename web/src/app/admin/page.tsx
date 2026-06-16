@@ -170,7 +170,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={adminCategoryGmv.map((c) => ({ name: c.category, revenue: c.gmv }))}
+              items={adminCategoryGmv.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.gmv }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}

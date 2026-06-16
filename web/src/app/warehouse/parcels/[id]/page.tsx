@@ -13,56 +13,84 @@ import { getInboundParcel } from "@/lib/warehouse-entities";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+// Parcel status / inspection values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  pending: "En attente",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
+const CONDITION_FR: Record<string, string> = {
+  Good: "Bon",
+  Pending: "En attente",
+  Damaged: "Endommagé",
+};
+
 export default function WarehouseParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const parcel = getInboundParcel(id);
 
   if (!parcel) {
-    return <div className="p-8 text-center text-slate-500">Parcel not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Colis introuvable" : "Parcel not found"}</div>;
   }
+
+  const statusLabel = fr ? STATUS_FR[parcel.status] ?? parcel.status : parcel.status;
+  const conditionLabel = fr
+    ? CONDITION_FR[parcel.inspectionDetail.condition] ?? parcel.inspectionDetail.condition
+    : parcel.inspectionDetail.condition;
+  const exceptionsLabel =
+    parcel.inspectionDetail.exceptions === "None"
+      ? fr
+        ? "Aucune"
+        : "None"
+      : parcel.inspectionDetail.exceptions;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={parcel.id}
-        subtitle={`Order ${parcel.orderId} · ${parcel.status} · ${parcel.zone}`}
+        subtitle={`${fr ? "Commande" : "Order"} ${parcel.orderId} · ${statusLabel} · ${parcel.zone}`}
         backHref="/warehouse/inbound"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
-          { label: "Inbound", href: "/warehouse/inbound" },
+          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
+          { label: t("inbound"), href: "/warehouse/inbound" },
           { label: parcel.id },
         ]}
         actions={
           parcel.status === "inbound" ? (
-            <button onClick={() => toast("Parcel received")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("receive")}</button>
+            <button onClick={() => toast(fr ? "Colis reçu" : "Parcel received")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("receive")}</button>
           ) : (
-            <Badge variant="info">{parcel.status}</Badge>
+            <Badge variant="info">{statusLabel}</Badge>
           )
         }
       />
 
       <DetailGrid>
-        <DetailGridSection title="Parcel Information">
+        <DetailGridSection title={fr ? "Informations du colis" : "Parcel Information"}>
           <InfoGrid items={[
-            { label: "Parcel ID", value: parcel.id },
-            { label: "Barcode", value: parcel.barcode },
-            { label: "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-[var(--primary)] hover:underline">{parcel.orderId}</Link> },
-            { label: "Weight", value: parcel.weight },
-            { label: "Volume", value: parcel.volume },
-            { label: "Status", value: parcel.status },
-            { label: "Arrival Time", value: parcel.arrival },
-            { label: "Zone", value: parcel.zone },
+            { label: fr ? "ID colis" : "Parcel ID", value: parcel.id },
+            { label: fr ? "Code-barres" : "Barcode", value: parcel.barcode },
+            { label: fr ? "ID commande" : "Order ID", value: <Link href={`/admin/orders/${parcel.orderId}`} className="text-[var(--primary)] hover:underline">{parcel.orderId}</Link> },
+            { label: fr ? "Poids" : "Weight", value: parcel.weight },
+            { label: fr ? "Volume" : "Volume", value: parcel.volume },
+            { label: fr ? "Statut" : "Status", value: statusLabel },
+            { label: fr ? "Heure d'arrivée" : "Arrival Time", value: parcel.arrival },
+            { label: fr ? "Zone" : "Zone", value: parcel.zone },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Seller">
+        <DetailGridSection title={fr ? "Vendeur" : "Seller"}>
           <InfoGrid items={[
-            { label: "Seller Name", value: parcel.seller },
-            { label: "Store Name", value: parcel.storeName },
+            { label: fr ? "Nom du vendeur" : "Seller Name", value: parcel.seller },
+            { label: fr ? "Nom de la boutique" : "Store Name", value: parcel.storeName },
             {
-              label: "Phone",
+              label: fr ? "Téléphone" : "Phone",
               value: (
                 <a
                   href={`tel:${parcel.sellerPhone.replace(/\s/g, "")}`}
@@ -73,16 +101,16 @@ export default function WarehouseParcelDetailPage() {
                 </a>
               ),
             },
-            { label: "Pickup Rider", value: parcel.pickupRider },
-            { label: "Seller ID", value: parcel.sellerId },
+            { label: fr ? "Livreur de ramassage" : "Pickup Rider", value: parcel.pickupRider },
+            { label: fr ? "ID vendeur" : "Seller ID", value: parcel.sellerId },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Customer">
+        <DetailGridSection title={fr ? "Client" : "Customer"}>
           <InfoGrid items={[
-            { label: "Customer Name", value: parcel.customer },
+            { label: fr ? "Nom du client" : "Customer Name", value: parcel.customer },
             {
-              label: "Phone",
+              label: fr ? "Téléphone" : "Phone",
               value: (
                 <a
                   href={`tel:${parcel.customerPhone.replace(/\s/g, "")}`}
@@ -93,28 +121,28 @@ export default function WarehouseParcelDetailPage() {
                 </a>
               ),
             },
-            { label: "Address", value: parcel.customerAddress, full: true },
-            { label: "Delivery Zone", value: parcel.zone },
-            { label: "Order ID", value: parcel.orderId },
-            { label: "Customer ID", value: parcel.customerId },
+            { label: fr ? "Adresse" : "Address", value: parcel.customerAddress, full: true },
+            { label: fr ? "Zone de livraison" : "Delivery Zone", value: parcel.zone },
+            { label: fr ? "ID commande" : "Order ID", value: parcel.orderId },
+            { label: fr ? "ID client" : "Customer ID", value: parcel.customerId },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Inspection">
+        <DetailGridSection title={fr ? "Inspection" : "Inspection"}>
           <InfoGrid items={[
-            { label: "Condition", value: parcel.inspectionDetail.condition },
-            { label: "Photos", value: `${parcel.inspectionDetail.photos} uploaded` },
-            { label: "Damage Notes", value: parcel.inspectionDetail.damageNotes || "None", full: true },
-            { label: "Exceptions", value: parcel.inspectionDetail.exceptions },
+            { label: fr ? "État" : "Condition", value: conditionLabel },
+            { label: fr ? "Photos" : "Photos", value: `${parcel.inspectionDetail.photos} ${fr ? "téléversées" : "uploaded"}` },
+            { label: fr ? "Notes de dommages" : "Damage Notes", value: parcel.inspectionDetail.damageNotes || (fr ? "Aucune" : "None"), full: true },
+            { label: t("exceptions"), value: exceptionsLabel },
           ]} />
           <div className="mt-4 flex gap-2">
-            <button onClick={() => toast("Parcel accepted")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">Accept</button>
-            <button onClick={() => toast("Parcel rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">Reject</button>
-            <Link href="/warehouse/exceptions" className="rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-700">Create Incident</Link>
+            <button onClick={() => toast(fr ? "Colis accepté" : "Parcel accepted")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Accepter" : "Accept"}</button>
+            <button onClick={() => toast(fr ? "Colis rejeté" : "Parcel rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{fr ? "Rejeter" : "Reject"}</button>
+            <Link href="/warehouse/exceptions" className="rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-700">{fr ? "Créer un incident" : "Create Incident"}</Link>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Items" span={2}>
+        <DetailGridSection title={fr ? "Articles" : "Items"} span={2}>
           <div className="space-y-4">
             {parcel.itemsWithImages.map((item) => (
               <div key={item.sku} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3">
@@ -125,17 +153,17 @@ export default function WarehouseParcelDetailPage() {
                   <Link href={`/shop/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.product}</Link>
                   <p className="text-xs text-slate-500">SKU: {item.sku} · {item.variant}</p>
                 </div>
-                <span className="text-sm font-medium">Qty: {item.qty}</span>
+                <span className="text-sm font-medium">{fr ? "Qté" : "Qty"}: {item.qty}</span>
               </div>
             ))}
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
+        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
           <ActivityTimeline events={[
             ...parcel.timeline,
-            { time: "—", label: "Dispatched", done: parcel.status === "dispatched" },
-            { time: "—", label: "Delivered", done: false },
+            { time: "—", label: fr ? "Expédié" : "Dispatched", done: parcel.status === "dispatched" },
+            { time: "—", label: fr ? "Livré" : "Delivered", done: false },
           ]} />
         </DetailGridSection>
       </DetailGrid>

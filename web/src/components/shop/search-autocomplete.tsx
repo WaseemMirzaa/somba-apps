@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { products } from "@/lib/mock-data";
+import { useLocale } from "@/context/locale-context";
 
 export function SearchAutocomplete({ query, onSelect }: { query: string; onSelect?: () => void }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const suggestions = useMemo(() => {
     if (!query || query.length < 2) return [];
     const q = query.toLowerCase();
@@ -24,11 +27,11 @@ export function SearchAutocomplete({ query, onSelect }: { query: string; onSelec
           onClick={onSelect}
           className="block px-4 py-2 text-sm hover:bg-blue-50"
         >
-          {p.name} <span className="text-slate-400">· {p.category}</span>
+          {fr ? p.nameFr : p.name} <span className="text-slate-400">· {p.category}</span>
         </Link>
       ))}
       <Link href={`/shop/search?q=${encodeURIComponent(query)}`} onClick={onSelect} className="block border-t px-4 py-2 text-sm font-medium text-[var(--primary)]">
-        See all results →
+        {fr ? "Voir tous les résultats →" : "See all results →"}
       </Link>
     </div>
   );

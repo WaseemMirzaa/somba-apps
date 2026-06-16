@@ -24,6 +24,7 @@ export type RiderEntity = {
   phone: string;
   zone: string;
   vehicle: string;
+  vehicleFr: string;
   status: "active" | "inactive";
   activeDeliveries: number;
   location: string;
@@ -49,7 +50,7 @@ export type InventoryEntity = {
   damaged: number;
   location: string;
   image: string;
-  movements: { time: string; label: string; qty: number }[];
+  movements: { time: string; label: string; labelFr: string; qty: number }[];
 };
 
 export type DeliveryProduct = {
@@ -94,18 +95,21 @@ export type ReturnEntity = {
   customerId: number;
   customer: string;
   reason: string;
+  reasonFr: string;
   customerComment?: string;
+  customerCommentFr?: string;
   returnType: "refund" | "replacement" | "exchange";
   status: string;
+  statusFr: string;
   createdAt: string;
   productId: number;
   product: string;
   variant: string;
   qty: number;
   image: string;
-  inspection: { condition: string; photos: number; notes: string };
-  refund: { amount: number; method: string; status: string };
-  timeline: { time: string; label: string; done?: boolean; detail?: string; highlight?: boolean }[];
+  inspection: { condition: string; conditionFr: string; photos: number; notes: string; notesFr: string };
+  refund: { amount: number; method: string; methodFr: string; status: string; statusFr: string };
+  timeline: { time: string; label: string; done?: boolean; detail?: string; detailFr?: string; highlight?: boolean }[];
 };
 
 export type ReplacementProductInfo = {
@@ -141,6 +145,7 @@ export type ReplacementEntity = {
   sellerName: string;
   sku: string;
   status: string;
+  statusFr: string;
   reason: string;
   reasonFr: string;
   customerComment?: string;
@@ -188,6 +193,7 @@ export type ExchangeEntity = {
   customerCommentFr?: string;
   createdAt: string;
   status: string;
+  statusFr: string;
   oldProduct: ExchangeProduct;
   newProduct: ExchangeProduct;
   priceDifference: number;
@@ -246,14 +252,21 @@ export type ExceptionEntity = {
   parcelId: string;
   orderId: string;
   type: string;
+  typeFr: string;
   severity: "low" | "medium" | "high" | "critical";
+  severityFr: string;
   status: string;
+  statusFr: string;
   reportedBy: string;
+  reportedByFr: string;
   createdDate: string;
   photos: number;
   notes: string;
+  notesFr: string;
   assignedStaff: string;
+  assignedStaffFr: string;
   resolution: string;
+  resolutionFr: string;
 };
 
 export type SortingParcel = {
@@ -422,21 +435,21 @@ export const sortingParcels: SortingParcel[] = parcelEntities
 export const riderEntities: RiderEntity[] = [
   {
     id: 1, name: "Jean-Pierre M.", phone: "+243 99 111 2233", zone: "Zone A",
-    vehicle: "Motorcycle", status: "active", activeDeliveries: 8, location: "Gombe",
+    vehicle: "Motorcycle", vehicleFr: "Moto", status: "active", activeDeliveries: 8, location: "Gombe",
     performanceScore: 94, deliveries: 1240, failedDeliveries: 12, codCollections: 45200,
     rating: 4.8, earningsDaily: 85, earningsWeekly: 520, earningsMonthly: 2100,
     assignedBatches: ["BATCH-001"],
   },
   {
     id: 2, name: "Paul Kabongo", phone: "+243 99 444 5566", zone: "Zone B",
-    vehicle: "Van", status: "active", activeDeliveries: 5, location: "Limete",
+    vehicle: "Van", vehicleFr: "Camionnette", status: "active", activeDeliveries: 5, location: "Limete",
     performanceScore: 88, deliveries: 890, failedDeliveries: 18, codCollections: 32100,
     rating: 4.5, earningsDaily: 72, earningsWeekly: 445, earningsMonthly: 1780,
     assignedBatches: ["BATCH-002"],
   },
   {
     id: 3, name: "Marc Tshisekedi", phone: "+243 99 777 8899", zone: "Zone C",
-    vehicle: "Motorcycle", status: "active", activeDeliveries: 3, location: "Bandal",
+    vehicle: "Motorcycle", vehicleFr: "Moto", status: "active", activeDeliveries: 3, location: "Bandal",
     performanceScore: 91, deliveries: 670, failedDeliveries: 8, codCollections: 28900,
     rating: 4.7, earningsDaily: 68, earningsWeekly: 410, earningsMonthly: 1650,
     assignedBatches: [],
@@ -457,9 +470,9 @@ export const inventoryEntities: InventoryEntity[] = products.slice(0, 6).map((p,
   location: `A${i + 1}-${(i + 1) * 10}`,
   image: p.image,
   movements: [
-    { time: "2024-06-05", label: "Received", qty: 50 },
-    { time: "2024-06-04", label: "Reserved", qty: 5 },
-    { time: "2024-06-03", label: "Dispatched", qty: 12 },
+    { time: "2024-06-05", label: "Received", labelFr: "Reçu", qty: 50 },
+    { time: "2024-06-04", label: "Reserved", labelFr: "Réservé", qty: 5 },
+    { time: "2024-06-03", label: "Dispatched", labelFr: "Expédié", qty: 12 },
   ],
 }));
 
@@ -545,15 +558,17 @@ export const deliveryEntities: DeliveryEntity[] = riderEntities.flatMap((rider) 
 export const returnEntities: ReturnEntity[] = [
   {
     id: "RET-001", orderId: "ORD-2024-001", customerId: 1, customer: "Marie Dubois",
-    reason: "Wrong size", customerComment: "Ordered size 43 but received size 42. Item is unopened in original packaging.",
-    returnType: "refund", status: "pending_inspection", createdAt: "2024-06-05",
+    reason: "Wrong size", reasonFr: "Mauvaise taille",
+    customerComment: "Ordered size 43 but received size 42. Item is unopened in original packaging.",
+    customerCommentFr: "Pointure 43 commandée mais pointure 42 reçue. Article non ouvert dans son emballage d'origine.",
+    returnType: "refund", status: "pending_inspection", statusFr: "Inspection en attente", createdAt: "2024-06-05",
     productId: 4, product: "Nike Air Max 270", variant: "Size 42", qty: 1,
     image: products[3].image,
-    inspection: { condition: "Good", photos: 2, notes: "Unopened box — awaiting warehouse receipt" },
-    refund: { amount: 129, method: "Somba Wallet", status: "pending" },
+    inspection: { condition: "Good", conditionFr: "Bon", photos: 2, notes: "Unopened box — awaiting warehouse receipt", notesFr: "Boîte non ouverte — en attente de réception entrepôt" },
+    refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "pending", statusFr: "En attente" },
     timeline: [
       { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
-      { time: "2024-06-05 10:15", label: "Return Requested", done: true, detail: "Wrong size", highlight: true },
+      { time: "2024-06-05 10:15", label: "Return Requested", done: true, detail: "Wrong size", detailFr: "Mauvaise taille", highlight: true },
       { time: "2024-06-05 14:30", label: "Return Approved", done: true },
       { time: "2024-06-06 09:00", label: "Pickup Scheduled", done: true },
       { time: "—", label: "In Transit to Warehouse", done: false },
@@ -563,15 +578,17 @@ export const returnEntities: ReturnEntity[] = [
   },
   {
     id: "RET-002", orderId: "ORD-2024-004", customerId: 4, customer: "Ahmed Hassan",
-    reason: "Damaged item", customerComment: "Vacuum motor makes loud noise and box was crushed on arrival.",
-    returnType: "refund", status: "inspecting", createdAt: "2024-06-04",
+    reason: "Damaged item", reasonFr: "Article endommagé",
+    customerComment: "Vacuum motor makes loud noise and box was crushed on arrival.",
+    customerCommentFr: "Le moteur de l'aspirateur fait un bruit fort et la boîte était écrasée à l'arrivée.",
+    returnType: "refund", status: "inspecting", statusFr: "Inspection en cours", createdAt: "2024-06-04",
     productId: 5, product: "Dyson V15 Vacuum", variant: "Standard", qty: 1,
     image: products[4].image,
-    inspection: { condition: "Damaged", photos: 4, notes: "Box crushed, motor noise confirmed during inspection" },
-    refund: { amount: 649, method: "Original Payment", status: "pending" },
+    inspection: { condition: "Damaged", conditionFr: "Endommagé", photos: 4, notes: "Box crushed, motor noise confirmed during inspection", notesFr: "Boîte écrasée, bruit du moteur confirmé lors de l'inspection" },
+    refund: { amount: 649, method: "Original Payment", methodFr: "Paiement d'origine", status: "pending", statusFr: "En attente" },
     timeline: [
       { time: "2024-06-02 18:30", label: "Order Delivered", done: true },
-      { time: "2024-06-04 11:20", label: "Return Requested", done: true, detail: "Damaged item", highlight: true },
+      { time: "2024-06-04 11:20", label: "Return Requested", done: true, detail: "Damaged item", detailFr: "Article endommagé", highlight: true },
       { time: "2024-06-04 16:00", label: "Return Approved", done: true },
       { time: "2024-06-05 08:45", label: "Pickup Completed", done: true },
       { time: "2024-06-05 14:20", label: "Received at Warehouse", done: true },
@@ -581,15 +598,17 @@ export const returnEntities: ReturnEntity[] = [
   },
   {
     id: "RET-003", orderId: "ORD-2024-003", customerId: 3, customer: "Sophie Martin",
-    reason: "Not as described", customerComment: "Colour on the listing was white but the shoes received are grey.",
-    returnType: "exchange", status: "refunded", createdAt: "2024-06-02",
+    reason: "Not as described", reasonFr: "Non conforme à la description",
+    customerComment: "Colour on the listing was white but the shoes received are grey.",
+    customerCommentFr: "La couleur sur l'annonce était blanche mais les chaussures reçues sont grises.",
+    returnType: "exchange", status: "refunded", statusFr: "Remboursé", createdAt: "2024-06-02",
     productId: 4, product: "Nike Air Max 270", variant: "Size 40", qty: 1,
     image: products[3].image,
-    inspection: { condition: "Good", photos: 3, notes: "Item matches customer photos — colour mismatch confirmed" },
-    refund: { amount: 129, method: "Somba Wallet", status: "completed" },
+    inspection: { condition: "Good", conditionFr: "Bon", photos: 3, notes: "Item matches customer photos — colour mismatch confirmed", notesFr: "Article conforme aux photos du client — écart de couleur confirmé" },
+    refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "completed", statusFr: "Terminé" },
     timeline: [
       { time: "2024-05-28 19:00", label: "Order Delivered", done: true },
-      { time: "2024-06-02 09:30", label: "Return Requested", done: true, detail: "Not as described", highlight: true },
+      { time: "2024-06-02 09:30", label: "Return Requested", done: true, detail: "Not as described", detailFr: "Non conforme à la description", highlight: true },
       { time: "2024-06-02 13:00", label: "Return Approved", done: true },
       { time: "2024-06-03 10:15", label: "Pickup Completed", done: true },
       { time: "2024-06-03 16:40", label: "Received at Warehouse", done: true },
@@ -611,6 +630,7 @@ export const replacementEntities: ReplacementEntity[] = [
     sellerName: "AudioHub",
     sku: "SKU-3",
     status: "allocated",
+    statusFr: "Alloué",
     reason: "Defective product — audio failure",
     reasonFr: "Produit défectueux — panne audio",
     customerComment: "Left speaker crackles and cuts out after 10 minutes. Requesting a replacement unit.",
@@ -673,6 +693,7 @@ export const replacementEntities: ReplacementEntity[] = [
     sellerName: "GameZone",
     sku: "SKU-8",
     status: "pending",
+    statusFr: "En attente",
     reason: "Damaged on arrival",
     reasonFr: "Endommagé à la réception",
     customerComment: "Console box was crushed on delivery. Disc drive does not read games.",
@@ -740,6 +761,7 @@ export const exchangeEntities: ExchangeEntity[] = [
     customerCommentFr: "Taille 44 commandée mais taille 42 reçue. Je souhaite un échange pour la bonne taille.",
     createdAt: "2024-06-06",
     status: "pending",
+    statusFr: "En attente",
     oldProduct: {
       sku: "SKU-4-42",
       productId: 4,
@@ -788,6 +810,7 @@ export const exchangeEntities: ExchangeEntity[] = [
     customerCommentFr: "Besoin de plus de stockage — passage de 128 Go à 256 Go sur le même modèle.",
     createdAt: "2024-06-04",
     status: "approved",
+    statusFr: "Approuvé",
     oldProduct: {
       sku: "SKU-1-128",
       productId: 1,
@@ -934,22 +957,22 @@ export const shiftReconciliationEntities: ShiftReconciliationEntity[] = [
 
 export const exceptionEntities: ExceptionEntity[] = [
   {
-    id: "INC-001", parcelId: "PKG-002", orderId: "ORD-2024-006", type: "Damaged Parcel",
-    severity: "high", status: "open", reportedBy: "Receiver Staff", createdDate: "2024-06-05",
-    photos: 3, notes: "Corner crushed during inbound", assignedStaff: "Supervisor A",
-    resolution: "Pending investigation",
+    id: "INC-001", parcelId: "PKG-002", orderId: "ORD-2024-006", type: "Damaged Parcel", typeFr: "Colis endommagé",
+    severity: "high", severityFr: "Élevée", status: "open", statusFr: "Ouvert", reportedBy: "Receiver Staff", reportedByFr: "Agent de réception", createdDate: "2024-06-05",
+    photos: 3, notes: "Corner crushed during inbound", notesFr: "Coin écrasé lors de la réception", assignedStaff: "Supervisor A", assignedStaffFr: "Superviseur A",
+    resolution: "Pending investigation", resolutionFr: "Enquête en attente",
   },
   {
-    id: "INC-002", parcelId: "PKG-005", orderId: "ORD-2024-004", type: "Missing Item",
-    severity: "critical", status: "investigating", reportedBy: "Sorter B", createdDate: "2024-06-04",
-    photos: 1, notes: "1 of 2 items missing from package", assignedStaff: "Ops Manager",
-    resolution: "Seller notified",
+    id: "INC-002", parcelId: "PKG-005", orderId: "ORD-2024-004", type: "Missing Item", typeFr: "Article manquant",
+    severity: "critical", severityFr: "Critique", status: "investigating", statusFr: "En investigation", reportedBy: "Sorter B", reportedByFr: "Trieur B", createdDate: "2024-06-04",
+    photos: 1, notes: "1 of 2 items missing from package", notesFr: "1 article sur 2 manquant dans le colis", assignedStaff: "Ops Manager", assignedStaffFr: "Responsable des opérations",
+    resolution: "Seller notified", resolutionFr: "Vendeur notifié",
   },
   {
-    id: "INC-003", parcelId: "—", orderId: "ORD-2024-003", type: "Cash Difference",
-    severity: "medium", status: "resolved", reportedBy: "Finance", createdDate: "2024-06-03",
-    photos: 0, notes: "Rider short $60 on shift", assignedStaff: "Finance Team",
-    resolution: "Adjusted from rider deposit",
+    id: "INC-003", parcelId: "—", orderId: "ORD-2024-003", type: "Cash Difference", typeFr: "Écart de caisse",
+    severity: "medium", severityFr: "Moyenne", status: "resolved", statusFr: "Résolu", reportedBy: "Finance", reportedByFr: "Finance", createdDate: "2024-06-03",
+    photos: 0, notes: "Rider short $60 on shift", notesFr: "Livreur en déficit de 60 $ sur le service", assignedStaff: "Finance Team", assignedStaffFr: "Équipe finance",
+    resolution: "Adjusted from rider deposit", resolutionFr: "Ajusté depuis le dépôt du livreur",
   },
 ];
 

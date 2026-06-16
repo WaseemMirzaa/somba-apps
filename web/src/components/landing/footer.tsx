@@ -60,7 +60,7 @@ export function LandingFooter() {
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
           <p className="text-sm">© 2026 LipCart. {t("allRights")}</p>
           <div className="flex gap-6 text-sm">
-            <Link href="/shop/account" className="hover:text-white">Account</Link>
+            <Link href="/shop/account" className="hover:text-white">{t("myAccount")}</Link>
             <Link href="/shop/support" className="hover:text-white">{t("support")}</Link>
             <Link href="/shop/account" className="hover:text-white">{t("settings")}</Link>
           </div>

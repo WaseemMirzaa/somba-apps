@@ -43,6 +43,13 @@ function statusBadgeVariant(status: SellerPayoutItemStatus) {
   }
 }
 
+const PAYMENT_STATUS_FR: Record<string, string> = {
+  paid: "Payé",
+  pending: "En attente",
+  refunded: "Remboursé",
+  failed: "Échoué",
+};
+
 export default function SellerFinancePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -79,7 +86,7 @@ export default function SellerFinancePage() {
             ? "Revenus · En attente · Solde disponible · Commission · Remboursements"
             : "Revenue · Pending · Available Balance · Commission · Refunds"
         }
-        breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("finance") }]}
+        breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("finance") }]}
         actions={
           <Link href="/seller/finance/payouts/request" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
             {t("requestPayout")}
@@ -167,7 +174,7 @@ export default function SellerFinancePage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="success">{String(row.status)}</Badge>,
+                render: (row) => <Badge variant="success">{fr ? (PAYMENT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
               { key: "date", label: t("date") },
             ]}
@@ -248,12 +255,12 @@ export default function SellerFinancePage() {
                   label: t("amount"),
                   render: (row) => formatCurrency(row.amount as number, locale),
                 },
-                { key: "method", label: fr ? "Méthode" : "Method" },
+                { key: "method", label: fr ? "Méthode" : "Method", render: (row) => (fr ? String(row.methodFr ?? row.method) : String(row.method)) },
                 {
                   key: "status",
                   label: t("status"),
                   render: (row) => (
-                    <Badge variant={row.status === "paid" ? "success" : "warning"}>{String(row.status)}</Badge>
+                    <Badge variant={row.status === "paid" ? "success" : "warning"}>{fr ? String(row.statusFr ?? row.status) : String(row.status)}</Badge>
                   ),
                 },
                 { key: "date", label: t("date") },

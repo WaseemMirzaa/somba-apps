@@ -48,7 +48,7 @@ export default function SellerNotificationsPage() {
           : `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
       }
       breadcrumbs={[
-        { label: "Seller", href: "/seller" },
+        { label: locale === "fr" ? "Vendeur" : "Seller", href: "/seller" },
         { label: locale === "fr" ? "Notifications" : "Notifications" },
       ]}
       actions={
@@ -89,7 +89,7 @@ export default function SellerNotificationsPage() {
           key: "type",
           label: locale === "fr" ? "Type" : "Type",
           render: (row) => (
-            <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge>
+            <Badge variant="info">{String((locale === "fr" && row.typeFr) ? row.typeFr : row.type).replace(/_/g, " ")}</Badge>
           ),
         },
         {

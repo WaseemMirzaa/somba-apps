@@ -15,14 +15,15 @@ import { getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 const ROLE_GROUPS = [
-  { label: "Seller", roles: ["seller"] as UserRole[] },
-  { label: "Admin", roles: ["admin"] as UserRole[] },
-  { label: "Warehouse", roles: ["warehouse"] as UserRole[] },
+  { label: "Seller", labelFr: "Vendeur", roles: ["seller"] as UserRole[] },
+  { label: "Admin", labelFr: "Admin", roles: ["admin"] as UserRole[] },
+  { label: "Warehouse", labelFr: "Entrepôt", roles: ["warehouse"] as UserRole[] },
 ];
 
 export default function LoginPage() {
   const { login, isAuthenticated, authReady, persona, personas } = useAuth();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "guest">("login");
   const [group, setGroup] = useState("Admin");
@@ -93,8 +94,9 @@ export default function LoginPage() {
           <div className="space-y-3 text-sm text-white/80">
             <p>{t("prototypeDesc")}</p>
             <p className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
-              Each role is isolated: Admin manages warehouses and sees fulfillment inside Admin only.
-              Sellers need an active subscription. Warehouse staff cannot cross into other portals.
+              {fr
+                ? "Chaque rôle est isolé : l'Admin gère les entrepôts et voit la logistique uniquement dans Admin. Les vendeurs ont besoin d'un abonnement actif. Le personnel d'entrepôt ne peut pas accéder aux autres portails."
+                : "Each role is isolated: Admin manages warehouses and sees fulfillment inside Admin only. Sellers need an active subscription. Warehouse staff cannot cross into other portals."}
             </p>
           </div>
         </div>
@@ -104,21 +106,21 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md space-y-8">
           <div>
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
-              {mode === "login" ? "Sign in" : "Continue as Guest"}
+              {mode === "login" ? (fr ? "Se connecter" : "Sign in") : (fr ? "Continuer en tant qu'invité" : "Continue as Guest")}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">Select your role — you will only access your portal</p>
+            <p className="mt-1 text-sm text-slate-500">{fr ? "Sélectionnez votre rôle — vous n'accéderez qu'à votre portail" : "Select your role — you will only access your portal"}</p>
           </div>
 
           <div className="flex gap-2 rounded-xl bg-slate-100 p-1">
-            <button onClick={() => setMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "login" ? "bg-white shadow-sm" : ""}`}>Login</button>
-            <button onClick={() => setMode("guest")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "guest" ? "bg-white shadow-sm" : ""}`}>Guest</button>
+            <button onClick={() => setMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "login" ? "bg-white shadow-sm" : ""}`}>{fr ? "Connexion" : "Login"}</button>
+            <button onClick={() => setMode("guest")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "guest" ? "bg-white shadow-sm" : ""}`}>{fr ? "Invité" : "Guest"}</button>
           </div>
 
           {mode === "guest" ? (
             <div className="space-y-4">
-              <input className="input-premium w-full px-4 py-3 text-sm" placeholder="Email (optional)" />
-              <input className="input-premium w-full px-4 py-3 text-sm" placeholder="Phone (optional)" />
-              <Button onClick={() => enterAs("guest")} className="w-full">Continue as Guest → Shop</Button>
+              <input className="input-premium w-full px-4 py-3 text-sm" placeholder={fr ? "E-mail (facultatif)" : "Email (optional)"} />
+              <input className="input-premium w-full px-4 py-3 text-sm" placeholder={fr ? "Téléphone (facultatif)" : "Phone (optional)"} />
+              <Button onClick={() => enterAs("guest")} className="w-full">{fr ? "Continuer en tant qu'invité → Boutique" : "Continue as Guest → Shop"}</Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -129,7 +131,7 @@ export default function LoginPage() {
                     onClick={() => setGroup(g.label)}
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${group === g.label ? "bg-[var(--primary)] text-white" : "border border-red-200 text-slate-600"}`}
                   >
-                    {g.label}
+                    {fr ? g.labelFr : g.label}
                   </button>
                 ))}
               </div>
@@ -145,23 +147,25 @@ export default function LoginPage() {
                       <p className="text-xs text-slate-500">{p.subRole || p.role} · {p.email}</p>
                       {p.warehouseId && <p className="text-xs text-[var(--primary)]">{p.warehouseId}</p>}
                     </div>
-                    <span className="text-xs font-medium text-[var(--primary)]">Enter →</span>
+                    <span className="text-xs font-medium text-[var(--primary)]">{fr ? "Entrer →" : "Enter →"}</span>
                   </button>
                 ))}
               </div>
               {group === "Seller" && (
                 <p className="text-xs text-slate-500">
-                  Sellers must purchase a subscription. Try &quot;Fashion Hub&quot; (no subscription) or &quot;TechZone Store&quot; (subscribed).
+                  {fr
+                    ? "Les vendeurs doivent souscrire un abonnement. Essayez « Fashion Hub » (sans abonnement) ou « TechZone Store » (abonné)."
+                    : "Sellers must purchase a subscription. Try “Fashion Hub” (no subscription) or “TechZone Store” (subscribed)."}
                 </p>
               )}
               {group === "Warehouse" && (
-                <p className="text-xs text-slate-500">Warehouse credentials are issued by Admin when creating a warehouse.</p>
+                <p className="text-xs text-slate-500">{fr ? "Les identifiants d'entrepôt sont émis par l'Admin lors de la création d'un entrepôt." : "Warehouse credentials are issued by Admin when creating a warehouse."}</p>
               )}
             </div>
           )}
 
           <Link href="/" className="block text-center text-sm text-[var(--primary)] hover:underline">
-            ← Back to {BRAND.name}
+            ← {fr ? `Retour à ${BRAND.name}` : `Back to ${BRAND.name}`}
           </Link>
         </div>
       </div>

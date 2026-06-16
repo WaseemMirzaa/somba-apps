@@ -39,6 +39,7 @@ export default function WarehouseExchangeDetailPage() {
 
   const reason = fr ? exc.reasonFr : exc.reason;
   const comment = fr ? exc.customerCommentFr : exc.customerComment;
+  const statusLabel = fr ? exc.statusFr : formatExchangeStatus(exc.status);
 
   const priceDiffLabel =
     exc.priceDifference > 0
@@ -57,7 +58,7 @@ export default function WarehouseExchangeDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={exc.id}
-        subtitle={`${exc.createdAt} · ${formatExchangeStatus(exc.status)} · ${exc.orderId}`}
+        subtitle={`${exc.createdAt} · ${statusLabel} · ${exc.orderId}`}
         backHref="/warehouse/exchanges"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -66,7 +67,7 @@ export default function WarehouseExchangeDetailPage() {
         ]}
         actions={
           <>
-            <Badge variant={exchangeStatusVariant(exc.status)}>{formatExchangeStatus(exc.status)}</Badge>
+            <Badge variant={exchangeStatusVariant(exc.status)}>{statusLabel}</Badge>
             {exc.status === "pending" && (
               <>
                 <button onClick={() => toast(fr ? "Échange approuvé" : "Exchange approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">
@@ -109,7 +110,7 @@ export default function WarehouseExchangeDetailPage() {
           <InfoGrid items={[
             { label: fr ? "ID échange" : "Exchange ID", value: exc.id },
             { label: fr ? "Demandé le" : "Requested", value: exc.createdAt },
-            { label: fr ? "Statut" : "Status", value: formatExchangeStatus(exc.status) },
+            { label: fr ? "Statut" : "Status", value: statusLabel },
             { label: fr ? "Motif" : "Reason", value: <span className="font-semibold text-red-700">{reason}</span> },
             { label: fr ? "Différence de prix" : "Price difference", value: priceDiffLabel },
             { label: fr ? "Entrepôt" : "Warehouse", value: exc.warehouse },
@@ -135,7 +136,7 @@ export default function WarehouseExchangeDetailPage() {
               { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },
               { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
               { label: fr ? "Ville" : "City", value: order.customerCity },
-            ] : [{ label: "Customer ID", value: exc.customerId }]),
+            ] : [{ label: fr ? "ID client" : "Customer ID", value: exc.customerId }]),
           ]} />
         </DetailGridSection>
 

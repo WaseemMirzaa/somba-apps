@@ -14,6 +14,17 @@ import { REVIEWS, REPORTS, type ReviewItem, type ReportItem } from "@/lib/modera
 const reviewVariant = { pending: "warning", published: "success", removed: "danger" } as const;
 const reportVariant = { open: "warning", resolved: "success", dismissed: "default" } as const;
 
+const REVIEW_STATUS_FR: Record<string, string> = { pending: "En attente", published: "Publié", removed: "Retiré" };
+const REPORT_STATUS_FR: Record<string, string> = { open: "Ouvert", resolved: "Résolu", dismissed: "Rejeté" };
+const REPORT_TYPE_FR: Record<string, string> = { review: "Avis", product: "Produit", store: "Boutique" };
+const REPORT_REASON_FR: Record<string, string> = {
+  "Spam / external contact": "Spam / contact externe",
+  "Counterfeit goods": "Produits contrefaits",
+  "Misleading store info": "Informations boutique trompeuses",
+  "Offensive language": "Langage offensant",
+  "Safety concern": "Problème de sécurité",
+};
+
 export default function AdminReviewsPage() {
   const { locale } = useLocale();
   const { toast } = useToast();
@@ -78,7 +89,7 @@ export default function AdminReviewsPage() {
               },
               { key: "rating", label: fr ? "Note" : "Rating", render: (row) => <span className="inline-flex items-center gap-1 font-semibold text-amber-600"><Star className="h-3.5 w-3.5 fill-current" />{Number(row.rating)}</span> },
               { key: "text", label: fr ? "Avis" : "Review", render: (row) => <span className="line-clamp-2 block max-w-xs text-slate-600">{String(row.text)}</span> },
-              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={reviewVariant[row.status as ReviewItem["status"]]}>{String(row.status)}</Badge> },
+              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={reviewVariant[row.status as ReviewItem["status"]]}>{fr ? (REVIEW_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
               {
                 key: "actions",
                 label: "",
@@ -101,11 +112,11 @@ export default function AdminReviewsPage() {
           <DataTable
             data={reports as unknown as Record<string, unknown>[]}
             columns={[
-              { key: "type", label: "Type", render: (row) => <Badge variant="info">{String(row.type)}</Badge> },
+              { key: "type", label: "Type", render: (row) => <Badge variant="info">{fr ? (REPORT_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
               { key: "target", label: fr ? "Cible" : "Target", render: (row) => <span className="font-medium text-slate-900">{String(row.target)}</span> },
-              { key: "reason", label: fr ? "Motif" : "Reason" },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => fr ? (REPORT_REASON_FR[String(row.reason)] ?? String(row.reason)) : String(row.reason) },
               { key: "reporter", label: fr ? "Signalé par" : "Reporter", render: (row) => <span className="text-slate-500">{String(row.reporter)}</span> },
-              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={reportVariant[row.status as ReportItem["status"]]}>{String(row.status)}</Badge> },
+              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={reportVariant[row.status as ReportItem["status"]]}>{fr ? (REPORT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
               {
                 key: "actions",
                 label: "",

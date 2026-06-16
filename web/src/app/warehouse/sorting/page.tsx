@@ -20,8 +20,17 @@ const STATUS_OPTIONS = [
   { value: "on_hold", label: "On hold", labelFr: "En attente" },
 ];
 
+// Parcel priority values originate from the shared (non-owned) entities layer.
+const PRIORITY_FR: Record<string, string> = {
+  high: "Élevée",
+  normal: "Normale",
+  medium: "Moyenne",
+  low: "Faible",
+};
+
 export default function WarehouseSortingPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [parcels, setParcels] = useState(initialParcels);
@@ -52,7 +61,7 @@ export default function WarehouseSortingPage() {
 
   function proceedToConfirm() {
     if (!selectedZone) {
-      toast("Please select a zone", "error");
+      toast(fr ? "Veuillez sélectionner une zone" : "Please select a zone", "error");
       return;
     }
     setConfirmStep(true);
@@ -63,45 +72,45 @@ export default function WarehouseSortingPage() {
     setParcels((prev) =>
       prev.map((item) => (item.id === assignTarget.id ? { ...item, zone: selectedZone } : item))
     );
-    toast(`${assignTarget.id} assigned to ${selectedZone}`);
+    toast(fr ? `${assignTarget.id} assigné à ${selectedZone}` : `${assignTarget.id} assigned to ${selectedZone}`);
     closeAssignModal();
   }
 
   return (
     <>
     <WarehouseListPage
-      title="Sorting Board"
-      subtitle="List View — Parcel ID, Order ID, Customer, Zone, Priority, Route"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("sorting") }]}
+      title={fr ? "Table de tri" : "Sorting Board"}
+      subtitle={fr ? "Vue liste — ID colis, ID commande, Client, Zone, Priorité, Itinéraire" : "List View — Parcel ID, Order ID, Customer, Zone, Priority, Route"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("sorting") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Parcel ID, order, customer, zone…"
+          searchPlaceholder={fr ? "ID colis, commande, client, zone…" : "Parcel ID, order, customer, zone…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "id", label: "Parcel ID", render: (row) => (
+        { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
           <Link href={`/warehouse/parcels/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order ID" },
-        { key: "customer", label: "Customer" },
+        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
         { key: "zone", label: "Zone" },
-        { key: "priority", label: "Priority", render: (row) => (
-          <Badge variant={row.priority === "high" ? "danger" : "info"}>{String(row.priority)}</Badge>
+        { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
+          <Badge variant={row.priority === "high" ? "danger" : "info"}>{fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}</Badge>
         )},
-        { key: "route", label: "Route" },
+        { key: "route", label: fr ? "Itinéraire" : "Route" },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <button
               onClick={() => openAssignModal(row as unknown as SortingParcel)}
               className="text-[var(--primary)] hover:underline"
             >
-              Assign Zone
+              {fr ? "Assigner une zone" : "Assign Zone"}
             </button>
-            <button onClick={() => { setParcels((p) => p.map((item) => item.id === row.id ? { ...item, status: "on_hold" } : item)); toast(`${row.id} placed on hold`, "info"); }} className="text-slate-500 hover:underline">Hold</button>
+            <button onClick={() => { setParcels((p) => p.map((item) => item.id === row.id ? { ...item, status: "on_hold" } : item)); toast(fr ? `${row.id} mis en attente` : `${row.id} placed on hold`, "info"); }} className="text-slate-500 hover:underline">{fr ? "Attente" : "Hold"}</button>
             <Link href={`/warehouse/parcels/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
           </div>
         )},
@@ -114,18 +123,18 @@ export default function WarehouseSortingPage() {
         <div className="card-premium w-full max-w-md p-6">
           {!confirmStep ? (
             <>
-              <h3 className="text-lg font-semibold text-slate-900">Assign zone</h3>
+              <h3 className="text-lg font-semibold text-slate-900">{fr ? "Assigner une zone" : "Assign zone"}</h3>
               <p className="mt-1 text-sm text-slate-500">
                 {assignTarget.id} · {assignTarget.orderId} · {assignTarget.customer}
               </p>
 
               <div className="mt-4 space-y-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Current zone</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">{fr ? "Zone actuelle" : "Current zone"}</label>
                   <p className="rounded-lg border border-[var(--border)] bg-slate-50 px-3 py-2 text-sm">{assignTarget.zone}</p>
                 </div>
                 <div>
-                  <label htmlFor="sorting-zone" className="mb-1.5 block text-xs font-medium text-slate-600">New zone</label>
+                  <label htmlFor="sorting-zone" className="mb-1.5 block text-xs font-medium text-slate-600">{fr ? "Nouvelle zone" : "New zone"}</label>
                   <select
                     id="sorting-zone"
                     className="input-premium w-full px-3 py-2 text-sm"
@@ -141,39 +150,44 @@ export default function WarehouseSortingPage() {
 
               <div className="mt-6 flex gap-3">
                 <button onClick={closeAssignModal} className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                  Cancel
+                  {fr ? "Annuler" : "Cancel"}
                 </button>
                 <button
                   onClick={proceedToConfirm}
                   disabled={!selectedZone || selectedZone === assignTarget.zone}
                   className="btn-primary flex-1 rounded-xl py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Continue
+                  {fr ? "Continuer" : "Continue"}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <h3 className="text-lg font-semibold text-slate-900">Confirm zone assignment</h3>
+              <h3 className="text-lg font-semibold text-slate-900">{fr ? "Confirmer l'assignation de zone" : "Confirm zone assignment"}</h3>
               <p className="mt-3 text-sm text-slate-600">
-                Assign parcel <strong>{assignTarget.id}</strong> from{" "}
-                <strong>{assignTarget.zone}</strong> to <strong>{selectedZone}</strong>?
+                {fr ? (
+                  <>Assigner le colis <strong>{assignTarget.id}</strong> de{" "}
+                  <strong>{assignTarget.zone}</strong> vers <strong>{selectedZone}</strong> ?</>
+                ) : (
+                  <>Assign parcel <strong>{assignTarget.id}</strong> from{" "}
+                  <strong>{assignTarget.zone}</strong> to <strong>{selectedZone}</strong>?</>
+                )}
               </p>
               <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-700">
-                <p><span className="text-slate-500">Order:</span> {assignTarget.orderId}</p>
-                <p className="mt-1"><span className="text-slate-500">Customer:</span> {assignTarget.customer}</p>
-                <p className="mt-1"><span className="text-slate-500">Route:</span> {assignTarget.route}</p>
+                <p><span className="text-slate-500">{fr ? "Commande :" : "Order:"}</span> {assignTarget.orderId}</p>
+                <p className="mt-1"><span className="text-slate-500">{fr ? "Client :" : "Customer:"}</span> {assignTarget.customer}</p>
+                <p className="mt-1"><span className="text-slate-500">{fr ? "Itinéraire :" : "Route:"}</span> {assignTarget.route}</p>
               </div>
 
               <div className="mt-6 flex gap-3">
                 <button onClick={() => setConfirmStep(false)} className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                  Back
+                  {fr ? "Retour" : "Back"}
                 </button>
                 <button
                   onClick={confirmAssignZone}
                   className="btn-primary flex-1 rounded-xl py-2.5 text-sm font-medium"
                 >
-                  Confirm assignment
+                  {fr ? "Confirmer l'assignation" : "Confirm assignment"}
                 </button>
               </div>
             </>

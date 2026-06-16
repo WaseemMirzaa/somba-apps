@@ -41,15 +41,15 @@ export default function WarehouseExchangesPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Exchange ID, order, customer…"
+          searchPlaceholder={fr ? "ID échange, commande, client…" : "Exchange ID, order, customer…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "id", label: "Exchange ID", render: (row) => (
+        { key: "id", label: fr ? "ID échange" : "Exchange ID", render: (row) => (
           <Link href={`/warehouse/exchanges/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order ID" },
+        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "customer", label: fr ? "Client" : "Customer" },
         { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => {
           const exc = row as { reason?: string; reasonFr?: string };
@@ -63,8 +63,8 @@ export default function WarehouseExchangesPage() {
           const exc = row as { newProduct?: { sku: string } };
           return exc.newProduct?.sku ?? "—";
         }},
-        { key: "priceDifference", label: "Price Diff", render: (row) => formatCurrency(row.priceDifference as number, locale) },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status)}</Badge> },
+        { key: "priceDifference", label: fr ? "Diff. prix" : "Price Diff", render: (row) => formatCurrency(row.priceDifference as number, locale) },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(fr ? row.statusFr : row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/exchanges/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

@@ -67,7 +67,7 @@ export default function SellerCustomerAnalyticsPage() {
         subtitle={fr ? "Segments · Rétention · Cohortes · Géographie · Acquisition" : "Segments · Retention · Cohorts · Geography · Acquisition"}
         backHref="/seller/analytics"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("analytics"), href: "/seller/analytics" },
           { label: fr ? "Clients" : "Customers" },
         ]}

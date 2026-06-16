@@ -12,16 +12,20 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
   { value: "setup", label: "Setup", labelFr: "Configuration" },
   { value: "inactive", label: "Inactive", labelFr: "Inactif" },
 ];
+const WH_STATUS_FR: Record<string, string> = { active: "Actif", setup: "Configuration", inactive: "Inactif" };
 
 export default function AdminWarehousesPage() {
   const { warehouses } = useWarehouseAdmin();
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [showCreate, setShowCreate] = useState(false);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -37,17 +41,17 @@ export default function AdminWarehousesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Warehouses"
-        subtitle="Create fulfillment centers and issue portal credentials for warehouse managers"
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Warehouses" }]}
+        title={fr ? "Entrepôts" : "Warehouses"}
+        subtitle={fr ? "Créez des centres de distribution et délivrez des identifiants de portail aux responsables d'entrepôt" : "Create fulfillment centers and issue portal credentials for warehouse managers"}
+        breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Entrepôts" : "Warehouses" }]}
         actions={
           <>
             <Link href="/admin/warehouses/staff">
-              <Button variant="secondary" size="sm">Warehouse Staff</Button>
+              <Button variant="secondary" size="sm">{fr ? "Personnel d'entrepôt" : "Warehouse Staff"}</Button>
             </Link>
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
-              Create Warehouse
+              {fr ? "Créer un entrepôt" : "Create Warehouse"}
             </Button>
           </>
         }
@@ -59,20 +63,20 @@ export default function AdminWarehousesPage() {
             <Boxes className="h-8 w-8 text-[var(--primary)]" />
             <div>
               <p className="text-2xl font-bold">{warehouses.length}</p>
-              <p className="text-sm text-slate-500">Total warehouses</p>
+              <p className="text-sm text-slate-500">{fr ? "Total entrepôts" : "Total warehouses"}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-2xl font-bold text-emerald-600">{warehouses.filter((w) => w.status === "active").length}</p>
-            <p className="text-sm text-slate-500">Active</p>
+            <p className="text-sm text-slate-500">{fr ? "Actifs" : "Active"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-2xl font-bold text-amber-600">{warehouses.filter((w) => w.status === "setup").length}</p>
-            <p className="text-sm text-slate-500">In setup</p>
+            <p className="text-sm text-slate-500">{fr ? "En configuration" : "In setup"}</p>
           </CardContent>
         </Card>
       </div>
@@ -85,7 +89,7 @@ export default function AdminWarehousesPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Warehouse ID, name, city…"
+        searchPlaceholder={fr ? "ID d'entrepôt, nom, ville…" : "Warehouse ID, name, city…"}
         showDateFilters={false}
       />
 
@@ -96,17 +100,17 @@ export default function AdminWarehousesPage() {
               { key: "id", label: "ID", render: (row) => (
                 <Link href={`/admin/warehouses/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
               )},
-              { key: "name", label: "Warehouse" },
-              { key: "city", label: "City" },
-              { key: "country", label: "Country" },
-              { key: "staff", label: "Staff" },
-              { key: "capacity", label: "Capacity", render: (row) => Number(row.capacity).toLocaleString() },
-              { key: "portalEmail", label: "Portal Login" },
-              { key: "status", label: "Status", render: (row) => (
-                <Badge variant={row.status === "active" ? "success" : row.status === "setup" ? "warning" : "default"}>{String(row.status)}</Badge>
+              { key: "name", label: fr ? "Entrepôt" : "Warehouse" },
+              { key: "city", label: fr ? "Ville" : "City" },
+              { key: "country", label: fr ? "Pays" : "Country" },
+              { key: "staff", label: fr ? "Personnel" : "Staff" },
+              { key: "capacity", label: fr ? "Capacité" : "Capacity", render: (row) => Number(row.capacity).toLocaleString() },
+              { key: "portalEmail", label: fr ? "Connexion portail" : "Portal Login" },
+              { key: "status", label: fr ? "Statut" : "Status", render: (row) => (
+                <Badge variant={row.status === "active" ? "success" : row.status === "setup" ? "warning" : "default"}>{fr ? (WH_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
               )},
-              { key: "actions", label: "Action", render: (row) => (
-                <Link href={`/admin/warehouses/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">Manage</Link>
+              { key: "actions", label: fr ? "Action" : "Action", render: (row) => (
+                <Link href={`/admin/warehouses/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Gérer" : "Manage"}</Link>
               )},
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
@@ -117,9 +121,19 @@ export default function AdminWarehousesPage() {
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-slate-600">
-            Warehouse managers log in with the portal email and password you issue here.
-            They only see the <strong>Warehouse portal</strong> — not Admin, Seller, or other portals.
-            As admin, use <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Fulfillment Ops</Link> to monitor all warehouse activity.
+            {fr ? (
+              <>
+                Les responsables d&apos;entrepôt se connectent avec l&apos;e-mail et le mot de passe de portail que vous délivrez ici.
+                Ils ne voient que le <strong>portail Entrepôt</strong> — pas Admin, Vendeur ou les autres portails.
+                En tant qu&apos;admin, utilisez <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Opérations logistiques</Link> pour suivre toute l&apos;activité des entrepôts.
+              </>
+            ) : (
+              <>
+                Warehouse managers log in with the portal email and password you issue here.
+                They only see the <strong>Warehouse portal</strong> — not Admin, Seller, or other portals.
+                As admin, use <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Fulfillment Ops</Link> to monitor all warehouse activity.
+              </>
+            )}
           </p>
         </CardContent>
       </Card>
@@ -130,6 +144,8 @@ export default function AdminWarehousesPage() {
 function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
   const { createWarehouse } = useWarehouseAdmin();
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [form, setForm] = useState({
     name: "", city: "", country: "France", address: "",
     capacity: 10000, managerName: "", managerEmail: "", portalEmail: "", zones: "Zone A",
@@ -138,7 +154,7 @@ function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
 
   function submit() {
     if (!form.name || !form.portalEmail) {
-      toast("Name and portal email required", "error");
+      toast(fr ? "Nom et e-mail de portail requis" : "Name and portal email required", "error");
       return;
     }
     const { record, password } = createWarehouse({
@@ -146,23 +162,23 @@ function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
       zones: form.zones.split(",").map((z) => z.trim()),
     });
     setCreated({ id: record.id, password });
-    toast("Warehouse created — credentials generated");
+    toast(fr ? "Entrepôt créé — identifiants générés" : "Warehouse created — credentials generated");
   }
 
   if (created) {
     return (
       <Card>
         <CardContent className="space-y-4 p-6">
-          <h3 className="font-semibold text-emerald-700">Warehouse Created — Portal Credentials</h3>
-          <p className="text-sm text-slate-600">Share these credentials with the warehouse manager. They can log in at /login.</p>
+          <h3 className="font-semibold text-emerald-700">{fr ? "Entrepôt créé — identifiants du portail" : "Warehouse Created — Portal Credentials"}</h3>
+          <p className="text-sm text-slate-600">{fr ? "Partagez ces identifiants avec le responsable d'entrepôt. Il peut se connecter sur /login." : "Share these credentials with the warehouse manager. They can log in at /login."}</p>
           <div className="rounded-lg bg-slate-50 p-4 font-mono text-sm">
-            <p>Warehouse ID: {created.id}</p>
-            <p>Portal Email: {form.portalEmail}</p>
-            <p>Temp Password: {created.password}</p>
+            <p>{fr ? "ID entrepôt" : "Warehouse ID"}: {created.id}</p>
+            <p>{fr ? "E-mail du portail" : "Portal Email"}: {form.portalEmail}</p>
+            <p>{fr ? "Mot de passe temporaire" : "Temp Password"}: {created.password}</p>
           </div>
           <div className="flex gap-2">
-            <Link href={`/admin/warehouses/${created.id}`}><Button size="sm">View Warehouse</Button></Link>
-            <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+            <Link href={`/admin/warehouses/${created.id}`}><Button size="sm">{fr ? "Voir l'entrepôt" : "View Warehouse"}</Button></Link>
+            <Button variant="ghost" size="sm" onClick={onClose}>{fr ? "Fermer" : "Close"}</Button>
           </div>
         </CardContent>
       </Card>
@@ -172,21 +188,21 @@ function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
   return (
     <Card>
       <CardContent className="space-y-4 p-6">
-        <h3 className="font-semibold">New Warehouse</h3>
+        <h3 className="font-semibold">{fr ? "Nouvel entrepôt" : "New Warehouse"}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <input className="input-premium px-4 py-2 text-sm" placeholder="Warehouse name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder="Capacity" type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
-          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder="Manager name" value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder="Manager email" value={form.managerEmail} onChange={(e) => setForm({ ...form, managerEmail: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder="Portal login email (e.g. warehouse.city@somba.com)" value={form.portalEmail} onChange={(e) => setForm({ ...form, portalEmail: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder="Zones (comma-separated)" value={form.zones} onChange={(e) => setForm({ ...form, zones: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Nom de l'entrepôt" : "Warehouse name"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Pays" : "Country"} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Capacité" : "Capacity"} type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
+          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "Adresse" : "Address"} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Nom du responsable" : "Manager name"} value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "E-mail du responsable" : "Manager email"} value={form.managerEmail} onChange={(e) => setForm({ ...form, managerEmail: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "E-mail de connexion au portail (ex. warehouse.city@somba.com)" : "Portal login email (e.g. warehouse.city@somba.com)"} value={form.portalEmail} onChange={(e) => setForm({ ...form, portalEmail: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "Zones (séparées par des virgules)" : "Zones (comma-separated)"} value={form.zones} onChange={(e) => setForm({ ...form, zones: e.target.value })} />
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={submit}>Create & Generate Credentials</Button>
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={submit}>{fr ? "Créer et générer les identifiants" : "Create & Generate Credentials"}</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>{fr ? "Annuler" : "Cancel"}</Button>
         </div>
       </CardContent>
     </Card>

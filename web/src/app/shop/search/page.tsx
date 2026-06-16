@@ -11,7 +11,8 @@ import { products } from "@/lib/mock-data";
 function SearchResults() {
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") || "").toLowerCase();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   const results = query
     ? products.filter(
@@ -27,7 +28,7 @@ function SearchResults() {
     <div className="space-y-8">
       <PageHeader
         title={t("searchResults")}
-        subtitle={query ? `"${query}" — ${results.length} results` : `${results.length} products`}
+        subtitle={query ? (fr ? `"${query}" — ${results.length} résultats` : `"${query}" — ${results.length} results`) : (fr ? `${results.length} produits` : `${results.length} products`)}
         breadcrumbs={[
           { label: "Shop", href: "/" },
           { label: t("searchResults") },
@@ -36,7 +37,7 @@ function SearchResults() {
 
       {results.length === 0 ? (
         <div className="card-premium py-16 text-center">
-          <p className="text-slate-500">No products found for &quot;{query}&quot;</p>
+          <p className="text-slate-500">{fr ? <>Aucun produit trouvé pour &quot;{query}&quot;</> : <>No products found for &quot;{query}&quot;</>}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

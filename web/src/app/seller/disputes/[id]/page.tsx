@@ -16,7 +16,7 @@ export default function SellerDisputeDetailPage() {
   const dispute = getDispute(id);
   const fr = locale === "fr";
 
-  if (!dispute) return <div className="text-center text-slate-500">Not found</div>;
+  if (!dispute) return <div className="text-center text-slate-500">{fr ? "Introuvable" : "Not found"}</div>;
 
   return (
     <div className="space-y-6">

@@ -10,7 +10,8 @@ import { useLocale } from "@/context/locale-context";
 import { inventoryEntities } from "@/lib/warehouse-entities";
 
 export default function WarehouseInventoryPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -24,13 +25,13 @@ export default function WarehouseInventoryPage() {
   return (
     <WarehouseListPage
       title={t("inventory")}
-      subtitle="List View — SKU, Product, Category, Available, Reserved, Allocated, Location"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("inventory") }]}
+      subtitle={fr ? "Vue liste — SKU, Produit, Catégorie, Disponible, Réservé, Alloué, Emplacement" : "List View — SKU, Product, Category, Available, Reserved, Allocated, Location"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("inventory") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          searchPlaceholder="SKU, product, category, location…"
+          searchPlaceholder={fr ? "SKU, produit, catégorie, emplacement…" : "SKU, product, category, location…"}
           showDateFilters={false}
           showStatusFilter={false}
         />
@@ -39,7 +40,7 @@ export default function WarehouseInventoryPage() {
         { key: "sku", label: "SKU", render: (row) => (
           <Link href={`/warehouse/inventory/${encodeURIComponent(String(row.sku))}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.sku)}</Link>
         )},
-        { key: "product", label: "Product", render: (row) => (
+        { key: "product", label: fr ? "Produit" : "Product", render: (row) => (
           <div className="flex items-center gap-2">
             <div className="relative h-8 w-8 overflow-hidden rounded">
               <Image src={String(row.image)} alt="" fill className="object-cover" sizes="32px" />
@@ -47,11 +48,11 @@ export default function WarehouseInventoryPage() {
             <span>{String(row.product)}</span>
           </div>
         )},
-        { key: "category", label: "Category" },
-        { key: "available", label: "Available" },
-        { key: "reserved", label: "Reserved" },
-        { key: "allocated", label: "Allocated" },
-        { key: "location", label: "Location" },
+        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "available", label: fr ? "Disponible" : "Available" },
+        { key: "reserved", label: fr ? "Réservé" : "Reserved" },
+        { key: "allocated", label: fr ? "Alloué" : "Allocated" },
+        { key: "location", label: fr ? "Emplacement" : "Location" },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/inventory/${encodeURIComponent(String(row.sku))}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

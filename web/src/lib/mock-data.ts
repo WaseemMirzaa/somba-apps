@@ -21,6 +21,7 @@ export const products = [
     reviews: 2341,
     image: "https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400&h=400&fit=crop",
     category: "Electronics",
+    categoryFr: "Électronique",
     seller: "TechZone Store",
     stock: 45,
     deliveryDays: 2,
@@ -36,6 +37,7 @@ export const products = [
     reviews: 1823,
     image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=400&fit=crop",
     category: "Electronics",
+    categoryFr: "Électronique",
     seller: "Apple Official",
     stock: 23,
     deliveryDays: 3,
@@ -51,6 +53,7 @@ export const products = [
     reviews: 5621,
     image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
     category: "Electronics",
+    categoryFr: "Électronique",
     seller: "AudioHub",
     stock: 120,
     deliveryDays: 1,
@@ -66,6 +69,7 @@ export const products = [
     reviews: 3421,
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop",
     category: "Fashion",
+    categoryFr: "Mode",
     seller: "SportStyle",
     stock: 89,
     deliveryDays: 2,
@@ -81,6 +85,7 @@ export const products = [
     reviews: 892,
     image: "https://images.unsplash.com/photo-1558317374-067fb5f30029?w=400&h=400&fit=crop",
     category: "Home & Living",
+    categoryFr: "Maison",
     seller: "HomeEssentials",
     stock: 34,
     deliveryDays: 4,
@@ -96,6 +101,7 @@ export const products = [
     reviews: 2103,
     image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=400&fit=crop",
     category: "Fashion",
+    categoryFr: "Mode",
     seller: "DenimWorld",
     stock: 200,
     deliveryDays: 2,
@@ -111,6 +117,7 @@ export const products = [
     reviews: 15234,
     image: "https://images.unsplash.com/photo-1585515320310-259814833e62?w=400&h=400&fit=crop",
     category: "Home & Living",
+    categoryFr: "Maison",
     seller: "KitchenPro",
     stock: 67,
     deliveryDays: 1,
@@ -126,6 +133,7 @@ export const products = [
     reviews: 8932,
     image: "https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=400&h=400&fit=crop",
     category: "Electronics",
+    categoryFr: "Électronique",
     seller: "GameZone",
     stock: 12,
     deliveryDays: 3,
@@ -133,10 +141,10 @@ export const products = [
 ];
 
 export const stores = [
-  { id: 1, name: "TechZone Store", rating: 4.8, products: 1240, followers: 45000, image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop", badge: "Gold" },
-  { id: 2, name: "FashionHub", rating: 4.6, products: 3200, followers: 78000, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop", badge: "Silver" },
-  { id: 3, name: "HomeEssentials", rating: 4.7, products: 890, followers: 23000, image: "https://images.unsplash.com/photo-1555529669-e4e7eeef2289?w=200&h=200&fit=crop", badge: "Gold" },
-  { id: 4, name: "SportStyle", rating: 4.5, products: 2100, followers: 56000, image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa0?w=200&h=200&fit=crop", badge: "Bronze" },
+  { id: 1, name: "TechZone Store", rating: 4.8, products: 1240, followers: 45000, image: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop", badge: "Gold", badgeFr: "Or" },
+  { id: 2, name: "FashionHub", rating: 4.6, products: 3200, followers: 78000, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop", badge: "Silver", badgeFr: "Argent" },
+  { id: 3, name: "HomeEssentials", rating: 4.7, products: 890, followers: 23000, image: "https://images.unsplash.com/photo-1555529669-e4e7eeef2289?w=200&h=200&fit=crop", badge: "Gold", badgeFr: "Or" },
+  { id: 4, name: "SportStyle", rating: 4.5, products: 2100, followers: 56000, image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa0?w=200&h=200&fit=crop", badge: "Bronze", badgeFr: "Bronze" },
 ];
 
 export const orders = [

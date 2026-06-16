@@ -13,6 +13,7 @@ import { BROADCASTS, BROADCAST_CHANNELS, BROADCAST_AUDIENCES, type Broadcast } f
 
 const channelVariant = { push: "primary", sms: "purple", email: "info" } as const;
 const statusVariant = { sent: "success", scheduled: "warning", draft: "default" } as const;
+const STATUS_FR: Record<string, string> = { sent: "Envoyée", scheduled: "Programmée", draft: "Brouillon" };
 
 export default function AdminBroadcastsPage() {
   const { locale } = useLocale();
@@ -106,7 +107,7 @@ export default function AdminBroadcastsPage() {
         <DataTable
           data={items as unknown as Record<string, unknown>[]}
           columns={[
-            { key: "channel", label: fr ? "Canal" : "Channel", render: (row) => <Badge variant={channelVariant[row.channel as Broadcast["channel"]]}>{String(row.channel)}</Badge> },
+            { key: "channel", label: fr ? "Canal" : "Channel", render: (row) => { const ch = BROADCAST_CHANNELS.find((c) => c.id === row.channel); return <Badge variant={channelVariant[row.channel as Broadcast["channel"]]}>{ch ? (fr ? ch.labelFr : ch.label) : String(row.channel)}</Badge>; } },
             {
               key: "title",
               label: fr ? "Titre" : "Title",
@@ -122,7 +123,7 @@ export default function AdminBroadcastsPage() {
             },
             { key: "audience", label: "Audience" },
             { key: "reach", label: fr ? "Portée" : "Reach" },
-            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as Broadcast["status"]]}>{String(row.status)}</Badge> },
+            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as Broadcast["status"]]}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
             { key: "date", label: "Date", render: (row) => <span className="text-slate-500">{String(row.date)}</span> },
           ]}
         />

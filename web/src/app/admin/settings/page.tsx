@@ -8,7 +8,8 @@ import { useMarket } from "@/context/market-context";
 import { useToast } from "@/context/toast-context";
 
 export default function AdminSettingsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { profile, profileId, setProfileId } = useMarket();
   const { toast } = useToast();
   const [commission, setCommission] = useState("12");
@@ -18,7 +19,7 @@ export default function AdminSettingsPage() {
   const [clearanceHours, setClearanceHours] = useState(String(profile.payoutClearanceHours));
 
   function save() {
-    toast("Settings saved (audit logged)", "success");
+    toast(fr ? "Paramètres enregistrés (consigné dans l'audit)" : "Settings saved (audit logged)", "success");
   }
 
   return (
@@ -26,38 +27,38 @@ export default function AdminSettingsPage() {
       <PageHeader title={t("settings")} subtitle="AF-20 / AF-21 — Δ2, Δ3, Δ4, Δ8" />
 
       <div className="card-premium space-y-4 p-6">
-        <h3 className="font-semibold">Market Profile</h3>
+        <h3 className="font-semibold">{fr ? "Profil de marché" : "Market Profile"}</h3>
         <select className="input-premium w-full max-w-xs px-4 py-2 text-sm" value={profileId} onChange={(e) => setProfileId(e.target.value as "france" | "drc")}>
-          <option value="france">France (Demo)</option>
-          <option value="drc">DRC (Production)</option>
+          <option value="france">{fr ? "France (démo)" : "France (Demo)"}</option>
+          <option value="drc">{fr ? "RDC (production)" : "DRC (Production)"}</option>
         </select>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card-premium space-y-3 p-6">
           <h3 className="font-semibold">Commission (Δ4)</h3>
-          <label className="text-sm">Default commission %</label>
+          <label className="text-sm">{fr ? "Commission par défaut %" : "Default commission %"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={commission} onChange={(e) => setCommission(e.target.value)} />
         </div>
         <div className="card-premium space-y-3 p-6">
-          <h3 className="font-semibold">Pay at Delivery (Δ2)</h3>
-          <label className="text-sm">Max pay-at-delivery order value (USD)</label>
+          <h3 className="font-semibold">{fr ? "Paiement à la livraison (Δ2)" : "Pay at Delivery (Δ2)"}</h3>
+          <label className="text-sm">{fr ? "Valeur max. de commande au paiement à la livraison (USD)" : "Max pay-at-delivery order value (USD)"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={codMax} onChange={(e) => setCodMax(e.target.value)} />
         </div>
         <div className="card-premium space-y-3 p-6">
-          <h3 className="font-semibold">FX Rate (Δ8)</h3>
-          <label className="text-sm">USD → CDF (manual)</label>
+          <h3 className="font-semibold">{fr ? "Taux de change (Δ8)" : "FX Rate (Δ8)"}</h3>
+          <label className="text-sm">{fr ? "USD → CDF (manuel)" : "USD → CDF (manual)"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
         </div>
         <div className="card-premium space-y-3 p-6">
-          <h3 className="font-semibold">Payouts (Δ4)</h3>
-          <label className="text-sm">Min payout (USD)</label>
+          <h3 className="font-semibold">{fr ? "Versements (Δ4)" : "Payouts (Δ4)"}</h3>
+          <label className="text-sm">{fr ? "Versement min. (USD)" : "Min payout (USD)"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={payoutMin} onChange={(e) => setPayoutMin(e.target.value)} />
-          <label className="text-sm">Clearance hours</label>
+          <label className="text-sm">{fr ? "Heures de compensation" : "Clearance hours"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={clearanceHours} onChange={(e) => setClearanceHours(e.target.value)} />
         </div>
         <div className="card-premium space-y-3 p-6 lg:col-span-2">
-          <h3 className="font-semibold">Delivery fees by zone (Δ3)</h3>
+          <h3 className="font-semibold">{fr ? "Frais de livraison par zone (Δ3)" : "Delivery fees by zone (Δ3)"}</h3>
           <div className="space-y-2">
             {profile.zones.map((z) => (
               <div key={z.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
@@ -68,7 +69,7 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       </div>
-      <Button onClick={save}>Save Settings</Button>
+      <Button onClick={save}>{fr ? "Enregistrer les paramètres" : "Save Settings"}</Button>
     </div>
   );
 }

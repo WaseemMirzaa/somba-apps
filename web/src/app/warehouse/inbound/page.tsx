@@ -20,13 +20,24 @@ const STATUS_OPTIONS = [
   { value: "ready", label: "Ready", labelFr: "Prêt" },
 ];
 
+// Parcel status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  pending: "En attente",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
 export default function WarehouseInboundPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
   const ops = useOpsPath();
   const base = useOpsBase();
-  const homeLabel = base.startsWith("/admin") ? "Admin" : "Warehouse";
+  const homeLabel = base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse");
   const homeHref = base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -41,14 +52,14 @@ export default function WarehouseInboundPage() {
 
   return (
     <WarehouseListPage
-      title={`${t("inbound")} Queue`}
-      subtitle="List View — Parcel ID, Order ID, Seller, Pickup Rider, Arrival, Items, Weight, Status"
+      title={`${t("inbound")} ${fr ? "File" : "Queue"}`}
+      subtitle={fr ? "Vue liste — ID colis, ID commande, Vendeur, Livreur de ramassage, Arrivée, Articles, Poids, Statut" : "List View — Parcel ID, Order ID, Seller, Pickup Rider, Arrival, Items, Weight, Status"}
       breadcrumbs={[{ label: homeLabel, href: homeHref }, { label: t("inbound") }]}
       actions={
         <BarcodeScanner
-          label="Scan Barcode"
+          label={fr ? "Scanner le code-barres" : "Scan Barcode"}
           onScan={(code) => {
-            toast(`Scanned: ${code}`);
+            toast(fr ? `Scanné : ${code}` : `Scanned: ${code}`);
             router.push(ops("/parcels/PCL-001"));
           }}
         />
@@ -58,26 +69,26 @@ export default function WarehouseInboundPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Parcel ID, order, seller…"
+          searchPlaceholder={fr ? "ID colis, commande, vendeur…" : "Parcel ID, order, seller…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "id", label: "Parcel ID", render: (row) => (
+        { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
           <Link href={ops(`/parcels/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order ID" },
-        { key: "seller", label: "Seller" },
-        { key: "pickupRider", label: "Pickup Rider" },
-        { key: "arrival", label: "Arrival Time" },
-        { key: "itemsCount", label: "Items" },
-        { key: "weight", label: "Weight" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status)}</Badge> },
+        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+        { key: "seller", label: fr ? "Vendeur" : "Seller" },
+        { key: "pickupRider", label: fr ? "Livreur de ramassage" : "Pickup Rider" },
+        { key: "arrival", label: fr ? "Heure d'arrivée" : "Arrival Time" },
+        { key: "itemsCount", label: fr ? "Articles" : "Items" },
+        { key: "weight", label: fr ? "Poids" : "Weight" },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            <button onClick={() => toast(`Received ${row.id}`)} className="text-emerald-600">{t("receive")}</button>
-            <Link href={ops(`/parcels/${row.id}`)} className="text-amber-600">Inspect</Link>
+            <button onClick={() => toast(fr ? `${row.id} reçu` : `Received ${row.id}`)} className="text-emerald-600">{t("receive")}</button>
+            <Link href={ops(`/parcels/${row.id}`)} className="text-amber-600">{fr ? "Inspecter" : "Inspect"}</Link>
           </div>
         )},
       ]}

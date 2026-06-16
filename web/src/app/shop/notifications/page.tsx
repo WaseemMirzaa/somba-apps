@@ -31,6 +31,7 @@ export default function ShopNotificationsPage() {
           "body",
           "bodyFr",
           "type",
+          "typeFr",
           (n) => (n.read ? "read" : "unread"),
         ],
         dateField: "createdAt",
@@ -101,7 +102,11 @@ export default function ShopNotificationsPage() {
                 key: "type",
                 label: locale === "fr" ? "Type" : "Type",
                 render: (row) => (
-                  <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge>
+                  <Badge variant="info">
+                    {locale === "fr" && row.typeFr
+                      ? String(row.typeFr)
+                      : String(row.type).replace(/_/g, " ")}
+                  </Badge>
                 ),
               },
               {

@@ -13,7 +13,17 @@ import { getReplacement } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
-function formatReplacementStatus(status: string) {
+const REPLACEMENT_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
+  pending: { en: "Pending", fr: "En attente" },
+  processing: { en: "Processing", fr: "En cours" },
+  allocated: { en: "Allocated", fr: "Alloué" },
+  shipped: { en: "Shipped", fr: "Expédié" },
+  completed: { en: "Completed", fr: "Terminé" },
+};
+
+function formatReplacementStatus(status: string, fr = false) {
+  const entry = REPLACEMENT_STATUS_LABELS[status];
+  if (entry) return fr ? entry.fr : entry.en;
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -39,9 +49,9 @@ export default function SellerReplacementDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={rep.id}
-        subtitle={`${rep.createdAt} · ${formatReplacementStatus(rep.status)} · ${rep.orderId}`}
+        subtitle={`${rep.createdAt} · ${formatReplacementStatus(rep.status, fr)} · ${rep.orderId}`}
         backHref="/seller/replacements"
-        actions={<Badge variant="info">{formatReplacementStatus(rep.status)}</Badge>}
+        actions={<Badge variant="info">{formatReplacementStatus(rep.status, fr)}</Badge>}
       />
 
       <div className="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-5 shadow-sm">
@@ -75,7 +85,7 @@ export default function SellerReplacementDetailPage() {
                 ),
               },
               { label: fr ? "Client" : "Customer", value: rep.customer },
-              { label: fr ? "Statut" : "Status", value: formatReplacementStatus(rep.status) },
+              { label: fr ? "Statut" : "Status", value: formatReplacementStatus(rep.status, fr) },
             ]}
           />
         </DetailGridSection>

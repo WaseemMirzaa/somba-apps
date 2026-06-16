@@ -5,12 +5,36 @@ import { DetailSection } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
 
-const STEPS = ["Basic Info", "Media", "Variants", "Inventory", "Pricing", "Shipping", "Review"];
+const STEPS = [
+  { en: "Basic Info", fr: "Infos de base" },
+  { en: "Media", fr: "Médias" },
+  { en: "Variants", fr: "Variantes" },
+  { en: "Inventory", fr: "Inventaire" },
+  { en: "Pricing", fr: "Tarification" },
+  { en: "Shipping", fr: "Livraison" },
+  { en: "Review", fr: "Vérification" },
+];
+
+const FIELD_LABELS_FR: Record<string, string> = {
+  title: "Titre (EN)",
+  titleFr: "Titre (FR)",
+  brand: "Marque",
+  category: "Catégorie",
+  description: "Description",
+  price: "Prix",
+  stock: "Stock",
+  sku: "SKU",
+  weight: "Poids",
+  shippingClass: "Classe de livraison",
+};
 
 export function ProductWizard() {
   const router = useRouter();
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     title: "", titleFr: "", brand: "", category: "Electronics", description: "",
@@ -25,33 +49,33 @@ export function ProductWizard() {
       <div className="flex gap-1 overflow-x-auto">
         {STEPS.map((s, i) => (
           <button
-            key={s}
+            key={s.en}
             onClick={() => setStep(i)}
             className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
               i === step ? "bg-[var(--primary)] text-white" : i < step ? "bg-red-100 text-[var(--primary)]" : "bg-slate-100 text-slate-500"
             }`}
           >
-            {i + 1}. {s}
+            {i + 1}. {fr ? s.fr : s.en}
           </button>
         ))}
       </div>
 
       {step === 0 && (
-        <DetailSection title="Step 1: Basic Information (EN + FR)">
+        <DetailSection title={fr ? "Étape 1 : Informations de base (EN + FR)" : "Step 1: Basic Information (EN + FR)"}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Product Title (EN)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Titre produit (FR)" value={form.titleFr} onChange={(e) => setForm({ ...form, titleFr: e.target.value })} />
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Titre du produit (EN)" : "Product Title (EN)"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Titre du produit (FR)" : "Titre produit (FR)"} value={form.titleFr} onChange={(e) => setForm({ ...form, titleFr: e.target.value })} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Marque" : "Brand"} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
             <select className="input-premium px-4 py-2.5 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              <option>Electronics</option><option>Fashion</option><option>Home</option><option>Beauty</option>
+              <option value="Electronics">{fr ? "Électronique" : "Electronics"}</option><option value="Fashion">{fr ? "Mode" : "Fashion"}</option><option value="Home">{fr ? "Maison" : "Home"}</option><option value="Beauty">{fr ? "Beauté" : "Beauty"}</option>
             </select>
-            <textarea className="input-premium sm:col-span-2 px-4 py-2.5 text-sm" rows={4} placeholder="Description (bilingual content)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <textarea className="input-premium sm:col-span-2 px-4 py-2.5 text-sm" rows={4} placeholder={fr ? "Description (contenu bilingue)" : "Description (bilingual content)"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
         </DetailSection>
       )}
 
       {step === 1 && (
-        <DetailSection title="Step 2: Media">
+        <DetailSection title={fr ? "Étape 2 : Médias" : "Step 2: Media"}>
           <div className="grid gap-4 sm:grid-cols-3">
             {[1, 2, 3, 4, 5].map((n) => (
               <div key={n} className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] text-sm text-slate-400">
@@ -64,11 +88,11 @@ export function ProductWizard() {
       )}
 
       {step === 2 && (
-        <DetailSection title="Step 3: Variants">
+        <DetailSection title={fr ? "Étape 3 : Variantes" : "Step 3: Variants"}>
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-3">
-              <input className="input-premium px-3 py-2 text-sm" placeholder="Variant name (e.g. Color)" value={variantName} onChange={(e) => setVariantName(e.target.value)} />
-              <input className="input-premium px-3 py-2 text-sm" placeholder="Options (Red, Blue)" value={variantOptions} onChange={(e) => setVariantOptions(e.target.value)} />
+              <input className="input-premium px-3 py-2 text-sm" placeholder={fr ? "Nom de la variante (ex. Couleur)" : "Variant name (e.g. Color)"} value={variantName} onChange={(e) => setVariantName(e.target.value)} />
+              <input className="input-premium px-3 py-2 text-sm" placeholder={fr ? "Options (Rouge, Bleu)" : "Options (Red, Blue)"} value={variantOptions} onChange={(e) => setVariantOptions(e.target.value)} />
               <Button
                 variant="secondary"
                 size="sm"
@@ -77,10 +101,10 @@ export function ProductWizard() {
                   setVariants((v) => [...v, { name: variantName, options: variantOptions }]);
                   setVariantName("");
                   setVariantOptions("");
-                  toast(`Variant "${variantName}" added`);
+                  toast(fr ? `Variante « ${variantName} » ajoutée` : `Variant "${variantName}" added`);
                 }}
               >
-                Add
+                {fr ? "Ajouter" : "Add"}
               </Button>
             </div>
             {variants.length > 0 && (
@@ -88,66 +112,66 @@ export function ProductWizard() {
                 {variants.map((v, i) => <li key={i}>{v.name}: {v.options || "—"}</li>)}
               </ul>
             )}
-            <p className="text-xs text-slate-500">Size, Color, Storage — generate SKU matrix automatically</p>
+            <p className="text-xs text-slate-500">{fr ? "Taille, Couleur, Stockage — génère automatiquement la matrice de SKU" : "Size, Color, Storage — generate SKU matrix automatically"}</p>
           </div>
         </DetailSection>
       )}
 
       {step === 3 && (
-        <DetailSection title="Step 4: Inventory">
+        <DetailSection title={fr ? "Étape 4 : Inventaire" : "Step 4: Inventory"}>
           <div className="grid gap-4 sm:grid-cols-2">
             <input className="input-premium px-4 py-2.5 text-sm" placeholder="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Stock quantity" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-            <select className="input-premium px-4 py-2.5 text-sm"><option>Seller ships</option><option>Platform warehouse</option><option>Hybrid</option></select>
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Quantité en stock" : "Stock quantity"} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
+            <select className="input-premium px-4 py-2.5 text-sm"><option>{fr ? "Expédié par le vendeur" : "Seller ships"}</option><option>{fr ? "Entrepôt de la plateforme" : "Platform warehouse"}</option><option>{fr ? "Hybride" : "Hybrid"}</option></select>
           </div>
         </DetailSection>
       )}
 
       {step === 4 && (
-        <DetailSection title="Step 5: Pricing">
+        <DetailSection title={fr ? "Étape 5 : Tarification" : "Step 5: Pricing"}>
           <div className="grid gap-4 sm:grid-cols-3">
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Price (USD)" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="MRP / Compare at" />
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Commission (auto: 12%)" disabled />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Prix (USD)" : "Price (USD)"} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Prix conseillé / Comparé à" : "MRP / Compare at"} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Commission (auto : 12 %)" : "Commission (auto: 12%)"} disabled />
           </div>
         </DetailSection>
       )}
 
       {step === 5 && (
-        <DetailSection title="Step 6: Shipping">
+        <DetailSection title={fr ? "Étape 6 : Livraison" : "Step 6: Shipping"}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <input className="input-premium px-4 py-2.5 text-sm" placeholder="Weight (kg)" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} />
+            <input className="input-premium px-4 py-2.5 text-sm" placeholder={fr ? "Poids (kg)" : "Weight (kg)"} value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} />
             <select className="input-premium px-4 py-2.5 text-sm" value={form.shippingClass} onChange={(e) => setForm({ ...form, shippingClass: e.target.value })}>
-              <option value="standard">Standard</option><option value="express">Express</option><option value="heavy">Heavy/Bulky</option>
+              <option value="standard">{fr ? "Standard" : "Standard"}</option><option value="express">{fr ? "Express" : "Express"}</option><option value="heavy">{fr ? "Lourd/Volumineux" : "Heavy/Bulky"}</option>
             </select>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" defaultChecked /> Cross-city delivery allowed</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" defaultChecked /> Open box eligible</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" defaultChecked /> {fr ? "Livraison inter-villes autorisée" : "Cross-city delivery allowed"}</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" defaultChecked /> {fr ? "Éligible boîte ouverte" : "Open box eligible"}</label>
           </div>
         </DetailSection>
       )}
 
       {step === 6 && (
-        <DetailSection title="Step 7: Review & Submit">
+        <DetailSection title={fr ? "Étape 7 : Vérification et envoi" : "Step 7: Review & Submit"}>
           <dl className="space-y-2 text-sm">
             {Object.entries(form).filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex justify-between border-b border-[var(--border)] py-2">
-                <dt className="text-slate-500 capitalize">{k}</dt>
+                <dt className="text-slate-500 capitalize">{fr ? (FIELD_LABELS_FR[k] ?? k) : k}</dt>
                 <dd className="font-medium">{v}</dd>
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-xs text-amber-600">Product will enter moderation queue after submit</p>
+          <p className="mt-4 text-xs text-amber-600">{fr ? "Le produit entrera dans la file de modération après l'envoi" : "Product will enter moderation queue after submit"}</p>
         </DetailSection>
       )}
 
       <div className="flex gap-3">
-        {step > 0 && <Button variant="secondary" onClick={() => setStep(step - 1)}>Back</Button>}
+        {step > 0 && <Button variant="secondary" onClick={() => setStep(step - 1)}>{fr ? "Retour" : "Back"}</Button>}
         {step < 6 ? (
-          <Button onClick={() => setStep(step + 1)}>Next Step</Button>
+          <Button onClick={() => setStep(step + 1)}>{fr ? "Étape suivante" : "Next Step"}</Button>
         ) : (
-          <Button onClick={() => { toast("Submitted for moderation"); router.push("/seller/products"); }}>Submit for Moderation</Button>
+          <Button onClick={() => { toast(fr ? "Soumis pour modération" : "Submitted for moderation"); router.push("/seller/products"); }}>{fr ? "Soumettre pour modération" : "Submit for Moderation"}</Button>
         )}
-        <Button variant="ghost" onClick={() => toast("Draft saved")}>Save Draft</Button>
+        <Button variant="ghost" onClick={() => toast(fr ? "Brouillon enregistré" : "Draft saved")}>{fr ? "Enregistrer le brouillon" : "Save Draft"}</Button>
       </div>
     </div>
   );

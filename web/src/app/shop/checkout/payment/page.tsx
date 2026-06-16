@@ -49,7 +49,7 @@ function PaymentContent() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={locale === "fr" ? "Paiement" : "Payment"} breadcrumbs={[{ label: "Checkout", href: "/shop/checkout" }, { label: "Payment" }]} />
+      <PageHeader title={locale === "fr" ? "Paiement" : "Payment"} breadcrumbs={[{ label: locale === "fr" ? "Caisse" : "Checkout", href: "/shop/checkout" }, { label: locale === "fr" ? "Paiement" : "Payment" }]} />
 
       {paymentError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
@@ -64,8 +64,8 @@ function PaymentContent() {
       <DetailSection title={locale === "fr" ? "Mode de paiement" : "Payment Method"}>
         <div className="space-y-3">
           {[
-            { id: "stripe_card", label: "Stripe — Card" },
-            { id: "wallet", label: "Somba Wallet ($142.50)" },
+            { id: "stripe_card", label: locale === "fr" ? "Stripe — Carte" : "Stripe — Card" },
+            { id: "wallet", label: locale === "fr" ? "Portefeuille Somba ($142.50)" : "Somba Wallet ($142.50)" },
             { id: "airtel_money", label: "Airtel Money" },
             { id: "cod", label: locale === "fr" ? "Paiement à la livraison" : "Pay at Delivery", disabled: !codEligible },
           ].filter((m) => PAYMENTS.methods.includes(m.id as typeof PAYMENTS.methods[number])).map((m) => (
@@ -73,7 +73,7 @@ function PaymentContent() {
               <input type="radio" name="payment" checked={payment === m.id} disabled={m.disabled} onChange={() => setPayment(m.id)} />
               <span className="font-medium">{m.label}</span>
               {m.id === "cod" && !codEligible && (
-                <span className="text-xs text-amber-600">Max <DualCurrency amount={profile.codMaxOrderValue} /></span>
+                <span className="text-xs text-amber-600">{locale === "fr" ? "Max" : "Max"} <DualCurrency amount={profile.codMaxOrderValue} /></span>
               )}
             </label>
           ))}
@@ -81,7 +81,7 @@ function PaymentContent() {
 
         {payment === "stripe_card" && (
           <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-            [Stripe Card Element — mock]
+            {locale === "fr" ? "[Élément de carte Stripe — mock]" : "[Stripe Card Element — mock]"}
           </div>
         )}
         {payment === "airtel_money" && (
@@ -92,7 +92,7 @@ function PaymentContent() {
             <p className="text-sm text-amber-800">{locale === "fr" ? "Montant à payer à la livraison" : "Amount due at delivery"}</p>
             <DualCurrency amount={total} className="text-xl font-bold text-amber-900" />
             {PAYMENTS.cod.otpRequired && (
-              <input className="input-premium mt-2 w-full px-4 py-2 text-sm" placeholder="OTP at delivery" value={otp} onChange={(e) => setOtp(e.target.value)} />
+              <input className="input-premium mt-2 w-full px-4 py-2 text-sm" placeholder={locale === "fr" ? "Code OTP à la livraison" : "OTP at delivery"} value={otp} onChange={(e) => setOtp(e.target.value)} />
             )}
           </div>
         )}
@@ -101,7 +101,7 @@ function PaymentContent() {
         <Button onClick={placeOrder} className="mt-4 w-full">
           {payment === "cod" ? (locale === "fr" ? "Confirmer la commande" : "Confirm Order") : (locale === "fr" ? "Payer" : "Pay")}
         </Button>
-        <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">← Back</Link>
+        <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">{locale === "fr" ? "← Retour" : "← Back"}</Link>
       </DetailSection>
     </div>
   );

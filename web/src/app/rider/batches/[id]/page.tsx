@@ -18,6 +18,13 @@ const BATCH_STOPS = [
   { seq: 3, taskId: "TSK-8842", status: "pending" as const },
 ];
 
+// Display labels for the payment string from task data (logic uses raw value).
+const PAYMENT_FR: Record<string, string> = {
+  "Pay at delivery": "À la livraison",
+  Prepaid: "Prépayé",
+  Card: "Carte",
+};
+
 export default function RiderBatchPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -49,7 +56,13 @@ export default function RiderBatchPage() {
                 </span>
                 <div className="flex gap-2">
                   <Badge variant={stop.status === "completed" ? "success" : stop.status === "current" ? "primary" : "default"}>
-                    {stop.status}
+                    {fr
+                      ? stop.status === "completed"
+                        ? "Terminé"
+                        : stop.status === "current"
+                          ? "En cours"
+                          : "En attente"
+                      : stop.status}
                   </Badge>
                   <Badge>ETA {task.eta}</Badge>
                 </div>
@@ -78,7 +91,9 @@ export default function RiderBatchPage() {
                     label: fr ? "Paiement" : "Payment",
                     value: task.codAmount
                       ? `${fr ? "À la livraison" : "At delivery"} · ${formatCurrency(task.codAmount, locale)}`
-                      : task.paymentType,
+                      : fr
+                        ? PAYMENT_FR[task.paymentType] ?? task.paymentType
+                        : task.paymentType,
                   },
                 ]}
               />
@@ -92,7 +107,7 @@ export default function RiderBatchPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">Qty {item.qty}</p>
+                        <p className="text-xs text-slate-500">{fr ? "Qté" : "Qty"} {item.qty}</p>
                       </div>
                     </div>
                   ))}

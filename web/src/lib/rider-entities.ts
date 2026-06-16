@@ -44,6 +44,7 @@ export const riderProfile = {
   name: "Jean Mukendi",
   phone: "+243 812 345 678",
   vehicle: "Motorcycle — Honda CB150",
+  vehicleFr: "Moto — Honda CB150",
   zone: "Kinshasa — Gombe",
   rating: 4.9,
   deliveriesToday: 12,

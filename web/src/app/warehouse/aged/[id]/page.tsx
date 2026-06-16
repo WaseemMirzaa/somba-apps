@@ -15,8 +15,43 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+// Parcel / order status and priority values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
+const PRIORITY_FR: Record<string, string> = {
+  high: "Élevée",
+  normal: "Normale",
+  medium: "Moyenne",
+  low: "Faible",
+};
+
+const ORDER_STATUS_FR: Record<string, string> = {
+  delivered: "Livré",
+  processing: "En cours",
+  pending: "En attente",
+  cancelled: "Annulé",
+  shipped: "Expédié",
+  unknown: "Inconnu",
+};
+
+const CONDITION_FR: Record<string, string> = {
+  Good: "Bon",
+  Pending: "En attente",
+  Damaged: "Endommagé",
+};
+
 function formatStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function localize(map: Record<string, string>, value: string, fr: boolean) {
+  return fr ? map[value] ?? formatStatus(value) : formatStatus(value);
 }
 
 function statusVariant(status: string): "success" | "warning" | "info" | "danger" {
@@ -43,6 +78,15 @@ export default function WarehouseAgedParcelDetailPage() {
   }
 
   const stuckReason = fr ? parcel.stuckReasonFr : parcel.stuckReason;
+  const conditionLabel = fr
+    ? CONDITION_FR[parcel.inspectionDetail.condition] ?? parcel.inspectionDetail.condition
+    : parcel.inspectionDetail.condition;
+  const exceptionsLabel =
+    parcel.inspectionDetail.exceptions === "None"
+      ? fr
+        ? "Aucune"
+        : "None"
+      : parcel.inspectionDetail.exceptions;
   const timelineEvents = parcel.agedTimeline.map((event) => ({
     time: event.time,
     label: fr ? event.labelFr : event.label,
@@ -54,7 +98,7 @@ export default function WarehouseAgedParcelDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={parcel.id}
-        subtitle={`${parcel.orderId} · ${formatStatus(parcel.status)} · ${parcel.zone} · ${fr ? "Arrivé" : "Arrived"} ${parcel.arrivalDate} ${parcel.arrival}`}
+        subtitle={`${parcel.orderId} · ${localize(STATUS_FR, parcel.status, fr)} · ${parcel.zone} · ${fr ? "Arrivé" : "Arrived"} ${parcel.arrivalDate} ${parcel.arrival}`}
         backHref="/warehouse/aged"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -63,7 +107,7 @@ export default function WarehouseAgedParcelDetailPage() {
         ]}
         actions={
           <>
-            <Badge variant={statusVariant(parcel.status)}>{formatStatus(parcel.status)}</Badge>
+            <Badge variant={statusVariant(parcel.status)}>{localize(STATUS_FR, parcel.status, fr)}</Badge>
             <Badge variant="warning">
               {fr ? `${parcel.daysStuck} jours bloqué` : `${parcel.daysStuck} days stuck`}
             </Badge>
@@ -115,11 +159,11 @@ export default function WarehouseAgedParcelDetailPage() {
               { label: fr ? "Code-barres" : "Barcode", value: parcel.barcode },
               {
                 label: fr ? "Statut" : "Status",
-                value: <Badge variant={statusVariant(parcel.status)}>{formatStatus(parcel.status)}</Badge>,
+                value: <Badge variant={statusVariant(parcel.status)}>{localize(STATUS_FR, parcel.status, fr)}</Badge>,
               },
               {
                 label: fr ? "Priorité" : "Priority",
-                value: formatStatus(parcel.priority),
+                value: localize(PRIORITY_FR, parcel.priority, fr),
               },
               {
                 label: fr ? "Jours bloqué" : "Days stuck",
@@ -156,7 +200,7 @@ export default function WarehouseAgedParcelDetailPage() {
               },
               {
                 label: fr ? "Statut commande" : "Order status",
-                value: formatStatus(parcel.orderStatus),
+                value: localize(ORDER_STATUS_FR, parcel.orderStatus, fr),
               },
               ...(order
                 ? [
@@ -230,7 +274,7 @@ export default function WarehouseAgedParcelDetailPage() {
         <DetailGridSection title={fr ? "Inspection" : "Inspection"}>
           <InfoGrid
             items={[
-              { label: fr ? "État" : "Condition", value: parcel.inspectionDetail.condition },
+              { label: fr ? "État" : "Condition", value: conditionLabel },
               {
                 label: fr ? "Photos" : "Photos",
                 value: `${parcel.inspectionDetail.photos} ${fr ? "téléversée(s)" : "uploaded"}`,
@@ -240,7 +284,7 @@ export default function WarehouseAgedParcelDetailPage() {
                 value: parcel.inspectionDetail.damageNotes || (fr ? "Aucune" : "None"),
                 full: true,
               },
-              { label: fr ? "Exceptions" : "Exceptions", value: parcel.inspectionDetail.exceptions },
+              { label: fr ? "Exceptions" : "Exceptions", value: exceptionsLabel },
             ]}
           />
           <div className="mt-4 flex flex-wrap gap-2">

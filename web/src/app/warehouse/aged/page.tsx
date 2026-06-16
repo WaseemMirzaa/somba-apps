@@ -16,8 +16,32 @@ const STATUS_OPTIONS = [
   { value: "ready", label: "Ready", labelFr: "Prêt" },
 ];
 
+// Parcel status / priority values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  inbound: "Entrant",
+  received: "Reçu",
+  sorting: "Tri",
+  ready: "Prêt",
+  dispatched: "Expédié",
+};
+
+const PRIORITY_FR: Record<string, string> = {
+  high: "Élevée",
+  normal: "Normale",
+  medium: "Moyenne",
+  low: "Faible",
+};
+
 function formatStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function localizeStatus(status: string, fr: boolean) {
+  return fr ? STATUS_FR[status] ?? formatStatus(status) : formatStatus(status);
+}
+
+function localizePriority(priority: string, fr: boolean) {
+  return fr ? PRIORITY_FR[priority] ?? formatStatus(priority) : formatStatus(priority);
 }
 
 function statusVariant(status: string): "success" | "warning" | "info" | "danger" {
@@ -103,7 +127,7 @@ export default function WarehouseAgedPage() {
           label: t("status"),
           render: (row) => (
             <Badge variant={statusVariant(String(row.status))}>
-              {formatStatus(String(row.status))}
+              {localizeStatus(String(row.status), fr)}
             </Badge>
           ),
         },
@@ -122,7 +146,7 @@ export default function WarehouseAgedPage() {
           label: fr ? "Priorité" : "Priority",
           render: (row) => (
             <Badge variant={priorityVariant(String(row.priority))}>
-              {formatStatus(String(row.priority))}
+              {localizePriority(String(row.priority), fr)}
             </Badge>
           ),
         },

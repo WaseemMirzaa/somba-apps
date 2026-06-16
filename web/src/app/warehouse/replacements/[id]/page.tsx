@@ -46,12 +46,13 @@ export default function WarehouseReplacementDetailPage() {
   const comment = fr ? rep.customerCommentFr : rep.customerComment;
   const dispatch = rep.newProduct.dispatch;
   const dispatchStatus = fr ? dispatch.statusFr : dispatch.status;
+  const statusLabel = fr ? rep.statusFr : formatReplacementStatus(rep.status);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={rep.id}
-        subtitle={`${rep.createdAt} · ${formatReplacementStatus(rep.status)} · ${rep.orderId}`}
+        subtitle={`${rep.createdAt} · ${statusLabel} · ${rep.orderId}`}
         backHref="/warehouse/replacements"
         breadcrumbs={[
           { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
@@ -61,7 +62,7 @@ export default function WarehouseReplacementDetailPage() {
         actions={
           <>
             <Badge variant={replacementStatusVariant(rep.status)}>
-              {formatReplacementStatus(rep.status)}
+              {statusLabel}
             </Badge>
             {!rep.newProduct.allocated && (
               <button
@@ -115,7 +116,7 @@ export default function WarehouseReplacementDetailPage() {
             items={[
               { label: fr ? "ID remplacement" : "Replacement ID", value: rep.id },
               { label: fr ? "Demandé le" : "Requested", value: rep.createdAt },
-              { label: fr ? "Statut" : "Status", value: formatReplacementStatus(rep.status) },
+              { label: fr ? "Statut" : "Status", value: statusLabel },
               {
                 label: fr ? "Motif" : "Reason",
                 value: <span className="font-semibold text-red-700">{reason}</span>,
@@ -185,7 +186,7 @@ export default function WarehouseReplacementDetailPage() {
                     { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
                     { label: fr ? "Ville" : "City", value: order.customerCity },
                   ]
-                : [{ label: "Customer ID", value: rep.customerId }]),
+                : [{ label: fr ? "ID client" : "Customer ID", value: rep.customerId }]),
             ]}
           />
         </DetailGridSection>

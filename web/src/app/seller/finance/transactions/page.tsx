@@ -16,8 +16,17 @@ const STATUS_OPTIONS = [
   { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
 ];
 
+const STATUS_FR: Record<string, string> = {
+  paid: "Payé",
+  completed: "Terminé",
+  pending: "En attente",
+  refunded: "Remboursé",
+  failed: "Échoué",
+};
+
 export default function SellerTransactionsPage() {
   const { locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -32,31 +41,31 @@ export default function SellerTransactionsPage() {
 
   return (
     <SellerListPage
-      title="Transactions"
-      subtitle="Order, Customer, Gross, Commission, Net, Status, Date"
+      title={fr ? "Transactions" : "Transactions"}
+      subtitle={fr ? "Commande, Client, Brut, Commission, Net, Statut, Date" : "Order, Customer, Gross, Commission, Net, Status, Date"}
       breadcrumbs={[
-        { label: "Seller", href: "/seller" },
-        { label: "Finance", href: "/seller/finance" },
-        { label: "Transactions" },
+        { label: fr ? "Vendeur" : "Seller", href: "/seller" },
+        { label: fr ? "Finance" : "Finance", href: "/seller/finance" },
+        { label: fr ? "Transactions" : "Transactions" },
       ]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Order, customer…"
+          searchPlaceholder={fr ? "Commande, client…" : "Order, customer…"}
         />
       }
       columns={[
-        { key: "order", label: "Order", render: (row) => (
+        { key: "order", label: fr ? "Commande" : "Order", render: (row) => (
           <Link href={`/seller/orders/${row.order}`} className="text-[var(--primary)] hover:underline">{String(row.order)}</Link>
         )},
-        { key: "customer", label: "Customer" },
-        { key: "grossAmount", label: "Gross", render: (row) => formatCurrency(row.grossAmount as number, locale) },
-        { key: "commission", label: "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
-        { key: "netAmount", label: "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },
-        { key: "status", label: "Status", render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
-        { key: "date", label: "Date" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "grossAmount", label: fr ? "Brut" : "Gross", render: (row) => formatCurrency(row.grossAmount as number, locale) },
+        { key: "commission", label: fr ? "Commission" : "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
+        { key: "netAmount", label: fr ? "Net" : "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },
+        { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
+        { key: "date", label: fr ? "Date" : "Date" },
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
     />

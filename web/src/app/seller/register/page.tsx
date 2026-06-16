@@ -29,7 +29,7 @@ export default function SellerRegisterPage() {
       <form onSubmit={submit} className="card-premium space-y-4 p-6">
         <input required className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Nom de l'entreprise" : "Business name"} value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} />
         <input required className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Propriétaire" : "Owner name"} value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} />
-        <input required type="email" className="input-premium w-full px-4 py-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input required type="email" className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "E-mail" : "Email"} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <input required className="input-premium w-full px-4 py-2 text-sm" placeholder={profile.phoneFormat} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         <input required type="password" className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Mot de passe" : "Password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         <select required className="input-premium w-full px-4 py-2 text-sm" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}>

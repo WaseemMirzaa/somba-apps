@@ -21,6 +21,24 @@ function SellerSubscribeContent() {
   const { locale } = useLocale();
   const fr = locale === "fr";
 
+  const planContent: Record<string, { name: string; desc: string; features: string[] }> = {
+    starter: {
+      name: "Starter",
+      desc: "Parfait pour les nouveaux vendeurs — jusqu'à 100 produits, gestion des commandes et support par e-mail.",
+      features: ["100 fiches produits", "Gestion des commandes", "Analyses de base", "Support par e-mail"],
+    },
+    pro: {
+      name: "Professional",
+      desc: "Boutiques en croissance — produits illimités, ventes flash, analyses avancées et support prioritaire.",
+      features: ["Produits illimités", "Promotions et ventes flash", "Analyses avancées", "Support prioritaire", "Accès API"],
+    },
+    enterprise: {
+      name: "Enterprise",
+      desc: "Grandes marques — multi-boutiques, commission personnalisée, gestionnaire de compte dédié et SLA.",
+      features: ["Multi-boutiques", "Commission personnalisée", "Gestionnaire dédié", "SLA et intégration", "Options marque blanche"],
+    },
+  };
+
   const initialPlan = (() => {
     const raw = searchParams.get("plan");
     if (raw === "professional" || raw === "pro") return "pro" as const;
@@ -93,19 +111,19 @@ function SellerSubscribeContent() {
                   {fr ? "Populaire" : "Popular"}
                 </span>
               )}
-              <h3 className="font-bold text-slate-900">{plan.name}</h3>
+              <h3 className="font-bold text-slate-900">{fr ? (planContent[plan.id]?.name ?? plan.name) : plan.name}</h3>
               <div className="mt-2">
                 {plan.price !== null ? (
                   <p className="text-2xl font-extrabold text-slate-900">
-                    ${plan.price}<span className="text-sm font-medium text-slate-500">/mo</span>
+                    ${plan.price}<span className="text-sm font-medium text-slate-500">{fr ? "/mois" : "/mo"}</span>
                   </p>
                 ) : (
                   <p className="text-2xl font-extrabold text-slate-900">{fr ? "Sur mesure" : "Custom"}</p>
                 )}
               </div>
-              <p className="mt-2 text-xs text-slate-600">{plan.desc}</p>
+              <p className="mt-2 text-xs text-slate-600">{fr ? (planContent[plan.id]?.desc ?? plan.desc) : plan.desc}</p>
               <ul className="mt-4 space-y-2">
-                {plan.features.slice(0, 3).map((f) => (
+                {(fr ? (planContent[plan.id]?.features ?? [...plan.features]) : [...plan.features]).slice(0, 3).map((f) => (
                   <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
                     <Check className="h-3 w-3 text-emerald-500" />
                     {f}
@@ -135,8 +153,10 @@ function SellerSubscribeContent() {
 }
 
 export default function SellerSubscribePage() {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">{fr ? "Chargement…" : "Loading…"}</div>}>
       <SellerSubscribeContent />
     </Suspense>
   );

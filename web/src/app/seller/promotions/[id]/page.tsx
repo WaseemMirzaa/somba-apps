@@ -11,36 +11,37 @@ import { useLocale } from "@/context/locale-context";
 export default function SellerPromotionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
+  const fr = locale === "fr";
   const promo = getPromotion(id);
 
   if (!promo) {
-    return <div className="p-8 text-center text-slate-500">Campaign not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Campagne introuvable" : "Campaign not found"}</div>;
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={promo.campaign} subtitle={`${promo.discount}% off · ${promo.status}`} backHref="/seller/promotions" />
+      <PageHeader title={promo.campaign} subtitle={fr ? `${promo.discount}% de remise · ${promo.statusFr}` : `${promo.discount}% off · ${promo.status}`} backHref="/seller/promotions" />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DetailSection title="Overview">
+        <DetailSection title={fr ? "Aperçu" : "Overview"}>
           <InfoGrid items={[
-            { label: "Campaign Name", value: promo.campaign },
-            { label: "Budget", value: formatCurrency(promo.budget, locale) },
-            { label: "Products", value: promo.products },
-            { label: "Discount", value: `${promo.discount}%` },
-            { label: "Period", value: `${promo.startDate} → ${promo.endDate}` },
+            { label: fr ? "Nom de la campagne" : "Campaign Name", value: promo.campaign },
+            { label: fr ? "Budget" : "Budget", value: formatCurrency(promo.budget, locale) },
+            { label: fr ? "Produits" : "Products", value: promo.products },
+            { label: fr ? "Remise" : "Discount", value: `${promo.discount}%` },
+            { label: fr ? "Période" : "Period", value: `${promo.startDate} → ${promo.endDate}` },
           ]} />
         </DetailSection>
 
-        <DetailSection title="Performance">
+        <DetailSection title={fr ? "Performance" : "Performance"}>
           <InfoGrid columns={3} items={[
-            { label: "Views", value: promo.views.toLocaleString() },
-            { label: "Clicks", value: promo.clicks },
-            { label: "Orders", value: promo.orders },
-            { label: "Revenue", value: formatCurrency(promo.revenue, locale) },
-            { label: "ROI", value: `${promo.roi}x` },
+            { label: fr ? "Vues" : "Views", value: promo.views.toLocaleString() },
+            { label: fr ? "Clics" : "Clicks", value: promo.clicks },
+            { label: fr ? "Commandes" : "Orders", value: promo.orders },
+            { label: fr ? "Revenu" : "Revenue", value: formatCurrency(promo.revenue, locale) },
+            { label: fr ? "ROI" : "ROI", value: `${promo.roi}x` },
           ]} />
-          <Link href="/seller/analytics" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">Full Analytics →</Link>
+          <Link href="/seller/analytics" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Analyses complètes →" : "Full Analytics →"}</Link>
         </DetailSection>
       </div>
     </div>

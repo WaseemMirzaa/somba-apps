@@ -12,6 +12,13 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+// Delivery status values originate from the shared (non-owned) entities layer.
+const STATUS_FR: Record<string, string> = {
+  in_transit: "En transit",
+  out_for_delivery: "En livraison",
+  delivered: "Livré",
+};
+
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -31,15 +38,18 @@ export default function WarehouseDeliveryDetailPage() {
     delivery.codAmount > 0
       ? `${fr ? "À la livraison" : "At delivery"} · ${formatCurrency(delivery.codAmount, locale)}`
       : delivery.paymentType;
+  const statusLabel = fr
+    ? STATUS_FR[delivery.status] ?? delivery.status.replace("_", " ")
+    : delivery.status.replace("_", " ");
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={delivery.orderId}
-        subtitle={`${delivery.status.replace("_", " ")} · ETA ${delivery.eta}`}
+        subtitle={`${statusLabel} · ETA ${delivery.eta}`}
         backHref="/warehouse/deliveries"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
+          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
           { label: fr ? "Livraisons" : "Deliveries", href: "/warehouse/deliveries" },
           { label: delivery.orderId },
         ]}
@@ -136,7 +146,7 @@ export default function WarehouseDeliveryDetailPage() {
               { label: fr ? "N° commande" : "Order ID", value: delivery.orderId },
               { label: fr ? "Articles" : "Items", value: delivery.itemsCount },
               { label: fr ? "Paiement" : "Payment", value: paymentLabel },
-              { label: fr ? "Statut" : "Status", value: delivery.status.replace("_", " ") },
+              { label: fr ? "Statut" : "Status", value: statusLabel },
             ]}
           />
         </DetailGridSection>
@@ -170,7 +180,7 @@ export default function WarehouseDeliveryDetailPage() {
                 label: fr ? "Arrêt actuel" : "Current Stop",
                 value: `${delivery.currentStop} ${fr ? "sur" : "of"} ${delivery.totalStops}`,
               },
-              { label: fr ? "Statut" : "Status", value: delivery.status.replace("_", " ") },
+              { label: fr ? "Statut" : "Status", value: statusLabel },
             ]}
           />
           <div className="mt-4 flex h-48 items-center justify-center rounded-lg bg-indigo-50 text-sm text-slate-500">

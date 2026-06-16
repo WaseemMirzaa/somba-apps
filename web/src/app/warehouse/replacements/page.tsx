@@ -17,7 +17,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function WarehouseReplacementsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -33,24 +34,24 @@ export default function WarehouseReplacementsPage() {
   return (
     <WarehouseListPage
       title={t("replacements")}
-      subtitle="List View — Case ID, Order ID, SKU, Customer, Status"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("replacements") }]}
+      subtitle={fr ? "Vue liste — ID dossier, ID commande, SKU, Client, Statut" : "List View — Case ID, Order ID, SKU, Customer, Status"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("replacements") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Case ID, order, SKU, customer…"
+          searchPlaceholder={fr ? "ID dossier, commande, SKU, client…" : "Case ID, order, SKU, customer…"}
         />
       }
       columns={[
-        { key: "id", label: "Case ID", render: (row) => (
+        { key: "id", label: fr ? "ID dossier" : "Case ID", render: (row) => (
           <Link href={`/warehouse/replacements/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order ID" },
+        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "sku", label: "SKU" },
-        { key: "customer", label: "Customer" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(row.status)}</Badge> },
+        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(fr ? row.statusFr : row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

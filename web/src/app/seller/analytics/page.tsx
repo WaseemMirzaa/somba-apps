@@ -89,7 +89,7 @@ export default function SellerAnalyticsPage() {
       <PageHeader
         title={t("analytics")}
         subtitle={fr ? "Revenus · Commandes · Conversion · Meilleurs vendeurs" : "Revenue Trend · Orders · Conversion · Best/Worst Sellers"}
-        breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("analytics") }]}
+        breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("analytics") }]}
         actions={<AnalyticsPeriodControls period={period} onPeriodChange={setPeriod} dateRange={dateRange} onDateRangeChange={setDateRange} />}
       />
 
@@ -232,7 +232,7 @@ export default function SellerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={sellerCategoryRevenue.map((c) => ({ name: c.category, revenue: c.revenue }))}
+              items={sellerCategoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.revenue }))}
               valueKey="revenue"
               labelKey="name"
               formatValue={(v) => formatCurrency(v, locale)}
@@ -297,7 +297,18 @@ export default function SellerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
-              items={sellerHealthBreakdown.map((h) => ({ name: h.label, score: h.score }))}
+              items={sellerHealthBreakdown.map((h) => ({
+                name: fr
+                  ? ({
+                      "Fulfillment speed": "Vitesse d'expédition",
+                      "Return rate": "Taux de retour",
+                      "Customer rating": "Note client",
+                      "Stock availability": "Disponibilité du stock",
+                      "Response time": "Temps de réponse",
+                    }[h.label] ?? h.label)
+                  : h.label,
+                score: h.score,
+              }))}
               valueKey="score"
               labelKey="name"
               formatValue={(v) => `${v}%`}

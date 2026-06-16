@@ -13,9 +13,9 @@ export default function ShopCategoriesPage() {
     <div className="space-y-8">
       <PageHeader
         title={t("categories")}
-        subtitle="Browse all departments"
+        subtitle={locale === "fr" ? "Parcourir tous les rayons" : "Browse all departments"}
         breadcrumbs={[
-          { label: "Shop", href: "/" },
+          { label: locale === "fr" ? "Boutique" : "Shop", href: "/" },
           { label: t("categories") },
         ]}
       />
@@ -40,7 +40,7 @@ export default function ShopCategoriesPage() {
                 <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-white">
                   {locale === "fr" ? cat.nameFr : cat.name}
                 </h3>
-                <p className="text-sm text-white/80">Explore →</p>
+                <p className="text-sm text-white/80">{locale === "fr" ? "Explorer →" : "Explore →"}</p>
               </div>
             </div>
           </Link>

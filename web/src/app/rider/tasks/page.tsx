@@ -18,8 +18,17 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "Delivered", labelFr: "Livré" },
 ];
 
+// Display labels for the task type enum (logic uses the raw value).
+const TYPE_FR: Record<string, string> = {
+  delivery: "Livraison",
+  pickup: "Collecte",
+  return: "Retour",
+  cod: "Paiement à la livraison",
+};
+
 export default function RiderTasksPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -39,7 +48,7 @@ export default function RiderTasksPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Task ID, customer, address…"
+        searchPlaceholder={fr ? "N° tâche, client, adresse…" : "Task ID, customer, address…"}
         showDateFilters={false}
       />
 
@@ -49,7 +58,7 @@ export default function RiderTasksPage() {
             columns={[
               {
                 key: "id",
-                label: "Task",
+                label: fr ? "Tâche" : "Task",
                 render: (row) => (
                   <Link href={`/rider/tasks/${row.id}`} className="font-medium text-emerald-600 hover:underline">
                     {String(row.id)}
@@ -59,17 +68,24 @@ export default function RiderTasksPage() {
               {
                 key: "type",
                 label: "Type",
-                render: (row) => <Badge variant="primary">{String(row.type)}</Badge>,
+                render: (row) => (
+                  <Badge variant="primary">
+                    {fr ? TYPE_FR[String(row.type)] ?? String(row.type) : String(row.type)}
+                  </Badge>
+                ),
               },
-              { key: "customer", label: "Customer" },
-              { key: "address", label: "Address" },
+              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "address", label: fr ? "Adresse" : "Address" },
               { key: "distance", label: "Distance" },
-              { key: "items", label: "Items" },
+              { key: "items", label: fr ? "Articles" : "Items" },
               { key: "eta", label: "ETA" },
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge>{String(row.status).replace("_", " ")}</Badge>,
+                render: (row) => {
+                  const opt = STATUS_OPTIONS.find((o) => o.value === String(row.status));
+                  return <Badge>{opt ? (fr ? opt.labelFr : opt.label) : String(row.status).replace("_", " ")}</Badge>;
+                },
               },
               {
                 key: "actions",

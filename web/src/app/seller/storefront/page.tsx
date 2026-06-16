@@ -24,7 +24,7 @@ export default function SellerStorefrontPage() {
         <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Nom boutique (EN)" : "Store name (EN)"} defaultValue="TechZone Store" />
         <textarea className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Description FR" : "Description FR"} rows={3} />
         <textarea className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Description EN" : "Description EN"} rows={3} />
-        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Logo & Banner upload (mock)</div>
+        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">{fr ? "Téléversement logo et bannière (démo)" : "Logo & Banner upload (mock)"}</div>
         <Button onClick={() => toast(fr ? "Enregistré" : "Saved")}>{fr ? "Enregistrer" : "Save"}</Button>
         <Button variant="secondary" onClick={() => router.push("/seller/storefront/preview")}>{fr ? "Aperçu" : "Preview"}</Button>
       </div>

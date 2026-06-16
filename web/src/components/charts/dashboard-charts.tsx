@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 type Point = { label: string; value: number };
 
@@ -71,6 +72,8 @@ export function DualMetricChart({
   data: readonly { label: string; revenue: number; orders: number }[];
   height?: number;
 }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const revNorm = normalize(data.map((d) => d.revenue));
   const ordNorm = normalize(data.map((d) => d.orders));
 
@@ -99,8 +102,8 @@ export function DualMetricChart({
         <span>{data[data.length - 1]?.label}</span>
       </div>
       <div className="mt-3 flex gap-4 text-xs text-slate-500">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-100" /> Revenue</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--primary)]" /> Orders</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-100" /> {fr ? "Chiffre d'affaires" : "Revenue"}</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--primary)]" /> {fr ? "Commandes" : "Orders"}</span>
       </div>
     </div>
   );
@@ -266,6 +269,8 @@ export function GoalProgress({
   unit?: string;
   format?: (n: number) => string;
 }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const pct = Math.min(Math.round((current / target) * 100), 100);
   const r = 36;
   const circ = 2 * Math.PI * r;
@@ -298,7 +303,7 @@ export function GoalProgress({
           {unit}
         </p>
         <p className="text-xs text-slate-400">
-          of {format ? format(target) : target.toLocaleString()}{unit}
+          {fr ? "sur" : "of"} {format ? format(target) : target.toLocaleString()}{unit}
         </p>
       </div>
     </div>

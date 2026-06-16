@@ -19,8 +19,18 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
 ];
 
+const STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  pending_inspection: "Inspection en attente",
+  inspecting: "Inspection en cours",
+  approved: "Approuvé",
+  rejected: "Rejeté",
+  refunded: "Remboursé",
+};
+
 export default function AdminReturnsPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -37,7 +47,7 @@ export default function AdminReturnsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("returns")}
-        subtitle="Platform-wide return requests"
+        subtitle={fr ? "Demandes de retour sur toute la plateforme" : "Platform-wide return requests"}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("returns") }]}
       />
 
@@ -45,28 +55,28 @@ export default function AdminReturnsPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Return ID, order, customer…"
+        searchPlaceholder={fr ? "ID retour, commande, client…" : "Return ID, order, customer…"}
       />
 
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Return ID", render: (row) => (
+              { key: "id", label: fr ? "ID retour" : "Return ID", render: (row) => (
                 <Link href={`/admin/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                   {String(row.id)}
                 </Link>
               )},
-              { key: "orderId", label: "Order", render: (row) => (
+              { key: "orderId", label: fr ? "Commande" : "Order", render: (row) => (
                 <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
               )},
-              { key: "customer", label: "Customer" },
-              { key: "product", label: "Product" },
-              { key: "reason", label: "Reason", render: (row) => (
-                <span className="font-medium text-amber-700">{String(row.reason)}</span>
+              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "product", label: fr ? "Produit" : "Product" },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (
+                <span className="font-medium text-amber-700">{fr ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>
               )},
-              { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status).replace(/_/g, " ")}</Badge> },
-              { key: "refund", label: "Refund", render: (row) => {
+              { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")) : String(row.status).replace(/_/g, " ")}</Badge> },
+              { key: "refund", label: fr ? "Remboursement" : "Refund", render: (row) => {
                 const refund = row.refund as { amount: number };
                 return formatCurrency(refund.amount, locale);
               }},

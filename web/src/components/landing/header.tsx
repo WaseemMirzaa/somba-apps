@@ -80,19 +80,19 @@ export function LandingHeader() {
               value={profileId}
               onChange={(e) => setProfileId(e.target.value as "france" | "drc")}
               className="hidden rounded-lg border border-[var(--border)] bg-slate-50 px-2 py-1 text-xs font-medium lg:block"
-              title="Market profile"
+              title={locale === "fr" ? "Profil de marché" : "Market profile"}
             >
               <option value="france">FR</option>
               <option value="drc">DRC</option>
             </select>
             <NotificationBell portal="customer" href="/shop/notifications" className="hidden sm:flex" />
             <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-[var(--primary)] hover:bg-blue-50 sm:block">
-              Login
+              {locale === "fr" ? "Connexion" : "Login"}
             </Link>
             <Link
               href="/shop/account"
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)] sm:block"
-              title="Account"
+              title={t("myAccount")}
             >
               <User className="h-5 w-5" />
             </Link>
@@ -153,7 +153,7 @@ export function LandingHeader() {
             </div>
             <div className="mt-3 flex gap-2">
               <Link href="/shop/account" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
-                Account
+                {t("myAccount")}
               </Link>
               <Link href="/seller" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
                 {t("becomeSeller")}

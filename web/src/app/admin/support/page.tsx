@@ -22,8 +22,12 @@ const STATUS_OPTIONS = [
   { value: "resolved", label: "Resolved", labelFr: "Résolu" },
 ];
 
+const PRIORITY_FR: Record<string, string> = { high: "Élevée", medium: "Moyenne", low: "Faible" };
+const TICKET_STATUS_FR: Record<string, string> = { open: "Ouvert", in_progress: "En cours", resolved: "Résolu" };
+
 export default function AdminSupportPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -40,7 +44,7 @@ export default function AdminSupportPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("support")}
-        subtitle="Customer & seller support tickets"
+        subtitle={fr ? "Tickets de support clients et vendeurs" : "Customer & seller support tickets"}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("support") }]}
       />
 
@@ -48,7 +52,7 @@ export default function AdminSupportPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Ticket ID, subject, customer…"
+        searchPlaceholder={fr ? "N° de ticket, sujet, client…" : "Ticket ID, subject, customer…"}
       />
 
       <Card>
@@ -58,15 +62,15 @@ export default function AdminSupportPage() {
               { key: "id", label: "Ticket", render: (row) => (
                 <span className="font-medium text-[var(--primary)]">{String(row.id)}</span>
               )},
-              { key: "subject", label: "Subject" },
-              { key: "customer", label: "Customer" },
-              { key: "priority", label: "Priority", render: (row) => (
+              { key: "subject", label: fr ? "Sujet" : "Subject" },
+              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
                 <Badge variant={row.priority === "high" ? "danger" : row.priority === "medium" ? "warning" : "default"}>
-                  {String(row.priority)}
+                  {fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}
                 </Badge>
               )},
               { key: "status", label: t("status"), render: (row) => (
-                <Badge variant={row.status === "resolved" ? "success" : "info"}>{String(row.status).replace("_", " ")}</Badge>
+                <Badge variant={row.status === "resolved" ? "success" : "info"}>{fr ? (TICKET_STATUS_FR[String(row.status)] ?? String(row.status).replace("_", " ")) : String(row.status).replace("_", " ")}</Badge>
               )},
               { key: "date", label: t("date") },
             ]}
