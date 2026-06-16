@@ -18,7 +18,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function WarehouseReceivingPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -36,11 +37,11 @@ export default function WarehouseReceivingPage() {
   return (
     <WarehouseListPage
       title={t("receiving")}
-      subtitle="Parcels awaiting inspection"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("receiving") }]}
+      subtitle={fr ? "Colis en attente d'inspection" : "Parcels awaiting inspection"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("receiving") }]}
       actions={
         <BarcodeScanner
-          onScan={(code) => { toast(`Scanned: ${code}`); router.push("/warehouse/parcels/PCL-001"); }}
+          onScan={(code) => { toast(fr ? `Scanné : ${code}` : `Scanned: ${code}`); router.push("/warehouse/parcels/PCL-001"); }}
         />
       }
       filters={
@@ -48,21 +49,21 @@ export default function WarehouseReceivingPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Parcel ID, order, seller…"
+          searchPlaceholder={fr ? "ID colis, commande, vendeur…" : "Parcel ID, order, seller…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "id", label: "Parcel ID", render: (row) => (
+        { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
           <Link href={`/warehouse/parcels/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order ID" },
-        { key: "seller", label: "Seller" },
-        { key: "itemsCount", label: "Items" },
-        { key: "weight", label: "Weight" },
+        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+        { key: "seller", label: fr ? "Vendeur" : "Seller" },
+        { key: "itemsCount", label: fr ? "Articles" : "Items" },
+        { key: "weight", label: fr ? "Poids" : "Weight" },
         { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
-          <button onClick={() => toast(`Received ${row.id}`)} className="text-xs text-emerald-600">{t("receive")}</button>
+          <button onClick={() => toast(fr ? `${row.id} reçu` : `Received ${row.id}`)} className="text-xs text-emerald-600">{t("receive")}</button>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

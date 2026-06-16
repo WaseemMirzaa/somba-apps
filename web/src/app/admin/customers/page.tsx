@@ -17,8 +17,15 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive", labelFr: "Inactif" },
 ];
 
+const STATUS_FR: Record<string, string> = {
+  active: "Actif",
+  inactive: "Inactif",
+  suspended: "Suspendu",
+};
+
 export default function AdminCustomersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -34,7 +41,11 @@ export default function AdminCustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("customers")}
-        subtitle="List View — Name, Email, Phone, City, Orders, Total Spent, Status"
+        subtitle={
+          fr
+            ? "Vue liste — Nom, E-mail, Téléphone, Ville, Commandes, Total dépensé, Statut"
+            : "List View — Name, Email, Phone, City, Orders, Total Spent, Status"
+        }
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("customers") },
@@ -45,7 +56,7 @@ export default function AdminCustomersPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Name, email, phone, city…"
+        searchPlaceholder={fr ? "Nom, e-mail, téléphone, ville…" : "Name, email, phone, city…"}
         showDateFilters={false}
       />
 
@@ -65,17 +76,17 @@ export default function AdminCustomersPage() {
               },
               { key: "email", label: t("email") },
               { key: "phone", label: t("phone") },
-              { key: "city", label: "City" },
-              { key: "orders", label: "Orders" },
+              { key: "city", label: fr ? "Ville" : "City" },
+              { key: "orders", label: fr ? "Commandes" : "Orders" },
               {
                 key: "totalSpent",
-                label: "Total Spent",
+                label: fr ? "Total dépensé" : "Total Spent",
                 render: (row) => formatCurrency(row.totalSpent as number, locale),
               },
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="success">{String(row.status)}</Badge>,
+                render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
               {
                 key: "actions",

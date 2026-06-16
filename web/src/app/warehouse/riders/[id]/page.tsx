@@ -39,7 +39,7 @@ export default function WarehouseRiderDetailPage() {
         subtitle={`${rider.zone} · ${rider.vehicle} · ⭐ ${rider.rating}`}
         backHref="/warehouse/riders"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
+          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
           { label: fr ? "Livreurs" : "Riders", href: "/warehouse/riders" },
           { label: rider.name },
         ]}

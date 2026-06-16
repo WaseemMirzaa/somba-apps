@@ -13,6 +13,17 @@ import { PROMOTION_REQUESTS, type PromotionRequest } from "@/lib/promotions-enti
 
 const statusVariant = { pending: "warning", approved: "success", rejected: "danger" } as const;
 
+const STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  approved: "Approuvé",
+  rejected: "Rejeté",
+};
+
+const TYPE_FR: Record<string, string> = {
+  discount: "Remise",
+  coupon: "Coupon",
+};
+
 export default function AdminPromotionsPage() {
   const { locale } = useLocale();
   const { toast } = useToast();
@@ -73,11 +84,11 @@ export default function AdminPromotionsPage() {
                 );
               },
             },
-            { key: "type", label: "Type", render: (row) => <Badge variant="info"><Tag className="mr-1 h-3 w-3" />{String(row.type)}</Badge> },
+            { key: "type", label: "Type", render: (row) => <Badge variant="info"><Tag className="mr-1 h-3 w-3" />{fr ? (TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
             { key: "value", label: fr ? "Valeur" : "Value", render: (row) => <span className="font-semibold text-slate-900">{String(row.value)}</span> },
             { key: "scope", label: fr ? "Portée" : "Scope", render: (row) => <span className="text-slate-500">{String(row.scope)}</span> },
             { key: "end", label: fr ? "Période" : "Window", render: (row) => { const r = row as unknown as PromotionRequest; return <span className="text-xs text-slate-500">{r.start} → {r.end}</span>; } },
-            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as PromotionRequest["status"]]}>{String(row.status)}</Badge> },
+            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as PromotionRequest["status"]]}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
             {
               key: "actions",
               label: "",

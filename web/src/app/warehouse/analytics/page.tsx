@@ -76,7 +76,7 @@ export default function WarehouseAnalyticsPage() {
             ? "Réception · Expédition · Débit · Lanes · Livreurs · Retours · Exceptions · SLA"
             : "Inbound · Dispatch · Throughput · Lanes · Riders · Returns · Exceptions · SLAs"
         }
-        breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("analytics") }]}
+        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("analytics") }]}
         actions={
           <AnalyticsPeriodControls
             period={period}

@@ -17,7 +17,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function WarehouseDeliveriesPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -32,24 +33,24 @@ export default function WarehouseDeliveriesPage() {
 
   return (
     <WarehouseListPage
-      title="Active Deliveries"
-      subtitle="List View — Order ID, Customer, Rider, Status, ETA"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("deliveries") }]}
+      title={fr ? "Livraisons actives" : "Active Deliveries"}
+      subtitle={fr ? "Vue liste — ID commande, Client, Livreur, Statut, ETA" : "List View — Order ID, Customer, Rider, Status, ETA"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("deliveries") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Order ID, customer, rider…"
+          searchPlaceholder={fr ? "ID commande, client, livreur…" : "Order ID, customer, rider…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "orderId", label: "Order ID", render: (row) => (
+        { key: "orderId", label: fr ? "ID commande" : "Order ID", render: (row) => (
           <Link href={`/warehouse/deliveries/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
         )},
-        { key: "customer", label: "Customer" },
-        { key: "rider", label: "Rider", render: (row) => (
+        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => (
           <Link href={`/warehouse/riders/${row.riderId}`} className="text-[var(--primary)] hover:underline">{String(row.rider)}</Link>
         )},
         { key: "status", label: t("status"), render: (row) => (
@@ -59,7 +60,7 @@ export default function WarehouseDeliveriesPage() {
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/warehouse/deliveries/${row.id}`} className="text-[var(--primary)] hover:underline">{t("track")}</Link>
-            <button onClick={() => toast(`Delivery ${row.orderId} escalated`, "info")} className="text-slate-500 hover:underline">Escalate</button>
+            <button onClick={() => toast(fr ? `Livraison ${row.orderId} escaladée` : `Delivery ${row.orderId} escalated`, "info")} className="text-slate-500 hover:underline">{fr ? "Escalader" : "Escalate"}</button>
           </div>
         )},
       ]}

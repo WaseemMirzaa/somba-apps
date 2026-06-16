@@ -16,71 +16,72 @@ import { useToast } from "@/context/toast-context";
 export default function WarehouseReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const ret = getReturn(id);
   const [status, setStatus] = useState(ret?.status ?? "pending");
 
   if (!ret) {
-    return <div className="p-8 text-center text-slate-500">Return not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={ret.id}
-        subtitle={`Order ${ret.orderId} · ${ret.reason}`}
+        subtitle={`${fr ? "Commande" : "Order"} ${ret.orderId} · ${ret.reason}`}
         backHref="/warehouse/returns"
         actions={
           status === "pending" ? (
             <>
-              <button onClick={() => { setStatus("approved"); toast("Return approved"); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">Approve</button>
-              <button onClick={() => { setStatus("rejected"); toast("Return rejected", "error"); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">Reject</button>
+              <button onClick={() => { setStatus("approved"); toast(fr ? "Retour approuvé" : "Return approved"); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Approuver" : "Approve"}</button>
+              <button onClick={() => { setStatus("rejected"); toast(fr ? "Retour rejeté" : "Return rejected", "error"); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{fr ? "Rejeter" : "Reject"}</button>
             </>
           ) : null
         }
       />
 
       <DetailGrid>
-        <DetailGridSection title="Overview">
+        <DetailGridSection title={fr ? "Aperçu" : "Overview"}>
           <InfoGrid items={[
-            { label: "Return ID", value: ret.id },
-            { label: "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
-            { label: "Customer", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
-            { label: "Reason", value: ret.reason },
-            { label: "Status", value: status },
+            { label: fr ? "ID retour" : "Return ID", value: ret.id },
+            { label: fr ? "Commande" : "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
+            { label: fr ? "Client" : "Customer", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
+            { label: fr ? "Motif" : "Reason", value: ret.reason },
+            { label: fr ? "Statut" : "Status", value: status },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Product">
+        <DetailGridSection title={fr ? "Produit" : "Product"}>
           <div className="flex gap-4">
             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
               <Image src={ret.image} alt={ret.product} fill className="object-cover" sizes="80px" />
             </div>
             <InfoGrid items={[
-              { label: "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-              { label: "Variant", value: ret.variant },
-              { label: "Quantity", value: ret.qty },
+              { label: fr ? "Nom" : "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
+              { label: fr ? "Variante" : "Variant", value: ret.variant },
+              { label: fr ? "Quantité" : "Quantity", value: ret.qty },
             ]} />
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Refund">
+        <DetailGridSection title={fr ? "Remboursement" : "Refund"}>
           <InfoGrid items={[
-            { label: "Amount", value: formatCurrency(ret.refund.amount, locale) },
-            { label: "Method", value: ret.refund.method },
-            { label: "Status", value: ret.refund.status },
+            { label: fr ? "Montant" : "Amount", value: formatCurrency(ret.refund.amount, locale) },
+            { label: fr ? "Méthode" : "Method", value: ret.refund.method },
+            { label: fr ? "Statut" : "Status", value: ret.refund.status },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Inspection" span={2}>
+        <DetailGridSection title={fr ? "Inspection" : "Inspection"} span={2}>
           <InfoGrid items={[
-            { label: "Condition", value: ret.inspection.condition },
-            { label: "Photos", value: `${ret.inspection.photos} uploaded` },
-            { label: "Notes", value: ret.inspection.notes, full: true },
+            { label: fr ? "État" : "Condition", value: ret.inspection.condition },
+            { label: fr ? "Photos" : "Photos", value: `${ret.inspection.photos} ${fr ? "téléversée(s)" : "uploaded"}` },
+            { label: fr ? "Notes" : "Notes", value: ret.inspection.notes, full: true },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
+        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
           <ActivityTimeline events={ret.timeline} />
         </DetailGridSection>
       </DetailGrid>

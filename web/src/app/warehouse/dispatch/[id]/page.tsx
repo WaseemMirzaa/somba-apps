@@ -11,11 +11,14 @@ import { DataTable } from "@/components/ui/data-table";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { getBatch } from "@/lib/entities";
 import { getRider, type RiderEntity } from "@/lib/warehouse-entities";
+import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
 export default function WarehouseBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const batch = getBatch(id);
   const [status, setStatus] = useState(batch?.status ?? "ready");
@@ -23,7 +26,7 @@ export default function WarehouseBatchDetailPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   if (!batch) {
-    return <div className="p-8 text-center text-slate-500">Batch not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Lot introuvable" : "Batch not found"}</div>;
   }
 
   const rider = assignedRider ?? getRider(batch.riderId);
@@ -31,45 +34,45 @@ export default function WarehouseBatchDetailPage() {
   function handleAssignRider(selected: RiderEntity) {
     setAssignedRider(selected);
     setShowAssignModal(false);
-    toast(`${selected.name} assigned to ${batch.id}`);
+    toast(fr ? `${selected.name} assigné à ${batch!.id}` : `${selected.name} assigned to ${batch!.id}`);
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={batch.id}
-        subtitle={`${batch.zone} · ${batch.parcelCount} parcels · ${batch.status}`}
+        subtitle={`${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"} · ${batch.status}`}
         backHref="/warehouse/dispatch"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
-          { label: "Dispatch", href: "/warehouse/dispatch" },
+          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
+          { label: fr ? "Expédition" : "Dispatch", href: "/warehouse/dispatch" },
           { label: batch.id },
         ]}
         actions={
           status === "ready" ? (
-            <button onClick={() => { setStatus("dispatched"); toast(`Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">Dispatch</button>
+            <button onClick={() => { setStatus("dispatched"); toast(fr ? `Lot ${batch.id} expédié` : `Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{fr ? "Expédier" : "Dispatch"}</button>
           ) : null
         }
       />
 
       <DetailGrid>
-        <DetailGridSection title="Batch">
+        <DetailGridSection title={fr ? "Lot" : "Batch"}>
           <InfoGrid items={[
-            { label: "Batch ID", value: batch.id },
-            { label: "Zone", value: batch.zone },
-            { label: "Parcels", value: batch.parcelCount },
-            { label: "Status", value: status },
+            { label: fr ? "ID lot" : "Batch ID", value: batch.id },
+            { label: fr ? "Zone" : "Zone", value: batch.zone },
+            { label: fr ? "Colis" : "Parcels", value: batch.parcelCount },
+            { label: fr ? "Statut" : "Status", value: status },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Rider Assignment">
+        <DetailGridSection title={fr ? "Attribution du livreur" : "Rider Assignment"}>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => setShowAssignModal(true)}
               className="btn-primary rounded-xl px-4 py-2 text-sm font-medium"
             >
-              {assignedRider ? "Change rider" : "Assign rider"}
+              {assignedRider ? (fr ? "Changer de livreur" : "Change rider") : (fr ? "Assigner un livreur" : "Assign rider")}
             </button>
             {!assignedRider && (
               <button
@@ -78,70 +81,70 @@ export default function WarehouseBatchDetailPage() {
                   const nearest = getRider(batch.riderId);
                   if (nearest) {
                     setAssignedRider(nearest);
-                    toast(`Auto-assigned ${nearest.name}`);
+                    toast(fr ? `${nearest.name} assigné automatiquement` : `Auto-assigned ${nearest.name}`);
                   }
                 }}
                 className="text-sm text-[var(--primary)] hover:underline"
               >
-                Auto-assign nearest rider
+                {fr ? "Assigner automatiquement le livreur le plus proche" : "Auto-assign nearest rider"}
               </button>
             )}
           </div>
           {rider ? (
             <>
           <InfoGrid items={[
-            { label: "Name", value: rider.name },
-            { label: "Phone", value: rider.phone },
-            { label: "Vehicle", value: rider.vehicle },
-            { label: "Zone", value: rider.zone },
-            { label: "Performance", value: `${rider.performanceScore}%` },
+            { label: fr ? "Nom" : "Name", value: rider.name },
+            { label: fr ? "Téléphone" : "Phone", value: rider.phone },
+            { label: fr ? "Véhicule" : "Vehicle", value: rider.vehicle },
+            { label: fr ? "Zone" : "Zone", value: rider.zone },
+            { label: fr ? "Performance" : "Performance", value: `${rider.performanceScore}%` },
           ]} />
           <div className="mt-4 flex gap-3">
-            <Link href={`/warehouse/riders/${rider.id}`} className="text-sm text-[var(--primary)] hover:underline">Open Rider →</Link>
-            <a href={`tel:${rider.phone}`} className="text-sm text-slate-500 hover:text-[var(--primary)]">Call Rider</a>
+            <Link href={`/warehouse/riders/${rider.id}`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Ouvrir le livreur →" : "Open Rider →"}</Link>
+            <a href={`tel:${rider.phone}`} className="text-sm text-slate-500 hover:text-[var(--primary)]">{fr ? "Appeler le livreur" : "Call Rider"}</a>
           </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500">No rider assigned yet. Search and assign a rider.</p>
+            <p className="text-sm text-slate-500">{fr ? "Aucun livreur assigné pour le moment. Recherchez et assignez un livreur." : "No rider assigned yet. Search and assign a rider."}</p>
           )}
         </DetailGridSection>
 
-        <DetailGridSection title="Route">
+        <DetailGridSection title={fr ? "Itinéraire" : "Route"}>
           <InfoGrid items={[
-            { label: "Stops", value: batch.stops },
-            { label: "Distance", value: batch.distance },
+            { label: fr ? "Arrêts" : "Stops", value: batch.stops },
+            { label: fr ? "Distance" : "Distance", value: batch.distance },
             { label: "ETA", value: batch.eta },
           ]} />
           <div className="mt-4 flex h-32 items-center justify-center rounded-lg bg-blue-50 text-sm text-slate-500">
-            Map preview (mock)
+            {fr ? "Aperçu carte (simulation)" : "Map preview (mock)"}
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Parcels in Batch" span={3}>
+        <DetailGridSection title={fr ? "Colis dans le lot" : "Parcels in Batch"} span={3}>
           <DataTable
             columns={[
-              { key: "parcelId", label: "Parcel ID", render: (row) => (
+              { key: "parcelId", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
                 <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
               )},
-              { key: "orderId", label: "Order ID" },
-              { key: "customer", label: "Customer" },
-              { key: "actions", label: "Action", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-[var(--primary)] hover:underline">Open</Link>
+              { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "actions", label: fr ? "Action" : "Action", render: (row) => (
+                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-[var(--primary)] hover:underline">{fr ? "Ouvrir" : "Open"}</Link>
               )},
             ]}
             data={batch.parcels as unknown as Record<string, unknown>[]}
           />
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
+        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
           <ActivityTimeline events={batch.timeline} />
         </DetailGridSection>
       </DetailGrid>
 
       <AssignRiderModal
         open={showAssignModal}
-        title="Assign rider to batch"
-        subtitle={`${batch.id} · ${batch.zone} · ${batch.parcelCount} parcels`}
+        title={fr ? "Assigner un livreur au lot" : "Assign rider to batch"}
+        subtitle={`${batch.id} · ${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"}`}
         selectedRiderId={assignedRider?.id ?? batch.riderId}
         onClose={() => setShowAssignModal(false)}
         onConfirm={handleAssignRider}

@@ -17,7 +17,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function WarehouseRidersPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [assignRider, setAssignRider] = useState<RiderEntity | null>(null);
@@ -35,26 +36,26 @@ export default function WarehouseRidersPage() {
   return (
     <>
     <WarehouseListPage
-      title="Rider Assignments"
-      subtitle="List View — Rider Name, Zone, Active Deliveries, Location, Performance Score"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("riders") }]}
+      title={fr ? "Affectations des livreurs" : "Rider Assignments"}
+      subtitle={fr ? "Vue liste — Nom du livreur, Zone, Livraisons actives, Lieu, Score de performance" : "List View — Rider Name, Zone, Active Deliveries, Location, Performance Score"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("riders") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Rider name, zone, location…"
+          searchPlaceholder={fr ? "Nom du livreur, zone, lieu…" : "Rider name, zone, location…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "name", label: "Rider Name", render: (row) => (
+        { key: "name", label: fr ? "Nom du livreur" : "Rider Name", render: (row) => (
           <Link href={`/warehouse/riders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
         { key: "zone", label: "Zone" },
-        { key: "activeDeliveries", label: "Active Deliveries" },
-        { key: "location", label: "Current Location" },
-        { key: "performanceScore", label: "Performance", render: (row) => (
+        { key: "activeDeliveries", label: fr ? "Livraisons actives" : "Active Deliveries" },
+        { key: "location", label: fr ? "Lieu actuel" : "Current Location" },
+        { key: "performanceScore", label: fr ? "Performance" : "Performance", render: (row) => (
           <span className="font-medium text-emerald-600">{String(row.performanceScore)}%</span>
         )},
         { key: "status", label: t("status"), render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
@@ -81,15 +82,15 @@ export default function WarehouseRidersPage() {
 
     <AssignRiderModal
       open={showAssignModal}
-      title="Assign rider to batch"
-      subtitle={assignRider ? `Selected: ${assignRider.name}` : undefined}
+      title={fr ? "Assigner un livreur au lot" : "Assign rider to batch"}
+      subtitle={assignRider ? (fr ? `Sélectionné : ${assignRider.name}` : `Selected: ${assignRider.name}`) : undefined}
       selectedRiderId={assignRider?.id ?? null}
       onClose={() => {
         setShowAssignModal(false);
         setAssignRider(null);
       }}
       onConfirm={(rider) => {
-        toast(`${rider.name} assigned to next ready batch`);
+        toast(fr ? `${rider.name} assigné au prochain lot prêt` : `${rider.name} assigned to next ready batch`);
         setShowAssignModal(false);
         setAssignRider(null);
       }}

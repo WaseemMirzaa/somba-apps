@@ -13,9 +13,18 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
+const ORDER_STATUS_FR: Record<string, string> = {
+  delivered: "Livrée",
+  processing: "En traitement",
+  cancelled: "Annulée",
+  pending: "En attente",
+  shipped: "Expédiée",
+};
+
 export default function AdminCustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const customer = getCustomer(Number(id));
   const [status, setStatus] = useState(customer?.status ?? "active");
@@ -23,7 +32,7 @@ export default function AdminCustomerDetailPage() {
   const [creditAmount, setCreditAmount] = useState("");
 
   if (!customer) {
-    return <div className="p-8 text-center text-slate-500">Customer not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Client introuvable" : "Customer not found"}</div>;
   }
 
   const customerOrders = orderEntities.filter((o) => o.customerId === customer.id);
@@ -32,7 +41,7 @@ export default function AdminCustomerDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={customer.name}
-        subtitle={`${customer.email} · Member since ${customer.joined}`}
+        subtitle={fr ? `${customer.email} · Membre depuis ${customer.joined}` : `${customer.email} · Member since ${customer.joined}`}
         backHref="/admin/customers"
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
@@ -45,13 +54,18 @@ export default function AdminCustomerDetailPage() {
               onClick={() => {
                 const next = status === "active" ? "suspended" : "active";
                 setStatus(next);
-                toast(`Customer ${next === "suspended" ? "suspended" : "reactivated"}`, next === "suspended" ? "error" : "success");
+                toast(
+                  fr
+                    ? `Client ${next === "suspended" ? "suspendu" : "réactivé"}`
+                    : `Customer ${next === "suspended" ? "suspended" : "reactivated"}`,
+                  next === "suspended" ? "error" : "success"
+                );
               }}
               className="rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
             >
-              {status === "active" ? "Suspend" : "Reactivate"}
+              {status === "active" ? (fr ? "Suspendre" : "Suspend") : fr ? "Réactiver" : "Reactivate"}
             </button>
-            <button onClick={() => setShowCredit(true)} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">Wallet Credit</button>
+            <button onClick={() => setShowCredit(true)} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">{fr ? "Créditer le portefeuille" : "Wallet Credit"}</button>
           </>
         }
       />
@@ -59,7 +73,7 @@ export default function AdminCustomerDetailPage() {
       {showCredit && (
         <div className="card-premium flex flex-wrap items-end gap-3 p-4">
           <div>
-            <label className="text-xs text-slate-500">Credit amount</label>
+            <label className="text-xs text-slate-500">{fr ? "Montant du crédit" : "Credit amount"}</label>
             <input
               type="number"
               className="input-premium mt-1 w-40 px-3 py-2 text-sm"
@@ -68,40 +82,40 @@ export default function AdminCustomerDetailPage() {
               onChange={(e) => setCreditAmount(e.target.value)}
             />
           </div>
-          <Button size="sm" onClick={() => { toast(`Wallet credited ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>Apply Credit</Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>Cancel</Button>
+          <Button size="sm" onClick={() => { toast(fr ? `Portefeuille crédité de ${formatCurrency(Number(creditAmount) || 0, locale)}` : `Wallet credited ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>{fr ? "Appliquer le crédit" : "Apply Credit"}</Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>{fr ? "Annuler" : "Cancel"}</Button>
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DetailSection title="Customer Information">
+        <DetailSection title={fr ? "Informations client" : "Customer Information"}>
           <InfoGrid items={[
-            { label: "Name", value: customer.name },
+            { label: fr ? "Nom" : "Name", value: customer.name },
             { label: t("email"), value: customer.email },
             { label: t("phone"), value: customer.phone },
-            { label: "City", value: customer.city },
-            { label: "Status", value: <Badge variant={status === "active" ? "success" : "danger"}>{status}</Badge> },
-            { label: "Joined", value: customer.joined },
+            { label: fr ? "Ville" : "City", value: customer.city },
+            { label: fr ? "Statut" : "Status", value: <Badge variant={status === "active" ? "success" : "danger"}>{fr ? (status === "active" ? "Actif" : status === "suspended" ? "Suspendu" : status) : status}</Badge> },
+            { label: fr ? "Inscrit le" : "Joined", value: customer.joined },
           ]} />
         </DetailSection>
 
-        <DetailSection title="Activity">
+        <DetailSection title={fr ? "Activité" : "Activity"}>
           <InfoGrid items={[
-            { label: "Total Orders", value: customer.orders },
-            { label: "Total Spent", value: formatCurrency(customer.totalSpent, locale) },
+            { label: fr ? "Total commandes" : "Total Orders", value: customer.orders },
+            { label: fr ? "Total dépensé" : "Total Spent", value: formatCurrency(customer.totalSpent, locale) },
           ]} />
         </DetailSection>
       </div>
 
-      <DetailSection title="Orders">
+      <DetailSection title={fr ? "Commandes" : "Orders"}>
         <DataTable
           columns={[
-            { key: "id", label: "Order", render: (row) => (
+            { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
               <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
             )},
             { key: "date", label: t("date") },
             { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-            { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
+            { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (ORDER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
           ]}
           data={customerOrders as unknown as Record<string, unknown>[]}
         />

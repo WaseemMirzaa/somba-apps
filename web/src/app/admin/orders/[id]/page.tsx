@@ -12,82 +12,98 @@ import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
+const ORDER_STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  processing: "En cours",
+  delivered: "Livré",
+  cancelled: "Annulé",
+};
+
+const PAYMENT_STATUS_FR: Record<string, string> = {
+  paid: "Payé",
+  refunded: "Remboursé",
+  pending: "En attente",
+};
+
 export default function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const order = getOrder(id);
 
   if (!order) {
-    return <div className="p-8 text-center text-slate-500">Order not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Commande introuvable" : "Order not found"}</div>;
   }
+
+  const orderStatusLabel = fr ? (ORDER_STATUS_FR[order.status] ?? order.status) : order.status;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={order.id}
-        subtitle={`${order.date} · ${order.status} · ${formatCurrency(order.amount, locale)}`}
+        subtitle={`${order.date} · ${orderStatusLabel} · ${formatCurrency(order.amount, locale)}`}
         backHref="/admin/orders"
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("orders"), href: "/admin/orders" },
           { label: order.id },
         ]}
-        actions={<Badge variant="info">{order.status}</Badge>}
+        actions={<Badge variant="info">{orderStatusLabel}</Badge>}
       />
 
       <DetailGrid>
-        <DetailGridSection title="Order">
+        <DetailGridSection title={fr ? "Commande" : "Order"}>
           <InfoGrid items={[
-            { label: "Order ID", value: order.id },
-            { label: "Date", value: order.date },
-            { label: "Status", value: order.status },
-            { label: "Items", value: order.itemsCount },
+            { label: fr ? "ID commande" : "Order ID", value: order.id },
+            { label: fr ? "Date" : "Date", value: order.date },
+            { label: fr ? "Statut" : "Status", value: orderStatusLabel },
+            { label: fr ? "Articles" : "Items", value: order.itemsCount },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Customer">
+        <DetailGridSection title={fr ? "Client" : "Customer"}>
           <InfoGrid items={[
-            { label: "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{order.customer}</Link> },
-            { label: "Phone", value: order.customerPhone },
-            { label: "Address", value: order.customerAddress, full: true },
-            { label: "City", value: order.customerCity },
+            { label: fr ? "Nom" : "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{order.customer}</Link> },
+            { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },
+            { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
+            { label: fr ? "Ville" : "City", value: order.customerCity },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Seller">
+        <DetailGridSection title={fr ? "Vendeur" : "Seller"}>
           <InfoGrid items={[
-            { label: "Store", value: <Link href={`/admin/sellers/${order.sellerId}`} className="text-[var(--primary)] hover:underline">{order.seller}</Link> },
-            { label: "Seller ID", value: order.sellerId },
+            { label: fr ? "Boutique" : "Store", value: <Link href={`/admin/sellers/${order.sellerId}`} className="text-[var(--primary)] hover:underline">{order.seller}</Link> },
+            { label: fr ? "ID vendeur" : "Seller ID", value: order.sellerId },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Payment">
+        <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: "Gateway", value: order.paymentMethod === "COD" ? (locale === "fr" ? "Paiement à la livraison" : "Pay at delivery") : "Stripe" },
-            { label: "Transaction ID", value: order.transactionId },
-            { label: "Status", value: order.paymentStatus },
-            { label: "Amount", value: formatCurrency(order.amount, locale) },
+            { label: fr ? "Passerelle" : "Gateway", value: order.paymentMethod === "COD" ? (locale === "fr" ? "Paiement à la livraison" : "Pay at delivery") : "Stripe" },
+            { label: fr ? "ID transaction" : "Transaction ID", value: order.transactionId },
+            { label: fr ? "Statut" : "Status", value: fr ? (PAYMENT_STATUS_FR[order.paymentStatus] ?? order.paymentStatus) : order.paymentStatus },
+            { label: fr ? "Montant" : "Amount", value: formatCurrency(order.amount, locale) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Logistics">
+        <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
-            { label: "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{order.warehouse}</Link> },
-            { label: "Rider", value: order.rider },
-            { label: "Tracking Number", value: order.trackingNumber },
+            { label: fr ? "Entrepôt" : "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{order.warehouse}</Link> },
+            { label: fr ? "Livreur" : "Rider", value: order.rider },
+            { label: fr ? "Numéro de suivi" : "Tracking Number", value: order.trackingNumber },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Financial">
+        <DetailGridSection title={fr ? "Finances" : "Financial"}>
           <InfoGrid columns={3} items={[
-            { label: "Order Amount", value: formatCurrency(order.amount, locale) },
-            { label: "Commission", value: formatCurrency(order.commission, locale) },
-            { label: "Seller Earnings", value: formatCurrency(order.sellerEarnings, locale) },
-            { label: "Refunds", value: formatCurrency(order.refunds, locale) },
+            { label: fr ? "Montant de la commande" : "Order Amount", value: formatCurrency(order.amount, locale) },
+            { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
+            { label: fr ? "Gains du vendeur" : "Seller Earnings", value: formatCurrency(order.sellerEarnings, locale) },
+            { label: fr ? "Remboursements" : "Refunds", value: formatCurrency(order.refunds, locale) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Product Details" span={3}>
+        <DetailGridSection title={fr ? "Détails du produit" : "Product Details"} span={3}>
           <div className="space-y-4">
             {order.items.map((item) => (
               <div key={item.sku} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-4">
@@ -96,18 +112,18 @@ export default function AdminOrderDetailPage() {
                 </div>
                 <div className="flex-1">
                   <Link href={`/shop/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.name}</Link>
-                  <p className="text-xs text-slate-500">SKU: {item.sku} · Variant: {item.variant}</p>
+                  <p className="text-xs text-slate-500">SKU: {item.sku} · {fr ? "Variante" : "Variant"}: {item.variant}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-medium">{formatCurrency(item.price, locale)}</p>
-                  <p className="text-xs text-slate-500">Qty: {item.qty}</p>
+                  <p className="text-xs text-slate-500">{fr ? "Qté" : "Qty"}: {item.qty}</p>
                 </div>
               </div>
             ))}
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Activity Timeline" span={3}>
+        <DetailGridSection title={fr ? "Chronologie d'activité" : "Activity Timeline"} span={3}>
           <ActivityTimeline events={order.timeline} />
         </DetailGridSection>
       </DetailGrid>

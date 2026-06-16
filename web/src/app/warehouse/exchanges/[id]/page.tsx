@@ -135,7 +135,7 @@ export default function WarehouseExchangeDetailPage() {
               { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },
               { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
               { label: fr ? "Ville" : "City", value: order.customerCity },
-            ] : [{ label: "Customer ID", value: exc.customerId }]),
+            ] : [{ label: fr ? "ID client" : "Customer ID", value: exc.customerId }]),
           ]} />
         </DetailGridSection>
 

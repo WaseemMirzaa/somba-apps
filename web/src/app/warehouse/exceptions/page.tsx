@@ -23,7 +23,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function WarehouseExceptionsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -38,26 +39,26 @@ export default function WarehouseExceptionsPage() {
   return (
     <WarehouseListPage
       title={t("exceptions")}
-      subtitle="List View — Incident ID, Parcel, Type, Severity, Status"
-      breadcrumbs={[{ label: "Warehouse", href: "/warehouse" }, { label: t("exceptions") }]}
+      subtitle={fr ? "Vue liste — ID incident, Colis, Type, Gravité, Statut" : "List View — Incident ID, Parcel, Type, Severity, Status"}
+      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("exceptions") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Incident ID, parcel, type…"
+          searchPlaceholder={fr ? "ID incident, colis, type…" : "Incident ID, parcel, type…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "id", label: "Incident ID", render: (row) => (
+        { key: "id", label: fr ? "ID incident" : "Incident ID", render: (row) => (
           <Link href={`/warehouse/exceptions/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "parcelId", label: "Parcel", render: (row) => row.parcelId !== "—" ? (
+        { key: "parcelId", label: fr ? "Colis" : "Parcel", render: (row) => row.parcelId !== "—" ? (
           <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
         ) : "—" },
         { key: "type", label: "Type" },
-        { key: "severity", label: "Severity", render: (row) => (
+        { key: "severity", label: fr ? "Gravité" : "Severity", render: (row) => (
           <Badge variant={severityVariant[row.severity as string] ?? "default"}>{String(row.severity)}</Badge>
         )},
         { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{String(row.status)}</Badge> },

@@ -13,6 +13,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { useToast } from "@/context/toast-context";
+import { useLocale } from "@/context/locale-context";
 import {
   WAREHOUSE_STAFF_ROLE_LABELS,
   warehouseStaffPersonaId,
@@ -26,16 +27,24 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive", labelFr: "Inactif" },
 ];
 
-const ROLE_OPTIONS: { value: WarehouseStaffRole; label: string }[] = [
-  { value: "operator", label: "Operator" },
-  { value: "manager", label: "Manager" },
-  { value: "supervisor", label: "Supervisor" },
+const ROLE_OPTIONS: { value: WarehouseStaffRole; label: string; labelFr: string }[] = [
+  { value: "operator", label: "Operator", labelFr: "Opérateur" },
+  { value: "manager", label: "Manager", labelFr: "Responsable" },
+  { value: "supervisor", label: "Supervisor", labelFr: "Superviseur" },
 ];
+
+const ROLE_LABELS_FR: Record<WarehouseStaffRole, string> = {
+  operator: "Opérateur",
+  manager: "Responsable",
+  supervisor: "Superviseur",
+};
 
 export default function AdminWarehouseStaffPage() {
   const { staff, toggleStaffStatus } = useWarehouseStaff();
   const { warehouses } = useWarehouseAdmin();
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<WarehouseStaffMember | null>(null);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -59,21 +68,21 @@ export default function AdminWarehouseStaffPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Warehouse Staff"
-        subtitle="Create operator, supervisor, and manager accounts for fulfillment hubs"
+        title={fr ? "Personnel d'entrepôt" : "Warehouse Staff"}
+        subtitle={fr ? "Créez des comptes opérateur, superviseur et responsable pour les centres de distribution" : "Create operator, supervisor, and manager accounts for fulfillment hubs"}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: "Warehouses", href: "/admin/warehouses" },
-          { label: "Staff" },
+          { label: fr ? "Admin" : "Admin", href: "/admin" },
+          { label: fr ? "Entrepôts" : "Warehouses", href: "/admin/warehouses" },
+          { label: fr ? "Personnel" : "Staff" },
         ]}
         actions={
           <div className="flex gap-2">
             <Link href="/admin/warehouses">
-              <Button variant="secondary" size="sm">All Warehouses</Button>
+              <Button variant="secondary" size="sm">{fr ? "Tous les entrepôts" : "All Warehouses"}</Button>
             </Link>
             <Button size="sm" onClick={() => { setEditing(null); setShowCreate(true); }}>
               <Plus className="h-4 w-4" />
-              Add Employee
+              {fr ? "Ajouter un employé" : "Add Employee"}
             </Button>
           </div>
         }
@@ -85,20 +94,20 @@ export default function AdminWarehouseStaffPage() {
             <Users className="h-8 w-8 text-[var(--primary)]" />
             <div>
               <p className="text-2xl font-bold">{staff.length}</p>
-              <p className="text-sm text-slate-500">Total employees</p>
+              <p className="text-sm text-slate-500">{fr ? "Total employés" : "Total employees"}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-2xl font-bold text-emerald-600">{activeCount}</p>
-            <p className="text-sm text-slate-500">Active</p>
+            <p className="text-sm text-slate-500">{fr ? "Actifs" : "Active"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-2xl font-bold text-slate-600">{staff.length - activeCount}</p>
-            <p className="text-sm text-slate-500">Disabled</p>
+            <p className="text-sm text-slate-500">{fr ? "Désactivés" : "Disabled"}</p>
           </CardContent>
         </Card>
       </div>
@@ -115,7 +124,7 @@ export default function AdminWarehouseStaffPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Name, email, warehouse ID…"
+        searchPlaceholder={fr ? "Nom, e-mail, ID d'entrepôt…" : "Name, email, warehouse ID…"}
         showDateFilters={false}
       />
 
@@ -126,35 +135,35 @@ export default function AdminWarehouseStaffPage() {
               { key: "id", label: "ID", render: (row) => (
                 <span className="font-mono text-xs">{String(row.id)}</span>
               )},
-              { key: "name", label: "Name" },
-              { key: "email", label: "Email" },
-              { key: "phone", label: "Phone" },
+              { key: "name", label: fr ? "Nom" : "Name" },
+              { key: "email", label: fr ? "E-mail" : "Email" },
+              { key: "phone", label: fr ? "Téléphone" : "Phone" },
               {
                 key: "role",
-                label: "Role",
+                label: fr ? "Rôle" : "Role",
                 render: (row) => (
                   <Badge variant="default">
-                    {WAREHOUSE_STAFF_ROLE_LABELS[row.role as WarehouseStaffRole]}
+                    {fr ? ROLE_LABELS_FR[row.role as WarehouseStaffRole] : WAREHOUSE_STAFF_ROLE_LABELS[row.role as WarehouseStaffRole]}
                   </Badge>
                 ),
               },
               {
                 key: "warehouseId",
-                label: "Warehouse",
+                label: fr ? "Entrepôt" : "Warehouse",
                 render: (row) => warehouseMap[String(row.warehouseId)] ?? String(row.warehouseId),
               },
               {
                 key: "status",
-                label: "Status",
+                label: fr ? "Statut" : "Status",
                 render: (row) => (
                   <Badge variant={row.status === "active" ? "success" : "default"}>
-                    {String(row.status)}
+                    {fr ? (row.status === "active" ? "Actif" : "Inactif") : String(row.status)}
                   </Badge>
                 ),
               },
               {
                 key: "login",
-                label: "Login ID",
+                label: fr ? "ID de connexion" : "Login ID",
                 render: (row) => (
                   <span className="font-mono text-xs text-slate-500">
                     {warehouseStaffPersonaId(String(row.id))}
@@ -163,7 +172,7 @@ export default function AdminWarehouseStaffPage() {
               },
               {
                 key: "actions",
-                label: "Actions",
+                label: fr ? "Actions" : "Actions",
                 render: (row) => {
                   const member = row as unknown as WarehouseStaffMember;
                   return (
@@ -174,7 +183,7 @@ export default function AdminWarehouseStaffPage() {
                         onClick={() => { setShowCreate(false); setEditing(member); }}
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Edit
+                        {fr ? "Modifier" : "Edit"}
                       </button>
                       <button
                         type="button"
@@ -182,15 +191,15 @@ export default function AdminWarehouseStaffPage() {
                         onClick={() => {
                           toggleStaffStatus(member.id);
                           toast(
-                            member.status === "active" ? "Employee disabled" : "Employee re-enabled",
+                            member.status === "active" ? (fr ? "Employé désactivé" : "Employee disabled") : (fr ? "Employé réactivé" : "Employee re-enabled"),
                             member.status === "active" ? "error" : "success"
                           );
                         }}
                       >
                         {member.status === "active" ? (
-                          <><UserX className="h-3.5 w-3.5" /> Disable</>
+                          <><UserX className="h-3.5 w-3.5" /> {fr ? "Désactiver" : "Disable"}</>
                         ) : (
-                          <><UserCheck className="h-3.5 w-3.5" /> Enable</>
+                          <><UserCheck className="h-3.5 w-3.5" /> {fr ? "Activer" : "Enable"}</>
                         )}
                       </button>
                     </div>
@@ -206,8 +215,17 @@ export default function AdminWarehouseStaffPage() {
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-slate-600">
-            Active warehouse staff appear on the <Link href="/login" className="text-[var(--primary)] hover:underline">login page</Link> under
-            the <strong>Warehouse</strong> role tab. They can only access the warehouse portal for their assigned hub.
+            {fr ? (
+              <>
+                Le personnel d&apos;entrepôt actif apparaît sur la <Link href="/login" className="text-[var(--primary)] hover:underline">page de connexion</Link> sous
+                l&apos;onglet de rôle <strong>Entrepôt</strong>. Il ne peut accéder qu&apos;au portail entrepôt de son centre assigné.
+              </>
+            ) : (
+              <>
+                Active warehouse staff appear on the <Link href="/login" className="text-[var(--primary)] hover:underline">login page</Link> under
+                the <strong>Warehouse</strong> role tab. They can only access the warehouse portal for their assigned hub.
+              </>
+            )}
           </p>
         </CardContent>
       </Card>
@@ -226,6 +244,8 @@ function StaffForm({
 }) {
   const { createStaff, updateStaff } = useWarehouseStaff();
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [form, setForm] = useState({
     name: member?.name ?? "",
     email: member?.email ?? "",
@@ -237,15 +257,15 @@ function StaffForm({
 
   function submit() {
     if (!form.name || !form.email || !form.warehouseId) {
-      toast("Name, email, and warehouse are required", "error");
+      toast(fr ? "Le nom, l'e-mail et l'entrepôt sont requis" : "Name, email, and warehouse are required", "error");
       return;
     }
     if (member) {
       updateStaff(member.id, form);
-      toast("Employee updated");
+      toast(fr ? "Employé mis à jour" : "Employee updated");
     } else {
       const created = createStaff(form);
-      toast(`Employee created — login as ${warehouseStaffPersonaId(created.id)} on /login`);
+      toast(fr ? `Employé créé — connectez-vous en tant que ${warehouseStaffPersonaId(created.id)} sur /login` : `Employee created — login as ${warehouseStaffPersonaId(created.id)} on /login`);
     }
     onClose();
   }
@@ -253,24 +273,24 @@ function StaffForm({
   return (
     <Card>
       <CardContent className="space-y-4 p-6">
-        <h3 className="font-semibold">{member ? "Edit Employee" : "New Warehouse Employee"}</h3>
+        <h3 className="font-semibold">{member ? (fr ? "Modifier l'employé" : "Edit Employee") : (fr ? "Nouvel employé d'entrepôt" : "New Warehouse Employee")}</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             className="input-premium px-4 py-2 text-sm"
-            placeholder="Full name"
+            placeholder={fr ? "Nom complet" : "Full name"}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <input
             className="input-premium px-4 py-2 text-sm"
-            placeholder="Email"
+            placeholder={fr ? "E-mail" : "Email"}
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
           <input
             className="input-premium px-4 py-2 text-sm"
-            placeholder="Phone"
+            placeholder={fr ? "Téléphone" : "Phone"}
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
@@ -280,7 +300,7 @@ function StaffForm({
             onChange={(e) => setForm({ ...form, role: e.target.value as WarehouseStaffRole })}
           >
             {ROLE_OPTIONS.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value}>{fr ? r.labelFr : r.label}</option>
             ))}
           </select>
           <select
@@ -297,13 +317,13 @@ function StaffForm({
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value as WarehouseStaffStatus })}
           >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="active">{fr ? "Actif" : "Active"}</option>
+            <option value="inactive">{fr ? "Inactif" : "Inactive"}</option>
           </select>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={submit}>{member ? "Save Changes" : "Create Employee"}</Button>
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={submit}>{member ? (fr ? "Enregistrer les modifications" : "Save Changes") : (fr ? "Créer l'employé" : "Create Employee")}</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>{fr ? "Annuler" : "Cancel"}</Button>
         </div>
       </CardContent>
     </Card>

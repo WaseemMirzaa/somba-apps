@@ -18,8 +18,11 @@ const STATUS_OPTIONS = [
   { value: "suspended", label: "Suspended", labelFr: "Suspendu" },
 ];
 
+const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu" };
+
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -36,7 +39,7 @@ export default function AdminSellersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("sellers")}
-        subtitle="List View — quick scanning only. Full info on detail page."
+        subtitle={fr ? "Vue liste — survol rapide uniquement. Infos complètes sur la page de détail." : "List View — quick scanning only. Full info on detail page."}
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
           { label: t("sellers") },
@@ -47,7 +50,7 @@ export default function AdminSellersPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Store, owner, email…"
+        searchPlaceholder={fr ? "Boutique, propriétaire, e-mail…" : "Store, owner, email…"}
       />
 
       <Card>
@@ -56,24 +59,24 @@ export default function AdminSellersPage() {
             columns={[
               {
                 key: "storeName",
-                label: "Store",
+                label: fr ? "Boutique" : "Store",
                 render: (row) => (
                   <Link href={`/admin/sellers/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.storeName)}
                   </Link>
                 ),
               },
-              { key: "owner", label: "Owner" },
+              { key: "owner", label: fr ? "Propriétaire" : "Owner" },
               { key: "email", label: t("email") },
-              { key: "category", label: "Category" },
+              { key: "category", label: fr ? "Catégorie" : "Category" },
               {
                 key: "orders",
-                label: "Orders",
+                label: fr ? "Commandes" : "Orders",
                 render: (row) => Number(row.orders).toLocaleString(),
               },
               {
                 key: "revenue",
-                label: "Revenue",
+                label: fr ? "Chiffre d'affaires" : "Revenue",
                 render: (row) => formatCurrency(row.revenue as number, locale),
               },
               {
@@ -81,7 +84,7 @@ export default function AdminSellersPage() {
                 label: t("status"),
                 render: (row) => (
                   <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
-                    {String(row.status)}
+                    {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
                   </Badge>
                 ),
               },

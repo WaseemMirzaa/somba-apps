@@ -262,7 +262,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                   label: t("status"),
                   render: (row) => (
                     <Badge variant={dispatchStatusVariant[row.status as string] ?? "default"}>
-                      {fr ? row.statusFr : row.status}
+                      {(fr ? row.statusFr : row.status) as string}
                     </Badge>
                   ),
                 },

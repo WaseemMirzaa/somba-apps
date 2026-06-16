@@ -39,7 +39,7 @@ export default function WarehouseDeliveryDetailPage() {
         subtitle={`${delivery.status.replace("_", " ")} · ETA ${delivery.eta}`}
         backHref="/warehouse/deliveries"
         breadcrumbs={[
-          { label: "Warehouse", href: "/warehouse" },
+          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
           { label: fr ? "Livraisons" : "Deliveries", href: "/warehouse/deliveries" },
           { label: delivery.orderId },
         ]}

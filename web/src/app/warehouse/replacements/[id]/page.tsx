@@ -185,7 +185,7 @@ export default function WarehouseReplacementDetailPage() {
                     { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
                     { label: fr ? "Ville" : "City", value: order.customerCity },
                   ]
-                : [{ label: "Customer ID", value: rep.customerId }]),
+                : [{ label: fr ? "ID client" : "Customer ID", value: rep.customerId }]),
             ]}
           />
         </DetailGridSection>

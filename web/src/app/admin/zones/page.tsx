@@ -12,6 +12,8 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { ADMIN_ZONES, ZONE_RIDERS, ZONE_CITIES, type AdminZone } from "@/lib/zones-admin";
 
+const ZONE_STATUS_FR: Record<string, string> = { active: "Active", paused: "En pause" };
+
 export default function AdminZonesPage() {
   const { locale } = useLocale();
   const { toast } = useToast();
@@ -140,7 +142,7 @@ export default function AdminZonesPage() {
                 );
               },
             },
-            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "active" ? "success" : "warning"}>{String(row.status)}</Badge> },
+            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "active" ? "success" : "warning"}>{fr ? (ZONE_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
             {
               key: "actions",
               label: "",

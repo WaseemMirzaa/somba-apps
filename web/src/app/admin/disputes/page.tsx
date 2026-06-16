@@ -25,9 +25,26 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   closed: "default",
 };
 
+const STATUS_FR: Record<string, string> = {
+  open: "Ouvert",
+  seller_responded: "Réponse vendeur",
+  resolved: "Résolu",
+  closed: "Fermé",
+};
+
+const REASON_FR: Record<string, string> = {
+  not_as_described: "Non conforme à la description",
+  defective: "Défectueux",
+  damaged: "Endommagé",
+  wrong_item: "Mauvais article",
+  not_received: "Non reçu",
+  late_delivery: "Livraison en retard",
+};
+
 export default function AdminDisputesPage() {
   const { disputes } = useDisputes();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const openCount = disputes.filter((d) => d.status === "open" || d.status === "seller_responded").length;
@@ -45,16 +62,16 @@ export default function AdminDisputesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Disputes Queue"
-        subtitle={`${openCount} active case${openCount === 1 ? "" : "s"}`}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Disputes" }]}
+        title={fr ? "File des litiges" : "Disputes Queue"}
+        subtitle={fr ? `${openCount} dossier${openCount === 1 ? "" : "s"} actif${openCount === 1 ? "" : "s"}` : `${openCount} active case${openCount === 1 ? "" : "s"}`}
+        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Litiges" : "Disputes" }]}
       />
 
       <ListFilters
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder="Dispute ID, buyer, seller, order…"
+        searchPlaceholder={fr ? "ID litige, acheteur, vendeur, commande…" : "Dispute ID, buyer, seller, order…"}
       />
 
       <Card>
@@ -63,7 +80,7 @@ export default function AdminDisputesPage() {
             columns={[
               {
                 key: "id",
-                label: "Dispute ID",
+                label: fr ? "ID litige" : "Dispute ID",
                 render: (row) => (
                   <Link
                     href={`/admin/disputes/${row.id}`}
@@ -75,7 +92,7 @@ export default function AdminDisputesPage() {
               },
               {
                 key: "orderId",
-                label: "Order",
+                label: fr ? "Commande" : "Order",
                 render: (row) => (
                   <Link
                     href={`/admin/orders/${row.orderId}`}
@@ -85,15 +102,15 @@ export default function AdminDisputesPage() {
                   </Link>
                 ),
               },
-              { key: "buyerName", label: "Buyer" },
-              { key: "sellerName", label: "Seller" },
-              { key: "productName", label: "Product" },
+              { key: "buyerName", label: fr ? "Acheteur" : "Buyer" },
+              { key: "sellerName", label: fr ? "Vendeur" : "Seller" },
+              { key: "productName", label: fr ? "Produit" : "Product" },
               {
                 key: "reason",
-                label: "Reason",
+                label: fr ? "Motif" : "Reason",
                 render: (row) => (
                   <span className="max-w-[10rem] text-slate-600">
-                    {String(row.reason).replace(/_/g, " ")}
+                    {fr ? (REASON_FR[String(row.reason)] ?? String(row.reason).replace(/_/g, " ")) : String(row.reason).replace(/_/g, " ")}
                   </span>
                 ),
               },
@@ -102,7 +119,7 @@ export default function AdminDisputesPage() {
                 label: t("status"),
                 render: (row) => (
                   <Badge variant={statusVariant[row.status as string] ?? "default"}>
-                    {String(row.status).replace(/_/g, " ")}
+                    {fr ? (STATUS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")) : String(row.status).replace(/_/g, " ")}
                   </Badge>
                 ),
               },
