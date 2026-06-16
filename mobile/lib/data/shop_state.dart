@@ -15,6 +15,22 @@ class ShopState {
   final List<int> wishlist = [1, 3];
   final List<int> recentlyViewed = [1, 3, 5];
 
+  bool isInWishlist(int id) => wishlist.contains(id);
+
+  void toggleWishlist(int id) {
+    if (!wishlist.remove(id)) wishlist.add(id);
+  }
+
+  void removeFromCart(CartItem item) => cart.remove(item);
+
+  void setQty(CartItem item, int qty) {
+    if (qty <= 0) {
+      cart.remove(item);
+    } else {
+      item.qty = qty;
+    }
+  }
+
   ShopState._() {
     if (products.isNotEmpty) {
       cart.add(CartItem(product: products[0], variant: '256GB Black'));

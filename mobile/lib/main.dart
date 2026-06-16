@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app.dart';
+import 'theme/app_theme.dart';
 
 void main() {
-  runApp(const LipCartApp());
+  runApp(const SombaApp());
 }
 
-class LipCartApp extends StatefulWidget {
-  const LipCartApp({super.key});
+class SombaApp extends StatefulWidget {
+  const SombaApp({super.key});
 
   @override
-  State<LipCartApp> createState() => _LipCartAppState();
+  State<SombaApp> createState() => _SombaAppState();
 }
 
-class _LipCartAppState extends State<LipCartApp> {
+class _SombaAppState extends State<SombaApp> {
   Locale _locale = const Locale('en');
 
   void _setLocale(Locale locale) {
@@ -24,7 +24,7 @@ class _LipCartAppState extends State<LipCartApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LipCart',
+      title: 'Somba',
       debugShowCheckedModeBanner: false,
       locale: _locale,
       supportedLocales: const [Locale('en'), Locale('fr')],
@@ -33,14 +33,7 @@ class _LipCartAppState extends State<LipCartApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
-          brightness: Brightness.light,
-        ),
-        textTheme: GoogleFonts.interTextTheme(),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(),
       home: AppShell(onLocaleChanged: _setLocale, locale: _locale),
     );
   }

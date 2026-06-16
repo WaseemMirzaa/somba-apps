@@ -3,249 +3,487 @@ import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_badge.dart';
+import '../widgets/app_card.dart';
+import '../widgets/brand_mark.dart';
+import '../widgets/price_text.dart';
 import '../widgets/product_card.dart';
-import 'product_detail_screen.dart';
+import '../widgets/section_header.dart';
 import 'cart_screen.dart';
+import 'deals_screen.dart';
+import 'product_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final Locale locale;
   final void Function(Locale) onLocaleChanged;
 
   const HomeScreen({super.key, required this.locale, required this.onLocaleChanged});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  void _openProduct(product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product, locale: widget.locale)),
+    ).then((_) => setState(() {}));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final s = Strings(locale.languageCode);
-    final colorScheme = Theme.of(context).colorScheme;
+    final s = Strings(widget.locale.languageCode);
+    final lang = widget.locale.languageCode;
+    final flashDeals = products.where((p) => p.discount >= 13).toList();
+    final recent = ShopState.instance.recentlyViewed
+        .map((id) => products.firstWhere((p) => p.id == id, orElse: () => products.first))
+        .toList();
 
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          floating: true,
-          pinned: true,
-          backgroundColor: colorScheme.primary,
-          foregroundColor: Colors.white,
-          title: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text('LC', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // ── Brand app bar + search ──────────────────────────────────────
+          SliverAppBar(
+            floating: true,
+            pinned: true,
+            titleSpacing: 16,
+            toolbarHeight: 60,
+            title: const BrandMark(size: 34),
+            actions: [
+              IconButton(
+                tooltip: 'Language',
+                icon: const Icon(Icons.translate_rounded, color: AppColors.slate600),
+                onPressed: () => widget.onLocaleChanged(lang == 'en' ? const Locale('fr') : const Locale('en')),
               ),
-              const SizedBox(width: 8),
-              Text(s.brand, style: const TextStyle(fontWeight: FontWeight.bold)),
+              IconButton(
+                tooltip: s.cart,
+                icon: Badge(
+                  isLabelVisible: ShopState.instance.cartCount > 0,
+                  backgroundColor: AppColors.primary,
+                  label: Text('${ShopState.instance.cartCount}'),
+                  child: const Icon(Icons.shopping_bag_outlined, color: AppColors.slate700),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CartScreen(locale: widget.locale)),
+                ).then((_) => setState(() {})),
+              ),
+              const SizedBox(width: 4),
             ],
-          ),
-          actions: [
-            IconButton(icon: const Icon(Icons.language), onPressed: () {
-              onLocaleChanged(locale.languageCode == 'en' ? const Locale('fr') : const Locale('en'));
-            }),
-            IconButton(
-              icon: Badge(
-                label: Text('${ShopState.instance.cartCount}'),
-                isLabelVisible: ShopState.instance.cartCount > 0,
-                child: const Icon(Icons.shopping_cart_outlined),
-              ),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(locale: locale))),
-            ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(56),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: s.search,
-                  hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(62),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _SearchBar(hint: s.search),
               ),
             ),
           ),
-        ),
 
-        // Prototype banner
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.8)]),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                  child: Text(s.prototype, style: const TextStyle(color: Colors.white, fontSize: 11)),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  locale.languageCode == 'fr' ? 'Votre marketplace, réinventée' : 'Your marketplace, reimagined',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: colorScheme.primary),
-                  child: Text(s.shopNow),
-                ),
-              ],
-            ),
-          ),
-        ),
+          // ── Hero band ───────────────────────────────────────────────────
+          SliverToBoxAdapter(child: _HeroBand(s: s)),
 
-        // Categories
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(s.categories, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(16),
-              itemCount: categories.length,
-              itemBuilder: (_, i) {
-                final cat = categories[i];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Column(
-                    children: [
-                      ClipOval(
-                        child: CachedNetworkImage(imageUrl: cat.image, width: 56, height: 56, fit: BoxFit.cover),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(cat.displayName(locale.languageCode), style: const TextStyle(fontSize: 11)),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-
-        // Recently viewed / Buy again
-        if (ShopState.instance.recentlyViewed.isNotEmpty)
+          // ── Categories rail ─────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Text(locale.languageCode == 'fr' ? 'Vu récemment' : 'Recently Viewed', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: SectionHeader(title: s.shopByCategory, actionLabel: s.seeAll),
             ),
           ),
-        if (ShopState.instance.recentlyViewed.isNotEmpty)
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 120,
-              child: ListView.builder(
+              height: 112,
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(16),
-                itemCount: ShopState.instance.recentlyViewed.length,
-                itemBuilder: (_, i) {
-                  final p = products.firstWhere((x) => x.id == ShopState.instance.recentlyViewed[i], orElse: () => products[0]);
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p, locale: locale))),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(imageUrl: p.image, width: 80, height: 80, fit: BoxFit.cover),
-                      ),
-                    ),
-                  );
-                },
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                itemCount: categories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, i) => _CategoryTile(category: categories[i], lang: lang),
               ),
             ),
           ),
 
-        // Flash Sale
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [colorScheme.primary, const Color(0xFF4338CA)]),
-              borderRadius: BorderRadius.circular(12),
+          // ── Recently viewed ─────────────────────────────────────────────
+          if (recent.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                child: SectionHeader(title: s.recentlyViewed, flourish: false),
+              ),
             ),
-            child: Row(
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 188,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  itemCount: recent.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) => _MiniProductCard(
+                    product: recent[i],
+                    lang: lang,
+                    onTap: () => _openProduct(recent[i]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // ── Flash sale band ─────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: _FlashBand(
+                s: s,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => DealsScreen(locale: widget.locale)),
+                ).then((_) => setState(() {})),
+              ),
+            ),
+          ),
+          _ProductGrid(
+            products: flashDeals.take(4).toList(),
+            lang: lang,
+            flash: true,
+            onTap: _openProduct,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          ),
+
+          // ── Trending ────────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+              child: SectionHeader(title: s.trending),
+            ),
+          ),
+          _ProductGrid(
+            products: products,
+            lang: lang,
+            onTap: _openProduct,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pill search field styled like the web hero search.
+class _SearchBar extends StatelessWidget {
+  final String hint;
+  const _SearchBar({required this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Search (mock)')),
+      ),
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.borderStrong),
+          boxShadow: AppShadows.sm,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search_rounded, color: AppColors.slate400, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(hint, style: const TextStyle(color: AppColors.slate400, fontSize: 14)),
+            ),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.tune_rounded, color: AppColors.primary, size: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroBand extends StatelessWidget {
+  final Strings s;
+  const _HeroBand({required this.s});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: Container(
+          decoration: const BoxDecoration(gradient: AppGradients.band),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -40,
+                top: -40,
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SectionLabel(s.prototype, light: true),
+                    const SizedBox(height: 14),
+                    Text(
+                      s.tagline,
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall!
+                          .copyWith(color: Colors.white, height: 1.15),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () {},
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primary,
+                      ),
+                      child: Text(s.shopNow),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _HeroChip(icon: Icons.local_shipping_outlined, label: s.freeDelivery),
+                        const SizedBox(width: 10),
+                        _HeroChip(icon: Icons.verified_user_outlined, label: s.securePayment),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _HeroChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlashBand extends StatelessWidget {
+  final Strings s;
+  final VoidCallback onTap;
+  const _FlashBand({required this.s, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.amberLight,
+              borderRadius: BorderRadius.circular(AppRadius.control),
+            ),
+            child: const Icon(Icons.bolt_rounded, color: AppColors.amber),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.bolt, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(s.flashSale, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                const Spacer(),
-                Text('${s.endsIn} 02:45:30', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(s.flashSale, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  '${s.endsIn} 02:45:30',
+                  style: const TextStyle(color: AppColors.slate500, fontSize: 12.5),
+                ),
               ],
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.72,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (_, i) => ProductCard(
-                product: products[i % products.length],
-                lang: locale.languageCode,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ProductDetailScreen(product: products[i % products.length], locale: locale)),
-                ),
-              ),
-              childCount: 4,
-            ),
-          ),
-        ),
+          const AppBadge('-50%', tone: BadgeTone.amber),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right, color: AppColors.slate400),
+        ],
+      ),
+    );
+  }
+}
 
-        // Trending
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(s.trending, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.72,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (_, i) => ProductCard(
-                product: products[i],
-                lang: locale.languageCode,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ProductDetailScreen(product: products[i], locale: locale)),
+class _CategoryTile extends StatelessWidget {
+  final Category category;
+  final String lang;
+  const _CategoryTile({required this.category, required this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 116,
+      child: AppCard(
+        radius: AppRadius.lg,
+        onTap: () {},
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(imageUrl: category.image, fit: BoxFit.cover),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.center,
+                  colors: [Color(0xCC0B1020), Colors.transparent],
                 ),
               ),
-              childCount: products.length,
             ),
-          ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: Text(
+                category.displayName(lang),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _MiniProductCard extends StatelessWidget {
+  final dynamic product;
+  final String lang;
+  final VoidCallback onTap;
+  const _MiniProductCard({required this.product, required this.lang, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 134,
+      child: AppCard(
+        radius: AppRadius.lg,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.2,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.surfaceMuted, AppColors.royalTint],
+                  ),
+                ),
+                child: CachedNetworkImage(imageUrl: product.image, fit: BoxFit.cover),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.displayName(lang),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.slate800),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    formatUsd(product.price),
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 15, color: AppColors.slate900),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A 2-column sliver grid of [ProductCard]s.
+class _ProductGrid extends StatelessWidget {
+  final List products;
+  final String lang;
+  final bool flash;
+  final void Function(dynamic) onTap;
+  final EdgeInsets padding;
+
+  const _ProductGrid({
+    required this.products,
+    required this.lang,
+    required this.onTap,
+    required this.padding,
+    this.flash = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: padding,
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: 252,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (_, i) => ProductCard(
+            product: products[i],
+            lang: lang,
+            flash: flash,
+            onTap: () => onTap(products[i]),
+          ),
+          childCount: products.length,
+        ),
+      ),
     );
   }
 }
