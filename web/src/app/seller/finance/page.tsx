@@ -79,7 +79,7 @@ export default function SellerFinancePage() {
             ? "Revenus · En attente · Solde disponible · Commission · Remboursements"
             : "Revenue · Pending · Available Balance · Commission · Refunds"
         }
-        breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("finance") }]}
+        breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("finance") }]}
         actions={
           <Link href="/seller/finance/payouts/request" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
             {t("requestPayout")}

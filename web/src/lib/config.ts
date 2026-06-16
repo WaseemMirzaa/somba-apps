@@ -103,9 +103,9 @@ export const RETURNS = {
 } as const;
 
 export const LEGAL_LINKS = [
-  { label: "Terms of Use", href: "/legal/terms" },
-  { label: "Privacy Policy", href: "/legal/privacy" },
-  { label: "Return Policy", href: "/legal/returns" },
-  { label: "Seller Agreement", href: "/legal/seller" },
-  { label: "Shipping Policy", href: "/legal/shipping" },
+  { label: "Terms of Use", labelFr: "Conditions d'utilisation", href: "/legal/terms" },
+  { label: "Privacy Policy", labelFr: "Politique de confidentialité", href: "/legal/privacy" },
+  { label: "Return Policy", labelFr: "Politique de retour", href: "/legal/returns" },
+  { label: "Seller Agreement", labelFr: "Contrat vendeur", href: "/legal/seller" },
+  { label: "Shipping Policy", labelFr: "Politique d'expédition", href: "/legal/shipping" },
 ] as const;

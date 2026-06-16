@@ -63,7 +63,7 @@ export default function SellerRevenueAnalyticsPage() {
         subtitle={fr ? "Brut · Net · Commissions · Remboursements · Paiements" : "Gross · Net · Commissions · Refunds · Payments"}
         backHref="/seller/analytics"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("analytics"), href: "/seller/analytics" },
           { label: fr ? "Revenus" : "Revenue" },
         ]}

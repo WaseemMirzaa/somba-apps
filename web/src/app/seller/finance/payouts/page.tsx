@@ -19,6 +19,7 @@ const STATUS_OPTIONS = [
 
 export default function SellerPayoutsPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -34,10 +35,10 @@ export default function SellerPayoutsPage() {
   return (
     <SellerListPage
       title={t("payouts")}
-      subtitle="Request ID, Amount, Method, Status, Date"
+      subtitle={fr ? "Référence, Montant, Méthode, Statut, Date" : "Request ID, Amount, Method, Status, Date"}
       breadcrumbs={[
-        { label: "Seller", href: "/seller" },
-        { label: "Finance", href: "/seller/finance" },
+        { label: fr ? "Vendeur" : "Seller", href: "/seller" },
+        { label: t("finance"), href: "/seller/finance" },
         { label: t("payouts") },
       ]}
       actions={
@@ -46,7 +47,7 @@ export default function SellerPayoutsPage() {
             href="/seller/finance/payouts/pending"
             className="rounded-lg border border-[var(--primary-tint)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary-light)]"
           >
-            {locale === "fr" ? "Voir les éléments en attente" : "View breakdown"}
+            {fr ? "Voir les éléments en attente" : "View breakdown"}
           </Link>
           <Link href="/seller/finance/payouts/request" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("requestPayout")}</Link>
         </div>
@@ -56,24 +57,24 @@ export default function SellerPayoutsPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Request ID, method…"
+          searchPlaceholder={fr ? "Référence, méthode…" : "Request ID, method…"}
         />
       }
       columns={[
-        { key: "id", label: "Request ID", render: (row) => (
+        { key: "id", label: fr ? "Référence" : "Request ID", render: (row) => (
           <Link href={`/seller/finance/payouts/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "method", label: "Method" },
+        { key: "method", label: fr ? "Méthode" : "Method" },
         { key: "status", label: t("status"), render: (row) => (
           <Badge variant={row.status === "paid" ? "success" : "warning"}>{String(row.status)}</Badge>
         )},
         { key: "date", label: t("date") },
-        { key: "items", label: locale === "fr" ? "Articles" : "Items", render: (row) => String(row.itemCount ?? "—") },
+        { key: "items", label: fr ? "Articles" : "Items", render: (row) => String(row.itemCount ?? "—") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex flex-col gap-1">
             <Link href={`/seller/finance/payouts/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
-              {locale === "fr" ? "Voir détail" : "View breakdown"}
+              {fr ? "Voir détail" : "View breakdown"}
             </Link>
           </div>
         )},

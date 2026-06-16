@@ -49,7 +49,13 @@ export default function RiderBatchPage() {
                 </span>
                 <div className="flex gap-2">
                   <Badge variant={stop.status === "completed" ? "success" : stop.status === "current" ? "primary" : "default"}>
-                    {stop.status}
+                    {fr
+                      ? stop.status === "completed"
+                        ? "Terminé"
+                        : stop.status === "current"
+                          ? "En cours"
+                          : "En attente"
+                      : stop.status}
                   </Badge>
                   <Badge>ETA {task.eta}</Badge>
                 </div>
@@ -92,7 +98,7 @@ export default function RiderBatchPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">Qty {item.qty}</p>
+                        <p className="text-xs text-slate-500">{fr ? "Qté" : "Qty"} {item.qty}</p>
                       </div>
                     </div>
                   ))}

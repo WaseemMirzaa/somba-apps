@@ -64,35 +64,35 @@ export default function SellerOrderDetailPage() {
       />
 
       <DetailGrid>
-        <DetailGridSection title="Order Summary">
+        <DetailGridSection title={fr ? "Résumé de la commande" : "Order Summary"}>
           <InfoGrid items={[
-            { label: "Order Number", value: order.id },
-            { label: "Order Date", value: order.date },
-            { label: "Order Status", value: order.orderStatus },
-            { label: "Total Amount", value: formatCurrency(order.amount, locale) },
+            { label: fr ? "Numéro de commande" : "Order Number", value: order.id },
+            { label: fr ? "Date de commande" : "Order Date", value: order.date },
+            { label: fr ? "Statut de commande" : "Order Status", value: order.orderStatus },
+            { label: fr ? "Montant total" : "Total Amount", value: formatCurrency(order.amount, locale) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Customer">
+        <DetailGridSection title={fr ? "Client" : "Customer"}>
           <InfoGrid items={[
-            { label: "Name", value: order.customer },
-            { label: "Phone", value: order.customerPhone },
-            { label: "City", value: order.customerCity },
-            { label: "Address", value: order.customerAddress, full: true },
+            { label: fr ? "Nom" : "Name", value: order.customer },
+            { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },
+            { label: fr ? "Ville" : "City", value: order.customerCity },
+            { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
           ]} />
           <div className="mt-4 flex gap-3">
-            <a href={`tel:${order.customerPhone}`} className="text-sm text-[var(--primary)]">Call Customer</a>
-            <Link href="/seller/support" className="text-sm text-slate-500">Open Support</Link>
+            <a href={`tel:${order.customerPhone}`} className="text-sm text-[var(--primary)]">{fr ? "Appeler le client" : "Call Customer"}</a>
+            <Link href="/seller/support" className="text-sm text-slate-500">{fr ? "Ouvrir le support" : "Open Support"}</Link>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title="Payment">
+        <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: "Payment Method", value: formatPaymentMethod(order.paymentMethod, locale) },
-            { label: "Transaction ID", value: order.transactionId },
-            { label: "Status", value: order.paymentStatus },
-            { label: "Commission", value: formatCurrency(order.commission, locale) },
-            { label: "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
+            { label: fr ? "Mode de paiement" : "Payment Method", value: formatPaymentMethod(order.paymentMethod, locale) },
+            { label: fr ? "ID transaction" : "Transaction ID", value: order.transactionId },
+            { label: fr ? "Statut" : "Status", value: order.paymentStatus },
+            { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
+            { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
           ]} />
         </DetailGridSection>
       </DetailGrid>
@@ -128,7 +128,7 @@ export default function SellerOrderDetailPage() {
               </div>
               <div className="text-right">
                 <p>{formatCurrency(item.price, locale)}</p>
-                <p className="text-xs">Qty: {item.qty}</p>
+                <p className="text-xs">{fr ? "Qté" : "Qty"}: {item.qty}</p>
               </div>
             </div>
           ))}
@@ -161,8 +161,8 @@ export default function SellerOrderDetailPage() {
               ))}
             </select>
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setShowFlagModal(false)} className="flex-1 rounded-xl border py-2 text-sm">Cancel</button>
-              <button onClick={() => { setFlaggedSku(order.items_detail[0]?.sku ?? null); setShowFlagModal(false); toast(locale === "fr" ? "Article signalé — remboursement partiel" : "Item flagged — partial refund triggered"); }} className="flex-1 rounded-xl bg-amber-600 py-2 text-sm text-white">Confirm</button>
+              <button onClick={() => setShowFlagModal(false)} className="flex-1 rounded-xl border py-2 text-sm">{fr ? "Annuler" : "Cancel"}</button>
+              <button onClick={() => { setFlaggedSku(order.items_detail[0]?.sku ?? null); setShowFlagModal(false); toast(locale === "fr" ? "Article signalé — remboursement partiel" : "Item flagged — partial refund triggered"); }} className="flex-1 rounded-xl bg-amber-600 py-2 text-sm text-white">{fr ? "Confirmer" : "Confirm"}</button>
             </div>
           </div>
         </div>

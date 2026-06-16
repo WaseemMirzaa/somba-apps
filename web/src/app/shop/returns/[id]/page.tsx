@@ -23,7 +23,7 @@ export default function ReturnStatusPage() {
   const ret = getReturn(id);
   const fr = locale === "fr";
 
-  if (!ret) return <div className="text-center text-slate-500">Return not found</div>;
+  if (!ret) return <div className="text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
 
   return (
     <div className="space-y-6">

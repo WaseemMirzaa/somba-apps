@@ -16,8 +16,23 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed", labelFr: "Terminé" },
 ];
 
+const REPLACEMENT_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
+  pending: { en: "Pending", fr: "En attente" },
+  processing: { en: "Processing", fr: "En cours" },
+  allocated: { en: "Allocated", fr: "Alloué" },
+  shipped: { en: "Shipped", fr: "Expédié" },
+  completed: { en: "Completed", fr: "Terminé" },
+};
+
+function replacementStatusLabel(status: string, fr: boolean) {
+  const entry = REPLACEMENT_STATUS_LABELS[status];
+  if (entry) return fr ? entry.fr : entry.en;
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function SellerReplacementsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -33,24 +48,28 @@ export default function SellerReplacementsPage() {
   return (
     <SellerListPage
       title={t("replacements")}
-      subtitle="List View — Replacement ID, Order, Customer, SKU, Status"
-      breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("replacements") }]}
+      subtitle={
+        fr
+          ? "Vue liste — N° dossier, commande, client, SKU, statut"
+          : "List View — Replacement ID, Order, Customer, SKU, Status"
+      }
+      breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("replacements") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Case ID, order, customer, SKU…"
+          searchPlaceholder={fr ? "N° dossier, commande, client, SKU…" : "Case ID, order, customer, SKU…"}
         />
       }
       columns={[
-        { key: "id", label: "Case ID", render: (row) => (
+        { key: "id", label: fr ? "N° dossier" : "Case ID", render: (row) => (
           <Link href={`/seller/replacements/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "orderId", label: "Order" },
-        { key: "customer", label: "Customer" },
+        { key: "orderId", label: fr ? "Commande" : "Order" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
         { key: "sku", label: "SKU" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{replacementStatusLabel(String(row.status), fr)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

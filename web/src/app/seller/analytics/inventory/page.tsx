@@ -57,7 +57,7 @@ export default function SellerInventoryAnalyticsPage() {
         subtitle={fr ? "Stock · Rotation · Vieillissement · Réapprovisionnement" : "Stock · Turnover · Aging · Replenishment"}
         backHref="/seller/analytics"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("analytics"), href: "/seller/analytics" },
           { label: fr ? "Inventaire" : "Inventory" },
         ]}

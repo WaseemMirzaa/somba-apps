@@ -53,7 +53,7 @@ export default function SellerProductAnalyticsPage() {
         subtitle={fr ? "Performance · Conversion · Catégories · Tendances" : "Performance · Conversion · Categories · Trends"}
         backHref="/seller/analytics"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("analytics"), href: "/seller/analytics" },
           { label: fr ? "Produits" : "Products" },
         ]}

@@ -117,7 +117,7 @@ export default function RiderTaskDetailPage() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-slate-900">{item.name}</p>
                 <p className="text-xs text-slate-500">
-                  SKU: {item.sku} · {item.variant} · Qty {item.qty}
+                  SKU: {item.sku} · {item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
                 </p>
               </div>
             </div>

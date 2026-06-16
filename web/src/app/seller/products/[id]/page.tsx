@@ -15,10 +15,11 @@ import { useLocale } from "@/context/locale-context";
 export default function SellerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const product = getSellerProductFull(Number(id));
 
   if (!product) {
-    return <div className="p-8 text-center text-slate-500">Product not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
   }
 
   return (
@@ -28,13 +29,13 @@ export default function SellerProductDetailPage() {
         subtitle={`SKU: ${product.sku} · ${product.status}`}
         backHref="/seller/products"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("products"), href: "/seller/products" },
           { label: product.name },
         ]}
         actions={
           <div className="flex gap-2">
-            <Link href="/seller/products/create" className="rounded-lg border border-sky-200 px-4 py-2 text-sm">Edit</Link>
+            <Link href="/seller/products/create" className="rounded-lg border border-sky-200 px-4 py-2 text-sm">{fr ? "Modifier" : "Edit"}</Link>
             <Badge variant={product.status === "live" ? "success" : "warning"}>{String(product.status)}</Badge>
           </div>
         }
@@ -46,61 +47,61 @@ export default function SellerProductDetailPage() {
         </div>
 
         <DetailGrid className="lg:col-span-3">
-          <DetailGridSection title="Product Information" span={3}>
+          <DetailGridSection title={fr ? "Informations produit" : "Product Information"} span={3}>
             <InfoGrid items={[
-              { label: "Product ID", value: product.id },
+              { label: fr ? "ID produit" : "Product ID", value: product.id },
               { label: "SKU", value: product.sku },
-              { label: "Category", value: product.category },
-              { label: "Subcategory", value: product.subcategory },
-              { label: "Brand", value: product.brand },
-              { label: "Created", value: product.createdDate },
-              { label: "Updated", value: product.updatedDate },
-              { label: "Description", value: product.description, full: true },
+              { label: fr ? "Catégorie" : "Category", value: product.category },
+              { label: fr ? "Sous-catégorie" : "Subcategory", value: product.subcategory },
+              { label: fr ? "Marque" : "Brand", value: product.brand },
+              { label: fr ? "Créé le" : "Created", value: product.createdDate },
+              { label: fr ? "Mis à jour le" : "Updated", value: product.updatedDate },
+              { label: fr ? "Description" : "Description", value: product.description, full: true },
             ]} />
           </DetailGridSection>
 
-          <DetailGridSection title="Stock">
+          <DetailGridSection title={fr ? "Stock" : "Stock"}>
             <InfoGrid columns={3} items={[
-              { label: "Available", value: product.availableStock },
-              { label: "Reserved", value: product.reservedStock },
-              { label: "Allocated", value: product.allocatedStock },
-              { label: "Sold", value: product.soldCount },
-              { label: "Low Stock Threshold", value: product.lowStockThreshold },
+              { label: fr ? "Disponible" : "Available", value: product.availableStock },
+              { label: fr ? "Réservé" : "Reserved", value: product.reservedStock },
+              { label: fr ? "Alloué" : "Allocated", value: product.allocatedStock },
+              { label: fr ? "Vendus" : "Sold", value: product.soldCount },
+              { label: fr ? "Seuil de stock bas" : "Low Stock Threshold", value: product.lowStockThreshold },
             ]} />
             <div className="mt-4 flex gap-2">
-              <Link href={`/seller/inventory/${encodeURIComponent(product.sku)}`} className="btn-primary rounded-lg px-4 py-2 text-sm">View Inventory</Link>
+              <Link href={`/seller/inventory/${encodeURIComponent(product.sku)}`} className="btn-primary rounded-lg px-4 py-2 text-sm">{fr ? "Voir l'inventaire" : "View Inventory"}</Link>
             </div>
           </DetailGridSection>
 
-          <DetailGridSection title="Pricing">
+          <DetailGridSection title={fr ? "Tarification" : "Pricing"}>
             <InfoGrid items={[
               { label: "MRP", value: formatCurrency(product.mrp, locale) },
-              { label: "Sale Price", value: formatCurrency(product.price, locale) },
-              { label: "Discount Price", value: formatCurrency(product.discountPrice, locale) },
-              { label: "Commission", value: `${product.commission}%` },
-              { label: "Net Revenue", value: formatCurrency(product.netRevenue, locale) },
+              { label: fr ? "Prix de vente" : "Sale Price", value: formatCurrency(product.price, locale) },
+              { label: fr ? "Prix remisé" : "Discount Price", value: formatCurrency(product.discountPrice, locale) },
+              { label: fr ? "Commission" : "Commission", value: `${product.commission}%` },
+              { label: fr ? "Chiffre d'affaires net" : "Net Revenue", value: formatCurrency(product.netRevenue, locale) },
             ]} />
           </DetailGridSection>
 
-          <DetailGridSection title="Analytics">
+          <DetailGridSection title={fr ? "Analyses" : "Analytics"}>
             <InfoGrid columns={3} items={[
-              { label: "Views", value: formatNumber(product.views, locale) },
-              { label: "Add to Cart", value: product.addToCart },
-              { label: "Wishlist", value: product.wishlist },
-              { label: "Conversion Rate", value: `${((product.orders / product.views) * 100).toFixed(1)}%` },
-              { label: "Revenue", value: formatCurrency(product.revenue, locale) },
-              { label: "Orders", value: product.orders },
+              { label: fr ? "Vues" : "Views", value: formatNumber(product.views, locale) },
+              { label: fr ? "Ajouts au panier" : "Add to Cart", value: product.addToCart },
+              { label: fr ? "Liste de souhaits" : "Wishlist", value: product.wishlist },
+              { label: fr ? "Taux de conversion" : "Conversion Rate", value: `${((product.orders / product.views) * 100).toFixed(1)}%` },
+              { label: fr ? "Chiffre d'affaires" : "Revenue", value: formatCurrency(product.revenue, locale) },
+              { label: fr ? "Commandes" : "Orders", value: product.orders },
             ]} />
           </DetailGridSection>
 
-          <DetailGridSection title="Variants" span={3}>
+          <DetailGridSection title={fr ? "Variantes" : "Variants"} span={3}>
             <DataTable
               columns={[
-                { key: "variantName", label: "Variant" },
+                { key: "variantName", label: fr ? "Variante" : "Variant" },
                 { key: "sku", label: "SKU" },
-                { key: "color", label: "Color" },
-                { key: "size", label: "Size" },
-                { key: "price", label: "Price", render: (row) => formatCurrency(row.price as number, locale) },
+                { key: "color", label: fr ? "Couleur" : "Color" },
+                { key: "size", label: fr ? "Taille" : "Size" },
+                { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
                 { key: "stock", label: "Stock" },
                 { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
               ]}
@@ -108,15 +109,15 @@ export default function SellerProductDetailPage() {
             />
           </DetailGridSection>
 
-          <DetailGridSection title="Orders" span={3}>
+          <DetailGridSection title={fr ? "Commandes" : "Orders"} span={3}>
             <DataTable
               columns={[
-                { key: "orderNumber", label: "Order", render: (row) => (
+                { key: "orderNumber", label: fr ? "Commande" : "Order", render: (row) => (
                   <Link href={`/seller/orders/${row.orderNumber}`} className="text-[var(--primary)] hover:underline">{String(row.orderNumber)}</Link>
                 )},
-                { key: "customer", label: "Customer" },
-                { key: "quantity", label: "Qty" },
-                { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
+                { key: "customer", label: fr ? "Client" : "Customer" },
+                { key: "quantity", label: fr ? "Qté" : "Qty" },
+                { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
                 { key: "status", label: t("status"), render: (row) => <Badge>{String(row.status)}</Badge> },
                 { key: "date", label: t("date") },
               ]}
@@ -124,7 +125,7 @@ export default function SellerProductDetailPage() {
             />
           </DetailGridSection>
 
-          <DetailGridSection title="Reviews" span={3}>
+          <DetailGridSection title={fr ? "Avis" : "Reviews"} span={3}>
             {product.productReviews.map((r, i) => (
               <div key={i} className="mb-4 border-b border-[var(--border)] pb-4 last:border-0">
                 <div className="flex items-center gap-2">

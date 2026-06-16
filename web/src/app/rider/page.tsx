@@ -82,7 +82,7 @@ export default function RiderDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title={riderProfile.name}
-        subtitle={`${t("welcome")} · ${riderProfile.zone} · On duty · ⭐ ${k.rating}`}
+        subtitle={`${t("welcome")} · ${riderProfile.zone} · ${fr ? "En service" : "On duty"} · ⭐ ${k.rating}`}
       />
 
       <div className="grid grid-cols-2 gap-3">
@@ -90,17 +90,17 @@ export default function RiderDashboardPage() {
         <KpiCard title={t("completedToday")} value={String(completed)} change={k.deliveriesChange} spark={deliveriesSpark} icon={CheckCircle} />
         <KpiCard title={t("earnings")} value={formatCurrency(k.earningsToday, locale)} change={k.earningsChange} spark={earningsSpark} icon={DollarSign} />
         <KpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[320, 340, 360, 380, 400, 410, 420]} icon={Banknote} />
-        <KpiCard title="On-time rate" value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
-        <KpiCard title="Avg delivery" value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
+        <KpiCard title={fr ? "Taux de ponctualité" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
+        <KpiCard title={fr ? "Livraison moyenne" : "Avg delivery"} value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <h2 className="font-semibold text-slate-900">Earnings trend</h2>
-            <p className="text-xs text-slate-500">{period} · +{k.incentives} incentives today</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Tendance des gains" : "Earnings trend"}</h2>
+            <p className="text-xs text-slate-500">{period} · +{k.incentives} {fr ? "primes aujourd'hui" : "incentives today"}</p>
           </div>
-          <Badge variant="success">{formatCurrency(k.earningsToday, locale)} today</Badge>
+          <Badge variant="success">{formatCurrency(k.earningsToday, locale)} {fr ? "aujourd'hui" : "today"}</Badge>
         </CardHeader>
         <CardContent>
           <DualMetricChart data={riderEarningsTrend} height={180} />
@@ -110,8 +110,8 @@ export default function RiderDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">Task breakdown</h2>
-            <p className="text-xs text-slate-500">Today&apos;s delivery types</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Répartition des tâches" : "Task breakdown"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Types de livraison du jour" : "Today's delivery types"}</p>
           </CardHeader>
           <CardContent>
             <SegmentDonut
@@ -127,7 +127,7 @@ export default function RiderDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-emerald-600" />
-            <h2 className="font-semibold text-slate-900">Recent activity</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {riderRecentActivity.map((item) => (
@@ -142,8 +142,8 @@ export default function RiderDashboardPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-slate-900">Zone performance</h2>
-          <p className="text-xs text-slate-500">Deliveries & avg time by zone</p>
+          <h2 className="font-semibold text-slate-900">{fr ? "Performance par zone" : "Zone performance"}</h2>
+          <p className="text-xs text-slate-500">{fr ? "Livraisons et temps moyen par zone" : "Deliveries & avg time by zone"}</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -151,7 +151,7 @@ export default function RiderDashboardPage() {
               <div key={zone.zone} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
                 <p className="text-xs font-medium text-slate-600">{zone.zone}</p>
                 <p className="mt-1 text-2xl font-bold text-emerald-700">{zone.deliveries}</p>
-                <p className="text-xs text-slate-500">avg {zone.avgMin} min</p>
+                <p className="text-xs text-slate-500">{fr ? "moy." : "avg"} {zone.avgMin} min</p>
               </div>
             ))}
           </div>

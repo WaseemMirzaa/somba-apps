@@ -14,26 +14,27 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
 
 const menuItems = [
-  { href: "/shop/orders", icon: Package, label: "myOrders", desc: "Track & manage orders" },
-  { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: "Saved items" },
-  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: "Somba Wallet · Airtel top-up" },
-  { href: "/shop/refer", icon: Heart, label: "myAccount", desc: "Refer & Earn — $10 bonus" },
-  { href: "/shop/account/addresses", icon: MapPin, label: "addresses", desc: "France & global addresses" },
-  { href: "/shop/support", icon: Headphones, label: "support", desc: "Help center" },
-  { href: "/shop/notifications", icon: Headphones, label: "myAccount", desc: "Notifications" },
-  { href: "/shop/help", icon: Headphones, label: "support", desc: "Help & account deletion" },
-  { href: "/shop/deals", icon: Package, label: "flashSale", desc: "Flash deals" },
+  { href: "/shop/orders", icon: Package, label: "myOrders", desc: { en: "Track & manage orders", fr: "Suivre et gérer les commandes" } },
+  { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: { en: "Saved items", fr: "Articles enregistrés" } },
+  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: { en: "Somba Wallet · Airtel top-up", fr: "Somba Wallet · recharge Airtel" } },
+  { href: "/shop/refer", icon: Heart, label: "myAccount", desc: { en: "Refer & Earn — $10 bonus", fr: "Parrainez et gagnez — bonus de 10 $" } },
+  { href: "/shop/account/addresses", icon: MapPin, label: "addresses", desc: { en: "France & global addresses", fr: "Adresses en France et à l'international" } },
+  { href: "/shop/support", icon: Headphones, label: "support", desc: { en: "Help center", fr: "Centre d'aide" } },
+  { href: "/shop/notifications", icon: Headphones, label: "myAccount", desc: { en: "Notifications", fr: "Notifications" } },
+  { href: "/shop/help", icon: Headphones, label: "support", desc: { en: "Help & account deletion", fr: "Aide et suppression de compte" } },
+  { href: "/shop/deals", icon: Package, label: "flashSale", desc: { en: "Flash deals", fr: "Offres flash" } },
 ];
 
 export default function ShopAccountPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
 
   return (
     <div className="space-y-8">
       <PageHeader
         title={t("myAccount")}
         breadcrumbs={[
-          { label: "Shop", href: "/" },
+          { label: fr ? "Boutique" : "Shop", href: "/" },
           { label: t("myAccount") },
         ]}
       />
@@ -48,7 +49,7 @@ export default function ShopAccountPage() {
           </h2>
           <p className="text-sm text-slate-500">marie.kabila@email.com · +243 998 112 334</p>
           <span className="mt-2 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-            Gold Member
+            {fr ? "Membre Gold" : "Gold Member"}
           </span>
         </div>
       </div>
@@ -65,7 +66,7 @@ export default function ShopAccountPage() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-slate-900">{t(item.label as Parameters<typeof t>[0])}</p>
-              <p className="text-sm text-slate-500">{item.desc}</p>
+              <p className="text-sm text-slate-500">{fr ? item.desc.fr : item.desc.en}</p>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-400" />
           </Link>

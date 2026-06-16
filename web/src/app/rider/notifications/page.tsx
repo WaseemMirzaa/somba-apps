@@ -19,6 +19,7 @@ const READ_STATUS_OPTIONS = [
 export default function RiderNotificationsPage() {
   const { forPortal, markRead, markAllRead } = useNotifications();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const items = forPortal("rider");
 
@@ -38,15 +39,19 @@ export default function RiderNotificationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Notifications"
-        subtitle={`${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`}
-        breadcrumbs={[{ label: "Rider", href: "/rider" }, { label: "Notifications" }]}
+        subtitle={
+          fr
+            ? `${unreadCount} notification${unreadCount === 1 ? "" : "s"} non lue${unreadCount === 1 ? "" : "s"}`
+            : `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+        }
+        breadcrumbs={[{ label: fr ? "Livreur" : "Rider", href: "/rider" }, { label: "Notifications" }]}
         actions={
           unreadCount > 0 ? (
             <button
               onClick={() => markAllRead("rider")}
               className="text-sm font-medium text-[var(--primary)] hover:underline"
             >
-              Mark all read
+              {fr ? "Tout marquer comme lu" : "Mark all read"}
             </button>
           ) : undefined
         }
@@ -56,7 +61,7 @@ export default function RiderNotificationsPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={READ_STATUS_OPTIONS}
-        searchPlaceholder="Title, type, content…"
+        searchPlaceholder={fr ? "Titre, type, contenu…" : "Title, type, content…"}
       />
 
       <Card>
@@ -65,7 +70,7 @@ export default function RiderNotificationsPage() {
             columns={[
               {
                 key: "title",
-                label: "Title",
+                label: fr ? "Titre" : "Title",
                 render: (row) => (
                   <div>
                     <Link
@@ -73,9 +78,9 @@ export default function RiderNotificationsPage() {
                       onClick={() => markRead(String(row.id))}
                       className={`font-medium hover:underline ${row.read ? "text-slate-600" : "text-[var(--primary)]"}`}
                     >
-                      {locale === "fr" ? String(row.titleFr) : String(row.title)}
+                      {fr ? String(row.titleFr) : String(row.title)}
                     </Link>
-                    <p className="mt-0.5 text-sm text-slate-500">{String(row.body)}</p>
+                    <p className="mt-0.5 text-sm text-slate-500">{fr ? String(row.bodyFr) : String(row.body)}</p>
                   </div>
                 ),
               },
@@ -96,7 +101,7 @@ export default function RiderNotificationsPage() {
                 label: t("status"),
                 render: (row) => (
                   <Badge variant={row.read ? "default" : "warning"}>
-                    {row.read ? "Read" : "Unread"}
+                    {row.read ? (fr ? "Lu" : "Read") : (fr ? "Non lu" : "Unread")}
                   </Badge>
                 ),
               },

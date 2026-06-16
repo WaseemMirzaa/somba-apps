@@ -50,12 +50,12 @@ export default function ShopCheckoutPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={locale === "fr" ? "Caisse" : "Checkout"} breadcrumbs={[{ label: "Cart", href: "/shop/cart" }, { label: "Checkout" }]} />
+      <PageHeader title={locale === "fr" ? "Caisse" : "Checkout"} breadcrumbs={[{ label: locale === "fr" ? "Panier" : "Cart", href: "/shop/cart" }, { label: locale === "fr" ? "Caisse" : "Checkout" }]} />
 
       {!isAuthenticated && (
         <div className="card-premium p-4">
           <p className="text-sm font-medium">{locale === "fr" ? "Achat invité activé" : "Guest checkout enabled"}</p>
-          <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder="Email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
+          <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder={locale === "fr" ? "E-mail" : "Email"} value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
           <Link href="/shop/login" className="mt-2 inline-block text-xs text-[var(--primary)]">{locale === "fr" ? "Se connecter" : "Sign in"}</Link>
         </div>
       )}
@@ -72,23 +72,23 @@ export default function ShopCheckoutPage() {
               </div>
             </label>
           ))}
-          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-[var(--primary)] hover:underline">+ Add address</button>
+          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-[var(--primary)] hover:underline">{locale === "fr" ? "+ Ajouter une adresse" : "+ Add address"}</button>
         </div>
       </DetailSection>
 
       <DetailSection title={locale === "fr" ? "Options de livraison" : "Delivery Options"}>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={crossCity} onChange={(e) => setCrossCity(e.target.checked)} />
-          <span className="text-sm">Cross-city delivery {BUSINESS.crossCityDelivery ? "(allowed)" : "(blocked)"}</span>
+          <span className="text-sm">{locale === "fr" ? "Livraison inter-villes" : "Cross-city delivery"} {BUSINESS.crossCityDelivery ? (locale === "fr" ? "(autorisée)" : "(allowed)") : (locale === "fr" ? "(bloquée)" : "(blocked)")}</span>
         </label>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />
-          <span className="text-sm">Open Box Delivery</span>
+          <span className="text-sm">{locale === "fr" ? "Livraison colis ouvert" : "Open Box Delivery"}</span>
         </label>
         <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={locale === "fr" ? "Note de commande (optionnel)" : "Order note (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
         <InfoGrid items={[
-          { label: locale === "fr" ? "Frais de zone" : "Zone delivery fee", value: deliveryFee === 0 ? "FREE" : <DualCurrency amount={deliveryFee} /> },
-          { label: "ETA", value: crossCity ? "3-5 days" : "1-2 days" },
+          { label: locale === "fr" ? "Frais de zone" : "Zone delivery fee", value: deliveryFee === 0 ? (locale === "fr" ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          { label: locale === "fr" ? "Délai estimé" : "ETA", value: crossCity ? (locale === "fr" ? "3-5 jours" : "3-5 days") : (locale === "fr" ? "1-2 jours" : "1-2 days") },
           { label: locale === "fr" ? "Total" : "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>

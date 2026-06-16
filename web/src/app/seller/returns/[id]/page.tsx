@@ -10,57 +10,86 @@ import { getSellerReturn } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
+const RETURN_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
+  pending: { en: "Pending", fr: "En attente" },
+  pending_inspection: { en: "Pending inspection", fr: "En attente d'inspection" },
+  inspecting: { en: "Inspecting", fr: "Inspection" },
+  approved: { en: "Approved", fr: "Approuvé" },
+  rejected: { en: "Rejected", fr: "Rejeté" },
+  refunded: { en: "Refunded", fr: "Remboursé" },
+};
+
+const TIMELINE_LABELS: Record<string, string> = {
+  "Order Delivered": "Commande livrée",
+  "Return Requested": "Retour demandé",
+  "Return Approved": "Retour approuvé",
+  "Pickup Scheduled": "Ramassage planifié",
+  "Refund Processed": "Remboursement traité",
+  "Received at Warehouse": "Reçu à l'entrepôt",
+  "Inspecting": "Inspection",
+};
+
+function localizeStatus(status: string, fr: boolean) {
+  const entry = RETURN_STATUS_LABELS[status];
+  if (entry) return fr ? entry.fr : entry.en;
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
+  const fr = locale === "fr";
   const ret = getSellerReturn(id);
 
   if (!ret) {
-    return <div className="p-8 text-center text-slate-500">Return not found</div>;
+    return <div className="p-8 text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ret.id} subtitle={`Order ${ret.orderId} · ${ret.reason}`} backHref="/seller/returns" />
+      <PageHeader title={ret.id} subtitle={`${fr ? "Commande" : "Order"} ${ret.orderId} · ${ret.reason}`} backHref="/seller/returns" />
 
       <DetailGrid>
-        <DetailGridSection title="Overview">
+        <DetailGridSection title={fr ? "Aperçu" : "Overview"}>
           <InfoGrid items={[
-            { label: "Return ID", value: ret.id },
-            { label: "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
-            { label: "Customer", value: ret.customer },
-            { label: "Reason", value: ret.reason },
-            { label: "Status", value: ret.status },
+            { label: fr ? "N° retour" : "Return ID", value: ret.id },
+            { label: fr ? "Commande" : "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
+            { label: fr ? "Client" : "Customer", value: ret.customer },
+            { label: fr ? "Motif" : "Reason", value: ret.reason },
+            { label: fr ? "Statut" : "Status", value: localizeStatus(ret.status, fr) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Product">
+        <DetailGridSection title={fr ? "Produit" : "Product"}>
           <InfoGrid items={[
-            { label: "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-            { label: "Variant", value: ret.variant },
-            { label: "Quantity", value: ret.qty },
+            { label: fr ? "Produit" : "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
+            { label: fr ? "Variante" : "Variant", value: ret.variant },
+            { label: fr ? "Quantité" : "Quantity", value: ret.qty },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Refund">
+        <DetailGridSection title={fr ? "Remboursement" : "Refund"}>
           <InfoGrid items={[
-            { label: "Amount", value: formatCurrency(ret.refund.amount, locale) },
-            { label: "Method", value: ret.refund.method },
-            { label: "Status", value: ret.refund.status },
+            { label: fr ? "Montant" : "Amount", value: formatCurrency(ret.refund.amount, locale) },
+            { label: fr ? "Méthode" : "Method", value: ret.refund.method },
+            { label: fr ? "Statut" : "Status", value: localizeStatus(ret.refund.status, fr) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title="Inspection" span={2}>
+        <DetailGridSection title={fr ? "Inspection" : "Inspection"} span={2}>
           <InfoGrid items={[
-            { label: "Warehouse Notes", value: ret.inspection.warehouseNotes },
-            { label: "Photos", value: `${ret.inspection.photos} attached` },
-            { label: "Condition", value: ret.inspection.condition },
+            { label: fr ? "Notes entrepôt" : "Warehouse Notes", value: ret.inspection.warehouseNotes },
+            { label: fr ? "Photos" : "Photos", value: `${ret.inspection.photos} ${fr ? "jointe(s)" : "attached"}` },
+            { label: fr ? "Condition" : "Condition", value: ret.inspection.condition },
           ]} />
-          <Link href="/warehouse/returns" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">Warehouse Return Queue →</Link>
+          <Link href="/warehouse/returns" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "File de retours entrepôt →" : "Warehouse Return Queue →"}</Link>
         </DetailGridSection>
 
-        <DetailGridSection title="Timeline" span={3}>
-          <ActivityTimeline events={ret.timeline} />
+        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
+          <ActivityTimeline events={ret.timeline.map((event) => ({
+            ...event,
+            label: fr ? (TIMELINE_LABELS[event.label] ?? event.label) : event.label,
+          }))} />
         </DetailGridSection>
       </DetailGrid>
     </div>

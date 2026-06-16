@@ -73,10 +73,10 @@ export default function ShopCartPage() {
                     >
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
-                    <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast("Removed"); }}>
+                    <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast(locale === "fr" ? "Retiré" : "Removed"); }}>
                       {locale === "fr" ? "Supprimer" : "Remove"}
                     </button>
-                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast("Saved"); }}>
+                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast(locale === "fr" ? "Enregistré" : "Saved"); }}>
                       {locale === "fr" ? "Sauvegarder" : "Save for later"}
                     </button>
                   </div>
@@ -108,7 +108,7 @@ export default function ShopCartPage() {
             </button>
           )}
         </div>
-        {promoCode && <p className="mt-1 text-xs text-emerald-600">{promoCode} applied</p>}
+        {promoCode && <p className="mt-1 text-xs text-emerald-600">{promoCode} {locale === "fr" ? "appliqué" : "applied"}</p>}
       </div>
 
       <div className="card-premium p-6">
@@ -121,7 +121,7 @@ export default function ShopCartPage() {
           )}
           <div className="flex justify-between">
             <span>{locale === "fr" ? "Livraison (zone)" : "Delivery (zone)"}</span>
-            {delivery === 0 ? "FREE" : <DualCurrency amount={delivery} />}
+            {delivery === 0 ? (locale === "fr" ? "GRATUIT" : "FREE") : <DualCurrency amount={delivery} />}
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">
             <span>{locale === "fr" ? "Total" : "Total"}</span>

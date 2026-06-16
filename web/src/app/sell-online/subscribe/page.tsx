@@ -250,8 +250,10 @@ function SubscribeCheckoutContent() {
 }
 
 export default function SellOnlineSubscribePage() {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Loading…</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">{fr ? "Chargement…" : "Loading…"}</div>}>
       <SubscribeCheckoutContent />
     </Suspense>
   );

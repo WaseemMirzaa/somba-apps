@@ -73,7 +73,7 @@ export default function SellerPayoutDetailPage() {
         subtitle={`${formatCurrency(payout.amount, locale)} · ${payout.status}`}
         backHref="/seller/finance/payouts"
         breadcrumbs={[
-          { label: "Seller", href: "/seller" },
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
           { label: t("finance"), href: "/seller/finance" },
           { label: t("payouts"), href: "/seller/finance/payouts" },
           { label: payout.id },

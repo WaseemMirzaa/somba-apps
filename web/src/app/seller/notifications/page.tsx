@@ -48,7 +48,7 @@ export default function SellerNotificationsPage() {
           : `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
       }
       breadcrumbs={[
-        { label: "Seller", href: "/seller" },
+        { label: locale === "fr" ? "Vendeur" : "Seller", href: "/seller" },
         { label: locale === "fr" ? "Notifications" : "Notifications" },
       ]}
       actions={

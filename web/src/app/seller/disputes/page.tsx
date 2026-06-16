@@ -47,7 +47,7 @@ export default function SellerDisputesPage() {
           : "Manage customer disputes on your orders"
       }
       breadcrumbs={[
-        { label: "Seller", href: "/seller" },
+        { label: locale === "fr" ? "Vendeur" : "Seller", href: "/seller" },
         { label: locale === "fr" ? "Litiges" : "Disputes" },
       ]}
       filters={

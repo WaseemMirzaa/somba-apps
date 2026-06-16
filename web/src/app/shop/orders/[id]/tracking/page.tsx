@@ -14,7 +14,7 @@ export default function OrderTrackingPage() {
   const order = getOrder(id);
   const fr = locale === "fr";
 
-  if (!order) return <div className="text-center text-slate-500">Order not found</div>;
+  if (!order) return <div className="text-center text-slate-500">{fr ? "Commande introuvable" : "Order not found"}</div>;
 
   return (
     <div className="space-y-6">
@@ -37,7 +37,7 @@ export default function OrderTrackingPage() {
       </DetailSection>
       <DetailSection title={fr ? "Colis" : "Parcels"}>
         <InfoGrid items={[
-          { label: "Tracking", value: order.trackingNumber },
+          { label: fr ? "Suivi" : "Tracking", value: order.trackingNumber },
           { label: fr ? "Entrepôt" : "Warehouse", value: order.warehouse },
           { label: fr ? "Livreur" : "Rider", value: order.rider },
         ]} />

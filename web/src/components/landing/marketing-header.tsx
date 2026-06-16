@@ -125,7 +125,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
             <button
               onClick={() => setOpen(!open)}
               className={cn("rounded-lg p-2 lg:hidden", overlay ? "text-white" : "text-slate-600")}
-              aria-label="Menu"
+              aria-label={fr ? "Menu" : "Menu"}
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>

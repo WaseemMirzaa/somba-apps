@@ -24,7 +24,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SellerSupportPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -44,24 +45,24 @@ export default function SellerSupportPage() {
   return (
     <SellerListPage
       title={t("support")}
-      subtitle="Ticket ID, Category, Priority, Status, Last Update"
-      breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("support") }]}
+      subtitle={fr ? "ID ticket, Catégorie, Priorité, Statut, Dernière mise à jour" : "Ticket ID, Category, Priority, Status, Last Update"}
+      breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("support") }]}
       actions={
         <button
           onClick={() => {
             if (showNew) {
               const newId = `TKT-${String(tickets.length + 1).padStart(3, "0")}`;
-              setTickets((t) => [{ id: newId, category: "General", subject: "New support request", priority: "medium", status: "open", lastUpdate: "Just now" }, ...t]);
-              toast("Ticket created");
+              setTickets((t) => [{ id: newId, category: fr ? "Général" : "General", subject: fr ? "Nouvelle demande de support" : "New support request", priority: "medium", status: "open", lastUpdate: fr ? "À l'instant" : "Just now" }, ...t]);
+              toast(fr ? "Ticket créé" : "Ticket created");
               router.push(`/seller/support/${newId}`);
             } else {
               setShowNew(true);
-              toast("Fill in your issue and submit", "info");
+              toast(fr ? "Décrivez votre problème et soumettez" : "Fill in your issue and submit", "info");
             }
           }}
           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
         >
-          New Ticket
+          {fr ? "Nouveau ticket" : "New Ticket"}
         </button>
       }
       filters={
@@ -69,22 +70,22 @@ export default function SellerSupportPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Ticket ID, subject, category…"
+          searchPlaceholder={fr ? "ID ticket, sujet, catégorie…" : "Ticket ID, subject, category…"}
         />
       }
       columns={[
-        { key: "id", label: "Ticket ID", render: (row) => (
+        { key: "id", label: fr ? "ID ticket" : "Ticket ID", render: (row) => (
           <Link href={`/seller/support/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "category", label: "Category" },
-        { key: "subject", label: "Subject" },
-        { key: "priority", label: "Priority", render: (row) => (
+        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "subject", label: fr ? "Sujet" : "Subject" },
+        { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
           <Badge variant={priorityVariant[row.priority as string] ?? "default"}>{String(row.priority)}</Badge>
         )},
         { key: "status", label: t("status"), render: (row) => (
           <Badge variant={row.status === "resolved" ? "success" : "warning"}>{String(row.status)}</Badge>
         )},
-        { key: "lastUpdate", label: "Last Update" },
+        { key: "lastUpdate", label: fr ? "Dernière mise à jour" : "Last Update" },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/support/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

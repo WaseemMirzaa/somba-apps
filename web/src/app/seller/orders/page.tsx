@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
 
 export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [orders, setOrders] = useState(initialOrders);
@@ -37,46 +38,46 @@ export default function SellerOrdersPage() {
 
   function acceptOrder(id: string) {
     setOrders((o) => o.map((item) => item.id === id ? { ...item, shippingStatus: "processing" } : item));
-    toast(`Order ${id} accepted`);
+    toast(fr ? `Commande ${id} acceptée` : `Order ${id} accepted`);
   }
 
   function markReady(id: string) {
     setOrders((o) => o.map((item) => item.id === id ? { ...item, shippingStatus: "ready" } : item));
-    toast(`Order ${id} marked ready for pickup`);
+    toast(fr ? `Commande ${id} prête pour enlèvement` : `Order ${id} marked ready for pickup`);
   }
 
   return (
     <SellerListPage
       title={t("orders")}
-      subtitle="List View — Order Number, Customer, Items, Amount, Payment, Order Status, Shipping Status, Date"
-      breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("orders") }]}
+      subtitle={fr ? "Vue liste — Numéro de commande, Client, Articles, Montant, Paiement, Statut de commande, Statut d'expédition, Date" : "List View — Order Number, Customer, Items, Amount, Payment, Order Status, Shipping Status, Date"}
+      breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("orders") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Order ID, customer…"
+          searchPlaceholder={fr ? "ID commande, client…" : "Order ID, customer…"}
         />
       }
       columns={[
-        { key: "id", label: "Order", render: (row) => (
+        { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
           <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "customer", label: "Customer" },
-        { key: "items", label: "Items" },
+        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "paymentMethod", label: "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
-        { key: "orderStatus", label: "Order Status", render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
-        { key: "shippingStatus", label: "Shipping", render: (row) => <Badge>{String(row.shippingStatus)}</Badge> },
+        { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
+        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant="info">{String(row.orderStatus)}</Badge> },
+        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge>{String(row.shippingStatus)}</Badge> },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={`/seller/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
             {row.shippingStatus === "pending" && (
-              <button onClick={() => acceptOrder(String(row.id))} className="text-emerald-600 hover:underline">Accept</button>
+              <button onClick={() => acceptOrder(String(row.id))} className="text-emerald-600 hover:underline">{fr ? "Accepter" : "Accept"}</button>
             )}
             {row.shippingStatus === "processing" && (
-              <button onClick={() => markReady(String(row.id))} className="text-[var(--primary)] hover:underline">Mark Ready</button>
+              <button onClick={() => markReady(String(row.id))} className="text-[var(--primary)] hover:underline">{fr ? "Marquer prêt" : "Mark Ready"}</button>
             )}
           </div>
         )},

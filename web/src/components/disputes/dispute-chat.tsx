@@ -4,12 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/context/locale-context";
 
 type ChatMessage = { from: "buyer" | "seller" | "admin"; text: string; at: string };
 
 const FROM_LABELS: Record<ChatMessage["from"], string> = {
   buyer: "Buyer",
   seller: "Seller",
+  admin: "Admin",
+};
+
+const FROM_LABELS_FR: Record<ChatMessage["from"], string> = {
+  buyer: "Acheteur",
+  seller: "Vendeur",
   admin: "Admin",
 };
 
@@ -30,7 +37,7 @@ function formatMessageTime(at: string) {
 export function DisputeChat({
   messages,
   onSend,
-  placeholder = "Type a message as admin…",
+  placeholder,
   disabled,
 }: {
   messages: ChatMessage[];
@@ -38,6 +45,10 @@ export function DisputeChat({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
+  const resolvedPlaceholder =
+    placeholder ?? (fr ? "Tapez un message en tant qu'admin…" : "Type a message as admin…");
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -57,9 +68,10 @@ export function DisputeChat({
   return (
     <div className="flex h-[520px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm">
       <div className="shrink-0 border-b border-[var(--border)] bg-slate-50/80 px-5 py-4">
-        <p className="text-sm font-semibold text-slate-900">Dispute chat</p>
+        <p className="text-sm font-semibold text-slate-900">{fr ? "Discussion du litige" : "Dispute chat"}</p>
         <p className="text-xs text-slate-500">
-          {messages.length} message{messages.length !== 1 ? "s" : ""} · Buyer, seller & admin thread
+          {messages.length} message{messages.length !== 1 ? "s" : ""} ·{" "}
+          {fr ? "Fil acheteur, vendeur et admin" : "Buyer, seller & admin thread"}
         </p>
       </div>
 
@@ -68,7 +80,7 @@ export function DisputeChat({
         className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4"
       >
         {messages.length === 0 ? (
-          <p className="text-center text-sm text-slate-400">No messages yet.</p>
+          <p className="text-center text-sm text-slate-400">{fr ? "Aucun message pour le moment." : "No messages yet."}</p>
         ) : (
           messages.map((message, index) => (
             <div
@@ -77,7 +89,7 @@ export function DisputeChat({
             >
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {FROM_LABELS[message.from]}
+                  {(fr ? FROM_LABELS_FR : FROM_LABELS)[message.from]}
                 </span>
                 <span className="text-xs text-slate-400">{formatMessageTime(message.at)}</span>
               </div>
@@ -101,7 +113,7 @@ export function DisputeChat({
                   send();
                 }
               }}
-              placeholder={placeholder}
+              placeholder={resolvedPlaceholder}
             />
             <Button onClick={send} className="shrink-0 self-end px-4" disabled={!draft.trim()}>
               <Send className="h-4 w-4" />

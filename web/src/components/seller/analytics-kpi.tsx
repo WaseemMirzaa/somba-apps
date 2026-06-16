@@ -23,6 +23,8 @@ export function AnalyticsKpiCard({
   spark: number[];
   icon: React.ComponentType<{ className?: string }>;
 }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const up = change >= 0;
   const good = positive !== undefined ? (positive ? up : !up) : up;
 
@@ -34,7 +36,7 @@ export function AnalyticsKpiCard({
           <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-            {Math.abs(change)}% vs last period
+            {Math.abs(change)}% {fr ? "vs période précédente" : "vs last period"}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">

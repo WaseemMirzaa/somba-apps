@@ -92,7 +92,7 @@ export default function SellerShippingPage() {
           label: t("status"),
           render: (row) => (
             <Badge variant={row.status === "delivered" ? "success" : "info"}>
-              {formatStatus(String(row.status))}
+              {fr ? String(row.statusFr) : formatStatus(String(row.status))}
             </Badge>
           ),
         },

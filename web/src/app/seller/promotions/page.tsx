@@ -16,7 +16,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SellerPromotionsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -32,11 +33,11 @@ export default function SellerPromotionsPage() {
   return (
     <SellerListPage
       title={t("promotions")}
-      subtitle="List View — Campaign, Products, Discount, Start/End Date, Status"
-      breadcrumbs={[{ label: "Seller", href: "/seller" }, { label: t("promotions") }]}
+      subtitle={fr ? "Vue liste — Campagne, Produits, Remise, Date de début/fin, Statut" : "List View — Campaign, Products, Discount, Start/End Date, Status"}
+      breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("promotions") }]}
       actions={
         <Link href="/seller/promotions/create" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
-          Create Campaign
+          {fr ? "Créer une campagne" : "Create Campaign"}
         </Link>
       }
       filters={
@@ -44,17 +45,17 @@ export default function SellerPromotionsPage() {
           values={filters}
           onChange={setFilters}
           statusOptions={STATUS_OPTIONS}
-          searchPlaceholder="Campaign, products…"
+          searchPlaceholder={fr ? "Campagne, produits…" : "Campaign, products…"}
         />
       }
       columns={[
-        { key: "campaign", label: "Campaign", render: (row) => (
+        { key: "campaign", label: fr ? "Campagne" : "Campaign", render: (row) => (
           <Link href={`/seller/promotions/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.campaign)}</Link>
         )},
-        { key: "products", label: "Products" },
-        { key: "discount", label: "Discount", render: (row) => `${row.discount}%` },
-        { key: "startDate", label: "Start" },
-        { key: "endDate", label: "End" },
+        { key: "products", label: fr ? "Produits" : "Products" },
+        { key: "discount", label: fr ? "Remise" : "Discount", render: (row) => `${row.discount}%` },
+        { key: "startDate", label: fr ? "Début" : "Start" },
+        { key: "endDate", label: fr ? "Fin" : "End" },
         { key: "status", label: t("status"), render: (row) => (
           <Badge variant={row.status === "active" ? "success" : "warning"}>{String(row.status)}</Badge>
         )},
