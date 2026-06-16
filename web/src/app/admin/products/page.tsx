@@ -12,6 +12,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { moderationQueue } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
+import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -53,10 +54,7 @@ export default function AdminProductsPage() {
       <PageHeader
         title={fr ? "Modération des produits" : "Product Moderation"}
         subtitle={fr ? "Vue liste — ID produit, image, nom, vendeur, catégorie, prix, statut, date de soumission" : "List View — Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"}
-        breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: fr ? "Modération des produits" : "Product Moderation" },
-        ]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Modération des produits" : "Product Moderation" }]}
       />
 
       <ListFilters
@@ -98,9 +96,11 @@ export default function AdminProductsPage() {
                   </Link>
                 ),
               },
-              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (
-                <span>{fr ? (CATEGORY_FR[String(row.category)] ?? String(row.category)) : String(row.category)}</span>
-              )},
+              {
+                key: "category",
+                label: fr ? "Catégorie" : "Category",
+                render: (row) => categoryLabel(String(row.category), fr),
+              },
               {
                 key: "price",
                 label: fr ? "Prix" : "Price",

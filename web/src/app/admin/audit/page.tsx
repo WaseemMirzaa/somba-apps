@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { auditLogs } from "@/lib/admin-entities";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
 
 const ACTION_FR: Record<string, string> = {
@@ -36,7 +37,7 @@ export default function AdminAuditPage() {
   const fr = locale === "fr";
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Journal d'audit" : "Audit Log"} subtitle={fr ? "Flux d'activité avec différences avant/après" : "Activity feed with before/after diffs"} breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Audit" : "Audit" }]} />
+      <PageHeader title={fr ? "Journal d'audit" : "Audit Log"} subtitle={fr ? "Flux d'activité avec différences avant/après" : "Activity feed with before/after diffs"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Audit" : "Audit" }]} />
 
       <div className="space-y-3">
         {auditLogs.map((log) => (

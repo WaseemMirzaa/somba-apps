@@ -11,9 +11,10 @@ import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
 
 const NAV = [
+  { href: "/", label: "Home", labelFr: "Accueil" },
   { href: "/get-app", label: "Shop", labelFr: "Boutique" },
   { href: "/sell-online", label: "Sell Online", labelFr: "Vendre en ligne" },
-  { href: "#modules", label: "Services", labelFr: "Services" },
+  { href: "#modules", label: "Services", labelFr: "Nos services" },
   { href: "#portals", label: "About", labelFr: "À propos" },
 ];
 

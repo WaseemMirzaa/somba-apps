@@ -51,11 +51,13 @@ export default function SellOnlinePage() {
         <div className="hero-overlay absolute inset-0" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 lg:py-32">
           <div className="max-w-2xl">
-            <span className="section-label !bg-white/15 !text-white ring-1 ring-white/25">
+            <span className="section-label !bg-[var(--primary)] !text-white !shadow-none ring-1 ring-white/25">
               {fr ? "Programme vendeur" : "Seller program"}
             </span>
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
-              {fr ? SELL_ONLINE_HERO.titleFr : SELL_ONLINE_HERO.title}
+              {fr ? "Développez votre activité —" : "Grow your business —"}
+              <br />
+              {fr ? "vendez en ligne sur Somba & Tekka" : "sell online on Somba & Tekka"}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-white/88">
               {fr ? SELL_ONLINE_HERO.subtitleFr : SELL_ONLINE_HERO.subtitle}
@@ -63,7 +65,7 @@ export default function SellOnlinePage() {
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-base font-bold text-[var(--primary)] shadow-xl transition-transform hover:scale-[1.02]"
+                className="btn-primary inline-flex items-center gap-2 px-8 py-4 text-base font-bold"
               >
                 {fr ? SELL_ONLINE_HERO.ctaFr : SELL_ONLINE_HERO.cta}
                 <ArrowRight className="h-5 w-5" />

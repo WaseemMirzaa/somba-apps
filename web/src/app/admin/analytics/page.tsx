@@ -35,6 +35,7 @@ import {
   RevenueAreaChart,
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import {
   adminPlatformKpis,
   adminRevenueTrend,
@@ -75,7 +76,7 @@ export default function AdminAnalyticsPage() {
             ? "GMV · Commandes · Vendeurs · Clients · Retours · SLA · Santé marketplace"
             : "GMV · Orders · Sellers · Customers · Returns · SLAs · Marketplace health"
         }
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("analytics") }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("analytics") }]}
         actions={
           <AnalyticsPeriodControls
             period={period}

@@ -27,7 +27,7 @@ const PAYMENT_FR: Record<string, string> = {
 
 export default function RiderBatchPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
 
   return (
@@ -72,7 +72,7 @@ export default function RiderBatchPage() {
                 items={[
                   { label: fr ? "Tâche" : "Task", value: task.id },
                   { label: fr ? "Commande" : "Order", value: task.orderId },
-                  { label: fr ? "Client" : "Customer", value: task.customer },
+                  { label: t("customer"), value: task.customer },
                   {
                     label: fr ? "Téléphone" : "Phone",
                     value: (
@@ -85,7 +85,7 @@ export default function RiderBatchPage() {
                       </a>
                     ),
                   },
-                  { label: fr ? "Zone" : "Zone", value: task.zone },
+                  { label: t("zone"), value: task.zone },
                   { label: fr ? "Vendeur" : "Seller", value: `${task.sellerName} · ${task.sellerStore}` },
                   {
                     label: fr ? "Paiement" : "Payment",

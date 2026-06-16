@@ -16,6 +16,7 @@ import { useToast } from "@/context/toast-context";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const REASON_LABELS: Record<string, string> = {
   not_as_described: "Not as described",
@@ -91,7 +92,7 @@ export default function AdminDisputeResolutionPage() {
         subtitle={`${dispute.createdAt} · ${formatDisputeStatus(dispute.status, fr)} · ${dispute.orderId}`}
         backHref="/admin/disputes"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: fr ? "Litiges" : "Disputes", href: "/admin/disputes" },
           { label: dispute.id },
         ]}

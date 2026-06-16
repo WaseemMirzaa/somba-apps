@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { getModerationProduct } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 
 const STATUS_FR: Record<string, string> = {
@@ -65,7 +66,7 @@ export default function AdminProductModerationDetailPage() {
         subtitle={fr ? `Soumis le ${product.submittedDate} · Statut : ${STATUS_FR[status] ?? status}` : `Submitted ${product.submittedDate} · Status: ${status}`}
         backHref="/admin/products"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: fr ? "Modération des produits" : "Product Moderation", href: "/admin/products" },
           { label: product.name },
         ]}

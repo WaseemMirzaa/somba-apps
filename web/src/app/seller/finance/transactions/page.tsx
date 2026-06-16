@@ -25,7 +25,7 @@ const STATUS_FR: Record<string, string> = {
 };
 
 export default function SellerTransactionsPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -60,7 +60,7 @@ export default function SellerTransactionsPage() {
         { key: "order", label: fr ? "Commande" : "Order", render: (row) => (
           <Link href={`/seller/orders/${row.order}`} className="text-[var(--primary)] hover:underline">{String(row.order)}</Link>
         )},
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "grossAmount", label: fr ? "Brut" : "Gross", render: (row) => formatCurrency(row.grossAmount as number, locale) },
         { key: "commission", label: fr ? "Commission" : "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
         { key: "netAmount", label: fr ? "Net" : "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },

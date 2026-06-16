@@ -39,7 +39,7 @@ export default function SellerReviewsPage() {
         />
       }
       columns={[
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "product", label: fr ? "Produit" : "Product", render: (row) => (
           <Link href={`/seller/products/${row.productId}`} className="text-[var(--primary)] hover:underline">{String(row.product)}</Link>
         )},

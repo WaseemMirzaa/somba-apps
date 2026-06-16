@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import { INITIAL_WAREHOUSES, warehousePersonaId } from "@/lib/warehouses-admin";
 import {
   WAREHOUSE_STAFF_ROLE_LABELS,
+  WAREHOUSE_STAFF_ROLE_LABELS_FR,
   warehouseStaffPersonaId,
 } from "@/lib/admin-entities";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
@@ -12,34 +13,144 @@ export type Persona = {
   id: string;
   role: "guest" | "customer" | "seller" | "admin" | "warehouse" | "rider";
   name: string;
+  nameFr?: string;
   email: string;
   portal: string;
   subRole?: string;
+  subRoleFr?: string;
   warehouseId?: string;
 };
 
 const STATIC_PERSONAS: Persona[] = [
-  { id: "guest", role: "guest", name: "Guest", email: "", portal: "/" },
-  { id: "cust-1", role: "customer", name: "Marie Dubois", email: "marie@email.com", portal: "/shop/account" },
-  { id: "seller-1", role: "seller", name: "TechZone Store", email: "seller@techzone.com", portal: "/seller", subRole: "Subscribed" },
-  { id: "seller-2", role: "seller", name: "Fashion Hub", email: "fashion@seller.com", portal: "/seller", subRole: "No subscription" },
-  { id: "admin-1", role: "admin", name: "Admin User", email: "admin@somba.com", portal: "/admin", subRole: "Super Admin" },
-  { id: "admin-ops", role: "admin", name: "Ops Manager", email: "ops@somba.com", portal: "/admin", subRole: "Operations" },
-  { id: "admin-fin", role: "admin", name: "Finance Lead", email: "finance@somba.com", portal: "/admin/finance", subRole: "Finance" },
-  { id: "admin-sup", role: "admin", name: "Support Agent", email: "support@somba.com", portal: "/admin/support", subRole: "Support" },
-  { id: "admin-mkt", role: "admin", name: "Marketing Mgr", email: "marketing@somba.com", portal: "/admin/marketing", subRole: "Marketing" },
-  { id: "admin-mod", role: "admin", name: "Moderator", email: "mod@somba.com", portal: "/admin/moderation", subRole: "Moderation" },
-  { id: "rider-1", role: "rider", name: "Jean Mukendi", email: "rider@somba.com", portal: "/rider" },
+  { id: "guest", role: "guest", name: "Guest", nameFr: "Invité", email: "", portal: "/" },
+  {
+    id: "cust-1",
+    role: "customer",
+    name: "Marie Dubois",
+    nameFr: "Marie Dubois",
+    email: "marie@email.com",
+    portal: "/shop/account",
+  },
+  {
+    id: "seller-1",
+    role: "seller",
+    name: "TechZone Store",
+    nameFr: "TechZone Store",
+    email: "seller@techzone.com",
+    portal: "/seller",
+    subRole: "Subscribed",
+    subRoleFr: "Abonné",
+  },
+  {
+    id: "seller-2",
+    role: "seller",
+    name: "Fashion Hub",
+    nameFr: "Fashion Hub",
+    email: "fashion@seller.com",
+    portal: "/seller",
+    subRole: "No subscription",
+    subRoleFr: "Sans abonnement",
+  },
+  {
+    id: "admin-1",
+    role: "admin",
+    name: "Admin User",
+    nameFr: "Utilisateur admin",
+    email: "admin@somba.com",
+    portal: "/admin",
+    subRole: "Super Admin",
+    subRoleFr: "Super admin",
+  },
+  {
+    id: "admin-ops",
+    role: "admin",
+    name: "Ops Manager",
+    nameFr: "Responsable des opérations",
+    email: "ops@somba.com",
+    portal: "/admin",
+    subRole: "Operations",
+    subRoleFr: "Opérations",
+  },
+  {
+    id: "admin-fin",
+    role: "admin",
+    name: "Finance Lead",
+    nameFr: "Responsable finance",
+    email: "finance@somba.com",
+    portal: "/admin/finance",
+    subRole: "Finance",
+    subRoleFr: "Finance",
+  },
+  {
+    id: "admin-sup",
+    role: "admin",
+    name: "Support Agent",
+    nameFr: "Agent support",
+    email: "support@somba.com",
+    portal: "/admin/support",
+    subRole: "Support",
+    subRoleFr: "Support",
+  },
+  {
+    id: "admin-mkt",
+    role: "admin",
+    name: "Marketing Mgr",
+    nameFr: "Responsable marketing",
+    email: "marketing@somba.com",
+    portal: "/admin/marketing",
+    subRole: "Marketing",
+    subRoleFr: "Marketing",
+  },
+  {
+    id: "admin-mod",
+    role: "admin",
+    name: "Moderator",
+    nameFr: "Modérateur",
+    email: "mod@somba.com",
+    portal: "/admin/moderation",
+    subRole: "Moderation",
+    subRoleFr: "Modération",
+  },
+  {
+    id: "rider-1",
+    role: "rider",
+    name: "Jean Mukendi",
+    nameFr: "Jean Mukendi",
+    email: "rider@somba.com",
+    portal: "/rider",
+  },
 ];
+
+const PERSONA_ROLE_LABELS: Record<Persona["role"], { en: string; fr: string }> = {
+  guest: { en: "Guest", fr: "Invité" },
+  customer: { en: "Customer", fr: "Client" },
+  seller: { en: "Seller", fr: "Vendeur" },
+  admin: { en: "Admin", fr: "Admin" },
+  warehouse: { en: "Warehouse", fr: "Entrepôt" },
+  rider: { en: "Rider", fr: "Livreur" },
+};
+
+export function getPersonaDisplayName(persona: Persona, fr: boolean) {
+  return fr && persona.nameFr ? persona.nameFr : persona.name;
+}
+
+export function getPersonaDisplaySubRole(persona: Persona, fr: boolean) {
+  if (fr && persona.subRoleFr) return persona.subRoleFr;
+  if (persona.subRole) return persona.subRole;
+  const labels = PERSONA_ROLE_LABELS[persona.role];
+  return fr ? labels.fr : labels.en;
+}
 
 function buildWarehouseManagerPersonas(): Persona[] {
   return INITIAL_WAREHOUSES.filter((w) => w.status === "active").map((w) => ({
     id: warehousePersonaId(w.id),
     role: "warehouse" as const,
     name: w.managerName,
+    nameFr: w.managerName,
     email: w.portalEmail,
     portal: "/warehouse",
     subRole: `${w.name} Manager`,
+    subRoleFr: `Responsable — ${w.name}`,
     warehouseId: w.id,
   }));
 }
@@ -75,6 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: s.email,
         portal: "/warehouse",
         subRole: WAREHOUSE_STAFF_ROLE_LABELS[s.role],
+        subRoleFr: WAREHOUSE_STAFF_ROLE_LABELS_FR[s.role],
         warehouseId: s.warehouseId,
       }));
     return [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas(), ...staffPersonas];

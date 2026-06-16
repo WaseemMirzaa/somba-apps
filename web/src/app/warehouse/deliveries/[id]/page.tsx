@@ -43,7 +43,7 @@ const localizeVariant = (variant: string, fr: boolean) =>
 
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const delivery = getDelivery(id);
@@ -95,7 +95,7 @@ export default function WarehouseDeliveryDetailPage() {
       />
 
       <DetailGrid>
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid
             items={[
               { label: fr ? "Nom" : "Name", value: delivery.customer },
@@ -112,7 +112,7 @@ export default function WarehouseDeliveryDetailPage() {
                 ),
               },
               { label: fr ? "Adresse" : "Address", value: delivery.customerAddress, full: true },
-              { label: fr ? "Zone" : "Zone", value: delivery.zone },
+              { label: t("zone"), value: delivery.zone },
               { label: "ID", value: delivery.customerId },
             ]}
           />

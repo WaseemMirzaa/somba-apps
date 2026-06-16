@@ -10,13 +10,14 @@ import { Send, Megaphone, CalendarClock, Users } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { BROADCASTS, BROADCAST_CHANNELS, BROADCAST_AUDIENCES, type Broadcast } from "@/lib/broadcast-entities";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const channelVariant = { push: "primary", sms: "purple", email: "info" } as const;
 const statusVariant = { sent: "success", scheduled: "warning", draft: "default" } as const;
 const STATUS_FR: Record<string, string> = { sent: "Envoyée", scheduled: "Programmée", draft: "Brouillon" };
 
 export default function AdminBroadcastsPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const [items, setItems] = useState<Broadcast[]>(BROADCASTS);
@@ -57,7 +58,7 @@ export default function AdminBroadcastsPage() {
       <PageHeader
         title={fr ? "Notifications de diffusion" : "Broadcast Notifications"}
         subtitle={fr ? "Push, SMS et e-mail vers des audiences ciblées" : "Push, SMS and email to targeted audiences"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Diffusions" : "Broadcasts" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Diffusions" : "Broadcasts" }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -128,7 +129,7 @@ export default function AdminBroadcastsPage() {
             } },
             { key: "reach", label: fr ? "Portée" : "Reach" },
             { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as Broadcast["status"]]}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
-            { key: "date", label: "Date", render: (row) => <span className="text-slate-500">{String(row.date)}</span> },
+            { key: "date", label: t("date"), render: (row) => <span className="text-slate-500">{String(row.date)}</span> },
           ]}
         />
       </div>

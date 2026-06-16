@@ -91,10 +91,10 @@ function PublicPortalCard({
       <div className="flex flex-1 flex-col p-6">
         <p className="text-sm leading-relaxed text-slate-600">{fr ? portal.descFr : portal.desc}</p>
         <ul className="mt-4 space-y-2">
-          {portal.features.map((f) => (
+          {portal.features.map((f, i) => (
             <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
               <Check className="h-4 w-4 shrink-0 text-[var(--primary)]" />
-              {f}
+              {fr && "featuresFr" in portal && portal.featuresFr ? portal.featuresFr[i] : f}
             </li>
           ))}
         </ul>

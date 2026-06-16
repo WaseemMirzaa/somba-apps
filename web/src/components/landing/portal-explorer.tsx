@@ -222,7 +222,7 @@ export function PortalExplorer({
                         name={ITEM_ICONS[i % ITEM_ICONS.length]}
                         className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--primary)]"
                       />
-                      {item}
+                      {fr && "itemsFr" in mod && mod.itemsFr ? mod.itemsFr[i] : item}
                     </li>
                   ))}
                 </ul>

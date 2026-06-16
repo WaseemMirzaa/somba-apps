@@ -7,24 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cmsBlocks as initialBlocks } from "@/lib/admin-entities";
+import { adminBreadcrumb, cmsBlockTitle, cmsBlockTypeLabel } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-
-const BLOCK_TITLES_FR: Record<string, string> = {
-  hero: "Bannière héro",
-  categories: "Grille de catégories",
-  flash: "Bandeau vente flash",
-  trending: "Produits tendance",
-  stores: "Meilleures boutiques",
-};
-
-const BLOCK_TYPE_FR: Record<string, string> = {
-  hero: "bannière héro",
-  category_grid: "grille de catégories",
-  flash_sale: "vente flash",
-  product_carousel: "carrousel de produits",
-  store_grid: "grille de boutiques",
-};
 
 export default function AdminCmsPage() {
   const { toast } = useToast();
@@ -38,7 +23,7 @@ export default function AdminCmsPage() {
       <PageHeader
         title={fr ? "CMS — Mise en page de l'accueil" : "CMS — Homepage Layout"}
         subtitle={fr ? "Blocs modifiables par l'admin — cliquez pour configurer" : "Admin-editable blocks — click to configure"}
-        breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: "CMS" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: "CMS" }]}
         actions={<Link href="/"><Button size="sm">{fr ? "Aperçu de l'accueil" : "Preview Homepage"}</Button></Link>}
       />
 
@@ -49,8 +34,8 @@ export default function AdminCmsPage() {
               <div className="flex items-center gap-4">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-[var(--primary)]">{i + 1}</span>
                 <div>
-                  <h3 className="font-semibold">{fr ? (BLOCK_TITLES_FR[block.id] ?? block.title) : block.title}</h3>
-                  <p className="text-xs text-slate-500">{fr ? (BLOCK_TYPE_FR[block.type] ?? block.type) : block.type}</p>
+                  <h3 className="font-semibold">{cmsBlockTitle(block.id, block.title, fr)}</h3>
+                  <p className="text-xs text-slate-500">{cmsBlockTypeLabel(block.type, fr)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -62,7 +47,11 @@ export default function AdminCmsPage() {
                     onClick={() => {
                       setEditing(block.id);
                       setBlocks((b) => b.map((item) => item.id === block.id ? { ...item, active: !item.active } : item));
-                      toast(fr ? `Bloc « ${BLOCK_TITLES_FR[block.id] ?? block.title} » mis à jour` : `Block "${block.title}" updated`);
+                      toast(
+                        fr
+                          ? `Bloc « ${cmsBlockTitle(block.id, block.title, fr)} » mis à jour`
+                          : `Block "${block.title}" updated`
+                      );
                     }}
                   >
                     {editing === block.id ? (fr ? "Enregistré" : "Saved") : (fr ? "Modifier le bloc" : "Edit Block")}

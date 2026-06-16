@@ -72,7 +72,7 @@ export default function SellerOrdersPage() {
         { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
           <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
         { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },

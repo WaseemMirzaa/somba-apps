@@ -84,7 +84,7 @@ export default function RiderProfilePage() {
             ),
           },
           { label: fr ? "Véhicule" : "Vehicle", value: fr ? riderProfile.vehicleFr : riderProfile.vehicle },
-          { label: fr ? "Zone" : "Zone", value: riderProfile.zone },
+          { label: t("zone"), value: riderProfile.zone },
           {
             label: fr ? "Statut" : "Status",
             value: fr

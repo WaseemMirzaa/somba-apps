@@ -69,7 +69,7 @@ export default function SellerReturnsPage() {
           <Link href={`/seller/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "Commande" : "Order" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (fr ? String(row.reasonFr ?? row.reason) : String(row.reason)) },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
         { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{returnStatusLabel(String(row.status), fr)}</Badge> },

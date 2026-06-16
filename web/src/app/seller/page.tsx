@@ -460,7 +460,7 @@ export default function SellerDashboard() {
                     </Link>
                   ),
                 },
-                { key: "customer", label: t("name") },
+                { key: "customer", label: t("customer") },
                 { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
                 { key: "orderStatus", label: t("status"), render: (row) => <Badge variant="info">{fr ? (orderStatusFr[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
               ]}

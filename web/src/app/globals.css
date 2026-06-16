@@ -29,12 +29,13 @@
   --accent: var(--primary);
   --accent-glow: rgba(225, 20, 40, 0.28);
 
+  /* Sell-online hero — Tekka red → royal blue, aligned with logo tile & landing-band */
   --hero-overlay: linear-gradient(
-    112deg,
-    rgba(7, 15, 46, 0.94) 0%,
-    rgba(14, 31, 92, 0.86) 40%,
-    rgba(26, 58, 168, 0.58) 70%,
-    rgba(26, 58, 168, 0.2) 100%
+    135deg,
+    rgba(138, 10, 24, 0.92) 0%,
+    rgba(225, 20, 40, 0.86) 38%,
+    rgba(42, 82, 207, 0.78) 68%,
+    rgba(14, 31, 92, 0.9) 100%
   );
   --landing-glow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 28px 60px -18px rgba(14, 31, 92, 0.45);
 

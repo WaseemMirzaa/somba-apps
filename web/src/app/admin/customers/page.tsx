@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { customerEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 
@@ -47,7 +48,7 @@ export default function AdminCustomersPage() {
             : "List View — Name, Email, Phone, City, Orders, Total Spent, Status"
         }
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("customers") },
         ]}
       />

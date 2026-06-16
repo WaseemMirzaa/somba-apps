@@ -12,7 +12,7 @@ import { useToast } from "@/context/toast-context";
 
 export default function RiderPodPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function RiderPodPage() {
 
       <DetailSection title={fr ? "Détails" : "Details"}>
         <InfoGrid items={[
-          { label: fr ? "Client" : "Customer", value: task.customer },
+          { label: t("customer"), value: task.customer },
           { label: fr ? "Commande" : "Order", value: task.orderId },
           { label: fr ? "Destinataire" : "Recipient", value: recipient || "—" },
         ]} />

@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { BRAND } from "@/lib/config";
 import { LOGIN_HERO_IMAGE } from "@/lib/product-landing";
 import { BrandMark } from "@/components/landing/brand-mark";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, getPersonaDisplayName, getPersonaDisplaySubRole } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { FullPageLoader } from "@/components/ui/loader";
@@ -143,8 +143,10 @@ export default function LoginPage() {
                     className="card-premium flex w-full items-center justify-between p-4 text-left transition-colors hover:border-blue-200"
                   >
                     <div>
-                      <p className="font-semibold text-slate-900">{p.name}</p>
-                      <p className="text-xs text-slate-500">{p.subRole || p.role} · {p.email}</p>
+                      <p className="font-semibold text-slate-900">{getPersonaDisplayName(p, fr)}</p>
+                      <p className="text-xs text-slate-500">
+                        {getPersonaDisplaySubRole(p, fr)} · {p.email}
+                      </p>
                       {p.warehouseId && <p className="text-xs text-[var(--primary)]">{p.warehouseId}</p>}
                     </div>
                     <span className="text-xs font-medium text-[var(--primary)]">{fr ? "Entrer →" : "Enter →"}</span>

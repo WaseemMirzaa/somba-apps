@@ -67,7 +67,7 @@ export default function WarehouseReturnsPage() {
           <Link href={`/warehouse/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => String(fr ? row.reasonFr : row.reason) },
         { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status).replace("_", " ")}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (

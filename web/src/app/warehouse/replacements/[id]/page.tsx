@@ -37,7 +37,7 @@ function replacementStatusVariant(status: string): "success" | "warning" | "info
 export default function WarehouseReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const rep = getReplacement(id);
@@ -162,7 +162,7 @@ export default function WarehouseReplacementDetailPage() {
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid
             items={[
               {

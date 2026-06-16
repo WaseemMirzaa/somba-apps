@@ -13,6 +13,7 @@ import { getOrder } from "@/lib/entities";
 import { getReturn } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const RETURN_STATUS_FR: Record<string, string> = {
   pending: "En attente",
@@ -101,7 +102,7 @@ export default function AdminReturnDetailPage() {
         subtitle={`${ret.createdAt} · ${returnStatusLabel(ret.status)} · ${formatCurrency(ret.refund.amount, locale)}`}
         backHref="/admin/returns"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("returns"), href: "/admin/returns" },
           { label: ret.id },
         ]}
@@ -128,7 +129,7 @@ export default function AdminReturnDetailPage() {
           <InfoGrid items={[
             { label: fr ? "ID retour" : "Return ID", value: ret.id },
             { label: fr ? "Demandé le" : "Requested", value: ret.createdAt },
-            { label: "Type", value: fr ? (RETURN_TYPE_FR[ret.returnType] ?? ret.returnType) : ret.returnType.charAt(0).toUpperCase() + ret.returnType.slice(1) },
+            { label: t("type"), value: fr ? (RETURN_TYPE_FR[ret.returnType] ?? ret.returnType) : ret.returnType.charAt(0).toUpperCase() + ret.returnType.slice(1) },
             { label: fr ? "Statut" : "Status", value: returnStatusLabel(ret.status) },
             { label: fr ? "Motif" : "Reason", value: <span className="font-semibold text-amber-700">{fr ? ret.reasonFr : ret.reason}</span> },
           ]} />
@@ -145,7 +146,7 @@ export default function AdminReturnDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
             ...(order ? [

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { formatCurrency } from "@/lib/utils";
 
@@ -80,7 +81,7 @@ export default function AdminRefundsPage() {
         title={title}
         subtitle={subtitle}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: locale === "fr" ? "Remboursements" : "Refunds" },
         ]}
       />

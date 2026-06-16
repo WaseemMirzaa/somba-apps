@@ -15,7 +15,7 @@ import type { RiderEntity } from "@/lib/warehouse-entities";
 
 export default function WarehouseBatchBuilderPage() {
   const router = useRouter();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const [batch, setBatch] = useState<string[]>([]);
@@ -50,8 +50,8 @@ export default function WarehouseBatchBuilderPage() {
             <DataTable
               columns={[
                 { key: "id", label: fr ? "Colis" : "Parcel" },
-                { key: "customer", label: fr ? "Client" : "Customer" },
-                { key: "zone", label: "Zone" },
+                { key: "customer", label: t("customer") },
+                { key: "zone", label: t("zone") },
                 { key: "weight", label: fr ? "Poids" : "Weight", render: (row) => `${row.weight}kg` },
                 {
                   key: "actions",
@@ -78,7 +78,7 @@ export default function WarehouseBatchBuilderPage() {
                   columns={[
                     { key: "stop", label: "#" },
                     { key: "id", label: fr ? "Colis" : "Parcel" },
-                    { key: "zone", label: "Zone" },
+                    { key: "zone", label: t("zone") },
                     {
                       key: "actions",
                       label: fr ? "Action" : "Action",

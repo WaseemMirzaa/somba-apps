@@ -57,7 +57,7 @@ export default function WarehouseExceptionsPage() {
         { key: "parcelId", label: fr ? "Colis" : "Parcel", render: (row) => row.parcelId !== "—" ? (
           <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
         ) : "—" },
-        { key: "type", label: "Type", render: (row) => String(fr ? row.typeFr : row.type) },
+        { key: "type", label: t("type"), render: (row) => String(fr ? row.typeFr : row.type) },
         { key: "severity", label: fr ? "Gravité" : "Severity", render: (row) => (
           <Badge variant={severityVariant[row.severity as string] ?? "default"}>{String(fr ? row.severityFr : row.severity)}</Badge>
         )},

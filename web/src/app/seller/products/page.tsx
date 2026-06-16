@@ -8,18 +8,34 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { sellerProductList } from "@/lib/seller-entities";
+import { useToast } from "@/context/toast-context";
+import { sellerProductList as initialProducts } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
+
+type SellerProductStatus = "live" | "draft" | "paused" | "out_of_stock" | "unavailable";
 
 const STATUS_OPTIONS = [
   { value: "live", label: "Live", labelFr: "En ligne" },
   { value: "draft", label: "Draft", labelFr: "Brouillon" },
   { value: "paused", label: "Paused", labelFr: "En pause" },
+  { value: "unavailable", label: "Unavailable", labelFr: "Indisponible" },
+  { value: "out_of_stock", label: "Out of stock", labelFr: "En rupture de stock" },
 ];
 
 const PRODUCT_STATUS_FR: Record<string, string> = {
-  live: "En ligne", draft: "Brouillon", paused: "En pause", out_of_stock: "En rupture de stock", active: "Actif", disabled: "Désactivé",
+  live: "En ligne", draft: "Brouillon", paused: "En pause", unavailable: "Indisponible",
+  out_of_stock: "En rupture de stock", active: "Actif", disabled: "Désactivé",
 };
+
+function productStatusBadgeVariant(status: string) {
+  if (status === "live") return "success";
+  if (status === "unavailable" || status === "out_of_stock") return "danger";
+  return "warning";
+}
+
+function productStatusLabel(status: string, fr: boolean) {
+  return fr ? (PRODUCT_STATUS_FR[status] ?? status) : status;
+}
 
 const MODERATION_STATUS_FR: Record<string, string> = {
   approved: "Approuvé", pending: "En attente", rejected: "Rejeté", flagged: "Signalé",
@@ -28,16 +44,27 @@ const MODERATION_STATUS_FR: Record<string, string> = {
 export default function SellerProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const [products, setProducts] = useState(initialProducts);
 
   const filtered = useMemo(
     () =>
-      applyListFilters(sellerProductList, filters, {
+      applyListFilters(products, filters, {
         searchFields: ["id", "name", "brand", "sku", "category"],
         statusField: "status",
       }),
-    [filters]
+    [products, filters]
   );
+
+  function setProductStatus(id: number, status: SellerProductStatus) {
+    setProducts((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
+    toast(
+      status === "unavailable"
+        ? (fr ? "Produit marqué indisponible" : "Product marked unavailable")
+        : (fr ? "Produit remis en ligne" : "Product marked live")
+    );
+  }
 
   return (
     <SellerListPage
@@ -76,12 +103,22 @@ export default function SellerProductsPage() {
         { key: "soldCount", label: fr ? "Vendus" : "Sold" },
         { key: "views", label: fr ? "Vues" : "Views" },
         { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `⭐ ${row.rating}` },
-        { key: "status", label: t("status"), render: (row) => <Badge variant={row.status === "live" ? "success" : "warning"}>{fr ? (PRODUCT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={productStatusBadgeVariant(String(row.status))}>{productStatusLabel(String(row.status), fr)}</Badge> },
         { key: "moderationStatus", label: fr ? "Modération" : "Moderation", render: (row) => <Badge>{fr ? (MODERATION_STATUS_FR[String(row.moderationStatus)] ?? String(row.moderationStatus)) : String(row.moderationStatus)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs">
             <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
             <Link href="/seller/products/create" className="text-slate-500 hover:underline">{fr ? "Modifier" : "Edit"}</Link>
+            {row.status === "live" && (
+              <button type="button" onClick={() => setProductStatus(row.id as number, "unavailable")} className="text-amber-700 hover:underline">
+                {fr ? "Indisponible" : "Unavailable"}
+              </button>
+            )}
+            {row.status === "unavailable" && (
+              <button type="button" onClick={() => setProductStatus(row.id as number, "live")} className="text-emerald-700 hover:underline">
+                {fr ? "Remettre en ligne" : "Mark live"}
+              </button>
+            )}
           </div>
         )},
       ]}

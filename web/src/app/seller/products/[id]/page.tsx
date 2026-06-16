@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -11,28 +12,56 @@ import { Badge } from "@/components/ui/badge";
 import { getSellerProductFull } from "@/lib/seller-entities";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { useToast } from "@/context/toast-context";
+
+type SellerProductStatus = "live" | "draft" | "paused" | "out_of_stock" | "unavailable";
 
 const STATUS_FR: Record<string, string> = {
-  active: "Actif", disabled: "Désactivé", live: "En ligne", draft: "Brouillon",
+  active: "Actif", disabled: "Désactivé", live: "En ligne", draft: "Brouillon", unavailable: "Indisponible",
   pending: "En attente", processing: "En cours", shipped: "Expédié", ready: "Prêt",
   delivered: "Livré", cancelled: "Annulé", approved: "Approuvé", out_of_stock: "En rupture de stock",
 };
+
+function productStatusBadgeVariant(status: string) {
+  if (status === "live") return "success";
+  if (status === "unavailable" || status === "out_of_stock") return "danger";
+  return "warning";
+}
+
+function productStatusLabel(status: string, fr: boolean) {
+  return fr ? (STATUS_FR[status] ?? status) : status;
+}
 
 export default function SellerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { toast } = useToast();
   const product = getSellerProductFull(Number(id));
+  const [status, setStatus] = useState<SellerProductStatus>((product?.status as SellerProductStatus) ?? "draft");
 
   if (!product) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
   }
 
+  function markUnavailable() {
+    setStatus("unavailable");
+    toast(fr ? "Produit marqué indisponible — masqué de la boutique" : "Product marked unavailable — hidden from storefront");
+  }
+
+  function markLive() {
+    setStatus("live");
+    toast(fr ? "Produit remis en ligne" : "Product marked live");
+  }
+
+  const canMarkUnavailable = status === "live" || status === "paused";
+  const canMarkLive = status === "unavailable";
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={product.name}
-        subtitle={`SKU: ${product.sku} · ${fr ? (STATUS_FR[product.status] ?? product.status) : product.status}`}
+        subtitle={`SKU: ${product.sku} · ${productStatusLabel(status, fr)}`}
         backHref="/seller/products"
         breadcrumbs={[
           { label: fr ? "Vendeur" : "Seller", href: "/seller" },
@@ -40,9 +69,19 @@ export default function SellerProductDetailPage() {
           { label: product.name },
         ]}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href="/seller/products/create" className="rounded-lg border border-sky-200 px-4 py-2 text-sm">{fr ? "Modifier" : "Edit"}</Link>
-            <Badge variant={product.status === "live" ? "success" : "warning"}>{fr ? (STATUS_FR[String(product.status)] ?? String(product.status)) : String(product.status)}</Badge>
+            {canMarkUnavailable && (
+              <button type="button" onClick={markUnavailable} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white">
+                {fr ? "Marquer indisponible" : "Mark unavailable"}
+              </button>
+            )}
+            {canMarkLive && (
+              <button type="button" onClick={markLive} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+                {fr ? "Remettre en ligne" : "Mark live"}
+              </button>
+            )}
+            <Badge variant={productStatusBadgeVariant(status)}>{productStatusLabel(status, fr)}</Badge>
           </div>
         }
       />
@@ -121,7 +160,7 @@ export default function SellerProductDetailPage() {
                 { key: "orderNumber", label: fr ? "Commande" : "Order", render: (row) => (
                   <Link href={`/seller/orders/${row.orderNumber}`} className="text-[var(--primary)] hover:underline">{String(row.orderNumber)}</Link>
                 )},
-                { key: "customer", label: fr ? "Client" : "Customer" },
+                { key: "customer", label: t("customer") },
                 { key: "quantity", label: fr ? "Qté" : "Qty" },
                 { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
                 { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },

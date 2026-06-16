@@ -10,6 +10,7 @@ import { Tag, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { PROMOTION_REQUESTS, type PromotionRequest } from "@/lib/promotions-entities";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const statusVariant = { pending: "warning", approved: "success", rejected: "danger" } as const;
 
@@ -25,7 +26,7 @@ const TYPE_FR: Record<string, string> = {
 };
 
 export default function AdminPromotionsPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const [requests, setRequests] = useState<PromotionRequest[]>(PROMOTION_REQUESTS);
@@ -47,7 +48,7 @@ export default function AdminPromotionsPage() {
       <PageHeader
         title={fr ? "Demandes de promotion" : "Promotion Requests"}
         subtitle={fr ? "Les vendeurs demandent des promotions — la plateforme les approuve et les publie" : "Sellers request promotions — the platform approves and publishes them"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Promotions" : "Promotions" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Promotions" : "Promotions" }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -84,7 +85,7 @@ export default function AdminPromotionsPage() {
                 );
               },
             },
-            { key: "type", label: "Type", render: (row) => <Badge variant="info"><Tag className="mr-1 h-3 w-3" />{fr ? (TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
+            { key: "type", label: t("type"), render: (row) => <Badge variant="info"><Tag className="mr-1 h-3 w-3" />{fr ? (TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
             { key: "value", label: fr ? "Valeur" : "Value", render: (row) => <span className="font-semibold text-slate-900">{String(row.value)}</span> },
             { key: "scope", label: fr ? "Portée" : "Scope", render: (row) => <span className="text-slate-500">{String(row.scope)}</span> },
             { key: "end", label: fr ? "Période" : "Window", render: (row) => { const r = row as unknown as PromotionRequest; return <span className="text-xs text-slate-500">{r.start} → {r.end}</span>; } },

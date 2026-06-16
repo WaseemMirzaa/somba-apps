@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { banners } from "@/lib/mock-data";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const initialCampaigns = [
   { id: "CMP-01", name: "Summer Electronics Sale", nameFr: "Soldes électronique d'été", type: "flash_sale", status: "active", reach: "124K" },
@@ -40,7 +41,7 @@ export default function AdminMarketingPage() {
       <PageHeader
         title={t("marketing")}
         subtitle={fr ? "Campagnes, bannières et promotions" : "Campaigns, banners & promotions"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("marketing") }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("marketing") }]}
         actions={<Button size="sm" onClick={() => setShowCreate(true)}>{fr ? "Créer une campagne" : "Create Campaign"}</Button>}
       />
 

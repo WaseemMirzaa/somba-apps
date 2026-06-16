@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const ORDER_STATUS_FR: Record<string, string> = {
   pending: "En attente",
@@ -54,7 +55,7 @@ export default function AdminOrderDetailPage() {
         subtitle={`${order.date} · ${orderStatusLabel} · ${formatCurrency(order.amount, locale)}`}
         backHref="/admin/orders"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("orders"), href: "/admin/orders" },
           { label: order.id },
         ]}
@@ -71,7 +72,7 @@ export default function AdminOrderDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{order.customer}</Link> },
             { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },

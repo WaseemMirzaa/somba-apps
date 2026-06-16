@@ -31,7 +31,7 @@ const BATCH_STATUS_FR: Record<string, string> = {
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const rider = getRider(Number(id));
 
@@ -89,7 +89,7 @@ export default function WarehouseRiderDetailPage() {
                 ),
               },
               { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
-              { label: fr ? "Zone" : "Zone", value: rider.zone },
+              { label: t("zone"), value: rider.zone },
               { label: fr ? "Statut" : "Status", value: fr ? STATUS_FR[rider.status] ?? rider.status : rider.status },
               { label: fr ? "Position" : "Location", value: rider.location },
             ]}
@@ -131,7 +131,7 @@ export default function WarehouseRiderDetailPage() {
                   </Link>
                 ),
               },
-              { key: "zone", label: fr ? "Zone" : "Zone" },
+              { key: "zone", label: t("zone") },
               { key: "parcelCount", label: fr ? "Colis" : "Parcels" },
               {
                 key: "status",

@@ -25,7 +25,7 @@ const STATUS_FR: Record<string, string> = {
 export default function WarehouseBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const batch = getBatch(id);
@@ -68,7 +68,7 @@ export default function WarehouseBatchDetailPage() {
         <DetailGridSection title={fr ? "Lot" : "Batch"}>
           <InfoGrid items={[
             { label: fr ? "ID lot" : "Batch ID", value: batch.id },
-            { label: fr ? "Zone" : "Zone", value: batch.zone },
+            { label: t("zone"), value: batch.zone },
             { label: fr ? "Colis" : "Parcels", value: batch.parcelCount },
             { label: fr ? "Statut" : "Status", value: statusLabel },
           ]} />
@@ -105,7 +105,7 @@ export default function WarehouseBatchDetailPage() {
             { label: fr ? "Nom" : "Name", value: rider.name },
             { label: fr ? "Téléphone" : "Phone", value: rider.phone },
             { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
-            { label: fr ? "Zone" : "Zone", value: rider.zone },
+            { label: t("zone"), value: rider.zone },
             { label: fr ? "Performance" : "Performance", value: `${rider.performanceScore}%` },
           ]} />
           <div className="mt-4 flex gap-3">
@@ -136,7 +136,7 @@ export default function WarehouseBatchDetailPage() {
                 <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
               )},
               { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: t("customer") },
               { key: "actions", label: fr ? "Action" : "Action", render: (row) => (
                 <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-[var(--primary)] hover:underline">{fr ? "Ouvrir" : "Open"}</Link>
               )},

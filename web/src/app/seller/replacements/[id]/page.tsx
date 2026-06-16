@@ -29,7 +29,7 @@ function formatReplacementStatus(status: string, fr = false) {
 
 export default function SellerReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const rep = getReplacement(id);
 
@@ -84,7 +84,7 @@ export default function SellerReplacementDetailPage() {
                   </Link>
                 ),
               },
-              { label: fr ? "Client" : "Customer", value: rep.customer },
+              { label: t("customer"), value: rep.customer },
               { label: fr ? "Statut" : "Status", value: formatReplacementStatus(rep.status, fr) },
             ]}
           />

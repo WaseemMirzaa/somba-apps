@@ -56,7 +56,7 @@ export const COMMISSION_CATEGORIES = [
   { id: "grocery", label: "Grocery", labelFr: "Épicerie", rate: 10 },
   { id: "books", label: "Books", labelFr: "Livres", rate: 10 },
   { id: "toys", label: "Toys", labelFr: "Jouets", rate: 12 },
-  { id: "sports", label: "Sports", labelFr: "Sport", rate: 12 },
+  { id: "sports", label: "Sports", labelFr: "Articles de sport", rate: 12 },
 ] as const;
 
 export const PAYMENTS = {

@@ -10,6 +10,7 @@ import { Star, Flag, MessageSquare, ShieldCheck } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { REVIEWS, REPORTS, type ReviewItem, type ReportItem } from "@/lib/moderation-entities";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const reviewVariant = { pending: "warning", published: "success", removed: "danger" } as const;
 const reportVariant = { open: "warning", resolved: "success", dismissed: "default" } as const;
@@ -26,7 +27,7 @@ const REPORT_REASON_FR: Record<string, string> = {
 };
 
 export default function AdminReviewsPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const [tab, setTab] = useState("reviews");
@@ -51,7 +52,7 @@ export default function AdminReviewsPage() {
       <PageHeader
         title={fr ? "Avis et modération" : "Reviews & Moderation"}
         subtitle={fr ? "Modérez les avis clients et le contenu signalé" : "Moderate customer reviews and reported content"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Avis" : "Reviews" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Avis" : "Reviews" }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -112,7 +113,7 @@ export default function AdminReviewsPage() {
           <DataTable
             data={reports as unknown as Record<string, unknown>[]}
             columns={[
-              { key: "type", label: "Type", render: (row) => <Badge variant="info">{fr ? (REPORT_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
+              { key: "type", label: t("type"), render: (row) => <Badge variant="info">{fr ? (REPORT_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
               { key: "target", label: fr ? "Cible" : "Target", render: (row) => <span className="font-medium text-slate-900">{fr ? String((row as unknown as ReportItem).targetFr ?? row.target) : String(row.target)}</span> },
               { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => fr ? (REPORT_REASON_FR[String(row.reason)] ?? String((row as unknown as ReportItem).reasonFr ?? row.reason)) : String(row.reason) },
               { key: "reporter", label: fr ? "Signalé par" : "Reporter", render: (row) => <span className="text-slate-500">{fr ? String((row as unknown as ReportItem).reporterFr ?? row.reporter) : String(row.reporter)}</span> },

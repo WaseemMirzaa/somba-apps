@@ -9,6 +9,7 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import type { ShipmentDetail } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
+import { customerColumnLabel, zoneColumnLabel } from "@/lib/admin-i18n";
 
 function formatStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -84,7 +85,7 @@ export function ShipmentDetailGrid({
                 </a>
               ),
             },
-            { label: fr ? "Zone" : "Zone", value: shipment.warehouse.zone },
+            { label: zoneColumnLabel(locale), value: shipment.warehouse.zone },
           ]}
         />
       </DetailGridSection>
@@ -103,7 +104,7 @@ export function ShipmentDetailGrid({
               ),
             },
             { label: fr ? "Véhicule" : "Vehicle", value: fr ? shipment.rider.vehicleFr : shipment.rider.vehicle },
-            { label: fr ? "Zone" : "Zone", value: shipment.rider.zone },
+            { label: zoneColumnLabel(locale), value: shipment.rider.zone },
             {
               label: fr ? "Position actuelle" : "Current Location",
               value: fr ? shipment.rider.currentLocationFr : shipment.rider.currentLocation,
@@ -142,7 +143,7 @@ export function ShipmentDetailGrid({
                   shipment.orderId
                 ),
               },
-              { label: fr ? "Client" : "Customer", value: shipment.customer.name },
+              { label: customerColumnLabel(locale), value: shipment.customer.name },
               {
                 label: fr ? "Téléphone" : "Phone",
                 value: (

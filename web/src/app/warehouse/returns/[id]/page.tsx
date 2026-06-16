@@ -25,7 +25,7 @@ const STATUS_FR: Record<string, string> = {
 
 export default function WarehouseReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const ret = getReturn(id);
@@ -59,7 +59,7 @@ export default function WarehouseReturnDetailPage() {
           <InfoGrid items={[
             { label: fr ? "ID retour" : "Return ID", value: ret.id },
             { label: fr ? "Commande" : "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
-            { label: fr ? "Client" : "Customer", value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
+            { label: t("customer"), value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
             { label: fr ? "Motif" : "Reason", value: reason },
             { label: fr ? "Statut" : "Status", value: statusLabel },
           ]} />

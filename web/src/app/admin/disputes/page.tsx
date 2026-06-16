@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useDisputes } from "@/context/dispute-context";
 
 const STATUS_OPTIONS = [
@@ -64,7 +65,7 @@ export default function AdminDisputesPage() {
       <PageHeader
         title={fr ? "File des litiges" : "Disputes Queue"}
         subtitle={fr ? `${openCount} dossier${openCount === 1 ? "" : "s"} actif${openCount === 1 ? "" : "s"}` : `${openCount} active case${openCount === 1 ? "" : "s"}`}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Litiges" : "Disputes" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Litiges" : "Disputes" }]}
       />
 
       <ListFilters

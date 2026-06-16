@@ -53,7 +53,7 @@ function localizePaymentStatus(status: string, fr: boolean) {
 
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const order = getSellerOrder(id);
   const shipment = order ? getShipmentByOrderId(order.id) : undefined;
@@ -104,7 +104,7 @@ export default function SellerOrderDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: order.customer },
             { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },

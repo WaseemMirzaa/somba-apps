@@ -155,7 +155,7 @@ export default function SellerFinancePage() {
                   </Link>
                 ),
               },
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: t("customer") },
               {
                 key: "grossAmount",
                 label: fr ? "Brut" : "Gross",

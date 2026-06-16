@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { orderEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 
@@ -52,7 +53,7 @@ export default function AdminOrdersPage() {
         title={t("orders")}
         subtitle={fr ? "Vue liste — ID commande, client, vendeur, montant, paiement, statut, date" : "List View — Order ID, Customer, Seller, Amount, Payment, Status, Date"}
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("orders") },
         ]}
       />
@@ -79,7 +80,7 @@ export default function AdminOrdersPage() {
               },
               {
                 key: "customer",
-                label: fr ? "Client" : "Customer",
+                label: t("customer"),
                 render: (row) => (
                   <Link href={`/admin/customers/${row.customerId}`} className="text-[var(--primary)] hover:underline">
                     {String(row.customer)}

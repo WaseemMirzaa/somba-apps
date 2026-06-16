@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { returnEntities } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 
@@ -48,7 +49,7 @@ export default function AdminReturnsPage() {
       <PageHeader
         title={t("returns")}
         subtitle={fr ? "Demandes de retour sur toute la plateforme" : "Platform-wide return requests"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("returns") }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("returns") }]}
       />
 
       <ListFilters
@@ -70,7 +71,7 @@ export default function AdminReturnsPage() {
               { key: "orderId", label: fr ? "Commande" : "Order", render: (row) => (
                 <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
               )},
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: t("customer") },
               { key: "product", label: fr ? "Produit" : "Product" },
               { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (
                 <span className="font-medium text-amber-700">{fr ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>

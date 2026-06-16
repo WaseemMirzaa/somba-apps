@@ -59,7 +59,7 @@ const localizeVariant = (variant: string, fr: boolean) =>
 
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const task = getRiderTask(id);
   const [delivered, setDelivered] = useState(task?.status === "delivered");
@@ -107,7 +107,7 @@ export default function RiderTaskDetailPage() {
         />
       </DetailSection>
 
-      <DetailSection title={fr ? "Client" : "Customer"}>
+      <DetailSection title={t("customer")}>
         <InfoGrid
           items={[
             { label: fr ? "Nom" : "Name", value: task.customer },
@@ -124,7 +124,7 @@ export default function RiderTaskDetailPage() {
               ),
             },
             { label: fr ? "Adresse" : "Address", value: task.address, full: true },
-            { label: fr ? "Zone" : "Zone", value: task.zone },
+            { label: t("zone"), value: task.zone },
           ]}
         />
       </DetailSection>

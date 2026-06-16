@@ -119,9 +119,9 @@ export default function WarehouseAgedPage() {
             </Link>
           ),
         },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "seller", label: fr ? "Vendeur" : "Seller" },
-        { key: "zone", label: fr ? "Zone" : "Zone" },
+        { key: "zone", label: t("zone") },
         {
           key: "status",
           label: t("status"),

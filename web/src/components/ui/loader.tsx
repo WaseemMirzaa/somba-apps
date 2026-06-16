@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 type LoaderSize = "sm" | "md" | "lg";
@@ -16,10 +17,13 @@ export type LoaderProps = {
   showLabel?: boolean;
 };
 
-const sizeRing: Record<LoaderSize, string> = {
-  sm: "h-5 w-5 border-2",
-  md: "h-9 w-9 border-[3px]",
-  lg: "h-12 w-12 border-[3px]",
+const spinnerConfig: Record<
+  LoaderSize,
+  { dim: number; stroke: number; r: number; duration: string }
+> = {
+  sm: { dim: 20, stroke: 2.5, r: 7.25, duration: "0.75s" },
+  md: { dim: 36, stroke: 3, r: 14, duration: "0.8s" },
+  lg: { dim: 48, stroke: 3.5, r: 19, duration: "0.85s" },
 };
 
 function resolveLabel(
@@ -33,7 +37,45 @@ function resolveLabel(
   return label ?? fallbackEn;
 }
 
-/** Branded Somba spinner — red primary ring with logo blue accent. */
+function BrandedSpinner({ size = "md" }: { size?: LoaderSize }) {
+  const uid = useId().replace(/:/g, "");
+  const gradientId = `somba-spinner-${uid}`;
+  const { dim, stroke, r, duration } = spinnerConfig[size];
+  const center = dim / 2;
+  const circumference = 2 * Math.PI * r;
+  const arc = circumference * 0.62;
+
+  return (
+    <svg
+      width={dim}
+      height={dim}
+      viewBox={`0 0 ${dim} ${dim}`}
+      className="animate-spin"
+      style={{ animationDuration: duration }}
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--primary)" />
+          <stop offset="50%" stopColor="var(--brand-red)" />
+          <stop offset="100%" stopColor="var(--logo-primary)" />
+        </linearGradient>
+      </defs>
+      <circle
+        cx={center}
+        cy={center}
+        r={r}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={`${arc} ${circumference - arc}`}
+      />
+    </svg>
+  );
+}
+
+/** Branded Somba spinner — red-to-blue gradient arc, no background track. */
 export function Loader({
   size = "md",
   className,
@@ -51,21 +93,7 @@ export function Loader({
       aria-live="polite"
       aria-busy="true"
     >
-      <span className={cn("relative inline-flex shrink-0", sizeRing[size])}>
-        <span
-          className={cn(
-            "absolute inset-0 rounded-full border-slate-100/90",
-            sizeRing[size]
-          )}
-          aria-hidden
-        />
-        <span
-          className={cn(
-            "absolute inset-0 animate-spin rounded-full border-transparent border-t-[var(--primary)] border-r-[var(--logo-primary)]",
-            sizeRing[size]
-          )}
-        />
-      </span>
+      <BrandedSpinner size={size} />
       {showLabel && (
         <p className="text-sm font-medium tracking-tight text-slate-500">{text}</p>
       )}
@@ -136,7 +164,7 @@ export function LoadingOverlay({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] bg-white/80 backdrop-blur-[2px]",
+        "absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] bg-white/70 backdrop-blur-[1px]",
         className
       )}
       role="status"

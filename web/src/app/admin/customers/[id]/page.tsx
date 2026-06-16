@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { getCustomer, orderEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 
 const ORDER_STATUS_FR: Record<string, string> = {
@@ -44,7 +45,7 @@ export default function AdminCustomerDetailPage() {
         subtitle={fr ? `${customer.email} · Membre depuis ${customer.joined}` : `${customer.email} · Member since ${customer.joined}`}
         backHref="/admin/customers"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("customers"), href: "/admin/customers" },
           { label: customer.name },
         ]}

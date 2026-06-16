@@ -102,7 +102,7 @@ export default function WarehouseParcelDetailPage() {
             { label: fr ? "Volume" : "Volume", value: parcel.volume },
             { label: fr ? "Statut" : "Status", value: statusLabel },
             { label: fr ? "Heure d'arrivée" : "Arrival Time", value: parcel.arrival },
-            { label: fr ? "Zone" : "Zone", value: parcel.zone },
+            { label: t("zone"), value: parcel.zone },
           ]} />
         </DetailGridSection>
 
@@ -127,7 +127,7 @@ export default function WarehouseParcelDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom du client" : "Customer Name", value: parcel.customer },
             {

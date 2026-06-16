@@ -96,8 +96,8 @@ export default function WarehouseSortingPage() {
           <Link href={`/warehouse/parcels/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
-        { key: "zone", label: "Zone" },
+        { key: "customer", label: t("customer") },
+        { key: "zone", label: t("zone") },
         { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
           <Badge variant={row.priority === "high" ? "danger" : "info"}>{fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}</Badge>
         )},

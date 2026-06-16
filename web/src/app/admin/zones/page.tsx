@@ -9,6 +9,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { MapPin, Bike, Layers, Plus, X } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { ADMIN_ZONES, ZONE_RIDERS, ZONE_CITIES, type AdminZone } from "@/lib/zones-admin";
 
@@ -16,7 +17,7 @@ const ZONE_STATUS_FR: Record<string, string> = { active: "Actif", paused: "En pa
 const zoneStatusFr = (z: AdminZone) => z.statusFr ?? ZONE_STATUS_FR[z.status] ?? z.status;
 
 export default function AdminZonesPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const [zones, setZones] = useState<AdminZone[]>(ADMIN_ZONES);
@@ -59,7 +60,7 @@ export default function AdminZonesPage() {
       <PageHeader
         title={fr ? "Zones de livraison" : "Delivery Zones"}
         subtitle={fr ? "Définies par commune · affectation manuelle des livreurs" : "Defined by commune · manual rider assignment"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Zones" }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("zones") }]}
         actions={
           <Button size="sm" onClick={() => setShowAdd((s) => !s)}>
             <Plus className="h-4 w-4" />

@@ -27,7 +27,7 @@ function exchangeStatusVariant(status: string): "success" | "warning" | "info" {
 
 export default function WarehouseExchangeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const exc = getExchange(id);
@@ -127,7 +127,7 @@ export default function WarehouseExchangeDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: order
               ? <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{exc.customer}</Link>

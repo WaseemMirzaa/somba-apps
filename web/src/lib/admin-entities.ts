@@ -78,6 +78,12 @@ export const WAREHOUSE_STAFF_ROLE_LABELS: Record<WarehouseStaffRole, string> = {
   supervisor: "Supervisor",
 };
 
+export const WAREHOUSE_STAFF_ROLE_LABELS_FR: Record<WarehouseStaffRole, string> = {
+  operator: "Opérateur",
+  manager: "Responsable",
+  supervisor: "Superviseur",
+};
+
 export const INITIAL_WAREHOUSE_STAFF: WarehouseStaffMember[] = [
   {
     id: "WHS-001",

@@ -37,7 +37,7 @@ function localizeStatus(status: string, fr: boolean) {
 
 export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const ret = getSellerReturn(id);
 
@@ -54,7 +54,7 @@ export default function SellerReturnDetailPage() {
           <InfoGrid items={[
             { label: fr ? "N° retour" : "Return ID", value: ret.id },
             { label: fr ? "Commande" : "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
-            { label: fr ? "Client" : "Customer", value: ret.customer },
+            { label: t("customer"), value: ret.customer },
             { label: fr ? "Motif" : "Reason", value: fr ? ret.reasonFr : ret.reason },
             { label: fr ? "Statut" : "Status", value: localizeStatus(ret.status, fr) },
           ]} />

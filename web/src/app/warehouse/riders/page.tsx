@@ -58,7 +58,7 @@ export default function WarehouseRidersPage() {
         { key: "name", label: fr ? "Nom du livreur" : "Rider Name", render: (row) => (
           <Link href={`/warehouse/riders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
-        { key: "zone", label: "Zone" },
+        { key: "zone", label: t("zone") },
         { key: "activeDeliveries", label: fr ? "Livraisons actives" : "Active Deliveries" },
         { key: "location", label: fr ? "Lieu actuel" : "Current Location" },
         { key: "performanceScore", label: fr ? "Performance" : "Performance", render: (row) => (

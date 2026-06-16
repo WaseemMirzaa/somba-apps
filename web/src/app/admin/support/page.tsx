@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const tickets = [
   { id: "TKT-441", subject: "Order not delivered", subjectFr: "Commande non livrée", customer: "Marie Kabila", priority: "high", status: "open", date: "2024-06-08" },
@@ -45,7 +46,7 @@ export default function AdminSupportPage() {
       <PageHeader
         title={t("support")}
         subtitle={fr ? "Tickets de support clients et vendeurs" : "Customer & seller support tickets"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("support") }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("support") }]}
       />
 
       <ListFilters
@@ -59,13 +60,13 @@ export default function AdminSupportPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: "Ticket", render: (row) => (
+              { key: "id", label: t("ticket"), render: (row) => (
                 <span className="font-medium text-[var(--primary)]">{String(row.id)}</span>
               )},
               { key: "subject", label: fr ? "Sujet" : "Subject", render: (row) => (
                 <span>{fr ? String(row.subjectFr ?? row.subject) : String(row.subject)}</span>
               )},
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: t("customer") },
               { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
                 <Badge variant={row.priority === "high" ? "danger" : row.priority === "medium" ? "warning" : "default"}>
                   {fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}

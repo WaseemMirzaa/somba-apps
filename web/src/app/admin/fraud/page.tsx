@@ -11,6 +11,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { Shield, AlertTriangle, Ban } from "lucide-react";
 import { fraudAlerts } from "@/lib/admin-entities";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
@@ -40,7 +41,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AdminFraudPage() {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -56,7 +57,7 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Scoring fictif statique — échecs OTP, vélocité, blocages d'adresse" : "Static mock scoring — OTP failures, velocity, address blocks"} breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Scoring fictif statique — échecs OTP, vélocité, blocages d'adresse" : "Static mock scoring — OTP failures, velocity, address blocks"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />
@@ -76,13 +77,13 @@ export default function AdminFraudPage() {
           <DataTable
             columns={[
               { key: "id", label: fr ? "Alerte" : "Alert" },
-              { key: "type", label: "Type", render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
-              { key: "customer", label: fr ? "Client" : "Customer", render: (r) => <span>{fr ? (CUSTOMER_FR[String(r.customer)] ?? String(r.customer)) : String(r.customer)}</span> },
+              { key: "type", label: t("type"), render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
+              { key: "customer", label: t("customer"), render: (r) => <span>{fr ? (CUSTOMER_FR[String(r.customer)] ?? String(r.customer)) : String(r.customer)}</span> },
               { key: "orderId", label: fr ? "Commande" : "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-[var(--primary)]">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },
               { key: "severity", label: fr ? "Gravité" : "Severity", render: (r) => <Badge variant={severityVariant[r.severity as keyof typeof severityVariant]}>{fr ? (SEVERITY_FR[String(r.severity)] ?? String(r.severity)) : String(r.severity)}</Badge> },
               { key: "status", label: fr ? "Statut" : "Status", render: (r) => <Badge variant={r.status === "blocked" ? "danger" : "info"}>{fr ? (STATUS_FR[String(r.status)] ?? String(r.status)) : String(r.status)}</Badge> },
-              { key: "date", label: "Date" },
+              { key: "date", label: t("date") },
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
           />

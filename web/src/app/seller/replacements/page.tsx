@@ -67,7 +67,7 @@ export default function SellerReplacementsPage() {
           <Link href={`/seller/replacements/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "Commande" : "Order" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "sku", label: "SKU" },
         { key: "status", label: t("status"), render: (row) => <Badge variant="info">{replacementStatusLabel(String(row.status), fr)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (

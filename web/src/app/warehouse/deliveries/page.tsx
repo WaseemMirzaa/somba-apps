@@ -56,7 +56,7 @@ export default function WarehouseDeliveriesPage() {
         { key: "orderId", label: fr ? "ID commande" : "Order ID", render: (row) => (
           <Link href={`/warehouse/deliveries/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
         )},
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => (
           <Link href={`/warehouse/riders/${row.riderId}`} className="text-[var(--primary)] hover:underline">{String(row.rider)}</Link>
         )},

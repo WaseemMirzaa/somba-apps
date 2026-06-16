@@ -50,7 +50,7 @@ export default function WarehouseReplacementsPage() {
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "sku", label: "SKU" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(fr ? row.statusFr : row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>

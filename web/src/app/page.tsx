@@ -68,7 +68,7 @@ const MARQUEE_ITEMS = [
   { icon: RotateCcw, en: "30-day returns", fr: "Retours 30 jours" },
   { icon: Wallet, en: "Card · Pay at delivery · Wallet", fr: "Carte · Paiement à la livraison · Portefeuille" },
   { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
-  { icon: Headphones, en: "24/7 support", fr: "Support 24/7" },
+  { icon: Headphones, en: "24/7 support", fr: "Assistance 24h/24, 7j/7" },
   { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },
 ] as const;
 
@@ -434,7 +434,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Services" : "Why Somba"}
+            label={fr ? "Nos services" : "Why Somba"}
             title={fr ? MODULES_SECTION.titleFr : MODULES_SECTION.title}
             desc={fr ? MODULES_SECTION.subtitleFr : MODULES_SECTION.subtitle}
           />

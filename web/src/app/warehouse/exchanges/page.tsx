@@ -50,7 +50,7 @@ export default function WarehouseExchangesPage() {
           <Link href={`/warehouse/exchanges/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-        { key: "customer", label: fr ? "Client" : "Customer" },
+        { key: "customer", label: t("customer") },
         { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => {
           const exc = row as { reason?: string; reasonFr?: string };
           return <span className="font-medium text-red-700">{fr ? exc.reasonFr : exc.reason}</span>;

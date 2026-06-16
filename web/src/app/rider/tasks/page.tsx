@@ -74,7 +74,7 @@ export default function RiderTasksPage() {
                   </Badge>
                 ),
               },
-              { key: "customer", label: fr ? "Client" : "Customer" },
+              { key: "customer", label: t("customer") },
               { key: "address", label: fr ? "Adresse" : "Address" },
               { key: "distance", label: "Distance" },
               { key: "items", label: fr ? "Articles" : "Items" },

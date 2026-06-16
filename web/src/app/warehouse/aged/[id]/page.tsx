@@ -84,7 +84,7 @@ function statusVariant(status: string): "success" | "warning" | "info" | "danger
 
 export default function WarehouseAgedParcelDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
   const parcel = getAgedParcel(id);
@@ -235,7 +235,7 @@ export default function WarehouseAgedParcelDetailPage() {
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Client" : "Customer"}>
+        <DetailGridSection title={t("customer")}>
           <InfoGrid
             items={[
               {
@@ -284,7 +284,7 @@ export default function WarehouseAgedParcelDetailPage() {
                 label: fr ? "Entrepôt" : "Warehouse",
                 value: fr ? parcel.warehouseFr : parcel.warehouse,
               },
-              { label: fr ? "Zone" : "Zone", value: parcel.zone },
+              { label: t("zone"), value: parcel.zone },
               { label: fr ? "Route" : "Route", value: parcel.route },
               { label: fr ? "Livreur" : "Rider", value: parcel.rider },
               { label: fr ? "N° suivi" : "Tracking number", value: parcel.trackingNumber },

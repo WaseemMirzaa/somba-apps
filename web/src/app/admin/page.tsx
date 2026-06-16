@@ -306,7 +306,7 @@ export default function AdminDashboard() {
                     <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
                   ),
                 },
-                { key: "customer", label: t("name") },
+                { key: "customer", label: t("customer") },
                 { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
                 {
                   key: "status",

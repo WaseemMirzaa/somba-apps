@@ -3,7 +3,7 @@ export const categories = [
   { id: 2, name: "Fashion", nameFr: "Mode", icon: "👗", image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&h=300&fit=crop" },
   { id: 3, name: "Home & Living", nameFr: "Maison", icon: "🏠", image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=300&fit=crop" },
   { id: 4, name: "Beauty", nameFr: "Beauté", icon: "💄", image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=300&fit=crop" },
-  { id: 5, name: "Sports", nameFr: "Sport", icon: "⚽", image: "https://images.unsplash.com/photo-1517643876320-d6cb0646a20e?auto=format&fit=crop&w=400&h=300&q=80" },
+  { id: 5, name: "Sports", nameFr: "Articles de sport", icon: "⚽", image: "https://images.unsplash.com/photo-1517643876320-d6cb0646a20e?auto=format&fit=crop&w=400&h=300&q=80" },
   { id: 6, name: "Books", nameFr: "Livres", icon: "📚", image: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&h=300&fit=crop" },
   { id: 7, name: "Toys", nameFr: "Jouets", icon: "🧸", image: "https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=400&h=300&fit=crop" },
   { id: 8, name: "Grocery", nameFr: "Épicerie", icon: "🛒", image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=300&fit=crop" },
@@ -177,7 +177,7 @@ export const warehouseParcels = [
 export const sellerProducts = [
   { id: 1, name: "Samsung Galaxy S24 Ultra", sku: "SAM-S24U-256", stock: 45, reserved: 5, sold: 120, price: 1199, status: "live", moderation: "approved" },
   { id: 2, name: "Galaxy Buds Pro", sku: "SAM-BUDS-PRO", stock: 8, reserved: 2, sold: 89, price: 199, status: "live", moderation: "approved" },
-  { id: 3, name: "Galaxy Watch 6", sku: "SAM-WATCH-6", stock: 3, reserved: 0, sold: 45, price: 299, status: "live", moderation: "approved" },
+  { id: 3, name: "Galaxy Watch 6", sku: "SAM-WATCH-6", stock: 3, reserved: 0, sold: 45, price: 299, status: "unavailable", moderation: "approved" },
   { id: 4, name: "Galaxy Tab S9", sku: "SAM-TAB-S9", stock: 0, reserved: 0, sold: 23, price: 799, status: "out_of_stock", moderation: "approved" },
   { id: 5, name: "New Phone Model X", sku: "SAM-PHONE-X", stock: 0, reserved: 0, sold: 0, price: 899, status: "draft", moderation: "pending" },
 ];

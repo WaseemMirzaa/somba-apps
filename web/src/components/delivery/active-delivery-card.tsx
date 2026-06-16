@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { formatCurrency } from "@/lib/utils";
+import { customerColumnLabel, zoneColumnLabel } from "@/lib/admin-i18n";
 import type { DeliveryDetailData } from "@/lib/delivery-detail";
 import { cn } from "@/lib/utils";
 
@@ -91,7 +92,7 @@ export function ActiveDeliveryCard({
       <InfoGrid
         items={[
           { label: fr ? "Commande" : "Order ID", value: delivery.orderId },
-          { label: fr ? "Zone" : "Zone", value: delivery.zone },
+          { label: zoneColumnLabel(locale), value: delivery.zone },
           { label: fr ? "Paiement" : "Payment", value: paymentLabel(delivery.paymentType, fr) },
           {
             label: fr ? "Montant à collecter" : "Amount due",
@@ -110,7 +111,7 @@ export function ActiveDeliveryCard({
 
       <div>
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          {fr ? "Client" : "Customer"}
+          {customerColumnLabel(locale)}
         </h4>
         <InfoGrid
           items={[

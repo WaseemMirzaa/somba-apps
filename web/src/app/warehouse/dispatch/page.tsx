@@ -67,7 +67,7 @@ export default function WarehouseDispatchPage() {
         { key: "id", label: fr ? "ID lot" : "Batch ID", render: (row) => (
           <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
-        { key: "zone", label: "Zone" },
+        { key: "zone", label: t("zone") },
         { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => (
           <Link href={ops(`/riders/${row.riderId}`)} className="text-[var(--primary)] hover:underline">{String(row.rider)}</Link>
         )},

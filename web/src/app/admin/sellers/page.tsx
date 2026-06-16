@@ -11,6 +11,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { sellerEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
+import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -48,10 +49,7 @@ export default function AdminSellersPage() {
       <PageHeader
         title={t("sellers")}
         subtitle={fr ? "Vue liste — survol rapide uniquement. Infos complètes sur la page de détail." : "List View — quick scanning only. Full info on detail page."}
-        breadcrumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: t("sellers") },
-        ]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("sellers") }]}
       />
 
       <ListFilters
@@ -76,9 +74,11 @@ export default function AdminSellersPage() {
               },
               { key: "owner", label: fr ? "Propriétaire" : "Owner" },
               { key: "email", label: t("email") },
-              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (
-                <span>{fr ? (CATEGORY_FR[String(row.category)] ?? String(row.category)) : String(row.category)}</span>
-              )},
+              {
+                key: "category",
+                label: fr ? "Catégorie" : "Category",
+                render: (row) => categoryLabel(String(row.category), fr),
+              },
               {
                 key: "orders",
                 label: fr ? "Commandes" : "Orders",

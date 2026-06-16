@@ -11,9 +11,10 @@ import { DataTable } from "@/components/ui/data-table";
 import { getSeller, orderEntities, sellerProductDetails } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 
-const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", out_of_stock: "Rupture de stock", draft: "Brouillon" };
+const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", out_of_stock: "Rupture de stock", unavailable: "Indisponible", draft: "Brouillon" };
 const ORDER_STATUS_FR: Record<string, string> = { delivered: "Livrée", processing: "En traitement", cancelled: "Annulée", pending: "En attente", shipped: "Expédiée" };
 const TIMELINE_LABEL_FR: Record<string, string> = {
   Registered: "Inscrit",
@@ -53,7 +54,7 @@ export default function AdminSellerDetailPage() {
         subtitle={`${fr ? "Propriétaire" : "Owner"}: ${seller.owner} · ${seller.city}, ${seller.country}`}
         backHref="/admin/sellers"
         breadcrumbs={[
-          { label: "Admin", href: "/admin" },
+          adminBreadcrumb(locale),
           { label: t("sellers"), href: "/admin/sellers" },
           { label: seller.storeName },
         ]}
@@ -142,7 +143,7 @@ export default function AdminSellerDetailPage() {
               { key: "id", label: fr ? "N° de commande" : "Order ID", render: (row) => (
                 <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
               )},
-              { key: "customer", label: t("name") },
+              { key: "customer", label: t("customer") },
               { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
               { key: "status", label: t("status"), render: (row) => <Badge variant="info">{fr ? (ORDER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
               { key: "date", label: t("date") },

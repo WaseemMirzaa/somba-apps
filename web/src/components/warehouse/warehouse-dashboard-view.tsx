@@ -255,7 +255,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 },
                 { key: "parcels", label: fr ? "Colis" : "Parcels" },
                 { key: "rider", label: fr ? "Livreur" : "Rider" },
-                { key: "zone", label: fr ? "Zone" : "Zone" },
+                { key: "zone", label: t("zone") },
                 { key: "eta", label: "ETA" },
                 {
                   key: "status",

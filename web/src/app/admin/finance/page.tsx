@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const transactions = [
   { id: "TXN-901", type: "Order Payment", amount: 119900, status: "completed", date: "2024-06-08" },
@@ -37,7 +38,7 @@ export default function AdminFinancePage() {
       <PageHeader
         title={t("finance")}
         subtitle={fr ? "Chiffre d'affaires, versements et règlements de la plateforme" : "Platform revenue, payouts & settlements"}
-        breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: t("finance") }]}
+        breadcrumbs={[adminBreadcrumb(locale), { label: t("finance") }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -51,8 +52,8 @@ export default function AdminFinancePage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: fr ? "Transaction" : "Transaction" },
-              { key: "type", label: fr ? "Type" : "Type", render: (row) => (
+              { key: "id", label: t("transaction") },
+              { key: "type", label: t("type"), render: (row) => (
                 <span>{fr ? (TXN_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</span>
               )},
               { key: "amount", label: t("amount"), render: (row) => {
