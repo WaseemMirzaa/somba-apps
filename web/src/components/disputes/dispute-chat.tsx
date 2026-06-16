@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 
-type ChatMessage = { from: "buyer" | "seller" | "admin"; text: string; at: string };
+type ChatMessage = { from: "buyer" | "seller" | "admin"; text: string; textFr?: string; at: string };
 
 const FROM_LABELS: Record<ChatMessage["from"], string> = {
   buyer: "Buyer",
@@ -93,7 +93,7 @@ export function DisputeChat({
                 </span>
                 <span className="text-xs text-slate-400">{formatMessageTime(message.at)}</span>
               </div>
-              <p className="text-sm leading-relaxed text-slate-800">{message.text}</p>
+              <p className="text-sm leading-relaxed text-slate-800">{fr ? (message.textFr ?? message.text) : message.text}</p>
             </div>
           ))
         )}

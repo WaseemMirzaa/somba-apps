@@ -19,6 +19,28 @@ const STATUS_FR: Record<string, string> = {
   delivered: "Livré",
 };
 
+// Product variant tokens arrive in English from the shared (non-owned) entities
+// layer (e.g. "Default", "256GB Black"). Translate known tokens; fall back unchanged.
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Standard",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+
+const localizeVariant = (variant: string, fr: boolean) =>
+  !fr || !variant
+    ? variant
+    : variant
+        .split(" ")
+        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+        .join(" ");
+
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -164,7 +186,7 @@ export default function WarehouseDeliveryDetailPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-slate-900">{item.name}</p>
                   <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {item.variant} · Qty {item.qty}
+                    SKU: {item.sku} · {localizeVariant(item.variant, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
                   </p>
                 </div>
               </div>

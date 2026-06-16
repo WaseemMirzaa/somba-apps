@@ -9,7 +9,7 @@ import { flashSales as initialSales } from "@/lib/admin-entities";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
-const SALE_STATUS_FR: Record<string, string> = { active: "Active", scheduled: "Programmée", ended: "Terminée" };
+const SALE_STATUS_FR: Record<string, string> = { active: "Actif", scheduled: "Planifiée", ended: "Terminée" };
 
 export default function AdminFlashSalesPage() {
   const { toast } = useToast();

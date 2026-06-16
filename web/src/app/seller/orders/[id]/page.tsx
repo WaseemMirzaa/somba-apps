@@ -36,6 +36,14 @@ const PAYMENT_STATUS_FR: Record<string, string> = {
   failed: "Échoué",
 };
 
+const VARIANT_FR: Record<string, string> = {
+  Default: "Standard",
+};
+
+function localizeVariant(variant: string, fr: boolean) {
+  return fr ? VARIANT_FR[variant] ?? variant : variant;
+}
+
 function localizeOrderStatus(status: string, fr: boolean) {
   return fr ? ORDER_STATUS_FR[status] ?? status : status;
 }
@@ -147,7 +155,7 @@ export default function SellerOrderDetailPage() {
               </div>
               <div className="flex-1">
                 <Link href={`/seller/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.name}</Link>
-                <p className="text-xs text-slate-500">{item.variant} · {item.sku}</p>
+                <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)} · {item.sku}</p>
               </div>
               <div className="text-right">
                 <p>{formatCurrency(item.price, locale)}</p>

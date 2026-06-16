@@ -64,7 +64,7 @@ export default function SellerTransactionsPage() {
         { key: "grossAmount", label: fr ? "Brut" : "Gross", render: (row) => formatCurrency(row.grossAmount as number, locale) },
         { key: "commission", label: fr ? "Commission" : "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
         { key: "netAmount", label: fr ? "Net" : "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },
-        { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="success">{String(row.status)}</Badge> },
+        { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "date", label: fr ? "Date" : "Date" },
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

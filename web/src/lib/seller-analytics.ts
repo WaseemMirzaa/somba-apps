@@ -211,12 +211,12 @@ export const sellerDailyRevenue = [
 ] as const;
 
 export const sellerRevenueTransactions = [
-  { id: "TXN-8841", date: "2024-06-29", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-089", amount: 189, commission: 22.68, net: 166.32, method: "Mobile Money" },
-  { id: "TXN-8840", date: "2024-06-29", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-088", amount: 1200, commission: 144, net: 1056, method: "Card" },
-  { id: "TXN-8839", date: "2024-06-28", type: "Refund", typeFr: "Remboursement", orderId: "ORD-2024-072", amount: -89, commission: 0, net: -89, method: "Mobile Money" },
-  { id: "TXN-8838", date: "2024-06-28", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-087", amount: 45, commission: 5.4, net: 39.6, method: "Wallet" },
-  { id: "TXN-8837", date: "2024-06-27", type: "Payout", typeFr: "Versement", orderId: "PAY-002", amount: -8500, commission: 0, net: -8500, method: "Bank transfer" },
-  { id: "TXN-8836", date: "2024-06-27", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-086", amount: 320, commission: 38.4, net: 281.6, method: "Pay at delivery" },
+  { id: "TXN-8841", date: "2024-06-29", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-089", amount: 189, commission: 22.68, net: 166.32, method: "Mobile Money", methodFr: "Mobile Money" },
+  { id: "TXN-8840", date: "2024-06-29", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-088", amount: 1200, commission: 144, net: 1056, method: "Card", methodFr: "Carte bancaire" },
+  { id: "TXN-8839", date: "2024-06-28", type: "Refund", typeFr: "Remboursement", orderId: "ORD-2024-072", amount: -89, commission: 0, net: -89, method: "Mobile Money", methodFr: "Mobile Money" },
+  { id: "TXN-8838", date: "2024-06-28", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-087", amount: 45, commission: 5.4, net: 39.6, method: "Wallet", methodFr: "Portefeuille" },
+  { id: "TXN-8837", date: "2024-06-27", type: "Payout", typeFr: "Versement", orderId: "PAY-002", amount: -8500, commission: 0, net: -8500, method: "Bank transfer", methodFr: "Virement bancaire" },
+  { id: "TXN-8836", date: "2024-06-27", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-086", amount: 320, commission: 38.4, net: 281.6, method: "Pay at delivery", methodFr: "Paiement à la livraison" },
 ] as const;
 
 // ─── Customer Analytics ──────────────────────────────────────────────────────

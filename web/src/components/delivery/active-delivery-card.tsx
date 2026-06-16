@@ -43,6 +43,28 @@ const PAYMENT_FR: Record<string, string> = {
   COD: "Paiement à la livraison",
 };
 
+// Product variant strings arrive as free-form English tokens (e.g. "Default",
+// "256GB Black"). Translate known tokens; unknown tokens fall back unchanged.
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Standard",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+
+const localizeVariant = (variant: string, fr: boolean) =>
+  !fr || !variant
+    ? variant
+    : variant
+        .split(" ")
+        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+        .join(" ");
+
 const statusLabel = (status: string, fr: boolean) =>
   fr ? STATUS_FR[status] ?? status.replace(/_/g, " ") : status.replace(/_/g, " ");
 
@@ -151,7 +173,7 @@ export function ActiveDeliveryCard({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
                   <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {item.variant} · {fr ? "Qté" : "Qty"} {item.qty}
+                    SKU: {item.sku} · {localizeVariant(item.variant, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
                   </p>
                 </div>
               </div>

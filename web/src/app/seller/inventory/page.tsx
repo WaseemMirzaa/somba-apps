@@ -75,7 +75,7 @@ export default function SellerInventoryPage() {
             <Link href={`/seller/products/${row.productId}`} className="text-[var(--primary)] hover:underline">{String(row.product)}</Link>
           </div>
         )},
-        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
         { key: "available", label: fr ? "Disponible" : "Available" },
         { key: "reserved", label: fr ? "Réservé" : "Reserved" },
         { key: "allocated", label: fr ? "Alloué" : "Allocated" },

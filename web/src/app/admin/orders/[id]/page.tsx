@@ -25,6 +25,16 @@ const PAYMENT_STATUS_FR: Record<string, string> = {
   pending: "En attente",
 };
 
+const TIMELINE_LABEL_FR: Record<string, string> = {
+  Placed: "Passée",
+  Paid: "Payée",
+  Packed: "Emballée",
+  Picked: "Préparée",
+  Warehouse: "Entrepôt",
+  Dispatched: "Expédiée",
+  Delivered: "Livrée",
+};
+
 export default function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
@@ -124,7 +134,7 @@ export default function AdminOrderDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Chronologie d'activité" : "Activity Timeline"} span={3}>
-          <ActivityTimeline events={order.timeline} />
+          <ActivityTimeline events={fr ? order.timeline.map((e) => ({ ...e, label: TIMELINE_LABEL_FR[e.label] ?? e.label })) : order.timeline} />
         </DetailGridSection>
       </DetailGrid>
     </div>

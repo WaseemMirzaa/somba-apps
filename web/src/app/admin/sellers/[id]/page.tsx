@@ -29,6 +29,7 @@ const TIMELINE_DETAIL_FR: Record<string, string> = {
   "Application submitted": "Candidature soumise",
   "By Admin Sarah": "Par l'admin Sarah",
   "Moderation passed": "Modération validée",
+  "45 products": "45 produits",
 };
 
 export default function AdminSellerDetailPage() {

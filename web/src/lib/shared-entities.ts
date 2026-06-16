@@ -33,7 +33,7 @@ export type DisputeItem = {
   warehouse: string;
   warehouseHub: string;
   warehouseContact: string;
-  messages: { from: "buyer" | "seller" | "admin"; text: string; at: string }[];
+  messages: { from: "buyer" | "seller" | "admin"; text: string; textFr?: string; at: string }[];
 };
 
 export type ReturnItem = {
@@ -142,9 +142,9 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     warehouseHub: "WH-KIN-01",
     warehouseContact: "ops.kinshasa@somba.com",
     messages: [
-      { from: "buyer", text: "The white shoes arrived grey. Photos in the listing clearly show white.", at: "2024-06-05T10:00:00Z" },
-      { from: "seller", text: "Sorry for the inconvenience. Lighting in our studio may differ — can you share a photo of the item received?", at: "2024-06-05T14:30:00Z" },
-      { from: "buyer", text: "Uploaded comparison photos to my order page. The box label also says grey.", at: "2024-06-05T16:15:00Z" },
+      { from: "buyer", text: "The white shoes arrived grey. Photos in the listing clearly show white.", textFr: "Les chaussures blanches sont arrivées en gris. Les photos de l'annonce montrent clairement du blanc.", at: "2024-06-05T10:00:00Z" },
+      { from: "seller", text: "Sorry for the inconvenience. Lighting in our studio may differ — can you share a photo of the item received?", textFr: "Désolé pour la gêne occasionnée. L'éclairage de notre studio peut différer — pouvez-vous partager une photo de l'article reçu ?", at: "2024-06-05T14:30:00Z" },
+      { from: "buyer", text: "Uploaded comparison photos to my order page. The box label also says grey.", textFr: "J'ai téléchargé des photos comparatives sur ma page de commande. L'étiquette de la boîte indique aussi gris.", at: "2024-06-05T16:15:00Z" },
     ],
   },
   {
@@ -168,10 +168,10 @@ export const MOCK_DISPUTES: DisputeItem[] = [
     warehouseHub: "WH-PAR-02",
     warehouseContact: "ops.paris@somba.com",
     messages: [
-      { from: "buyer", text: "Left speaker has static noise and drops audio completely.", at: "2024-06-03T12:00:00Z" },
-      { from: "seller", text: "We can offer replacement or full refund. Please confirm your preference.", at: "2024-06-04T09:00:00Z" },
-      { from: "buyer", text: "I'd prefer a replacement if stock is available.", at: "2024-06-04T11:45:00Z" },
-      { from: "admin", text: "Somba support reviewing case — we'll confirm replacement eligibility within 24h.", at: "2024-06-04T15:00:00Z" },
+      { from: "buyer", text: "Left speaker has static noise and drops audio completely.", textFr: "Le haut-parleur gauche grésille et coupe complètement le son.", at: "2024-06-03T12:00:00Z" },
+      { from: "seller", text: "We can offer replacement or full refund. Please confirm your preference.", textFr: "Nous pouvons proposer un remplacement ou un remboursement intégral. Merci de confirmer votre préférence.", at: "2024-06-04T09:00:00Z" },
+      { from: "buyer", text: "I'd prefer a replacement if stock is available.", textFr: "Je préférerais un remplacement si le stock est disponible.", at: "2024-06-04T11:45:00Z" },
+      { from: "admin", text: "Somba support reviewing case — we'll confirm replacement eligibility within 24h.", textFr: "Le support Somba examine le dossier — nous confirmerons l'éligibilité au remplacement sous 24 h.", at: "2024-06-04T15:00:00Z" },
     ],
   },
 ];

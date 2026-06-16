@@ -15,6 +15,27 @@ import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
 import { useRouter } from "next/navigation";
 
+// Order item variants come from the data layer as free-form English tokens
+// (e.g. "Default", "256GB Black"). Translate the known tokens locally.
+const VARIANT_TOKENS_FR: Record<string, string> = {
+  Default: "Par défaut",
+  Black: "Noir",
+  White: "Blanc",
+  Blue: "Bleu",
+  Silver: "Argent",
+  Grey: "Gris",
+  Gray: "Gris",
+  Red: "Rouge",
+  Green: "Vert",
+};
+function localizeVariant(variant: string, fr: boolean) {
+  if (!fr || !variant) return variant;
+  return variant
+    .split(" ")
+    .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
+    .join(" ");
+}
+
 export default function ShopOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
@@ -43,6 +64,10 @@ export default function ShopOrderDetailPage() {
     };
     return fr ? (map[status] ?? status) : status;
   };
+
+  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
+  const paymentMethodLabel = (method: string) =>
+    fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 
   function reorder() {
     order?.items.forEach((item) => {
@@ -96,7 +121,7 @@ export default function ShopOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Moyen" : "Method", value: formatPaymentMethod(order.paymentMethod, locale) },
+            { label: fr ? "Moyen" : "Method", value: paymentMethodLabel(order.paymentMethod) },
             { label: fr ? "Transaction" : "Transaction", value: order.transactionId },
             { label: fr ? "Statut" : "Status", value: paymentStatusLabel(order.paymentStatus) },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(order.amount, locale) },
@@ -111,7 +136,7 @@ export default function ShopOrderDetailPage() {
               </Link>
               <div className="flex-1">
                 <Link href={`/shop/products/${item.productId}`} className="font-medium hover:text-[var(--primary)]">{item.name}</Link>
-                <p className="text-xs text-slate-500">{item.variant} · SKU: {item.sku}</p>
+                <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)} · SKU: {item.sku}</p>
               </div>
               <div className="text-right">
                 <p className="font-medium">{formatCurrency(item.price, locale)}</p>

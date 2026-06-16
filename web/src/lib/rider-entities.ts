@@ -37,6 +37,7 @@ export type RiderTask = {
   products: RiderTaskProduct[];
   timeline: RiderTaskTimeline[];
   notes?: string;
+  notesFr?: string;
 };
 
 export const riderProfile = {
@@ -95,6 +96,7 @@ export const riderTasks: RiderTask[] = [
     products: taskProducts([0, 2], 1),
     timeline: deliveryTimeline(3),
     notes: "Call on arrival — gate code 4521",
+    notesFr: "Appeler à l'arrivée — code portail 4521",
   },
   {
     id: "TSK-8842",
@@ -154,6 +156,7 @@ export const riderTasks: RiderTask[] = [
     products: taskProducts([3], 1),
     timeline: deliveryTimeline(2),
     notes: "Return — defective item",
+    notesFr: "Retour — article défectueux",
   },
   {
     id: "TSK-8830",

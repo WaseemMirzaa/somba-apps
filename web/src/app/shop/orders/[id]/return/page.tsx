@@ -120,7 +120,7 @@ export default function ShopOrderReturnPage() {
           <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
             <p><strong>{fr ? "Commande" : "Order"}:</strong> {order.id}</p>
             <p><strong>{fr ? "Motif" : "Reason"}:</strong> {fr ? (reasons.find((r) => r.en === reason)?.fr ?? reason) : reason}</p>
-            <p><strong>{fr ? "Mode de remboursement" : "Refund method"}:</strong> {fr ? "Paiement d'origine" : "Original payment"} ({formatPaymentMethod(order.paymentMethod, locale)})</p>
+            <p><strong>{fr ? "Mode de remboursement" : "Refund method"}:</strong> {fr ? "Paiement d'origine" : "Original payment"} ({fr && order.paymentMethod === "Card" ? "Carte" : formatPaymentMethod(order.paymentMethod, locale)})</p>
             <p className="mt-2 text-xs text-slate-500">{fr ? "Enlèvement depuis" : "Pickup from"}: {order.customerAddress}</p>
           </div>
           <div className="flex gap-3">

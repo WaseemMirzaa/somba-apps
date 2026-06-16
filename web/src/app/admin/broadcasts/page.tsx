@@ -38,7 +38,7 @@ export default function AdminBroadcastsPage() {
       {
         id: `BC-0${50 + b.length}`,
         channel,
-        audience: aud ? (fr ? aud.labelFr : aud.label) : audience,
+        audience: aud ? aud.label : audience,
         title: title.trim(),
         body: body.trim(),
         status,
@@ -121,7 +121,11 @@ export default function AdminBroadcastsPage() {
                 );
               },
             },
-            { key: "audience", label: "Audience" },
+            { key: "audience", label: "Audience", render: (row) => {
+              const val = String(row.audience);
+              const aud = BROADCAST_AUDIENCES.find((a) => a.label === val || a.labelFr === val);
+              return <span>{aud ? (fr ? aud.labelFr : aud.label) : val}</span>;
+            } },
             { key: "reach", label: fr ? "Portée" : "Reach" },
             { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as Broadcast["status"]]}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
             { key: "date", label: "Date", render: (row) => <span className="text-slate-500">{String(row.date)}</span> },

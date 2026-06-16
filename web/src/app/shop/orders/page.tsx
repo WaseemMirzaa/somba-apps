@@ -23,6 +23,10 @@ export default function ShopOrdersPage() {
     return fr ? (map[status] ?? status) : status;
   };
 
+  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
+  const paymentMethodLabel = (method: string) =>
+    fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
+
   return (
     <div className="space-y-6">
       <PageHeader title={fr ? "Mes commandes" : "My Orders"} subtitle={fr ? "Vue liste — Numéro de commande, Date, Statut, Montant, Articles" : "List View — Order Number, Date, Status, Amount, Items"} />
@@ -35,7 +39,7 @@ export default function ShopOrdersPage() {
           { key: "date", label: fr ? "Date" : "Date" },
           { key: "itemsCount", label: fr ? "Articles" : "Items" },
           { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
-          { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
+          { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => paymentMethodLabel(String(row.paymentMethod)) },
           { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="info">{statusLabel(String(row.status))}</Badge> },
           { key: "actions", label: fr ? "Actions" : "Actions", render: (row) => (
             <div className="flex gap-2 text-xs">

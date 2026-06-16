@@ -27,7 +27,7 @@ export function SearchAutocomplete({ query, onSelect }: { query: string; onSelec
           onClick={onSelect}
           className="block px-4 py-2 text-sm hover:bg-blue-50"
         >
-          {fr ? p.nameFr : p.name} <span className="text-slate-400">· {p.category}</span>
+          {fr ? p.nameFr : p.name} <span className="text-slate-400">· {fr ? p.categoryFr : p.category}</span>
         </Link>
       ))}
       <Link href={`/shop/search?q=${encodeURIComponent(query)}`} onClick={onSelect} className="block border-t px-4 py-2 text-sm font-medium text-[var(--primary)]">

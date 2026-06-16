@@ -30,7 +30,7 @@ export default function SellerSettingsPage() {
         <DetailGridSection title={fr ? "Profil de la boutique" : "Store Profile"} span={2}>
           <InfoGrid items={[
             { label: fr ? "Nom de la boutique" : "Store Name", value: storeSettings.storeName },
-            { label: fr ? "Description" : "Description", value: storeSettings.description, full: true },
+            { label: fr ? "Description" : "Description", value: fr ? storeSettings.descriptionFr : storeSettings.description, full: true },
           ]} />
           <div className="mt-4 flex h-24 w-full items-center justify-center rounded-lg border-2 border-dashed border-sky-200 text-sm text-slate-400">
             {fr ? "Téléversement logo et bannière (démo)" : "Logo & Banner upload (mock)"}
@@ -61,7 +61,7 @@ export default function SellerSettingsPage() {
           <DataTable
             columns={[
               { key: "name", label: fr ? "Nom" : "Name" },
-              { key: "role", label: fr ? "Rôle" : "Role" },
+              { key: "role", label: fr ? "Rôle" : "Role", render: (row) => (fr ? String(row.roleFr ?? row.role) : String(row.role)) },
               { key: "email", label: fr ? "E-mail" : "Email" },
               { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? (String(row.status) === "active" ? "Actif" : String(row.status)) : String(row.status)}</Badge> },
             ]}

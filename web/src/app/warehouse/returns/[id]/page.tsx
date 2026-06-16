@@ -72,7 +72,7 @@ export default function WarehouseReturnDetailPage() {
             </div>
             <InfoGrid items={[
               { label: fr ? "Nom" : "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-              { label: fr ? "Variante" : "Variant", value: ret.variant },
+              { label: fr ? "Variante" : "Variant", value: fr ? ret.variantFr : ret.variant },
               { label: fr ? "Quantité" : "Quantity", value: ret.qty },
             ]} />
           </div>

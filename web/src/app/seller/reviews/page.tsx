@@ -44,7 +44,7 @@ export default function SellerReviewsPage() {
           <Link href={`/seller/products/${row.productId}`} className="text-[var(--primary)] hover:underline">{String(row.product)}</Link>
         )},
         { key: "rating", label: fr ? "Note" : "Rating", render: (row) => "★".repeat(row.rating as number) },
-        { key: "review", label: fr ? "Avis" : "Review" },
+        { key: "review", label: fr ? "Avis" : "Review", render: (row) => (fr ? String(row.reviewFr ?? row.review) : String(row.review)) },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">

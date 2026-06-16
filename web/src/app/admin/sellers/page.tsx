@@ -20,6 +20,14 @@ const STATUS_OPTIONS = [
 
 const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu" };
 
+const CATEGORY_FR: Record<string, string> = {
+  Electronics: "Électronique",
+  Fashion: "Mode",
+  "Home & Living": "Maison & Décoration",
+  Beauty: "Beauté",
+  Grocery: "Épicerie",
+};
+
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -68,7 +76,9 @@ export default function AdminSellersPage() {
               },
               { key: "owner", label: fr ? "Propriétaire" : "Owner" },
               { key: "email", label: t("email") },
-              { key: "category", label: fr ? "Catégorie" : "Category" },
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (
+                <span>{fr ? (CATEGORY_FR[String(row.category)] ?? String(row.category)) : String(row.category)}</span>
+              )},
               {
                 key: "orders",
                 label: fr ? "Commandes" : "Orders",

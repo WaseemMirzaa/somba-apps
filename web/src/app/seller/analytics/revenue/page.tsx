@@ -285,7 +285,7 @@ export default function SellerRevenueAnalyticsPage() {
                 label: fr ? "Net" : "Net",
                 render: (row) => formatCurrency(row.net as number, locale),
               },
-              { key: "method", label: fr ? "Méthode" : "Method" },
+              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => (fr ? String(row.methodFr ?? row.method) : String(row.method)) },
             ]}
             data={filteredTransactions as unknown as Record<string, unknown>[]}
           />
