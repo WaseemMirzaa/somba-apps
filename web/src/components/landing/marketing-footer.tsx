@@ -19,8 +19,8 @@ export function MarketingFooter() {
             <BrandMark tone="light" full className="mb-5" />
             <p className="max-w-sm text-sm leading-relaxed">
               {fr
-                ? "Votre marketplace en ligne — achetez des milliers de produits ou vendez sur Somba & Tekka."
-                : "Your online marketplace — shop thousands of products or sell on Somba & Tekka."}
+                ? "Votre marketplace en ligne — achetez des milliers de produits ou vendez sur Somba & Teka."
+                : "Your online marketplace — shop thousands of products or sell on Somba & Teka."}
             </p>
             <p className="mt-4 text-xs text-slate-500">
               {BRAND.legalEntity} · {BRAND.legalAddress}

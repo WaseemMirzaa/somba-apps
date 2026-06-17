@@ -247,7 +247,7 @@ export const orderEntities: OrderEntity[] = orders.map((o, i) => {
     seller: o.seller,
     amount: o.amount,
     status: o.status,
-    paymentMethod: i % 2 === 0 ? "COD" : "Card",
+    paymentMethod: i % 2 === 0 ? "Airtel Money" : "Card",
     paymentStatus: o.status === "cancelled" ? "refunded" : "paid",
     transactionId: `TXN-${o.id.replace("ORD-", "")}`,
     date: o.date,

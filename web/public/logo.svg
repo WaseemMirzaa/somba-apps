@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="S&T Marketplace">
+  <defs>
+    <linearGradient id="stBag" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f44b5"/>
+      <stop offset="1" stop-color="#13328f"/>
+    </linearGradient>
+  </defs>
+  <!-- Shopping-bag tile -->
+  <rect x="6" y="22" width="88" height="72" rx="14" fill="url(#stBag)"/>
+  <!-- Bag handle -->
+  <path d="M34 26 a16 16 0 0 1 32 0" fill="none" stroke="url(#stBag)" stroke-width="7" stroke-linecap="round"/>
+  <!-- Red accent stripe -->
+  <rect x="84" y="22" width="10" height="72" rx="5" fill="#e30613"/>
+  <!-- S & T monogram -->
+  <text x="46" y="74" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="46" letter-spacing="-2">
+    <tspan fill="#ffffff">S</tspan><tspan fill="#bcd0ff" font-size="30">&amp;</tspan><tspan fill="#e30613">T</tspan>
+  </text>
+</svg>

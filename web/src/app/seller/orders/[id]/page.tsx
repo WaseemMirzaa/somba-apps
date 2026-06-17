@@ -105,14 +105,18 @@ export default function SellerOrderDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title={t("customer")}>
+          {/* Privacy: sellers see first name + destination city only. Delivery is
+              handled by Somba logistics — no phone, email, or street address. */}
           <InfoGrid items={[
-            { label: fr ? "Nom" : "Name", value: order.customer },
-            { label: fr ? "Téléphone" : "Phone", value: order.customerPhone },
-            { label: fr ? "Ville" : "City", value: order.customerCity },
-            { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
+            { label: fr ? "Prénom" : "First Name", value: order.customer },
+            { label: fr ? "Ville de destination" : "Destination City", value: order.customerCity },
           ]} />
-          <div className="mt-4 flex gap-3">
-            <a href={`tel:${order.customerPhone}`} className="text-sm text-[var(--primary)]">{fr ? "Appeler le client" : "Call Customer"}</a>
+          <p className="mt-4 text-xs text-slate-500">
+            {fr
+              ? "Livraison gérée par la logistique Somba. Les coordonnées du client sont privées."
+              : "Delivery handled by Somba logistics. Customer contact details are private."}
+          </p>
+          <div className="mt-3 flex gap-3">
             <Link href="/seller/support" className="text-sm text-slate-500">{fr ? "Ouvrir le support" : "Open Support"}</Link>
           </div>
         </DetailGridSection>

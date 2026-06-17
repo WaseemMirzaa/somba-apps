@@ -57,7 +57,7 @@ export default function SellOnlinePage() {
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
               {fr ? "Développez votre activité —" : "Grow your business —"}
               <br />
-              {fr ? "vendez en ligne sur Somba & Tekka" : "sell online on Somba & Tekka"}
+              {fr ? "vendez en ligne sur Somba & Teka" : "sell online on Somba & Teka"}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-white/88">
               {fr ? SELL_ONLINE_HERO.subtitleFr : SELL_ONLINE_HERO.subtitle}

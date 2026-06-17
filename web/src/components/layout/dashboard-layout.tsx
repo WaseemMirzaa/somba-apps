@@ -42,6 +42,8 @@ import { PortalSwitcher } from "@/components/layout/portal-switcher";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
+import { getAdminSections, getDepartmentLabel } from "@/lib/admin-access";
+import type { AdminDepartment } from "@/lib/admin-access";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -169,6 +171,35 @@ export function DashboardLayout({
   const config = portalConfigs[portal];
   const { navRef, saveScroll } = usePersistedSidebarScroll(portal);
 
+  const department = (persona.department ?? "super") as AdminDepartment;
+  const adminSections = portal === "admin" ? getAdminSections(department) : null;
+
+  const renderNavItem = (item: NavItem) => {
+    const active =
+      pathname === item.href ||
+      (item.href !== `/${portal}` && pathname.startsWith(item.href));
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        scroll={false}
+        onClick={() => {
+          saveScroll();
+          setSidebarOpen(false);
+        }}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150",
+          active
+            ? "bg-[var(--sidebar-active)] text-white shadow-sm"
+            : "text-slate-400 hover:bg-[var(--sidebar-hover)] hover:text-white"
+        )}
+      >
+        <item.icon className={cn("h-4 w-4", active && "text-red-400")} />
+        {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
+      </Link>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <aside
@@ -181,7 +212,9 @@ export function DashboardLayout({
           <BrandMark tone="light" iconOnly />
           <div className="flex-1 min-w-0">
             <p className="font-[family-name:var(--font-display)] text-sm font-bold text-white">{BRAND.name}</p>
-            <p className="text-xs text-slate-400">{t(config.title)}</p>
+            <p className="text-xs text-slate-400">
+              {portal === "admin" ? getDepartmentLabel(department, locale === "fr") : t(config.title)}
+            </p>
           </div>
           <button className="text-slate-400 lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5" />
@@ -193,31 +226,18 @@ export function DashboardLayout({
           onScroll={saveScroll}
           className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]"
         >
-          {config.nav.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== `/${portal}` && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                scroll={false}
-                onClick={() => {
-                  saveScroll();
-                  setSidebarOpen(false);
-                }}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-150",
-                  active
-                    ? "bg-[var(--sidebar-active)] text-white shadow-sm"
-                    : "text-slate-400 hover:bg-[var(--sidebar-hover)] hover:text-white"
-                )}
-              >
-                <item.icon className={cn("h-4 w-4", active && "text-red-400")} />
-                {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
-              </Link>
-            );
-          })}
+          {adminSections
+            ? adminSections.map((section) => (
+                <div key={section.id} className="mb-1.5">
+                  {adminSections.length > 1 && (
+                    <p className="px-3.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      {locale === "fr" ? section.titleFr : section.titleEn}
+                    </p>
+                  )}
+                  {section.items.map(renderNavItem)}
+                </div>
+              ))
+            : config.nav.map(renderNavItem)}
         </nav>
 
         <div className="shrink-0 border-t border-white/5 p-4">

@@ -8,6 +8,7 @@ import {
   warehouseStaffPersonaId,
 } from "@/lib/admin-entities";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
+import type { AdminDepartment } from "@/lib/admin-access";
 
 export type Persona = {
   id: string;
@@ -19,6 +20,8 @@ export type Persona = {
   subRole?: string;
   subRoleFr?: string;
   warehouseId?: string;
+  /** Admin-only: which department this manager runs. Drives sidebar + access. */
+  department?: AdminDepartment;
 };
 
 const STATIC_PERSONAS: Persona[] = [
@@ -54,6 +57,7 @@ const STATIC_PERSONAS: Persona[] = [
   {
     id: "admin-1",
     role: "admin",
+    department: "super",
     name: "Admin User",
     nameFr: "Utilisateur admin",
     email: "admin@somba.com",
@@ -64,16 +68,18 @@ const STATIC_PERSONAS: Persona[] = [
   {
     id: "admin-ops",
     role: "admin",
+    department: "operations",
     name: "Ops Manager",
     nameFr: "Responsable des opérations",
     email: "ops@somba.com",
-    portal: "/admin",
+    portal: "/admin/orders",
     subRole: "Operations",
     subRoleFr: "Opérations",
   },
   {
     id: "admin-fin",
     role: "admin",
+    department: "finance",
     name: "Finance Lead",
     nameFr: "Responsable finance",
     email: "finance@somba.com",
@@ -82,8 +88,20 @@ const STATIC_PERSONAS: Persona[] = [
     subRoleFr: "Finance",
   },
   {
+    id: "admin-wh",
+    role: "admin",
+    department: "warehouse",
+    name: "Warehouse Admin",
+    nameFr: "Admin entrepôt",
+    email: "warehouse-admin@somba.com",
+    portal: "/admin/warehouses",
+    subRole: "Warehouse Admin",
+    subRoleFr: "Admin entrepôt",
+  },
+  {
     id: "admin-sup",
     role: "admin",
+    department: "support",
     name: "Support Agent",
     nameFr: "Agent support",
     email: "support@somba.com",
@@ -94,16 +112,18 @@ const STATIC_PERSONAS: Persona[] = [
   {
     id: "admin-mkt",
     role: "admin",
+    department: "marketing",
     name: "Marketing Mgr",
     nameFr: "Responsable marketing",
     email: "marketing@somba.com",
-    portal: "/admin/marketing",
+    portal: "/admin/flash-sales",
     subRole: "Marketing",
     subRoleFr: "Marketing",
   },
   {
     id: "admin-mod",
     role: "admin",
+    department: "moderation",
     name: "Moderator",
     nameFr: "Modérateur",
     email: "mod@somba.com",

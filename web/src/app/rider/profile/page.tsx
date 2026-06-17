@@ -57,9 +57,6 @@ export default function RiderProfilePage() {
 
       <DetailSection title={fr ? "Liens rapides" : "Quick Links"}>
         <div className="flex flex-wrap gap-2">
-          <Link href="/rider/cod/summary" className="text-sm text-emerald-600 hover:underline">
-            {fr ? "Résumé paiements" : "Payment Shift Summary"}
-          </Link>
           <Link href="/rider/history" className="text-sm text-emerald-600 hover:underline">
             {fr ? "Historique" : "Task History"}
           </Link>

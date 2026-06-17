@@ -125,7 +125,6 @@ export default function ShopProductDetailPage() {
               <span>{locale === "fr" ? `Livraison en ${product.deliveryDays} jours` : `Delivery in ${product.deliveryDays} days`}</span>
             </div>
             <div className="flex gap-4 text-xs text-slate-600">
-              {product.codAvailable && <span>✓ {locale === "fr" ? "Paiement à la livraison" : "Pay at Delivery"}</span>}
               {product.openBoxAvailable && <span>✓ {locale === "fr" ? "Colis ouvert" : "Open Box"}</span>}
               <span>✓ {locale === "fr" ? `Retours sous ${product.returnWindow} jours` : `${product.returnWindow}-day returns`}</span>
             </div>

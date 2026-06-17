@@ -144,17 +144,12 @@ export function ShipmentDetailGrid({
                 ),
               },
               { label: customerColumnLabel(locale), value: shipment.customer.name },
+              { label: fr ? "Ville de destination" : "Destination City", value: shipment.customer.city },
               {
-                label: fr ? "Téléphone" : "Phone",
-                value: (
-                  <a href={`tel:${shipment.customer.phone.replace(/\s/g, "")}`} className={phoneLinkClass}>
-                    <Phone className="h-3.5 w-3.5" />
-                    {shipment.customer.phone}
-                  </a>
-                ),
+                label: fr ? "Livraison" : "Delivery",
+                value: fr ? "Gérée par la logistique Somba" : "Handled by Somba logistics",
+                full: true,
               },
-              { label: fr ? "Ville" : "City", value: shipment.customer.city },
-              { label: fr ? "Adresse" : "Address", value: shipment.customer.address, full: true },
             ]}
           />
         </DetailGridSection>

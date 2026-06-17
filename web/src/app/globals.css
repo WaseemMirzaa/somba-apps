@@ -9,14 +9,14 @@
   --border: rgba(15, 23, 42, 0.08);
   --border-strong: rgba(15, 23, 42, 0.12);
 
-  /* Brand — primary actions (Tekka red) */
+  /* Brand — primary actions (Teka red) */
   --primary: #e11428;
   --primary-hover: #c00e20;
   --primary-dark: #8a0a18;
   --primary-light: #fff1f2;
   --primary-tint: #fcdde0;
 
-  /* Brand — Tekka red accent (alias) */
+  /* Brand — Teka red accent (alias) */
   --brand-red: #e11428;
   --brand-red-hover: #c00e20;
   --brand-red-light: #fff1f2;
@@ -29,7 +29,7 @@
   --accent: var(--primary);
   --accent-glow: rgba(225, 20, 40, 0.28);
 
-  /* Sell-online hero — Tekka red → royal blue, aligned with logo tile & landing-band */
+  /* Sell-online hero — Teka red → royal blue, aligned with logo tile & landing-band */
   --hero-overlay: linear-gradient(
     135deg,
     rgba(138, 10, 24, 0.92) 0%,
@@ -143,7 +143,7 @@ body {
   box-shadow: 0 8px 22px var(--accent-glow);
 }
 
-/* Interactive link text — uses brand primary (Tekka red) */
+/* Interactive link text — uses brand primary (Teka red) */
 .text-link {
   color: var(--primary);
 }

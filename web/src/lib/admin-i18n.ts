@@ -9,6 +9,8 @@ export const PERMISSION_SCOPE_LABELS: Record<string, { en: string; fr: string }>
   payouts: { en: "Payouts", fr: "Versements" },
   refunds: { en: "Refunds", fr: "Remboursements" },
   cod: { en: "Payment reconciliation", fr: "Réconciliation des paiements" },
+  reconciliation: { en: "Payment reconciliation", fr: "Réconciliation des paiements" },
+  payments: { en: "Payments", fr: "Paiements" },
   reports: { en: "Reports", fr: "Rapports" },
   tickets: { en: "Tickets", fr: "Tickets" },
   customers: { en: "Customers", fr: "Clients" },
