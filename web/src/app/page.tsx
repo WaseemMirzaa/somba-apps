@@ -66,7 +66,7 @@ const MARQUEE_ITEMS = [
   { icon: Truck, en: "1–3 day delivery", fr: "Livraison 1–3 jours" },
   { icon: ShieldCheck, en: "Buyer protection", fr: "Protection acheteur" },
   { icon: RotateCcw, en: "30-day returns", fr: "Retours 30 jours" },
-  { icon: Wallet, en: "Card · Pay at delivery · Wallet", fr: "Carte · Paiement à la livraison · Portefeuille" },
+  { icon: Wallet, en: "Card · Mobile money · Wallet", fr: "Carte · Mobile money · Portefeuille" },
   { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
   { icon: Headphones, en: "24/7 support", fr: "Assistance 24h/24, 7j/7" },
   { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },
@@ -673,7 +673,7 @@ export default function HomePage() {
           <SectionIntro
             center
             label={fr ? "Vendeurs" : "For sellers"}
-            title={fr ? "Vendez sur Somba & Tekka" : "Sell on Somba & Tekka"}
+            title={fr ? "Vendez sur Somba & Teka" : "Sell on Somba & Teka"}
             desc={
               fr
                 ? "Ouvrez votre boutique — choisissez un plan et commencez à vendre."
@@ -777,8 +777,8 @@ export default function HomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-lg text-white/75">
             {fr
-              ? "Parcourez des milliers de produits ou ouvrez votre boutique sur Somba & Tekka."
-              : "Browse thousands of products or open your seller store on Somba & Tekka."}
+              ? "Parcourez des milliers de produits ou ouvrez votre boutique sur Somba & Teka."
+              : "Browse thousands of products or open your seller store on Somba & Teka."}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link

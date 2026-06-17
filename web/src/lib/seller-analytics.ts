@@ -238,13 +238,15 @@ export const sellerCustomerKpis = {
   churnChange: -4.1,
 } as const;
 
+// Privacy: customer names are anonymized to first name + last initial only.
+// Sellers must not see customers' full names or any other personal info.
 export const sellerTopCustomers = [
-  { id: "CUST-1042", name: "Marie Kabongo", orders: 18, spent: 4820, lastOrder: "2024-06-28", segment: "VIP", segmentFr: "VIP" },
-  { id: "CUST-0891", name: "Jean Mukendi", orders: 14, spent: 3640, lastOrder: "2024-06-27", segment: "Returning", segmentFr: "Récurrent" },
-  { id: "CUST-1203", name: "Grace Mbuyi", orders: 12, spent: 2890, lastOrder: "2024-06-26", segment: "Returning", segmentFr: "Récurrent" },
-  { id: "CUST-0756", name: "Patrick Ilunga", orders: 11, spent: 2450, lastOrder: "2024-06-25", segment: "Returning", segmentFr: "Récurrent" },
-  { id: "CUST-1334", name: "Sophie Tshilombo", orders: 9, spent: 1980, lastOrder: "2024-06-24", segment: "New", segmentFr: "Nouveau" },
-  { id: "CUST-0612", name: "David Kasongo", orders: 8, spent: 1720, lastOrder: "2024-06-22", segment: "At-risk", segmentFr: "À risque" },
+  { id: "CUST-1042", name: "Marie K.", orders: 18, spent: 4820, lastOrder: "2024-06-28", segment: "VIP", segmentFr: "VIP" },
+  { id: "CUST-0891", name: "Jean M.", orders: 14, spent: 3640, lastOrder: "2024-06-27", segment: "Returning", segmentFr: "Récurrent" },
+  { id: "CUST-1203", name: "Grace M.", orders: 12, spent: 2890, lastOrder: "2024-06-26", segment: "Returning", segmentFr: "Récurrent" },
+  { id: "CUST-0756", name: "Patrick I.", orders: 11, spent: 2450, lastOrder: "2024-06-25", segment: "Returning", segmentFr: "Récurrent" },
+  { id: "CUST-1334", name: "Sophie T.", orders: 9, spent: 1980, lastOrder: "2024-06-24", segment: "New", segmentFr: "Nouveau" },
+  { id: "CUST-0612", name: "David K.", orders: 8, spent: 1720, lastOrder: "2024-06-22", segment: "At-risk", segmentFr: "À risque" },
 ] as const;
 
 export const sellerCustomerGeography = [

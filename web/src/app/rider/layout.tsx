@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { List, User, Wallet, Home, LogOut, Bell, Banknote } from "lucide-react";
+import { List, User, Wallet, Home, LogOut, Bell } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
@@ -41,7 +41,6 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
               <button onClick={() => setLocale("en")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "en" ? "bg-emerald-600 text-white" : "text-slate-500")}>EN</button>
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>
-            <Link href="/rider/cod/summary" className="rounded-lg p-1.5 text-slate-500 hover:text-emerald-600" title={locale === "fr" ? "Résumé paiements" : "Payment Summary"}><Banknote className="h-4 w-4" /></Link>
             <NotificationBell portal="rider" href="/rider/notifications" />
             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{t("prototype")}</span>
             <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label="Logout">

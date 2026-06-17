@@ -20,8 +20,8 @@ export default function TermsPage() {
         : `${BRAND.name} operates as a marketplace platform. Sellers list and sell their own inventory. ${BRAND.legalEntity} facilitates transactions, payments, and logistics in a hybrid fulfillment model.`}</p>
       <h2>{fr ? "2. Commandes et paiements" : "2. Orders & Payments"}</h2>
       <p>{fr
-        ? "Nous acceptons les paiements par carte Stripe, Airtel Money, le portefeuille Somba et le paiement à la livraison. Les commandes payées à la livraison peuvent nécessiter une vérification par code OTP et sont soumises à des limites de prévention de la fraude."
-        : "We support Stripe card payments, Airtel Money, Somba Wallet, and pay at delivery. Pay-at-delivery orders may require OTP verification and are subject to fraud prevention limits."}</p>
+        ? "Nous acceptons les paiements par carte Stripe, Airtel Money et le portefeuille Somba."
+        : "We support Stripe card payments, Airtel Money, and the Somba Wallet."}</p>
       <h2>{fr ? "3. Retours et remboursements" : "3. Returns & Refunds"}</h2>
       <p>{fr
         ? "Les remboursements peuvent être effectués sur le moyen de paiement d'origine ou sur le portefeuille Somba, à votre choix, conformément à notre politique de retour."

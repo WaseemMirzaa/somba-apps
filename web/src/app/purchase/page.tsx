@@ -31,8 +31,8 @@ export default function PurchasePage() {
       </h1>
       <p className="mt-2 max-w-md text-slate-600">
         {fr
-          ? "Somba & Tekka est une marketplace — consultez nos plans vendeur pour ouvrir votre boutique."
-          : "Somba & Tekka is a marketplace — see our seller plans to open your store."}
+          ? "Somba & Teka est une marketplace — consultez nos plans vendeur pour ouvrir votre boutique."
+          : "Somba & Teka is a marketplace — see our seller plans to open your store."}
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/sell-online" className="btn-primary inline-flex items-center gap-2 px-6 py-3 text-sm">

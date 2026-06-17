@@ -26,7 +26,7 @@ export const APP_LINKS = {
   riderApp: "https://play.google.com/store/apps/details?id=com.somba.rider",
   sellerSignup: "/login",
   sellOnline: "/sell-online",
-  contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%20%26%20Tekka%20Support`,
+  contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%20%26%20Teka%20Support`,
 } as const;
 
 /** Flipkart-style quick-access strip — portal entry points */
@@ -59,8 +59,8 @@ export const PORTAL_IMAGES = {
 export const PORTAL_SECTION = {
   title: "One marketplace, every role",
   titleFr: "Une marketplace, chaque rôle",
-  subtitle: "Whether you're shopping, selling, or running operations — Somba & Tekka connects every part of the journey.",
-  subtitleFr: "Que vous achetiez, vendiez ou gériez les opérations — Somba & Tekka connecte chaque étape.",
+  subtitle: "Whether you're shopping, selling, or running operations — Somba & Teka connects every part of the journey.",
+  subtitleFr: "Que vous achetiez, vendiez ou gériez les opérations — Somba & Teka connecte chaque étape.",
   publicLabel: "For shoppers & sellers",
   publicLabelFr: "Pour acheteurs et vendeurs",
   opsLabel: "For our operations team",
@@ -432,11 +432,11 @@ export const PLATFORM_MODULES = [
 export const PAYMENT_OPTIONS = [
   { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba." },
   { title: "Pay at Delivery", titleFr: "Paiement à la livraison", desc: "Order now and pay when your package arrives — available on eligible items.", descFr: "Commandez maintenant, payez à la réception — sur articles éligibles." },
-  { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba & Tekka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba & Tekka." },
+  { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba & Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba & Teka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
 
-/** Why shoppers and sellers choose Somba & Tekka */
+/** Why shoppers and sellers choose Somba & Teka */
 export const WHY_CHOOSE = [
   { title: "Verified sellers", titleFr: "Vendeurs vérifiés", desc: "Every store on Somba is reviewed — shop with confidence from trusted merchants.", descFr: "Chaque boutique est vérifiée — achetez en confiance." },
   { title: "Fast delivery", titleFr: "Livraison rapide", desc: "1–3 day delivery nationwide with real-time tracking from warehouse to doorstep.", descFr: "Livraison en 1–3 jours avec suivi en temps réel." },
@@ -591,8 +591,8 @@ export const TESTIMONIALS = [
 
 export const FAQ_ITEMS = [
   {
-    q: "What is Somba & Tekka?",
-    qFr: "Qu'est-ce que Somba & Tekka ?",
+    q: "What is Somba & Teka?",
+    qFr: "Qu'est-ce que Somba & Teka ?",
     a: `${BRAND.fullName} is an online marketplace where you can shop from verified sellers across electronics, fashion, home, beauty, and more — with fast delivery and secure payments.`,
     aFr: `${BRAND.fullName} est une marketplace en ligne où vous achetez auprès de vendeurs vérifiés — électronique, mode, maison, beauté et plus — avec livraison rapide.`,
   },
@@ -624,8 +624,8 @@ export const FAQ_ITEMS = [
 
 /** Flipkart-style sell-online landing — /sell-online */
 export const SELL_ONLINE_HERO = {
-  title: "Grow your business — sell online on Somba & Tekka",
-  titleFr: "Développez votre activité — vendez en ligne sur Somba & Tekka",
+  title: "Grow your business — sell online on Somba & Teka",
+  titleFr: "Développez votre activité — vendez en ligne sur Somba & Teka",
   subtitle: "Reach millions of shoppers, get fulfillment support, and get paid on time. List your products and start selling in as little as 24 hours.",
   subtitleFr: "Touchez des millions d'acheteurs, bénéficiez du fulfillment et soyez payé à temps. Listez vos produits et vendez en 24 h.",
   cta: "Start selling",
@@ -667,7 +667,7 @@ export const SELL_ONLINE_TOOLS = [
 ] as const;
 
 export const SELL_ONLINE_FAQ = [
-  { q: "Who can sell on Somba & Tekka?", qFr: "Qui peut vendre sur Somba & Tekka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
+  { q: "Who can sell on Somba & Teka?", qFr: "Qui peut vendre sur Somba & Teka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
   { q: "What are the seller fees?", qFr: "Quels sont les frais vendeur ?", a: "Monthly plans start at $49/mo (Starter). Platform commission applies per category (typically 8–15%). No hidden listing fees on Pro and Enterprise.", aFr: "Plans mensuels à partir de 49 $/mois (Starter). Commission par catégorie (8–15 % en général). Pas de frais de listing cachés sur Pro et Entreprise." },
   { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use Somba's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride Somba — entrepôt, tri et livraison dernier kilomètre." },
   { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Paiements hebdomadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },

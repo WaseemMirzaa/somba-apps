@@ -38,7 +38,8 @@ export default function SellerOrdersPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(orders, filters, {
-        searchFields: ["id", "customer", "paymentMethod"],
+        // Privacy: search only on order ID and customer first name — no PII.
+        searchFields: ["id", "customer"],
         dateField: "date",
         statusField: "shippingStatus",
       }),

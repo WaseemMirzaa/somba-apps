@@ -17,7 +17,7 @@ export const auditLogs: AuditLogEntry[] = [
 export const adminRoles = [
   { id: "super", name: "Super Admin", permissions: ["all"] },
   { id: "operations", name: "Operations", permissions: ["orders", "warehouse", "logistics"] },
-  { id: "finance", name: "Finance", permissions: ["payouts", "refunds", "cod", "reports"] },
+  { id: "finance", name: "Finance", permissions: ["payments", "refunds", "reconciliation", "reports"] },
   { id: "support", name: "Support", permissions: ["tickets", "customers", "returns"] },
   { id: "marketing", name: "Marketing", permissions: ["campaigns", "cms", "coupons", "banners"] },
   { id: "moderation", name: "Moderation", permissions: ["products", "reviews", "sellers"] },

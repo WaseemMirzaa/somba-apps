@@ -2,6 +2,15 @@ import { products } from "./mock-data";
 import { orderEntities, sellerProductDetails } from "./entities";
 import { INITIAL_WAREHOUSES } from "./warehouses-admin";
 
+/**
+ * Sellers must not see customers' personal info — the platform/riders handle
+ * delivery. Sellers may only see a customer's FIRST NAME (no last name) and
+ * destination CITY. Use this helper to derive the first name from a full name.
+ */
+function firstNameOnly(fullName: string): string {
+  return fullName.split(" ")[0] ?? fullName;
+}
+
 // ─── Store & Dashboard ───────────────────────────────────────────────────────
 
 export const sellerStore = {
@@ -101,10 +110,9 @@ export const sellerOrderList = orderEntities
   .filter((o) => o.seller === "TechZone Store")
   .map((o) => ({
     id: o.id,
-    customer: o.customer,
-    customerPhone: o.customerPhone,
+    // Privacy: expose first name only — no last name, phone, email, or address.
+    customer: firstNameOnly(o.customer),
     customerCity: o.customerCity,
-    customerAddress: o.customerAddress,
     items: o.itemsCount,
     amount: o.amount,
     paymentMethod: o.paymentMethod,
@@ -192,9 +200,8 @@ export type ShipmentDetail = {
     currentLocationFr: string;
   };
   customer: {
+    // Privacy: first name + destination city only — no phone, address, or last name.
     name: string;
-    phone: string;
-    address: string;
     city: string;
   };
   seller: {
@@ -258,8 +265,6 @@ function buildShipmentDetail(order: (typeof sellerOrderList)[number]): ShipmentD
     },
     customer: {
       name: order.customer,
-      phone: order.customerPhone,
-      address: order.customerAddress,
       city: order.customerCity,
     },
     seller: {

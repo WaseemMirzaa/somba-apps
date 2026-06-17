@@ -25,7 +25,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Somba — Complete Marketplace Platform",
-  description: "Somba & Tekka — Admin, Seller, Warehouse, Rider & Customer apps. Purchase and deploy your marketplace.",
+  description: "Somba & Teka — Admin, Seller, Warehouse, Rider & Customer apps. Purchase and deploy your marketplace.",
 };
 
 export default function RootLayout({

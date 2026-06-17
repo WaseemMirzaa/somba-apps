@@ -1,4 +1,4 @@
-# Somba & Tekka — Configuration Record
+# Somba & Teka — Configuration Record
 
 All questionnaire answers applied to the prototype.
 
@@ -6,7 +6,7 @@ All questionnaire answers applied to the prototype.
 
 | Setting | Value |
 |---------|-------|
-| Brand | **Somba & Tekka** (`web/src/lib/config.ts`) |
+| Brand | **Somba & Teka** (`web/src/lib/config.ts`) |
 | Market | France + Global |
 | Languages | EN + FR together (toggle on all portals) |
 | Currency | USD (mock) |

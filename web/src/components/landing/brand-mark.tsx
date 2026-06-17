@@ -1,10 +1,10 @@
-import { ShoppingBag } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type BrandMarkProps = {
   /** Color treatment for the wordmark text. */
   tone?: "light" | "dark";
-  /** Show the full "Somba & Tekka" lockup instead of just "Somba". */
+  /** Show the full "Somba & Teka" lockup instead of just "Somba". */
   full?: boolean;
   /** Hide the wordmark and render only the icon tile. */
   iconOnly?: boolean;
@@ -14,16 +14,20 @@ type BrandMarkProps = {
 };
 
 /**
- * Somba & Tekka brand lockup — a royal-blue shopping-bag tile with the
+ * Somba & Teka brand lockup — a royal-blue shopping-bag tile with the
  * signature red accent stripe, paired with the wordmark (red ampersand).
  */
 export function BrandMark({ tone = "dark", full = false, iconOnly = false, className, wordClassName }: BrandMarkProps) {
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[var(--logo-primary)] to-[var(--logo-primary-dark)] shadow-md shadow-[var(--logo-primary)]/25">
-        <ShoppingBag className="h-5 w-5 text-white" strokeWidth={2.4} />
-        <span className="absolute right-0 top-0 h-full w-[5px] bg-[var(--brand-red)]" aria-hidden />
-      </span>
+      <Image
+        src="/logo.svg"
+        alt="Somba & Teka"
+        width={40}
+        height={40}
+        priority
+        className="h-10 w-10 shrink-0 rounded-xl shadow-md shadow-[var(--logo-primary)]/25"
+      />
       {!iconOnly && (
         <span
           className={cn(
@@ -34,7 +38,7 @@ export function BrandMark({ tone = "dark", full = false, iconOnly = false, class
         >
           {full ? (
             <>
-              Somba <span className="text-[var(--brand-red)]">&amp;</span> Tekka
+              Somba <span className="text-[var(--brand-red)]">&amp;</span> Teka
             </>
           ) : (
             "Somba"
