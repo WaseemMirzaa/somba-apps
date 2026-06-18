@@ -9,6 +9,7 @@ import {
 } from "@/lib/admin-entities";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
 import type { AdminDepartment } from "@/lib/admin-access";
+import type { WarehouseStaffRole } from "@/lib/admin-entities";
 
 export type Persona = {
   id: string;
@@ -22,6 +23,8 @@ export type Persona = {
   warehouseId?: string;
   /** Admin-only: which department this manager runs. Drives sidebar + access. */
   department?: AdminDepartment;
+  /** Warehouse-only: staff tier. Drives warehouse sidebar + access. */
+  warehouseRole?: WarehouseStaffRole;
 };
 
 const STATIC_PERSONAS: Persona[] = [
@@ -172,6 +175,7 @@ function buildWarehouseManagerPersonas(): Persona[] {
     subRole: `${w.name} Manager`,
     subRoleFr: `Responsable — ${w.name}`,
     warehouseId: w.id,
+    warehouseRole: "manager" as const,
   }));
 }
 
@@ -208,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         subRole: WAREHOUSE_STAFF_ROLE_LABELS[s.role],
         subRoleFr: WAREHOUSE_STAFF_ROLE_LABELS_FR[s.role],
         warehouseId: s.warehouseId,
+        warehouseRole: s.role,
       }));
     return [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas(), ...staffPersonas];
   }, [staff]);
