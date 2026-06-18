@@ -22,6 +22,7 @@ import {
   BarChart3,
   Settings,
   Boxes,
+  Truck,
 } from "lucide-react";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 
@@ -60,6 +61,7 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/parcels", label: "parcels", icon: Boxes, tier: T.operator, nav: false },
   { href: "/warehouse/riders", label: "riders", icon: Bike, tier: T.supervisor, nav: true },
   { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin, tier: T.supervisor, nav: true },
+  { href: "/warehouse/transfers", label: "transfers", icon: Truck, tier: T.supervisor, nav: true },
   { href: "/warehouse/returns", label: "returns", icon: RotateCcw, tier: T.supervisor, nav: true },
   { href: "/warehouse/replacements", label: "replacements", icon: RefreshCw, tier: T.supervisor, nav: true },
   { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, tier: T.supervisor, nav: true },
