@@ -44,6 +44,8 @@ import { useAuth } from "@/context/auth-context";
 import { BRAND } from "@/lib/config";
 import { getAdminSections, getDepartmentLabel } from "@/lib/admin-access";
 import type { AdminDepartment } from "@/lib/admin-access";
+import { getWarehouseNav, getWarehouseRoleLabel } from "@/lib/warehouse-access";
+import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -174,6 +176,9 @@ export function DashboardLayout({
   const department = (persona.department ?? "super") as AdminDepartment;
   const adminSections = portal === "admin" ? getAdminSections(department) : null;
 
+  const warehouseRole = (persona.warehouseRole ?? "manager") as WarehouseStaffRole;
+  const warehouseNav = portal === "warehouse" ? getWarehouseNav(warehouseRole) : null;
+
   const renderNavItem = (item: NavItem) => {
     const active =
       pathname === item.href ||
@@ -213,7 +218,11 @@ export function DashboardLayout({
           <div className="flex-1 min-w-0">
             <p className="font-[family-name:var(--font-display)] text-sm font-bold text-white">{BRAND.name}</p>
             <p className="text-xs text-slate-400">
-              {portal === "admin" ? getDepartmentLabel(department, locale === "fr") : t(config.title)}
+              {portal === "admin"
+                ? getDepartmentLabel(department, locale === "fr")
+                : portal === "warehouse"
+                  ? `${t(config.title)} · ${getWarehouseRoleLabel(warehouseRole, locale === "fr")}`
+                  : t(config.title)}
             </p>
           </div>
           <button className="text-slate-400 lg:hidden" onClick={() => setSidebarOpen(false)}>
@@ -237,7 +246,7 @@ export function DashboardLayout({
                   {section.items.map(renderNavItem)}
                 </div>
               ))
-            : config.nav.map(renderNavItem)}
+            : (warehouseNav ?? config.nav).map(renderNavItem)}
         </nav>
 
         <div className="shrink-0 border-t border-white/5 p-4">
