@@ -3,7 +3,7 @@
 export const BRAND = {
   name: "Somba",
   partner: "Teka",
-  fullName: "Somba & Teka",
+  fullName: "S&T Marketplace",
   tagline: "Shop smarter. Deliver faster.",
   legalEntity: "Somba Commerce SAS",
   legalAddress: "8 Rue de la Paix, 75002 Paris, France",

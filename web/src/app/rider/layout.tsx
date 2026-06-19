@@ -6,7 +6,6 @@ import { List, User, Wallet, Home, LogOut, Bell } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
-import { BRAND } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalGuard } from "@/components/layout/portal-guard";
@@ -30,11 +29,8 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <BrandMark iconOnly />
-            <div>
-              <p className="font-[family-name:var(--font-display)] text-sm font-bold text-slate-900">{BRAND.name}</p>
-              <p className="text-[10px] font-medium text-emerald-600">{t("riderApp")}</p>
-            </div>
+            <BrandMark compact />
+            <p className="text-[10px] font-medium text-emerald-600">{t("riderApp")}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border)] p-0.5 text-[10px]">

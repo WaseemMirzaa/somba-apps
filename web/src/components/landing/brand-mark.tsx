@@ -1,50 +1,104 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
+export const BRAND_LOGO_ALT = "S&T Marketplace";
+
 type BrandMarkProps = {
-  /** Color treatment for the wordmark text. */
+  /** Adds a white tile behind raster logos on dark backgrounds. */
   tone?: "light" | "dark";
-  /** Show the full "Somba & Teka" lockup instead of just "Somba". */
+  /** Stacked hexagon lockup with MARKETPLACE wordmark. */
   full?: boolean;
-  /** Hide the wordmark and render only the icon tile. */
+  /** Hexagon mark only — for tight spaces (sidebar, mobile header). */
   iconOnly?: boolean;
+  /** Always show the horizontal bag lockup at a compact height (portal chrome). */
+  compact?: boolean;
   className?: string;
-  /** Extra classes for the wordmark text (e.g. responsive visibility). */
+  /** Extra classes for the horizontal lockup wrapper (e.g. responsive visibility). */
   wordClassName?: string;
 };
 
-/**
- * Somba & Teka brand lockup — a royal-blue shopping-bag tile with the
- * signature red accent stripe, paired with the wordmark (red ampersand).
- */
-export function BrandMark({ tone = "dark", full = false, iconOnly = false, className, wordClassName }: BrandMarkProps) {
+function logoSurface(tone: "light" | "dark") {
+  return tone === "light" ? "rounded-xl bg-white px-2 py-1 shadow-sm" : "";
+}
+
+function HexagonIcon({ className, surface }: { className?: string; surface?: string }) {
   return (
-    <span className={cn("flex items-center gap-2.5", className)}>
+    <span className={cn("relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg", surface, className)}>
       <Image
-        src="/logo.svg"
-        alt="Somba & Teka"
-        width={40}
-        height={40}
+        src="/brand/logo-stack.png"
+        alt={BRAND_LOGO_ALT}
+        fill
         priority
-        className="h-10 w-10 shrink-0 rounded-xl shadow-md shadow-[var(--logo-primary)]/25"
+        className="object-cover object-[center_20%] scale-[3.4]"
+        sizes="40px"
       />
-      {!iconOnly && (
-        <span
-          className={cn(
-            "font-[family-name:var(--font-display)] text-xl font-extrabold tracking-tight",
-            tone === "light" ? "text-white" : "text-[var(--logo-primary)]",
-            wordClassName
-          )}
-        >
-          {full ? (
-            <>
-              Somba <span className="text-[var(--brand-red)]">&amp;</span> Teka
-            </>
-          ) : (
-            "Somba"
-          )}
-        </span>
-      )}
+    </span>
+  );
+}
+
+function HorizontalLockup({
+  className,
+  surface,
+  heightClass = "h-11",
+}: {
+  className?: string;
+  surface?: string;
+  heightClass?: string;
+}) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center", surface, className)}>
+      <Image
+        src="/brand/logo-horizontal.png"
+        alt={BRAND_LOGO_ALT}
+        width={180}
+        height={80}
+        priority
+        className={cn("w-auto", heightClass)}
+      />
+    </span>
+  );
+}
+
+/**
+ * S&T Marketplace brand lockups — hexagon mark and shopping-bag horizontal lockup.
+ */
+export function BrandMark({
+  tone = "dark",
+  full = false,
+  iconOnly = false,
+  compact = false,
+  className,
+  wordClassName,
+}: BrandMarkProps) {
+  const surface = logoSurface(tone);
+
+  if (full) {
+    return (
+      <span className={cn("inline-block", surface, className)}>
+        <Image
+          src="/brand/logo-stack.png"
+          alt={BRAND_LOGO_ALT}
+          width={220}
+          height={150}
+          priority
+          className="h-auto w-[min(220px,78vw)]"
+        />
+      </span>
+    );
+  }
+
+  if (iconOnly) {
+    return <HexagonIcon className={className} surface={surface} />;
+  }
+
+  if (compact) {
+    return <HorizontalLockup className={className} surface={surface} heightClass="h-9" />;
+  }
+
+  return (
+    <span className={cn("flex items-center", className)}>
+      <HexagonIcon className="sm:hidden" surface={surface} />
+      <HorizontalLockup className={cn("hidden sm:inline-flex", wordClassName)} surface={surface} />
     </span>
   );
 }
