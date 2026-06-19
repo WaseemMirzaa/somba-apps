@@ -37,6 +37,8 @@ import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/an
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
+import { warehouseRoleLevel, canWarehouseAccess } from "@/lib/warehouse-access";
+import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import { warehouseDashboardStats } from "@/lib/warehouse-entities";
 import {
   warehouseThroughputTrend,
@@ -90,6 +92,14 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const warehouse = persona.warehouseId ? getWarehouse(persona.warehouseId) : undefined;
   const title = hubName ?? warehouse?.name ?? (fr ? "Opérations fulfillment" : "Fulfillment Operations");
 
+  // Role-tiered dashboard. Only gate inside the warehouse portal; admins viewing
+  // /admin/fulfillment (no warehouseRole) see everything.
+  const gated = persona.role === "warehouse";
+  const whRole = (persona.warehouseRole ?? "manager") as WarehouseStaffRole;
+  const level = gated ? warehouseRoleLevel(whRole) : 3;
+  const canSupervise = level >= 2; // supervisor + manager
+  const isManager = level >= 3; // manager / hub manager only
+
   const inboundSpark = warehouseInboundDispatchTrend.map((d) => d.inbound);
   const dispatchSpark = warehouseInboundDispatchTrend.map((d) => d.dispatch);
   const throughputData = warehouseInboundDispatchTrend.map((d) => ({
@@ -108,6 +118,9 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
     { path: "/deliveries", label: fr ? "Livraisons" : "Deliveries", countKey: null, count: s.dispatchedToday - s.failedDeliveries, icon: Truck },
     { path: "/analytics", label: t("analytics"), countKey: null, count: null, icon: Target },
   ];
+  const visibleQuickLinks = quickLinks.filter(
+    (link) => !gated || canWarehouseAccess(whRole, `/warehouse${link.path}`)
+  );
 
   return (
     <div className="space-y-6">
@@ -120,12 +133,14 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <AnalyticsPeriodControls
-              period={period}
-              onPeriodChange={setPeriod}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
+            {isManager && (
+              <AnalyticsPeriodControls
+                period={period}
+                onPeriodChange={setPeriod}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
+            )}
             <Link href={ops("/dispatch")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
               {fr ? "Ouvrir expédition" : "Open dispatch"}
             </Link>
@@ -137,11 +152,17 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <AnalyticsKpiCard title={fr ? "Réception (auj.)" : "Received today"} value={String(k.receivedToday)} change={k.receivedChange} spark={inboundSpark} icon={Package} />
         <AnalyticsKpiCard title={fr ? "Expédition (auj.)" : "Dispatched today"} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={dispatchSpark} icon={Send} />
         <AnalyticsKpiCard title={fr ? "Livraison à l'heure" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        <AnalyticsKpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={warehouseThroughputTrend.map((d) => d.revenue * 30)} icon={DollarSign} />
-        <AnalyticsKpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
+        {isManager && (
+          <AnalyticsKpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={warehouseThroughputTrend.map((d) => d.revenue * 30)} icon={DollarSign} />
+        )}
+        {canSupervise && (
+          <AnalyticsKpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
+        )}
         <AnalyticsKpiCard title={fr ? "Temps traitement moy." : "Avg. process time"} value={`${k.avgProcessHours}h`} change={k.processChange} positive={false} spark={[5.1, 4.8, 4.6, 4.5, 4.4, 4.3, 4.2]} icon={RefreshCw} />
         <AnalyticsKpiCard title={fr ? "Lots actifs" : "Active batches"} value={String(k.activeBatches)} change={8} spark={[10, 11, 12, 12, 13, 14, 14]} icon={Layers} />
-        <AnalyticsKpiCard title={fr ? "Colis vieillis" : "Aged parcels"} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
+        {canSupervise && (
+          <AnalyticsKpiCard title={fr ? "Colis vieillis" : "Aged parcels"} value={String(k.agedParcels)} change={-14} positive={false} spark={[12, 10, 9, 8, 8, 7, 6]} icon={AlertTriangle} />
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -191,6 +212,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           </CardContent>
         </Card>
 
+        {canSupervise && (
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -227,6 +249,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
             })}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -272,6 +295,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           </CardContent>
         </Card>
 
+        {canSupervise && (
         <Card>
           <CardHeader>
             <h2 className="font-semibold text-slate-900">{fr ? "Score ops" : "Ops health score"}</h2>
@@ -291,10 +315,11 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
             ))}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {quickLinks.map((link) => (
+        {visibleQuickLinks.map((link) => (
           <Link
             key={link.path}
             href={ops(link.path)}
@@ -315,6 +340,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
+        {canSupervise && (
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -348,6 +374,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
             />
           </CardContent>
         </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
@@ -365,6 +392,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         </Card>
       </div>
 
+      {canSupervise && (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -389,6 +417,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }
