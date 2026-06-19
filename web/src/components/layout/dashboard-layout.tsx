@@ -41,7 +41,6 @@ import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
-import { BRAND } from "@/lib/config";
 import { getAdminSections, getDepartmentLabel } from "@/lib/admin-access";
 import type { AdminDepartment } from "@/lib/admin-access";
 import { getWarehouseNav, getWarehouseRoleLabel } from "@/lib/warehouse-access";
@@ -214,9 +213,8 @@ export function DashboardLayout({
         )}
       >
         <div className="flex h-[72px] shrink-0 items-center gap-3 border-b border-white/5 px-6">
-          <BrandMark tone="light" iconOnly />
-          <div className="flex-1 min-w-0">
-            <p className="font-[family-name:var(--font-display)] text-sm font-bold text-white">{BRAND.name}</p>
+          <BrandMark tone="light" compact />
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-400">
               {portal === "admin"
                 ? getDepartmentLabel(department, locale === "fr")

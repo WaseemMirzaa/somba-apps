@@ -24,8 +24,12 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Somba — Complete Marketplace Platform",
-  description: "Somba & Teka — Admin, Seller, Warehouse, Rider & Customer apps. Purchase and deploy your marketplace.",
+  title: "S&T Marketplace — Complete Marketplace Platform",
+  description: "S&T Marketplace — Admin, Seller, Warehouse, Rider & Customer apps. Purchase and deploy your marketplace.",
+  icons: {
+    icon: "/brand/logo-stack.png",
+    apple: "/brand/logo-stack.png",
+  },
 };
 
 export default function RootLayout({
