@@ -1,0 +1,80 @@
+name: Build debug APKs
+
+on:
+  push:
+    branches:
+      - feature/mobile-apps-frontend
+      - claude/flutter-mobile-frontend-m5kdw4
+    paths:
+      - "mobile/**"
+      - "rider-app/**"
+      - ".github/workflows/build-debug-apks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-apks
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.32.5
+          cache: true
+
+      - name: Build customer app (somba_teka)
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter build apk --debug
+
+      - name: Build rider app (somba_rider)
+        working-directory: rider-app
+        run: |
+          flutter pub get
+          flutter build apk --debug
+
+      - name: Rename APKs
+        run: |
+          mkdir -p dist
+          cp mobile/build/app/outputs/flutter-apk/app-debug.apk dist/somba-teka-customer-debug.apk
+          cp rider-app/build/app/outputs/flutter-apk/app-debug.apk dist/somba-rider-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somba-teka-customer-debug-apk
+          path: dist/somba-teka-customer-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somba-rider-debug-apk
+          path: dist/somba-rider-debug.apk
+
+      # Publish/refresh a public "debug-builds" release so the APKs have
+      # stable direct download links (no GitHub login needed).
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-builds
+          name: Debug APKs (latest)
+          prerelease: true
+          body: |
+            Latest debug builds of the Somba&Teka mobile apps.
+            - somba-teka-customer-debug.apk — customer shopping app
+            - somba-rider-debug.apk — rider pickup/delivery app
+          files: |
+            dist/somba-teka-customer-debug.apk
+            dist/somba-rider-debug.apk
