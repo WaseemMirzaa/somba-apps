@@ -108,6 +108,11 @@ export function getWarehouseHome(): string {
   return "/warehouse";
 }
 
+/** Numeric tier for a role (operator 1 → supervisor 2 → manager 3). */
+export function warehouseRoleLevel(role: WarehouseStaffRole): number {
+  return ROLE_LEVEL[role] ?? ROLE_LEVEL.manager;
+}
+
 const ROLE_LABELS: Record<WarehouseStaffRole, { en: string; fr: string }> = {
   operator: { en: "Operator", fr: "Opérateur" },
   supervisor: { en: "Supervisor", fr: "Superviseur" },
