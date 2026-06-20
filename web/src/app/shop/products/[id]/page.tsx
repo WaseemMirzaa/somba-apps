@@ -18,6 +18,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
+import { useModeration } from "@/context/moderation-context";
 import { cn } from "@/lib/utils";
 
 export default function ShopProductDetailPage() {
@@ -25,6 +26,7 @@ export default function ShopProductDetailPage() {
   const { locale } = useLocale();
   const { toggleFollowStore, isFollowingStore, addRecentlyViewed } = useShop();
   const { toast } = useToast();
+  const { isProductVisible } = useModeration();
   const { profile, getZoneFee } = useMarket();
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
   const [pincode, setPincode] = useState("");
@@ -53,6 +55,20 @@ export default function ShopProductDetailPage() {
 
   if (!product) {
     return <div className="text-center text-slate-500">{locale === "fr" ? "Produit introuvable" : "Product not found"}</div>;
+  }
+
+  if (!isProductVisible(product)) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 py-20 text-center">
+        <p className="text-lg font-semibold text-slate-900">{locale === "fr" ? "Produit indisponible" : "Product unavailable"}</p>
+        <p className="text-sm text-slate-500">
+          {locale === "fr" ? "Ce produit n'est plus disponible." : "This product is no longer available."}
+        </p>
+        <Link href="/shop/products" className="inline-block text-sm font-medium text-[var(--primary)] hover:underline">
+          {locale === "fr" ? "← Voir d'autres produits" : "← Browse other products"}
+        </Link>
+      </div>
+    );
   }
 
   const fr = locale === "fr";

@@ -8,18 +8,36 @@ import { ProductCard } from "@/components/landing/product-card";
 import { getSeller } from "@/lib/entities";
 import { products, stores, categories } from "@/lib/mock-data";
 import { useLocale } from "@/context/locale-context";
+import { useModeration } from "@/context/moderation-context";
 
 export default function ShopStoreDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { isSellerBlocked, isProductVisible } = useModeration();
   const seller = getSeller(Number(id));
   const store = stores.find((s) => s.name === seller?.storeName) ?? stores[0];
-  const storeProducts = products.filter((p) => p.seller === seller?.storeName || p.seller === store.name);
+  const storeProducts = products.filter(
+    (p) => (p.seller === seller?.storeName || p.seller === store.name) && isProductVisible(p)
+  );
   const categoryFr = categories.find((c) => c.name === seller?.category)?.nameFr ?? seller?.category;
 
   if (!seller) {
     return <div className="text-center text-slate-500">{fr ? "Boutique introuvable" : "Store not found"}</div>;
+  }
+
+  if (isSellerBlocked(seller.id)) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 py-20 text-center">
+        <p className="text-lg font-semibold text-slate-900">{fr ? "Boutique indisponible" : "Store unavailable"}</p>
+        <p className="text-sm text-slate-500">
+          {fr ? "Cette boutique n'est pas disponible pour le moment." : "This store is currently not available."}
+        </p>
+        <Link href="/shop" className="inline-block text-sm font-medium text-[var(--primary)] hover:underline">
+          {fr ? "← Retour à la boutique" : "← Back to shop"}
+        </Link>
+      </div>
+    );
   }
 
   return (

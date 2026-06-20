@@ -12,6 +12,8 @@ import { useLocale } from "@/context/locale-context";
 import { sellerEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
+import { useModeration } from "@/context/moderation-context";
+import { useToast } from "@/context/toast-context";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -32,6 +34,8 @@ const CATEGORY_FR: Record<string, string> = {
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { toast } = useToast();
+  const { isSellerBlocked, blockSeller, unblockSeller } = useModeration();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -92,21 +96,43 @@ export default function AdminSellersPage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => (
-                  <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
-                    {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
-                  </Badge>
-                ),
+                render: (row) =>
+                  isSellerBlocked(Number(row.id)) ? (
+                    <Badge variant="danger">{fr ? "Bloqué" : "Blocked"}</Badge>
+                  ) : (
+                    <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
+                      {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
+                    </Badge>
+                  ),
               },
               { key: "date", label: t("date") },
               {
                 key: "actions",
                 label: t("action"),
-                render: (row) => (
-                  <Link href={`/admin/sellers/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
-                    {t("view")}
-                  </Link>
-                ),
+                render: (row) => {
+                  const blocked = isSellerBlocked(Number(row.id));
+                  return (
+                    <div className="flex items-center gap-3">
+                      <Link href={`/admin/sellers/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
+                        {t("view")}
+                      </Link>
+                      <button
+                        onClick={() => {
+                          if (blocked) {
+                            unblockSeller(Number(row.id));
+                            toast(fr ? `${row.storeName} débloqué` : `${row.storeName} unblocked`);
+                          } else {
+                            blockSeller(Number(row.id));
+                            toast(fr ? `${row.storeName} bloqué` : `${row.storeName} blocked`, "info");
+                          }
+                        }}
+                        className={blocked ? "text-sm font-medium text-emerald-600 hover:underline" : "text-sm font-medium text-red-600 hover:underline"}
+                      >
+                        {blocked ? (fr ? "Débloquer" : "Unblock") : (fr ? "Bloquer" : "Block")}
+                      </button>
+                    </div>
+                  );
+                },
               },
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
