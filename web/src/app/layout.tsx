@@ -13,6 +13,7 @@ import { NotificationProvider } from "@/context/notification-context";
 import { DisputeProvider } from "@/context/dispute-context";
 import { ModerationProvider } from "@/context/moderation-context";
 import { CategoriesProvider } from "@/context/categories-context";
+import { SupportProvider } from "@/context/support-context";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -50,9 +51,11 @@ export default function RootLayout({
                       <WarehouseAdminProvider>
                         <ModerationProvider>
                           <CategoriesProvider>
-                            <ShopProvider>
-                              <ToastProvider>{children}</ToastProvider>
-                            </ShopProvider>
+                            <SupportProvider>
+                              <ShopProvider>
+                                <ToastProvider>{children}</ToastProvider>
+                              </ShopProvider>
+                            </SupportProvider>
                           </CategoriesProvider>
                         </ModerationProvider>
                       </WarehouseAdminProvider>
