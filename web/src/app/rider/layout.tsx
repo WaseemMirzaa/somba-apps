@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { List, User, Wallet, Home, LogOut, Bell } from "lucide-react";
+import { List, User, Wallet, Home, LogOut, Bell, MapPin } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
@@ -13,6 +13,7 @@ import { PortalGuard } from "@/components/layout/portal-guard";
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
   { href: "/rider/tasks", icon: List, label: "activeTasks" },
+  { href: "/rider/zone", icon: MapPin, label: "myZone" },
   { href: "/rider/earnings", icon: Wallet, label: "earnings" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
