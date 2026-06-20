@@ -13,6 +13,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
+import { useModeration } from "@/context/moderation-context";
+import { Ban, ShieldCheck } from "lucide-react";
 
 const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", out_of_stock: "Rupture de stock", unavailable: "Indisponible", draft: "Brouillon" };
 const ORDER_STATUS_FR: Record<string, string> = { delivered: "Livrée", processing: "En traitement", cancelled: "Annulée", pending: "En attente", shipped: "Expédiée" };
@@ -38,10 +40,24 @@ export default function AdminSellerDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { isSellerBlocked, blockSeller, unblockSeller } = useModeration();
   const seller = getSeller(Number(id));
 
   if (!seller) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Vendeur introuvable" : "Seller not found"}</div>;
+  }
+
+  const blocked = isSellerBlocked(seller.id);
+
+  function toggleBlock() {
+    if (!seller) return;
+    if (blocked) {
+      unblockSeller(seller.id);
+      toast(fr ? `${seller.storeName} débloqué` : `${seller.storeName} unblocked`);
+    } else {
+      blockSeller(seller.id);
+      toast(fr ? `${seller.storeName} bloqué — boutique et produits masqués` : `${seller.storeName} blocked — store & products hidden`, "info");
+    }
   }
 
   const sellerOrders = orderEntities.filter((o) => o.sellerId === seller.id);
@@ -59,16 +75,40 @@ export default function AdminSellerDetailPage() {
           { label: seller.storeName },
         ]}
         actions={
-          seller.status === "pending" ? (
-            <>
-              <button onClick={() => toast(fr ? "Vendeur approuvé" : "Seller approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{t("approve")}</button>
-              <button onClick={() => toast(fr ? "Vendeur rejeté" : "Seller rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{t("reject")}</button>
-            </>
-          ) : (
-            <Badge variant="success">{t("approved")}</Badge>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            {seller.status === "pending" ? (
+              <>
+                <button onClick={() => toast(fr ? "Vendeur approuvé" : "Seller approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{t("approve")}</button>
+                <button onClick={() => toast(fr ? "Vendeur rejeté" : "Seller rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{t("reject")}</button>
+              </>
+            ) : (
+              <Badge variant={blocked ? "danger" : "success"}>{blocked ? (fr ? "Bloqué" : "Blocked") : t("approved")}</Badge>
+            )}
+            <button
+              onClick={toggleBlock}
+              className={
+                blocked
+                  ? "flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  : "flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              }
+            >
+              {blocked ? <ShieldCheck className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+              {blocked ? (fr ? "Débloquer le vendeur" : "Unblock seller") : (fr ? "Bloquer le vendeur" : "Block seller")}
+            </button>
+          </div>
         }
       />
+
+      {blocked && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <Ban className="h-5 w-5 shrink-0" />
+          <p>
+            {fr
+              ? "Ce vendeur est bloqué. Sa boutique et tous ses produits sont masqués aux clients et il ne peut pas accéder à son portail."
+              : "This seller is blocked. Their storefront and all their products are hidden from customers, and they cannot access their portal."}
+          </p>
+        </div>
+      )}
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Entreprise" : "Business"}>

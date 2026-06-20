@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageLoader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
+import { useModeration } from "@/context/moderation-context";
 import { products } from "@/lib/mock-data";
 
 function SearchResults() {
@@ -13,16 +14,18 @@ function SearchResults() {
   const query = (searchParams.get("q") || "").toLowerCase();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { isProductVisible } = useModeration();
 
+  const visible = products.filter(isProductVisible);
   const results = query
-    ? products.filter(
+    ? visible.filter(
         (p) =>
           p.name.toLowerCase().includes(query) ||
           p.nameFr.toLowerCase().includes(query) ||
           p.category.toLowerCase().includes(query) ||
           p.seller.toLowerCase().includes(query)
       )
-    : products;
+    : visible;
 
   return (
     <div className="space-y-8">

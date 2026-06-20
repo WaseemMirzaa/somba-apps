@@ -11,6 +11,7 @@ import { SellerSubscriptionProvider } from "@/context/seller-subscription-contex
 import { MarketProvider } from "@/context/market-context";
 import { NotificationProvider } from "@/context/notification-context";
 import { DisputeProvider } from "@/context/dispute-context";
+import { ModerationProvider } from "@/context/moderation-context";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -46,9 +47,11 @@ export default function RootLayout({
                   <DisputeProvider>
                     <SellerSubscriptionProvider>
                       <WarehouseAdminProvider>
-                        <ShopProvider>
-                          <ToastProvider>{children}</ToastProvider>
-                        </ShopProvider>
+                        <ModerationProvider>
+                          <ShopProvider>
+                            <ToastProvider>{children}</ToastProvider>
+                          </ShopProvider>
+                        </ModerationProvider>
                       </WarehouseAdminProvider>
                     </SellerSubscriptionProvider>
                   </DisputeProvider>

@@ -7,10 +7,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { products } from "@/lib/mock-data";
 import { useShop } from "@/context/shop-context";
 import { useLocale } from "@/context/locale-context";
+import { useModeration } from "@/context/moderation-context";
 
 export default function ShopProductsPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { isProductVisible } = useModeration();
   const [sort, setSort] = useState("popularity");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
@@ -26,7 +28,7 @@ export default function ShopProductsPage() {
     c === "all" ? (fr ? "Toutes les catégories" : "All categories") : fr ? (categoryFrMap.get(c) ?? c) : c;
 
   const sorted = useMemo(() => {
-    let list = [...products];
+    let list = products.filter(isProductVisible);
     if (category !== "all") list = list.filter((p) => p.category === category);
     if (brand !== "all") list = list.filter((p) => p.seller === brand);
     if (minRating > 0) list = list.filter((p) => p.rating >= minRating);
@@ -37,7 +39,7 @@ export default function ShopProductsPage() {
     if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
     if (sort === "discount") list.sort((a, b) => b.discount - a.discount);
     return list;
-  }, [sort, category, brand, minRating, minDiscount, priceMax]);
+  }, [sort, category, brand, minRating, minDiscount, priceMax, isProductVisible]);
 
   const buyAgain = products.filter((p) => recentlyViewed.includes(p.id)).slice(0, 4);
 
