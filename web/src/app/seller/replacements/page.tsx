@@ -8,27 +8,15 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { sellerReplacementList } from "@/lib/seller-entities";
+import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "processing", label: "Processing", labelFr: "En cours" },
-  { value: "shipped", label: "Shipped", labelFr: "Expédié" },
-  { value: "completed", label: "Completed", labelFr: "Terminé" },
+  { value: "pending", label: "Requested", labelFr: "Demandé" },
+  { value: "processing", label: "Inspecting", labelFr: "Inspection" },
+  { value: "allocated", label: "Allocated", labelFr: "Alloué" },
+  { value: "shipped", label: "Dispatched", labelFr: "Expédié" },
+  { value: "completed", label: "Closed", labelFr: "Clôturé" },
 ];
-
-const REPLACEMENT_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  pending: { en: "Pending", fr: "En attente" },
-  processing: { en: "Processing", fr: "En cours" },
-  allocated: { en: "Allocated", fr: "Alloué" },
-  shipped: { en: "Shipped", fr: "Expédié" },
-  completed: { en: "Completed", fr: "Terminé" },
-};
-
-function replacementStatusLabel(status: string, fr: boolean) {
-  const entry = REPLACEMENT_STATUS_LABELS[status];
-  if (entry) return fr ? entry.fr : entry.en;
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export default function SellerReplacementsPage() {
   const { t, locale } = useLocale();
@@ -69,7 +57,7 @@ export default function SellerReplacementsPage() {
         { key: "orderId", label: fr ? "Commande" : "Order" },
         { key: "customer", label: t("customer") },
         { key: "sku", label: "SKU" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{replacementStatusLabel(String(row.status), fr)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={replacementStatusVariant(String(row.status))}>{replacementStatusLabel(String(row.status), fr)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

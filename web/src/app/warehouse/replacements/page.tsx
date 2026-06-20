@@ -7,28 +7,33 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { replacementEntities } from "@/lib/warehouse-entities";
+import { useReplacements } from "@/context/replacement-context";
+import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "processing", label: "Processing", labelFr: "En cours" },
-  { value: "shipped", label: "Shipped", labelFr: "Expédié" },
-  { value: "completed", label: "Completed", labelFr: "Terminé" },
+  { value: "requested", label: "Requested", labelFr: "Demandé" },
+  { value: "inspecting", label: "Inspecting", labelFr: "Inspection" },
+  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "allocated", label: "Allocated", labelFr: "Alloué" },
+  { value: "dispatched", label: "Dispatched", labelFr: "Expédié" },
+  { value: "delivered", label: "Delivered", labelFr: "Livré" },
+  { value: "closed", label: "Closed", labelFr: "Clôturé" },
 ];
 
 export default function WarehouseReplacementsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { replacements } = useReplacements();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
     () =>
-      applyListFilters(replacementEntities, filters, {
+      applyListFilters(replacements, filters, {
         searchFields: ["id", "orderId", "sku", "customer"],
         dateField: timelineRequestDate,
         statusField: "status",
       }),
-    [filters]
+    [replacements, filters]
   );
 
   return (
@@ -51,7 +56,7 @@ export default function WarehouseReplacementsPage() {
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "sku", label: "SKU" },
         { key: "customer", label: t("customer") },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{String(fr ? row.statusFr : row.status)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={replacementStatusVariant(String(row.status))}>{replacementStatusLabel(String(row.status), fr)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/warehouse/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

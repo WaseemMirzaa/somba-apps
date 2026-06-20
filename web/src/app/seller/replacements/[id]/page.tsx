@@ -9,28 +9,20 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
-import { getReplacement } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const REPLACEMENT_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  pending: { en: "Pending", fr: "En attente" },
-  processing: { en: "Processing", fr: "En cours" },
-  allocated: { en: "Allocated", fr: "Alloué" },
-  shipped: { en: "Shipped", fr: "Expédié" },
-  completed: { en: "Completed", fr: "Terminé" },
-};
+import { useReplacements } from "@/context/replacement-context";
+import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
 
 function formatReplacementStatus(status: string, fr = false) {
-  const entry = REPLACEMENT_STATUS_LABELS[status];
-  if (entry) return fr ? entry.fr : entry.en;
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return replacementStatusLabel(status, fr);
 }
 
 export default function SellerReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getReplacement } = useReplacements();
   const rep = getReplacement(id);
 
   if (!rep) {
@@ -51,7 +43,7 @@ export default function SellerReplacementDetailPage() {
         title={rep.id}
         subtitle={`${rep.createdAt} · ${formatReplacementStatus(rep.status, fr)} · ${rep.orderId}`}
         backHref="/seller/replacements"
-        actions={<Badge variant="info">{formatReplacementStatus(rep.status, fr)}</Badge>}
+        actions={<Badge variant={replacementStatusVariant(rep.status)}>{formatReplacementStatus(rep.status, fr)}</Badge>}
       />
 
       <div className="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-5 shadow-sm">
