@@ -1,23 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { AlertCircle, Package, Phone, Truck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
-import { getReplacement } from "@/lib/warehouse-entities";
 import { getOrder } from "@/lib/entities";
+import { riderEntities } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-
-function formatReplacementStatus(status: string) {
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { useReplacements } from "@/context/replacement-context";
+import {
+  replacementStatusLabel,
+  replacementStatusVariant,
+  replacementNextActions,
+  normalizeReplacementStatus,
+  type ReplacementStatus,
+} from "@/lib/replacement-workflow";
 
 // Order status values originate from the shared (non-owned) entities layer.
 const ORDER_STATUS_FR: Record<string, string> = {
@@ -28,20 +33,15 @@ const ORDER_STATUS_FR: Record<string, string> = {
   shipped: "Expédié",
 };
 
-function replacementStatusVariant(status: string): "success" | "warning" | "info" {
-  if (status === "allocated" || status === "dispatched" || status === "completed") return "success";
-  if (status === "inspecting") return "info";
-  return "warning";
-}
-
 export default function WarehouseReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
+  const { getReplacement, advance, assignRider } = useReplacements();
   const rep = getReplacement(id);
   const order = rep ? getOrder(rep.orderId) : undefined;
+  const [riderName, setRiderName] = useState("");
 
   if (!rep) {
     return (
@@ -55,7 +55,32 @@ export default function WarehouseReplacementDetailPage() {
   const comment = fr ? rep.customerCommentFr : rep.customerComment;
   const dispatch = rep.newProduct.dispatch;
   const dispatchStatus = fr ? dispatch.statusFr : dispatch.status;
-  const statusLabel = fr ? rep.statusFr : formatReplacementStatus(rep.status);
+  const statusLabel = replacementStatusLabel(rep.status, fr);
+  const actions = replacementNextActions(rep.status);
+  const hasRider = Boolean(dispatch.rider);
+
+  function runAction(to: ReplacementStatus, requiresRider?: boolean) {
+    if (!rep) return;
+    if (requiresRider && !hasRider) {
+      toast(fr ? "Assignez d'abord un livreur" : "Assign a rider first", "info");
+      return;
+    }
+    advance(rep.id, to);
+    toast(fr ? "Statut mis à jour" : "Status updated");
+  }
+
+  function doAssignRider() {
+    if (!rep || !riderName.trim()) return;
+    const match = riderEntities.find((r) => r.name === riderName);
+    assignRider(rep.id, {
+      rider: riderName,
+      riderPhone: match?.phone,
+      batchId: dispatch.batchId ?? "BATCH-REP",
+      eta: fr ? "Aujourd'hui, 16:00" : "Today, 4:00 PM",
+    });
+    toast(fr ? "Livreur assigné" : "Rider assigned");
+    setRiderName("");
+  }
 
   return (
     <div className="space-y-6">
@@ -69,32 +94,40 @@ export default function WarehouseReplacementDetailPage() {
           { label: rep.id },
         ]}
         actions={
-          <>
-            <Badge variant={replacementStatusVariant(rep.status)}>
-              {statusLabel}
-            </Badge>
-            {!rep.newProduct.allocated && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={replacementStatusVariant(rep.status)}>{statusLabel}</Badge>
+            {actions.map((a) => (
               <button
-                onClick={() => toast(fr ? "Inventaire alloué pour le remplacement" : "Inventory allocated for replacement")}
-                className="btn-primary rounded-lg px-4 py-2 text-sm"
+                key={a.to}
+                onClick={() => runAction(a.to, a.requiresRider)}
+                className={
+                  a.danger
+                    ? "rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                    : "btn-primary rounded-lg px-4 py-2 text-sm font-medium"
+                }
               >
-                {fr ? "Allouer inventaire" : "Allocate Inventory"}
+                {fr ? a.labelFr : a.labelEn}
               </button>
-            )}
-            {rep.newProduct.allocated && !dispatch.batchId && (
-              <button
-                onClick={() => {
-                  toast(fr ? "Lot d'expédition créé" : "Dispatch batch created");
-                  router.push("/warehouse/dispatch/BAT-001");
-                }}
-                className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50"
-              >
-                {fr ? "Créer expédition" : "Create Dispatch"}
-              </button>
-            )}
-          </>
+            ))}
+          </div>
         }
       />
+
+      {/* Workflow progress */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-white p-3 text-xs">
+        {(["requested", "inspecting", "approved", "allocated", "dispatched", "delivered", "closed"] as ReplacementStatus[]).map((s, i) => {
+          const cur = normalizeReplacementStatus(rep.status);
+          const order = ["requested", "inspecting", "approved", "allocated", "dispatched", "delivered", "closed"];
+          const reached = order.indexOf(cur) >= i || cur === "rejected";
+          return (
+            <span key={s} className="flex items-center gap-2">
+              <span className={reached ? "flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white" : "flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[10px] text-slate-500"}>{i + 1}</span>
+              <span className={reached ? "font-medium text-slate-800" : "text-slate-400"}>{replacementStatusLabel(s, fr)}</span>
+              {i < 6 && <span className="text-slate-300">→</span>}
+            </span>
+          );
+        })}
+      </div>
 
       <div className="rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-5 shadow-sm">
         <div className="flex items-start gap-3">
@@ -334,13 +367,29 @@ export default function WarehouseReplacementDetailPage() {
                   : "Replacement unit will be reserved after the returned item is received and inspected."}
               </p>
             )}
-            {rep.newProduct.allocated && !dispatch.batchId && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-200 bg-white p-3 text-sm text-slate-700">
-                <Package className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
-                <p>
-                  {fr
-                    ? "Unité allouée et prête. Ajoutez au prochain lot d'expédition Zone A ou créez un lot dédié depuis le panneau d'actions."
-                    : "Unit allocated and ready. Add to the next Zone A dispatch batch or create a dedicated batch from the action panel."}
+            {rep.newProduct.allocated && !hasRider && (
+              <div className="mt-3 rounded-lg border border-indigo-200 bg-white p-3">
+                <p className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-800">
+                  <Package className="h-4 w-4 text-indigo-600" />
+                  {fr ? "Assigner un livreur pour l'expédition" : "Assign a rider for dispatch"}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={riderName}
+                    onChange={(e) => setRiderName(e.target.value)}
+                    className="input-premium px-3 py-2 text-sm"
+                  >
+                    <option value="">{fr ? "Choisir un livreur…" : "Choose a rider…"}</option>
+                    {riderEntities.map((r) => (
+                      <option key={r.id} value={r.name}>{r.name} · {r.zone}</option>
+                    ))}
+                  </select>
+                  <button onClick={doAssignRider} disabled={!riderName} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
+                    {fr ? "Assigner" : "Assign"}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {fr ? "Une fois le livreur assigné, utilisez « Expédier au client »." : "Once a rider is assigned, use “Dispatch to customer”."}
                 </p>
               </div>
             )}
