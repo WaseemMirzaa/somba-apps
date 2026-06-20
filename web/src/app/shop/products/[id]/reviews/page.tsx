@@ -7,8 +7,10 @@ import { Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { getProductDetail } from "@/lib/entities";
+import { sellerReviewList } from "@/lib/seller-entities";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { useReviews } from "@/context/reviews-context";
 import { cn } from "@/lib/utils";
 
 export default function ProductReviewsPage() {
@@ -16,7 +18,12 @@ export default function ProductReviewsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { getReply } = useReviews();
   const product = getProductDetail(Number(id));
+  const sellerResponses = sellerReviewList
+    .filter((r) => r.productId === Number(id))
+    .map((r) => ({ review: r, reply: getReply(r.id) }))
+    .filter((x) => x.reply);
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
@@ -59,6 +66,22 @@ export default function ProductReviewsPage() {
           >
             {fr ? "Soumettre l'avis" : "Submit Review"}
           </Button>
+        </div>
+      )}
+
+      {sellerResponses.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">{fr ? "Réponses du vendeur" : "Seller responses"}</h3>
+          {sellerResponses.map(({ review, reply }) => (
+            <div key={review.id} className="card-premium p-5">
+              <p className="text-amber-500 text-sm">{"★".repeat(review.rating)} <span className="ml-1 text-slate-500">— {review.customer}</span></p>
+              <p className="mt-1 text-sm text-slate-700">{fr ? review.reviewFr : review.review}</p>
+              <div className="mt-3 rounded-lg border-l-2 border-emerald-300 bg-emerald-50 px-3 py-2">
+                <p className="text-xs font-semibold text-emerald-800">{fr ? "Réponse du vendeur" : "Seller response"}</p>
+                <p className="mt-0.5 text-sm text-emerald-900">{reply?.text}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
