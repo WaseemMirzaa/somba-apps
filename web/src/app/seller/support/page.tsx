@@ -9,24 +9,14 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { supportTicketList as initialTickets } from "@/lib/seller-entities";
+import { useAuth } from "@/context/auth-context";
+import { useSupport } from "@/context/support-context";
+import { SUPPORT_PRIORITY_LABELS, SUPPORT_STATUS_LABELS } from "@/lib/support-tickets";
 
 const priorityVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
   low: "default",
   medium: "warning",
   high: "danger",
-};
-
-const PRIORITY_FR: Record<string, string> = {
-  low: "Faible",
-  medium: "Moyenne",
-  high: "Élevée",
-};
-
-const STATUS_FR: Record<string, string> = {
-  open: "Ouvert",
-  in_progress: "En cours",
-  resolved: "Résolu",
 };
 
 const STATUS_OPTIONS = [
@@ -40,18 +30,30 @@ export default function SellerSupportPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
+  const { persona } = useAuth();
+  const { tickets, addTicket } = useSupport();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [tickets, setTickets] = useState(initialTickets);
-  const [showNew, setShowNew] = useState(false);
+
+  const sellerTickets = useMemo(
+    () =>
+      tickets
+        .filter((tk) => tk.audience === "seller")
+        .map((tk) => ({
+          id: tk.id,
+          category: tk.category,
+          categoryFr: tk.categoryFr,
+          subject: tk.subject,
+          subjectFr: tk.subjectFr,
+          priority: tk.priority,
+          status: tk.status,
+          lastUpdate: tk.date,
+        })),
+    [tickets]
+  );
 
   const filtered = useMemo(
-    () =>
-      applyListFilters(tickets, filters, {
-        searchFields: ["id", "subject", "category"],
-        dateField: "lastUpdate",
-        statusField: "status",
-      }),
-    [tickets, filters]
+    () => applyListFilters(sellerTickets, filters, { searchFields: ["id", "subject", "category"], dateField: "lastUpdate", statusField: "status" }),
+    [sellerTickets, filters]
   );
 
   return (
@@ -62,15 +64,17 @@ export default function SellerSupportPage() {
       actions={
         <button
           onClick={() => {
-            if (showNew) {
-              const newId = `TKT-${String(tickets.length + 1).padStart(3, "0")}`;
-              setTickets((t) => [{ id: newId, category: "General", categoryFr: "Général", subject: "New support request", subjectFr: "Nouvelle demande de support", priority: "medium", status: "open", statusFr: "Ouvert", lastUpdate: fr ? "À l'instant" : "Just now" }, ...t]);
-              toast(fr ? "Ticket créé" : "Ticket created");
-              router.push(`/seller/support/${newId}`);
-            } else {
-              setShowNew(true);
-              toast(fr ? "Décrivez votre problème et soumettez" : "Fill in your issue and submit", "info");
-            }
+            const id = addTicket({
+              subject: "New support request",
+              subjectFr: "Nouvelle demande de support",
+              category: "General",
+              categoryFr: "Général",
+              audience: "seller",
+              party: persona.name,
+              message: fr ? "Bonjour, j'ai besoin d'aide." : "Hi, I need some help.",
+            });
+            toast(fr ? "Ticket créé" : "Ticket created");
+            router.push(`/seller/support/${id}`);
           }}
           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
         >
@@ -92,10 +96,10 @@ export default function SellerSupportPage() {
         { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
         { key: "subject", label: fr ? "Sujet" : "Subject", render: (row) => (fr ? String(row.subjectFr ?? row.subject) : String(row.subject)) },
         { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
-          <Badge variant={priorityVariant[row.priority as string] ?? "default"}>{fr ? (PRIORITY_FR[String(row.priority)] ?? String(row.priority)) : String(row.priority)}</Badge>
+          <Badge variant={priorityVariant[row.priority as string] ?? "default"}>{fr ? SUPPORT_PRIORITY_LABELS[String(row.priority)].fr : SUPPORT_PRIORITY_LABELS[String(row.priority)].en}</Badge>
         )},
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "resolved" ? "success" : "warning"}>{fr ? (String(row.statusFr ?? STATUS_FR[String(row.status)] ?? row.status)) : String(row.status)}</Badge>
+          <Badge variant={row.status === "resolved" ? "success" : row.status === "in_progress" ? "info" : "warning"}>{fr ? SUPPORT_STATUS_LABELS[row.status as "open"].fr : SUPPORT_STATUS_LABELS[row.status as "open"].en}</Badge>
         )},
         { key: "lastUpdate", label: fr ? "Dernière mise à jour" : "Last Update" },
         { key: "actions", label: t("action"), render: (row) => (
