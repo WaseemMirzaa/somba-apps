@@ -11,6 +11,7 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { REVIEWS, REPORTS, type ReviewItem, type ReportItem } from "@/lib/moderation-entities";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { useReviews } from "@/context/reviews-context";
 
 const reviewVariant = { pending: "warning", published: "success", removed: "danger" } as const;
 const reportVariant = { open: "warning", resolved: "success", dismissed: "default" } as const;
@@ -33,10 +34,29 @@ export default function AdminReviewsPage() {
   const [tab, setTab] = useState("reviews");
   const [reviews, setReviews] = useState<ReviewItem[]>(REVIEWS);
   const [reports, setReports] = useState<ReportItem[]>(REPORTS);
+  const { reports: sellerReports, setReportStatus: setSellerReportStatus } = useReviews();
+
+  // Seller-submitted reports (from the seller reviews "Report" flow) shown alongside static reports.
+  const sellerReportItems: ReportItem[] = sellerReports.map((r) => ({
+    id: r.id,
+    type: "review",
+    target: `#${r.reviewId} · ${r.product}`,
+    reporter: r.reporter,
+    reason: r.reason,
+    reasonFr: r.reasonFr,
+    date: r.date,
+    status: r.status,
+  }));
+  const allReports = [...sellerReportItems, ...reports];
+
+  function updateReportStatus(id: string, status: ReportItem["status"]) {
+    if (id.startsWith("SR-")) setSellerReportStatus(id, status);
+    else setReportStatus(id, status);
+  }
 
   const pending = reviews.filter((r) => r.status === "pending").length;
   const published = reviews.filter((r) => r.status === "published").length;
-  const openReports = reports.filter((r) => r.status === "open").length;
+  const openReports = allReports.filter((r) => r.status === "open").length;
 
   function setReviewStatus(id: string, status: ReviewItem["status"]) {
     setReviews((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
@@ -111,7 +131,7 @@ export default function AdminReviewsPage() {
       ) : (
         <div className="card-premium overflow-hidden">
           <DataTable
-            data={reports as unknown as Record<string, unknown>[]}
+            data={allReports as unknown as Record<string, unknown>[]}
             columns={[
               { key: "type", label: t("type"), render: (row) => <Badge variant="info">{fr ? (REPORT_TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
               { key: "target", label: fr ? "Cible" : "Target", render: (row) => <span className="font-medium text-slate-900">{fr ? String((row as unknown as ReportItem).targetFr ?? row.target) : String(row.target)}</span> },
@@ -126,8 +146,8 @@ export default function AdminReviewsPage() {
                   if (r.status !== "open") return <span className="text-xs text-slate-400">—</span>;
                   return (
                     <div className="flex gap-2">
-                      <button onClick={() => setReportStatus(r.id, "resolved")} className="text-sm font-medium text-emerald-600 hover:underline">{fr ? "Résoudre" : "Resolve"}</button>
-                      <button onClick={() => setReportStatus(r.id, "dismissed")} className="text-sm font-medium text-slate-500 hover:underline">{fr ? "Rejeter" : "Dismiss"}</button>
+                      <button onClick={() => updateReportStatus(r.id, "resolved")} className="text-sm font-medium text-emerald-600 hover:underline">{fr ? "Résoudre" : "Resolve"}</button>
+                      <button onClick={() => updateReportStatus(r.id, "dismissed")} className="text-sm font-medium text-slate-500 hover:underline">{fr ? "Rejeter" : "Dismiss"}</button>
                     </div>
                   );
                 },
