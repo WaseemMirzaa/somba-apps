@@ -10,12 +10,15 @@ import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
 import { riderProfile, getActiveRiderTasks } from "@/lib/rider-entities";
 import { riderTaskToDeliveryDetail } from "@/lib/delivery-detail";
 import { useLocale } from "@/context/locale-context";
+import { useRiderZones } from "@/context/rider-zone-context";
 
 export default function RiderProfilePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getRiderZone } = useRiderZones();
   const [onDuty, setOnDuty] = useState(true);
   const activeTasks = getActiveRiderTasks();
+  const assignedZone = getRiderZone(riderProfile.id) || riderProfile.zone;
 
   return (
     <div className="space-y-6">
@@ -81,7 +84,7 @@ export default function RiderProfilePage() {
             ),
           },
           { label: fr ? "Véhicule" : "Vehicle", value: fr ? riderProfile.vehicleFr : riderProfile.vehicle },
-          { label: t("zone"), value: riderProfile.zone },
+          { label: t("zone"), value: assignedZone },
           {
             label: fr ? "Statut" : "Status",
             value: fr

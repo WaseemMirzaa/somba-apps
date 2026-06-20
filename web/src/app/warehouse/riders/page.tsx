@@ -9,6 +9,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { useRiderZones } from "@/context/rider-zone-context";
 import { riderEntities, type RiderEntity } from "@/lib/warehouse-entities";
 
 const STATUS_OPTIONS = [
@@ -26,6 +27,7 @@ export default function WarehouseRidersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { zoneOptions, getRiderZone, setRiderZone } = useRiderZones();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [assignRider, setAssignRider] = useState<RiderEntity | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -58,7 +60,21 @@ export default function WarehouseRidersPage() {
         { key: "name", label: fr ? "Nom du livreur" : "Rider Name", render: (row) => (
           <Link href={`/warehouse/riders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
-        { key: "zone", label: t("zone") },
+        { key: "zone", label: t("zone"), render: (row) => (
+          <select
+            value={getRiderZone(row.id as number)}
+            onChange={(e) => {
+              setRiderZone(row.id as number, e.target.value);
+              toast(fr ? `${row.name} → ${e.target.value}` : `${row.name} → ${e.target.value}`);
+            }}
+            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {zoneOptions.map((z) => (
+              <option key={z} value={z}>{z}</option>
+            ))}
+          </select>
+        )},
         { key: "activeDeliveries", label: fr ? "Livraisons actives" : "Active Deliveries" },
         { key: "location", label: fr ? "Lieu actuel" : "Current Location" },
         { key: "performanceScore", label: fr ? "Performance" : "Performance", render: (row) => (
