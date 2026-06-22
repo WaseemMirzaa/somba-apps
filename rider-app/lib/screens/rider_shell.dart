@@ -34,7 +34,7 @@ class _RiderShellState extends State<RiderShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Somba Rider'),
+        title: const Text('Somba & Teka Rider'),
         actions: [
           Chip(label: Text(widget.locale.languageCode.toUpperCase()), backgroundColor: Colors.green.shade50),
           const SizedBox(width: 8),

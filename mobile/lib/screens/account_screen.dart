@@ -36,7 +36,7 @@ class AccountScreen extends StatelessWidget {
           ),
           _tile(Icons.shopping_bag_outlined, s.orders, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(locale: locale)))),
           _tile(Icons.favorite_border, s.wishlist, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(locale: locale)))),
-          _tile(Icons.account_balance_wallet_outlined, s.wallet, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Somba Wallet (mock)')))),
+          _tile(Icons.account_balance_wallet_outlined, s.wallet, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Somba & Teka Wallet (mock)')))),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.language),

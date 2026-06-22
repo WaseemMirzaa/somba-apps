@@ -1,7 +1,7 @@
 /** Business configuration from product questionnaire. */
 
 export const BRAND = {
-  name: "Somba",
+  name: "Somba & Teka",
   partner: "Teka",
   fullName: "S&T Marketplace",
   tagline: "Shop smarter. Deliver faster.",

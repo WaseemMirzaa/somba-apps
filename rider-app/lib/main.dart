@@ -19,7 +19,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Somba Rider',
+      title: 'Somba & Teka Rider',
       debugShowCheckedModeBanner: false,
       locale: _locale,
       themeMode: _theme,

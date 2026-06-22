@@ -206,7 +206,7 @@ export default function HomePage() {
                 href="/sell-online"
                 className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold text-slate-700 transition-colors hover:bg-slate-100"
               >
-                {fr ? "Vendre sur Somba" : "Sell on Somba"}
+                {fr ? "Vendre sur Somba & Teka" : "Sell on Somba & Teka"}
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
@@ -434,7 +434,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Nos services" : "Why Somba"}
+            label={fr ? "Nos services" : "Why Somba & Teka"}
             title={fr ? MODULES_SECTION.titleFr : MODULES_SECTION.title}
             desc={fr ? MODULES_SECTION.subtitleFr : MODULES_SECTION.subtitle}
           />

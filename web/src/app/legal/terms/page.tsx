@@ -20,12 +20,12 @@ export default function TermsPage() {
         : `${BRAND.name} operates as a marketplace platform. Sellers list and sell their own inventory. ${BRAND.legalEntity} facilitates transactions, payments, and logistics in a hybrid fulfillment model.`}</p>
       <h2>{fr ? "2. Commandes et paiements" : "2. Orders & Payments"}</h2>
       <p>{fr
-        ? "Nous acceptons les paiements par carte Stripe, Airtel Money et le portefeuille Somba."
-        : "We support Stripe card payments, Airtel Money, and the Somba Wallet."}</p>
+        ? "Nous acceptons les paiements par carte Stripe, Airtel Money et le portefeuille Somba & Teka."
+        : "We support Stripe card payments, Airtel Money, and the Somba & Teka Wallet."}</p>
       <h2>{fr ? "3. Retours et remboursements" : "3. Returns & Refunds"}</h2>
       <p>{fr
-        ? "Les remboursements peuvent être effectués sur le moyen de paiement d'origine ou sur le portefeuille Somba, à votre choix, conformément à notre politique de retour."
-        : "Refunds may be issued to the original payment method or Somba Wallet at your choice, subject to our Return Policy."}</p>
+        ? "Les remboursements peuvent être effectués sur le moyen de paiement d'origine ou sur le portefeuille Somba & Teka, à votre choix, conformément à notre politique de retour."
+        : "Refunds may be issued to the original payment method or Somba & Teka Wallet at your choice, subject to our Return Policy."}</p>
       <h2>{fr ? "4. Livraison colis ouvert" : "4. Open Box Delivery"}</h2>
       <p>{fr
         ? "Lorsque disponible, vous pouvez inspecter les produits à la livraison avant de les accepter. Un refus déclenche un retour sans frais."

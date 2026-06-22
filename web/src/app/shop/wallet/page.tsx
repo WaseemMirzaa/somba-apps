@@ -26,7 +26,7 @@ export default function ShopWalletPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
-        title={fr ? "Portefeuille Somba" : "Somba Wallet"}
+        title={fr ? "Portefeuille Somba & Teka" : "Somba & Teka Wallet"}
         subtitle={fr ? "Crédit en boutique · Recharge via mobile money · Cashback" : "Store credit · Top-up via mobile money · Cashback"}
         breadcrumbs={[{ label: fr ? "Mon compte" : "Account", href: "/shop/account" }, { label: fr ? "Portefeuille" : "Wallet" }]}
       />

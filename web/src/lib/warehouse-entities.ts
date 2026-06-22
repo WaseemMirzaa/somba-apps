@@ -568,7 +568,7 @@ export const returnEntities: ReturnEntity[] = [
     productId: 4, product: "Nike Air Max 270", variant: "Size 42", variantFr: "Taille 42", qty: 1,
     image: products[3].image,
     inspection: { condition: "Good", conditionFr: "Bon", photos: 2, notes: "Unopened box — awaiting warehouse receipt", notesFr: "Boîte non ouverte — en attente de réception entrepôt" },
-    refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "pending", statusFr: "En attente" },
+    refund: { amount: 129, method: "Somba & Teka Wallet", methodFr: "Portefeuille Somba & Teka", status: "pending", statusFr: "En attente" },
     timeline: [
       { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
       { time: "2024-06-05 10:15", label: "Return Requested", done: true, detail: "Wrong size", detailFr: "Mauvaise taille", highlight: true },
@@ -608,7 +608,7 @@ export const returnEntities: ReturnEntity[] = [
     productId: 4, product: "Nike Air Max 270", variant: "Size 40", variantFr: "Taille 40", qty: 1,
     image: products[3].image,
     inspection: { condition: "Good", conditionFr: "Bon", photos: 3, notes: "Item matches customer photos — colour mismatch confirmed", notesFr: "Article conforme aux photos du client — écart de couleur confirmé" },
-    refund: { amount: 129, method: "Somba Wallet", methodFr: "Portefeuille Somba", status: "completed", statusFr: "Terminé" },
+    refund: { amount: 129, method: "Somba & Teka Wallet", methodFr: "Portefeuille Somba & Teka", status: "completed", statusFr: "Terminé" },
     timeline: [
       { time: "2024-05-28 19:00", label: "Order Delivered", done: true },
       { time: "2024-06-02 09:30", label: "Return Requested", done: true, detail: "Not as described", detailFr: "Non conforme à la description", highlight: true },

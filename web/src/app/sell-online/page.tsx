@@ -240,7 +240,7 @@ export default function SellOnlinePage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="text-center">
             <span className="section-label">{fr ? "Témoignages" : "Success stories"}</span>
-            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba" : "Sellers who grew with us"}</h2>
+            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba & Teka" : "Sellers who grew with us"}</h2>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2">
             {(sellerTestimonials.length > 0 ? sellerTestimonials : TESTIMONIALS.slice(1, 3)).map((t) => (
