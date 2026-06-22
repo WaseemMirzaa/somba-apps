@@ -17,7 +17,7 @@ export default function SellerStatementsPage() {
   const fr = locale === "fr";
 
   function downloadPdf(month: string) {
-    const blob = new Blob([`Somba & Teka Statement — ${month}\nRevenue, fees, payouts (mock PDF)`], { type: "application/pdf" });
+    const blob = new Blob([`Somba&Teka Statement — ${month}\nRevenue, fees, payouts (mock PDF)`], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

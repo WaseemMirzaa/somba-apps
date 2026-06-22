@@ -1,4 +1,4 @@
-# Somba & Teka — Configuration Record
+# Somba&Teka — Configuration Record
 
 All questionnaire answers applied to the prototype.
 
@@ -6,7 +6,7 @@ All questionnaire answers applied to the prototype.
 
 | Setting | Value |
 |---------|-------|
-| Brand | **Somba & Teka** (`web/src/lib/config.ts`) |
+| Brand | **Somba&Teka** (`web/src/lib/config.ts`) |
 | Market | France + Global |
 | Languages | EN + FR together (toggle on all portals) |
 | Currency | USD (mock) |
@@ -29,7 +29,7 @@ All questionnaire answers applied to the prototype.
 | Stripe card | Mock at checkout |
 | COD | OTP verification, limits, address blocking |
 | Airtel Money | Checkout + wallet top-up |
-| Somba & Teka Wallet | Store credit, top-up, transaction history |
+| Somba&Teka Wallet | Store credit, top-up, transaction history |
 | Refunds | Original method OR wallet |
 
 ## 4. Auth & Roles
