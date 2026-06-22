@@ -76,14 +76,14 @@ export function BrandMark({
 
   if (full) {
     return (
-      <span className={cn("inline-block", surface, className)}>
+      <span className={cn("inline-block w-[min(220px,78vw)]", surface, className)}>
         <Image
           src="/brand/logo-stack.png"
           alt={BRAND_LOGO_ALT}
           width={220}
           height={150}
           priority
-          className="h-auto w-[min(220px,78vw)]"
+          className="h-auto w-full"
         />
       </span>
     );

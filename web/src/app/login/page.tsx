@@ -58,7 +58,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Mobile — compact hero banner */}
-      <div className="relative h-44 shrink-0 overflow-hidden lg:hidden">
+      <div className="relative min-h-[11rem] shrink-0 overflow-hidden lg:hidden">
         <Image
           src={LOGIN_HERO_IMAGE.src}
           alt={LOGIN_HERO_IMAGE.alt}
@@ -68,8 +68,8 @@ export default function LoginPage() {
           sizes="100vw"
         />
         <div className="login-hero-overlay absolute inset-0" aria-hidden />
-        <div className="relative z-10 flex h-full flex-col justify-end p-6 text-white">
-          <BrandMark tone="light" full className="mb-2" />
+        <div className="relative z-10 flex flex-col justify-end p-6 text-white">
+          <BrandMark tone="light" full className="mb-2 w-[min(160px,48vw)]" />
           <p className="text-sm text-white/85">{BRAND.tagline}</p>
         </div>
       </div>
