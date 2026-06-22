@@ -222,7 +222,7 @@ export default function ShopProductDetailPage() {
               className="btn-primary px-4 py-2 text-sm"
               onClick={() => {
                 if (!question.trim()) return;
-                setExtraQuestions((q) => [...q, { q: question, a: locale === "fr" ? "Le vendeur répondra sous 24h." : "Seller will respond within 24h.", author: "Somba & Teka" }]);
+                setExtraQuestions((q) => [...q, { q: question, a: locale === "fr" ? "Le vendeur répondra sous 24h." : "Seller will respond within 24h.", author: "Somba&Teka" }]);
                 setQuestion("");
                 toast(locale === "fr" ? "Question soumise" : "Question submitted");
               }}

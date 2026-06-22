@@ -43,7 +43,7 @@ export const SCREEN_REGISTRY: ScreenEntry[] = [
   { id: "CF-29", name: "Notification Centre", webRoute: "/shop/notifications", flutterRoute: "/notifications", portal: "CF" },
   { id: "CF-30", name: "Dispute Detail", webRoute: "/shop/disputes/:id", flutterRoute: "/disputes/:id", portal: "CF" },
   { id: "CF-31", name: "Help / Account Deletion", webRoute: "/shop/help", flutterRoute: "/help", portal: "CF" },
-  { id: "CF-32", name: "Somba & Teka Wallet", webRoute: "/shop/wallet", flutterRoute: "/wallet", portal: "CF" },
+  { id: "CF-32", name: "Somba&Teka Wallet", webRoute: "/shop/wallet", flutterRoute: "/wallet", portal: "CF" },
   { id: "CF-33", name: "Refer & Earn", webRoute: "/shop/refer", flutterRoute: "/refer", portal: "CF" },
   { id: "CF-34", name: "Exchange Request", webRoute: "/shop/exchange", flutterRoute: "/exchange", portal: "CF" },
   { id: "CF-35", name: "Support Ticket", webRoute: "/shop/support", flutterRoute: "/support", portal: "CF" },

@@ -19,7 +19,7 @@ function SuccessContent() {
       <div className="card-premium p-10">
         <CheckCircle className="mx-auto h-16 w-16 text-emerald-500" />
         <h1 className="mt-6 font-[family-name:var(--font-display)] text-2xl font-bold">{fr ? "Commande passée !" : "Order Placed!"}</h1>
-        <p className="mt-2 text-slate-500">{fr ? "Merci d'avoir fait vos achats sur Somba & Teka" : "Thank you for shopping on Somba & Teka"}</p>
+        <p className="mt-2 text-slate-500">{fr ? "Merci d'avoir fait vos achats sur Somba&Teka" : "Thank you for shopping on Somba&Teka"}</p>
         <p className="mt-4 font-mono text-lg font-semibold text-blue-700">{orderId}</p>
         <p className="mt-2 text-sm text-slate-500">{fr ? "Confirmation envoyée à votre e-mail" : "Confirmation sent to your email"}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">

@@ -16,7 +16,7 @@ import { useLocale } from "@/context/locale-context";
 const menuItems = [
   { href: "/shop/orders", icon: Package, label: "myOrders", desc: { en: "Track & manage orders", fr: "Suivre et gérer les commandes" } },
   { href: "/shop/wishlist", icon: Heart, label: "wishlist", desc: { en: "Saved items", fr: "Articles enregistrés" } },
-  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: { en: "Somba & Teka Wallet · Airtel top-up", fr: "Somba & Teka Wallet · recharge Airtel" } },
+  { href: "/shop/wallet", icon: CreditCard, label: "paymentMethods", desc: { en: "Somba&Teka Wallet · Airtel top-up", fr: "Somba&Teka Wallet · recharge Airtel" } },
   { href: "/shop/refer", icon: Heart, label: "myAccount", desc: { en: "Refer & Earn — $10 bonus", fr: "Parrainez et gagnez — bonus de 10 $" } },
   { href: "/shop/account/addresses", icon: MapPin, label: "addresses", desc: { en: "France & global addresses", fr: "Adresses en France et à l'international" } },
   { href: "/shop/support", icon: Headphones, label: "support", desc: { en: "Help center", fr: "Centre d'aide" } },

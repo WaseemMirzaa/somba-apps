@@ -26,7 +26,7 @@ export const APP_LINKS = {
   riderApp: "https://play.google.com/store/apps/details?id=com.somba.rider",
   sellerSignup: "/login",
   sellOnline: "/sell-online",
-  contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%20%26%20Teka%20Support`,
+  contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%26Teka%20Support`,
 } as const;
 
 /** Flipkart-style quick-access strip — portal entry points */
@@ -59,8 +59,8 @@ export const PORTAL_IMAGES = {
 export const PORTAL_SECTION = {
   title: "One marketplace, every role",
   titleFr: "Une marketplace, chaque rôle",
-  subtitle: "Whether you're shopping, selling, or running operations — Somba & Teka connects every part of the journey.",
-  subtitleFr: "Que vous achetiez, vendiez ou gériez les opérations — Somba & Teka connecte chaque étape.",
+  subtitle: "Whether you're shopping, selling, or running operations — Somba&Teka connects every part of the journey.",
+  subtitleFr: "Que vous achetiez, vendiez ou gériez les opérations — Somba&Teka connecte chaque étape.",
   publicLabel: "For shoppers & sellers",
   publicLabelFr: "Pour acheteurs et vendeurs",
   opsLabel: "For our operations team",
@@ -92,8 +92,8 @@ export const PORTALS = [
     image: PORTAL_IMAGES.shop,
     loginHref: "/get-app",
     appHref: APP_LINKS.customerApp,
-    features: ["Categories, search & flash deals", "Guest checkout & Somba & Teka wallet", "Order tracking & easy returns"],
-    featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et portefeuille Somba & Teka", "Suivi de commande et retours faciles"],
+    features: ["Categories, search & flash deals", "Guest checkout & Somba&Teka wallet", "Order tracking & easy returns"],
+    featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et portefeuille Somba&Teka", "Suivi de commande et retours faciles"],
     trust: [
       { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
       { icon: "Banknote", label: "Pay at delivery", labelFr: "Paiement à la livraison" },
@@ -132,8 +132,8 @@ export const PORTALS = [
     taglineFr: "Lister, vendre, grandir, être payé",
     name: "Seller Portal",
     nameFr: "Portail Vendeur",
-    desc: "Open your store on Somba & Teka — manage catalog, orders, promotions, and payouts from one dashboard.",
-    descFr: "Ouvrez votre boutique sur Somba & Teka — catalogue, commandes, promotions et paiements en un seul tableau de bord.",
+    desc: "Open your store on Somba&Teka — manage catalog, orders, promotions, and payouts from one dashboard.",
+    descFr: "Ouvrez votre boutique sur Somba&Teka — catalogue, commandes, promotions et paiements en un seul tableau de bord.",
     icon: "Store",
     image: PORTAL_IMAGES.seller,
     loginHref: "/sell-online",
@@ -368,8 +368,8 @@ export const PLATFORM_MODULES = [
     id: "cod",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Card, Somba & Teka wallet, or pay at delivery — fraud-checked checkout with buyer protection on every order.",
-    descFr: "Carte, portefeuille Somba & Teka ou paiement à la livraison — paiement vérifié avec protection acheteur sur chaque commande.",
+    desc: "Card, Somba&Teka wallet, or pay at delivery — fraud-checked checkout with buyer protection on every order.",
+    descFr: "Carte, portefeuille Somba&Teka ou paiement à la livraison — paiement vérifié avec protection acheteur sur chaque commande.",
     highlight: "Pay at delivery + wallet",
     highlightFr: "Paiement à la livraison + portefeuille",
     cta: "See payment options",
@@ -408,8 +408,8 @@ export const PLATFORM_MODULES = [
   },
   {
     id: "subscription",
-    name: "Sell on Somba & Teka",
-    nameFr: "Vendre sur Somba & Teka",
+    name: "Sell on Somba&Teka",
+    nameFr: "Vendre sur Somba&Teka",
     desc: "Join 1,200+ verified sellers — list products, reach 48K+ shoppers, and get weekly payouts from $49/mo.",
     descFr: "Rejoignez 1 200+ vendeurs vérifiés — listez, touchez 48K+ acheteurs et soyez payé chaque semaine dès 49 $/mois.",
     highlight: "From $49/mo",
@@ -430,21 +430,21 @@ export const PLATFORM_MODULES = [
 ] as const;
 
 export const PAYMENT_OPTIONS = [
-  { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba & Teka wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba & Teka." },
+  { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba&Teka wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba&Teka." },
   { title: "Pay at Delivery", titleFr: "Paiement à la livraison", desc: "Order now and pay when your package arrives — available on eligible items.", descFr: "Commandez maintenant, payez à la réception — sur articles éligibles." },
-  { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba & Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba & Teka." },
+  { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba&Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba&Teka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
 
-/** Why shoppers and sellers choose Somba & Teka */
+/** Why shoppers and sellers choose Somba&Teka */
 export const WHY_CHOOSE = [
-  { title: "Verified sellers", titleFr: "Vendeurs vérifiés", desc: "Every store on Somba & Teka is reviewed — shop with confidence from trusted merchants.", descFr: "Chaque boutique est vérifiée — achetez en confiance." },
+  { title: "Verified sellers", titleFr: "Vendeurs vérifiés", desc: "Every store on Somba&Teka is reviewed — shop with confidence from trusted merchants.", descFr: "Chaque boutique est vérifiée — achetez en confiance." },
   { title: "Fast delivery", titleFr: "Livraison rapide", desc: "1–3 day delivery nationwide with real-time tracking from warehouse to doorstep.", descFr: "Livraison en 1–3 jours avec suivi en temps réel." },
   { title: "Thousands of products", titleFr: "Des milliers de produits", desc: "Electronics, fashion, home, beauty, grocery, and more — all in one marketplace.", descFr: "Électronique, mode, maison, beauté, épicerie et plus — tout au même endroit." },
   { title: "Easy returns", titleFr: "Retours faciles", desc: "Start a return in seconds from your account — replacements and refunds handled for you.", descFr: "Retour en quelques clics — remplacement ou remboursement géré pour vous." },
   { title: "Sell and grow", titleFr: "Vendre et grandir", desc: "Open your store, list products, run promotions, and reach customers across the country.", descFr: "Ouvrez votre boutique, listez vos produits et touchez des clients partout." },
   { title: "Bilingual FR/EN", titleFr: "Bilingue FR/EN", desc: "Shop, sell, and get support in French or English across web and mobile.", descFr: "Achetez, vendez et obtenez de l'aide en français ou en anglais." },
-  { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba & Teka app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba & Teka — même panier, mêmes commandes." },
+  { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba&Teka app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba&Teka — même panier, mêmes commandes." },
   { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card, wallet, and pay-at-delivery options with buyer protection on every order.", descFr: "Carte, portefeuille et paiement à la livraison avec protection acheteur sur chaque commande." },
 ] as const;
 
@@ -490,8 +490,8 @@ export const PRODUCT_HERO = {
   titleFr: `Achetez malin. Livré vite.`,
   subtitle: `${BRAND.fullName} is your online marketplace — shop thousands of products from verified sellers, with fast delivery, secure payments, and easy returns.`,
   subtitleFr: `${BRAND.fullName} est votre marketplace en ligne — des milliers de produits de vendeurs vérifiés, livraison rapide, paiements sécurisés et retours faciles.`,
-  intro: `Whether you're shopping for electronics, fashion, or everyday essentials — browse, add to cart, and get it delivered. Want to grow your business? Open a seller store on Somba & Teka and reach customers nationwide.`,
-  introFr: `Que vous cherchiez de l'électronique, de la mode ou l'essentiel du quotidien — parcourez, ajoutez au panier et recevez chez vous. Vous voulez développer votre activité ? Ouvrez une boutique vendeur sur Somba & Teka.`,
+  intro: `Whether you're shopping for electronics, fashion, or everyday essentials — browse, add to cart, and get it delivered. Want to grow your business? Open a seller store on Somba&Teka and reach customers nationwide.`,
+  introFr: `Que vous cherchiez de l'électronique, de la mode ou l'essentiel du quotidien — parcourez, ajoutez au panier et recevez chez vous. Vous voulez développer votre activité ? Ouvrez une boutique vendeur sur Somba&Teka.`,
   bullets: [
     "Thousands of products from verified sellers",
     "1–3 day delivery with real-time tracking",
@@ -531,8 +531,8 @@ export const CONVERSION_PATHS = [
     id: "seller",
     badge: "For businesses",
     badgeFr: "Pour les entreprises",
-    title: "I want to sell on Somba & Teka",
-    titleFr: "Je veux vendre sur Somba & Teka",
+    title: "I want to sell on Somba&Teka",
+    titleFr: "Je veux vendre sur Somba&Teka",
     desc: "Open your store, list products, manage orders, and get paid — choose a seller plan that fits your business.",
     descFr: "Ouvrez votre boutique, listez vos produits, gérez les commandes et soyez payé — choisissez un plan vendeur.",
     cta: "Sell online",
@@ -544,8 +544,8 @@ export const CONVERSION_PATHS = [
     id: "staff",
     badge: "Team access",
     badgeFr: "Accès équipe",
-    title: "I'm on the Somba & Teka team",
-    titleFr: "Je fais partie de l'équipe Somba & Teka",
+    title: "I'm on the Somba&Teka team",
+    titleFr: "Je fais partie de l'équipe Somba&Teka",
     desc: "Staff and partners — sign in to your portal: admin, warehouse, rider, or seller dashboard.",
     descFr: "Équipe et partenaires — connectez-vous à votre portail : admin, entrepôt, livreur ou vendeur.",
     cta: "Staff login",
@@ -557,7 +557,7 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card, Somba & Teka wallet, or at delivery — guest checkout available on every order.", descFr: "Payez par carte, portefeuille Somba & Teka ou à la livraison — paiement invité disponible." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card, Somba&Teka wallet, or at delivery — guest checkout available on every order.", descFr: "Payez par carte, portefeuille Somba&Teka ou à la livraison — paiement invité disponible." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
@@ -572,16 +572,16 @@ export const TESTIMONIALS = [
     initials: "MD",
   },
   {
-    quote: "We listed 200 SKUs in our first week on Somba & Teka. Orders, payouts, and promotions are all in one seller dashboard — our revenue is up 40%.",
-    quoteFr: "200 références en une semaine sur Somba & Teka. Commandes, paiements et promos dans un seul tableau de bord — +40 % de revenus.",
+    quote: "We listed 200 SKUs in our first week on Somba&Teka. Orders, payouts, and promotions are all in one seller dashboard — our revenue is up 40%.",
+    quoteFr: "200 références en une semaine sur Somba&Teka. Commandes, paiements et promos dans un seul tableau de bord — +40 % de revenus.",
     name: "Ahmed Benali",
     role: "Owner, TechZone Store",
     roleFr: "Propriétaire, TechZone Store",
     initials: "AB",
   },
   {
-    quote: "Returns used to be a headache. On Somba & Teka I requested a replacement from my order page and had a new item within three days.",
-    quoteFr: "Les retours étaient compliqués. Sur Somba & Teka j'ai demandé un remplacement depuis ma commande et reçu en trois jours.",
+    quote: "Returns used to be a headache. On Somba&Teka I requested a replacement from my order page and had a new item within three days.",
+    quoteFr: "Les retours étaient compliqués. Sur Somba&Teka j'ai demandé un remplacement depuis ma commande et reçu en trois jours.",
     name: "Sophie Laurent",
     role: "Customer, Paris",
     roleFr: "Cliente, Paris",
@@ -591,8 +591,8 @@ export const TESTIMONIALS = [
 
 export const FAQ_ITEMS = [
   {
-    q: "What is Somba & Teka?",
-    qFr: "Qu'est-ce que Somba & Teka ?",
+    q: "What is Somba&Teka?",
+    qFr: "Qu'est-ce que Somba&Teka ?",
     a: `${BRAND.fullName} is an online marketplace where you can shop from verified sellers across electronics, fashion, home, beauty, and more — with fast delivery and secure payments.`,
     aFr: `${BRAND.fullName} est une marketplace en ligne où vous achetez auprès de vendeurs vérifiés — électronique, mode, maison, beauté et plus — avec livraison rapide.`,
   },
@@ -605,8 +605,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept credit/debit cards, Somba & Teka wallet balance, and pay at delivery on eligible orders. Guest checkout is available without creating an account.",
-    aFr: "Cartes bancaires, portefeuille Somba & Teka et paiement à la livraison sur commandes éligibles. Paiement invité sans compte.",
+    a: "We accept credit/debit cards, Somba&Teka wallet balance, and pay at delivery on eligible orders. Guest checkout is available without creating an account.",
+    aFr: "Cartes bancaires, portefeuille Somba&Teka et paiement à la livraison sur commandes éligibles. Paiement invité sans compte.",
   },
   {
     q: "How long does delivery take?",
@@ -624,8 +624,8 @@ export const FAQ_ITEMS = [
 
 /** Flipkart-style sell-online landing — /sell-online */
 export const SELL_ONLINE_HERO = {
-  title: "Grow your business — sell online on Somba & Teka",
-  titleFr: "Développez votre activité — vendez en ligne sur Somba & Teka",
+  title: "Grow your business — sell online on Somba&Teka",
+  titleFr: "Développez votre activité — vendez en ligne sur Somba&Teka",
   subtitle: "Reach millions of shoppers, get fulfillment support, and get paid on time. List your products and start selling in as little as 24 hours.",
   subtitleFr: "Touchez des millions d'acheteurs, bénéficiez du fulfillment et soyez payé à temps. Listez vos produits et vendez en 24 h.",
   cta: "Start selling",
@@ -643,7 +643,7 @@ export const SELL_ONLINE_STATS = [
 
 export const SELL_ONLINE_WHY = [
   { icon: "Users", title: "Huge customer base", titleFr: "Large base clients", desc: "Access shoppers across France and beyond — no need to build your own traffic.", descFr: "Accédez aux acheteurs en France et au-delà — sans créer votre propre trafic." },
-  { icon: "Truck", title: "Fulfillment support", titleFr: "Support fulfillment", desc: "Warehouse sorting, dispatch, and last-mile delivery handled by Somba & Teka logistics.", descFr: "Tri entrepôt, expédition et dernier kilomètre gérés par la logistique Somba & Teka." },
+  { icon: "Truck", title: "Fulfillment support", titleFr: "Support fulfillment", desc: "Warehouse sorting, dispatch, and last-mile delivery handled by Somba&Teka logistics.", descFr: "Tri entrepôt, expédition et dernier kilomètre gérés par la logistique Somba&Teka." },
   { icon: "Wallet", title: "Timely payouts", titleFr: "Paiements à temps", desc: "Transparent commission, weekly payouts, and a full finance dashboard in your seller portal.", descFr: "Commission transparente, paiements hebdomadaires et tableau de bord finance complet." },
   { icon: "TrendingUp", title: "Growth tools", titleFr: "Outils de croissance", desc: "Promotions, flash sales, analytics, and review management to scale your store.", descFr: "Promotions, flash sales, analytics et gestion des avis pour faire grandir votre boutique." },
   { icon: "ShieldCheck", title: "Trusted marketplace", titleFr: "Marketplace de confiance", desc: "Sell on a verified platform where buyers already shop electronics, fashion, and more.", descFr: "Vendez sur une plateforme vérifiée où les acheteurs achètent déjà électronique, mode et plus." },
@@ -653,7 +653,7 @@ export const SELL_ONLINE_WHY = [
 export const SELL_ONLINE_STEPS = [
   { step: "1", title: "Create your seller account", titleFr: "Créez votre compte vendeur", desc: "Sign up at /login, complete your business profile, and choose a seller plan.", descFr: "Inscrivez-vous sur /login, complétez votre profil et choisissez un plan vendeur." },
   { step: "2", title: "List your products", titleFr: "Listez vos produits", desc: "Use the product wizard to add SKUs, images, pricing, and inventory — go live in hours.", descFr: "Utilisez l'assistant produit pour ajouter références, images, prix et stock — en ligne en quelques heures." },
-  { step: "3", title: "Receive orders", titleFr: "Recevez les commandes", desc: "Orders flow into your seller dashboard — pack, ship, or hand off to Somba & Teka fulfillment.", descFr: "Les commandes arrivent dans votre tableau de bord — emballez, expédiez ou confiez au fulfillment Somba & Teka." },
+  { step: "3", title: "Receive orders", titleFr: "Recevez les commandes", desc: "Orders flow into your seller dashboard — pack, ship, or hand off to Somba&Teka fulfillment.", descFr: "Les commandes arrivent dans votre tableau de bord — emballez, expédiez ou confiez au fulfillment Somba&Teka." },
   { step: "4", title: "Get paid", titleFr: "Soyez payé", desc: "Track earnings, request payouts, and grow with promotions and analytics.", descFr: "Suivez vos revenus, demandez des paiements et grandissez avec promos et analytics." },
 ] as const;
 
@@ -667,9 +667,9 @@ export const SELL_ONLINE_TOOLS = [
 ] as const;
 
 export const SELL_ONLINE_FAQ = [
-  { q: "Who can sell on Somba & Teka?", qFr: "Qui peut vendre sur Somba & Teka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
+  { q: "Who can sell on Somba&Teka?", qFr: "Qui peut vendre sur Somba&Teka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
   { q: "What are the seller fees?", qFr: "Quels sont les frais vendeur ?", a: "Monthly plans start at $49/mo (Starter). Platform commission applies per category (typically 8–15%). No hidden listing fees on Pro and Enterprise.", aFr: "Plans mensuels à partir de 49 $/mois (Starter). Commission par catégorie (8–15 % en général). Pas de frais de listing cachés sur Pro et Entreprise." },
-  { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use Somba & Teka's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride Somba & Teka — entrepôt, tri et livraison dernier kilomètre." },
+  { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use Somba&Teka's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride Somba&Teka — entrepôt, tri et livraison dernier kilomètre." },
   { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Paiements hebdomadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },
   { q: "How fast can I go live?", qFr: "Quel délai pour être en ligne ?", a: "Most sellers list their first products within 24 hours of subscribing. Our onboarding team can help with catalog setup.", aFr: "La plupart des vendeurs listent leurs premiers produits sous 24 h après abonnement. Notre équipe aide à la mise en place du catalogue." },
 ] as const;

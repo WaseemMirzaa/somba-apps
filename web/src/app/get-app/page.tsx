@@ -52,7 +52,7 @@ export default function GetAppPage() {
           </span>
 
           <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.05] tracking-tight text-balance sm:text-5xl">
-            {fr ? "Achetez sur l'app Somba & Teka" : "Shopping happens on the Somba & Teka app"}
+            {fr ? "Achetez sur l'app Somba&Teka" : "Shopping happens on the Somba&Teka app"}
           </h1>
 
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/80">
@@ -61,8 +61,8 @@ export default function GetAppPage() {
                 ? "Redirection vers la boutique d'applications…"
                 : "Taking you to the app store…"
               : fr
-                ? "Parcourez, achetez, suivez et retournez vos commandes — directement depuis l'application mobile Somba & Teka."
-                : "Browse, buy, track and return your orders — right from the Somba & Teka mobile app."}
+                ? "Parcourez, achetez, suivez et retournez vos commandes — directement depuis l'application mobile Somba&Teka."
+                : "Browse, buy, track and return your orders — right from the Somba&Teka mobile app."}
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">

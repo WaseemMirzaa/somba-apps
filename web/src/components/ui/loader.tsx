@@ -75,7 +75,7 @@ function BrandedSpinner({ size = "md" }: { size?: LoaderSize }) {
   );
 }
 
-/** Branded Somba & Teka spinner — red-to-blue gradient arc, no background track. */
+/** Branded Somba&Teka spinner — red-to-blue gradient arc, no background track. */
 export function Loader({
   size = "md",
   className,

@@ -57,7 +57,7 @@ export default function SellOnlinePage() {
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
               {fr ? "Développez votre activité —" : "Grow your business —"}
               <br />
-              {fr ? "vendez en ligne sur Somba & Teka" : "sell online on Somba & Teka"}
+              {fr ? "vendez en ligne sur Somba&Teka" : "sell online on Somba&Teka"}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-white/88">
               {fr ? SELL_ONLINE_HERO.subtitleFr : SELL_ONLINE_HERO.subtitle}
@@ -240,7 +240,7 @@ export default function SellOnlinePage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="text-center">
             <span className="section-label">{fr ? "Témoignages" : "Success stories"}</span>
-            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba & Teka" : "Sellers who grew with us"}</h2>
+            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba&Teka" : "Sellers who grew with us"}</h2>
           </div>
           <div className="mt-12 grid gap-6 md:grid-cols-2">
             {(sellerTestimonials.length > 0 ? sellerTestimonials : TESTIMONIALS.slice(1, 3)).map((t) => (
