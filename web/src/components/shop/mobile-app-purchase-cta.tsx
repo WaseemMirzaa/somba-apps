@@ -20,8 +20,8 @@ export function MobileAppPurchaseCta() {
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {fr
-              ? "Les achats se font uniquement via l'app Somba. Téléchargez-la pour ajouter au panier, payer et suivre votre commande."
-              : "Purchases are available only in the Somba app. Download it to add to cart, checkout, and track your order."}
+              ? "Les achats se font uniquement via l'app Somba & Teka. Téléchargez-la pour ajouter au panier, payer et suivre votre commande."
+              : "Purchases are available only in the Somba & Teka app. Download it to add to cart, checkout, and track your order."}
           </p>
         </div>
       </div>

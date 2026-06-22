@@ -24,12 +24,14 @@ function logoSurface(tone: "light" | "dark") {
 function HexagonIcon({ className, surface }: { className?: string; surface?: string }) {
   return (
     <span className={cn("relative block h-10 w-10 shrink-0 overflow-hidden rounded-lg", surface, className)}>
+      {/* Frame the hexagon S&T mark (crops the "MARKETPLACE" sub-wordmark and
+          surrounding whitespace) with enough margin that the mark never clips. */}
       <Image
         src="/brand/logo-stack.png"
         alt={BRAND_LOGO_ALT}
         fill
         priority
-        className="object-cover object-[center_20%] scale-[3.4]"
+        className="origin-[50%_16%] scale-[1.5] object-cover"
         sizes="40px"
       />
     </span>

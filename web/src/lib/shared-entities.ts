@@ -171,7 +171,7 @@ export const MOCK_DISPUTES: DisputeItem[] = [
       { from: "buyer", text: "Left speaker has static noise and drops audio completely.", textFr: "Le haut-parleur gauche grésille et coupe complètement le son.", at: "2024-06-03T12:00:00Z" },
       { from: "seller", text: "We can offer replacement or full refund. Please confirm your preference.", textFr: "Nous pouvons proposer un remplacement ou un remboursement intégral. Merci de confirmer votre préférence.", at: "2024-06-04T09:00:00Z" },
       { from: "buyer", text: "I'd prefer a replacement if stock is available.", textFr: "Je préférerais un remplacement si le stock est disponible.", at: "2024-06-04T11:45:00Z" },
-      { from: "admin", text: "Somba support reviewing case — we'll confirm replacement eligibility within 24h.", textFr: "Le support Somba examine le dossier — nous confirmerons l'éligibilité au remplacement sous 24 h.", at: "2024-06-04T15:00:00Z" },
+      { from: "admin", text: "Somba & Teka support reviewing case — we'll confirm replacement eligibility within 24h.", textFr: "Le support Somba & Teka examine le dossier — nous confirmerons l'éligibilité au remplacement sous 24 h.", at: "2024-06-04T15:00:00Z" },
     ],
   },
 ];

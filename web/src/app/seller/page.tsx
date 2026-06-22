@@ -32,6 +32,7 @@ import {
   Sparkline,
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
+import { useSellerGoals } from "@/context/seller-goals-context";
 import {
   sellerStore,
   sellerDashboardStats,
@@ -46,7 +47,6 @@ import {
   sellerCustomerSegments,
   sellerOrderFunnel,
   sellerCategoryRevenue,
-  sellerGoals,
   sellerExtendedKpis,
   sellerHealthBreakdown,
   sellerFulfillmentMetrics,
@@ -106,6 +106,7 @@ export default function SellerDashboard() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
   const k = sellerExtendedKpis;
   const s = sellerDashboardStats;
+  const { goals } = useSellerGoals();
 
   const revenueSpark = sellerRevenueTrend.map((d) => d.revenue);
   const ordersSpark = sellerRevenueTrend.map((d) => d.orders);
@@ -192,24 +193,28 @@ export default function SellerDashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du mois" : "Monthly goals"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "Progression vers les objectifs de juin" : "Progress toward June targets"}</p>
+          <CardHeader className="flex flex-row items-start justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du mois" : "Monthly goals"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Progression vers les objectifs de juin" : "Progress toward June targets"}</p>
+            </div>
+            <Link href="/seller/settings" className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">{fr ? "Modifier" : "Edit"}</Link>
           </CardHeader>
           <CardContent className="space-y-6">
-            <GoalProgress
-              label={fr ? "Objectif revenu" : "Revenue goal"}
-              current={sellerGoals.revenueCurrent}
-              target={sellerGoals.revenueTarget}
-              format={(n) => formatCurrency(n, locale)}
-            />
-            <GoalProgress label={fr ? "Objectif commandes" : "Orders goal"} current={sellerGoals.ordersCurrent} target={sellerGoals.ordersTarget} />
-            <GoalProgress
-              label={fr ? "Objectif rétention" : "Retention goal"}
-              current={sellerGoals.retentionCurrent}
-              target={sellerGoals.retentionTarget}
-              unit="%"
-            />
+            {goals.length === 0 ? (
+              <p className="text-sm text-slate-400">{fr ? "Aucun objectif défini. Ajoutez-en dans les paramètres." : "No goals yet — add some in Settings."}</p>
+            ) : (
+              goals.map((g) => (
+                <GoalProgress
+                  key={g.id}
+                  label={fr ? g.labelFr : g.label}
+                  current={g.current}
+                  target={g.target}
+                  unit={g.metric === "percent" ? "%" : ""}
+                  format={g.metric === "currency" ? (n) => formatCurrency(n, locale) : undefined}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

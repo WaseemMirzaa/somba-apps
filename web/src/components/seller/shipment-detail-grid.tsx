@@ -147,7 +147,7 @@ export function ShipmentDetailGrid({
               { label: fr ? "Ville de destination" : "Destination City", value: shipment.customer.city },
               {
                 label: fr ? "Livraison" : "Delivery",
-                value: fr ? "Gérée par la logistique Somba" : "Handled by Somba logistics",
+                value: fr ? "Gérée par la logistique Somba & Teka" : "Handled by Somba & Teka logistics",
                 full: true,
               },
             ]}
