@@ -313,7 +313,7 @@ export function DashboardLayout({
           </button>
         </header>
 
-        <main className="flex-1 overflow-x-clip p-4 lg:p-8">{children}</main>
+        <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );
