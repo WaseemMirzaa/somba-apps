@@ -333,19 +333,28 @@ export function GoalProgress({
 
 /** Sparkline for stat cards */
 export function Sparkline({ values, color = "#1d4ed8" }: { values: number[]; color?: string }) {
-  const norm = normalize(values);
-  const points = norm.map((n, i) => `${(i / Math.max(norm.length - 1, 1)) * 100},${100 - n * 100}`).join(" ");
+  // Project each value into a 100×100 box (y inverted so larger values rise)
+  // and stitch the points together into a single SVG path.
+  const peak = Math.max(...values, 1);
+  const lastIndex = Math.max(values.length - 1, 1);
+  const path = values
+    .map((value, i) => {
+      const x = (i / lastIndex) * 100;
+      const y = 100 - (value / peak) * 100;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
 
   return (
-    <svg viewBox="0 0 100 100" className="block h-8 w-20 shrink-0" preserveAspectRatio="none" aria-hidden="true">
-      <polyline
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" className="block h-8 w-20 shrink-0">
+      <path
+        d={path}
         fill="none"
         stroke={color}
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
-        points={points}
       />
     </svg>
   );

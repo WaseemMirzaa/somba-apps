@@ -80,8 +80,8 @@ function KpiCard({
 
   return (
     <div className="card-premium p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{title}</p>
           <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
@@ -89,7 +89,7 @@ function KpiCard({
             {Math.abs(change)}% {fr ? "vs période précédente" : "vs last period"}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="grid justify-items-end gap-2">
           <div className="rounded-xl bg-blue-50 p-2">
             <Icon className="h-4 w-4 text-[var(--primary)]" />
           </div>
