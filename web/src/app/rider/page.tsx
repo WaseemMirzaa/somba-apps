@@ -56,7 +56,7 @@ function KpiCard({
             {Math.abs(change)}%
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="grid justify-items-end gap-2">
           <div className="rounded-xl bg-emerald-50 p-2">
             <Icon className="h-4 w-4 text-emerald-600" />
           </div>
