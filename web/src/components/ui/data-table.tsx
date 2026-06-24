@@ -88,7 +88,7 @@ export function DataTable({
               </dl>
             )}
             {actionCol && (
-              <div className="border-t border-[var(--border)] pt-2.5">
+              <div className="row-actions border-t border-[var(--border)] pt-3">
                 {renderCell(actionCol, row)}
               </div>
             )}
