@@ -767,6 +767,17 @@ body {
  * the frosted-glass look.
  */
 @media (max-width: 1023px) {
+  /*
+   * Guard against horizontal page scroll at the document root. We previously
+   * clipped the scrolled <main> with overflow-x: clip, but clipping a tall,
+   * scrolled element triggers a GPU repaint bug on some Android browsers
+   * (black fills + ghost/trailing of cards and text). Clipping at the root
+   * instead keeps the native page scroll and avoids that bug.
+   */
+  html {
+    overflow-x: hidden;
+  }
+
   [class*="backdrop-blur"],
   .glass,
   .landing-glass-panel,
