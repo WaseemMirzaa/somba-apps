@@ -804,14 +804,16 @@ body {
   }
 
   /*
-   * Flatten heavy compositing for low-end mobile GPUs. Many large, blurred
-   * box-shadows and transform/opacity entrance animations are exactly what
-   * those devices struggle to rasterise while scrolling (black fills / ghost
-   * trails). Use a single cheap shadow and skip the decorative animations so
-   * there is almost nothing to composite. Desktop keeps the richer treatment.
+   * Flatten heavy compositing for low-end mobile GPUs (e.g. 4GB Adreno 612).
+   * Large/blurred box-shadows, transitions and transform/opacity entrance
+   * animations are exactly what those devices fail to tile-rasterise while
+   * scrolling (black fills / ghost trails / "crashes"). On phones the cards
+   * become flat (border only, no shadow, no transition) so there is almost
+   * nothing to composite. Desktop keeps the richer treatment.
    */
   .card-premium {
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    box-shadow: none;
+    transition: none;
   }
 
   .animate-fade-up,

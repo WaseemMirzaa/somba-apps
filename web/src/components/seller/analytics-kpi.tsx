@@ -43,7 +43,11 @@ export function AnalyticsKpiCard({
           <div className="rounded-xl bg-red-50 p-2">
             <Icon className="h-4 w-4 text-[var(--primary)]" />
           </div>
-          <Sparkline values={spark} color="var(--primary)" />
+          {/* Decorative sparkline — hidden on phones/tablets so low-end GPUs
+              have less SVG to rasterise and the value never gets squeezed. */}
+          <div className="hidden lg:block">
+            <Sparkline values={spark} color="var(--primary)" />
+          </div>
         </div>
       </div>
     </div>
