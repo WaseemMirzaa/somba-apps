@@ -266,7 +266,7 @@ export function DashboardLayout({
       )}
 
       <div className="flex min-h-screen min-w-0 flex-col lg:pl-[272px]">
-        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-[var(--border)] bg-white/80 px-4 backdrop-blur-xl lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-[var(--border)] bg-white px-4 lg:bg-white/80 lg:px-8 lg:backdrop-blur-xl">
           <button className="rounded-xl border border-[var(--border)] p-2.5 lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5 text-slate-600" />
           </button>
