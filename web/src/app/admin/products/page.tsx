@@ -81,6 +81,7 @@ export default function AdminProductsPage() {
               {
                 key: "name",
                 label: fr ? "Nom" : "Name",
+                primary: true,
                 render: (row) => (
                   <Link href={`/admin/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                     {String(row.name)}

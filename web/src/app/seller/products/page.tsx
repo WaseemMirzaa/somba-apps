@@ -91,7 +91,7 @@ export default function SellerProductsPage() {
             <Image src={String(row.image)} alt="" fill className="object-cover" sizes="40px" />
           </div>
         )},
-        { key: "name", label: fr ? "Produit" : "Product", render: (row) => (
+        { key: "name", label: fr ? "Produit" : "Product", primary: true, render: (row) => (
           <Link href={`/seller/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
         { key: "brand", label: fr ? "Marque" : "Brand" },

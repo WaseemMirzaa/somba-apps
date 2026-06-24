@@ -276,21 +276,21 @@ export default function SellerCustomerAnalyticsPage() {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="py-2 pr-4 font-semibold text-slate-500">{fr ? "Cohorte" : "Cohort"}</th>
+                  <th className="py-2 pr-2 font-semibold text-slate-500 sm:pr-4">{fr ? "Cohorte" : "Cohort"}</th>
                   {["M1", "M2", "M3", "M4", "M5", "M6"].map((m) => (
-                    <th key={m} className="px-2 py-2 text-center font-semibold text-slate-500">{m}</th>
+                    <th key={m} className="px-1 py-2 text-center font-semibold text-slate-500 sm:px-2">{m}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {sellerCustomerCohorts.map((c) => (
                   <tr key={c.cohort} className="border-b border-slate-50">
-                    <td className="py-2 pr-4 font-medium text-slate-700">{c.cohort}</td>
+                    <td className="py-2 pr-2 font-medium text-slate-700 sm:pr-4">{c.cohort}</td>
                     {[c.month1, c.month2, c.month3, c.month4, c.month5, c.month6].map((val, i) => (
-                      <td key={i} className="px-2 py-2 text-center">
+                      <td key={i} className="px-1 py-2 text-center sm:px-2">
                         {val > 0 ? (
                           <span
-                            className="inline-block rounded px-2 py-1 font-semibold text-white"
+                            className="inline-block rounded px-1.5 py-1 font-semibold text-white sm:px-2"
                             style={{
                               background: `rgba(220, 38, 38, ${val / 100})`,
                               opacity: val > 0 ? 1 : 0.3,
