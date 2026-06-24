@@ -774,8 +774,10 @@ body {
    * (black fills + ghost/trailing of cards and text). Clipping at the root
    * instead keeps the native page scroll and avoids that bug.
    */
-  html {
+  html,
+  body {
     overflow-x: hidden;
+    max-width: 100%;
   }
 
   [class*="backdrop-blur"],
