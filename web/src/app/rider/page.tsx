@@ -50,13 +50,13 @@ function KpiCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
             {Math.abs(change)}%
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="rounded-xl bg-emerald-50 p-2">
             <Icon className="h-4 w-4 text-emerald-600" />
           </div>

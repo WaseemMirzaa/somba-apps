@@ -337,8 +337,16 @@ export function Sparkline({ values, color = "#1d4ed8" }: { values: number[]; col
   const points = norm.map((n, i) => `${(i / Math.max(norm.length - 1, 1)) * 100},${100 - n * 100}`).join(" ");
 
   return (
-    <svg viewBox="0 0 100 100" className="h-8 w-20" preserveAspectRatio="none">
-      <polyline fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    <svg viewBox="0 0 100 100" className="block h-8 w-20 shrink-0" preserveAspectRatio="none" aria-hidden="true">
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+        points={points}
+      />
     </svg>
   );
 }
