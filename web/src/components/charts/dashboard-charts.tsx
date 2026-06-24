@@ -36,8 +36,8 @@ export function RevenueAreaChart({
   const areaPath = `${linePath} L ${w - pad},${h - pad} L ${pad},${h - pad} Z`;
 
   return (
-    <div className="w-full" style={{ height }}>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" preserveAspectRatio="none">
+    <div className="w-full">
+      <svg viewBox={`0 0 ${w} ${h}`} className="block w-full" style={{ height }} preserveAspectRatio="none">
         <defs>
           <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -78,8 +78,8 @@ export function DualMetricChart({
   const ordNorm = normalize(data.map((d) => d.orders));
 
   return (
-    <div className="w-full" style={{ height }}>
-      <div className="flex h-[calc(100%-24px)] items-end gap-1">
+    <div className="w-full">
+      <div className="flex items-end gap-1" style={{ height }}>
         {data.map((d, i) => (
           <div key={d.label} className="group relative flex flex-1 flex-col items-center justify-end gap-1">
             <div
@@ -101,7 +101,7 @@ export function DualMetricChart({
         <span>{data[0]?.label}</span>
         <span>{data[data.length - 1]?.label}</span>
       </div>
-      <div className="mt-3 flex gap-4 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-100" /> {fr ? "Chiffre d'affaires" : "Revenue"}</span>
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--primary)]" /> {fr ? "Commandes" : "Orders"}</span>
       </div>

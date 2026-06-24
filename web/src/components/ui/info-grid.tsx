@@ -13,11 +13,11 @@ export function InfoGrid({
   return (
     <dl className={cn("grid gap-4", colClass[columns], className)}>
       {items.map((item) => (
-        <div key={item.label} className={cn(item.full && "sm:col-span-full")}>
+        <div key={item.label} className={cn("min-w-0", item.full && "sm:col-span-full")}>
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
             {item.label}
           </dt>
-          <dd className="mt-1 text-sm font-medium text-slate-900">{item.value}</dd>
+          <dd className="mt-1 break-words text-sm font-medium text-slate-900">{item.value}</dd>
         </div>
       ))}
     </dl>
