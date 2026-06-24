@@ -291,6 +291,9 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 },
               ]}
               data={warehouseDispatchQueue as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>
@@ -371,6 +374,9 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 { key: "exceptions", label: fr ? "Exceptions" : "Exceptions" },
               ]}
               data={warehouseRiderLeaderboard.slice(0, 6) as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={ops(`/riders/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>

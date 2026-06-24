@@ -13,15 +13,24 @@ export function DataTable({
   data,
   className,
   emptyMessage,
+  rowAction,
 }: {
   columns: DataTableColumn[];
   data: Record<string, unknown>[];
   className?: string;
   emptyMessage?: string;
+  /**
+   * Optional per-row action rendered as a tappable button in the mobile card
+   * footer. Use for listings (e.g. dashboard widgets) that have no dedicated
+   * "actions" column but should still expose a clear tap target on phones.
+   */
+  rowAction?: (row: Record<string, unknown>) => React.ReactNode;
 }) {
   const primaryCol = columns.find((col) => col.primary) ?? columns[0];
-  // "actions" columns get a full-width footer on mobile instead of a label/value row.
-  const actionCol = columns.find((col) => col.key === "actions" && col !== primaryCol);
+  // "action"/"actions" columns get a full-width footer on mobile instead of a label/value row.
+  const actionCol = columns.find(
+    (col) => (col.key === "actions" || col.key === "action") && col !== primaryCol
+  );
   const detailCols = columns.filter(
     (col) => col !== primaryCol && col !== actionCol && !col.hideOnMobile
   );
@@ -87,9 +96,9 @@ export function DataTable({
                 })}
               </dl>
             )}
-            {actionCol && (
+            {(actionCol || rowAction) && (
               <div className="row-actions border-t border-[var(--border)] pt-3">
-                {renderCell(actionCol, row)}
+                {actionCol ? renderCell(actionCol, row) : rowAction?.(row)}
               </div>
             )}
           </li>

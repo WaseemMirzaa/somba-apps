@@ -244,6 +244,9 @@ export default function AdminDashboard() {
                 { key: "returns", label: fr ? "Retours" : "Returns", render: (row) => `${row.returns}%` },
               ]}
               data={adminTopSellers.slice(0, 5) as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>
@@ -319,6 +322,9 @@ export default function AdminDashboard() {
                 },
               ]}
               data={orderEntities.slice(0, 5) as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>

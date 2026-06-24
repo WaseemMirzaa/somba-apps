@@ -441,6 +441,9 @@ export default function SellerDashboard() {
                 },
               ]}
               data={lowStockProducts as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>
@@ -470,6 +473,9 @@ export default function SellerDashboard() {
                 { key: "orderStatus", label: t("status"), render: (row) => <Badge variant="info">{fr ? (orderStatusFr[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
               ]}
               data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={`/seller/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>
@@ -499,6 +505,9 @@ export default function SellerDashboard() {
                   { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? String(row.statusFr) : String(row.status)}</Badge> },
                 ]}
                 data={promotionList.filter((p) => p.status === "active") as unknown as Record<string, unknown>[]}
+                rowAction={(row) => (
+                  <Link href={`/seller/promotions/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                )}
               />
             </CardContent>
           </Card>
