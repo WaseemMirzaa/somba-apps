@@ -258,7 +258,7 @@ export default function WarehouseAnalyticsPage() {
             ]}
             data={warehouseRiderLeaderboard as unknown as Record<string, unknown>[]}
             rowAction={(row) => (
-              <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
             )}
           />
         </CardContent>
@@ -301,7 +301,7 @@ export default function WarehouseAnalyticsPage() {
               ]}
               data={warehouseTopBatches as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={`/warehouse/dispatch/${String(row.id).replace("BAT-", "")}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={`/warehouse/dispatch/${String(row.id).replace("BAT-", "")}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>

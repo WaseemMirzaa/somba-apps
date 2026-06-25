@@ -293,7 +293,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
               ]}
               data={warehouseDispatchQueue as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
@@ -376,7 +376,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
               ]}
               data={warehouseRiderLeaderboard.slice(0, 6) as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={ops(`/riders/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={ops(`/riders/${row.id}`)} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>

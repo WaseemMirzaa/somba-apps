@@ -68,7 +68,7 @@ export default function SellerTransactionsPage() {
         { key: "date", label: fr ? "Date" : "Date" },
       ]}
       rowAction={(row) => (
-        <Link href={`/seller/orders/${row.order}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
+        <Link href={`/seller/orders/${row.order}`} className="text-sm text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
       )}
       data={filtered as unknown as Record<string, unknown>[]}
     />

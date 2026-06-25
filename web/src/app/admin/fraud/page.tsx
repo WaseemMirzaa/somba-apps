@@ -87,7 +87,7 @@ export default function AdminFraudPage() {
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
             rowAction={(row) => row.orderId ? (
-              <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
             ) : null}
           />
         </CardContent>

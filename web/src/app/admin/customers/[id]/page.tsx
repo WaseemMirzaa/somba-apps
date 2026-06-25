@@ -120,7 +120,7 @@ export default function AdminCustomerDetailPage() {
           ]}
           data={customerOrders as unknown as Record<string, unknown>[]}
           rowAction={(row) => (
-            <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            <Link href={`/admin/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
           )}
         />
       </DetailSection>

@@ -246,7 +246,7 @@ export default function AdminDashboard() {
               ]}
               data={adminTopSellers.slice(0, 5) as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={`/admin/sellers/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
@@ -324,7 +324,7 @@ export default function AdminDashboard() {
               ]}
               data={orderEntities.slice(0, 5) as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={`/admin/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
                       <button type="button" onClick={() => toast(fr ? `Vendeur ${row.storeName} rejeté` : `Seller ${row.storeName} rejected`)} className="text-xs font-medium text-red-600 hover:underline">{t("reject")}</button>
                     </div>
                   ) : (
-                    <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--primary)] hover:underline">{t("view")}</Link>
+                    <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
                   ),
               },
             ]}
