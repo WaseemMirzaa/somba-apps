@@ -173,6 +173,7 @@ export default function AdminRefundsPage() {
                   }
                   return (
                     <Button
+                      variant="approve"
                       size="sm"
                       className="ml-4 whitespace-nowrap"
                       onClick={() => {
