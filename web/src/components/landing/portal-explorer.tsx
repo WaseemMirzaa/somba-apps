@@ -140,11 +140,11 @@ export function PortalExplorer({
 
       <div className="grid lg:grid-cols-5">
         <div className="relative border-b border-[var(--border)] lg:col-span-2 lg:border-b-0 lg:border-r">
-          <div className="relative h-56 lg:h-full lg:min-h-[320px]">
+          <div className="relative min-h-[20rem] lg:h-full lg:min-h-[320px]">
             <Image src={portal.image} alt={portal.name} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
             <div className="absolute inset-0 bg-[var(--primary)]/45" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/95 via-slate-900/40 to-slate-900/10 lg:bg-gradient-to-r" />
-            <div className="absolute inset-0 flex flex-col justify-end p-8 text-white">
+            <div className="relative flex flex-col justify-end p-8 text-white lg:absolute lg:inset-0">
               <span className="inline-flex w-fit rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-white/25">
                 {fr ? portal.audienceLabelFr : portal.audienceLabel}
               </span>
