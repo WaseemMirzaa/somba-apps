@@ -788,6 +788,35 @@ body {
     -webkit-backdrop-filter: none !important;
   }
 
+  /*
+   * mix-blend-mode forces the GPU to read back and blend each layer's backdrop
+   * on every composited frame. Low-end Android GPUs corrupt the tile under that
+   * load — the rainbow "static" tearing reported over the image-backed portal
+   * cards on the home page. Composite these overlays normally on phones; the
+   * semi-transparent tint plus the gradient still darken the image enough for
+   * the white text to stay legible.
+   */
+  [class*="mix-blend"] {
+    mix-blend-mode: normal !important;
+  }
+
+  /*
+   * Same flat treatment .card-premium got (#32), extended to the public-page
+   * card classes: on phones they drop their rounded corners so a low-end GPU
+   * has no clipped, curved edge to tear, keeping only a single cheap shadow
+   * for separation. Desktop keeps the rounded, elevated look.
+   */
+  .pcard,
+  .cat-tile,
+  .bento-cell,
+  .split-panel,
+  .step-card,
+  .landing-pricing-card,
+  .landing-testimonial {
+    border-radius: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  }
+
   .glass,
   .landing-glass-panel,
   .showcase-chip {
