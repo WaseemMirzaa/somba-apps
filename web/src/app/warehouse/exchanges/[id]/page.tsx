@@ -71,7 +71,7 @@ export default function WarehouseExchangeDetailPage() {
             <Badge variant={exchangeStatusVariant(exc.status)}>{statusLabel}</Badge>
             {exc.status === "pending" && (
               <>
-                <button onClick={() => toast(fr ? "Échange approuvé" : "Exchange approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">
+                <button onClick={() => toast(fr ? "Échange approuvé" : "Exchange approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">
                   {fr ? "Approuver l'échange" : "Approve Exchange"}
                 </button>
                 <button onClick={() => toast(fr ? "Variante allouée depuis l'inventaire" : "Variant allocated from inventory", "info")} className="btn-primary rounded-lg px-4 py-2 text-sm">

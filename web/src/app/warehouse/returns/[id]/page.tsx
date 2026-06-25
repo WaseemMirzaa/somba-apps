@@ -47,8 +47,8 @@ export default function WarehouseReturnDetailPage() {
         actions={
           status === "pending" ? (
             <>
-              <button onClick={() => { setStatus("approved"); toast(fr ? "Retour approuvé" : "Return approved"); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Approuver" : "Approve"}</button>
-              <button onClick={() => { setStatus("rejected"); toast(fr ? "Retour rejeté" : "Return rejected", "error"); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{fr ? "Rejeter" : "Reject"}</button>
+              <button onClick={() => { setStatus("approved"); toast(fr ? "Retour approuvé" : "Return approved"); }} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
+              <button onClick={() => { setStatus("rejected"); toast(fr ? "Retour rejeté" : "Return rejected", "error"); }} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
             </>
           ) : null
         }

@@ -79,8 +79,8 @@ export default function AdminSellerDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {seller.status === "pending" ? (
               <>
-                <button onClick={() => toast(fr ? "Vendeur approuvé" : "Seller approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{t("approve")}</button>
-                <button onClick={() => toast(fr ? "Vendeur rejeté" : "Seller rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{t("reject")}</button>
+                <button onClick={() => toast(fr ? "Vendeur approuvé" : "Seller approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{t("approve")}</button>
+                <button onClick={() => toast(fr ? "Vendeur rejeté" : "Seller rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{t("reject")}</button>
               </>
             ) : (
               <Badge variant={blocked ? "danger" : "success"}>{blocked ? (fr ? "Bloqué" : "Blocked") : t("approved")}</Badge>
