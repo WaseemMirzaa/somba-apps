@@ -90,8 +90,8 @@ export default function AdminProductModerationDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {status === "pending" ? (
               <>
-                <button onClick={() => updateStatus("approved")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">{fr ? "Approuver" : "Approve"}</button>
-                <button onClick={() => updateStatus("rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white">{fr ? "Rejeter" : "Reject"}</button>
+                <button onClick={() => updateStatus("approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
+                <button onClick={() => updateStatus("rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
               </>
             ) : (
               <Badge variant={blocked ? "danger" : status === "approved" ? "success" : status === "rejected" ? "danger" : "warning"}>
@@ -164,8 +164,8 @@ export default function AdminProductModerationDetailPage() {
               />
               {status === "pending" && (
                 <div className="flex gap-2">
-                  <button onClick={() => updateStatus("approved")} className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-medium text-white">{fr ? "Approuver" : "Approve"}</button>
-                  <button onClick={() => updateStatus("rejected")} className="rounded-lg bg-red-600 px-6 py-2 text-sm font-medium text-white">{fr ? "Rejeter" : "Reject"}</button>
+                  <button onClick={() => updateStatus("approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-6 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
+                  <button onClick={() => updateStatus("rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-6 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
                   <button onClick={() => updateStatus("changes_requested")} className="rounded-lg border border-blue-200 px-6 py-2 text-sm font-medium text-slate-600">{fr ? "Demander des modifications" : "Request Changes"}</button>
                 </div>
               )}

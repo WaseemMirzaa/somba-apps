@@ -157,8 +157,8 @@ export default function WarehouseParcelDetailPage() {
             { label: t("exceptions"), value: exceptionsLabel },
           ]} />
           <div className="mt-4 flex gap-2">
-            <button onClick={() => toast(fr ? "Colis accepté" : "Parcel accepted")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">{fr ? "Accepter" : "Accept"}</button>
-            <button onClick={() => toast(fr ? "Colis rejeté" : "Parcel rejected")} className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{fr ? "Rejeter" : "Reject"}</button>
+            <button onClick={() => toast(fr ? "Colis accepté" : "Parcel accepted")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Accepter" : "Accept"}</button>
+            <button onClick={() => toast(fr ? "Colis rejeté" : "Parcel rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
             <Link href="/warehouse/exceptions" className="rounded-lg border border-amber-200 px-4 py-2 text-sm text-amber-700">{fr ? "Créer un incident" : "Create Incident"}</Link>
           </div>
         </DetailGridSection>
