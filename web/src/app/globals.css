@@ -801,26 +801,19 @@ body {
   }
 
   /*
-   * Image-backed public cards (product, category and bento tiles): a rounded
-   * corner clipping a background image grains on low-end Android GPUs *while
-   * the image decodes* — the artifact then self-heals once the image settles.
-   * So these stay square on phones (no rounded clip to churn during decode).
-   * Flat recipe otherwise, matching .card-premium.
+   * All public-page cards: flat recipe on phones (8px radius, no shadow, no
+   * transition, own stacking context) plus the documented fixes for the
+   * subpixel "ghost line" at rounded corners on Android Chrome:
+   *   - background-clip: padding-box stops the card background bleeding past
+   *     the border into the curved corner (the thin line).
+   *   - backface-visibility: hidden pushes the GPU to composite the rounded
+   *     clip cleanly instead of leaving a jagged subpixel edge.
+   * Images inside use object-cover and are clipped by the card's own
+   * overflow:hidden, so they follow the rounded corner too.
    */
   .pcard,
   .cat-tile,
-  .bento-cell {
-    border-radius: 0;
-    box-shadow: none;
-    transition: none;
-    isolation: isolate;
-  }
-
-  /*
-   * Solid public cards (no background image to clip): clean at the small 8px
-   * radius, exactly like the dashboard cards. Flat recipe so there is nothing
-   * extra to composite.
-   */
+  .bento-cell,
   .split-panel,
   .step-card,
   .landing-pricing-card,
@@ -829,6 +822,9 @@ body {
     box-shadow: none;
     transition: none;
     isolation: isolate;
+    background-clip: padding-box;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .glass,
@@ -867,6 +863,9 @@ body {
     transition: none;
     border-radius: 0.5rem;
     isolation: isolate;
+    background-clip: padding-box;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .animate-fade-up,
