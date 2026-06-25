@@ -124,7 +124,7 @@ export function LandingHeader() {
         </div>
 
         {mobileOpen && (
-          <div className="border-t border-[var(--border)] py-4 md:hidden">
+          <div className="-mx-4 bg-[var(--primary)] px-4 py-4 md:hidden">
             <form onSubmit={handleSearch} className="mb-4">
               <input
                 type="text"
@@ -140,22 +140,22 @@ export function LandingHeader() {
             <div className="flex gap-2">
               <button
                 onClick={() => setLocale("en")}
-                className={cn("flex-1 rounded-xl py-2.5 text-sm font-medium", locale === "en" ? "btn-primary" : "border border-[var(--border)]")}
+                className={cn("flex-1 rounded-xl py-2.5 text-sm font-medium", locale === "en" ? "bg-white text-[var(--primary)]" : "border border-white/30 text-white")}
               >
                 EN
               </button>
               <button
                 onClick={() => setLocale("fr")}
-                className={cn("flex-1 rounded-xl py-2.5 text-sm font-medium", locale === "fr" ? "btn-primary" : "border border-[var(--border)]")}
+                className={cn("flex-1 rounded-xl py-2.5 text-sm font-medium", locale === "fr" ? "bg-white text-[var(--primary)]" : "border border-white/30 text-white")}
               >
                 FR
               </button>
             </div>
             <div className="mt-3 flex gap-2">
-              <Link href="/shop/account" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
+              <Link href="/shop/account" className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
                 {t("myAccount")}
               </Link>
-              <Link href="/seller" className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-center text-sm">
+              <Link href="/seller" className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
                 {t("becomeSeller")}
               </Link>
             </div>
