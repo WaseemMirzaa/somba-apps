@@ -814,6 +814,22 @@ body {
   .card-premium {
     box-shadow: none;
     transition: none;
+    /*
+     * Give each card its own GPU raster layer, snapped to whole device
+     * pixels. Without this, Android Chrome rasterises the 1px border, the
+     * rounded corners and any overflow:hidden child at fractional pixel
+     * offsets while scrolling/zooming, tearing the edges into the doubled /
+     * overlapping "lines" reported on phones. Desktop inspectors round those
+     * fractions away, which is why it only reproduces on a real device.
+     *   - isolation: own stacking context, so no neighbouring card composites
+     *     into a shared layer and bleeds a line across the boundary.
+     *   - translateZ(0) + backface-visibility: promote to a clean, integer-
+     *     aligned layer instead of being re-sampled on the shared page layer.
+     */
+    isolation: isolate;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .animate-fade-up,
