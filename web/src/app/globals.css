@@ -801,12 +801,12 @@ body {
   }
 
   /*
-   * Give the public-page cards the exact flat .card-premium recipe so they
-   * behave like the dashboard cards (which don't grain). These cards carry
-   * background images, and clipping an image at a rounded corner is what tears
-   * on low-end Android GPUs — so on phones they go fully square, shadowless and
-   * transition-free, each in its own stacking context. Desktop keeps the
-   * rounded, elevated look.
+   * Give the public-page cards the flat .card-premium recipe so they behave
+   * like the dashboard cards (which are clean at this radius): no shadow, no
+   * transition, own stacking context, and a small uniform 8px radius. The flat
+   * compositing — not the corner — is what keeps low-end Android GPUs from
+   * graining; the heavy desktop shadows/transitions were the trigger. Desktop
+   * keeps the fully rounded, elevated look.
    */
   .pcard,
   .cat-tile,
@@ -815,7 +815,7 @@ body {
   .step-card,
   .landing-pricing-card,
   .landing-testimonial {
-    border-radius: 0;
+    border-radius: 0.5rem;
     box-shadow: none;
     transition: none;
     isolation: isolate;
@@ -846,16 +846,16 @@ body {
    */
   .card-premium {
     /*
-     * Flatten compositing for low-end Android GPUs: drop the shadow,
-     * transition and corner radius so there is almost nothing to composite
-     * per scroll frame, and keep each card in its own stacking context.
-     * Square on phones — uniform with the image-backed public cards, which
-     * must be square to avoid the rounded-corner image-clip grain. Desktop
-     * keeps the full radius + shadowed treatment.
+     * Flatten compositing for low-end Android GPUs: drop the shadow and
+     * transition so there is almost nothing to composite per scroll frame,
+     * keep each card in its own stacking context, and use a small 8px radius
+     * (uniform with every other card). The flat compositing is what keeps the
+     * GPU clean; the radius at this size is fine. Desktop keeps the full
+     * radius + shadowed treatment.
      */
     box-shadow: none;
     transition: none;
-    border-radius: 0;
+    border-radius: 0.5rem;
     isolation: isolate;
   }
 
