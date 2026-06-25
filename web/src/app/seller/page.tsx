@@ -447,7 +447,7 @@ export default function SellerDashboard() {
               ]}
               data={lowStockProducts as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={`/seller/products/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
@@ -479,7 +479,7 @@ export default function SellerDashboard() {
               ]}
               data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
               rowAction={(row) => (
-                <Link href={`/seller/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                <Link href={`/seller/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
@@ -511,7 +511,7 @@ export default function SellerDashboard() {
                 ]}
                 data={promotionList.filter((p) => p.status === "active") as unknown as Record<string, unknown>[]}
                 rowAction={(row) => (
-                  <Link href={`/seller/promotions/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+                  <Link href={`/seller/promotions/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
                 )}
               />
             </CardContent>

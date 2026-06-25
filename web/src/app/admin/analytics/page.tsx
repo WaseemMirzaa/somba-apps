@@ -297,7 +297,7 @@ export default function AdminAnalyticsPage() {
             ]}
             data={adminTopSellers as unknown as Record<string, unknown>[]}
             rowAction={(row) => (
-              <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/admin/sellers/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
             )}
           />
         </CardContent>

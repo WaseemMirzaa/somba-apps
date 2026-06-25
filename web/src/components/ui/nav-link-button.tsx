@@ -25,9 +25,9 @@ export function NavLinkButton({
       onClick={onClick}
       className={cn(
         // Mobile (< lg): tinted pill with a comfortable tap target.
-        "inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-[var(--primary)]/25 bg-[var(--primary-light)] px-3 py-1.5 text-xs font-semibold text-[var(--primary)] transition-colors hover:bg-[var(--primary-tint)]",
-        // Desktop (lg+): revert to the original inline text-link look.
-        "lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:hover:bg-transparent lg:hover:underline",
+        "inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-[var(--primary)]/25 bg-[var(--primary-light)] px-3 py-1.5 text-xs font-semibold text-[var(--nav-accent)] transition-colors hover:bg-[var(--primary-tint)]",
+        // Desktop (lg+): revert to the original inline text-link look (brand red).
+        "lg:min-h-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:text-[var(--primary)] lg:hover:bg-transparent lg:hover:underline",
         className
       )}
     >

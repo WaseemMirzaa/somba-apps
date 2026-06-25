@@ -176,7 +176,7 @@ export default function AdminSellerDetailPage() {
             ]}
             data={(sellerProducts.length ? sellerProducts : [{ id: 0, name: fr ? "Aucun produit" : "No products", sku: "-", stock: 0, sold: 0, price: 0, status: "-" }]) as unknown as Record<string, unknown>[]}
             rowAction={(row) => (
-              <Link href={`/admin/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/admin/products/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
             )}
           />
         </DetailGridSection>
@@ -194,7 +194,7 @@ export default function AdminSellerDetailPage() {
             ]}
             data={sellerOrders as unknown as Record<string, unknown>[]}
             rowAction={(row) => (
-              <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/admin/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
             )}
           />
         </DetailGridSection>
