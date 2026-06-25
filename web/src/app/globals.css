@@ -801,16 +801,26 @@ body {
   }
 
   /*
-   * Give the public-page cards the flat .card-premium recipe so they behave
-   * like the dashboard cards (which are clean at this radius): no shadow, no
-   * transition, own stacking context, and a small uniform 8px radius. The flat
-   * compositing — not the corner — is what keeps low-end Android GPUs from
-   * graining; the heavy desktop shadows/transitions were the trigger. Desktop
-   * keeps the fully rounded, elevated look.
+   * Image-backed public cards (product, category and bento tiles): a rounded
+   * corner clipping a background image grains on low-end Android GPUs *while
+   * the image decodes* — the artifact then self-heals once the image settles.
+   * So these stay square on phones (no rounded clip to churn during decode).
+   * Flat recipe otherwise, matching .card-premium.
    */
   .pcard,
   .cat-tile,
-  .bento-cell,
+  .bento-cell {
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+    isolation: isolate;
+  }
+
+  /*
+   * Solid public cards (no background image to clip): clean at the small 8px
+   * radius, exactly like the dashboard cards. Flat recipe so there is nothing
+   * extra to composite.
+   */
   .split-panel,
   .step-card,
   .landing-pricing-card,
