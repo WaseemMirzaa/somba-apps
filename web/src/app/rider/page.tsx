@@ -60,7 +60,11 @@ function KpiCard({
           <div className="rounded-xl bg-emerald-50 p-2">
             <Icon className="h-4 w-4 text-emerald-600" />
           </div>
-          <Sparkline values={spark} color="#059669" />
+          {/* Decorative sparkline — hidden on phones/tablets (matches
+              AnalyticsKpiCard) so low-end GPUs have no stretched SVG to paint. */}
+          <div className="hidden lg:block">
+            <Sparkline values={spark} color="#059669" />
+          </div>
         </div>
       </div>
     </div>
