@@ -801,10 +801,10 @@ body {
   }
 
   /*
-   * Same flat treatment .card-premium got (#32), extended to the public-page
-   * card classes: on phones they drop their rounded corners so a low-end GPU
-   * has no clipped, curved edge to tear, keeping only a single cheap shadow
-   * for separation. Desktop keeps the rounded, elevated look.
+   * Lighten the public-page cards on phones: a single cheap shadow instead of
+   * the elevated desktop shadow so low-end GPUs have less to composite. Rounded
+   * corners are kept — killing the mix-blend overlays is what stopped the
+   * tearing here. Desktop keeps the full elevated treatment.
    */
   .pcard,
   .cat-tile,
@@ -813,7 +813,6 @@ body {
   .step-card,
   .landing-pricing-card,
   .landing-testimonial {
-    border-radius: 0;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   }
 
@@ -842,19 +841,15 @@ body {
    */
   .card-premium {
     /*
-     * Reduce each card to the simplest possible paint on phones. Low-end
-     * Android GPUs tear the card edges into doubled / overlapping "lines"
-     * because the rounded corners + 1px border (and, for chart cards, an
-     * overflow:hidden clip) must be anti-aliased every scroll/zoom frame.
-     * Promoting each card to its own GPU layer (translateZ/backface) was
-     * tried and did NOT help — the bottleneck is the per-frame paint, not
-     * the layer count — so we drop the radius and shadow entirely: a flat,
-     * square, single-border rectangle has no curved edge to tear and is
-     * trivial to rasterise. Desktop keeps the rounded, shadowed treatment.
+     * Flatten compositing for low-end Android GPUs: drop the shadow and
+     * transition so there is almost nothing to composite per scroll frame,
+     * and keep each card in its own stacking context. The rounded corners
+     * are kept — removing the translateZ layer promotion (and, on the
+     * landing pages, the mix-blend overlays) is what actually stopped the
+     * tearing, not the radius. Desktop keeps the full shadowed treatment.
      */
     box-shadow: none;
     transition: none;
-    border-radius: 0;
     isolation: isolate;
   }
 
