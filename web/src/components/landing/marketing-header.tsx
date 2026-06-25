@@ -134,28 +134,28 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
         </div>
 
         {open && (
-          <div className="border-t border-[var(--border)] py-4 lg:hidden">
+          <div className="-mx-4 bg-[var(--primary)] px-4 py-4 lg:hidden">
             <nav className="flex flex-col gap-1">
               {NAV.map((item) => (
                 <a
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700"
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-white hover:bg-white/10"
                 >
                   {fr ? item.labelFr : item.label}
                 </a>
               ))}
               {authReady && isAuthenticated ? (
-                <Link href={dashboardHref} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--primary)]">
+                <Link href={dashboardHref} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-white hover:bg-white/10">
                   {fr ? "Mon tableau de bord" : "My Dashboard"} — {persona.name}
                 </Link>
               ) : (
-                <Link href="/login" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700">
+                <Link href="/login" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-white hover:bg-white/10">
                   {fr ? "Connexion équipe" : "Staff login"}
                 </Link>
               )}
-              <Link href="/get-app" onClick={() => setOpen(false)} className="btn-primary mt-2 px-5 py-2.5 text-sm text-center">
+              <Link href="/get-app" onClick={() => setOpen(false)} className="mt-2 rounded-xl bg-white px-5 py-2.5 text-center text-sm font-semibold text-[var(--primary)] hover:bg-white/90">
                 {fr ? "Acheter maintenant" : "Shop now"}
               </Link>
             </nav>
