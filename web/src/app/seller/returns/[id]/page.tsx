@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getSellerReturn } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -82,7 +83,7 @@ export default function SellerReturnDetailPage() {
             { label: fr ? "Photos" : "Photos", value: `${ret.inspection.photos} ${fr ? "jointe(s)" : "attached"}` },
             { label: fr ? "Condition" : "Condition", value: fr ? ret.inspection.conditionFr : ret.inspection.condition },
           ]} />
-          <Link href="/warehouse/returns" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "File de retours entrepôt →" : "Warehouse Return Queue →"}</Link>
+          <NavLinkButton href="/warehouse/returns" className="mt-4">{fr ? "File de retours entrepôt →" : "Warehouse Return Queue →"}</NavLinkButton>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>

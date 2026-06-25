@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getOrder } from "@/lib/entities";
 import { getReturn } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
@@ -180,9 +181,9 @@ export default function AdminReturnDetailPage() {
             { label: "Photos", value: fr ? `${ret.inspection.photos} téléversée(s)` : `${ret.inspection.photos} uploaded` },
             { label: "Notes", value: fr ? (ret.inspection.notesFr ?? ret.inspection.notes) : ret.inspection.notes, full: true },
           ]} />
-          <Link href={`/warehouse/returns/${ret.id}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">
+          <NavLinkButton href={`/warehouse/returns/${ret.id}`} className="mt-4">
             {fr ? "File d'inspection de l'entrepôt →" : "Warehouse inspection queue →"}
-          </Link>
+          </NavLinkButton>
         </DetailGridSection>
 
         {order && (
@@ -199,7 +200,7 @@ export default function AdminReturnDetailPage() {
         {order && (
           <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
             <InfoGrid items={[
-              { label: fr ? "Entrepôt" : "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{order.warehouse}</Link> },
+              { label: fr ? "Entrepôt" : "Warehouse", value: <NavLinkButton href="/warehouse">{order.warehouse}</NavLinkButton> },
               { label: fr ? "Livreur" : "Rider", value: order.rider },
               { label: fr ? "Numéro de suivi" : "Tracking Number", value: order.trackingNumber },
             ]} />

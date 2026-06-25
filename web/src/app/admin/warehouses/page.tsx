@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
@@ -125,13 +126,13 @@ export default function AdminWarehousesPage() {
               <>
                 Les responsables d&apos;entrepôt se connectent avec l&apos;e-mail et le mot de passe de portail que vous délivrez ici.
                 Ils ne voient que le <strong>portail Entrepôt</strong> — pas Admin, Vendeur ou les autres portails.
-                En tant qu&apos;admin, utilisez <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Opérations logistiques</Link> pour suivre toute l&apos;activité des entrepôts.
+                En tant qu&apos;admin, utilisez <NavLinkButton href="/admin/fulfillment">Opérations logistiques</NavLinkButton> pour suivre toute l&apos;activité des entrepôts.
               </>
             ) : (
               <>
                 Warehouse managers log in with the portal email and password you issue here.
                 They only see the <strong>Warehouse portal</strong> — not Admin, Seller, or other portals.
-                As admin, use <Link href="/admin/fulfillment" className="text-[var(--primary)] hover:underline">Fulfillment Ops</Link> to monitor all warehouse activity.
+                As admin, use <NavLinkButton href="/admin/fulfillment">Fulfillment Ops</NavLinkButton> to monitor all warehouse activity.
               </>
             )}
           </p>

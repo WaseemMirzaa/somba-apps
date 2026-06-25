@@ -23,6 +23,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
   DualMetricChart,
   HorizontalBarChart,
@@ -262,7 +263,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 <p className="text-xs text-slate-500">{fr ? "Lots en préparation et prêts" : "Batches building & ready"}</p>
               </div>
             </div>
-            <Link href={ops("/dispatch")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href={ops("/dispatch")}>{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -353,7 +354,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 <p className="text-xs text-slate-500">{fr ? "Classement du jour" : "Today's leaderboard"}</p>
               </div>
             </div>
-            <Link href={ops("/riders")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href={ops("/riders")}>{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -403,7 +404,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold">{fr ? "Livraisons actives" : "Active deliveries"}</h2>
-            <Link href={ops("/deliveries")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href={ops("/deliveries")}>{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-slate-900">{s.dispatchedToday - s.failedDeliveries}</p>
@@ -413,7 +414,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold">{fr ? "Retours en attente" : "Pending returns"}</h2>
-            <Link href={ops("/returns")} className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href={ops("/returns")}>{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-amber-600">{warehouseReturnMetrics.pendingReturns}</p>

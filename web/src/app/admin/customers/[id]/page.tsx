@@ -119,6 +119,9 @@ export default function AdminCustomerDetailPage() {
             { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (ORDER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
           ]}
           data={customerOrders as unknown as Record<string, unknown>[]}
+          rowAction={(row) => (
+            <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+          )}
         />
       </DetailSection>
     </div>

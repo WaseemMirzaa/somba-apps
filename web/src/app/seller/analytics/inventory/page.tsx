@@ -13,6 +13,7 @@ import {
   Truck,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -184,9 +185,9 @@ export default function SellerInventoryAnalyticsPage() {
             <h2 className="font-semibold text-slate-900">{fr ? "Rotation par SKU" : "Turnover by SKU"}</h2>
             <p className="text-xs text-slate-500">{fr ? "Vitesse de vente et jours en stock" : "Sell-through rate and days on hand"}</p>
           </div>
-          <Link href="/seller/inventory" className="text-xs font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/seller/inventory">
             {t("viewAll")}
-          </Link>
+          </NavLinkButton>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable

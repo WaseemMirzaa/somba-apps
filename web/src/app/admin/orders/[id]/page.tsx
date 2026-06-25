@@ -8,6 +8,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -99,7 +100,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
-            { label: fr ? "Entrepôt" : "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{order.warehouse}</Link> },
+            { label: fr ? "Entrepôt" : "Warehouse", value: <NavLinkButton href="/warehouse">{order.warehouse}</NavLinkButton> },
             { label: fr ? "Livreur" : "Rider", value: order.rider },
             { label: fr ? "Numéro de suivi" : "Tracking Number", value: order.trackingNumber },
           ]} />

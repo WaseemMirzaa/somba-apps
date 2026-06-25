@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
@@ -80,12 +81,9 @@ export default function SellerPayoutDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-3">
-            <Link
-              href="/seller/finance/payouts/pending"
-              className="text-sm text-[var(--primary)] hover:underline"
-            >
+            <NavLinkButton href="/seller/finance/payouts/pending">
               {fr ? "Voir tous les éléments en attente" : "See all pending items"}
-            </Link>
+            </NavLinkButton>
             <Badge variant={payout.status === "paid" ? "success" : "warning"}>{fr ? (payout.statusFr ?? payout.status) : payout.status}</Badge>
           </div>
         }
@@ -114,12 +112,9 @@ export default function SellerPayoutDetailPage() {
           <h2 className="text-lg font-semibold text-slate-900">
             {fr ? "Répartition par commande" : "Order breakdown"}
           </h2>
-          <Link
-            href="/seller/finance/payouts/pending"
-            className="text-sm font-medium text-[var(--primary)] hover:underline"
-          >
+          <NavLinkButton href="/seller/finance/payouts/pending">
             {fr ? "Voir le détail complet →" : "View full breakdown →"}
-          </Link>
+          </NavLinkButton>
         </div>
 
         <ListFilters

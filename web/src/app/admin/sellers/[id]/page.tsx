@@ -8,6 +8,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getSeller, orderEntities, sellerProductDetails } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -154,7 +155,7 @@ export default function AdminSellerDetailPage() {
             { label: fr ? "En attente" : "Pending", value: formatCurrency(seller.pendingBalance, locale) },
             { label: fr ? "Total versé" : "Total Paid", value: formatCurrency(seller.paidBalance, locale) },
           ]} />
-          <Link href="/admin/finance" className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Voir toutes les transactions →" : "View all transactions →"}</Link>
+          <NavLinkButton href="/admin/finance" className="mt-3">{fr ? "Voir toutes les transactions →" : "View all transactions →"}</NavLinkButton>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Tickets de support" : "Support Tickets"}>
@@ -174,6 +175,9 @@ export default function AdminSellerDetailPage() {
               { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (PRODUCT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
             ]}
             data={(sellerProducts.length ? sellerProducts : [{ id: 0, name: fr ? "Aucun produit" : "No products", sku: "-", stock: 0, sold: 0, price: 0, status: "-" }]) as unknown as Record<string, unknown>[]}
+            rowAction={(row) => (
+              <Link href={`/admin/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            )}
           />
         </DetailGridSection>
 
@@ -189,6 +193,9 @@ export default function AdminSellerDetailPage() {
               { key: "date", label: t("date") },
             ]}
             data={sellerOrders as unknown as Record<string, unknown>[]}
+            rowAction={(row) => (
+              <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            )}
           />
         </DetailGridSection>
 

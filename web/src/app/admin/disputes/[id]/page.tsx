@@ -10,6 +10,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DisputeChat } from "@/components/disputes/dispute-chat";
 import { useDisputes } from "@/context/dispute-context";
 import { useToast } from "@/context/toast-context";
@@ -182,7 +183,7 @@ export default function AdminDisputeResolutionPage() {
 
         <DetailGridSection title={fr ? "Entrepôt et logistique" : "Warehouse & Logistics"}>
           <InfoGrid items={[
-            { label: fr ? "Entrepôt" : "Warehouse", value: <Link href="/warehouse" className="text-[var(--primary)] hover:underline">{dispute.warehouse}</Link> },
+            { label: fr ? "Entrepôt" : "Warehouse", value: <NavLinkButton href="/warehouse">{dispute.warehouse}</NavLinkButton> },
             { label: fr ? "ID hub" : "Hub ID", value: dispute.warehouseHub },
             { label: fr ? "Contact ops" : "Ops Contact", value: dispute.warehouseContact },
             ...(order ? [

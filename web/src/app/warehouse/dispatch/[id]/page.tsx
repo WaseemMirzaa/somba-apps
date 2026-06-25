@@ -8,6 +8,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { getBatch } from "@/lib/entities";
 import { getRider, type RiderEntity } from "@/lib/warehouse-entities";
@@ -109,7 +110,7 @@ export default function WarehouseBatchDetailPage() {
             { label: fr ? "Performance" : "Performance", value: `${rider.performanceScore}%` },
           ]} />
           <div className="mt-4 flex gap-3">
-            <Link href={`/warehouse/riders/${rider.id}`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Ouvrir le livreur →" : "Open Rider →"}</Link>
+            <NavLinkButton href={`/warehouse/riders/${rider.id}`}>{fr ? "Ouvrir le livreur →" : "Open Rider →"}</NavLinkButton>
             <a href={`tel:${rider.phone}`} className="text-sm text-slate-500 hover:text-[var(--primary)]">{fr ? "Appeler le livreur" : "Call Rider"}</a>
           </div>
             </>

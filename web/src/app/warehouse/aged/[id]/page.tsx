@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getAgedParcel } from "@/lib/warehouse-entities";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
@@ -161,12 +162,12 @@ export default function WarehouseAgedParcelDetailPage() {
               <p className="mt-1 text-sm font-medium text-amber-800/80">{parcel.stuckReason}</p>
             )}
             {parcel.linkedExceptionId && (
-              <Link
+              <NavLinkButton
                 href={`/warehouse/exceptions/${parcel.linkedExceptionId}`}
-                className="mt-3 inline-block text-sm font-medium text-[var(--primary)] hover:underline"
+                className="mt-3"
               >
                 {fr ? "Voir l'exception liée" : "View linked exception"} → {parcel.linkedExceptionId}
-              </Link>
+              </NavLinkButton>
             )}
           </div>
         </div>

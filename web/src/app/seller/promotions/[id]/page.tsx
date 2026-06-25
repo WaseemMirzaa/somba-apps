@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { getPromotion } from "@/lib/seller-entities";
 import { formatCurrency } from "@/lib/utils";
@@ -41,7 +41,7 @@ export default function SellerPromotionDetailPage() {
             { label: fr ? "Revenu" : "Revenue", value: formatCurrency(promo.revenue, locale) },
             { label: fr ? "ROI" : "ROI", value: `${promo.roi}x` },
           ]} />
-          <Link href="/seller/analytics" className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Analyses complètes →" : "Full Analytics →"}</Link>
+          <NavLinkButton href="/seller/analytics" className="mt-4">{fr ? "Analyses complètes →" : "Full Analytics →"}</NavLinkButton>
         </DetailSection>
       </div>
     </div>
