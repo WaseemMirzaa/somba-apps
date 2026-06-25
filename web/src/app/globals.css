@@ -813,6 +813,7 @@ body {
   .step-card,
   .landing-pricing-card,
   .landing-testimonial {
+    border-radius: 0.5rem;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   }
 
@@ -843,13 +844,14 @@ body {
     /*
      * Flatten compositing for low-end Android GPUs: drop the shadow and
      * transition so there is almost nothing to composite per scroll frame,
-     * and keep each card in its own stacking context. The rounded corners
-     * are kept — removing the translateZ layer promotion (and, on the
-     * landing pages, the mix-blend overlays) is what actually stopped the
-     * tearing, not the radius. Desktop keeps the full shadowed treatment.
+     * and keep each card in its own stacking context. The corner radius is
+     * reduced (not removed) on phones — a smaller rounded area is far less
+     * for the GPU to anti-alias per scroll frame, which is what grained at
+     * the full radius. Desktop keeps the full radius + shadowed treatment.
      */
     box-shadow: none;
     transition: none;
+    border-radius: 0.5rem;
     isolation: isolate;
   }
 
