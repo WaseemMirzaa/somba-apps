@@ -220,6 +220,34 @@ body {
   text-decoration: none;
 }
 
+/*
+ * Full <Button> components dropped into a row-actions footer (e.g. the
+ * "Authorise Refund" / "Autoriser le remboursement" action) ship their own
+ * solid fill + white label. The neutral .row-actions background above would
+ * repaint them white-on-white, leaving just the grey outline with no visible
+ * text (reported on /admin/refunds). Re-assert the solid fill so the white
+ * label stays readable. Locale-agnostic — covers every translation.
+ */
+.row-actions .btn-primary,
+.row-actions button.bg-red-600 {
+  color: #fff;
+  border-color: transparent;
+}
+.row-actions .btn-primary {
+  background: var(--primary);
+}
+.row-actions button.bg-red-600 {
+  background: #dc2626;
+}
+.row-actions .btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: transparent;
+}
+.row-actions button.bg-red-600:hover {
+  background: #b91c1c;
+  border-color: transparent;
+}
+
 .input-premium {
   border: 1px solid var(--border);
   border-radius: 12px;
