@@ -139,10 +139,10 @@ export default function AdminPayoutsPage() {
                   if (status === "requested") {
                     return (
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" onClick={() => updateStatus(id, "approved")}>
+                        <Button variant="approve" size="sm" onClick={() => updateStatus(id, "approved")}>
                           {t("approve")}
                         </Button>
-                        <Button variant="danger" size="sm" onClick={() => updateStatus(id, "rejected")}>
+                        <Button variant="reject" size="sm" onClick={() => updateStatus(id, "rejected")}>
                           {t("reject")}
                         </Button>
                       </div>

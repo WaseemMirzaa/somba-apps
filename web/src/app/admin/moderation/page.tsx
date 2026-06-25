@@ -53,8 +53,8 @@ export default function AdminModerationPage() {
                 </div>
                 {p.status === "pending" && (
                   <div className="mt-3 flex gap-2">
-                    <Button size="sm" onClick={() => updateStatus(p.id, "approved")}>{fr ? "Approuver" : "Approve"}</Button>
-                    <Button variant="danger" size="sm" onClick={() => updateStatus(p.id, "rejected")}>{fr ? "Rejeter" : "Reject"}</Button>
+                    <Button variant="approve" size="sm" onClick={() => updateStatus(p.id, "approved")}>{fr ? "Approuver" : "Approve"}</Button>
+                    <Button variant="reject" size="sm" onClick={() => updateStatus(p.id, "rejected")}>{fr ? "Rejeter" : "Reject"}</Button>
                   </div>
                 )}
               </div>
