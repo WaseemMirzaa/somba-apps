@@ -178,10 +178,28 @@ export function DashboardLayout({
   const warehouseRole = (persona.warehouseRole ?? "manager") as WarehouseStaffRole;
   const warehouseNav = portal === "warehouse" ? getWarehouseNav(warehouseRole) : null;
 
-  const renderNavItem = (item: NavItem) => {
-    const active =
+  // Only one nav item may appear selected at a time. Several hrefs can match
+  // the current path at once — e.g. "/admin/warehouses" is a prefix of
+  // "/admin/warehouses/staff", and the portal root is a prefix of every
+  // sub-route — so resolve the single best match: the longest href the path
+  // equals or sits beneath (on a path boundary). The portal root only counts
+  // on an exact match, so it never lights up alongside a sub-page.
+  const navItems = adminSections
+    ? adminSections.flatMap((section) => section.items)
+    : (warehouseNav ?? config.nav);
+  const portalRoot = `/${portal}`;
+  let activeHref: string | null = null;
+  for (const item of navItems) {
+    const matches =
       pathname === item.href ||
-      (item.href !== `/${portal}` && pathname.startsWith(item.href));
+      (item.href !== portalRoot && pathname.startsWith(`${item.href}/`));
+    if (matches && (activeHref === null || item.href.length > activeHref.length)) {
+      activeHref = item.href;
+    }
+  }
+
+  const renderNavItem = (item: NavItem) => {
+    const active = item.href === activeHref;
     return (
       <Link
         key={item.href}
