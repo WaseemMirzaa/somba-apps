@@ -140,6 +140,9 @@ export default function WarehouseRiderDetailPage() {
               },
             ]}
             data={batches as unknown as Record<string, unknown>[]}
+            rowAction={(row) => (
+              <Link href={`/warehouse/dispatch/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            )}
           />
         </DetailGridSection>
 

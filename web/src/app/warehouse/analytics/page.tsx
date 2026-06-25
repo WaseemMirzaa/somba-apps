@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import {
@@ -213,9 +214,9 @@ export default function WarehouseAnalyticsPage() {
             <h2 className="font-semibold text-slate-900">{fr ? "Performance livreurs" : "Rider performance"}</h2>
             <p className="text-xs text-slate-500">{fr ? "Classement par livraisons" : "Ranked by deliveries"}</p>
           </div>
-          <Link href="/warehouse/riders" className="text-xs font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/warehouse/riders">
             {t("viewAll")}
-          </Link>
+          </NavLinkButton>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
@@ -256,6 +257,9 @@ export default function WarehouseAnalyticsPage() {
               },
             ]}
             data={warehouseRiderLeaderboard as unknown as Record<string, unknown>[]}
+            rowAction={(row) => (
+              <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            )}
           />
         </CardContent>
       </Card>
@@ -296,6 +300,9 @@ export default function WarehouseAnalyticsPage() {
                 },
               ]}
               data={warehouseTopBatches as unknown as Record<string, unknown>[]}
+              rowAction={(row) => (
+                <Link href={`/warehouse/dispatch/${String(row.id).replace("BAT-", "")}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              )}
             />
           </CardContent>
         </Card>

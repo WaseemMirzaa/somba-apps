@@ -10,6 +10,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getSellerOrder, getShipmentByOrderId } from "@/lib/seller-entities";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -117,7 +118,7 @@ export default function SellerOrderDetailPage() {
               : "Delivery handled by Somba&Teka logistics. Customer contact details are private."}
           </p>
           <div className="mt-3 flex gap-3">
-            <Link href="/seller/support" className="text-sm text-slate-500">{fr ? "Ouvrir le support" : "Open Support"}</Link>
+            <NavLinkButton href="/seller/support">{fr ? "Ouvrir le support" : "Open Support"}</NavLinkButton>
           </div>
         </DetailGridSection>
 

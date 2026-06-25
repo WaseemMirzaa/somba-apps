@@ -67,6 +67,9 @@ export default function SellerTransactionsPage() {
         { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "date", label: fr ? "Date" : "Date" },
       ]}
+      rowAction={(row) => (
+        <Link href={`/seller/orders/${row.order}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
+      )}
       data={filtered as unknown as Record<string, unknown>[]}
     />
   );

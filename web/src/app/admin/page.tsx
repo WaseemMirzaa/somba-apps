@@ -22,6 +22,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
   DualMetricChart,
   HorizontalBarChart,
@@ -223,7 +224,7 @@ export default function AdminDashboard() {
               <h2 className="font-semibold text-slate-900">{fr ? "Top vendeurs" : "Top sellers"}</h2>
               <p className="text-xs text-slate-500">{fr ? "Classement GMV MTD" : "Ranked by GMV MTD"}</p>
             </div>
-            <Link href="/admin/sellers" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -296,7 +297,7 @@ export default function AdminDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-slate-900">{t("recentOrders")}</h2>
-              <Link href="/admin/orders" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+              <NavLinkButton href="/admin/orders">{t("viewAll")}</NavLinkButton>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -349,7 +350,7 @@ export default function AdminDashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-900">{t("sellerQueue")}</h2>
-            <Link href="/admin/sellers" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
           </div>
         </CardHeader>
         <CardContent className="p-0">

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getSellerInventory } from "@/lib/seller-entities";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -58,10 +59,10 @@ export default function SellerInventoryDetailPage() {
 
         <DetailGridSection title={fr ? "Navigation associée" : "Related Navigation"}>
           <div className="flex flex-wrap gap-3 text-sm">
-            <Link href={`/seller/products/${item.productId}`} className="text-[var(--primary)] hover:underline">{fr ? "→ Détail du produit" : "→ Product Detail"}</Link>
-            <Link href="/seller/orders" className="text-[var(--primary)] hover:underline">{fr ? "→ Commandes" : "→ Orders"}</Link>
-            <Link href="/seller/returns" className="text-[var(--primary)] hover:underline">{fr ? "→ Retours" : "→ Returns"}</Link>
-            <Link href="/seller/replacements" className="text-[var(--primary)] hover:underline">{fr ? "→ Remplacements" : "→ Replacements"}</Link>
+            <NavLinkButton href={`/seller/products/${item.productId}`}>{fr ? "→ Détail du produit" : "→ Product Detail"}</NavLinkButton>
+            <NavLinkButton href="/seller/orders">{fr ? "→ Commandes" : "→ Orders"}</NavLinkButton>
+            <NavLinkButton href="/seller/returns">{fr ? "→ Retours" : "→ Returns"}</NavLinkButton>
+            <NavLinkButton href="/seller/replacements">{fr ? "→ Remplacements" : "→ Replacements"}</NavLinkButton>
           </div>
         </DetailGridSection>
 

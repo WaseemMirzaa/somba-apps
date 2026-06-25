@@ -8,6 +8,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -121,9 +122,9 @@ export default function AdminWarehouseDetailPage() {
               </Link>
             ))}
           </div>
-          <Link href="/admin/fulfillment" className="mt-4 inline-block text-sm font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/admin/fulfillment" className="mt-4">
             {fr ? "Ouvrir le tableau de bord logistique" : "Open Fulfillment Dashboard"} →
-          </Link>
+          </NavLinkButton>
         </DetailGridSection>
       </DetailGrid>
     </div>

@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getExchange } from "@/lib/warehouse-entities";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
@@ -199,9 +200,9 @@ export default function WarehouseExchangeDetailPage() {
               : "Old product returned → Inspection → Allocate new variant → Dispatch"}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/warehouse/dispatch" className="text-sm text-[var(--primary)] hover:underline">
+            <NavLinkButton href="/warehouse/dispatch">
               {fr ? "Créer expédition →" : "Create Dispatch →"}
-            </Link>
+            </NavLinkButton>
           </div>
         </DetailGridSection>
 

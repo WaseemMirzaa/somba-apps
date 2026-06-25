@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { getInventory } from "@/lib/warehouse-entities";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -52,9 +53,9 @@ export default function WarehouseInventoryDetailPage() {
 
           <DetailGridSection title={fr ? "Navigation liée" : "Related Navigation"}>
             <div className="flex flex-wrap gap-3">
-              <Link href={`/shop/products/${item.productId}`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "→ Détail du produit" : "→ Product Detail"}</Link>
-              <Link href="/warehouse/replacements" className="text-sm text-[var(--primary)] hover:underline">{fr ? "→ Cas de remplacement" : "→ Replacement Cases"}</Link>
-              <Link href="/warehouse/dispatch" className="text-sm text-[var(--primary)] hover:underline">{fr ? "→ Expéditions" : "→ Dispatches"}</Link>
+              <NavLinkButton href={`/shop/products/${item.productId}`}>{fr ? "→ Détail du produit" : "→ Product Detail"}</NavLinkButton>
+              <NavLinkButton href="/warehouse/replacements">{fr ? "→ Cas de remplacement" : "→ Replacement Cases"}</NavLinkButton>
+              <NavLinkButton href="/warehouse/dispatch">{fr ? "→ Expéditions" : "→ Dispatches"}</NavLinkButton>
             </div>
           </DetailGridSection>
 

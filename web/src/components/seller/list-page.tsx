@@ -12,6 +12,7 @@ export function SellerListPage({
   filters,
   columns,
   data,
+  rowAction,
 }: {
   title: string;
   subtitle?: string;
@@ -20,6 +21,7 @@ export function SellerListPage({
   filters?: React.ReactNode;
   columns: Parameters<typeof DataTable>[0]["columns"];
   data: Record<string, unknown>[];
+  rowAction?: Parameters<typeof DataTable>[0]["rowAction"];
 }) {
   return (
     <div className="space-y-6">
@@ -27,7 +29,7 @@ export function SellerListPage({
       {filters}
       <Card>
         <CardContent className="p-0">
-          <DataTable columns={columns} data={data} />
+          <DataTable columns={columns} data={data} rowAction={rowAction} />
         </CardContent>
       </Card>
     </div>

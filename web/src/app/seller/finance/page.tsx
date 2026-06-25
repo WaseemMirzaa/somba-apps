@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DollarSign, Wallet, RotateCcw, TrendingUp, ArrowRight } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DetailSection } from "@/components/ui/info-grid";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -112,9 +113,9 @@ export default function SellerFinancePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <h3 className="font-semibold text-slate-900">{fr ? "Tendance des revenus" : "Revenue Trend"}</h3>
-            <Link href="/seller/analytics/revenue" className="text-xs font-medium text-[var(--primary)] hover:underline">
+            <NavLinkButton href="/seller/analytics/revenue">
               {fr ? "Voir tout" : "View all"} →
-            </Link>
+            </NavLinkButton>
           </CardHeader>
           <CardContent>
             <RevenueAreaChart data={revenueTrendData} valueKey="revenue" height={200} />
@@ -139,9 +140,9 @@ export default function SellerFinancePage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <h3 className="font-semibold text-slate-900">{fr ? "Transactions récentes" : "Recent Transactions"}</h3>
-          <Link href="/seller/finance/transactions" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/seller/finance/transactions">
             {fr ? "Toutes les transactions" : "All transactions"} <ArrowRight className="h-3 w-3" />
-          </Link>
+          </NavLinkButton>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
@@ -194,9 +195,9 @@ export default function SellerFinancePage() {
                   : `${formatCurrency(summary.totalPending, locale)} pending · ${formatCurrency(summary.availableForPayout, locale)} available`}
               </p>
             </div>
-            <Link href="/seller/finance/payouts/pending" className="text-xs font-medium text-[var(--primary)] hover:underline">
+            <NavLinkButton href="/seller/finance/payouts/pending">
               {fr ? "Voir détail" : "View breakdown"} →
-            </Link>
+            </NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -234,9 +235,9 @@ export default function SellerFinancePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <h3 className="font-semibold text-slate-900">{fr ? "Derniers versements" : "Recent Payouts"}</h3>
-            <Link href="/seller/finance/payouts" className="text-xs font-medium text-[var(--primary)] hover:underline">
+            <NavLinkButton href="/seller/finance/payouts">
               {fr ? "Tous les versements" : "All payouts"} →
-            </Link>
+            </NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable

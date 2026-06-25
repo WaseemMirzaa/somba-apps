@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
@@ -43,12 +44,9 @@ export default function SellerPayoutsPage() {
       ]}
       actions={
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/seller/finance/payouts/pending"
-            className="rounded-lg border border-[var(--primary-tint)] px-4 py-2 text-sm font-medium text-[var(--primary)] hover:bg-[var(--primary-light)]"
-          >
+          <NavLinkButton href="/seller/finance/payouts/pending">
             {fr ? "Voir les éléments en attente" : "View breakdown"}
-          </Link>
+          </NavLinkButton>
           <Link href="/seller/finance/payouts/request" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("requestPayout")}</Link>
         </div>
       }

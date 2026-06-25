@@ -13,6 +13,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -161,9 +162,9 @@ export default function SellerProductAnalyticsPage() {
             <h2 className="font-semibold text-slate-900">{fr ? "Performance produits" : "Product performance"}</h2>
             <p className="text-xs text-slate-500">{fr ? "Classement par revenu" : "Ranked by revenue"}</p>
           </div>
-          <Link href="/seller/products" className="text-xs font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/seller/products">
             {t("viewAll")}
-          </Link>
+          </NavLinkButton>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
@@ -217,12 +218,12 @@ export default function AdminWarehouseStaffPage() {
           <p className="text-sm text-slate-600">
             {fr ? (
               <>
-                Le personnel d&apos;entrepôt actif apparaît sur la <Link href="/login" className="text-[var(--primary)] hover:underline">page de connexion</Link> sous
+                Le personnel d&apos;entrepôt actif apparaît sur la <NavLinkButton href="/login">page de connexion</NavLinkButton> sous
                 l&apos;onglet de rôle <strong>Entrepôt</strong>. Il ne peut accéder qu&apos;au portail entrepôt de son centre assigné.
               </>
             ) : (
               <>
-                Active warehouse staff appear on the <Link href="/login" className="text-[var(--primary)] hover:underline">login page</Link> under
+                Active warehouse staff appear on the <NavLinkButton href="/login">login page</NavLinkButton> under
                 the <strong>Warehouse</strong> role tab. They can only access the warehouse portal for their assigned hub.
               </>
             )}

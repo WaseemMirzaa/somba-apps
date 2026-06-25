@@ -16,6 +16,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Badge } from "@/components/ui/badge";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
@@ -256,9 +257,9 @@ export default function AdminAnalyticsPage() {
             <h2 className="font-semibold text-slate-900">{fr ? "Top vendeurs" : "Top sellers"}</h2>
             <p className="text-xs text-slate-500">{fr ? "Classement par GMV" : "Ranked by GMV"}</p>
           </div>
-          <Link href="/admin/sellers" className="text-xs font-medium text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/admin/sellers">
             {t("viewAll")}
-          </Link>
+          </NavLinkButton>
         </CardHeader>
         <CardContent className="p-0">
           <DataTable
@@ -295,6 +296,9 @@ export default function AdminAnalyticsPage() {
               },
             ]}
             data={adminTopSellers as unknown as Record<string, unknown>[]}
+            rowAction={(row) => (
+              <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            )}
           />
         </CardContent>
       </Card>

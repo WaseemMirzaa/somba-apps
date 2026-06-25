@@ -22,6 +22,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
   DualMetricChart,
   RetentionBarChart,
@@ -202,7 +203,7 @@ export default function SellerDashboard() {
               <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du mois" : "Monthly goals"}</h2>
               <p className="text-xs text-slate-500">{fr ? "Progression vers les objectifs de juin" : "Progress toward June targets"}</p>
             </div>
-            <Link href="/seller/settings" className="shrink-0 text-xs font-medium text-[var(--primary)] hover:underline">{fr ? "Modifier" : "Edit"}</Link>
+            <NavLinkButton href="/seller/settings" className="shrink-0">{fr ? "Modifier" : "Edit"}</NavLinkButton>
           </CardHeader>
           <CardContent className="space-y-6">
             {goals.length === 0 ? (
@@ -388,7 +389,7 @@ export default function SellerDashboard() {
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{fr ? "Meilleurs produits" : "Top products"}</h2>
-            <Link href="/seller/analytics/products" className="text-xs text-[var(--primary)] hover:underline">{fr ? "Détails" : "Details"}</Link>
+            <NavLinkButton href="/seller/analytics/products">{fr ? "Détails" : "Details"}</NavLinkButton>
           </CardHeader>
           <CardContent>
             <HorizontalBarChart
@@ -423,7 +424,7 @@ export default function SellerDashboard() {
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{t("lowStock")}</h2>
-            <Link href="/seller/inventory" className="text-xs text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href="/seller/inventory">{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -458,7 +459,7 @@ export default function SellerDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{t("recentOrders")}</h2>
-            <Link href="/seller/orders" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+            <NavLinkButton href="/seller/orders">{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
@@ -488,7 +489,7 @@ export default function SellerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <h2 className="font-semibold text-slate-900">{fr ? "Promotions actives" : "Active promotions"}</h2>
-              <Link href="/seller/promotions" className="text-sm text-[var(--primary)] hover:underline">{t("viewAll")}</Link>
+              <NavLinkButton href="/seller/promotions">{t("viewAll")}</NavLinkButton>
             </CardHeader>
             <CardContent className="p-0">
               <DataTable
@@ -540,9 +541,9 @@ export default function SellerDashboard() {
                   <p className="text-lg font-bold text-amber-600">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
                 </div>
               </div>
-              <Link href="/seller/finance" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline">
+              <NavLinkButton href="/seller/finance" className="mt-4">
                 {t("finance")} <ArrowUpRight className="h-4 w-4" />
-              </Link>
+              </NavLinkButton>
             </CardContent>
           </Card>
         </div>

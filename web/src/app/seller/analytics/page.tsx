@@ -16,6 +16,7 @@ import {
   Heart,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { DetailSection } from "@/components/ui/info-grid";
@@ -195,9 +196,9 @@ export default function SellerAnalyticsPage() {
               <span className="font-medium text-emerald-600">{p.soldCount} {fr ? "vendus" : "sold"}</span>
             </Link>
           ))}
-          <Link href="/seller/analytics/products" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)] hover:underline">
+          <NavLinkButton href="/seller/analytics/products" className="mt-2">
             {fr ? "Voir analytique produits" : "View product analytics"} <ArrowUpRight className="h-3 w-3" />
-          </Link>
+          </NavLinkButton>
         </DetailSection>
 
         <DetailSection title={fr ? "Entonnoir de conversion" : "Conversion funnel"}>
