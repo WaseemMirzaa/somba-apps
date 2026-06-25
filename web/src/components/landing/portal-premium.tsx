@@ -53,7 +53,7 @@ function PublicPortalCard({
     <Link
       href={cta.href}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-white shadow-none transition-all duration-300 hover:-translate-y-1 hover:border-[var(--primary)]/30 hover:shadow-xl lg:rounded-2xl lg:shadow-sm",
+        "group relative isolate flex flex-col overflow-hidden rounded-none border border-[var(--border)] bg-white shadow-none transition-all duration-300 hover:-translate-y-1 hover:border-[var(--primary)]/30 hover:shadow-xl max-lg:transition-none lg:rounded-2xl lg:shadow-sm",
         large && "md:min-h-[420px]"
       )}
     >
@@ -133,7 +133,7 @@ function OpsPortalCard({
     <button
       type="button"
       onClick={() => onExplore?.(portal.id)}
-      className="group flex w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50/80 text-left transition-all hover:border-[var(--primary)]/25 hover:bg-white hover:shadow-md lg:rounded-xl"
+      className="group isolate flex w-full flex-col overflow-hidden rounded-none border border-slate-200 bg-slate-50/80 text-left transition-all hover:border-[var(--primary)]/25 hover:bg-white hover:shadow-md max-lg:transition-none lg:rounded-xl"
     >
       <div className="relative h-28 overflow-hidden">
         <Image src={portal.image} alt={portal.name} fill className="object-cover opacity-80 transition-transform group-hover:scale-105" sizes="200px" />

@@ -801,10 +801,12 @@ body {
   }
 
   /*
-   * Lighten the public-page cards on phones: a single cheap shadow instead of
-   * the elevated desktop shadow so low-end GPUs have less to composite. Rounded
-   * corners are kept — killing the mix-blend overlays is what stopped the
-   * tearing here. Desktop keeps the full elevated treatment.
+   * Give the public-page cards the exact flat .card-premium recipe so they
+   * behave like the dashboard cards (which don't grain). These cards carry
+   * background images, and clipping an image at a rounded corner is what tears
+   * on low-end Android GPUs — so on phones they go fully square, shadowless and
+   * transition-free, each in its own stacking context. Desktop keeps the
+   * rounded, elevated look.
    */
   .pcard,
   .cat-tile,
@@ -813,8 +815,10 @@ body {
   .step-card,
   .landing-pricing-card,
   .landing-testimonial {
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+    isolation: isolate;
   }
 
   .glass,
