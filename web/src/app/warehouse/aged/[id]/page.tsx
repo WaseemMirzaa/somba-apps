@@ -228,7 +228,7 @@ export default function WarehouseAgedParcelDetailPage() {
                 ? [
                     {
                       label: fr ? "Mode de paiement" : "Payment method",
-                      value: order.paymentMethod === "COD" ? (fr ? "Paiement à la livraison" : "Pay at delivery") : "Card",
+                      value: "Card",
                     },
                   ]
                 : []),

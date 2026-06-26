@@ -58,7 +58,7 @@ export default function WarehouseDeliveryDetailPage() {
 
   const paymentLabel =
     delivery.codAmount > 0
-      ? `${fr ? "À la livraison" : "At delivery"} · ${formatCurrency(delivery.codAmount, locale)}`
+      ? `${fr ? "À encaisser" : "Collect"} · ${formatCurrency(delivery.codAmount, locale)}`
       : delivery.paymentType;
   const statusLabel = fr
     ? STATUS_FR[delivery.status] ?? delivery.status.replace("_", " ")

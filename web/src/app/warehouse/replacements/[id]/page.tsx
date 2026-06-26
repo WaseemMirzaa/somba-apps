@@ -186,7 +186,7 @@ export default function WarehouseReplacementDetailPage() {
                       label: fr ? "Montant commande" : "Order amount",
                       value: formatCurrency(order.amount, locale),
                     },
-                    { label: fr ? "Paiement" : "Payment", value: order.paymentMethod === "COD" ? (fr ? "Paiement à la livraison" : "Pay at delivery") : order.paymentMethod },
+                    { label: fr ? "Paiement" : "Payment", value: order.paymentMethod },
                     { label: fr ? "Statut commande" : "Order status", value: fr ? (ORDER_STATUS_FR[order.status] ?? order.status) : order.status },
                     { label: fr ? "Articles" : "Items", value: order.itemsCount },
                   ]

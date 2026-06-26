@@ -189,7 +189,7 @@ export default function AdminReturnDetailPage() {
         {order && (
           <DetailGridSection title={fr ? "Paiement" : "Payment"}>
             <InfoGrid items={[
-              { label: fr ? "Passerelle" : "Gateway", value: order.paymentMethod === "COD" ? (locale === "fr" ? "Paiement à la livraison" : "Pay at delivery") : "Stripe" },
+              { label: fr ? "Passerelle" : "Gateway", value: "Stripe" },
               { label: fr ? "ID de transaction" : "Transaction ID", value: order.transactionId },
               { label: fr ? "Statut du paiement" : "Payment Status", value: fr ? (PAYMENT_STATUS_FR[order.paymentStatus] ?? order.paymentStatus) : order.paymentStatus },
               { label: fr ? "Montant de la commande" : "Order Amount", value: formatCurrency(order.amount, locale) },

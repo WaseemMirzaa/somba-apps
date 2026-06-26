@@ -186,9 +186,8 @@ export const sellerRevenueKpis = {
 } as const;
 
 export const sellerRevenueByPayment = [
-  { method: "Mobile Money", methodFr: "Mobile Money", revenue: 42800, pct: 48, orders: 312 },
+  { method: "Mobile Money", methodFr: "Mobile Money", revenue: 57000, pct: 64, orders: 410 },
   { method: "Card", methodFr: "Carte bancaire", revenue: 26800, pct: 30, orders: 186 },
-  { method: "Pay at Delivery", methodFr: "Paiement à la livraison", revenue: 14200, pct: 16, orders: 98 },
   { method: "Wallet", methodFr: "Portefeuille", revenue: 5632, pct: 6, orders: 16 },
 ] as const;
 
@@ -216,7 +215,7 @@ export const sellerRevenueTransactions = [
   { id: "TXN-8839", date: "2024-06-28", type: "Refund", typeFr: "Remboursement", orderId: "ORD-2024-072", amount: -89, commission: 0, net: -89, method: "Mobile Money", methodFr: "Mobile Money" },
   { id: "TXN-8838", date: "2024-06-28", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-087", amount: 45, commission: 5.4, net: 39.6, method: "Wallet", methodFr: "Portefeuille" },
   { id: "TXN-8837", date: "2024-06-27", type: "Payout", typeFr: "Versement", orderId: "PAY-002", amount: -8500, commission: 0, net: -8500, method: "Bank transfer", methodFr: "Virement bancaire" },
-  { id: "TXN-8836", date: "2024-06-27", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-086", amount: 320, commission: 38.4, net: 281.6, method: "Pay at delivery", methodFr: "Paiement à la livraison" },
+  { id: "TXN-8836", date: "2024-06-27", type: "Sale", typeFr: "Vente", orderId: "ORD-2024-086", amount: 320, commission: 38.4, net: 281.6, method: "Card", methodFr: "Carte bancaire" },
 ] as const;
 
 // ─── Customer Analytics ──────────────────────────────────────────────────────

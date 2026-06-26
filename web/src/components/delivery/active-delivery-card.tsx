@@ -36,12 +36,10 @@ const STATUS_FR: Record<string, string> = {
 };
 
 const PAYMENT_FR: Record<string, string> = {
-  "Pay at delivery": "À la livraison",
   Prepaid: "Prépayé",
   Card: "Carte",
   Cash: "Espèces",
   "Mobile money": "Mobile money",
-  COD: "Paiement à la livraison",
 };
 
 // Product variant strings arrive as free-form English tokens (e.g. "Default",

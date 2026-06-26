@@ -31,8 +31,8 @@ const PENDING_REFUNDS = [
     amount: 129,
     method: "Manual — Airtel Money",
     methodFr: "Manuel — Airtel Money",
-    reason: "Pay-at-delivery refund via Airtel",
-    reasonFr: "Remboursement à la livraison via Airtel",
+    reason: "Refund via Airtel",
+    reasonFr: "Remboursement via Airtel",
     createdAt: "2024-06-06",
   },
 ];
