@@ -18,7 +18,7 @@ export type RiderTaskTimeline = {
 
 export type RiderTask = {
   id: string;
-  type: "delivery" | "pickup" | "return" | "cod";
+  type: "delivery" | "pickup" | "return";
   status: "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
   customer: string;
   address: string;

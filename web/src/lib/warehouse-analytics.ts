@@ -17,8 +17,6 @@ export const warehouseExtendedKpis = {
   dispatchedChange: 12.1,
   onTimeRate: 96.4,
   onTimeChange: 1.2,
-  codCollected: 18420,
-  codChange: 9.8,
   returnRate: 1.8,
   returnChange: -0.4,
   avgProcessHours: 4.2,
@@ -92,7 +90,6 @@ export const warehouseExceptionLog = [
   { id: "EXC-228", type: "Misrouted", typeFr: "Mauvaise route", parcel: "PRC-218", age: "6h", status: "In progress", statusFr: "En cours", priority: "Medium", priorityFr: "Moyenne" },
   { id: "EXC-227", type: "Lost scan", typeFr: "Scan perdu", parcel: "PRC-204", age: "12h", status: "Open", statusFr: "Ouvert", priority: "Critical", priorityFr: "Critique" },
   { id: "EXC-226", type: "Weight mismatch", typeFr: "Poids incorrect", parcel: "PRC-198", age: "1d", status: "Resolved", statusFr: "Résolu", priority: "Low", priorityFr: "Faible" },
-  { id: "EXC-225", type: "Payment mismatch", typeFr: "Écart de paiement", parcel: "PRC-192", age: "1d", status: "Resolved", statusFr: "Résolu", priority: "Medium", priorityFr: "Moyenne" },
 ] as const;
 
 export const warehouseReturnMetrics = {
@@ -113,20 +110,20 @@ export const warehouseReturnTrend = [
 ] as const;
 
 export const warehouseTopBatches = [
-  { id: "BAT-042", parcels: 48, rider: "Jean M.", status: "Dispatched", statusFr: "Expédié", onTime: 96, cod: 12400 },
-  { id: "BAT-041", parcels: 52, rider: "Paul K.", status: "Dispatched", statusFr: "Expédié", onTime: 94, cod: 14200 },
-  { id: "BAT-040", parcels: 38, rider: "Marc L.", status: "In transit", statusFr: "En transit", onTime: 98, cod: 9800 },
-  { id: "BAT-039", parcels: 44, rider: "David R.", status: "Building", statusFr: "En préparation", onTime: 0, cod: 11200 },
-  { id: "BAT-038", parcels: 36, rider: "Jean M.", status: "Delivered", statusFr: "Livré", onTime: 97, cod: 8600 },
+  { id: "BAT-042", parcels: 48, rider: "Jean M.", status: "Dispatched", statusFr: "Expédié", onTime: 96 },
+  { id: "BAT-041", parcels: 52, rider: "Paul K.", status: "Dispatched", statusFr: "Expédié", onTime: 94 },
+  { id: "BAT-040", parcels: 38, rider: "Marc L.", status: "In transit", statusFr: "En transit", onTime: 98 },
+  { id: "BAT-039", parcels: 44, rider: "David R.", status: "Building", statusFr: "En préparation", onTime: 0 },
+  { id: "BAT-038", parcels: 36, rider: "Jean M.", status: "Delivered", statusFr: "Livré", onTime: 97 },
 ] as const;
 
 export const warehouseRiderLeaderboard = [
-  { id: "RDR-001", name: "Jean M.", deliveries: 28, onTime: 96, codCollected: 18420, rating: 4.9, exceptions: 1 },
-  { id: "RDR-002", name: "Paul K.", deliveries: 24, onTime: 94, codCollected: 15200, rating: 4.8, exceptions: 2 },
-  { id: "RDR-003", name: "Marc L.", deliveries: 22, onTime: 98, codCollected: 14100, rating: 4.9, exceptions: 0 },
-  { id: "RDR-004", name: "David R.", deliveries: 19, onTime: 91, codCollected: 11800, rating: 4.6, exceptions: 3 },
-  { id: "RDR-005", name: "Eric T.", deliveries: 18, onTime: 93, codCollected: 10200, rating: 4.7, exceptions: 1 },
-  { id: "RDR-006", name: "Fabrice N.", deliveries: 16, onTime: 95, codCollected: 9400, rating: 4.8, exceptions: 0 },
+  { id: "RDR-001", name: "Jean M.", deliveries: 28, onTime: 96, rating: 4.9, exceptions: 1 },
+  { id: "RDR-002", name: "Paul K.", deliveries: 24, onTime: 94, rating: 4.8, exceptions: 2 },
+  { id: "RDR-003", name: "Marc L.", deliveries: 22, onTime: 98, rating: 4.9, exceptions: 0 },
+  { id: "RDR-004", name: "David R.", deliveries: 19, onTime: 91, rating: 4.6, exceptions: 3 },
+  { id: "RDR-005", name: "Eric T.", deliveries: 18, onTime: 93, rating: 4.7, exceptions: 1 },
+  { id: "RDR-006", name: "Fabrice N.", deliveries: 16, onTime: 95, rating: 4.8, exceptions: 0 },
 ] as const;
 
 export const warehouseInboundByHour = [
@@ -178,19 +175,6 @@ export const warehouseDashboardAlerts = [
     priorityFr: "Moyenne",
     time: "1 hr ago",
     timeFr: "Il y a 1 h",
-  },
-  {
-    id: "cod-mismatch",
-    type: "cod" as const,
-    title: "Payment mismatch — BAT-039",
-    titleFr: "Écart paiement — BAT-039",
-    detail: "$240 variance · David R.",
-    detailFr: "Écart 240 $ · David R.",
-    href: "/reconciliation",
-    priority: "High" as const,
-    priorityFr: "Élevée",
-    time: "2 hr ago",
-    timeFr: "Il y a 2 h",
   },
 ] as const;
 

@@ -9,7 +9,6 @@ export type WarehouseStats = {
   activeBatches: number;
   pendingReturns: number;
   pendingReplacements: number;
-  codCollected: number;
   failedDeliveries: number;
   agedParcels: number;
   inboundQueue: number;
@@ -289,7 +288,6 @@ export const warehouseDashboardStats: WarehouseStats = {
   activeBatches: 2,
   pendingReturns: 18,
   pendingReplacements: 5,
-  codCollected: 12450,
   failedDeliveries: 7,
   agedParcels: 3,
   inboundQueue: 23,

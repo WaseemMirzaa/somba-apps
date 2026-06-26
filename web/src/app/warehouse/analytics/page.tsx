@@ -10,7 +10,6 @@ import {
   Clock,
   Truck,
   Target,
-  DollarSign,
   ArrowUpRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -50,7 +49,6 @@ import {
   warehouseRecentActivity,
   warehouseGoals,
 } from "@/lib/warehouse-analytics";
-import { formatCurrency } from "@/lib/utils";
 
 export default function WarehouseAnalyticsPage() {
   const { t, locale } = useLocale();
@@ -109,13 +107,6 @@ export default function WarehouseAnalyticsPage() {
           change={k.onTimeChange}
           spark={[93.8, 94.2, 94.8, 95.6, 96.0, 96.4]}
           icon={Target}
-        />
-        <AnalyticsKpiCard
-          title={fr ? "Paiements collectés" : "Payments collected"}
-          value={formatCurrency(k.codCollected, locale)}
-          change={k.codChange}
-          spark={warehouseThroughputTrend.map((d) => d.revenue * 30)}
-          icon={DollarSign}
         />
         <AnalyticsKpiCard
           title={fr ? "Taux de retour" : "Return rate"}
@@ -237,11 +228,6 @@ export default function WarehouseAnalyticsPage() {
                 render: (row) => `${row.onTime}%`,
               },
               {
-                key: "codCollected",
-                label: fr ? "Paiements" : "Payments",
-                render: (row) => formatCurrency(row.codCollected as number, locale),
-              },
-              {
                 key: "rating",
                 label: fr ? "Note" : "Rating",
                 render: (row) => `★ ${row.rating}`,
@@ -292,11 +278,6 @@ export default function WarehouseAnalyticsPage() {
                   key: "onTime",
                   label: fr ? "À l'heure" : "On-time",
                   render: (row) => (Number(row.onTime) > 0 ? `${row.onTime}%` : "—"),
-                },
-                {
-                  key: "cod",
-                  label: fr ? "Paiements" : "Payments",
-                  render: (row) => formatCurrency(row.cod as number, locale),
                 },
               ]}
               data={warehouseTopBatches as unknown as Record<string, unknown>[]}

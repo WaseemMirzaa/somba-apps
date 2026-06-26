@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getRiderTask } from "@/lib/rider-entities";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
 const BATCH_STOPS = [
@@ -88,11 +87,7 @@ export default function RiderBatchPage() {
                   { label: fr ? "Vendeur" : "Seller", value: `${task.sellerName} · ${task.sellerStore}` },
                   {
                     label: fr ? "Paiement" : "Payment",
-                    value: task.codAmount
-                      ? `${fr ? "À encaisser" : "Collect"} · ${formatCurrency(task.codAmount, locale)}`
-                      : fr
-                        ? PAYMENT_FR[task.paymentType] ?? task.paymentType
-                        : task.paymentType,
+                    value: fr ? PAYMENT_FR[task.paymentType] ?? task.paymentType : task.paymentType,
                   },
                 ]}
               />
