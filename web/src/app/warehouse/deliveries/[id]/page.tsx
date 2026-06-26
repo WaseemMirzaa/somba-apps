@@ -8,7 +8,6 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { getDelivery } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -56,10 +55,7 @@ export default function WarehouseDeliveryDetailPage() {
     );
   }
 
-  const paymentLabel =
-    delivery.codAmount > 0
-      ? `${fr ? "À encaisser" : "Collect"} · ${formatCurrency(delivery.codAmount, locale)}`
-      : delivery.paymentType;
+  const paymentLabel = delivery.paymentType;
   const statusLabel = fr
     ? STATUS_FR[delivery.status] ?? delivery.status.replace("_", " ")
     : delivery.status.replace("_", " ");

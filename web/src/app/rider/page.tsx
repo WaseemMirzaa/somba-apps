@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Bike, CheckCircle, DollarSign, Clock,
-  ArrowUpRight, ArrowDownRight, Activity, Target, Banknote,
+  ArrowUpRight, ArrowDownRight, Activity, Target,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
@@ -98,7 +98,6 @@ export default function RiderDashboardPage() {
         <KpiCard title={t("activeTasks")} value={String(activeTasks.length)} change={k.deliveriesChange} spark={deliveriesSpark} icon={Bike} />
         <KpiCard title={t("completedToday")} value={String(completed)} change={k.deliveriesChange} spark={deliveriesSpark} icon={CheckCircle} />
         <KpiCard title={t("earnings")} value={formatCurrency(k.earningsToday, locale)} change={k.earningsChange} spark={earningsSpark} icon={DollarSign} />
-        <KpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={[320, 340, 360, 380, 400, 410, 420]} icon={Banknote} />
         <KpiCard title={fr ? "Taux de ponctualité" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[91, 92, 93, 93.5, 94, 94.2, 94.4]} icon={Target} />
         <KpiCard title={fr ? "Livraison moyenne" : "Avg delivery"} value={`${k.avgDeliveryMin} min`} change={k.avgChange} positive={false} spark={[32, 31, 30, 29, 29, 28, 28]} icon={Clock} />
       </div>
@@ -127,7 +126,7 @@ export default function RiderDashboardPage() {
               segments={riderTaskBreakdown.map((seg) => ({
                 label: fr ? seg.typeFr : seg.type,
                 pct: seg.pct,
-                color: seg.type === "Standard delivery" ? "#059669" : seg.type === "Payment collection" ? "#2563eb" : seg.type === "Returns pickup" ? "#d97706" : "#7c3aed",
+                color: seg.type === "Standard delivery" ? "#059669" : seg.type === "Returns pickup" ? "#d97706" : "#7c3aed",
               }))}
             />
           </CardContent>

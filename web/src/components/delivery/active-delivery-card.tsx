@@ -7,7 +7,6 @@ import { ChevronDown, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { formatCurrency } from "@/lib/utils";
 import { customerColumnLabel, zoneColumnLabel } from "@/lib/admin-i18n";
 import type { DeliveryDetailData } from "@/lib/delivery-detail";
 import { cn } from "@/lib/utils";
@@ -92,12 +91,6 @@ export function ActiveDeliveryCard({
           { label: fr ? "Commande" : "Order ID", value: delivery.orderId },
           { label: zoneColumnLabel(locale), value: delivery.zone },
           { label: fr ? "Paiement" : "Payment", value: paymentLabel(delivery.paymentType, fr) },
-          {
-            label: fr ? "Montant à collecter" : "Amount due",
-            value: delivery.codAmount
-              ? formatCurrency(delivery.codAmount, locale)
-              : fr ? "Non applicable" : "N/A",
-          },
           ...(delivery.currentStop != null && delivery.totalStops != null
             ? [{
                 label: fr ? "Arrêt" : "Stop",

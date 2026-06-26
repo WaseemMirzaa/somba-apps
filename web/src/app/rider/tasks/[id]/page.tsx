@@ -169,17 +169,6 @@ export default function RiderTaskDetailPage() {
         </div>
       </DetailSection>
 
-      {task.codAmount && (
-        <div className="card-premium border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-sm font-medium text-emerald-800">
-            {fr ? "Paiement à collecter" : "Payment to Collect"}
-          </p>
-          <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-emerald-700">
-            {formatCurrency(task.codAmount, locale)}
-          </p>
-        </div>
-      )}
-
       {task.notes && (
         <div className="card-premium p-4">
           <p className="text-xs font-semibold uppercase text-slate-500">

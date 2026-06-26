@@ -59,7 +59,6 @@ export const adminFulfillmentHealth = [
   { label: "On-time dispatch", labelFr: "Expédition à temps", score: 94 },
   { label: "Warehouse capacity", labelFr: "Capacité entrepôt", score: 87 },
   { label: "Rider availability", labelFr: "Disponibilité livreurs", score: 91 },
-  { label: "Payment reconciliation", labelFr: "Rapprochement paiements", score: 96 },
   { label: "Return resolution", labelFr: "Résolution des retours", score: 89 },
 ] as const;
 
@@ -85,7 +84,6 @@ export const adminMarketplaceHealth = {
   fulfillmentScore: 94,
   sellerQualityScore: 88,
   customerTrustScore: 92,
-  paymentHealthScore: 96,
   disputeRate: 0.8,
   avgResolutionHours: 18.4,
 } as const;
@@ -101,7 +99,6 @@ export const adminFulfillmentSlas = [
   { metric: "Dispatch within 24h", metricFr: "Expédition < 24h", target: 95, actual: 94.2, status: "warning" },
   { metric: "Delivery within SLA", metricFr: "Livraison dans SLA", target: 92, actual: 93.8, status: "ok" },
   { metric: "Return processing", metricFr: "Traitement retours", target: 90, actual: 89.1, status: "warning" },
-  { metric: "Payment reconciliation", metricFr: "Réconciliation des paiements", target: 98, actual: 96.4, status: "ok" },
   { metric: "Warehouse capacity", metricFr: "Capacité entrepôt", target: 85, actual: 87.0, status: "ok" },
 ] as const;
 

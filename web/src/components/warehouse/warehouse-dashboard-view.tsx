@@ -16,7 +16,6 @@ import {
   Activity,
   Truck,
   Target,
-  DollarSign,
   PackageX,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -42,7 +41,6 @@ import { warehouseRoleLevel, canWarehouseAccess } from "@/lib/warehouse-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import { warehouseDashboardStats } from "@/lib/warehouse-entities";
 import {
-  warehouseThroughputTrend,
   warehouseExtendedKpis,
   warehouseInboundDispatchTrend,
   warehouseLaneUtilization,
@@ -55,7 +53,6 @@ import {
   warehouseReturnMetrics,
   warehouseExceptionMetrics,
 } from "@/lib/warehouse-analytics";
-import { formatCurrency } from "@/lib/utils";
 import { useOpsPath } from "@/lib/ops-path";
 
 const alertPriorityVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
@@ -76,7 +73,6 @@ const alertIcon = {
   exception: AlertTriangle,
   returns: RotateCcw,
   aged: PackageX,
-  cod: DollarSign,
 } as const;
 
 export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
@@ -153,9 +149,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <AnalyticsKpiCard title={fr ? "Réception (auj.)" : "Received today"} value={String(k.receivedToday)} change={k.receivedChange} spark={inboundSpark} icon={Package} />
         <AnalyticsKpiCard title={fr ? "Expédition (auj.)" : "Dispatched today"} value={String(k.dispatchedToday)} change={k.dispatchedChange} spark={dispatchSpark} icon={Send} />
         <AnalyticsKpiCard title={fr ? "Livraison à l'heure" : "On-time rate"} value={`${k.onTimeRate}%`} change={k.onTimeChange} spark={[94, 94.5, 95, 95.2, 96, 96.2, 96.4]} icon={Clock} />
-        {isManager && (
-          <AnalyticsKpiCard title={fr ? "Paiements collectés" : "Payments collected"} value={formatCurrency(k.codCollected, locale)} change={k.codChange} spark={warehouseThroughputTrend.map((d) => d.revenue * 30)} icon={DollarSign} />
-        )}
         {canSupervise && (
           <AnalyticsKpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.2, 2.1, 2.0, 1.9, 1.9, 1.8, 1.8]} icon={RotateCcw} />
         )}
@@ -370,7 +363,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
                 },
                 { key: "deliveries", label: fr ? "Livraisons" : "Deliveries" },
                 { key: "onTime", label: fr ? "À l'heure %" : "On-time %", render: (row) => `${row.onTime}%` },
-                { key: "codCollected", label: fr ? "Paiements" : "Payments", render: (row) => formatCurrency(row.codCollected as number, locale) },
                 { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `★ ${row.rating}` },
                 { key: "exceptions", label: fr ? "Exceptions" : "Exceptions" },
               ]}
