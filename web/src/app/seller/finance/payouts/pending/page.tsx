@@ -99,8 +99,8 @@ export default function SellerPayoutPendingPage() {
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         {fr
-          ? `Les gains sont versés après confirmation de livraison et réconciliation entrepôt, puis un délai de sécurisation de ${summary.clearanceHours}h.`
-          : `Earnings accrue after delivery confirmation and warehouse reconciliation, then a ${summary.clearanceHours}h clearance period.`}
+          ? `Les gains sont versés après confirmation de livraison, puis un délai de sécurisation de ${summary.clearanceHours}h.`
+          : `Earnings accrue after delivery confirmation, then a ${summary.clearanceHours}h clearance period.`}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

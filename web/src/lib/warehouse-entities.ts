@@ -203,51 +203,6 @@ export type ExchangeEntity = {
   timeline: { time: string; label: string; labelFr: string; done?: boolean }[];
 };
 
-export type CodReconciliationEntity = {
-  id: string;
-  riderId: number;
-  rider: string;
-  shift: string;
-  vehicle: string;
-  expected: number;
-  collected: number;
-  difference: number;
-  status: string;
-  orders: { orderId: string; codAmount: number; collected: number }[];
-};
-
-export type ShiftReconciliationOrder = {
-  orderId: string;
-  customer: string;
-  expected: number;
-  collected: number;
-  status: "collected" | "partial" | "failed" | "pending";
-};
-
-export type ShiftReconciliationEntity = {
-  id: string;
-  shiftDate: string;
-  shiftName: string;
-  shiftNameFr: string;
-  warehouse: string;
-  warehouseFr: string;
-  supervisor: string;
-  riderId: number;
-  rider: string;
-  riderPhone: string;
-  zone: string;
-  vehicle: string;
-  expectedCollections: number;
-  amountReceived: number | null;
-  variance: number;
-  ordersCount: number;
-  status: "pending" | "investigating" | "reconciled" | "approved";
-  varianceNotes?: string;
-  varianceNotesFr?: string;
-  timeline: { time: string; label: string; labelFr: string; done?: boolean }[];
-  orders: ShiftReconciliationOrder[];
-};
-
 export type ExceptionEntity = {
   id: string;
   parcelId: string;
@@ -848,112 +803,6 @@ export const exchangeEntities: ExchangeEntity[] = [
   },
 ];
 
-// ─── COD reconciliation ──────────────────────────────────────────────────────
-
-export const codEntities: CodReconciliationEntity[] = [
-  {
-    id: "COD-001", riderId: 1, rider: "Jean-Pierre M.", shift: "Morning", vehicle: "Motorcycle",
-    expected: 4520, collected: 4520, difference: 0, status: "approved",
-    orders: [
-      { orderId: "ORD-2024-001", codAmount: 1199, collected: 1199 },
-      { orderId: "ORD-2024-004", codAmount: 649, collected: 649 },
-    ],
-  },
-  {
-    id: "COD-002", riderId: 2, rider: "Paul Kabongo", shift: "Afternoon", vehicle: "Van",
-    expected: 2340, collected: 2280, difference: -60, status: "investigating",
-    orders: [
-      { orderId: "ORD-2024-003", codAmount: 129, collected: 129 },
-      { orderId: "ORD-2024-006", codAmount: 499, collected: 439 },
-    ],
-  },
-];
-
-// ─── Shift reconciliation ────────────────────────────────────────────────────
-
-export const shiftReconciliationEntities: ShiftReconciliationEntity[] = [
-  {
-    id: "REC-SHIFT-001",
-    shiftDate: "2026-06-08",
-    shiftName: "Afternoon",
-    shiftNameFr: "Après-midi",
-    warehouse: "Kinshasa Hub",
-    warehouseFr: "Hub Kinshasa",
-    supervisor: "Supervisor A · Marie N.",
-    riderId: 2,
-    rider: "Paul Kabongo",
-    riderPhone: "+243 99 444 5566",
-    zone: "Zone B",
-    vehicle: "Van",
-    expectedCollections: 2340,
-    amountReceived: 2280,
-    variance: -60,
-    ordersCount: 8,
-    status: "investigating",
-    varianceNotes: "Rider reported customer on ORD-2024-006 paid $439 instead of $499. Shortfall under review.",
-    varianceNotesFr: "Le livreur signale que le client ORD-2024-006 a payé 439 $ au lieu de 499 $. Écart en cours d'examen.",
-    timeline: [
-      { time: "2026-06-08 14:00", label: "Shift started", labelFr: "Shift démarré", done: true },
-      { time: "2026-06-08 18:45", label: "Last delivery completed", labelFr: "Dernière livraison terminée", done: true },
-      { time: "2026-06-08 19:10", label: "Rider handover at hub", labelFr: "Remise livreur au hub", done: true },
-      { time: "2026-06-08 19:25", label: "Cash counted — variance detected", labelFr: "Comptage espèces — écart détecté", done: true },
-      { time: "—", label: "Supervisor review", labelFr: "Revue superviseur", done: false },
-      { time: "—", label: "Shift approved", labelFr: "Shift approuvé", done: false },
-    ],
-    orders: [
-      { orderId: "ORD-2024-003", customer: "Sophie Martin", expected: 129, collected: 129, status: "collected" },
-      { orderId: "ORD-2024-006", customer: "Pierre Laurent", expected: 499, collected: 439, status: "partial" },
-      { orderId: "ORD-2024-008", customer: "Ahmed Hassan", expected: 349, collected: 349, status: "collected" },
-      { orderId: "ORD-2024-009", customer: "Jean Kambale", expected: 189, collected: 189, status: "collected" },
-      { orderId: "ORD-2024-010", customer: "Claire M.", expected: 275, collected: 275, status: "collected" },
-      { orderId: "ORD-2024-011", customer: "David O.", expected: 420, collected: 420, status: "collected" },
-      { orderId: "ORD-2024-012", customer: "Fatou B.", expected: 229, collected: 229, status: "collected" },
-      { orderId: "ORD-2024-013", customer: "Marc T.", expected: 250, collected: 250, status: "collected" },
-    ],
-  },
-  {
-    id: "REC-SHIFT-002",
-    shiftDate: "2026-06-08",
-    shiftName: "Morning",
-    shiftNameFr: "Matin",
-    warehouse: "Kinshasa Hub",
-    warehouseFr: "Hub Kinshasa",
-    supervisor: "Supervisor B · Jean D.",
-    riderId: 1,
-    rider: "Jean-Pierre M.",
-    riderPhone: "+243 99 111 2233",
-    zone: "Zone A",
-    vehicle: "Motorcycle",
-    expectedCollections: 4520,
-    amountReceived: 4520,
-    variance: 0,
-    ordersCount: 12,
-    status: "approved",
-    timeline: [
-      { time: "2026-06-08 07:00", label: "Shift started", labelFr: "Shift démarré", done: true },
-      { time: "2026-06-08 13:30", label: "Last delivery completed", labelFr: "Dernière livraison terminée", done: true },
-      { time: "2026-06-08 13:50", label: "Rider handover at hub", labelFr: "Remise livreur au hub", done: true },
-      { time: "2026-06-08 14:05", label: "Cash counted — match confirmed", labelFr: "Comptage espèces — correspondance confirmée", done: true },
-      { time: "2026-06-08 14:15", label: "Supervisor review", labelFr: "Revue superviseur", done: true },
-      { time: "2026-06-08 14:20", label: "Shift approved", labelFr: "Shift approuvé", done: true },
-    ],
-    orders: [
-      { orderId: "ORD-2024-001", customer: "Marie Dubois", expected: 1199, collected: 1199, status: "collected" },
-      { orderId: "ORD-2024-004", customer: "Ahmed Hassan", expected: 649, collected: 649, status: "collected" },
-      { orderId: "ORD-2024-014", customer: "Luc P.", expected: 320, collected: 320, status: "collected" },
-      { orderId: "ORD-2024-015", customer: "Nadia S.", expected: 410, collected: 410, status: "collected" },
-      { orderId: "ORD-2024-016", customer: "Eric W.", expected: 285, collected: 285, status: "collected" },
-      { orderId: "ORD-2024-017", customer: "Grace L.", expected: 198, collected: 198, status: "collected" },
-      { orderId: "ORD-2024-018", customer: "Hassan M.", expected: 367, collected: 367, status: "collected" },
-      { orderId: "ORD-2024-019", customer: "Isabelle R.", expected: 292, collected: 292, status: "collected" },
-      { orderId: "ORD-2024-020", customer: "James K.", expected: 175, collected: 175, status: "collected" },
-      { orderId: "ORD-2024-021", customer: "Karim A.", expected: 225, collected: 225, status: "collected" },
-      { orderId: "ORD-2024-022", customer: "Laura B.", expected: 200, collected: 200, status: "collected" },
-      { orderId: "ORD-2024-023", customer: "Michel C.", expected: 200, collected: 200, status: "collected" },
-    ],
-  },
-];
-
 // ─── Exceptions ──────────────────────────────────────────────────────────────
 
 export const exceptionEntities: ExceptionEntity[] = [
@@ -1015,15 +864,6 @@ export function getReplacement(id: string) {
 
 export function getExchange(id: string) {
   return exchangeEntities.find((e) => e.id === id);
-}
-
-export function getCodReconciliation(id: string) {
-  return codEntities.find((c) => c.id === id);
-}
-
-export function getShiftReconciliation(id?: string) {
-  if (id) return shiftReconciliationEntities.find((s) => s.id === id);
-  return shiftReconciliationEntities.find((s) => s.status === "investigating") ?? shiftReconciliationEntities[0];
 }
 
 export function getException(id: string) {
