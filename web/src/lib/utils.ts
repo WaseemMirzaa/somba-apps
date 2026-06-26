@@ -13,10 +13,7 @@ export function formatCurrency(amount: number, locale = "en") {
   }).format(amount);
 }
 
-export function formatPaymentMethod(method: string, locale: "en" | "fr" = "en") {
-  if (method === "COD") {
-    return locale === "fr" ? "Paiement à la livraison" : "Pay at delivery";
-  }
+export function formatPaymentMethod(method: string, _locale: "en" | "fr" = "en") {
   return method;
 }
 

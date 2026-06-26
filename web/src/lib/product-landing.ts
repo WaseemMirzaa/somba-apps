@@ -59,8 +59,8 @@ export const PORTAL_IMAGES = {
 export const PORTAL_SECTION = {
   title: "One marketplace, every role",
   titleFr: "Une marketplace, chaque rôle",
-  subtitle: "Whether you're shopping, selling, or running operations — Somba&Teka connects every part of the journey.",
-  subtitleFr: "Que vous achetiez, vendiez ou gériez les opérations — Somba&Teka connecte chaque étape.",
+  subtitle: "Whether you're shopping or selling — Somba&Teka connects every part of the journey.",
+  subtitleFr: "Que vous achetiez ou vendiez — Somba&Teka connecte chaque étape.",
   publicLabel: "For shoppers & sellers",
   publicLabelFr: "Pour acheteurs et vendeurs",
   opsLabel: "For our operations team",
@@ -73,7 +73,7 @@ export const MODULES_SECTION = {
   title: "Built for a better shopping experience",
   titleFr: "Conçu pour mieux acheter",
   subtitle: "From checkout to doorstep — payments, delivery, returns, and seller tools that keep the marketplace running smoothly.",
-  subtitleFr: "Du paiement à la livraison — paiements, livraison, retours et outils vendeur pour une marketplace fluide.",
+  subtitleFr: "De la commande à la livraison — paiements, livraison, retours et outils vendeur pour une marketplace fluide.",
 } as const;
 
 export const PORTALS = [
@@ -96,7 +96,6 @@ export const PORTALS = [
     featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et portefeuille Somba&Teka", "Suivi de commande et retours faciles"],
     trust: [
       { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
-      { icon: "Banknote", label: "Pay at delivery", labelFr: "Paiement à la livraison" },
       { icon: "Globe", label: "Web + mobile app", labelFr: "Web + app mobile" },
     ],
     modules: [
@@ -368,10 +367,10 @@ export const PLATFORM_MODULES = [
     id: "cod",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Card, Somba&Teka wallet, or pay at delivery — fraud-checked checkout with buyer protection on every order.",
-    descFr: "Carte, portefeuille Somba&Teka ou paiement à la livraison — paiement vérifié avec protection acheteur sur chaque commande.",
-    highlight: "Pay at delivery + wallet",
-    highlightFr: "Paiement à la livraison + portefeuille",
+    desc: "Card or Somba&Teka wallet — fraud-checked checkout with buyer protection on every order.",
+    descFr: "Carte ou portefeuille Somba&Teka — paiement vérifié avec protection acheteur sur chaque commande.",
+    highlight: "Card + wallet",
+    highlightFr: "Carte + portefeuille",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
     href: "/get-app",
@@ -380,7 +379,6 @@ export const PLATFORM_MODULES = [
     icon: "ShieldCheck",
     image: "https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=1200&auto=format&fit=crop",
     trust: [
-      { icon: "Banknote", label: "Pay at delivery", labelFr: "Paiement à la livraison" },
       { icon: "Wallet", label: "Wallet & coupons", labelFr: "Portefeuille & coupons" },
       { icon: "Lock", label: "Encrypted checkout", labelFr: "Paiement chiffré" },
     ],
@@ -431,7 +429,6 @@ export const PLATFORM_MODULES = [
 
 export const PAYMENT_OPTIONS = [
   { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba&Teka wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba&Teka." },
-  { title: "Pay at Delivery", titleFr: "Paiement à la livraison", desc: "Order now and pay when your package arrives — available on eligible items.", descFr: "Commandez maintenant, payez à la réception — sur articles éligibles." },
   { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba&Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba&Teka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
@@ -445,7 +442,7 @@ export const WHY_CHOOSE = [
   { title: "Sell and grow", titleFr: "Vendre et grandir", desc: "Open your store, list products, run promotions, and reach customers across the country.", descFr: "Ouvrez votre boutique, listez vos produits et touchez des clients partout." },
   { title: "Bilingual FR/EN", titleFr: "Bilingue FR/EN", desc: "Shop, sell, and get support in French or English across web and mobile.", descFr: "Achetez, vendez et obtenez de l'aide en français ou en anglais." },
   { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba&Teka app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba&Teka — même panier, mêmes commandes." },
-  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card, wallet, and pay-at-delivery options with buyer protection on every order.", descFr: "Carte, portefeuille et paiement à la livraison avec protection acheteur sur chaque commande." },
+  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card and wallet options with buyer protection on every order.", descFr: "Carte et portefeuille avec protection acheteur sur chaque commande." },
 ] as const;
 
 export const SELLER_PLANS = [
@@ -495,12 +492,12 @@ export const PRODUCT_HERO = {
   bullets: [
     "Thousands of products from verified sellers",
     "1–3 day delivery with real-time tracking",
-    "Card, wallet, and pay at delivery",
+    "Card and wallet",
   ],
   bulletsFr: [
     "Des milliers de produits de vendeurs vérifiés",
     "Livraison en 1–3 jours avec suivi en temps réel",
-    "Carte, portefeuille et paiement à la livraison",
+    "Carte et portefeuille",
   ],
   guarantee: "Free to browse · Guest checkout · Easy returns within 7 days",
   guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 7 jours",
@@ -520,8 +517,8 @@ export const CONVERSION_PATHS = [
     badgeFr: "Le plus populaire",
     title: "I want to shop",
     titleFr: "Je veux acheter",
-    desc: "Browse categories, compare deals, and checkout — guest or account, card, wallet, or pay at delivery.",
-    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte, portefeuille ou à la livraison.",
+    desc: "Browse categories, compare deals, and checkout — guest or account, card, or wallet.",
+    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte ou portefeuille.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
     href: "/get-app",
@@ -557,15 +554,15 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card, Somba&Teka wallet, or at delivery — guest checkout available on every order.", descFr: "Payez par carte, portefeuille Somba&Teka ou à la livraison — paiement invité disponible." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card or Somba&Teka wallet — guest checkout available on every order.", descFr: "Payez par carte ou portefeuille Somba&Teka — paiement invité disponible." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
 
 export const TESTIMONIALS = [
   {
-    quote: "I ordered a phone on Tuesday and it arrived Thursday — tracking was spot-on. Pay at delivery made it easy since I prefer paying when my package arrives.",
-    quoteFr: "J'ai commandé un téléphone mardi et reçu jeudi — le suivi était parfait. Le paiement à la livraison m'a simplifié la vie.",
+    quote: "I ordered a phone on Tuesday and it arrived Thursday — tracking was spot-on, and the whole experience was smooth.",
+    quoteFr: "J'ai commandé un téléphone mardi et reçu jeudi — le suivi était parfait, et toute l'expérience a été fluide.",
     name: "Marie Dupont",
     role: "Customer, Lyon",
     roleFr: "Cliente, Lyon",
@@ -605,8 +602,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept credit/debit cards, Somba&Teka wallet balance, and pay at delivery on eligible orders. Guest checkout is available without creating an account.",
-    aFr: "Cartes bancaires, portefeuille Somba&Teka et paiement à la livraison sur commandes éligibles. Paiement invité sans compte.",
+    a: "We accept credit/debit cards and Somba&Teka wallet balance. Guest checkout is available without creating an account.",
+    aFr: "Cartes bancaires et portefeuille Somba&Teka. Paiement invité sans compte.",
   },
   {
     q: "How long does delivery take?",

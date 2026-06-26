@@ -23,7 +23,6 @@ const TYPE_FR: Record<string, string> = {
   delivery: "Livraison",
   pickup: "Collecte",
   return: "Retour",
-  cod: "Paiement à la livraison",
 };
 
 export default function RiderTasksPage() {

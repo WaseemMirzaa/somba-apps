@@ -28,7 +28,6 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
 };
 
 const PAYMENT_METHOD_FR: Record<string, string> = {
-  COD: "Paiement à la livraison",
   Card: "Carte",
 };
 

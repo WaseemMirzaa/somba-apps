@@ -20,7 +20,6 @@ const BATCH_STOPS = [
 
 // Display labels for the payment string from task data (logic uses raw value).
 const PAYMENT_FR: Record<string, string> = {
-  "Pay at delivery": "À la livraison",
   Prepaid: "Prépayé",
   Card: "Carte",
 };
@@ -90,7 +89,7 @@ export default function RiderBatchPage() {
                   {
                     label: fr ? "Paiement" : "Payment",
                     value: task.codAmount
-                      ? `${fr ? "À la livraison" : "At delivery"} · ${formatCurrency(task.codAmount, locale)}`
+                      ? `${fr ? "À encaisser" : "Collect"} · ${formatCurrency(task.codAmount, locale)}`
                       : fr
                         ? PAYMENT_FR[task.paymentType] ?? task.paymentType
                         : task.paymentType,

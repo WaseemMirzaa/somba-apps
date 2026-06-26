@@ -18,13 +18,13 @@ const severityVariant = { low: "default", medium: "warning", high: "danger" } as
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
 const STATUS_FR: Record<string, string> = { open: "Ouvert", reviewed: "Examiné", blocked: "Bloqué" };
 const TYPE_FR: Record<string, string> = {
-  cod_risk: "Risque paiement à la livraison",
+  cod_risk: "Risque de paiement",
   otp_fail: "Échec OTP",
   velocity: "Vélocité",
   address_block: "Blocage d'adresse",
 };
 const TYPE_EN: Record<string, string> = {
-  cod_risk: "COD risk",
+  cod_risk: "Payment risk",
   otp_fail: "OTP fail",
   velocity: "Velocity",
   address_block: "Address block",

@@ -13,7 +13,6 @@ export default function AdminSettingsPage() {
   const { profile, profileId, setProfileId } = useMarket();
   const { toast } = useToast();
   const [commission, setCommission] = useState("12");
-  const [codMax, setCodMax] = useState(String(profile.codMaxOrderValue));
   const [fxRate, setFxRate] = useState(String(profile.fxRateUsdCdf ?? 2850));
   const [payoutMin, setPayoutMin] = useState(String(profile.payoutMinUsd));
   const [clearanceHours, setClearanceHours] = useState(String(profile.payoutClearanceHours));
@@ -39,11 +38,6 @@ export default function AdminSettingsPage() {
           <h3 className="font-semibold">Commission (Δ4)</h3>
           <label className="text-sm">{fr ? "Commission par défaut %" : "Default commission %"}</label>
           <input className="input-premium w-full px-4 py-2 text-sm" value={commission} onChange={(e) => setCommission(e.target.value)} />
-        </div>
-        <div className="card-premium space-y-3 p-6">
-          <h3 className="font-semibold">{fr ? "Paiement à la livraison (Δ2)" : "Pay at Delivery (Δ2)"}</h3>
-          <label className="text-sm">{fr ? "Valeur max. de commande au paiement à la livraison (USD)" : "Max pay-at-delivery order value (USD)"}</label>
-          <input className="input-premium w-full px-4 py-2 text-sm" value={codMax} onChange={(e) => setCodMax(e.target.value)} />
         </div>
         <div className="card-premium space-y-3 p-6">
           <h3 className="font-semibold">{fr ? "Taux de change (Δ8)" : "FX Rate (Δ8)"}</h3>

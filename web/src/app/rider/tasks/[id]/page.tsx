@@ -19,7 +19,6 @@ const TYPE_FR: Record<string, string> = {
   delivery: "Livraison",
   pickup: "Collecte",
   return: "Retour",
-  cod: "Paiement à la livraison",
 };
 
 const STATUS_FR: Record<string, string> = {
@@ -31,7 +30,6 @@ const STATUS_FR: Record<string, string> = {
 };
 
 const PAYMENT_FR: Record<string, string> = {
-  "Pay at delivery": "À la livraison",
   Prepaid: "Prépayé",
   Card: "Carte",
 };
