@@ -15,8 +15,6 @@ const TIMELINE_LABELS_FR: Record<string, string> = {
   "Arrived": "Arrivé",
   "At warehouse": "À l'entrepôt",
   "Batch Created": "Lot créé",
-  "Cash counted — match confirmed": "Espèces comptées — concordance confirmée",
-  "Cash counted — variance detected": "Espèces comptées — écart détecté",
   "Collected from seller": "Collecté chez le vendeur",
   "Collected": "Collecté",
   "Confirmed": "Confirmé",

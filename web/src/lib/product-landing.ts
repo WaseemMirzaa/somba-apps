@@ -364,7 +364,7 @@ export const PLATFORM_MODULES = [
     ],
   },
   {
-    id: "cod",
+    id: "payments",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
     desc: "Card or Somba&Teka wallet — fraud-checked checkout with buyer protection on every order.",

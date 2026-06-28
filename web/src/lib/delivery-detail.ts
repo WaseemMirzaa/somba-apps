@@ -24,7 +24,6 @@ export type DeliveryDetailData = {
   eta: string;
   zone: string;
   paymentType: string;
-  codAmount?: number;
   currentStop?: number;
   totalStops?: number;
   customer: { name: string; phone: string; address: string; id?: number };
@@ -42,7 +41,6 @@ export function riderTaskToDeliveryDetail(task: RiderTask): DeliveryDetailData {
     eta: task.eta,
     zone: task.zone,
     paymentType: task.paymentType,
-    codAmount: task.codAmount,
     customer: {
       name: task.customer,
       phone: task.phone,
@@ -67,7 +65,6 @@ export function deliveryEntityToDetail(delivery: DeliveryEntity): DeliveryDetail
     eta: delivery.eta,
     zone: delivery.zone,
     paymentType: delivery.paymentType,
-    codAmount: delivery.codAmount > 0 ? delivery.codAmount : undefined,
     currentStop: delivery.currentStop,
     totalStops: delivery.totalStops,
     customer: {
