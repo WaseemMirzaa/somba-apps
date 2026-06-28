@@ -37,7 +37,6 @@ const STATUS_FR: Record<string, string> = {
 const PAYMENT_FR: Record<string, string> = {
   Prepaid: "Prépayé",
   Card: "Carte",
-  Cash: "Espèces",
   "Mobile money": "Mobile money",
 };
 

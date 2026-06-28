@@ -26,7 +26,6 @@ export type RiderTask = {
   zone: string;
   orderId: string;
   amount?: number;
-  codAmount?: number;
   paymentType: string;
   eta: string;
   distance: string;

@@ -18,7 +18,6 @@ export type MarketProfile = {
   currencySecondary?: "CDF";
   fxRateUsdCdf?: number;
   zones: Zone[];
-  codMaxOrderValue: number;
   returnWindowDays: number;
   payoutMinUsd: number;
   payoutClearanceHours: number;
@@ -40,7 +39,6 @@ export const MARKET_PROFILES: Record<MarketProfileId, MarketProfile> = {
       { id: "zone-b", name: "Zone B — Nord", nameFr: "Zone B — Nord", city: "Paris", deliveryFeeUsd: 5 },
       { id: "zone-c", name: "Zone C — Sud", nameFr: "Zone C — Sud", city: "Paris", deliveryFeeUsd: 8 },
     ],
-    codMaxOrderValue: 500,
     returnWindowDays: 30,
     payoutMinUsd: 10,
     payoutClearanceHours: 48,
@@ -63,7 +61,6 @@ export const MARKET_PROFILES: Record<MarketProfileId, MarketProfile> = {
       { id: "masina", name: "Masina", nameFr: "Masina", city: "Kinshasa", deliveryFeeUsd: 6 },
       { id: "lubumbashi-centre", name: "Centre", nameFr: "Centre", city: "Lubumbashi", deliveryFeeUsd: 4 },
     ],
-    codMaxOrderValue: 200,
     returnWindowDays: 7,
     payoutMinUsd: 10,
     payoutClearanceHours: 48,

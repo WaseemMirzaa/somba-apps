@@ -81,7 +81,6 @@ export type DeliveryEntity = {
   vehicle: string;
   status: string;
   eta: string;
-  codAmount: number;
   itemsCount: number;
   currentStop: number;
   totalStops: number;
@@ -465,7 +464,6 @@ function buildDeliveryEntity(
     vehicle: rider.vehicle,
     status,
     eta: ETAS[(seq - 1) % ETAS.length],
-    codAmount: order.paymentMethod === "COD" ? order.amount : 0,
     itemsCount: order.itemsCount,
     currentStop: seq,
     totalStops,
@@ -817,12 +815,6 @@ export const exceptionEntities: ExceptionEntity[] = [
     severity: "critical", severityFr: "Critique", status: "investigating", statusFr: "En investigation", reportedBy: "Sorter B", reportedByFr: "Trieur B", createdDate: "2024-06-04",
     photos: 1, notes: "1 of 2 items missing from package", notesFr: "1 article sur 2 manquant dans le colis", assignedStaff: "Ops Manager", assignedStaffFr: "Responsable des opérations",
     resolution: "Seller notified", resolutionFr: "Vendeur notifié",
-  },
-  {
-    id: "INC-003", parcelId: "—", orderId: "ORD-2024-003", type: "Cash Difference", typeFr: "Écart de caisse",
-    severity: "medium", severityFr: "Moyenne", status: "resolved", statusFr: "Résolu", reportedBy: "Finance", reportedByFr: "Finance", createdDate: "2024-06-03",
-    photos: 0, notes: "Rider short $60 on shift", notesFr: "Livreur en déficit de 60 $ sur le service", assignedStaff: "Finance Team", assignedStaffFr: "Équipe finance",
-    resolution: "Adjusted from rider deposit", resolutionFr: "Ajusté depuis le dépôt du livreur",
   },
 ];
 

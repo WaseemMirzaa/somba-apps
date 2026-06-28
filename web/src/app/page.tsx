@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 
 const MODULE_ICONS = {
   fulfillment: Truck,
-  cod: ShieldCheck,
+  payments: ShieldCheck,
   returns: RotateCcw,
   subscription: Store,
 } as const;

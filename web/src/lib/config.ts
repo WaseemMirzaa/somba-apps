@@ -60,15 +60,8 @@ export const COMMISSION_CATEGORIES = [
 ] as const;
 
 export const PAYMENTS = {
-  // Q8: Cash on Delivery removed. Q7: Airtel + Orange + Vodacom (M-Pesa) mobile money.
+  // Q7: Airtel + Orange + Vodacom (M-Pesa) mobile money. Online payments only.
   methods: ["stripe_card", "airtel_money", "orange_money", "vodacom_mpesa", "wallet"] as const,
-  codEnabled: false,
-  cod: {
-    otpRequired: true,
-    maxPerCustomer: 3,
-    maxAmount: 500,
-    addressBlocklist: true,
-  },
   wallet: {
     storeCredit: true,
     topUpViaMobileMoney: true,
