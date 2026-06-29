@@ -366,7 +366,7 @@ export const sellerFinanceStats = {
   refundTrend: "-4.2% vs last month",
 };
 
-export const sellerFinanceWallet = {
+export const sellerFinanceBalance = {
   availableBalance: 12450,
   pendingClearance: 2250,
   pendingPayout: 8500,

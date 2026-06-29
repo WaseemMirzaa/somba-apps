@@ -142,7 +142,7 @@ export const PORTALS = [
     trust: [
       { icon: "Users", label: "48K+ shoppers", labelFr: "48K+ acheteurs" },
       { icon: "TrendingUp", label: "Growth tools", labelFr: "Outils de croissance" },
-      { icon: "Wallet", label: "Weekly payouts", labelFr: "Paiements hebdo" },
+      { icon: "Banknote", label: "Weekly payouts", labelFr: "Paiements hebdo" },
     ],
     modules: [
       {
@@ -169,7 +169,7 @@ export const PORTALS = [
       {
         name: "Finance",
         nameFr: "Finance",
-        icon: "Wallet",
+        icon: "Banknote",
         items: ["Payout statements", "Commission breakdown", "Available balance", "Analytics"],
         itemsFr: ["Relevés de paiement", "Détail des commissions", "Solde disponible", "Analytics"],
       },
@@ -641,7 +641,7 @@ export const SELL_ONLINE_STATS = [
 export const SELL_ONLINE_WHY = [
   { icon: "Users", title: "Huge customer base", titleFr: "Large base clients", desc: "Access shoppers across France and beyond — no need to build your own traffic.", descFr: "Accédez aux acheteurs en France et au-delà — sans créer votre propre trafic." },
   { icon: "Truck", title: "Fulfillment support", titleFr: "Support fulfillment", desc: "Warehouse sorting, dispatch, and last-mile delivery handled by Somba&Teka logistics.", descFr: "Tri entrepôt, expédition et dernier kilomètre gérés par la logistique Somba&Teka." },
-  { icon: "Wallet", title: "Timely payouts", titleFr: "Paiements à temps", desc: "Transparent commission, weekly payouts, and a full finance dashboard in your seller portal.", descFr: "Commission transparente, paiements hebdomadaires et tableau de bord finance complet." },
+  { icon: "Banknote", title: "Timely payouts", titleFr: "Paiements à temps", desc: "Transparent commission, weekly payouts, and a full finance dashboard in your seller portal.", descFr: "Commission transparente, paiements hebdomadaires et tableau de bord finance complet." },
   { icon: "TrendingUp", title: "Growth tools", titleFr: "Outils de croissance", desc: "Promotions, flash sales, analytics, and review management to scale your store.", descFr: "Promotions, flash sales, analytics et gestion des avis pour faire grandir votre boutique." },
   { icon: "ShieldCheck", title: "Trusted marketplace", titleFr: "Marketplace de confiance", desc: "Sell on a verified platform where buyers already shop electronics, fashion, and more.", descFr: "Vendez sur une plateforme vérifiée où les acheteurs achètent déjà électronique, mode et plus." },
   { icon: "Headphones", title: "Seller support", titleFr: "Support vendeur", desc: "Dedicated seller support in French and English — onboarding help when you need it.", descFr: "Support vendeur dédié en français et anglais — aide à l'onboarding quand vous en avez besoin." },
@@ -660,7 +660,7 @@ export const SELL_ONLINE_TOOLS = [
   { icon: "BarChart3", name: "Analytics", nameFr: "Analytics", desc: "Revenue, funnel, retention, goals", descFr: "Revenus, funnel, rétention, objectifs" },
   { icon: "Sparkles", name: "Promotions", nameFr: "Promotions", desc: "Flash deals and discount campaigns", descFr: "Offres flash et campagnes promo" },
   { icon: "Star", name: "Reviews", nameFr: "Avis", desc: "Respond to customers and build trust", descFr: "Répondez aux clients et gagnez la confiance" },
-  { icon: "Wallet", name: "Finance", nameFr: "Finance", desc: "Payouts, statements, commission breakdown", descFr: "Paiements, relevés, détail commissions" },
+  { icon: "Banknote", name: "Finance", nameFr: "Finance", desc: "Payouts, statements, commission breakdown", descFr: "Paiements, relevés, détail commissions" },
 ] as const;
 
 export const SELL_ONLINE_FAQ = [

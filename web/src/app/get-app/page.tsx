@@ -21,14 +21,14 @@ export default function GetAppPage() {
     let platform: Platform = "desktop";
     if (/iPad|iPhone|iPod/i.test(ua)) platform = "ios";
     else if (/android/i.test(ua)) platform = "android";
+    if (platform === "desktop") return;
 
-    if (platform === "ios") {
+    const dest = platform === "ios" ? APP_LINKS.ios : APP_LINKS.android;
+    const timer = window.setTimeout(() => {
       setRedirecting(true);
-      window.location.href = APP_LINKS.ios;
-    } else if (platform === "android") {
-      setRedirecting(true);
-      window.location.href = APP_LINKS.android;
-    }
+      window.location.href = dest;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const features = [

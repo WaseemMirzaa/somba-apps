@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   DollarSign,
-  Wallet,
+  Banknote,
   Percent,
   RotateCcw,
   Target,
@@ -83,7 +83,7 @@ export default function SellerRevenueAnalyticsPage() {
           value={formatCurrency(k.netRevenue, locale)}
           change={k.netChange}
           spark={netSpark}
-          icon={Wallet}
+          icon={Banknote}
         />
         <AnalyticsKpiCard
           title={fr ? "Commissions payées" : "Commission paid"}

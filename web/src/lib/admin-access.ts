@@ -20,7 +20,7 @@ import {
   RotateCcw,
   AlertTriangle,
   DollarSign,
-  Wallet,
+  Banknote,
   Settings,
   Headphones,
   Zap,
@@ -78,7 +78,7 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
     titleFr: "Finance",
     items: [
       { href: "/admin/finance", label: "finance", icon: DollarSign, i18n: true },
-      { href: "/admin/payouts", label: "payouts", icon: Wallet, i18n: true },
+      { href: "/admin/payouts", label: "payouts", icon: Banknote, i18n: true },
       { href: "/admin/refunds", label: "refunds", icon: DollarSign, i18n: true },
       { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },
       { href: "/admin/analytics", label: "analytics", icon: BarChart3, i18n: true },

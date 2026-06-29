@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DollarSign, Wallet, RotateCcw, TrendingUp, ArrowRight } from "lucide-react";
+import { DollarSign, Banknote, RotateCcw, TrendingUp, ArrowRight } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
@@ -104,7 +104,7 @@ export default function SellerFinancePage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard title={fr ? "Revenus" : "Revenue"} value={formatCurrency(f.revenue, locale)} icon={TrendingUp} />
         <StatCard title={fr ? "Revenus en attente" : "Pending Revenue"} value={formatCurrency(f.pendingRevenue, locale)} icon={DollarSign} />
-        <StatCard title={t("availableBalance")} value={formatCurrency(f.availableBalance, locale)} icon={Wallet} />
+        <StatCard title={t("availableBalance")} value={formatCurrency(f.availableBalance, locale)} icon={Banknote} />
         <StatCard title={fr ? "Commissions payées" : "Commission Paid"} value={formatCurrency(f.commissionPaid, locale)} icon={DollarSign} />
         <StatCard title={fr ? "Montant remboursé" : "Refund Amount"} value={formatCurrency(f.refundAmount, locale)} icon={RotateCcw} />
       </div>

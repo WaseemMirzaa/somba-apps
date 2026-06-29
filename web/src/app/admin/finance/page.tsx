@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, TrendingUp, Wallet, CreditCard, Percent, Scale, Receipt, Banknote } from "lucide-react";
+import { DollarSign, TrendingUp, CreditCard, Percent, Scale, Receipt, Banknote } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -76,7 +76,7 @@ export default function AdminFinancePage() {
         <StatCard title={fr ? "Chiffre brut" : "Gross revenue"} value={formatCurrency(k.grossRevenue, locale)} icon={DollarSign} trend={`+${k.grossChange}% ${fr ? "cette semaine" : "this week"}`} />
         <StatCard title={fr ? "Revenu net" : "Net revenue"} value={formatCurrency(k.netRevenue, locale)} icon={TrendingUp} trend={`+${k.netChange}%`} />
         <StatCard title={fr ? "Commissions" : "Commission earned"} value={formatCurrency(k.commissionEarned, locale)} icon={Percent} trend={`+${k.commissionChange}%`} />
-        <StatCard title={fr ? "Versements en attente" : "Pending payouts"} value={formatCurrency(k.pendingPayouts, locale)} icon={Wallet} />
+        <StatCard title={fr ? "Versements en attente" : "Pending payouts"} value={formatCurrency(k.pendingPayouts, locale)} icon={Banknote} />
         <StatCard title={fr ? "Remboursements (MTD)" : "Refunds (MTD)"} value={formatCurrency(k.refundsMtd, locale)} icon={Receipt} />
         <StatCard title={fr ? "Paiements en souffrance" : "Outstanding"} value={formatCurrency(k.outstanding, locale)} icon={CreditCard} />
         <StatCard title={fr ? "Retenue fiscale" : "Tax withheld"} value={formatCurrency(k.taxWithheld, locale)} icon={Banknote} />

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Clock, Wallet, Calendar, Percent } from "lucide-react";
+import { Clock, Banknote, Calendar, Percent } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -112,7 +112,7 @@ export default function SellerPayoutPendingPage() {
         <StatCard
           title={fr ? "Disponible pour versement" : "Available for payout"}
           value={formatCurrency(summary.availableForPayout, locale)}
-          icon={Wallet}
+          icon={Banknote}
         />
         <StatCard
           title={fr ? "Prochain versement" : "Next payout date"}

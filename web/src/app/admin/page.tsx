@@ -14,7 +14,7 @@ import {
   ArrowUpRight,
   Activity,
   Shield,
-  Wallet,
+  Banknote,
   Scale,
   Package,
 } from "lucide-react";
@@ -72,7 +72,7 @@ const alertIcon = {
   fraud: Shield,
   returns: RotateCcw,
   dispute: Scale,
-  payout: Wallet,
+  payout: Banknote,
 } as const;
 
 export default function AdminDashboard() {
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
   const quickLinks = [
     { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(k.ordersMtd, locale)} MTD`, icon: ShoppingCart },
     { href: "/admin/sellers", label: t("activeSellers"), sub: `${k.pendingApprovals} ${fr ? "en attente" : "pending"}`, icon: Users },
-    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: formatCurrency(84200, locale), icon: Wallet },
+    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: formatCurrency(84200, locale), icon: Banknote },
     { href: "/admin/fraud", label: fr ? "Fraude" : "Fraud", sub: `${k.fraudFlags} ${fr ? "alertes" : "flags"}`, icon: Shield },
     { href: "/admin/returns", label: fr ? "Retours" : "Returns", sub: `${adminReturnMetrics.returnRate}% ${fr ? "taux" : "rate"}`, icon: RotateCcw },
     { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: fr ? "5 escaladés" : "5 escalated", icon: Scale },
