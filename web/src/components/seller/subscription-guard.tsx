@@ -18,8 +18,23 @@ export function SellerSubscriptionGuard({ children }: { children: React.ReactNod
   const { hasActiveSubscription, subscriptionReady } = useSellerSubscription();
   const { isStoreBlocked } = useModeration();
 
+  const storeBlocked = persona.role === "seller" && isStoreBlocked(persona.name);
+  const isSubscribeRoute = pathname === "/seller/subscribe" || pathname.startsWith("/seller/subscribe/");
+  const needsSubscription = persona.role === "seller" && !isSubscribeRoute;
+  const subscribed = hasActiveSubscription(persona.id);
+
+  // Declared before the early returns below so the hook always runs in the
+  // same order. Blocked stores are excluded so a locked-out seller sees the
+  // block screen instead of being redirected to the subscribe flow.
+  useEffect(() => {
+    if (storeBlocked || !subscriptionReady) return;
+    if (needsSubscription && !subscribed) {
+      router.replace("/seller/subscribe");
+    }
+  }, [storeBlocked, needsSubscription, subscribed, router, subscriptionReady]);
+
   // A seller whose store has been blocked by admin/moderation is locked out.
-  if (persona.role === "seller" && isStoreBlocked(persona.name)) {
+  if (storeBlocked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-6">
         <div className="max-w-md space-y-4 rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
@@ -39,17 +54,6 @@ export function SellerSubscriptionGuard({ children }: { children: React.ReactNod
       </div>
     );
   }
-
-  const isSubscribeRoute = pathname === "/seller/subscribe" || pathname.startsWith("/seller/subscribe/");
-  const needsSubscription = persona.role === "seller" && !isSubscribeRoute;
-  const subscribed = hasActiveSubscription(persona.id);
-
-  useEffect(() => {
-    if (!subscriptionReady) return;
-    if (needsSubscription && !subscribed) {
-      router.replace("/seller/subscribe");
-    }
-  }, [needsSubscription, subscribed, router, subscriptionReady]);
 
   if (!subscriptionReady) {
     return <PageLoader locale={locale} />;

@@ -58,6 +58,7 @@ export function PortalExplorer({
         (g.portalIds as readonly string[]).includes(initialPortalId)
       );
       if (targetGroup) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time tab/group selection synced from props on mount (intentional)
         setGroupId(targetGroup.id);
         setActive(initialPortalId);
       }
@@ -66,6 +67,7 @@ export function PortalExplorer({
 
   useEffect(() => {
     if (!groupPortalIds.includes(active)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time tab/group selection synced from props on mount (intentional)
       setActive(groupPortalIds[0]);
     }
   }, [groupId, active, groupPortalIds]);

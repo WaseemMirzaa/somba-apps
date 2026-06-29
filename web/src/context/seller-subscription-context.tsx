@@ -39,6 +39,7 @@ export function SellerSubscriptionProvider({ children }: { children: React.React
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted state from localStorage after mount (SSR-safe; a lazy initializer would cause a hydration mismatch)
       if (stored) setSubscriptions({ ...DEFAULT_SUBSCRIPTIONS, ...JSON.parse(stored) });
     } catch {
       /* ignore */

@@ -33,6 +33,7 @@ export function RiderZoneProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted state from localStorage after mount (SSR-safe; a lazy initializer would cause a hydration mismatch)
       if (raw) setZones({ ...seed(), ...JSON.parse(raw) });
     } catch {
       /* ignore */

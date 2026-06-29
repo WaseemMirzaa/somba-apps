@@ -40,6 +40,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted state from localStorage after mount (SSR-safe; a lazy initializer would cause a hydration mismatch)
         setBlockedSellers(parsed.sellers ?? []);
         setBlockedProducts(parsed.products ?? []);
       }

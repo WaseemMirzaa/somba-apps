@@ -34,6 +34,7 @@ function MonthlyGoalsEditor() {
   // Local draft so edits, additions and removals can be reviewed before saving.
   const [draft, setDraft] = useState<SellerGoal[]>(goals);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resync the local draft when the saved goals change (intentional)
     setDraft(goals);
   }, [goals]);
 

@@ -145,15 +145,18 @@ export function SegmentDonut({
   const cx = 20;
   const cy = 20;
   const circumference = 2 * Math.PI * r;
-  let offset = 0;
+  // Per-segment dash length and its cumulative start offset, computed as a
+  // pure cumulative sum so nothing is reassigned during render.
+  const dashes = segments.map((s) => (s.pct / 100) * circumference);
+  const offsets = dashes.map((_, i) => dashes.slice(0, i).reduce((sum, d) => sum + d, 0));
 
   return (
     <div className="flex items-center gap-6">
       <svg width={size} height={size} viewBox="0 0 40 40" className="shrink-0 -rotate-90">
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth="5" />
-        {segments.map((s) => {
-          const dash = (s.pct / 100) * circumference;
-          const el = (
+        {segments.map((s, i) => {
+          const dash = dashes[i];
+          return (
             <circle
               key={s.label}
               cx={cx}
@@ -163,12 +166,10 @@ export function SegmentDonut({
               stroke={s.color}
               strokeWidth="5"
               strokeDasharray={`${dash} ${circumference - dash}`}
-              strokeDashoffset={-offset}
+              strokeDashoffset={-offsets[i]}
               strokeLinecap="round"
             />
           );
-          offset += dash;
-          return el;
         })}
       </svg>
       <div className="space-y-2">

@@ -48,6 +48,7 @@ export function SellerGoalsProvider({ children }: { children: React.ReactNode })
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted state from localStorage after mount (SSR-safe; a lazy initializer would cause a hydration mismatch)
         if (Array.isArray(parsed)) setGoals(parsed);
       }
     } catch {
