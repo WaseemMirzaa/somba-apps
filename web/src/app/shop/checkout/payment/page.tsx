@@ -58,7 +58,6 @@ function PaymentContent() {
         <div className="space-y-3">
           {[
             { id: "stripe_card", label: locale === "fr" ? "Stripe — Carte" : "Stripe — Card" },
-            { id: "wallet", label: locale === "fr" ? "Portefeuille Somba&Teka ($142.50)" : "Somba&Teka Wallet ($142.50)" },
             { id: "airtel_money", label: "Airtel Money" },
           ].filter((m) => PAYMENTS.methods.includes(m.id as typeof PAYMENTS.methods[number])).map((m) => (
             <label key={m.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${payment === m.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>

@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getCustomer, orderEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -29,8 +28,6 @@ export default function AdminCustomerDetailPage() {
   const { toast } = useToast();
   const customer = getCustomer(Number(id));
   const [status, setStatus] = useState(customer?.status ?? "active");
-  const [showCredit, setShowCredit] = useState(false);
-  const [creditAmount, setCreditAmount] = useState("");
 
   if (!customer) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Client introuvable" : "Customer not found"}</div>;
@@ -66,27 +63,9 @@ export default function AdminCustomerDetailPage() {
             >
               {status === "active" ? (fr ? "Suspendre" : "Suspend") : fr ? "Réactiver" : "Reactivate"}
             </button>
-            <button onClick={() => setShowCredit(true)} className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">{fr ? "Créditer le portefeuille" : "Wallet Credit"}</button>
           </>
         }
       />
-
-      {showCredit && (
-        <div className="card-premium flex flex-wrap items-end gap-3 p-4">
-          <div>
-            <label className="text-xs text-slate-500">{fr ? "Montant du crédit" : "Credit amount"}</label>
-            <input
-              type="number"
-              className="input-premium mt-1 w-40 px-3 py-2 text-sm"
-              placeholder="50.00"
-              value={creditAmount}
-              onChange={(e) => setCreditAmount(e.target.value)}
-            />
-          </div>
-          <Button size="sm" onClick={() => { toast(fr ? `Portefeuille crédité de ${formatCurrency(Number(creditAmount) || 0, locale)}` : `Wallet credited ${formatCurrency(Number(creditAmount) || 0, locale)}`); setShowCredit(false); setCreditAmount(""); }}>{fr ? "Appliquer le crédit" : "Apply Credit"}</Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowCredit(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-        </div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailSection title={fr ? "Informations client" : "Customer Information"}>

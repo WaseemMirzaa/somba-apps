@@ -67,7 +67,7 @@ export const SUPPORT_TICKETS: SupportTicket[] = [
     date: "2026-06-07",
     messages: [
       { from: "customer", text: "It's been 10 days and my refund hasn't arrived.", textFr: "Cela fait 10 jours et mon remboursement n'est pas arrivé.", at: "2026-06-07T14:00:00Z" },
-      { from: "admin", text: "The refund was issued to your wallet on the 6th. Please check and confirm.", textFr: "Le remboursement a été émis sur votre portefeuille le 6. Merci de vérifier.", at: "2026-06-07T15:12:00Z" },
+      { from: "admin", text: "The refund was issued to your original payment method on the 6th. Please check and confirm.", textFr: "Le remboursement a été émis sur votre moyen de paiement d'origine le 6. Merci de vérifier.", at: "2026-06-07T15:12:00Z" },
     ],
   },
   {

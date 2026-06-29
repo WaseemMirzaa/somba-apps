@@ -61,13 +61,7 @@ export const COMMISSION_CATEGORIES = [
 
 export const PAYMENTS = {
   // Q7: Airtel + Orange + Vodacom (M-Pesa) mobile money. Online payments only.
-  methods: ["stripe_card", "airtel_money", "orange_money", "vodacom_mpesa", "wallet"] as const,
-  wallet: {
-    storeCredit: true,
-    topUpViaMobileMoney: true,
-    refundToWallet: true,
-    refundToOriginal: true,
-  },
+  methods: ["stripe_card", "airtel_money", "orange_money", "vodacom_mpesa"] as const,
   stripe: { mock: true, publishableKey: "pk_test_somba_mock" },
   airtel: { mock: true },
   orange: { mock: true },
@@ -92,7 +86,7 @@ export const RETURNS = {
     { label: "Digital products", labelFr: "Produits numériques" },
   ],
   costBearers: ["seller", "platform"] as const, // Q19
-  refundDestinations: ["original", "store_credit"] as const, // Q20
+  refundDestinations: ["original"] as const, // Q20
 } as const;
 
 export const LEGAL_LINKS = [

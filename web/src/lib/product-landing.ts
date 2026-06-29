@@ -92,8 +92,8 @@ export const PORTALS = [
     image: PORTAL_IMAGES.shop,
     loginHref: "/get-app",
     appHref: APP_LINKS.customerApp,
-    features: ["Categories, search & flash deals", "Guest checkout & Somba&Teka wallet", "Order tracking & easy returns"],
-    featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et portefeuille Somba&Teka", "Suivi de commande et retours faciles"],
+    features: ["Categories, search & flash deals", "Guest checkout & secure payments", "Order tracking & easy returns"],
+    featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et paiement sécurisé", "Suivi de commande et retours faciles"],
     trust: [
       { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
       { icon: "Globe", label: "Web + mobile app", labelFr: "Web + app mobile" },
@@ -110,8 +110,8 @@ export const PORTALS = [
         name: "Cart & Checkout",
         nameFr: "Panier et paiement",
         icon: "CreditCard",
-        items: ["Cart & wishlist", "Guest checkout", "Wallet & coupons", "Order confirmation"],
-        itemsFr: ["Panier et liste d'envies", "Achat invité", "Portefeuille et coupons", "Confirmation de commande"],
+        items: ["Cart & wishlist", "Guest checkout", "Coupons & offers", "Order confirmation"],
+        itemsFr: ["Panier et liste d'envies", "Achat invité", "Coupons et offres", "Confirmation de commande"],
       },
       {
         name: "After Purchase",
@@ -170,8 +170,8 @@ export const PORTALS = [
         name: "Finance",
         nameFr: "Finance",
         icon: "Wallet",
-        items: ["Payout statements", "Commission breakdown", "Wallet balance", "Analytics"],
-        itemsFr: ["Relevés de paiement", "Détail des commissions", "Solde portefeuille", "Analytics"],
+        items: ["Payout statements", "Commission breakdown", "Available balance", "Analytics"],
+        itemsFr: ["Relevés de paiement", "Détail des commissions", "Solde disponible", "Analytics"],
       },
     ],
   },
@@ -367,10 +367,10 @@ export const PLATFORM_MODULES = [
     id: "payments",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Card or Somba&Teka wallet — fraud-checked checkout with buyer protection on every order.",
-    descFr: "Carte ou portefeuille Somba&Teka — paiement vérifié avec protection acheteur sur chaque commande.",
-    highlight: "Card + wallet",
-    highlightFr: "Carte + portefeuille",
+    desc: "Card or mobile money — fraud-checked checkout with buyer protection on every order.",
+    descFr: "Carte ou mobile money — paiement vérifié avec protection acheteur sur chaque commande.",
+    highlight: "Card + mobile money",
+    highlightFr: "Carte + mobile money",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
     href: "/get-app",
@@ -379,7 +379,7 @@ export const PLATFORM_MODULES = [
     icon: "ShieldCheck",
     image: "https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=1200&auto=format&fit=crop",
     trust: [
-      { icon: "Wallet", label: "Wallet & coupons", labelFr: "Portefeuille & coupons" },
+      { icon: "Banknote", label: "Mobile money", labelFr: "Mobile money" },
       { icon: "Lock", label: "Encrypted checkout", labelFr: "Paiement chiffré" },
     ],
   },
@@ -428,7 +428,7 @@ export const PLATFORM_MODULES = [
 ] as const;
 
 export const PAYMENT_OPTIONS = [
-  { title: "Card & Wallet", titleFr: "Carte et portefeuille", desc: "Pay securely at checkout with saved cards or your Somba&Teka wallet balance.", descFr: "Payez en toute sécurité par carte ou portefeuille Somba&Teka." },
+  { title: "Card & Mobile Money", titleFr: "Carte et mobile money", desc: "Pay securely at checkout with saved cards or mobile money (Airtel, Orange, M-Pesa).", descFr: "Payez en toute sécurité par carte ou mobile money (Airtel, Orange, M-Pesa)." },
   { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba&Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba&Teka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
@@ -442,7 +442,7 @@ export const WHY_CHOOSE = [
   { title: "Sell and grow", titleFr: "Vendre et grandir", desc: "Open your store, list products, run promotions, and reach customers across the country.", descFr: "Ouvrez votre boutique, listez vos produits et touchez des clients partout." },
   { title: "Bilingual FR/EN", titleFr: "Bilingue FR/EN", desc: "Shop, sell, and get support in French or English across web and mobile.", descFr: "Achetez, vendez et obtenez de l'aide en français ou en anglais." },
   { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba&Teka app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba&Teka — même panier, mêmes commandes." },
-  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card and wallet options with buyer protection on every order.", descFr: "Carte et portefeuille avec protection acheteur sur chaque commande." },
+  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card and mobile money options with buyer protection on every order.", descFr: "Carte et mobile money avec protection acheteur sur chaque commande." },
 ] as const;
 
 export const SELLER_PLANS = [
@@ -492,12 +492,12 @@ export const PRODUCT_HERO = {
   bullets: [
     "Thousands of products from verified sellers",
     "1–3 day delivery with real-time tracking",
-    "Card and wallet",
+    "Card and mobile money",
   ],
   bulletsFr: [
     "Des milliers de produits de vendeurs vérifiés",
     "Livraison en 1–3 jours avec suivi en temps réel",
-    "Carte et portefeuille",
+    "Carte et mobile money",
   ],
   guarantee: "Free to browse · Guest checkout · Easy returns within 7 days",
   guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 7 jours",
@@ -517,8 +517,8 @@ export const CONVERSION_PATHS = [
     badgeFr: "Le plus populaire",
     title: "I want to shop",
     titleFr: "Je veux acheter",
-    desc: "Browse categories, compare deals, and checkout — guest or account, card, or wallet.",
-    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte ou portefeuille.",
+    desc: "Browse categories, compare deals, and checkout — guest or account, card, or mobile money.",
+    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte ou mobile money.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
     href: "/get-app",
@@ -554,7 +554,7 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card or Somba&Teka wallet — guest checkout available on every order.", descFr: "Payez par carte ou portefeuille Somba&Teka — paiement invité disponible." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card or mobile money — guest checkout available on every order.", descFr: "Payez par carte ou mobile money — paiement invité disponible." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
@@ -602,8 +602,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept credit/debit cards and Somba&Teka wallet balance. Guest checkout is available without creating an account.",
-    aFr: "Cartes bancaires et portefeuille Somba&Teka. Paiement invité sans compte.",
+    a: "We accept credit/debit cards and mobile money (Airtel, Orange, M-Pesa). Guest checkout is available without creating an account.",
+    aFr: "Cartes bancaires et mobile money (Airtel, Orange, M-Pesa). Paiement invité sans compte.",
   },
   {
     q: "How long does delivery take?",
