@@ -15,7 +15,6 @@ class Strings {
   String get prototype => isFr ? 'Mode prototype' : 'Prototype Mode';
   String get orders => isFr ? 'Commandes' : 'Orders';
   String get wishlist => isFr ? 'Favoris' : 'Wishlist';
-  String get wallet => isFr ? 'Portefeuille' : 'Wallet';
   String get settings => isFr ? 'Paramètres' : 'Settings';
   String get language => isFr ? 'Langue' : 'Language';
   String get addToCart => isFr ? 'Ajouter' : 'Add to Cart';

@@ -22,7 +22,7 @@ export interface FxRate {
   setBy: string;
 }
 
-export type PaymentMethod = "stripe_card" | "cod" | "airtel_money" | "wallet";
+export type PaymentMethod = "stripe_card" | "airtel_money";
 
 export type UserRole =
   | "customer"
@@ -65,15 +65,6 @@ export interface Address {
   postalCode: string;
   phone: string;
   isDefault: boolean;
-}
-
-export interface WalletTransaction {
-  id: string;
-  type: "credit" | "debit" | "cashback" | "refund" | "topup";
-  amount: number;
-  balance: number;
-  description: string;
-  date: string;
 }
 
 export interface FraudAlert {

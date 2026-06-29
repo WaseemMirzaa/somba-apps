@@ -14,7 +14,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
-  String payment = 'cod';
+  String payment = 'stripe_card';
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 8),
             Text('${fr ? "Frais zone" : "Zone fee"}: \$5'),
             const SizedBox(height: 16),
-            ...['stripe_card', 'cod', 'airtel_money', 'wallet'].map((m) => RadioListTile(
+            ...['stripe_card', 'airtel_money'].map((m) => RadioListTile(
                   title: Text(m),
                   value: m,
                   groupValue: payment,
@@ -43,7 +43,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OrderSuccessScreen(locale: widget.locale, orderId: 'ORD-2024-001'))),
-              child: Text(payment == 'cod' ? (fr ? 'Confirmer COD' : 'Confirm COD') : (fr ? 'Payer' : 'Pay')),
+              child: Text(fr ? 'Payer' : 'Pay'),
             ),
           ],
         ),

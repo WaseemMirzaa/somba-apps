@@ -27,10 +27,8 @@ All questionnaire answers applied to the prototype.
 | Method | Status |
 |--------|--------|
 | Stripe card | Mock at checkout |
-| COD | OTP verification, limits, address blocking |
-| Airtel Money | Checkout + wallet top-up |
-| Somba&Teka Wallet | Store credit, top-up, transaction history |
-| Refunds | Original method OR wallet |
+| Airtel Money | Checkout |
+| Refunds | Original payment method |
 
 ## 4. Auth & Roles
 
@@ -43,7 +41,7 @@ All questionnaire answers applied to the prototype.
 ## 5. Portals (78 web routes)
 
 ### Customer Shop
-Home, search, categories, PDP (Q&A + reviews), cart, checkout (4-step), wallet, refer, wishlist, orders, return, exchange, support, guest flow
+Home, search, categories, PDP (Q&A + reviews), cart, checkout (4-step), refer, wishlist, orders, return, exchange, support, guest flow
 
 ### Seller (28 routes)
 7-step product wizard, health badges, payout request form, promotions, finance, analytics

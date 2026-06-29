@@ -6,7 +6,6 @@ Reconciles prototype-only flows with the build contract (2026-06-08).
 
 | ID | Screen | Route |
 |----|--------|-------|
-| CF-32 | Somba&Teka Wallet | `/shop/wallet` |
 | CF-33 | Refer & Earn | `/shop/refer` |
 | CF-34 | Exchange Request | `/shop/exchange` |
 | CF-35 | Support Ticket | `/shop/support` |
