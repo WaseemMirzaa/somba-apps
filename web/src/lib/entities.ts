@@ -146,7 +146,6 @@ export type ProductDetailEntity = {
   stock: number;
   inStock: boolean;
   deliveryDays: number;
-  codAvailable: boolean;
   openBoxAvailable: boolean;
   returnWindow: number;
   sellerId: number;
@@ -399,7 +398,6 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     stock: p.stock,
     inStock: p.stock > 0,
     deliveryDays: p.deliveryDays,
-    codAvailable: true,
     openBoxAvailable: p.price > 200,
     returnWindow: 7,
     sellerId: store.id,

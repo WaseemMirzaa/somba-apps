@@ -66,13 +66,11 @@ export const SCREEN_REGISTRY: ScreenEntry[] = [
   { id: "AF-18", name: "Category Management", webRoute: "/admin/categories", portal: "AF" },
   // WF Warehouse
   { id: "WF-11", name: "Aged/Stuck Parcels", webRoute: "/warehouse/aged", portal: "WF" },
-  { id: "WF-12", name: "Shift Reconciliation", webRoute: "/warehouse/reconciliation", portal: "WF" },
   // RF Rider
   { id: "RF-02", name: "First Password Set", webRoute: "/rider/first-password", flutterRoute: "/first-password", portal: "RF" },
   { id: "RF-07", name: "Batch Overview", webRoute: "/rider/batches/:id", flutterRoute: "/batches/:id", portal: "RF" },
   { id: "RF-09", name: "Proof of Delivery", webRoute: "/rider/tasks/:id/pod", flutterRoute: "/tasks/:id/pod", portal: "RF" },
   { id: "RF-10", name: "Failed Delivery", webRoute: "/rider/tasks/:id/fail", flutterRoute: "/tasks/:id/fail", portal: "RF" },
-  { id: "RF-11", name: "COD Shift Summary", webRoute: "/rider/cod/summary", flutterRoute: "/cod/summary", portal: "RF" },
   { id: "RF-13", name: "Task History", webRoute: "/rider/history", flutterRoute: "/history", portal: "RF" },
   { id: "RF-14", name: "Notification Centre", webRoute: "/rider/notifications", flutterRoute: "/notifications", portal: "RF" },
 ];

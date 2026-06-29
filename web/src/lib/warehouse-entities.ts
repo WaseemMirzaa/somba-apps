@@ -30,7 +30,6 @@ export type RiderEntity = {
   performanceScore: number;
   deliveries: number;
   failedDeliveries: number;
-  codCollections: number;
   rating: number;
   earningsDaily: number;
   earningsWeekly: number;
@@ -390,21 +389,21 @@ export const riderEntities: RiderEntity[] = [
   {
     id: 1, name: "Jean-Pierre M.", phone: "+243 99 111 2233", zone: "Zone A",
     vehicle: "Motorcycle", vehicleFr: "Moto", status: "active", activeDeliveries: 8, location: "Gombe",
-    performanceScore: 94, deliveries: 1240, failedDeliveries: 12, codCollections: 45200,
+    performanceScore: 94, deliveries: 1240, failedDeliveries: 12,
     rating: 4.8, earningsDaily: 85, earningsWeekly: 520, earningsMonthly: 2100,
     assignedBatches: ["BATCH-001"],
   },
   {
     id: 2, name: "Paul Kabongo", phone: "+243 99 444 5566", zone: "Zone B",
     vehicle: "Van", vehicleFr: "Camionnette", status: "active", activeDeliveries: 5, location: "Limete",
-    performanceScore: 88, deliveries: 890, failedDeliveries: 18, codCollections: 32100,
+    performanceScore: 88, deliveries: 890, failedDeliveries: 18,
     rating: 4.5, earningsDaily: 72, earningsWeekly: 445, earningsMonthly: 1780,
     assignedBatches: ["BATCH-002"],
   },
   {
     id: 3, name: "Marc Tshisekedi", phone: "+243 99 777 8899", zone: "Zone C",
     vehicle: "Motorcycle", vehicleFr: "Moto", status: "active", activeDeliveries: 3, location: "Bandal",
-    performanceScore: 91, deliveries: 670, failedDeliveries: 8, codCollections: 28900,
+    performanceScore: 91, deliveries: 670, failedDeliveries: 8,
     rating: 4.7, earningsDaily: 68, earningsWeekly: 410, earningsMonthly: 1650,
     assignedBatches: [],
   },

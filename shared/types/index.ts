@@ -69,7 +69,7 @@ export interface Address {
 
 export interface FraudAlert {
   id: string;
-  type: "cod_risk" | "address_block" | "velocity" | "otp_fail";
+  type: "address_block" | "velocity" | "otp_fail";
   severity: "low" | "medium" | "high";
   customer: string;
   orderId?: string;

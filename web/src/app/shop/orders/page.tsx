@@ -23,7 +23,7 @@ export default function ShopOrdersPage() {
     return fr ? (map[status] ?? status) : status;
   };
 
-  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
+  // formatPaymentMethod is a passthrough; map the "Card" value to French locally.
   const paymentMethodLabel = (method: string) =>
     fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 

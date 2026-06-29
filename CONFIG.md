@@ -47,16 +47,16 @@ Home, search, categories, PDP (Q&A + reviews), cart, checkout (4-step), refer, w
 7-step product wizard, health badges, payout request form, promotions, finance, analytics
 
 ### Admin (22 routes)
-Moderation, fraud/COD risk, flash sales (date picker), CMS blocks, roles, audit log, finance, marketing
+Moderation, fraud risk, flash sales (date picker), CMS blocks, roles, audit log, finance, marketing
 
 ### Warehouse (27 routes)
-Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim), COD shift reconciliation
+Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim)
 
 ### Rider Web
 `/rider/*` — tasks, earnings, profile
 
 ### Rider Flutter (separate app)
-`rider-app/` — tasks, mock maps, COD, open box, earnings, dark mode
+`rider-app/` — tasks, mock maps, open box, earnings, dark mode
 
 ## 6. Technical
 

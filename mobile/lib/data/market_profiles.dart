@@ -21,7 +21,6 @@ class MarketProfile {
   final String label;
   final String phonePrefix;
   final double? fxRateUsdCdf;
-  final double codMaxOrderValue;
   final List<Zone> zones;
 
   const MarketProfile({
@@ -29,7 +28,6 @@ class MarketProfile {
     required this.label,
     required this.phonePrefix,
     this.fxRateUsdCdf,
-    required this.codMaxOrderValue,
     required this.zones,
   });
 }
@@ -39,7 +37,6 @@ const marketProfiles = {
     id: MarketProfileId.france,
     label: 'France (Demo)',
     phonePrefix: '+33',
-    codMaxOrderValue: 500,
     zones: [
       Zone(id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', deliveryFeeUsd: 0),
       Zone(id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', deliveryFeeUsd: 5),
@@ -50,7 +47,6 @@ const marketProfiles = {
     label: 'DRC (Production)',
     phonePrefix: '+243',
     fxRateUsdCdf: 2850,
-    codMaxOrderValue: 200,
     zones: [
       Zone(id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', deliveryFeeUsd: 3),
       Zone(id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', deliveryFeeUsd: 5),

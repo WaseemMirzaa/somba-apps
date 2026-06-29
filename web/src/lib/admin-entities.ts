@@ -1,7 +1,6 @@
 import type { AuditLogEntry, FraudAlert } from "../../../shared/types/index";
 
 export const fraudAlerts: FraudAlert[] = [
-  { id: "FRD-001", type: "cod_risk", severity: "high", customer: "Unknown User", orderId: "ORD-2024-990", score: 87, status: "open", date: "2024-06-08" },
   { id: "FRD-002", type: "otp_fail", severity: "medium", customer: "Patrick L.", orderId: "ORD-2024-988", score: 62, status: "reviewed", date: "2024-06-07" },
   { id: "FRD-003", type: "velocity", severity: "high", customer: "Sophie M.", score: 91, status: "blocked", date: "2024-06-07" },
   { id: "FRD-004", type: "address_block", severity: "low", customer: "Ahmed H.", orderId: "ORD-2024-985", score: 45, status: "open", date: "2024-06-06" },
