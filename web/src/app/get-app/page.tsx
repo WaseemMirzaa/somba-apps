@@ -33,7 +33,7 @@ export default function GetAppPage() {
 
   const features = [
     { icon: Truck, en: "1–3 day delivery with live tracking", fr: "Livraison 1–3 jours avec suivi en direct" },
-    { icon: ShieldCheck, en: "Card, wallet & mobile money", fr: "Carte, portefeuille et mobile money" },
+    { icon: ShieldCheck, en: "Card & mobile money", fr: "Carte et mobile money" },
     { icon: RotateCcw, en: "Easy 30-day returns", fr: "Retours faciles sous 30 jours" },
   ];
 

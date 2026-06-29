@@ -287,7 +287,7 @@ export const sellerReturnList = [
     id: "RET-001", orderId: "ORD-2024-001", customer: "Marie Dubois", reason: "Wrong size", reasonFr: "Mauvaise taille",
     amount: 129, status: "pending_inspection", productId: 4, product: "Nike Air Max 270", variant: "Size 42", variantFr: "Taille 42", qty: 1,
     inspection: { warehouseNotes: "Good condition — unopened box", warehouseNotesFr: "Bon état — boîte non ouverte", photos: 2, condition: "Unopened", conditionFr: "Non ouvert" },
-    refund: { amount: 129, method: "Somba&Teka Wallet", methodFr: "Portefeuille Somba&Teka", status: "pending" },
+    refund: { amount: 129, method: "Original Payment", methodFr: "Paiement d'origine", status: "pending" },
     timeline: [
       { time: "2024-06-01 20:00", label: "Order Delivered", done: true },
       { time: "2024-06-05 10:15", label: "Return Requested", done: true },

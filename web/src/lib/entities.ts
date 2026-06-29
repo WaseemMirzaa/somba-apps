@@ -141,7 +141,6 @@ export type ProductDetailEntity = {
   originalPrice: number;
   discount: number;
   tax: number;
-  walletCashback: number;
   rating: number;
   reviews: number;
   stock: number;
@@ -395,7 +394,6 @@ export const productDetailEntities: ProductDetailEntity[] = products.map((p) => 
     originalPrice: p.originalPrice,
     discount: p.discount,
     tax: Math.round(p.price * 0.1),
-    walletCashback: Math.round(p.price * 0.02),
     rating: p.rating,
     reviews: p.reviews,
     stock: p.stock,

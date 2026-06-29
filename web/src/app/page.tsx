@@ -66,7 +66,7 @@ const MARQUEE_ITEMS = [
   { icon: Truck, en: "1–3 day delivery", fr: "Livraison 1–3 jours" },
   { icon: ShieldCheck, en: "Buyer protection", fr: "Protection acheteur" },
   { icon: RotateCcw, en: "30-day returns", fr: "Retours 30 jours" },
-  { icon: Wallet, en: "Card · Mobile money · Wallet", fr: "Carte · Mobile money · Portefeuille" },
+  { icon: Wallet, en: "Card · Mobile money", fr: "Carte · Mobile money" },
   { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
   { icon: Headphones, en: "24/7 support", fr: "Assistance 24h/24, 7j/7" },
   { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },

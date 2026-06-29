@@ -47,11 +47,10 @@ export const commissionByCategory = [
 
 /** Payment method split (share of collected volume). */
 export const paymentMethodSplit = [
-  { label: "Card (Stripe)", labelFr: "Carte (Stripe)", pct: 46, color: "#1d4ed8" },
+  { label: "Card (Stripe)", labelFr: "Carte (Stripe)", pct: 52, color: "#1d4ed8" },
   { label: "Airtel Money", labelFr: "Airtel Money", pct: 21, color: "#dc2626" },
   { label: "Orange Money", labelFr: "Orange Money", pct: 18, color: "#ea580c" },
   { label: "Vodacom M-Pesa", labelFr: "Vodacom M-Pesa", pct: 9, color: "#16a34a" },
-  { label: "Wallet", labelFr: "Portefeuille", pct: 6, color: "#7c3aed" },
 ] as const;
 
 /** Settlement aging — pending payouts by age cohort. */

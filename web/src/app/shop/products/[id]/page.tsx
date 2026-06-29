@@ -108,8 +108,6 @@ export default function ShopProductDetailPage() {
             <span className="rounded bg-[var(--primary)] px-2 py-0.5 text-sm font-bold text-white">-{product.discount}%</span>
           </div>
 
-          <p className="text-sm text-emerald-600">{locale === "fr" ? "Remboursement portefeuille" : "Wallet cashback"}: {formatCurrency(product.walletCashback, locale)}</p>
-
           {product.variants.map((v) => (
             <div key={v.name}>
               <p className="mb-2 text-sm font-medium text-slate-700">{fr ? v.nameFr : v.name}</p>
