@@ -33,7 +33,7 @@ class NotificationsScreen extends StatelessWidget {
       (Icons.local_shipping_rounded, AppColors.primary, 'Out for delivery', 'Your order SMB-2026-4821 is on the way.', '2m', true),
       (Icons.bolt_rounded, AppColors.accent, 'Flash sale live', 'Up to 30% off electronics — ends tonight.', '1h', true),
       (Icons.check_circle_rounded, AppColors.success, 'Order delivered', 'SMB-2026-4712 was delivered. Rate it?', '1d', false),
-      (Icons.account_balance_wallet_rounded, AppColors.royalBlue, 'Wallet top-up', '\$50 added to your Somba wallet.', '2d', false),
+      (Icons.replay_rounded, AppColors.royalBlue, 'Refund processed', '\$18 refunded to your card for SMB-2026-4712.', '2d', false),
       (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false),
     ];
     return Scaffold(
@@ -66,66 +66,6 @@ class NotificationsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class WalletScreen extends StatelessWidget {
-  final Locale locale;
-  const WalletScreen({super.key, this.locale = const Locale('en')});
-  @override
-  Widget build(BuildContext context) {
-    const tx = [
-      (Icons.add_rounded, 'Top-up · Airtel Money', '+\$50.00', true),
-      (Icons.shopping_bag_rounded, 'Order SMB-2026-4821', '-\$29.00', false),
-      (Icons.card_giftcard_rounded, 'Referral reward', '+\$5.00', true),
-      (Icons.replay_rounded, 'Refund · SMB-2026-4712', '+\$18.00', true),
-    ];
-    return Scaffold(
-      appBar: backAppBar(context, 'Somba Wallet'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(24), boxShadow: AppShadow.soft),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Available balance', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13.5)),
-              const SizedBox(height: 6),
-              const Text('\$240.00', style: TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -1)),
-              const SizedBox(height: 18),
-              Row(children: [
-                Expanded(child: _walletBtn(Icons.add_rounded, 'Top up')),
-                const SizedBox(width: 12),
-                Expanded(child: _walletBtn(Icons.north_east_rounded, 'Send')),
-              ]),
-            ]),
-          ),
-          const SectionHeader('Recent activity', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
-          ...tx.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Panel(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(children: [
-                    Container(height: 42, width: 42, decoration: BoxDecoration(color: (t.$4 ? AppColors.success : AppColors.ink).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(t.$1, color: t.$4 ? AppColors.success : AppColors.ink, size: 20)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(t.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-                    Text(t.$3, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: t.$4 ? AppColors.success : AppColors.ink)),
-                  ]),
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _walletBtn(IconData icon, String label) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13.5)),
-        ]),
-      );
 }
 
 class AddressBookScreen extends StatelessWidget {

@@ -85,16 +85,6 @@ class TaskDetailScreen extends StatelessWidget {
           Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
             child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary), onPressed: () {})),
         ])),
-        if (t.codAmount != null) ...[
-          const SizedBox(height: 12),
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: AppColors.cashGradient, borderRadius: BorderRadius.circular(18)),
-            child: Row(children: [
-              const Icon(Icons.payments_rounded, color: Colors.white),
-              const SizedBox(width: 10),
-              const Expanded(child: Text('Collect cash on delivery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-              Text('\$${t.codAmount!.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-            ])),
-        ],
         const SizedBox(height: 12),
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Handover checklist', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
@@ -164,17 +154,6 @@ class PodScreen extends StatelessWidget {
           const Expanded(child: Text('Delivery OTP verified', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
           Pill('4821', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
         ])),
-        if (task.codAmount != null) ...[
-          const SizedBox(height: 12),
-          SurfaceCard(child: Row(children: [
-            Container(height: 40, width: 40, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.payments_rounded, color: Color(0xFFB45309))),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('Cash collected', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-            Text('\$${task.codAmount!.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-            const SizedBox(width: 8),
-            const Icon(Icons.check_circle_rounded, color: AppColors.primary),
-          ])),
-        ],
         const SizedBox(height: 18),
         PrimaryButton('Complete delivery', icon: Icons.check_rounded,
           onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),

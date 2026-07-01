@@ -16,13 +16,11 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
-  String payment = 'cod';
+  String payment = 'stripe_card';
 
   static const _methods = [
     ('stripe_card', Icons.credit_card_rounded),
-    ('cod', Icons.payments_rounded),
     ('airtel_money', Icons.smartphone_rounded),
-    ('wallet', Icons.account_balance_wallet_rounded),
   ];
 
   @override

@@ -9,7 +9,7 @@ class BatchOverviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stops = mockTasks;
-    final cod = stops.where((t) => t.codAmount != null).fold<double>(0, (s, t) => s + t.codAmount!);
+    final items = stops.fold<int>(0, (s, t) => s + t.items);
     return Scaffold(
       appBar: backAppBar(context, 'Batch BAT-204'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
@@ -21,7 +21,7 @@ class BatchOverviewScreen extends StatelessWidget {
             _hdiv(),
             _hstat('12.4', 'km'),
             _hdiv(),
-            _hstat('\$${cod.toStringAsFixed(0)}', 'COD'),
+            _hstat('$items', 'Items'),
           ]),
         ),
         const SizedBox(height: 16),
@@ -39,7 +39,7 @@ class BatchOverviewScreen extends StatelessWidget {
               Text(t.customer, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, decoration: done ? TextDecoration.lineThrough : null, color: done ? AppColors.muted : AppColors.ink)),
               Text('${t.typeLabel} · ${t.distanceKm} km', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             ])),
-            if (t.codAmount != null) Pill('\$${t.codAmount!.toStringAsFixed(0)}', color: AppColors.accent.withValues(alpha: 0.16), textColor: const Color(0xFFB45309), fontSize: 11),
+            Pill('${t.items} item${t.items > 1 ? 's' : ''}', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
           ])));
         }),
         const SizedBox(height: 4),
@@ -94,52 +94,6 @@ class ZoneScreen extends StatelessWidget {
         ])))),
         const SizedBox(height: 4),
         const PrimaryButton('Move to high-demand zone', icon: Icons.trending_up_rounded),
-      ]),
-    );
-  }
-}
-
-// ---------------- COD shift summary (RF-11) ----------------
-class CodSummaryScreen extends StatelessWidget {
-  const CodSummaryScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    const rows = [
-      ('TSK-8841', 'Marie Dubois', 149.90, 'Cash'),
-      ('TSK-8839', 'Jean Petit', 89.00, 'Cash'),
-      ('TSK-8830', 'Aline K.', 62.00, 'Airtel'),
-      ('TSK-8825', 'Paul Kabeya', 119.10, 'Cash'),
-    ];
-    final total = rows.fold<double>(0, (s, r) => s + r.$3);
-    return Scaffold(
-      appBar: backAppBar(context, 'COD shift summary'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(gradient: AppColors.cashGradient, borderRadius: BorderRadius.circular(22)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Collected today', style: TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 4),
-            Text('\$${total.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans')),
-            const SizedBox(height: 4),
-            Text('${rows.length} collections · deposit due by 6 PM', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        const Text('Collections', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-        const SizedBox(height: 10),
-        ...rows.map((r) => Padding(padding: const EdgeInsets.only(bottom: 10), child: SurfaceCard(padding: const EdgeInsets.all(14), child: Row(children: [
-          Container(height: 40, width: 40, decoration: BoxDecoration(color: (r.$4 == 'Cash' ? AppColors.accent : AppColors.info).withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
-            child: Icon(r.$4 == 'Cash' ? Icons.payments_rounded : Icons.smartphone_rounded, color: r.$4 == 'Cash' ? const Color(0xFFB45309) : AppColors.info, size: 20)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(r.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-            Text('${r.$1} · ${r.$4}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-          ])),
-          Text('\$${r.$3.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-        ])))),
-        const SizedBox(height: 4),
-        const PrimaryButton('Confirm hub deposit', icon: Icons.account_balance_rounded),
       ]),
     );
   }

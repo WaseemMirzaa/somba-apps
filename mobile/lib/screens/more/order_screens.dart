@@ -74,9 +74,9 @@ class OrderDetailScreen extends StatelessWidget {
               _row('Total', money(subtotal + fee), bold: true),
               const SizedBox(height: 12),
               Row(children: [
-                Icon(Icons.payments_rounded, size: 18, color: AppColors.success),
+                Icon(Icons.verified_rounded, size: 18, color: AppColors.success),
                 const SizedBox(width: 8),
-                const Text('Cash on delivery', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const Text('Paid online · Airtel Money', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
             ]),
           ),

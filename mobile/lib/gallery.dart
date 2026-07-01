@@ -24,7 +24,6 @@ Map<String, WidgetBuilder> get _screens => {
       'order-detail': (_) => const OrderDetailScreen(locale: _en),
       'order-tracking': (_) => const OrderTrackingScreen(locale: _en),
       'wishlist': (_) => const WishlistScreen(locale: _en),
-      'wallet': (_) => const WalletScreen(locale: _en),
       'notifications': (_) => const NotificationsScreen(locale: _en),
       'addresses': (_) => const AddressBookScreen(locale: _en),
       'store': (_) => const StoreScreen(locale: _en),

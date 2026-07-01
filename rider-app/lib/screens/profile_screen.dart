@@ -96,8 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchOverviewScreen()))),
           _Item(Icons.map_rounded, 'Zones & demand', 'Live demand heatmap',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZoneScreen()))),
-          _Item(Icons.account_balance_wallet_rounded, 'COD summary', 'Cash collected & deposit',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CodSummaryScreen()))),
           _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
           _Item(Icons.notifications_rounded, 'Notifications', 'Tasks, routes & payouts',

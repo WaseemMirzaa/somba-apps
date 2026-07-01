@@ -16,6 +16,8 @@ IconData categoryIcon(String category) {
       return Icons.sports_basketball_rounded;
     case 'Books':
       return Icons.menu_book_rounded;
+    case 'Jewelery':
+      return Icons.diamond_rounded;
     default:
       return Icons.shopping_bag_rounded;
   }
@@ -36,43 +38,30 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grad = AppColors.tileGradients[product.id % AppColors.tileGradients.length];
-    final accent = grad.last;
     final glyph = categoryIcon(product.category);
 
     return LayoutBuilder(
       builder: (context, c) {
         final size = iconSize ?? (c.maxWidth.isFinite ? c.maxWidth * 0.42 : 64.0);
+        final pad = c.maxHeight.isFinite ? c.maxHeight * 0.10 : 12.0;
         return Stack(
           fit: StackFit.expand,
           children: [
-            // Base gradient
-            DecoratedBox(
+            // Clean, catalogue-style light backdrop for the professional photo.
+            const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: grad,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFFFFFFF), Color(0xFFF3F4F8)],
                 ),
               ),
             ),
-            // Decorative soft circles
-            Positioned(
-              top: -18,
-              right: -18,
-              child: _blob(64, Colors.white.withValues(alpha: 0.35)),
-            ),
-            Positioned(
-              bottom: -24,
-              left: -10,
-              child: _blob(72, accent.withValues(alpha: 0.35)),
-            ),
-            // Bundled 3D product image, centred on the gradient tile. Falls
-            // back to the category glyph if the asset is missing.
+            // Real product photo (white-background studio shot).
             Padding(
-              padding: EdgeInsets.all(c.maxHeight.isFinite ? c.maxHeight * 0.14 : 16),
+              padding: EdgeInsets.all(pad),
               child: Image.asset(
-                'assets/products/${product.id}.png',
+                'assets/products/${product.id}.jpg',
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => Center(
                   child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
@@ -84,10 +73,4 @@ class ProductImage extends StatelessWidget {
       },
     );
   }
-
-  Widget _blob(double d, Color color) => Container(
-        width: d,
-        height: d,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
 }
