@@ -1,0 +1,95 @@
+name: Rider App · Build APK
+
+# Builds and releases the Somba&Teka rider Flutter app (rider-app/) as an
+# Android APK using Flutter 3.35.7.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/customer-app-cicd-ui-xjwzda
+    paths:
+      - 'rider-app/**'
+      - '.github/workflows/rider-app-apk.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rider-app/**'
+      - '.github/workflows/rider-app-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.35.7'
+
+jobs:
+  build-apk:
+    name: Build Rider Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rider-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build release APK (universal)
+        run: flutter build apk --release
+
+      - name: Build release APKs (split per ABI)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Rename universal APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/somba-rider.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: somba-rider-apk
+          path: rider-app/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rider-apk-v${{ github.run_number }}
+          name: Somba Rider App — APK build ${{ github.run_number }}
+          body: |
+            Automated release of the Somba&Teka rider Android app.
+
+            - Built with Flutter ${{ env.FLUTTER_VERSION }}
+            - Commit: ${{ github.sha }}
+
+            Download `somba-rider.apk` (universal) below and install on any Android device.
+          files: rider-app/build/app/outputs/flutter-apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
