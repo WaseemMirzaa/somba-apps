@@ -26,3 +26,6 @@ flutter:
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter.ttf
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf

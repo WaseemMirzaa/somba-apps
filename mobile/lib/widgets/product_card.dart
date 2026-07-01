@@ -13,6 +13,7 @@ class ProductCard extends StatefulWidget {
   final String lang;
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
+  final int? soldPercent;
 
   const ProductCard({
     super.key,
@@ -20,6 +21,7 @@ class ProductCard extends StatefulWidget {
     required this.lang,
     this.onTap,
     this.onAdd,
+    this.soldPercent,
   });
 
   @override
@@ -118,6 +120,10 @@ class _ProductCardState extends State<ProductCard> {
                         ),
                       ],
                     ),
+                    if (widget.soldPercent != null) ...[
+                      const SizedBox(height: 8),
+                      _ClaimBar(percent: widget.soldPercent!, lang: widget.lang),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -184,6 +190,53 @@ class _AddButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Slim "N% claimed" progress bar used on deal cards to add urgency.
+class _ClaimBar extends StatelessWidget {
+  final int percent;
+  final String lang;
+  const _ClaimBar({required this.percent, required this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = (percent.clamp(0, 100)) / 100;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(100),
+          child: Stack(
+            children: [
+              Container(height: 6, color: AppColors.accent.withValues(alpha: 0.14)),
+              FractionallySizedBox(
+                widthFactor: p,
+                child: Container(
+                  height: 6,
+                  decoration: const BoxDecoration(gradient: AppColors.dealGradient),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Icon(Icons.local_fire_department_rounded, size: 12, color: AppColors.accent),
+            const SizedBox(width: 2),
+            Text(
+              lang == 'fr' ? '$percent% réclamé' : '$percent% claimed',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accentDark,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

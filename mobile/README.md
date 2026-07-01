@@ -7,9 +7,12 @@ The customer-facing marketplace app for **Somba&Teka**, built with Flutter.
 - Modern, top-tier e-commerce UI: gradient header, hero carousel, live flash-sale
   countdown, premium product cards, wishlist, variant & quantity selectors, a full
   cart → checkout → order-success flow, and a polished account area.
+- Contemporary touches: **floating capsule navigation** with an animated expanding
+  pill, **Sora** display headings paired with Inter body text, a "For You / Trending"
+  feed selector, and "% claimed" urgency bars on deals.
 - Centralised design system (`lib/theme/app_theme.dart`) — colour, type, radius,
   elevation and component themes in one place.
-- Bundled **Inter** font (no runtime font fetching) and self-contained product
+- Bundled **Inter + Sora** fonts (no runtime font fetching) and self-contained product
   visuals (gradient tiles with category glyphs) that fall back gracefully when
   network images are unavailable.
 - English / French localisation.
