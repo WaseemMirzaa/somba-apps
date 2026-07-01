@@ -171,7 +171,7 @@ class _CartScreenState extends State<CartScreen> {
                     style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500)),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo code applied'))),
                 child: Text(s.apply),
               ),
             ],

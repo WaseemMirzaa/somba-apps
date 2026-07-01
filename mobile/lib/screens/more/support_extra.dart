@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
@@ -53,7 +54,7 @@ class ReferScreen extends StatelessWidget {
             const SizedBox(height: 12),
             const Text('Give \$5, get \$5', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans')),
             const SizedBox(height: 6),
-            Text('Invite friends — you both earn \$5 in wallet credit on their first order.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+            Text('Invite friends — you both earn \$5 in store credit on their first order.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
           ]),
         ),
         const SizedBox(height: 18),
@@ -66,11 +67,20 @@ class ReferScreen extends StatelessWidget {
             const Icon(Icons.confirmation_number_rounded, color: AppColors.primary),
             const SizedBox(width: 12),
             const Expanded(child: Text('MARIE-5X9K', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: 1))),
-            TextButton.icon(onPressed: () {}, icon: const Icon(Icons.copy_rounded, size: 16), label: const Text('Copy')),
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(const ClipboardData(text: 'MARIE-5X9K'));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied')));
+              },
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy'),
+            ),
           ]),
         ),
         const SizedBox(height: 12),
-        const PrimaryButton('Share invite link', icon: Icons.share_rounded),
+        PrimaryButton('Share invite link',
+            icon: Icons.share_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sharing your invite link…')))),
         const SectionHeader('Your rewards', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(child: Row(children: [
           _stat('7', 'Friends joined'), _div(), _stat('\$35', 'Earned'), _div(), _stat('3', 'Pending'),
@@ -188,21 +198,24 @@ class AccountDeleteScreen extends StatelessWidget {
             SizedBox(height: 10),
             Text('This action is permanent', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
             SizedBox(height: 6),
-            Text('Deleting your account removes your orders, wallet balance, wishlist and addresses. This cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
+            Text('Deleting your account removes your orders, coupons, wishlist and addresses. This cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
           ]),
         ),
         const SizedBox(height: 16),
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
           Text("Before you go", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           SizedBox(height: 10),
-          _Bullet('Any wallet balance will be forfeited'),
+          _Bullet('Any unused coupons will be forfeited'),
           _Bullet('Active orders must be completed or cancelled'),
           _Bullet('You can create a new account anytime'),
         ])),
         const SizedBox(height: 20),
         SizedBox(width: double.infinity, child: FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
-          onPressed: () {},
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deletion requested')));
+            Navigator.maybePop(context);
+          },
           child: const Text('Permanently delete account'),
         )),
         const SizedBox(height: 10),

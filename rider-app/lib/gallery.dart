@@ -6,11 +6,16 @@ import 'theme/app_theme.dart';
 import 'data/mock_tasks.dart';
 import 'screens/more/rider_more.dart';
 import 'screens/more/rider_more2.dart';
+import 'screens/more/rider_more3.dart';
+import 'screens/more/rider_auth.dart';
 
 void main() => runApp(const _GalleryApp());
 
 Map<String, WidgetBuilder> get _screens => {
+      'splash': (_) => SplashScreen(onDone: () {}),
       'login': (_) => const RiderLoginScreen(),
+      'forgot': (_) => const ForgotPasswordScreen(),
+      'otp': (_) => const OtpScreen(),
       'task-detail': (_) => TaskDetailScreen(task: mockTasks.first),
       'pod': (_) => PodScreen(task: mockTasks.first),
       'failed': (_) => const FailedDeliveryScreen(),
@@ -18,6 +23,14 @@ Map<String, WidgetBuilder> get _screens => {
       'notifications': (_) => const RiderNotificationsScreen(),
       'batch': (_) => const BatchOverviewScreen(),
       'zone': (_) => const ZoneScreen(),
+      'settings': (_) => const RiderSettingsScreen(),
+      'support': (_) => const RiderSupportScreen(),
+      'chat': (_) => const ChatScreen(name: 'Marie Dubois'),
+      'documents': (_) => const RiderDocumentsScreen(),
+      'vehicle': (_) => const RiderVehicleScreen(),
+      'shift': (_) => const RiderShiftScreen(),
+      'edit-profile': (_) => const RiderEditProfileScreen(),
+      'about': (_) => const RiderAboutScreen(),
     };
 
 class _GalleryApp extends StatelessWidget {

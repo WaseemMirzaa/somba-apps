@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
+import 'more/order_screens.dart';
 
 class OrderSuccessScreen extends StatefulWidget {
   final Locale locale;
@@ -84,7 +85,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale))),
                   icon: const Icon(Icons.local_shipping_rounded, size: 20),
                   label: Text(s.trackOrder),
                 ),

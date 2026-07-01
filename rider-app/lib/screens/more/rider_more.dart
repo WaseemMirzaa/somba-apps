@@ -2,61 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_tasks.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
-
-// ---------------- Login / First password ----------------
-class RiderLoginScreen extends StatelessWidget {
-  const RiderLoginScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
-    return Scaffold(
-      body: ListView(padding: EdgeInsets.zero, children: [
-        Container(
-          padding: EdgeInsets.fromLTRB(24, top + 44, 24, 40),
-          decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(32))),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(height: 54, width: 54, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.two_wheeler_rounded, color: AppColors.primary, size: 30)),
-            const SizedBox(height: 18),
-            const Text('Rider sign in', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
-            const SizedBox(height: 6),
-            Text('Set your password on first login', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
-          ]),
-        ),
-        Padding(padding: const EdgeInsets.all(20), child: Column(children: const [
-          _Field(label: 'Rider ID', hint: 'RDR-001', icon: Icons.badge_outlined),
-          SizedBox(height: 16),
-          _Field(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true),
-          SizedBox(height: 16),
-          _Field(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true),
-          SizedBox(height: 22),
-          PrimaryButton('Set password & continue', icon: Icons.arrow_forward_rounded),
-        ])),
-      ]),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  final String label, hint;
-  final IconData icon;
-  final bool obscure;
-  const _Field({required this.label, required this.hint, required this.icon, this.obscure = false});
-  @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.inkSoft)),
-      const SizedBox(height: 6),
-      TextField(obscureText: obscure, decoration: InputDecoration(
-        hintText: hint, prefixIcon: Icon(icon, size: 20),
-        filled: true, fillColor: AppColors.surface,
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.6)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
-      )),
-    ]);
-  }
-}
+import 'rider_more3.dart';
 
 // ---------------- Task detail (full screen) ----------------
 class TaskDetailScreen extends StatelessWidget {
@@ -83,7 +29,12 @@ class TaskDetailScreen extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: Text(t.address, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
           Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
-            child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary), onPressed: () {})),
+            child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary),
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Calling ${t.customer}…'))))),
+          const SizedBox(width: 8),
+          Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+            child: IconButton(icon: const Icon(Icons.chat_bubble_rounded, color: AppColors.primary),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(name: t.customer))))),
         ])),
         const SizedBox(height: 12),
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -94,7 +45,8 @@ class TaskDetailScreen extends StatelessWidget {
           _check('Capture proof of delivery', false),
         ])),
         const SizedBox(height: 16),
-        PrimaryButton('Navigate', icon: Icons.navigation_rounded),
+        PrimaryButton('Navigate', icon: Icons.navigation_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening turn-by-turn navigation…')))),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: FilledButton.icon(
@@ -186,7 +138,7 @@ class FailedDeliveryScreen extends StatefulWidget {
 
 class _FailedDeliveryScreenState extends State<FailedDeliveryScreen> {
   int _reason = 0;
-  final _reasons = ['Customer not available', 'Wrong / incomplete address', 'Customer refused delivery', 'Unable to collect COD', 'Damaged package'];
+  final _reasons = ['Customer not available', 'Wrong / incomplete address', 'Customer refused delivery', 'Could not reach customer', 'Damaged package'];
   @override
   Widget build(BuildContext context) {
     return Scaffold(

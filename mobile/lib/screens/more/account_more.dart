@@ -24,28 +24,44 @@ class WishlistScreen extends StatelessWidget {
   }
 }
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   final Locale locale;
   const NotificationsScreen({super.key, this.locale = const Locale('en')});
   @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  bool _allRead = false;
+  static const _items = [
+    (Icons.local_shipping_rounded, AppColors.primary, 'Out for delivery', 'Your order SMB-2026-4821 is on the way.', '2m', true),
+    (Icons.bolt_rounded, AppColors.accent, 'Flash sale live', 'Up to 30% off electronics — ends tonight.', '1h', true),
+    (Icons.check_circle_rounded, AppColors.success, 'Order delivered', 'SMB-2026-4712 was delivered. Rate it?', '1d', false),
+    (Icons.replay_rounded, AppColors.royalBlue, 'Refund processed', '\$18 refunded to your card for SMB-2026-4712.', '2d', false),
+    (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false),
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    const items = [
-      (Icons.local_shipping_rounded, AppColors.primary, 'Out for delivery', 'Your order SMB-2026-4821 is on the way.', '2m', true),
-      (Icons.bolt_rounded, AppColors.accent, 'Flash sale live', 'Up to 30% off electronics — ends tonight.', '1h', true),
-      (Icons.check_circle_rounded, AppColors.success, 'Order delivered', 'SMB-2026-4712 was delivered. Rate it?', '1d', false),
-      (Icons.replay_rounded, AppColors.royalBlue, 'Refund processed', '\$18 refunded to your card for SMB-2026-4712.', '2d', false),
-      (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false),
-    ];
     return Scaffold(
       appBar: backAppBar(context, 'Notifications', actions: [
-        TextButton(onPressed: () {}, child: const Text('Mark all')),
+        TextButton(
+          onPressed: _allRead
+              ? null
+              : () {
+                  setState(() => _allRead = true);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All notifications marked as read')));
+                },
+          child: const Text('Mark all'),
+        ),
       ]),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: items.length,
+        itemCount: _items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
-          final n = items[i];
+          final n = _items[i];
+          final unread = n.$6 && !_allRead;
           return Panel(
             padding: const EdgeInsets.all(14),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -59,7 +75,7 @@ class NotificationsScreen extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(n.$4, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
               ])),
-              if (n.$6) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+              if (unread) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
             ]),
           );
         },
