@@ -4,6 +4,7 @@ import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
 import 'more/account_more.dart';
+import 'more/support_extra.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -38,7 +39,12 @@ class AccountScreen extends StatelessWidget {
           _menuCard(context, [
             _MenuItem(Icons.notifications_none_rounded, 'Notifications', AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
-            _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft, () => _snack(context, s.help)),
+            _MenuItem(Icons.card_giftcard_rounded, 'Refer & Earn', AppColors.accent,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReferScreen(locale: locale)))),
+            _MenuItem(Icons.confirmation_number_outlined, 'Support', AppColors.royalBlue,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
+            _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale)))),
           ]),
           const SizedBox(height: 20),
           Padding(
@@ -245,11 +251,6 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  void _snack(BuildContext context, String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$label (mock)')));
-  }
 }
 
 class _MenuItem {

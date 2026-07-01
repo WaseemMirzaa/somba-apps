@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme/app_theme.dart';
 import 'data/mock_tasks.dart';
 import 'screens/more/rider_more.dart';
+import 'screens/more/rider_more2.dart';
 
 void main() => runApp(const _GalleryApp());
 
@@ -15,6 +16,9 @@ Map<String, WidgetBuilder> get _screens => {
       'failed': (_) => const FailedDeliveryScreen(),
       'history': (_) => const RiderHistoryScreen(),
       'notifications': (_) => const RiderNotificationsScreen(),
+      'batch': (_) => const BatchOverviewScreen(),
+      'zone': (_) => const ZoneScreen(),
+      'cod-summary': (_) => const CodSummaryScreen(),
     };
 
 class _GalleryApp extends StatelessWidget {

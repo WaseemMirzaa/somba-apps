@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'more/rider_more.dart';
+import 'more/rider_more2.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Locale locale;
@@ -91,12 +92,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 14),
         _menuCard([
+          _Item(Icons.layers_rounded, 'Current batch', 'BAT-204 · 4 stops',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchOverviewScreen()))),
+          _Item(Icons.map_rounded, 'Zones & demand', 'Live demand heatmap',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZoneScreen()))),
+          _Item(Icons.account_balance_wallet_rounded, 'COD summary', 'Cash collected & deposit',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CodSummaryScreen()))),
           _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
           _Item(Icons.notifications_rounded, 'Notifications', 'Tasks, routes & payouts',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNotificationsScreen()))),
-          _Item(Icons.two_wheeler_rounded, 'Vehicle', 'Honda CB150 · Motorcycle'),
-          _Item(Icons.description_rounded, 'Documents', 'License · Insurance verified'),
           _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help'),
         ]),
         const SizedBox(height: 14),
