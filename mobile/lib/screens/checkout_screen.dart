@@ -22,14 +22,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   static const _methods = [
     ('stripe_card', Icons.credit_card_rounded),
     ('airtel_money', Icons.smartphone_rounded),
+    ('orange_money', Icons.smartphone_rounded),
+    ('vodacom_mpesa', Icons.account_balance_wallet_rounded),
   ];
 
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
-    const deliveryFee = 5.0;
-    final total = shop.subtotal + deliveryFee;
+    final deliveryFee = deliveryFeeUsd;
+    final discount = shop.promoDiscount(shop.subtotal);
+    final total = shop.subtotal + deliveryFee - discount;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,6 +78,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 22),
+          _sectionTitle('Delivery zone'),
+          const SizedBox(height: 10),
+          _card(
+            child: Column(children: [
+              for (final z in currentMarket.zones) ...[
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => shop.selectedZoneId = z.id),
+                  child: Row(children: [
+                    Icon(selectedZone.id == z.id ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                        color: selectedZone.id == z.id ? AppColors.primary : AppColors.faint, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('${lang == 'fr' ? z.nameFr : z.name} · ${z.city}',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                    Text(z.deliveryFeeUsd == 0 ? 'FREE' : money(z.deliveryFeeUsd),
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: z.deliveryFeeUsd == 0 ? AppColors.success : AppColors.ink)),
+                  ]),
+                ),
+                if (z != currentMarket.zones.last) const Divider(height: 20),
+              ],
+            ]),
           ),
           const SizedBox(height: 22),
           _sectionTitle(s.payment),
@@ -126,7 +152,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 _row(s.subtotal, money(shop.subtotal)),
                 const SizedBox(height: 8),
-                _row(s.delivery, money(deliveryFee)),
+                _row('${s.delivery} · ${selectedZone.name}', deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
+                if (discount > 0) ...[
+                  const SizedBox(height: 8),
+                  _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
+                ],
                 const Divider(height: 22),
                 _row(s.total, money(total), bold: true),
               ],

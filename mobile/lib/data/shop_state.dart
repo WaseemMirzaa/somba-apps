@@ -1,4 +1,5 @@
 import 'mock_data.dart';
+import 'promos.dart';
 
 class CartItem {
   final Product product;
@@ -14,6 +15,20 @@ class ShopState {
   final List<CartItem> cart = [];
   final List<int> wishlist = [1, 3];
   final List<int> recentlyViewed = [1, 3, 5];
+
+  /// Applied promo code (null when none). Set from the cart/checkout.
+  Promo? appliedPromo;
+
+  /// Stores the customer follows (seller ids).
+  final Set<String> followedStores = {};
+
+  /// Ids of notifications the customer has read.
+  final Set<int> readNotifications = {};
+
+  /// Selected delivery zone id (drives the delivery fee); null → first zone.
+  String? selectedZoneId;
+
+  double promoDiscount(double subtotalUsd) => appliedPromo?.discountFor(subtotalUsd) ?? 0;
 
   ShopState._() {
     if (products.isNotEmpty) {

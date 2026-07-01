@@ -12,6 +12,8 @@ import 'screens/more/returns_extra.dart';
 import 'screens/more/support_extra.dart';
 import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
+import 'screens/product_detail_screen.dart';
+import 'data/mock_data.dart';
 
 void main() => runApp(const _GalleryApp());
 
@@ -26,6 +28,8 @@ Map<String, WidgetBuilder> get _screens => {
       'reset': (_) => const ResetPasswordScreen(),
       'verify-email': (_) => const VerifyEmailScreen(),
       'product-list': (_) => const ProductListScreen(locale: _en, category: 'Electronics'),
+      'product-detail': (_) => ProductDetailScreen(product: products[8], locale: _en),
+      'coupons': (_) => const CouponsScreen(locale: _en),
       'review-compose': (_) => const ReviewComposeScreen(locale: _en),
       'settings': (_) => const CustomerSettingsScreen(locale: _en),
       'edit-profile': (_) => const CustomerEditProfileScreen(locale: _en),

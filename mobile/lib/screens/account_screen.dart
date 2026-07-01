@@ -6,6 +6,7 @@ import 'orders_screen.dart';
 import 'more/account_more.dart';
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
+import 'more/catalog_extra.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -32,6 +33,8 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => WishlistScreen(locale: locale)))),
             _MenuItem(Icons.location_on_outlined, s.addresses, AppColors.mint,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: locale)))),
+            _MenuItem(Icons.local_offer_outlined, 'Coupons', AppColors.amber,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CouponsScreen(locale: locale)))),
           ]),
           const SizedBox(height: 14),
           _languageCard(s),

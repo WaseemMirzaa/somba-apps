@@ -1,8 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../data/mock_data.dart';
+import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
+import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_card.dart';
+
+/// Coupons / promo codes available to the customer (mirrors admin promotions).
+class CouponsScreen extends StatelessWidget {
+  final Locale locale;
+  const CouponsScreen({super.key, this.locale = const Locale('en')});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: backAppBar(context, 'Coupons'),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+        ...promos.map((p) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Panel(
+                child: Row(children: [
+                  Container(
+                    height: 48, width: 48,
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+                    child: const Icon(Icons.local_offer_rounded, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(p.code, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5)),
+                    const SizedBox(height: 2),
+                    Text(p.description, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                    if (p.minOrderUsd > 0)
+                      Text('Min. order ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                  ])),
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: p.code));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p.code} copied')));
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 15),
+                    label: const Text('Copy'),
+                  ),
+                ]),
+              ),
+            )),
+        const SizedBox(height: 4),
+        const Panel(
+          child: Row(children: [
+            Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+            SizedBox(width: 10),
+            Expanded(child: Text('Apply a coupon code in your cart before checkout.',
+                style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
 
 /// CF-04 — Product list / category results (grid with sort affordances).
 class ProductListScreen extends StatefulWidget {

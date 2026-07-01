@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../data/shop_state.dart';
+import '../data/catalog_meta.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/product_image.dart';
 import 'checkout_screen.dart';
+import 'more/shop_extra.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -205,6 +207,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           : 'The ${p.displayName(lang)} blends premium quality with a refined design. A perfect pick — shipped fast and backed by our satisfaction guarantee.',
                       style: const TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.inkSoft),
                     ),
+                    const SizedBox(height: 24),
+                    _sellerCard(p),
+                    const SizedBox(height: 24),
+                    Text('Specifications', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 10),
+                    _specs(p),
+                    const SizedBox(height: 24),
+                    _reviewsRow(p),
+                    const SizedBox(height: 24),
+                    _related(p, lang),
                   ],
                 ),
               ),
@@ -214,6 +226,142 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       bottomNavigationBar: _bottomBar(s),
     );
+  }
+
+  Widget _sellerCard(Product p) {
+    final seller = sellerFor(p);
+    final following = ShopState.instance.followedStores.contains(seller.id);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(radius: 22, backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              child: Text(seller.name[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800))),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(seller.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+            const SizedBox(height: 3),
+            Row(children: [
+              const Icon(Icons.star_rounded, size: 14, color: AppColors.amber),
+              const SizedBox(width: 3),
+              Text('${seller.rating} · ${seller.health}% health', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            ]),
+          ])),
+          _badge(seller.badge),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: () {
+              setState(() {
+                following ? ShopState.instance.followedStores.remove(seller.id) : ShopState.instance.followedStores.add(seller.id);
+              });
+            },
+            icon: Icon(following ? Icons.check_rounded : Icons.add_rounded, size: 18),
+            label: Text(following ? 'Following' : 'Follow store'),
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: FilledButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale))),
+            icon: const Icon(Icons.storefront_rounded, size: 18),
+            label: const Text('Visit store'),
+          )),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _badge(SellerBadge b) {
+    final gold = b == SellerBadge.gold || b == SellerBadge.sombaAssured;
+    final c = b == SellerBadge.sombaAssured
+        ? AppColors.primary
+        : gold
+            ? AppColors.amber
+            : b == SellerBadge.silver
+                ? AppColors.muted
+                : const Color(0xFFB45309);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(b == SellerBadge.sombaAssured ? Icons.verified_rounded : Icons.workspace_premium_rounded, size: 13, color: c),
+        const SizedBox(width: 4),
+        Text(b.label, style: TextStyle(color: c, fontWeight: FontWeight.w700, fontSize: 10.5)),
+      ]),
+    );
+  }
+
+  Widget _specs(Product p) {
+    final specs = specsFor(p);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
+      child: Column(children: [
+        for (int i = 0; i < specs.length; i++) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(children: [
+              Text(specs[i].$1, style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
+              const Spacer(),
+              Text(specs[i].$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+            ]),
+          ),
+          if (i != specs.length - 1) const Divider(height: 1),
+        ],
+      ]),
+    );
+  }
+
+  Widget _reviewsRow(Product p) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewsScreen(locale: widget.locale))),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
+        child: Row(children: [
+          const Icon(Icons.reviews_rounded, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${p.rating} · ${p.reviews} reviews', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            const Text('Read what buyers say', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+        ]),
+      ),
+    );
+  }
+
+  Widget _related(Product p, String lang) {
+    final items = relatedTo(p);
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('You may also like', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 12),
+      SizedBox(
+        height: 170,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, i) {
+            final r = items[i];
+            return GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: r, locale: widget.locale))),
+              child: SizedBox(
+                width: 128,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ClipRRect(borderRadius: BorderRadius.circular(14), child: SizedBox(height: 110, width: 128, child: ProductImage(product: r, iconSize: 30))),
+                  const SizedBox(height: 6),
+                  Text(r.displayName(lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  Text(money(r.price), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primary)),
+                ]),
+              ),
+            );
+          },
+        ),
+      ),
+    ]);
   }
 
   Widget _infoCard(IconData icon, String title, String subtitle) {
