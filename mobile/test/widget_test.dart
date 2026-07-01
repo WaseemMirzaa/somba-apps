@@ -1,5 +1,4 @@
 // Basic smoke test for the Somba customer app.
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:lipcart/main.dart';
@@ -11,7 +10,8 @@ void main() {
     // countdown) so pumpAndSettle would never complete.
     await tester.pump();
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    // Home screen renders and the floating navigation shows its tabs.
+    expect(find.text('Deliver to'), findsOneWidget);
     expect(find.text('Home'), findsWidgets);
   });
 }
