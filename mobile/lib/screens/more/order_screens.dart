@@ -137,7 +137,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                 final progress = _c.value;
                 final minsLeft = (14 * (1 - progress)).ceil().clamp(1, 14);
                 return Stack(children: [
-                  Positioned.fill(child: CustomPaint(painter: _LiveMapPainter(progress), child: const DecoratedBox(
+                  Positioned.fill(child: CustomPaint(foregroundPainter: _LiveMapPainter(progress), child: const DecoratedBox(
                     decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEAF0FF), Color(0xFFF3E9EC)])),
                   ))),
                   Positioned(left: 16, top: 14, child: Container(
