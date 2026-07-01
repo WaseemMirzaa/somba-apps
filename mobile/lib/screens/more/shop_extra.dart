@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
+import 'catalog_extra.dart';
 
 /// Store front (CF-07).
 class StoreScreen extends StatelessWidget {
@@ -141,7 +142,7 @@ class ReviewsScreen extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
         child: PrimaryButton('Write a review',
             icon: Icons.rate_review_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening review composer…')))),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale)))),
       ),
     );
   }

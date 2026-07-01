@@ -98,8 +98,18 @@ class AddressBookScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          ...addrs.map((a) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+          ...addrs.map((a) {
+            void openEdit() => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(
+                  locale: locale,
+                  label: a.$1,
+                  name: 'Marie Dubois',
+                  phone: a.$3,
+                  address: a.$2,
+                )));
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: openEdit,
                 child: Panel(
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(a.$5, color: AppColors.primary)),
@@ -115,10 +125,12 @@ class AddressBookScreen extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(a.$3, style: const TextStyle(color: AppColors.faint, fontSize: 12)),
                     ])),
-                    const Icon(Icons.edit_rounded, size: 18, color: AppColors.faint),
+                    IconButton(icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.faint), onPressed: openEdit),
                   ]),
                 ),
-              )),
+              ),
+            );
+          }),
           const SizedBox(height: 4),
           OutlinedButton.icon(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),

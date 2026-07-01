@@ -10,6 +10,7 @@ import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'more/search_screen.dart';
+import 'more/account_more.dart';
 
 class HomeScreen extends StatefulWidget {
   final Locale locale;
@@ -141,7 +142,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Icon(Icons.location_on_rounded, color: Colors.white70, size: 18),
                   const SizedBox(width: 5),
-                  Column(
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale))),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -155,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ],
+                    ),
                   ),
                   const Spacer(),
                   CircleIconButton(

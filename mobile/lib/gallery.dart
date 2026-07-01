@@ -10,6 +10,8 @@ import 'screens/more/account_more.dart';
 import 'screens/more/shop_extra.dart';
 import 'screens/more/returns_extra.dart';
 import 'screens/more/support_extra.dart';
+import 'screens/more/catalog_extra.dart';
+import 'screens/more/settings_extra.dart';
 
 void main() => runApp(const _GalleryApp());
 
@@ -21,6 +23,13 @@ Map<String, WidgetBuilder> get _screens => {
       'register': (_) => const RegisterScreen(),
       'otp': (_) => const OtpScreen(),
       'forgot': (_) => const ForgotScreen(),
+      'reset': (_) => const ResetPasswordScreen(),
+      'verify-email': (_) => const VerifyEmailScreen(),
+      'product-list': (_) => const ProductListScreen(locale: _en, category: 'Electronics'),
+      'review-compose': (_) => const ReviewComposeScreen(locale: _en),
+      'settings': (_) => const CustomerSettingsScreen(locale: _en),
+      'edit-profile': (_) => const CustomerEditProfileScreen(locale: _en),
+      'support-detail': (_) => const SupportTicketDetailScreen(id: 'TKT-3391', subject: 'Refund not received', status: 'Open', statusColor: AppColors.amber),
       'search': (_) => const SearchScreen(locale: _en),
       'order-detail': (_) => const OrderDetailScreen(locale: _en),
       'order-tracking': (_) => const OrderTrackingScreen(locale: _en),

@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import 'orders_screen.dart';
 import 'more/account_more.dart';
 import 'more/support_extra.dart';
+import 'more/settings_extra.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -36,12 +37,16 @@ class AccountScreen extends StatelessWidget {
           _languageCard(s),
           const SizedBox(height: 14),
           _menuCard(context, [
+            _MenuItem(Icons.person_outline_rounded, 'Edit profile', AppColors.primary,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerEditProfileScreen(locale: locale)))),
             _MenuItem(Icons.notifications_none_rounded, 'Notifications', AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
             _MenuItem(Icons.card_giftcard_rounded, 'Refer & Earn', AppColors.accent,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReferScreen(locale: locale)))),
             _MenuItem(Icons.confirmation_number_outlined, 'Support', AppColors.royalBlue,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
+            _MenuItem(Icons.settings_outlined, 'Settings', AppColors.inkSoft,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSettingsScreen(locale: locale)))),
             _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale)))),
           ]),
