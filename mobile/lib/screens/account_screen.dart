@@ -3,6 +3,7 @@ import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
+import 'more/account_more.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -25,17 +26,18 @@ class AccountScreen extends StatelessWidget {
             _MenuItem(Icons.shopping_bag_outlined, s.myOrders, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(locale: locale)))),
             _MenuItem(Icons.favorite_border_rounded, s.wishlist, AppColors.accent,
-                () => _snack(context, s.wishlist)),
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => WishlistScreen(locale: locale)))),
+            _MenuItem(Icons.account_balance_wallet_outlined, s.wallet, AppColors.royalBlue,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => WalletScreen(locale: locale)))),
             _MenuItem(Icons.location_on_outlined, s.addresses, AppColors.mint,
-                () => _snack(context, s.addresses)),
-            _MenuItem(Icons.credit_card_rounded, s.payments, AppColors.amber,
-                () => _snack(context, s.payments)),
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: locale)))),
           ]),
           const SizedBox(height: 14),
           _languageCard(s),
           const SizedBox(height: 14),
           _menuCard(context, [
-            _MenuItem(Icons.settings_outlined, s.settings, AppColors.inkSoft, () => _snack(context, s.settings)),
+            _MenuItem(Icons.notifications_none_rounded, 'Notifications', AppColors.primary,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
             _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft, () => _snack(context, s.help)),
           ]),
           const SizedBox(height: 20),

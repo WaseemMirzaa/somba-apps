@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+import 'more/rider_more.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Locale locale;
@@ -90,6 +91,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 14),
         _menuCard([
+          _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
+          _Item(Icons.notifications_rounded, 'Notifications', 'Tasks, routes & payouts',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNotificationsScreen()))),
           _Item(Icons.two_wheeler_rounded, 'Vehicle', 'Honda CB150 · Motorcycle'),
           _Item(Icons.description_rounded, 'Documents', 'License · Insurance verified'),
           _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help'),
@@ -152,7 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: Text(items[i].title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                 subtitle: Text(items[i].subtitle, style: const TextStyle(fontSize: 12.5)),
                 trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
-                onTap: () {},
+                onTap: items[i].onTap,
               ),
               if (i != items.length - 1) const Divider(height: 1, indent: 68, endIndent: 14),
             ],
@@ -175,5 +180,6 @@ class _Item {
   final IconData icon;
   final String title;
   final String subtitle;
-  _Item(this.icon, this.title, this.subtitle);
+  final VoidCallback? onTap;
+  _Item(this.icon, this.title, this.subtitle, [this.onTap]);
 }

@@ -6,7 +6,7 @@ earnings.
 
 ## Highlights
 
-- Modern emerald/teal identity with a **floating capsule navigation** (animated
+- Modern royal-blue identity (logo colour) with a **floating capsule navigation** (animated
   expanding pill), **Plus Jakarta Sans** display headings paired with Inter body text.
 - **Tasks**: gradient on-duty header with live stats, colour-coded task cards
   (delivery / pickup / return) with COD and open-box chips, distance · ETA · items,

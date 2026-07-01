@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
+import 'more/order_screens.dart';
 
 class OrdersScreen extends StatelessWidget {
   final Locale locale;
@@ -33,7 +34,9 @@ class OrdersScreen extends StatelessWidget {
           final o = orders[i];
           final status = o['status'] as String;
           final c = _statusColor(status);
-          return Container(
+          return GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: locale))),
+            child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -87,7 +90,7 @@ class OrdersScreen extends StatelessWidget {
                           style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500)),
                     ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: locale))),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -99,6 +102,7 @@ class OrdersScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           );
         },
       ),
