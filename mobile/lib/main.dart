@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app.dart';
+import 'screens/more/auth_screens.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -10,27 +11,43 @@ void main() {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
-  runApp(const LipCartApp());
+  runApp(const SombaApp());
 }
 
-class LipCartApp extends StatefulWidget {
-  const LipCartApp({super.key});
+class SombaApp extends StatefulWidget {
+  const SombaApp({super.key});
 
   @override
-  State<LipCartApp> createState() => _LipCartAppState();
+  State<SombaApp> createState() => _SombaAppState();
 }
 
-class _LipCartAppState extends State<LipCartApp> {
+class _SombaAppState extends State<SombaApp> {
   Locale _locale = const Locale('en');
+  bool _splashDone = false;
+  bool _authed = false;
 
   void _setLocale(Locale locale) {
     setState(() => _locale = locale);
   }
 
+  Widget _home() {
+    if (!_splashDone) {
+      return CustomerSplashScreen(onDone: () => setState(() => _splashDone = true));
+    }
+    if (!_authed) {
+      return LoginScreen(onAuthed: () => setState(() => _authed = true));
+    }
+    return AppShell(
+      onLocaleChanged: _setLocale,
+      locale: _locale,
+      onLogout: () => setState(() => _authed = false),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LipCart',
+      title: 'Somba&Teka',
       debugShowCheckedModeBanner: false,
       locale: _locale,
       supportedLocales: const [Locale('en'), Locale('fr')],
@@ -40,7 +57,7 @@ class _LipCartAppState extends State<LipCartApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: AppTheme.light(),
-      home: AppShell(onLocaleChanged: _setLocale, locale: _locale),
+      home: _home(),
     );
   }
 }

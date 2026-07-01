@@ -16,6 +16,7 @@ void main() => runApp(const _GalleryApp());
 const _en = Locale('en');
 
 Map<String, WidgetBuilder> get _screens => {
+      'splash': (_) => CustomerSplashScreen(onDone: () {}),
       'login': (_) => const LoginScreen(),
       'register': (_) => const RegisterScreen(),
       'otp': (_) => const OtpScreen(),

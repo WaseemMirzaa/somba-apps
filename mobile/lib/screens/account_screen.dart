@@ -9,8 +9,9 @@ import 'more/support_extra.dart';
 class AccountScreen extends StatelessWidget {
   final Locale locale;
   final void Function(Locale) onLocaleChanged;
+  final VoidCallback? onLogout;
 
-  const AccountScreen({super.key, required this.locale, required this.onLocaleChanged});
+  const AccountScreen({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +45,28 @@ class AccountScreen extends StatelessWidget {
             _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale)))),
           ]),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppShadow.card,
+              ),
+              child: ListTile(
+                onTap: () => _confirmLogout(context),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                leading: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
+                ),
+                title: const Text('Log out', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -249,6 +272,38 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
+  void _confirmLogout(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(
+              height: 56, width: 56,
+              decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 28),
+            ),
+            const SizedBox(height: 16),
+            const Text('Log out?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+            const SizedBox(height: 6),
+            const Text('You can sign back in anytime to see your orders and wishlist.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+            const SizedBox(height: 20),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () {
+                Navigator.pop(context);
+                onLogout?.call();
+              },
+              child: const Text('Log out'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ]),
+        ),
+      ),
+    );
+  }
 }
 
 class _MenuItem {

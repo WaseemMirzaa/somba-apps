@@ -3,12 +3,14 @@ import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'more/rider_more.dart';
 import 'more/rider_more2.dart';
+import 'more/rider_more3.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
+  final VoidCallback? onLogout;
 
-  const ProfileScreen({super.key, required this.locale, required this.onLocaleChanged});
+  const ProfileScreen({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -52,6 +54,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ]),
                 ),
+                Column(children: [
+                  _headerBtn(Icons.settings_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSettingsScreen()))),
+                  const SizedBox(height: 8),
+                  _headerBtn(Icons.edit_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderEditProfileScreen()))),
+                ]),
               ]),
               const SizedBox(height: 20),
               Container(
@@ -96,11 +103,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchOverviewScreen()))),
           _Item(Icons.map_rounded, 'Zones & demand', 'Live demand heatmap',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZoneScreen()))),
+          _Item(Icons.schedule_rounded, 'Shift & attendance', 'Hours & clock-in log',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderShiftScreen()))),
           _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
           _Item(Icons.notifications_rounded, 'Notifications', 'Tasks & route updates',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNotificationsScreen()))),
-          _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help'),
+        ]),
+        const SizedBox(height: 14),
+        _menuCard([
+          _Item(Icons.two_wheeler_rounded, 'My vehicle', 'Details & maintenance',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderVehicleScreen()))),
+          _Item(Icons.folder_shared_rounded, 'Documents', 'Licence, ID & insurance',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderDocumentsScreen()))),
+          _Item(Icons.settings_rounded, 'Settings', 'Alerts & preferences',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSettingsScreen()))),
+          _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help',
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSupportScreen()))),
         ]),
         const SizedBox(height: 14),
         // Language card
@@ -122,10 +141,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ]),
           ),
         ),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              leading: Container(
+                height: 40, width: 40,
+                decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
+              ),
+              title: const Text('Log out', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
+              onTap: _confirmLogout,
+            ),
+          ),
+        ),
         const SizedBox(height: 90),
       ],
     );
   }
+
+  void _confirmLogout() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(height: 56, width: 56, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 28)),
+            const SizedBox(height: 16),
+            const Text('Log out?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+            const SizedBox(height: 6),
+            const Text('You will need to sign in again to receive tasks.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+            const SizedBox(height: 20),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onLogout?.call();
+              },
+              child: const Text('Log out'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _headerBtn(IconData icon, VoidCallback onTap) => Material(
+        color: Colors.white.withValues(alpha: 0.2),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.all(8), child: Icon(icon, color: Colors.white, size: 20)),
+        ),
+      );
 
   Widget _langChip(String label, String code) {
     final sel = widget.locale.languageCode == code;

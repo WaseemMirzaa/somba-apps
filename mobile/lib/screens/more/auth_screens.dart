@@ -1,12 +1,67 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
+
+// ---------------- Splash ----------------
+class CustomerSplashScreen extends StatefulWidget {
+  final VoidCallback onDone;
+  const CustomerSplashScreen({super.key, required this.onDone});
+  @override
+  State<CustomerSplashScreen> createState() => _CustomerSplashScreenState();
+}
+
+class _CustomerSplashScreenState extends State<CustomerSplashScreen> {
+  Timer? _t;
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer(const Duration(milliseconds: 1600), widget.onDone);
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+        child: Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              height: 96,
+              width: 96,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), boxShadow: AppShadow.floating),
+              child: const Center(child: Text('S', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 52, fontFamily: 'PlusJakartaSans'))),
+            ),
+            const SizedBox(height: 22),
+            const Text('Somba&Teka',
+                style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
+            const SizedBox(height: 6),
+            Text('Shop everything, delivered', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 34),
+            SizedBox(
+              height: 22,
+              width: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.4, valueColor: AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.9))),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
 
 class _AuthScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final List<Widget> children;
-  const _AuthScaffold({required this.title, required this.subtitle, required this.children});
+  final bool showBack;
+  const _AuthScaffold({required this.title, required this.subtitle, required this.children, this.showBack = false});
 
   @override
   Widget build(BuildContext context) {
@@ -24,12 +79,26 @@ class _AuthScaffold extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 54,
-                  width: 54,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                  child: const Center(child: Text('S', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 26, fontFamily: 'PlusJakartaSans'))),
-                ),
+                Row(children: [
+                  if (showBack) ...[
+                    Material(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Container(
+                    height: 54,
+                    width: 54,
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                    child: const Center(child: Text('S', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 26, fontFamily: 'PlusJakartaSans'))),
+                  ),
+                ]),
                 const SizedBox(height: 18),
                 Text(title, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
                 const SizedBox(height: 6),
@@ -47,8 +116,26 @@ class _AuthScaffold extends StatelessWidget {
   }
 }
 
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  /// Fires when the user completes sign-in. Null in gallery/preview mode.
+  final VoidCallback? onAuthed;
+  const LoginScreen({super.key, this.onAuthed});
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _loading = false;
+
+  void _signIn() {
+    setState(() => _loading = true);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      widget.onAuthed?.call();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return _AuthScaffold(
@@ -61,25 +148,52 @@ class LoginScreen extends StatelessWidget {
         const SizedBox(height: 10),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(onPressed: () {}, child: const Text('Forgot password?')),
+          child: TextButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotScreen())),
+            child: const Text('Forgot password?'),
+          ),
         ),
         const SizedBox(height: 8),
-        const PrimaryButton('Sign in', icon: Icons.login_rounded),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _loading ? null : _signIn,
+            child: _loading
+                ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.login_rounded, size: 20),
+                    SizedBox(width: 8),
+                    Text('Sign in'),
+                  ]),
+          ),
+        ),
         const SizedBox(height: 16),
-        Row(children: const [
+        const Row(children: [
           Expanded(child: Divider()),
           Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: TextStyle(color: AppColors.muted))),
           Expanded(child: Divider()),
         ]),
         const SizedBox(height: 16),
-        OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.g_mobiledata_rounded, size: 28), label: const Text('Continue with Google')),
-        const SizedBox(height: 20),
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _signIn,
+          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+          label: const Text('Continue with Google'),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => widget.onAuthed?.call(),
+          child: const Text('Continue as guest'),
+        ),
+        const SizedBox(height: 12),
         Center(
-          child: RichText(
-            text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
-              TextSpan(text: "New here?  "),
-              TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
-            ]),
+          child: GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen(onAuthed: widget.onAuthed))),
+            child: RichText(
+              text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
+                TextSpan(text: "New here?  "),
+                TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+              ]),
+            ),
           ),
         ),
       ],
@@ -88,12 +202,14 @@ class LoginScreen extends StatelessWidget {
 }
 
 class RegisterScreen extends StatelessWidget {
-  const RegisterScreen({super.key});
+  final VoidCallback? onAuthed;
+  const RegisterScreen({super.key, this.onAuthed});
   @override
   Widget build(BuildContext context) {
     return _AuthScaffold(
       title: 'Create account',
       subtitle: 'Join Somba&Teka in under a minute',
+      showBack: true,
       children: [
         const AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.badge_outlined),
         const SizedBox(height: 16),
@@ -112,19 +228,23 @@ class RegisterScreen extends StatelessWidget {
           ]))),
         ]),
         const SizedBox(height: 18),
-        const PrimaryButton('Create account', icon: Icons.arrow_forward_rounded),
+        PrimaryButton('Create account',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(onAuthed: onAuthed)))),
       ],
     );
   }
 }
 
 class OtpScreen extends StatelessWidget {
-  const OtpScreen({super.key});
+  final VoidCallback? onAuthed;
+  const OtpScreen({super.key, this.onAuthed});
   @override
   Widget build(BuildContext context) {
     return _AuthScaffold(
       title: 'Verify your number',
       subtitle: 'Enter the 6-digit code sent to +243 970 000 000',
+      showBack: true,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -144,7 +264,7 @@ class OtpScreen extends StatelessWidget {
           }),
         ),
         const SizedBox(height: 22),
-        const PrimaryButton('Verify', icon: Icons.verified_rounded),
+        PrimaryButton('Verify', icon: Icons.verified_rounded, onPressed: () => onAuthed?.call()),
         const SizedBox(height: 16),
         Center(
           child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
@@ -164,10 +284,16 @@ class ForgotScreen extends StatelessWidget {
     return _AuthScaffold(
       title: 'Reset password',
       subtitle: "We'll send a reset link to your email",
-      children: const [
-        AppField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
-        SizedBox(height: 20),
-        PrimaryButton('Send reset link', icon: Icons.send_rounded),
+      showBack: true,
+      children: [
+        const AppField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
+        const SizedBox(height: 20),
+        PrimaryButton('Send reset link',
+            icon: Icons.send_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
+              Navigator.of(context).maybePop();
+            }),
       ],
     );
   }

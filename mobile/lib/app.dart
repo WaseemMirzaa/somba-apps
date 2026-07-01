@@ -9,8 +9,9 @@ import 'l10n/strings.dart';
 class AppShell extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   final Locale locale;
+  final VoidCallback? onLogout;
 
-  const AppShell({super.key, required this.onLocaleChanged, required this.locale});
+  const AppShell({super.key, required this.onLocaleChanged, required this.locale, this.onLogout});
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -26,7 +27,7 @@ class _AppShellState extends State<AppShell> {
       HomeScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
       CategoriesScreen(locale: widget.locale),
       DealsScreen(locale: widget.locale),
-      AccountScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
+      AccountScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
 
     final items = <_NavItem>[

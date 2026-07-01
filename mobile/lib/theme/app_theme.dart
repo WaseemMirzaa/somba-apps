@@ -18,6 +18,7 @@ class AppColors {
   static const Color amber = Color(0xFFF59E0B); // ratings
   static const Color success = Color(0xFF059669); // web success
   static const Color mint = Color(0xFF0D9488);
+  static const Color danger = Color(0xFFEF4444); // destructive / log out
 
   static const Color ink = Color(0xFF0B1020); // web foreground
   static const Color inkSoft = Color(0xFF334155);

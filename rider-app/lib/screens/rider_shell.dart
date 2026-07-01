@@ -7,8 +7,9 @@ import 'profile_screen.dart';
 class RiderShell extends StatefulWidget {
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
+  final VoidCallback? onLogout;
 
-  const RiderShell({super.key, required this.locale, required this.onLocaleChanged});
+  const RiderShell({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
 
   @override
   State<RiderShell> createState() => _RiderShellState();
@@ -22,7 +23,7 @@ class _RiderShellState extends State<RiderShell> {
     final screens = [
       TasksScreen(locale: widget.locale),
       MapScreen(locale: widget.locale),
-      ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
+      ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
     final items = <_NavItem>[
       _NavItem(Icons.assignment_rounded, 'Tasks'),
