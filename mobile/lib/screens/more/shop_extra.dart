@@ -53,6 +53,16 @@ class StoreScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 2),
             Text('Official electronics partner', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(100)),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.verified_rounded, color: Colors.white, size: 13),
+                SizedBox(width: 4),
+                Text('Somba Assured · 97% health', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10.5)),
+              ]),
+            ),
           ])),
         ]),
         const SizedBox(height: 16),
@@ -65,9 +75,13 @@ class StoreScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Row(children: [
-          Expanded(child: _btn(Icons.add_rounded, 'Follow', true)),
+          Expanded(child: GestureDetector(
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Following TechSphere Store'))),
+            child: _btn(Icons.add_rounded, 'Follow', true))),
           const SizedBox(width: 12),
-          Expanded(child: _btn(Icons.chat_bubble_outline_rounded, 'Chat', false)),
+          Expanded(child: GestureDetector(
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening chat with the store…'))),
+            child: _btn(Icons.chat_bubble_outline_rounded, 'Chat', false))),
         ]),
       ]),
     );

@@ -66,12 +66,22 @@ class Strings {
 
   String orderStatus(String status) {
     switch (status) {
-      case 'delivered':
-        return isFr ? 'Livré' : 'Delivered';
-      case 'shipped':
-        return isFr ? 'Expédié' : 'Shipped';
+      case 'pending':
+        return isFr ? 'En attente' : 'Pending';
+      case 'confirmed':
+        return isFr ? 'Confirmé' : 'Confirmed';
       case 'processing':
         return isFr ? 'En préparation' : 'Processing';
+      case 'shipped':
+        return isFr ? 'Expédié' : 'Shipped';
+      case 'out_for_delivery':
+        return isFr ? 'En livraison' : 'Out for delivery';
+      case 'delivered':
+        return isFr ? 'Livré' : 'Delivered';
+      case 'cancelled':
+        return isFr ? 'Annulé' : 'Cancelled';
+      case 'returned':
+        return isFr ? 'Retourné' : 'Returned';
       default:
         return status;
     }
@@ -85,8 +95,10 @@ class Strings {
         return isFr ? 'Paiement à la livraison' : 'Cash on Delivery';
       case 'airtel_money':
         return 'Airtel Money';
-      case 'wallet':
-        return isFr ? 'Portefeuille Somba' : 'Somba Wallet';
+      case 'orange_money':
+        return 'Orange Money';
+      case 'vodacom_mpesa':
+        return 'Vodacom M-Pesa';
       default:
         return m;
     }

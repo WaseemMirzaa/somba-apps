@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../data/market_profiles.dart';
 import '../../theme/app_theme.dart';
+import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import 'support_extra.dart';
 
@@ -23,6 +25,11 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
           _toggle(Icons.notifications_active_rounded, 'Push notifications', 'Order updates & offers', _push, (v) => setState(() => _push = v)),
           _toggle(Icons.mail_outline_rounded, 'Email', 'Receipts & newsletters', _email, (v) => setState(() => _email = v)),
           _toggle(Icons.sms_outlined, 'SMS', 'Delivery alerts by text', _sms, (v) => setState(() => _sms = v)),
+        ]),
+        const SizedBox(height: 14),
+        _group('Market & currency', [
+          _market('France (Demo)', 'Prices in USD', MarketProfileId.france),
+          _market('DR Congo', 'Prices in Congolese Franc (FC)', MarketProfileId.drc),
         ]),
         const SizedBox(height: 14),
         _group('Privacy', [
@@ -65,6 +72,23 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
         trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
         onTap: onTap,
       );
+
+  Widget _market(String title, String sub, MarketProfileId id) {
+    final sel = marketNotifier.value == id;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: _icon(id == MarketProfileId.france ? Icons.euro_rounded : Icons.paid_rounded),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12.5)),
+      trailing: Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+          color: sel ? AppColors.primary : AppColors.faint),
+      onTap: () {
+        marketNotifier.value = id;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Market set to $title')));
+      },
+    );
+  }
 
   Widget _icon(IconData icon) => Container(
         height: 40, width: 40,

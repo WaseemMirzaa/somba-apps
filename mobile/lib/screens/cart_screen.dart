@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
+import '../data/promos.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -18,6 +19,30 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final shop = ShopState.instance;
+  final _promoCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _promoCtrl.dispose();
+    super.dispose();
+  }
+
+  void _applyPromo() {
+    final code = _promoCtrl.text.trim();
+    if (code.isEmpty) return;
+    final promo = findPromo(code);
+    String msg;
+    if (promo == null) {
+      msg = 'Invalid promo code';
+    } else if (shop.subtotal < promo.minOrderUsd) {
+      msg = 'Spend ${money(promo.minOrderUsd)} to use ${promo.code}';
+    } else {
+      shop.appliedPromo = promo;
+      msg = '${promo.code} applied';
+    }
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,8 +168,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _summaryBar(Strings s) {
-    const deliveryFee = 5.0;
-    final total = shop.subtotal + deliveryFee;
+    final deliveryFee = deliveryFeeUsd;
+    final discount = shop.promoDiscount(shop.subtotal);
+    final total = shop.subtotal + deliveryFee - discount;
     return Container(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
@@ -167,19 +193,29 @@ class _CartScreenState extends State<CartScreen> {
               const Icon(Icons.local_offer_rounded, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(s.promoHint,
-                    style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500)),
+                child: TextField(
+                  controller: _promoCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  onSubmitted: (_) => _applyPromo(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: s.promoHint,
+                    border: InputBorder.none,
+                    hintStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+                  ),
+                ),
               ),
-              TextButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo code applied'))),
-                child: Text(s.apply),
-              ),
+              TextButton(onPressed: _applyPromo, child: Text(s.apply)),
             ],
           ),
           const Divider(height: 18),
           _row(s.subtotal, money(shop.subtotal)),
           const SizedBox(height: 6),
-          _row(s.delivery, money(deliveryFee)),
+          _row(s.delivery, deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
+          if (discount > 0) ...[
+            const SizedBox(height: 6),
+            _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
+          ],
           const SizedBox(height: 10),
           _row(s.total, money(total), bold: true),
           const SizedBox(height: 14),

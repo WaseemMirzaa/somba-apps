@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app.dart';
 import 'screens/more/auth_screens.dart';
 import 'theme/app_theme.dart';
+import 'util/format.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,7 +58,11 @@ class _SombaAppState extends State<SombaApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: AppTheme.light(),
-      home: _home(),
+      // Rebuild on market/currency change so prices re-render app-wide.
+      home: ValueListenableBuilder(
+        valueListenable: marketNotifier,
+        builder: (_, __, ___) => _home(),
+      ),
     );
   }
 }
