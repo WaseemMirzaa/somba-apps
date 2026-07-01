@@ -3,7 +3,7 @@ import '../data/mock_data.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_image.dart';
-import 'product_detail_screen.dart';
+import 'more/catalog_extra.dart';
 
 class CategoriesScreen extends StatelessWidget {
   final Locale locale;
@@ -30,12 +30,8 @@ class CategoriesScreen extends StatelessWidget {
           final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           final count = categoryCount(cat.name);
           return GestureDetector(
-            onTap: () {
-              final first = products.firstWhere((p) => p.category == cat.name,
-                  orElse: () => products[0]);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => ProductDetailScreen(product: first, locale: locale)));
-            },
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => ProductListScreen(locale: locale, category: cat.name))),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(

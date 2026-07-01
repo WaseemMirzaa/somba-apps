@@ -4,6 +4,7 @@ import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import 'order_success_screen.dart';
+import 'more/account_more.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Locale locale;
@@ -68,7 +69,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.edit_rounded, size: 18, color: AppColors.muted),
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.muted),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale))),
+                ),
               ],
             ),
           ),

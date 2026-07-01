@@ -230,7 +230,9 @@ class RegisterScreen extends StatelessWidget {
         const SizedBox(height: 18),
         PrimaryButton('Create account',
             icon: Icons.arrow_forward_rounded,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(onAuthed: onAuthed)))),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(
+                  onAuthed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(onVerified: onAuthed))),
+                )))),
       ],
     );
   }
@@ -292,8 +294,71 @@ class ForgotScreen extends StatelessWidget {
             icon: Icons.send_rounded,
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
-              Navigator.of(context).maybePop();
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
             }),
+      ],
+    );
+  }
+}
+
+// CF-18 — Reset password (set a new password from the reset link).
+class ResetPasswordScreen extends StatelessWidget {
+  const ResetPasswordScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return _AuthScaffold(
+      title: 'Set a new password',
+      subtitle: 'Choose a strong password you have not used before',
+      showBack: true,
+      children: [
+        const AppField(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true),
+        const SizedBox(height: 16),
+        const AppField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true),
+        const SizedBox(height: 20),
+        PrimaryButton('Save new password',
+            icon: Icons.check_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+              Navigator.popUntil(context, (r) => r.isFirst);
+            }),
+      ],
+    );
+  }
+}
+
+// CF-16 — Email verification.
+class VerifyEmailScreen extends StatelessWidget {
+  final VoidCallback? onVerified;
+  const VerifyEmailScreen({super.key, this.onVerified});
+  @override
+  Widget build(BuildContext context) {
+    return _AuthScaffold(
+      title: 'Verify your email',
+      subtitle: 'We sent a confirmation link to marie@email.com',
+      showBack: true,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
+          child: Column(children: const [
+            Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 44),
+            SizedBox(height: 12),
+            Text('Check your inbox', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            SizedBox(height: 6),
+            Text('Tap the link in the email to activate your account. It may take a minute to arrive.',
+                textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+          ]),
+        ),
+        const SizedBox(height: 20),
+        PrimaryButton("I've verified — continue",
+            icon: Icons.check_circle_rounded,
+            onPressed: () => onVerified != null ? onVerified!() : Navigator.maybePop(context)),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification email resent'))),
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text('Resend email'),
+        ),
       ],
     );
   }
