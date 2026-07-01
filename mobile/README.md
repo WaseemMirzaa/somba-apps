@@ -8,11 +8,11 @@ The customer-facing marketplace app for **Somba&Teka**, built with Flutter.
   countdown, premium product cards, wishlist, variant & quantity selectors, a full
   cart → checkout → order-success flow, and a polished account area.
 - Contemporary touches: **floating capsule navigation** with an animated expanding
-  pill, **Sora** display headings paired with Inter body text, a "For You / Trending"
+  pill, **Plus Jakarta Sans** display headings paired with Inter body text, a "For You / Trending"
   feed selector, and "% claimed" urgency bars on deals.
 - Centralised design system (`lib/theme/app_theme.dart`) — colour, type, radius,
   elevation and component themes in one place.
-- Bundled **Inter + Sora** fonts (no runtime font fetching) and self-contained product
+- Bundled **Inter + Plus Jakarta Sans** fonts (no runtime font fetching) and self-contained product
   visuals (gradient tiles with category glyphs) that fall back gracefully when
   network images are unavailable.
 - English / French localisation.

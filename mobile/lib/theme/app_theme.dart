@@ -8,26 +8,29 @@ import 'package:flutter/services.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF4F46E5); // indigo 600
-  static const Color primaryDark = Color(0xFF4338CA); // indigo 700
-  static const Color primaryDeep = Color(0xFF312E81); // indigo 900
-  static const Color accent = Color(0xFFF43F5E); // rose 500 — deals / sale
-  static const Color accentDark = Color(0xFFE11D48);
+  // Brand palette matches the Somba&Teka web app (Teka red).
+  static const Color primary = Color(0xFFE11428); // Teka red
+  static const Color primaryDark = Color(0xFFC00E20); // primary hover
+  static const Color primaryDeep = Color(0xFF8A0A18); // primary dark
+  static const Color accent = Color(0xFFFF1F3A); // nav accent (bright red)
+  static const Color accentDark = Color(0xFFC00E20);
+  static const Color royalBlue = Color(0xFF1A3AA8); // web logo tile
   static const Color amber = Color(0xFFF59E0B); // ratings
-  static const Color success = Color(0xFF10B981); // emerald
-  static const Color mint = Color(0xFF14B8A6);
+  static const Color success = Color(0xFF059669); // web success
+  static const Color mint = Color(0xFF0D9488);
 
-  static const Color ink = Color(0xFF0F172A); // slate 900
-  static const Color inkSoft = Color(0xFF334155); // slate 700
-  static const Color muted = Color(0xFF64748B); // slate 500
-  static const Color faint = Color(0xFF94A3B8); // slate 400
-  static const Color line = Color(0xFFE9ECF4);
-  static const Color background = Color(0xFFF6F7FB);
+  static const Color ink = Color(0xFF0B1020); // web foreground
+  static const Color inkSoft = Color(0xFF334155);
+  static const Color muted = Color(0xFF64748B);
+  static const Color faint = Color(0xFF94A3B8);
+  static const Color line = Color(0xFFE7EAF3);
+  static const Color background = Color(0xFFF5F7FC); // web background
   static const Color surface = Color(0xFFFFFFFF);
 
   /// Distinct soft gradients used to render product / category tiles natively
   /// so the UI is beautiful and fully self-contained even offline.
   static const List<List<Color>> tileGradients = [
+    [Color(0xFFFFF1F2), Color(0xFFFCDDE0)],
     [Color(0xFFEEF2FF), Color(0xFFDBE3FF)],
     [Color(0xFFFFF1F2), Color(0xFFFFE0E6)],
     [Color(0xFFECFEFF), Color(0xFFCFFAFE)],
@@ -35,19 +38,19 @@ class AppColors {
     [Color(0xFFFEF3C7), Color(0xFFFDE9B8)],
     [Color(0xFFF5F3FF), Color(0xFFEDE9FE)],
     [Color(0xFFFFF7ED), Color(0xFFFFEAD5)],
-    [Color(0xFFFDF2F8), Color(0xFFFCE7F3)],
   ];
 
+  // Signature Teka red → royal blue gradient, mirroring the web hero.
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6D5DF6), Color(0xFF4F46E5), Color(0xFF4338CA)],
+    colors: [Color(0xFFFF1F3A), Color(0xFFE11428), Color(0xFF8A0A18)],
   );
 
   static const LinearGradient dealGradient = LinearGradient(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
-    colors: [Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFE11D48)],
+    colors: [Color(0xFFFF4D5E), Color(0xFFE11428), Color(0xFFC00E20)],
   );
 }
 
@@ -97,7 +100,7 @@ class AppTheme {
   AppTheme._();
 
   static const String _font = 'Inter';
-  static const String display = 'Sora';
+  static const String display = 'PlusJakartaSans';
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
