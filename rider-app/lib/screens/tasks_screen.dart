@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_tasks.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+import 'more/rider_more.dart';
 
 class TasksScreen extends StatefulWidget {
   final Locale locale;
@@ -118,7 +119,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _taskCard(BuildContext context, RiderTask t, int i) {
     return SurfaceCard(
-      onTap: () => _showTaskDetail(context, t),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TaskDetailScreen(task: t))),
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,89 +188,4 @@ class _TasksScreenState extends State<TasksScreen> {
         const SizedBox(width: 3),
         Text(text, style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
       ]);
-
-  void _showTaskDetail(BuildContext context, RiderTask t) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + MediaQuery.of(ctx).padding.bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(100)))),
-            const SizedBox(height: 18),
-            Row(children: [
-              Container(
-                height: 48,
-                width: 48,
-                decoration: BoxDecoration(color: t.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-                child: Icon(t.icon, color: t.color),
-              ),
-              const SizedBox(width: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t.customer, style: Theme.of(context).textTheme.titleMedium),
-                Text('${t.typeLabel} · ${t.id}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-              ]),
-            ]),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16)),
-              child: Row(children: [
-                const Icon(Icons.location_on_rounded, color: AppColors.primary),
-                const SizedBox(width: 10),
-                Expanded(child: Text(t.address, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
-                Text('${t.distanceKm} km', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5)),
-              ]),
-            ),
-            if (t.codAmount != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(gradient: AppColors.cashGradient, borderRadius: BorderRadius.circular(16)),
-                child: Row(children: [
-                  const Icon(Icons.payments_rounded, color: Colors.white),
-                  const SizedBox(width: 10),
-                  const Expanded(child: Text('Collect cash on delivery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-                  Text('\$${t.codAmount!.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                ]),
-              ),
-            ],
-            if (t.openBox) ...[
-              const SizedBox(height: 12),
-              Row(children: [
-                const Icon(Icons.inventory_rounded, color: AppColors.info, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(child: Text('Open-box order — let the customer inspect before handover.', style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
-              ]),
-            ],
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () { Navigator.pop(ctx); _snack(context, 'Opening navigation…'); },
-              icon: const Icon(Icons.navigation_rounded, size: 20),
-              label: const Text('Navigate'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () { Navigator.pop(ctx); _snack(context, 'Proof of delivery captured${t.codAmount != null ? " — \$${t.codAmount!.toStringAsFixed(0)} collected" : ""}'); },
-              icon: const Icon(Icons.check_circle_rounded, size: 20),
-              label: const Text('Complete delivery'),
-            ),
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: () { Navigator.pop(ctx); _snack(context, 'Failed delivery logged'); },
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-              child: const Text('Report a problem'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _snack(BuildContext context, String m) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(m)));
 }

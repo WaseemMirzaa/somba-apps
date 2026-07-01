@@ -6,12 +6,13 @@ import 'package:flutter/services.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF059669); // emerald 600
-  static const Color primaryDark = Color(0xFF047857); // emerald 700
-  static const Color teal = Color(0xFF0D9488);
-  static const Color cyan = Color(0xFF06B6D4);
+  // Royal-blue brand, matching the Somba&Teka logo tile (web --logo-primary).
+  static const Color primary = Color(0xFF1A3AA8); // logo royal blue
+  static const Color primaryDark = Color(0xFF0E1F5C); // logo dark
+  static const Color teal = Color(0xFF2A52CF); // mid royal blue
+  static const Color cyan = Color(0xFF3B82F6);
   static const Color accent = Color(0xFFF59E0B); // COD / cash amber
-  static const Color info = Color(0xFF3B82F6); // navigate
+  static const Color info = Color(0xFF0EA5E9); // navigate (sky)
   static const Color danger = Color(0xFFEF4444); // failed / return
   static const Color violet = Color(0xFF7C3AED); // pickup
 
@@ -24,11 +25,11 @@ class AppColors {
   static const Color background = Color(0xFFF5F7FC); // web background
   static const Color surface = Color(0xFFFFFFFF);
 
-  // Emerald→teal, matching the web rider portal (emerald-400 → teal-600).
+  // Royal-blue gradient, mirroring the web logo tile (#2a52cf → #1a3aa8 → #0e1f5c).
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF34D399), Color(0xFF059669), Color(0xFF0D9488)],
+    colors: [Color(0xFF3258D8), Color(0xFF1A3AA8), Color(0xFF0E1F5C)],
   );
   static const LinearGradient cashGradient = LinearGradient(
     begin: Alignment.topLeft,

@@ -9,6 +9,7 @@ import '../widgets/product_card.dart';
 import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
+import 'more/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Locale locale;
@@ -187,21 +188,25 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(100),
-                    boxShadow: AppShadow.soft,
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 16),
-                      const Icon(Icons.search_rounded, color: AppColors.muted, size: 22),
-                      const SizedBox(width: 10),
-                      Text(s.search,
-                          style: const TextStyle(color: AppColors.faint, fontSize: 14.5, fontWeight: FontWeight.w500)),
-                    ],
+                child: GestureDetector(
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale))),
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: AppShadow.soft,
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        const Icon(Icons.search_rounded, color: AppColors.muted, size: 22),
+                        const SizedBox(width: 10),
+                        Text(s.search,
+                            style: const TextStyle(color: AppColors.faint, fontSize: 14.5, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ),
                 ),
               ),

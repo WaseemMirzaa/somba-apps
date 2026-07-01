@@ -78,6 +78,38 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+/// AppBar with a circular back button.
+PreferredSizeWidget backAppBar(BuildContext context, String title, {List<Widget>? actions}) {
+  return AppBar(
+    titleSpacing: 4,
+    leading: Padding(
+      padding: const EdgeInsets.all(8),
+      child: CircleIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
+    ),
+    title: Text(title),
+    actions: actions,
+  );
+}
+
+/// Full-width primary button.
+class PrimaryButton extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  const PrimaryButton(this.label, {super.key, this.icon, this.onPressed});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: onPressed ?? () {},
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
+            Text(label),
+          ]),
+        ),
+      );
+}
+
 /// Rounded white card container.
 class SurfaceCard extends StatelessWidget {
   final Widget child;

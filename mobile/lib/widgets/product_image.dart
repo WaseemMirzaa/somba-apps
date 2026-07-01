@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
@@ -28,13 +27,11 @@ IconData categoryIcon(String category) {
 class ProductImage extends StatelessWidget {
   final Product product;
   final double? iconSize;
-  final BoxFit fit;
 
   const ProductImage({
     super.key,
     required this.product,
     this.iconSize,
-    this.fit = BoxFit.cover,
   });
 
   @override
@@ -70,22 +67,16 @@ class ProductImage extends StatelessWidget {
               left: -10,
               child: _blob(72, accent.withValues(alpha: 0.35)),
             ),
-            // Category glyph
-            Center(
-              child: Icon(
-                glyph,
-                size: size,
-                color: AppColors.primary.withValues(alpha: 0.42),
-              ),
-            ),
-            // Real photo when reachable — fades over the gradient.
-            Positioned.fill(
-              child: CachedNetworkImage(
-                imageUrl: product.image,
-                fit: fit,
-                fadeInDuration: const Duration(milliseconds: 350),
-                placeholder: (_, __) => const SizedBox.shrink(),
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            // Bundled 3D product image, centred on the gradient tile. Falls
+            // back to the category glyph if the asset is missing.
+            Padding(
+              padding: EdgeInsets.all(c.maxHeight.isFinite ? c.maxHeight * 0.14 : 16),
+              child: Image.asset(
+                'assets/products/${product.id}.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
+                ),
               ),
             ),
           ],
