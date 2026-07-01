@@ -69,7 +69,8 @@ Sources: `web/src/app/shop/**`, `web/src/app/admin/**`, `shared/types/index.ts`,
 - **Phase 1 (this pass):** seller card + badges (product & store), specs +
   related products, full 8 order statuses + actions, zone-based delivery fee +
   market switcher, promo validation + discount, Coupons screen, Orange/M-Pesa.
-- **Phase 2:** multi-step returns with item selection & refund calc, dispute
-  message send, notification broadcast feed, product Q&A.
+- **Phase 2 (done):** multi-step returns with item selection & computed refund;
+  dispute message send (live thread); notification read-state persistence + tap
+  + admin broadcast feed; product Q&A with "ask a question".
 - **Phase 3:** dual-currency inline display, related-store follow persistence,
   live tracking map.

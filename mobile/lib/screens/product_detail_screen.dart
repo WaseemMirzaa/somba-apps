@@ -25,6 +25,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _qty = 1;
   late final List<String> _variants;
 
+  // (question, answer?) — answer null while awaiting the seller.
+  final List<(String, String?)> _qa = [
+    ('Is this the latest model?', 'Yes — it is the current 2026 edition.'),
+    ('Does it ship to Kinshasa?', 'Yes, delivered within 2 days in Gombe.'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -216,6 +222,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 24),
                     _reviewsRow(p),
                     const SizedBox(height: 24),
+                    _qaSection(),
+                    const SizedBox(height: 24),
                     _related(p, lang),
                   ],
                 ),
@@ -327,6 +335,82 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Text('Read what buyers say', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ])),
           const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+        ]),
+      ),
+    );
+  }
+
+  Widget _qaSection() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text('Questions & answers', style: Theme.of(context).textTheme.titleMedium),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _askQuestion,
+          icon: const Icon(Icons.help_outline_rounded, size: 18),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          label: const Text('Ask'),
+        ),
+      ]),
+      const SizedBox(height: 4),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
+        child: Column(children: [
+          for (int i = 0; i < _qa.length; i++) ...[
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_qa[i].$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+              ]),
+              Padding(
+                padding: const EdgeInsets.only(left: 24, top: 4),
+                child: Text(_qa[i].$2 ?? 'Awaiting seller response…',
+                    style: TextStyle(color: _qa[i].$2 == null ? AppColors.faint : AppColors.inkSoft, fontSize: 13, height: 1.35, fontStyle: _qa[i].$2 == null ? FontStyle.italic : FontStyle.normal)),
+              ),
+            ]),
+            if (i != _qa.length - 1) const Divider(height: 22),
+          ],
+        ]),
+      ),
+    ]);
+  }
+
+  void _askQuestion() {
+    final ctrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Ask a question', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Ask the seller about this product…',
+              filled: true,
+              fillColor: AppColors.background,
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: () {
+              final q = ctrl.text.trim();
+              if (q.isEmpty) return;
+              setState(() => _qa.add((q, null)));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Question sent to the seller')));
+            },
+            child: const Text('Submit question'),
+          ),
         ]),
       ),
     );
