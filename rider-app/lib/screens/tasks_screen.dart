@@ -20,7 +20,10 @@ class _TasksScreenState extends State<TasksScreen> {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(child: _header(context)),
-        const SliverToBoxAdapter(child: SectionHeader("Today's route", actionLabel: 'Optimize')),
+        SliverToBoxAdapter(
+            child: SectionHeader("Today's route",
+                actionLabel: 'Optimize',
+                onAction: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Route optimized — 3 stops reordered'))))),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
           sliver: SliverList.separated(
