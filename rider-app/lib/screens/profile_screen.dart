@@ -98,7 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZoneScreen()))),
           _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
-          _Item(Icons.notifications_rounded, 'Notifications', 'Tasks, routes & payouts',
+          _Item(Icons.notifications_rounded, 'Notifications', 'Tasks & route updates',
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNotificationsScreen()))),
           _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help'),
         ]),

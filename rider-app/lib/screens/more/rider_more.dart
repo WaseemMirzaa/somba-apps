@@ -252,9 +252,9 @@ class RiderNotificationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const items = [
-      (Icons.assignment_rounded, AppColors.primary, 'New task assigned', 'TSK-8841 · Gombe · COD \$149', '1m', true),
+      (Icons.assignment_rounded, AppColors.primary, 'New task assigned', 'TSK-8841 · Gombe · 2 items', '1m', true),
       (Icons.route_rounded, AppColors.info, 'Route re-optimized', 'Your next 3 stops were reordered.', '12m', true),
-      (Icons.payments_rounded, AppColors.accent, 'COD remittance due', 'Deposit \$420 at the hub by 6 PM.', '1h', false),
+      (Icons.inventory_2_rounded, AppColors.accent, 'Pickup ready', 'Warehouse batch BAT-204 is ready.', '1h', false),
       (Icons.star_rounded, AppColors.accent, 'New 5★ rating', 'Marie rated your delivery 5 stars.', '3h', false),
     ];
     return Scaffold(
