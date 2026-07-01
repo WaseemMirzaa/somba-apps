@@ -11,28 +11,33 @@ class AddressFormScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: backAppBar(context, 'Add address'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: const [
-        AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded),
-        SizedBox(height: 16),
-        AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded),
-        SizedBox(height: 16),
-        AppField(label: 'Phone', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone),
-        SizedBox(height: 16),
-        AppField(label: 'Address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined),
-        SizedBox(height: 16),
-        Row(children: [
+      body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
+        const AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded),
+        const SizedBox(height: 16),
+        const AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded),
+        const SizedBox(height: 16),
+        const AppField(label: 'Phone', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone),
+        const SizedBox(height: 16),
+        const AppField(label: 'Address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined),
+        const SizedBox(height: 16),
+        const Row(children: [
           Expanded(child: AppField(label: 'City', hint: 'Kinshasa')),
           SizedBox(width: 12),
           Expanded(child: AppField(label: 'Zone', hint: 'Gombe')),
         ]),
-        SizedBox(height: 16),
-        Row(children: [
+        const SizedBox(height: 16),
+        const Row(children: [
           Icon(Icons.check_box_rounded, color: AppColors.primary, size: 22),
           SizedBox(width: 8),
           Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
         ]),
-        SizedBox(height: 20),
-        PrimaryButton('Save address', icon: Icons.save_rounded),
+        const SizedBox(height: 20),
+        PrimaryButton('Save address',
+            icon: Icons.save_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved')));
+              Navigator.maybePop(context);
+            }),
       ]),
     );
   }
@@ -122,7 +127,9 @@ class SupportListScreen extends StatelessWidget {
           ]),
         ))),
         const SizedBox(height: 4),
-        const PrimaryButton('New ticket', icon: Icons.add_rounded),
+        PrimaryButton('New ticket',
+            icon: Icons.add_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening a new support ticket…')))),
       ]),
     );
   }

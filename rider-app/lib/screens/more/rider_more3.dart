@@ -279,7 +279,9 @@ class RiderDocumentsScreen extends StatelessWidget {
           );
         }),
         const SizedBox(height: 4),
-        const PrimaryButton('Upload a document', icon: Icons.upload_file_rounded),
+        PrimaryButton('Upload a document',
+            icon: Icons.upload_file_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening document upload…')))),
       ]),
     );
   }
@@ -326,7 +328,9 @@ class RiderVehicleScreen extends StatelessWidget {
           _row(Icons.event_rounded, 'Next service', 'Due in 640 km'),
         ])),
         const SizedBox(height: 16),
-        const PrimaryButton('Report an issue', icon: Icons.report_problem_rounded),
+        PrimaryButton('Report an issue',
+            icon: Icons.report_problem_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Issue reported to the fleet team')))),
       ]),
     );
   }
@@ -393,7 +397,12 @@ class RiderShiftScreen extends StatelessWidget {
               ),
             )),
         const SizedBox(height: 4),
-        const PrimaryButton('End shift', icon: Icons.logout_rounded),
+        PrimaryButton('End shift',
+            icon: Icons.logout_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shift ended — have a good rest!')));
+              Navigator.maybePop(context);
+            }),
       ]),
     );
   }

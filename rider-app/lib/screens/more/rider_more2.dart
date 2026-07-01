@@ -43,7 +43,12 @@ class BatchOverviewScreen extends StatelessWidget {
           ])));
         }),
         const SizedBox(height: 4),
-        const PrimaryButton('Start batch', icon: Icons.play_arrow_rounded),
+        PrimaryButton('Start batch',
+            icon: Icons.play_arrow_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Batch BAT-204 started')));
+              Navigator.maybePop(context);
+            }),
       ]),
     );
   }
@@ -93,7 +98,9 @@ class ZoneScreen extends StatelessWidget {
           ClipRRect(borderRadius: BorderRadius.circular(100), child: LinearProgressIndicator(value: z.$3, minHeight: 8, backgroundColor: AppColors.line, color: z.$4)),
         ])))),
         const SizedBox(height: 4),
-        const PrimaryButton('Move to high-demand zone', icon: Icons.trending_up_rounded),
+        PrimaryButton('Move to high-demand zone',
+            icon: Icons.trending_up_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rerouting you toward Gombe…')))),
       ]),
     );
   }

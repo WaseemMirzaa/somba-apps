@@ -83,13 +83,15 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(child: _heroCarousel(s)),
         SliverToBoxAdapter(child: _quickActions(s)),
         SliverToBoxAdapter(
-          child: SectionHeader(s.topCategories, actionLabel: s.seeAll),
+          child: SectionHeader(s.topCategories, actionLabel: s.seeAll,
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale)))),
         ),
         SliverToBoxAdapter(child: _categories(lang)),
         SliverToBoxAdapter(child: _flashSaleStrip(s)),
         SliverToBoxAdapter(child: _dealsRow(deals, lang)),
         SliverToBoxAdapter(
-          child: SectionHeader(s.recommended, actionLabel: s.seeAll),
+          child: SectionHeader(s.recommended, actionLabel: s.seeAll,
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale)))),
         ),
         SliverToBoxAdapter(child: _feedChips(s)),
         SliverPadding(

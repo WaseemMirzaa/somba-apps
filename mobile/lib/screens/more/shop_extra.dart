@@ -36,7 +36,8 @@ class StoreScreen extends StatelessWidget {
         Row(children: [
           CircleIconButton(icon: Icons.arrow_back_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white, onTap: () => Navigator.maybePop(context)),
           const Spacer(),
-          CircleIconButton(icon: Icons.share_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white),
+          CircleIconButton(icon: Icons.share_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white,
+              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store link copied')))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
@@ -138,7 +139,9 @@ class ReviewsScreen extends StatelessWidget {
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: const PrimaryButton('Write a review', icon: Icons.rate_review_rounded),
+        child: PrimaryButton('Write a review',
+            icon: Icons.rate_review_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening review composer…')))),
       ),
     );
   }
@@ -193,7 +196,12 @@ class PaymentScreen extends StatelessWidget {
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton(failed ? 'Retry payment · \$1,109' : 'Pay \$1,109', icon: Icons.lock_rounded),
+        child: PrimaryButton(failed ? 'Retry payment · \$1,109' : 'Pay \$1,109',
+            icon: Icons.lock_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failed ? 'Retrying payment…' : 'Payment successful')));
+              Navigator.maybePop(context);
+            }),
       ),
     );
   }

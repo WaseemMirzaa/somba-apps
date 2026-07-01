@@ -16,7 +16,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   int _reason = 0;
   int _refund = 0;
   final _reasons = ['Damaged / defective', 'Wrong item received', 'No longer needed', 'Better price elsewhere'];
-  final _refunds = ['Somba Wallet (instant)', 'Original payment method', 'Bank transfer'];
+  final _refunds = ['Store credit (instant)', 'Original payment method', 'Bank transfer'];
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +41,9 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
         const SizedBox(height: 10),
         ..._pick(_refunds, _refund, (i) => setState(() => _refund = i)),
         const SizedBox(height: 8),
-        const PrimaryButton('Submit return', icon: Icons.assignment_return_rounded),
+        PrimaryButton('Submit return',
+            icon: Icons.assignment_return_rounded,
+            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReturnStatusScreen(locale: widget.locale)))),
       ]),
     );
   }
@@ -129,7 +131,12 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
           Expanded(child: Text('Free size exchange within 30 days. A rider will swap it at your door.', style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft, height: 1.3))),
         ])),
         const SizedBox(height: 16),
-        const PrimaryButton('Request exchange', icon: Icons.swap_horiz_rounded),
+        PrimaryButton('Request exchange',
+            icon: Icons.swap_horiz_rounded,
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exchange requested — size ${_sizes[_size]}')));
+              Navigator.maybePop(context);
+            }),
       ]),
     );
   }
