@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
@@ -32,24 +33,30 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  bool _allRead = false;
+  final _read = ShopState.instance.readNotifications;
+
+  // (icon, color, title, body, time, originallyUnread, isBroadcast)
   static const _items = [
-    (Icons.local_shipping_rounded, AppColors.primary, 'Out for delivery', 'Your order SMB-2026-4821 is on the way.', '2m', true),
-    (Icons.bolt_rounded, AppColors.accent, 'Flash sale live', 'Up to 30% off electronics — ends tonight.', '1h', true),
-    (Icons.check_circle_rounded, AppColors.success, 'Order delivered', 'SMB-2026-4712 was delivered. Rate it?', '1d', false),
-    (Icons.replay_rounded, AppColors.royalBlue, 'Refund processed', '\$18 refunded to your card for SMB-2026-4712.', '2d', false),
-    (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false),
+    (Icons.local_shipping_rounded, AppColors.primary, 'Out for delivery', 'Your order SMB-2026-4821 is on the way.', '2m', true, false),
+    (Icons.campaign_rounded, AppColors.royalBlue, 'Weekend mega sale', 'Somba&Teka: up to 50% off this weekend only!', '40m', true, true),
+    (Icons.bolt_rounded, AppColors.accent, 'Flash sale live', 'Up to 30% off electronics — ends tonight.', '1h', true, false),
+    (Icons.check_circle_rounded, AppColors.success, 'Order delivered', 'SMB-2026-4712 was delivered. Rate it?', '1d', false, false),
+    (Icons.replay_rounded, AppColors.royalBlue, 'Refund processed', '\$18 refunded for SMB-2026-4712.', '2d', false, false),
+    (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false, false),
   ];
+
+  bool _isUnread(int i) => _items[i].$6 && !_read.contains(i);
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = List.generate(_items.length, (i) => i).where(_isUnread).length;
     return Scaffold(
-      appBar: backAppBar(context, 'Notifications', actions: [
+      appBar: backAppBar(context, unreadCount > 0 ? 'Notifications ($unreadCount)' : 'Notifications', actions: [
         TextButton(
-          onPressed: _allRead
+          onPressed: unreadCount == 0
               ? null
               : () {
-                  setState(() => _allRead = true);
+                  setState(() => _read.addAll(List.generate(_items.length, (i) => i)));
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All notifications marked as read')));
                 },
           child: const Text('Mark all'),
@@ -61,22 +68,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
           final n = _items[i];
-          final unread = n.$6 && !_allRead;
-          return Panel(
-            padding: const EdgeInsets.all(14),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(height: 42, width: 42, decoration: BoxDecoration(color: n.$2.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(n.$1, color: n.$2, size: 21)),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(child: Text(n.$3, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
-                  Text(n.$5, style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
-                ]),
-                const SizedBox(height: 3),
-                Text(n.$4, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
-              ])),
-              if (unread) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-            ]),
+          final unread = _isUnread(i);
+          return GestureDetector(
+            onTap: () {
+              setState(() => _read.add(i));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(n.$7 ? 'Opening promotion…' : 'Opening ${n.$3}…')));
+            },
+            child: Panel(
+              padding: const EdgeInsets.all(14),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(height: 42, width: 42, decoration: BoxDecoration(color: n.$2.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(n.$1, color: n.$2, size: 21)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text(n.$3, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+                    if (n.$7) Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Pill('News', color: AppColors.royalBlue.withValues(alpha: 0.12), textColor: AppColors.royalBlue, fontSize: 9.5),
+                    ),
+                    Text(n.$5, style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                  ]),
+                  const SizedBox(height: 3),
+                  Text(n.$4, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                ])),
+                if (unread) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+              ]),
+            ),
           );
         },
       ),
