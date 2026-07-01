@@ -154,8 +154,7 @@ class PaymentScreen extends StatelessWidget {
     const methods = [
       ('Credit / Debit Card', Icons.credit_card_rounded, true),
       ('Airtel Money', Icons.smartphone_rounded, false),
-      ('Somba Wallet · \$240', Icons.account_balance_wallet_rounded, false),
-      ('Cash on delivery', Icons.payments_rounded, false),
+      ('M-Pesa', Icons.account_balance_wallet_rounded, false),
     ];
     return Scaffold(
       appBar: backAppBar(context, 'Payment'),

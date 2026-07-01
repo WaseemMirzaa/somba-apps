@@ -18,7 +18,6 @@ Map<String, WidgetBuilder> get _screens => {
       'notifications': (_) => const RiderNotificationsScreen(),
       'batch': (_) => const BatchOverviewScreen(),
       'zone': (_) => const ZoneScreen(),
-      'cod-summary': (_) => const CodSummaryScreen(),
     };
 
 class _GalleryApp extends StatelessWidget {

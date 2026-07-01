@@ -38,27 +38,28 @@ class Category {
 }
 
 const categories = [
-  Category(id: 1, name: 'Electronics', nameFr: 'Électronique', image: 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=200&h=200&fit=crop'),
-  Category(id: 2, name: 'Fashion', nameFr: 'Mode', image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=200&h=200&fit=crop'),
-  Category(id: 3, name: 'Home', nameFr: 'Maison', image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=200&h=200&fit=crop'),
-  Category(id: 4, name: 'Beauty', nameFr: 'Beauté', image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&h=200&fit=crop'),
-  Category(id: 5, name: 'Sports', nameFr: 'Sport', image: 'https://images.unsplash.com/photo-1461896836934-ffe607ba9681?w=200&h=200&fit=crop'),
-  Category(id: 6, name: 'Books', nameFr: 'Livres', image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=200&h=200&fit=crop'),
+  Category(id: 1, name: 'Electronics', nameFr: 'Électronique', image: ''),
+  Category(id: 2, name: 'Fashion', nameFr: 'Mode', image: ''),
+  Category(id: 3, name: 'Jewelery', nameFr: 'Bijoux', image: ''),
 ];
 
+// Real professional catalogue photos are bundled in assets/products/<id>.jpg.
+// The `image` URLs are the same photos, used as an online fallback on device.
+const _img = 'https://raw.githubusercontent.com/keikaavousi/fake-store-api/master/public/img';
+
 const products = [
-  Product(id: 1, name: 'Samsung Galaxy S24 Ultra', nameFr: 'Samsung Galaxy S24 Ultra', price: 1199, originalPrice: 1399, discount: 14, rating: 4.8, reviews: 2341, image: 'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400&h=400&fit=crop', category: 'Electronics'),
-  Product(id: 2, name: 'MacBook Air M3', nameFr: 'MacBook Air M3', price: 1099, originalPrice: 1299, discount: 15, rating: 4.9, reviews: 1823, image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=400&fit=crop', category: 'Electronics'),
-  Product(id: 3, name: 'Sony WH-1000XM5', nameFr: 'Casque Sony WH-1000XM5', price: 349, originalPrice: 399, discount: 13, rating: 4.7, reviews: 5621, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', category: 'Electronics'),
-  Product(id: 4, name: 'Nike Air Max 270', nameFr: 'Nike Air Max 270', price: 129, originalPrice: 160, discount: 19, rating: 4.5, reviews: 3421, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', category: 'Fashion'),
-  Product(id: 5, name: 'PlayStation 5', nameFr: 'PlayStation 5', price: 499, originalPrice: 549, discount: 9, rating: 4.9, reviews: 8932, image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=400&h=400&fit=crop', category: 'Electronics'),
-  Product(id: 6, name: 'Instant Pot Duo', nameFr: 'Instant Pot Duo', price: 89, originalPrice: 119, discount: 25, rating: 4.7, reviews: 15234, image: 'https://images.unsplash.com/photo-1585515320310-259814833e62?w=400&h=400&fit=crop', category: 'Home'),
-  Product(id: 7, name: 'Apple Watch Series 9', nameFr: 'Apple Watch Series 9', price: 399, originalPrice: 449, discount: 11, rating: 4.8, reviews: 6120, image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=400&h=400&fit=crop', category: 'Electronics'),
-  Product(id: 8, name: 'Levi\'s 501 Original Jeans', nameFr: 'Jean Levi\'s 501', price: 69, originalPrice: 98, discount: 30, rating: 4.6, reviews: 4210, image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=400&fit=crop', category: 'Fashion'),
-  Product(id: 9, name: 'Dyson V15 Vacuum', nameFr: 'Aspirateur Dyson V15', price: 649, originalPrice: 749, discount: 13, rating: 4.9, reviews: 3890, image: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?w=400&h=400&fit=crop', category: 'Home'),
-  Product(id: 10, name: 'Chanel N°5 Perfume', nameFr: 'Parfum Chanel N°5', price: 135, originalPrice: 160, discount: 16, rating: 4.8, reviews: 9021, image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=400&fit=crop', category: 'Beauty'),
-  Product(id: 11, name: 'Adidas Ultraboost Light', nameFr: 'Adidas Ultraboost Light', price: 149, originalPrice: 190, discount: 22, rating: 4.7, reviews: 5340, image: 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=400&h=400&fit=crop', category: 'Sports'),
-  Product(id: 12, name: 'The Psychology of Money', nameFr: 'La Psychologie de l\'Argent', price: 18, originalPrice: 25, discount: 28, rating: 4.9, reviews: 21340, image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=400&fit=crop', category: 'Books'),
+  Product(id: 1, name: 'Fjällräven Foldsack No.1 Backpack', nameFr: 'Sac à dos Fjällräven Foldsack N°1', price: 110, originalPrice: 140, discount: 21, rating: 3.9, reviews: 120, image: '$_img/81fPKd-2AYL._AC_SL1500_.jpg', category: 'Fashion'),
+  Product(id: 2, name: 'Mens Casual Premium Slim Fit T-Shirt', nameFr: 'T-shirt slim premium homme', price: 22, originalPrice: 30, discount: 26, rating: 4.1, reviews: 259, image: '$_img/71-3HjGNDUL._AC_SY879._SX._UX._SY._UY_.jpg', category: 'Fashion'),
+  Product(id: 3, name: 'Mens Cotton Jacket', nameFr: 'Veste en coton homme', price: 56, originalPrice: 70, discount: 20, rating: 4.7, reviews: 500, image: '$_img/71li-ujtlUL._AC_UX679_.jpg', category: 'Fashion'),
+  Product(id: 4, name: 'Mens Casual Slim Fit Shirt', nameFr: 'Chemise slim casual homme', price: 16, originalPrice: 25, discount: 36, rating: 4.0, reviews: 430, image: '$_img/71YXzeOuslL._AC_UY879_.jpg', category: 'Fashion'),
+  Product(id: 5, name: 'John Hardy Gold & Silver Dragon Bracelet', nameFr: 'Bracelet Dragon or & argent John Hardy', price: 695, originalPrice: 780, discount: 11, rating: 4.6, reviews: 400, image: '$_img/71pWzhdJNwL._AC_UL640_QL65_ML3_.jpg', category: 'Jewelery'),
+  Product(id: 6, name: 'Solid Gold Petite Micropavé Ring', nameFr: 'Bague micropavé en or', price: 168, originalPrice: 199, discount: 16, rating: 3.9, reviews: 70, image: '$_img/61sbMiUnoGL._AC_UL640_QL65_ML3_.jpg', category: 'Jewelery'),
+  Product(id: 7, name: 'White Gold Plated Princess Earrings', nameFr: 'Boucles d\'oreilles plaqué or blanc', price: 10, originalPrice: 15, discount: 33, rating: 3.5, reviews: 400, image: '$_img/71YAIFU48IL._AC_UL640_QL65_ML3_.jpg', category: 'Jewelery'),
+  Product(id: 8, name: 'Pierced Owl Rose Gold Earrings', nameFr: 'Boucles d\'oreilles hibou or rose', price: 11, originalPrice: 18, discount: 39, rating: 4.2, reviews: 100, image: '$_img/51UDEzMJVpL._AC_UL640_QL65_ML3_.jpg', category: 'Jewelery'),
+  Product(id: 9, name: 'WD 2TB Elements Portable Hard Drive', nameFr: 'Disque dur portable WD 2 To', price: 64, originalPrice: 79, discount: 19, rating: 3.3, reviews: 203, image: '$_img/61IBBVJvSDL._AC_SY879_.jpg', category: 'Electronics'),
+  Product(id: 10, name: 'SanDisk SSD PLUS 1TB Internal SSD', nameFr: 'SSD interne SanDisk PLUS 1 To', price: 109, originalPrice: 139, discount: 22, rating: 4.5, reviews: 470, image: '$_img/61U7T1koQqL._AC_SX679_.jpg', category: 'Electronics'),
+  Product(id: 11, name: 'Silicon Power 256GB SSD 3D NAND', nameFr: 'SSD Silicon Power 256 Go', price: 109, originalPrice: 129, discount: 16, rating: 4.8, reviews: 319, image: '$_img/71kWymZ+c+L._AC_SX679_.jpg', category: 'Electronics'),
+  Product(id: 12, name: 'Acer 21.5" Full HD IPS Monitor', nameFr: 'Écran Acer 21,5" Full HD IPS', price: 599, originalPrice: 699, discount: 14, rating: 4.3, reviews: 250, image: '$_img/81QpkIctqPL._AC_SX679_.jpg', category: 'Electronics'),
 ];
 
 /// Number of catalogue products in a given category.

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'tasks_screen.dart';
-import 'earnings_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 
@@ -23,13 +22,11 @@ class _RiderShellState extends State<RiderShell> {
     final screens = [
       TasksScreen(locale: widget.locale),
       MapScreen(locale: widget.locale),
-      const EarningsScreen(),
       ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
     ];
     final items = <_NavItem>[
       _NavItem(Icons.assignment_rounded, 'Tasks'),
       _NavItem(Icons.navigation_rounded, 'Navigate'),
-      _NavItem(Icons.account_balance_wallet_rounded, 'Earnings'),
       _NavItem(Icons.person_rounded, 'Profile'),
     ];
 

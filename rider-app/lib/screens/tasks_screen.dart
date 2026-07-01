@@ -97,7 +97,7 @@ class _TasksScreenState extends State<TasksScreen> {
             child: Row(children: [
               _stat('${mockTasks.length}', 'Active'),
               _divider(),
-              _stat('\$84', 'Earned'),
+              _stat('12', 'Done'),
               _divider(),
               _stat('12.4', 'km'),
             ]),
@@ -171,12 +171,8 @@ class _TasksScreenState extends State<TasksScreen> {
             const SizedBox(width: 8),
             _meta(Icons.inventory_2_outlined, '${t.items} item${t.items > 1 ? 's' : ''}'),
             const Spacer(),
-            if (t.codAmount != null)
-              Pill('COD \$${t.codAmount!.toStringAsFixed(0)}', color: AppColors.accent.withValues(alpha: 0.16), textColor: const Color(0xFFB45309), icon: Icons.payments_rounded, fontSize: 11),
-            if (t.openBox) ...[
-              const SizedBox(width: 6),
+            if (t.openBox)
               Pill('Open box', color: AppColors.info.withValues(alpha: 0.14), textColor: AppColors.info, icon: Icons.inventory_rounded, fontSize: 11),
-            ],
           ]),
         ],
       ),
