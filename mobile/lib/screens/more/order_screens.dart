@@ -101,9 +101,23 @@ class OrderDetailScreen extends StatelessWidget {
       ]);
 }
 
-class OrderTrackingScreen extends StatelessWidget {
+class OrderTrackingScreen extends StatefulWidget {
   final Locale locale;
   const OrderTrackingScreen({super.key, this.locale = const Locale('en')});
+
+  @override
+  State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
+}
+
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(seconds: 16))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -112,22 +126,32 @@ class OrderTrackingScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          // Map preview
+          // Live map with an animated rider marker + ETA countdown.
           Container(
-            height: 180,
+            height: 190,
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
             clipBehavior: Clip.antiAlias,
-            child: Stack(children: [
-              Positioned.fill(child: CustomPaint(painter: _MiniMapPainter(), child: const DecoratedBox(
-                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEAF0FF), Color(0xFFF3E9EC)])),
-              ))),
-              const Positioned(right: 16, bottom: 16, child: _Bubble(icon: Icons.two_wheeler_rounded)),
-              Positioned(left: 16, top: 14, child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(100), boxShadow: AppShadow.soft),
-                child: const Text('Arriving in ~14 min', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
-              )),
-            ]),
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) {
+                final progress = _c.value;
+                final minsLeft = (14 * (1 - progress)).ceil().clamp(1, 14);
+                return Stack(children: [
+                  Positioned.fill(child: CustomPaint(foregroundPainter: _LiveMapPainter(progress), child: const DecoratedBox(
+                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEAF0FF), Color(0xFFF3E9EC)])),
+                  ))),
+                  Positioned(left: 16, top: 14, child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(100), boxShadow: AppShadow.soft),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text('Arriving in ~$minsLeft min', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                    ]),
+                  )),
+                ]);
+              },
+            ),
           ),
           const SizedBox(height: 14),
           Panel(
@@ -159,18 +183,10 @@ class OrderTrackingScreen extends StatelessWidget {
   }
 }
 
-class _Bubble extends StatelessWidget {
-  final IconData icon;
-  const _Bubble({required this.icon});
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppShadow.card),
-        child: Container(height: 34, width: 34, decoration: const BoxDecoration(gradient: AppColors.brandGradient, shape: BoxShape.circle), child: Icon(icon, color: Colors.white, size: 19)),
-      );
-}
+class _LiveMapPainter extends CustomPainter {
+  final double progress; // 0..1 rider position along the route
+  _LiveMapPainter(this.progress);
 
-class _MiniMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final grid = Paint()..color = const Color(0xFF0B1020).withValues(alpha: 0.04)..strokeWidth = 1;
@@ -180,11 +196,45 @@ class _MiniMapPainter extends CustomPainter {
     for (double y = 0; y < size.height; y += 30) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
     }
-    final route = Paint()..color = AppColors.primary..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round;
-    final path = Path()..moveTo(30, 40)..cubicTo(120, 90, 160, 60, size.width - 40, size.height - 30);
-    canvas.drawPath(path, route);
+
+    // Route as a cubic Bézier from warehouse (P0) to the customer (P3).
+    final p0 = Offset(34, 44);
+    final p1 = Offset(size.width * 0.32, size.height * 0.9);
+    final p2 = Offset(size.width * 0.62, size.height * 0.18);
+    final p3 = Offset(size.width - 36, size.height - 34);
+
+    final full = Paint()..color = AppColors.line..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round;
+    final done = Paint()..color = AppColors.primary..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round;
+    final path = Path()..moveTo(p0.dx, p0.dy)..cubicTo(p1.dx, p1.dy, p2.dx, p2.dy, p3.dx, p3.dy);
+    canvas.drawPath(path, full);
+
+    // Travelled portion of the path (approximate by sampling up to progress).
+    final travelled = Path()..moveTo(p0.dx, p0.dy);
+    for (double t = 0; t <= progress; t += 0.02) {
+      final pt = _bezier(p0, p1, p2, p3, t);
+      travelled.lineTo(pt.dx, pt.dy);
+    }
+    canvas.drawPath(travelled, done);
+
+    // Start & destination pins.
+    canvas.drawCircle(p0, 6, Paint()..color = AppColors.muted);
+    canvas.drawCircle(p3, 7, Paint()..color = AppColors.danger);
+    canvas.drawCircle(p3, 3, Paint()..color = Colors.white);
+
+    // Rider marker at the current position.
+    final rider = _bezier(p0, p1, p2, p3, progress);
+    canvas.drawCircle(rider, 13, Paint()..color = AppColors.primary.withValues(alpha: 0.18));
+    canvas.drawCircle(rider, 9, Paint()..color = Colors.white);
+    canvas.drawCircle(rider, 7, Paint()..color = AppColors.primary);
+  }
+
+  Offset _bezier(Offset p0, Offset p1, Offset p2, Offset p3, double t) {
+    final u = 1 - t;
+    final x = u * u * u * p0.dx + 3 * u * u * t * p1.dx + 3 * u * t * t * p2.dx + t * t * t * p3.dx;
+    final y = u * u * u * p0.dy + 3 * u * u * t * p1.dy + 3 * u * t * t * p2.dy + t * t * t * p3.dy;
+    return Offset(x, y);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _LiveMapPainter oldDelegate) => oldDelegate.progress != progress;
 }

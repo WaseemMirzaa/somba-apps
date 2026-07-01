@@ -140,9 +140,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(money(p.price),
-                            style: const TextStyle(
-                                fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.ink, letterSpacing: -1)),
+                        Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(money(p.price),
+                              style: const TextStyle(
+                                  fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.ink, letterSpacing: -1)),
+                          if (secondaryMoney(p.price) != null)
+                            Text(secondaryMoney(p.price)!, style: const TextStyle(fontSize: 12.5, color: AppColors.muted, fontWeight: FontWeight.w600)),
+                        ]),
                         const SizedBox(width: 10),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 5),
@@ -261,11 +265,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
-            onPressed: () {
-              setState(() {
-                following ? ShopState.instance.followedStores.remove(seller.id) : ShopState.instance.followedStores.add(seller.id);
-              });
-            },
+            onPressed: () => setState(() => ShopState.instance.toggleFollow(seller.id)),
             icon: Icon(following ? Icons.check_rounded : Icons.add_rounded, size: 18),
             label: Text(following ? 'Following' : 'Follow store'),
           )),

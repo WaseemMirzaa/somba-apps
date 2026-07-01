@@ -34,6 +34,14 @@ Zone get selectedZone {
 /// Delivery fee (USD) for the selected zone in the active market.
 double get deliveryFeeUsd => selectedZone.deliveryFeeUsd;
 
+/// Secondary-currency line for dual display. In the DRC market prices show in
+/// CDF (primary via [money]) with the USD equivalent underneath; France is
+/// single-currency so this returns null.
+String? secondaryMoney(num usdValue) {
+  if (currentMarket.fxRateUsdCdf != null) return '≈ ${_usd.format(usdValue)}';
+  return null;
+}
+
 /// Compact count, e.g. `2.3k` reviews.
 String compact(num value) {
   if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
