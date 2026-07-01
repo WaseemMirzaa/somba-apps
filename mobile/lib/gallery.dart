@@ -14,6 +14,8 @@ import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
 import 'screens/product_detail_screen.dart';
 import 'data/mock_data.dart';
+import 'data/market_profiles.dart';
+import 'util/format.dart';
 
 void main() => runApp(const _GalleryApp());
 
@@ -29,6 +31,10 @@ Map<String, WidgetBuilder> get _screens => {
       'verify-email': (_) => const VerifyEmailScreen(),
       'product-list': (_) => const ProductListScreen(locale: _en, category: 'Electronics'),
       'product-detail': (_) => ProductDetailScreen(product: products[8], locale: _en),
+      'product-detail-drc': (_) {
+        marketNotifier.value = MarketProfileId.drc; // dual-currency (FC + ≈$)
+        return ProductDetailScreen(product: products[8], locale: _en);
+      },
       'coupons': (_) => const CouponsScreen(locale: _en),
       'review-compose': (_) => const ReviewComposeScreen(locale: _en),
       'settings': (_) => const CustomerSettingsScreen(locale: _en),

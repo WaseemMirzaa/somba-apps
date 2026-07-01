@@ -57,6 +57,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ? null
               : () {
                   setState(() => _read.addAll(List.generate(_items.length, (i) => i)));
+                  ShopState.instance.save();
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All notifications marked as read')));
                 },
           child: const Text('Mark all'),
@@ -72,6 +73,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return GestureDetector(
             onTap: () {
               setState(() => _read.add(i));
+              ShopState.instance.save();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(n.$7 ? 'Opening promotion…' : 'Opening ${n.$3}…')));
             },
             child: Panel(

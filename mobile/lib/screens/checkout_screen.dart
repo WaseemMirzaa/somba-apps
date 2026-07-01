@@ -87,7 +87,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               for (final z in currentMarket.zones) ...[
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => shop.selectedZoneId = z.id),
+                  onTap: () => setState(() {
+                    shop.selectedZoneId = z.id;
+                    shop.save();
+                  }),
                   child: Row(children: [
                     Icon(selectedZone.id == z.id ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
                         color: selectedZone.id == z.id ? AppColors.primary : AppColors.faint, size: 22),
@@ -159,6 +162,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
                 const Divider(height: 22),
                 _row(s.total, money(total), bold: true),
+                if (secondaryMoney(total) != null)
+                  Align(alignment: Alignment.centerRight, child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(secondaryMoney(total)!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  )),
               ],
             ),
           ),

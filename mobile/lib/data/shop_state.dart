@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'mock_data.dart';
 import 'promos.dart';
 
@@ -29,6 +30,35 @@ class ShopState {
   String? selectedZoneId;
 
   double promoDiscount(double subtotalUsd) => appliedPromo?.discountFor(subtotalUsd) ?? 0;
+
+  SharedPreferences? _prefs;
+
+  /// Load persisted state (followed stores, read notifications, delivery zone).
+  /// Call once at startup before runApp.
+  Future<void> load() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      followedStores.addAll(_prefs!.getStringList('followedStores') ?? const []);
+      readNotifications.addAll((_prefs!.getStringList('readNotifications') ?? const []).map(int.parse));
+      selectedZoneId = _prefs!.getString('selectedZoneId');
+    } catch (_) {
+      // Persistence is best-effort; ignore load failures.
+    }
+  }
+
+  /// Persist the small session-carryover state.
+  void save() {
+    final p = _prefs;
+    if (p == null) return;
+    p.setStringList('followedStores', followedStores.toList());
+    p.setStringList('readNotifications', readNotifications.map((e) => e.toString()).toList());
+    if (selectedZoneId != null) p.setString('selectedZoneId', selectedZoneId!);
+  }
+
+  void toggleFollow(String sellerId) {
+    followedStores.contains(sellerId) ? followedStores.remove(sellerId) : followedStores.add(sellerId);
+    save();
+  }
 
   ShopState._() {
     if (products.isNotEmpty) {
