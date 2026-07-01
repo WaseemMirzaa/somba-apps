@@ -4,6 +4,8 @@ import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
+import 'returns_extra.dart';
+import 'support_extra.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final Locale locale;
@@ -80,9 +82,13 @@ class OrderDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.assignment_return_rounded, size: 18), label: const Text('Return'))),
+            Expanded(child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
+                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: const Text('Return'))),
             const SizedBox(width: 12),
-            Expanded(child: OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.headset_mic_rounded, size: 18), label: const Text('Help'))),
+            Expanded(child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale))),
+                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: const Text('Help'))),
           ]),
         ],
       ),

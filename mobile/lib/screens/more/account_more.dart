@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
+import 'support_extra.dart';
 
 class WishlistScreen extends StatelessWidget {
   final Locale locale;
@@ -163,7 +164,9 @@ class AddressBookScreen extends StatelessWidget {
                 ),
               )),
           const SizedBox(height: 4),
-          OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Add new address')),
+          OutlinedButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),
+              icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Add new address')),
         ],
       ),
     );

@@ -7,6 +7,9 @@ import 'screens/more/auth_screens.dart';
 import 'screens/more/search_screen.dart';
 import 'screens/more/order_screens.dart';
 import 'screens/more/account_more.dart';
+import 'screens/more/shop_extra.dart';
+import 'screens/more/returns_extra.dart';
+import 'screens/more/support_extra.dart';
 
 void main() => runApp(const _GalleryApp());
 
@@ -24,6 +27,19 @@ Map<String, WidgetBuilder> get _screens => {
       'wallet': (_) => const WalletScreen(locale: _en),
       'notifications': (_) => const NotificationsScreen(locale: _en),
       'addresses': (_) => const AddressBookScreen(locale: _en),
+      'store': (_) => const StoreScreen(locale: _en),
+      'reviews': (_) => const ReviewsScreen(locale: _en),
+      'payment': (_) => const PaymentScreen(locale: _en),
+      'payment-failed': (_) => const PaymentScreen(locale: _en, failed: true),
+      'return-request': (_) => const ReturnRequestScreen(locale: _en),
+      'return-status': (_) => const ReturnStatusScreen(locale: _en),
+      'exchange': (_) => const ExchangeScreen(locale: _en),
+      'dispute': (_) => const DisputeScreen(locale: _en),
+      'address-form': (_) => const AddressFormScreen(locale: _en),
+      'refer': (_) => const ReferScreen(locale: _en),
+      'support': (_) => const SupportListScreen(locale: _en),
+      'help': (_) => const HelpScreen(locale: _en),
+      'account-delete': (_) => const AccountDeleteScreen(),
     };
 
 class _GalleryApp extends StatelessWidget {
