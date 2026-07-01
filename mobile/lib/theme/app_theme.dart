@@ -84,12 +84,20 @@ class AppShadow {
       offset: const Offset(0, 10),
     ),
   ];
+  static List<BoxShadow> floating = [
+    BoxShadow(
+      color: const Color(0xFF0F172A).withValues(alpha: 0.14),
+      blurRadius: 28,
+      offset: const Offset(0, 12),
+    ),
+  ];
 }
 
 class AppTheme {
   AppTheme._();
 
   static const String _font = 'Inter';
+  static const String display = 'Sora';
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
@@ -110,9 +118,10 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
     );
 
-    TextStyle t(double size, FontWeight w, {double? h, double? ls, Color? c}) =>
+    TextStyle t(double size, FontWeight w,
+            {double? h, double? ls, Color? c, String? family}) =>
         TextStyle(
-          fontFamily: _font,
+          fontFamily: family ?? _font,
           fontSize: size,
           fontWeight: w,
           height: h,
@@ -123,10 +132,10 @@ class AppTheme {
     return base.copyWith(
       textTheme: base.textTheme
           .copyWith(
-            displaySmall: t(30, FontWeight.w800, h: 1.1, ls: -0.5),
-            headlineSmall: t(22, FontWeight.w800, h: 1.15, ls: -0.3),
-            titleLarge: t(19, FontWeight.w700, h: 1.2, ls: -0.2),
-            titleMedium: t(16, FontWeight.w700, h: 1.25),
+            displaySmall: t(32, FontWeight.w800, h: 1.05, ls: -0.8, family: display),
+            headlineSmall: t(23, FontWeight.w800, h: 1.12, ls: -0.5, family: display),
+            titleLarge: t(19, FontWeight.w700, h: 1.18, ls: -0.4, family: display),
+            titleMedium: t(16, FontWeight.w700, h: 1.25, ls: -0.2),
             titleSmall: t(14, FontWeight.w600, h: 1.3),
             bodyLarge: t(15, FontWeight.w500, h: 1.4, c: AppColors.inkSoft),
             bodyMedium: t(14, FontWeight.w500, h: 1.4, c: AppColors.inkSoft),
@@ -142,11 +151,11 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: _font,
-          fontSize: 19,
-          fontWeight: FontWeight.w700,
+          fontFamily: display,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
           color: AppColors.ink,
-          letterSpacing: -0.2,
+          letterSpacing: -0.5,
         ),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
       ),

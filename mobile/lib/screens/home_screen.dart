@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _pageController = PageController(viewportFraction: 0.92);
   int _page = 0;
+  int _feedTab = 0;
   Timer? _autoplay;
 
   late final List<_Banner> _banners = [
@@ -89,8 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: SectionHeader(s.recommended, actionLabel: s.seeAll),
         ),
+        SliverToBoxAdapter(child: _feedChips(s)),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -339,6 +341,49 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  // ---- Feed filter chips ----
+  Widget _feedChips(Strings s) {
+    final fr = s.isFr;
+    final tabs = fr
+        ? ['Pour vous', 'Tendances', 'Nouveau', 'Populaire']
+        : ['For You', 'Trending', 'New', 'Popular'];
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: tabs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final sel = _feedTab == i;
+          return GestureDetector(
+            onTap: () => setState(() => _feedTab = i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: sel ? AppColors.brandGradient : null,
+                color: sel ? null : AppColors.surface,
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: sel ? Colors.transparent : AppColors.line),
+                boxShadow: sel ? AppShadow.lifted : null,
+              ),
+              child: Text(
+                tabs[i],
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: sel ? Colors.white : AppColors.muted,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

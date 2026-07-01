@@ -70,7 +70,7 @@ class _DealsScreenState extends State<DealsScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -82,6 +82,7 @@ class _DealsScreenState extends State<DealsScreen> {
                 (_, i) => ProductCard(
                   product: deals[i],
                   lang: lang,
+                  soldPercent: 60 + (deals[i].id * 13) % 38,
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => ProductDetailScreen(product: deals[i], locale: widget.locale))),
                   onAdd: () {
