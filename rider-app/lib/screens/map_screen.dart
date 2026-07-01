@@ -46,7 +46,8 @@ class MapScreen extends StatelessWidget {
                 ]),
               ),
               const Spacer(),
-              CircleIconButton(icon: Icons.my_location_rounded, color: AppColors.primary, onTap: () {}),
+              CircleIconButton(icon: Icons.my_location_rounded, color: AppColors.primary,
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Centering on your location')))),
             ],
           ),
         ),
@@ -91,7 +92,7 @@ class MapScreen extends StatelessWidget {
                 Row(children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () {},
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening turn-by-turn navigation…'))),
                       icon: const Icon(Icons.navigation_rounded, size: 20),
                       label: const Text('Start navigation'),
                     ),
@@ -99,7 +100,11 @@ class MapScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Container(
                     decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(16)),
-                    child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary), onPressed: () {}, iconSize: 22),
+                    child: IconButton(
+                      icon: const Icon(Icons.call_rounded, color: AppColors.primary),
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Calling Marie Dubois…'))),
+                      iconSize: 22,
+                    ),
                   ),
                 ]),
               ],
