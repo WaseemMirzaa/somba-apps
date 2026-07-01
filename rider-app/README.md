@@ -7,7 +7,7 @@ earnings.
 ## Highlights
 
 - Modern emerald/teal identity with a **floating capsule navigation** (animated
-  expanding pill), **Sora** display headings paired with Inter body text.
+  expanding pill), **Plus Jakarta Sans** display headings paired with Inter body text.
 - **Tasks**: gradient on-duty header with live stats, colour-coded task cards
   (delivery / pickup / return) with COD and open-box chips, distance · ETA · items,
   and a rich task-action bottom sheet (navigate, complete, report).
@@ -16,7 +16,7 @@ earnings.
 - **Earnings**: gradient balance hero, a weekly bar chart with the best day
   highlighted, and payout history.
 - **Profile**: stats header, on-duty switch, vehicle/documents/support, EN/FR toggle.
-- Bundled **Inter + Sora** fonts — no runtime font fetching; fully self-contained.
+- Bundled **Inter + Plus Jakarta Sans** fonts — no runtime font fetching; fully self-contained.
 
 ## Run locally
 
