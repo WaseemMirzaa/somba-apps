@@ -1,5 +1,5 @@
 name: lipcart
-description: LipCart marketplace mobile app prototype
+description: Somba customer marketplace mobile app
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -12,7 +12,6 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
-  google_fonts: ^6.2.1
   cached_network_image: ^3.4.1
 
 dev_dependencies:
@@ -22,3 +21,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf

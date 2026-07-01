@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
+import '../theme/app_theme.dart';
+import '../util/format.dart';
 import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -16,38 +18,170 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
   String payment = 'cod';
 
+  static const _methods = [
+    ('stripe_card', Icons.credit_card_rounded),
+    ('cod', Icons.payments_rounded),
+    ('airtel_money', Icons.smartphone_rounded),
+    ('wallet', Icons.account_balance_wallet_rounded),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final fr = widget.locale.languageCode == 'fr';
-    final total = shop.subtotal + 5;
+    final s = Strings(widget.locale.languageCode);
+    final lang = widget.locale.languageCode;
+    const deliveryFee = 5.0;
+    final total = shop.subtotal + deliveryFee;
 
     return Scaffold(
-      appBar: AppBar(title: Text(fr ? 'Caisse' : 'Checkout')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(fr ? 'Adresse: Kinshasa, Gombe' : 'Address: Kinshasa, Gombe'),
-            const SizedBox(height: 8),
-            Text('${fr ? "Frais zone" : "Zone fee"}: \$5'),
-            const SizedBox(height: 16),
-            ...['stripe_card', 'cod', 'airtel_money', 'wallet'].map((m) => RadioListTile(
-                  title: Text(m),
-                  value: m,
-                  groupValue: payment,
-                  onChanged: (v) => setState(() => payment = v!),
-                )),
-            const Spacer(),
-            Text('${fr ? "Total" : "Total"}: \$${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OrderSuccessScreen(locale: widget.locale, orderId: 'ORD-2024-001'))),
-              child: Text(payment == 'cod' ? (fr ? 'Confirmer COD' : 'Confirm COD') : (fr ? 'Payer' : 'Pay')),
+      appBar: AppBar(
+        title: Text(s.checkout),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          _sectionTitle(s.deliveryAddress),
+          const SizedBox(height: 10),
+          _card(
+            child: Row(
+              children: [
+                Container(
+                  height: 44,
+                  width: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.location_on_rounded, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Marie Dubois · +243 970 000 000',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      const SizedBox(height: 2),
+                      Text(lang == 'fr' ? 'Av. du Commerce, Gombe, Kinshasa' : '12 Commerce Ave, Gombe, Kinshasa',
+                          style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.edit_rounded, size: 18, color: AppColors.muted),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          _sectionTitle(s.payment),
+          const SizedBox(height: 10),
+          ..._methods.map((m) {
+            final selected = payment == m.$1;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GestureDetector(
+                onTap: () => setState(() => payment = m.$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.line,
+                      width: selected ? 1.8 : 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(m.$2, color: selected ? AppColors.primary : AppColors.muted, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(s.paymentLabel(m.$1),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: selected ? AppColors.ink : AppColors.inkSoft)),
+                      ),
+                      Icon(
+                        selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                        color: selected ? AppColors.primary : AppColors.faint,
+                        size: 22,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          _sectionTitle(s.orderSummary),
+          const SizedBox(height: 10),
+          _card(
+            child: Column(
+              children: [
+                _row(s.subtotal, money(shop.subtotal)),
+                const SizedBox(height: 8),
+                _row(s.delivery, money(deliveryFee)),
+                const Divider(height: 22),
+                _row(s.total, money(total), bold: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, 12 + MediaQuery.of(context).padding.bottom),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E293B).withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
             ),
           ],
+        ),
+        child: FilledButton(
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderSuccessScreen(locale: widget.locale, orderId: 'SMB-2026-4821'),
+            ),
+          ),
+          child: Text('${s.placeOrder}  ·  ${money(total)}'),
         ),
       ),
     );
   }
+
+  Widget _sectionTitle(String t) => Text(t, style: Theme.of(context).textTheme.titleMedium);
+
+  Widget _card({required Widget child}) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppShadow.card,
+        ),
+        child: child,
+      );
+
+  Widget _row(String label, String value, {bool bold = false}) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: bold ? 16 : 14,
+                  fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+                  color: bold ? AppColors.ink : AppColors.muted)),
+          Text(value,
+              style: TextStyle(
+                  fontSize: bold ? 18 : 14,
+                  fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
+                  color: bold ? AppColors.primary : AppColors.ink)),
+        ],
+      );
 }
