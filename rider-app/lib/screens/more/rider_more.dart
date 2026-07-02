@@ -73,56 +73,161 @@ class TaskDetailScreen extends StatelessWidget {
       );
 }
 
-// ---------------- Proof of delivery ----------------
-class PodScreen extends StatelessWidget {
+// ---------------- Proof of delivery (functional) ----------------
+class PodScreen extends StatefulWidget {
   final RiderTask task;
   const PodScreen({super.key, required this.task});
+  @override
+  State<PodScreen> createState() => _PodScreenState();
+}
+
+class _PodScreenState extends State<PodScreen> {
+  bool _photo = false;
+  bool _otp = false;
+  final List<List<Offset>> _strokes = [];
+
+  bool get _signed => _strokes.any((s) => s.length > 1);
+  bool get _canComplete => _photo && _signed;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: backAppBar(context, 'Proof of delivery'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+        // Photo capture (mock).
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Photo of delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const SizedBox(height: 10),
-          Container(height: 130, decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
-            child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 30),
-              SizedBox(height: 8),
-              Text('Tap to capture', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
-            ])),
+          GestureDetector(
+            onTap: () => setState(() => _photo = !_photo),
+            child: Container(
+              height: 130,
+              decoration: BoxDecoration(
+                gradient: _photo ? AppColors.brandGradient : null,
+                color: _photo ? null : AppColors.background,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _photo ? Colors.transparent : AppColors.line, style: _photo ? BorderStyle.solid : BorderStyle.none),
+              ),
+              child: _photo
+                  ? const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 32),
+                      SizedBox(height: 8),
+                      Text('Photo captured — tap to retake', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    ])
+                  : _dashed(const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 30),
+                      SizedBox(height: 8),
+                      Text('Tap to capture', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                    ])),
+            ),
+          ),
         ])),
         const SizedBox(height: 12),
+        // Signature pad (dependency-free).
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Signature', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          Row(children: [
+            const Text('Signature', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+            const Spacer(),
+            if (_signed)
+              TextButton.icon(
+                onPressed: () => setState(() => _strokes.clear()),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: EdgeInsets.zero),
+                label: const Text('Clear'),
+              ),
+          ]),
           const SizedBox(height: 10),
-          Container(height: 90, decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
-            child: CustomPaint(painter: _SignPainter(), child: const SizedBox.expand())),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 130,
+              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+              child: GestureDetector(
+                onPanStart: (d) => setState(() => _strokes.add([d.localPosition])),
+                onPanUpdate: (d) => setState(() {
+                  if (_strokes.isEmpty) _strokes.add([]);
+                  _strokes.last.add(d.localPosition);
+                }),
+                child: CustomPaint(
+                  painter: _SignPainter(_strokes),
+                  child: _signed
+                      ? const SizedBox.expand()
+                      : const Center(child: Text('Sign here', style: TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600))),
+                ),
+              ),
+            ),
+          ),
         ])),
         const SizedBox(height: 12),
+        // Delivery OTP verify (mock).
         SurfaceCard(child: Row(children: [
-          const Icon(Icons.pin_rounded, color: AppColors.primary),
+          Icon(Icons.pin_rounded, color: _otp ? AppColors.primary : AppColors.muted),
           const SizedBox(width: 10),
-          const Expanded(child: Text('Delivery OTP verified', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-          Pill('4821', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
+          Expanded(child: Text(_otp ? 'Delivery OTP verified' : 'Verify delivery OTP', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+          _otp
+              ? Pill('4821', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary)
+              : FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary, minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 14)),
+                  onPressed: () => setState(() => _otp = true),
+                  child: const Text('Verify')),
         ])),
         const SizedBox(height: 18),
-        PrimaryButton('Complete delivery', icon: Icons.check_rounded,
-          onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
+        PrimaryButton('Complete delivery',
+            icon: Icons.check_rounded,
+            onPressed: _canComplete
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.task.id} delivered ✓')));
+                    Navigator.popUntil(context, (r) => r.isFirst);
+                  }
+                : null),
+        if (!_canComplete)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Center(child: Text('Capture a photo and signature to complete', style: TextStyle(color: AppColors.faint, fontSize: 11.5))),
+          ),
       ]),
     );
   }
+
+  Widget _dashed(Widget child) => CustomPaint(painter: _DashedBorder(), child: SizedBox.expand(child: child));
 }
 
+/// Draws the captured signature strokes.
 class _SignPainter extends CustomPainter {
+  final List<List<Offset>> strokes;
+  _SignPainter(this.strokes);
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = AppColors.ink..style = PaintingStyle.stroke..strokeWidth = 2.5..strokeCap = StrokeCap.round;
-    final path = Path()
-      ..moveTo(size.width * 0.15, size.height * 0.6)
-      ..cubicTo(size.width * 0.3, size.height * 0.1, size.width * 0.38, size.height * 0.95, size.width * 0.5, size.height * 0.5)
-      ..cubicTo(size.width * 0.62, size.height * 0.1, size.width * 0.72, size.height * 0.9, size.width * 0.88, size.height * 0.4);
-    canvas.drawPath(path, p);
+    final p = Paint()..color = AppColors.ink..style = PaintingStyle.stroke..strokeWidth = 2.6..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    for (final s in strokes) {
+      if (s.length < 2) continue;
+      final path = Path()..moveTo(s.first.dx, s.first.dy);
+      for (final pt in s.skip(1)) {
+        path.lineTo(pt.dx, pt.dy);
+      }
+      canvas.drawPath(path, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignPainter old) => true;
+}
+
+/// Dashed rounded border for the empty capture tile.
+class _DashedBorder extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = AppColors.primary.withValues(alpha: 0.5)..style = PaintingStyle.stroke..strokeWidth = 1.6;
+    final rrect = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(16));
+    final path = Path()..addRRect(rrect);
+    const dash = 7.0, gap = 5.0;
+    for (final m in path.computeMetrics()) {
+      double d = 0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, d + dash), p);
+        d += dash + gap;
+      }
+    }
   }
 
   @override
