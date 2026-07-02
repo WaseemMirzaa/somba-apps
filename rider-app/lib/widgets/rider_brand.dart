@@ -1,65 +1,158 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// The Somba&Teka logo (copied from the web app) on a white tile.
+/// The Somba&Teka logo (copied from the web app) on a white tile, wrapped in a
+/// soft luminous halo so it reads as premium over the deep-blue backdrop.
 class RiderBrandLogo extends StatelessWidget {
   final double size;
   final double radius;
-  const RiderBrandLogo({super.key, this.size = 84, this.radius = 24});
+  final bool halo;
+  const RiderBrandLogo({super.key, this.size = 84, this.radius = 24, this.halo = true});
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final tile = Container(
       height: size,
       width: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Color(0xFFF3F6FF)],
+        ),
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 10))],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1),
+        boxShadow: [
+          BoxShadow(color: AppColors.primaryDark.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 16)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
-      padding: EdgeInsets.all(size * 0.12),
+      padding: EdgeInsets.all(size * 0.13),
       child: Image.asset('assets/brand/logo.png', fit: BoxFit.contain),
+    );
+    if (!halo) return tile;
+    // Luminous ring behind the tile for depth.
+    return SizedBox(
+      height: size + 34,
+      width: size + 34,
+      child: Stack(alignment: Alignment.center, children: [
+        Container(
+          height: size + 30,
+          width: size + 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(colors: [
+              const Color(0xFF7DA2FF).withValues(alpha: 0.55),
+              const Color(0xFF7DA2FF).withValues(alpha: 0.0),
+            ]),
+          ),
+        ),
+        tile,
+      ]),
     );
   }
 }
 
-/// Frosted glass card holding auth forms over the blue gradient.
+/// Frosted glass card holding auth forms over the blue gradient. Real backdrop
+/// blur plus a bright top edge give it a premium, layered-glass feel.
 class RiderGlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   const RiderGlassCard({super.key, required this.child, this.padding = const EdgeInsets.all(22)});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 40, offset: const Offset(0, 18))],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          width: double.infinity,
+          padding: padding,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white.withValues(alpha: 0.97), Colors.white.withValues(alpha: 0.90)],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 1.2),
+            boxShadow: [
+              BoxShadow(color: AppColors.primaryDark.withValues(alpha: 0.28), blurRadius: 50, offset: const Offset(0, 24)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 14, offset: const Offset(0, 6)),
+            ],
+          ),
+          child: child,
+        ),
       ),
-      child: child,
     );
   }
 }
 
-/// Blue gradient backdrop with soft blobs (rider theme).
+/// Premium blue backdrop: deep royal gradient, layered soft blobs, a radial
+/// halo of light and a faint conic sheen for depth.
 class RiderAuthBackdrop extends StatelessWidget {
   final Widget child;
   const RiderAuthBackdrop({super.key, required this.child});
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      const Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: AppColors.brandGradient))),
-      Positioned(top: -60, right: -40, child: _blob(220, Colors.white.withValues(alpha: 0.16))),
-      Positioned(bottom: -80, left: -50, child: _blob(260, const Color(0xFF38BDF8).withValues(alpha: 0.30))),
-      Positioned(top: 140, left: -60, child: _blob(150, AppColors.accent.withValues(alpha: 0.22))),
+      // Base deep-royal gradient.
+      const Positioned.fill(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2E56D8), Color(0xFF16308F), Color(0xFF0A1747)],
+              stops: [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+      ),
+      // Warm halo of light from the top, lifting the logo area.
+      Positioned.fill(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0, -0.75),
+              radius: 1.1,
+              colors: [const Color(0xFF6D8FF5).withValues(alpha: 0.45), Colors.transparent],
+            ),
+          ),
+        ),
+      ),
+      // Soft colour blobs.
+      Positioned(top: -70, right: -50, child: _blob(240, const Color(0xFF8FB0FF).withValues(alpha: 0.30))),
+      Positioned(bottom: -90, left: -60, child: _blob(300, const Color(0xFF38BDF8).withValues(alpha: 0.28))),
+      Positioned(top: 150, left: -70, child: _blob(170, AppColors.accent.withValues(alpha: 0.20))),
+      Positioned(bottom: 120, right: -40, child: _blob(160, const Color(0xFF22D3EE).withValues(alpha: 0.16))),
+      // Subtle sheen sweeping across the top.
+      Positioned(
+        top: -40, left: -20, right: -20,
+        child: Container(
+          height: 260,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.white.withValues(alpha: 0.10), Colors.transparent],
+            ),
+          ),
+        ),
+      ),
       Positioned.fill(child: child),
     ]);
   }
 
-  Widget _blob(double d, Color c) => Container(height: d, width: d, decoration: BoxDecoration(shape: BoxShape.circle, color: c));
+  Widget _blob(double d, Color c) => Container(
+        height: d,
+        width: d,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [c, c.withValues(alpha: 0)]),
+        ),
+      );
 }
 
 /// Pill-shaped primary auth button with elevation.

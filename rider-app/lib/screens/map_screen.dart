@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/mock_tasks.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+import '../l10n/strings.dart';
 
 class MapScreen extends StatelessWidget {
   final Locale locale;
@@ -37,22 +38,22 @@ class MapScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: AppShadow.soft),
-                child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                  Icon(Icons.route_rounded, color: AppColors.primary, size: 20),
-                  SizedBox(width: 8),
-                  Text('Optimized route', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
-                  SizedBox(width: 8),
-                  Text('3 stops · 12.4 km', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.route_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(tr(context, 'Optimized route'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                  const SizedBox(width: 8),
+                  Text(tr(context, '3 stops · 12.4 km'), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                 ]),
               ),
               const Spacer(),
               CircleIconButton(icon: Icons.my_location_rounded, color: AppColors.primary,
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Centering on your location')))),
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Centering on your location'))))),
             ],
           ),
         ),
         // Route markers
-        const Positioned(top: 210, left: 60, child: _Marker(label: 'You', color: AppColors.info, icon: Icons.two_wheeler_rounded)),
+        Positioned(top: 210, left: 60, child: _Marker(label: tr(context, 'You'), color: AppColors.info, icon: Icons.two_wheeler_rounded)),
         const Positioned(top: 330, right: 70, child: _Marker(label: '1', color: AppColors.primary)),
         const Positioned(top: 470, left: 90, child: _Marker(label: '2', color: AppColors.violet)),
         // Next stop card
@@ -66,9 +67,9 @@ class MapScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Pill('Next stop', color: AppColors.primary.withValues(alpha: 0.14), textColor: AppColors.primary, fontSize: 11),
+                  Pill(tr(context, 'Next stop'), color: AppColors.primary.withValues(alpha: 0.14), textColor: AppColors.primary, fontSize: 11),
                   const Spacer(),
-                  const Text('ETA 8 min', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  Text(tr(context, 'ETA 8 min'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ]),
                 const SizedBox(height: 12),
                 Row(children: [
@@ -92,9 +93,9 @@ class MapScreen extends StatelessWidget {
                 Row(children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening turn-by-turn navigation…'))),
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Opening turn-by-turn navigation…')))),
                       icon: const Icon(Icons.navigation_rounded, size: 20),
-                      label: const Text('Start navigation'),
+                      label: Text(tr(context, 'Start navigation')),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -102,7 +103,7 @@ class MapScreen extends StatelessWidget {
                     decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(16)),
                     child: IconButton(
                       icon: const Icon(Icons.call_rounded, color: AppColors.primary),
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Calling Marie Dubois…'))),
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Calling Marie Dubois…')))),
                       iconSize: 22,
                     ),
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 
 class RiderTask {
@@ -65,6 +66,20 @@ class RiderTask {
 
   String get typeLabel => type[0].toUpperCase() + type.substring(1);
 
+  /// Localized short type label (Delivery / Pickup / Zone / Return).
+  String typeLabelL(String lang) {
+    switch (type) {
+      case 'pickup':
+        return trl(lang, 'Pickup');
+      case 'zone':
+        return trl(lang, 'Zone');
+      case 'return':
+        return trl(lang, 'Return');
+      default:
+        return trl(lang, 'Delivery');
+    }
+  }
+
   /// The task nature, made explicit for the rider.
   String get natureLabel {
     switch (type) {
@@ -79,6 +94,9 @@ class RiderTask {
     }
   }
 
+  /// Localized nature label.
+  String natureLabelL(String lang) => trl(lang, natureLabel);
+
   String get natureDetail {
     switch (type) {
       case 'pickup':
@@ -92,6 +110,28 @@ class RiderTask {
         return '$origin  →  $destination · $batch parcel${batch > 1 ? 's' : ''}$s';
     }
   }
+
+  /// Localized nature detail (rebuilds the interpolated copy in the target lang).
+  String natureDetailL(String lang) {
+    final o = trl(lang, origin);
+    final d = trl(lang, destination);
+    switch (type) {
+      case 'pickup':
+        return '${trl(lang, 'Collect')} $batch ${_parcels(lang, batch)} ${trl(lang, 'at')} $o';
+      case 'zone':
+        return '$o  →  $d · ${trl(lang, 'batch of')} $batch ${trl(lang, 'parcels')}';
+      case 'return':
+        return '${trl(lang, 'Return')} $items ${_itemsWord(lang, items)} ${trl(lang, 'to')} $o';
+      default:
+        final s = sellers > 1 ? ' · $sellers ${trl(lang, 'sellers')}' : '';
+        return '$o  →  $d · $batch ${_parcels(lang, batch)}$s';
+    }
+  }
+
+  static String _parcels(String lang, int n) =>
+      lang == 'fr' ? (n > 1 ? 'colis' : 'colis') : (n > 1 ? 'parcels' : 'parcel');
+  static String _itemsWord(String lang, int n) =>
+      lang == 'fr' ? (n > 1 ? 'articles' : 'article') : (n > 1 ? 'items' : 'item');
 
   bool get isBatch => batch > 1;
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_tasks.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
+import '../../l10n/strings.dart';
 import 'rider_more3.dart';
 
 // ---------------- Task detail (full screen) ----------------
@@ -25,9 +26,9 @@ class TaskDetailScreen extends StatelessWidget {
             Container(height: 46, width: 46, decoration: BoxDecoration(color: t.color.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(14)), child: Icon(t.icon, color: t.color)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t.natureLabel, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: t.color)),
+              Text(tr(context, t.natureLabel), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: t.color)),
               const SizedBox(height: 2),
-              Text(t.natureDetail, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3)),
+              Text(t.natureDetailL(Localizations.localeOf(context).languageCode), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3)),
             ])),
           ]),
         ),
@@ -37,7 +38,7 @@ class TaskDetailScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(t.customer, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            Text('${t.typeLabel} · ${t.batch} parcel${t.batch > 1 ? 's' : ''}${t.isBatch ? ' (batch)' : ''}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text('${tr(context, t.typeLabel)} · ${t.batch} ${tr(context, t.batch > 1 ? 'parcels' : 'parcel')}${t.isBatch ? ' (${tr(context, 'batch')})' : ''}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ])),
           Pill('${t.distanceKm} km', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
         ])),
@@ -48,7 +49,7 @@ class TaskDetailScreen extends StatelessWidget {
           Expanded(child: Text(t.address, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
           Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
             child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary),
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Calling ${t.customer}…'))))),
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, 'Calling')} ${t.customer}…'))))),
           const SizedBox(width: 8),
           Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
             child: IconButton(icon: const Icon(Icons.chat_bubble_rounded, color: AppColors.primary),
@@ -56,43 +57,43 @@ class TaskDetailScreen extends StatelessWidget {
         ])),
         const SizedBox(height: 12),
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(isDelivery ? 'Handover checklist' : (isZone ? 'Transfer checklist' : 'Pickup checklist'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          Text(isDelivery ? tr(context, 'Handover checklist') : (isZone ? tr(context, 'Transfer checklist') : tr(context, 'Pickup checklist')), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const SizedBox(height: 10),
           if (isDelivery) ...[
-            _check('Verify customer identity', true),
-            _check(t.openBox ? 'Open-box: let customer inspect' : 'Confirm package sealed', t.openBox),
-            _check('Capture proof of delivery', false),
+            _check(tr(context, 'Verify customer identity'), true),
+            _check(t.openBox ? tr(context, 'Open-box: let customer inspect') : tr(context, 'Confirm package sealed'), t.openBox),
+            _check(tr(context, 'Capture proof of delivery'), false),
           ] else if (isZone) ...[
-            _check('Load & batch-scan ${t.batch} parcels', false),
-            _check('Batch-scan on arrival at ${t.destination}', false),
-            _check('Receiving document signed', false),
+            _check('${tr(context, 'Load & batch-scan')} ${t.batch} ${tr(context, 'parcels')}', false),
+            _check('${tr(context, 'Batch-scan on arrival at')} ${tr(context, t.destination)}', false),
+            _check(tr(context, 'Receiving document signed'), false),
           ] else ...[
-            _check('Collect ${t.batch} parcels at ${t.origin}', false),
-            _check('Batch-scan every parcel', false),
-            _check('Confirm pickup complete', false),
+            _check('${tr(context, 'Collect')} ${t.batch} ${tr(context, 'parcels at')} ${tr(context, t.origin)}', false),
+            _check(tr(context, 'Batch-scan every parcel'), false),
+            _check(tr(context, 'Confirm pickup complete'), false),
           ],
         ])),
         const SizedBox(height: 16),
-        PrimaryButton('Navigate', icon: Icons.navigation_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening turn-by-turn navigation…')))),
+        PrimaryButton(tr(context, 'Navigate'), icon: Icons.navigation_rounded,
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Opening turn-by-turn navigation…'))))),
         const SizedBox(height: 10),
         if (isDelivery)
           Row(children: [
             Expanded(child: FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PodScreen(task: t))),
-              icon: const Icon(Icons.check_circle_rounded, size: 20), label: Text(t.isBatch ? 'Deliver batch' : 'Deliver'))),
+              icon: const Icon(Icons.check_circle_rounded, size: 20), label: Text(t.isBatch ? tr(context, 'Deliver batch') : tr(context, 'Deliver')))),
             const SizedBox(width: 10),
             Expanded(child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger, width: 1.5)),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FailedDeliveryScreen())),
-              icon: const Icon(Icons.report_gmailerrorred_rounded, size: 20), label: const Text('Failed'))),
+              icon: const Icon(Icons.report_gmailerrorred_rounded, size: 20), label: Text(tr(context, 'Failed')))),
           ])
         else if (isZone)
-          PrimaryButton('Batch scan & handover', icon: Icons.qr_code_scanner_rounded,
+          PrimaryButton(tr(context, 'Batch scan & handover'), icon: Icons.qr_code_scanner_rounded,
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BatchScanScreen(task: t, zone: true))))
         else if (isPickup)
-          PrimaryButton('Scan & confirm pickup', icon: Icons.qr_code_scanner_rounded,
+          PrimaryButton(tr(context, 'Scan & confirm pickup'), icon: Icons.qr_code_scanner_rounded,
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BatchScanScreen(task: t, zone: false)))),
       ]),
     );
@@ -127,11 +128,11 @@ class _PodScreenState extends State<PodScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Proof of delivery'),
+      appBar: backAppBar(context, tr(context, 'Proof of delivery')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         // Photo capture (mock).
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Photo of delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          Text(tr(context, 'Photo of delivery'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const SizedBox(height: 10),
           GestureDetector(
             onTap: () => setState(() => _photo = !_photo),
@@ -144,15 +145,15 @@ class _PodScreenState extends State<PodScreen> {
                 border: Border.all(color: _photo ? Colors.transparent : AppColors.line, style: _photo ? BorderStyle.solid : BorderStyle.none),
               ),
               child: _photo
-                  ? const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 32),
-                      SizedBox(height: 8),
-                      Text('Photo captured — tap to retake', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 32),
+                      const SizedBox(height: 8),
+                      Text(tr(context, 'Photo captured — tap to retake'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
                     ])
-                  : _dashed(const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 30),
-                      SizedBox(height: 8),
-                      Text('Tap to capture', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
+                  : _dashed(Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 30),
+                      const SizedBox(height: 8),
+                      Text(tr(context, 'Tap to capture'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 12.5)),
                     ])),
             ),
           ),
@@ -161,14 +162,14 @@ class _PodScreenState extends State<PodScreen> {
         // Signature pad (dependency-free).
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('Signature', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+            Text(tr(context, 'Signature'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
             const Spacer(),
             if (_signed)
               TextButton.icon(
                 onPressed: () => setState(() => _strokes.clear()),
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: EdgeInsets.zero),
-                label: const Text('Clear'),
+                label: Text(tr(context, 'Clear')),
               ),
           ]),
           const SizedBox(height: 10),
@@ -187,7 +188,7 @@ class _PodScreenState extends State<PodScreen> {
                   painter: _SignPainter(_strokes),
                   child: _signed
                       ? const SizedBox.expand()
-                      : const Center(child: Text('Sign here', style: TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600))),
+                      : Center(child: Text(tr(context, 'Sign here'), style: const TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600))),
                 ),
               ),
             ),
@@ -198,27 +199,27 @@ class _PodScreenState extends State<PodScreen> {
         SurfaceCard(child: Row(children: [
           Icon(Icons.pin_rounded, color: _otp ? AppColors.primary : AppColors.muted),
           const SizedBox(width: 10),
-          Expanded(child: Text(_otp ? 'Delivery OTP verified' : 'Verify delivery OTP', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+          Expanded(child: Text(_otp ? tr(context, 'Delivery OTP verified') : tr(context, 'Verify delivery OTP'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
           _otp
               ? Pill('4821', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary)
               : FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: AppColors.primary, minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 14)),
                   onPressed: () => setState(() => _otp = true),
-                  child: const Text('Verify')),
+                  child: Text(tr(context, 'Verify'))),
         ])),
         const SizedBox(height: 18),
-        PrimaryButton('Complete delivery',
+        PrimaryButton(tr(context, 'Complete delivery'),
             icon: Icons.check_rounded,
             onPressed: _canComplete
                 ? () {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.task.id} delivered ✓')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.task.id} ${tr(context, 'delivered')} ✓')));
                     Navigator.popUntil(context, (r) => r.isFirst);
                   }
                 : null),
         if (!_canComplete)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Center(child: Text('Capture a photo and signature to complete', style: TextStyle(color: AppColors.faint, fontSize: 11.5))),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(child: Text(tr(context, 'Capture a photo and signature to complete'), style: const TextStyle(color: AppColors.faint, fontSize: 11.5))),
           ),
       ]),
     );
@@ -282,9 +283,9 @@ class _FailedDeliveryScreenState extends State<FailedDeliveryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Report a problem'),
+      appBar: backAppBar(context, tr(context, 'Report a problem')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        const Padding(padding: EdgeInsets.fromLTRB(4, 4, 4, 10), child: Text('Why did the delivery fail?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+        Padding(padding: const EdgeInsets.fromLTRB(4, 4, 4, 10), child: Text(tr(context, 'Why did the delivery fail?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         ...List.generate(_reasons.length, (i) {
           final sel = _reason == i;
           return Padding(padding: const EdgeInsets.only(bottom: 10), child: GestureDetector(
@@ -292,12 +293,12 @@ class _FailedDeliveryScreenState extends State<FailedDeliveryScreen> {
             child: SurfaceCard(padding: const EdgeInsets.all(14), child: Row(children: [
               Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel ? AppColors.primary : AppColors.faint),
               const SizedBox(width: 12),
-              Expanded(child: Text(_reasons[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: sel ? AppColors.ink : AppColors.inkSoft))),
+              Expanded(child: Text(tr(context, _reasons[i]), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: sel ? AppColors.ink : AppColors.inkSoft))),
             ])),
           ));
         }),
         const SizedBox(height: 6),
-        PrimaryButton('Submit report', icon: Icons.send_rounded,
+        PrimaryButton(tr(context, 'Submit report'), icon: Icons.send_rounded,
           onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
       ]),
     );
@@ -324,15 +325,15 @@ class _BatchScanScreenState extends State<BatchScanScreen> {
   Widget build(BuildContext context) {
     final t = widget.task;
     return Scaffold(
-      appBar: backAppBar(context, widget.zone ? 'Batch handover' : 'Scan pickup'),
+      appBar: backAppBar(context, widget.zone ? tr(context, 'Batch handover') : tr(context, 'Scan pickup')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Batch scan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+            Expanded(child: Text(tr(context, 'Batch scan'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
             Pill('$_scanned / ${t.batch}', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
           ]),
           const SizedBox(height: 6),
-          Text(widget.zone ? '${t.origin} → ${t.destination}' : 'Collect at ${t.origin}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          Text(widget.zone ? '${tr(context, t.origin)} → ${tr(context, t.destination)}' : '${tr(context, 'Collect at')} ${tr(context, t.origin)}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           const SizedBox(height: 12),
           ClipRRect(borderRadius: BorderRadius.circular(100), child: LinearProgressIndicator(value: t.batch == 0 ? 0 : _scanned / t.batch, minHeight: 8, backgroundColor: AppColors.line, color: AppColors.primary)),
           const SizedBox(height: 14),
@@ -351,16 +352,16 @@ class _BatchScanScreenState extends State<BatchScanScreen> {
         ])),
         const SizedBox(height: 12),
         if (!_allScanned)
-          PrimaryButton('Scan parcel ${_scanned + 1}', icon: Icons.qr_code_scanner_rounded,
+          PrimaryButton('${tr(context, 'Scan parcel')} ${_scanned + 1}', icon: Icons.qr_code_scanner_rounded,
               onPressed: () => setState(() => _scanned++))
         else if (widget.zone) ...[
           SurfaceCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Expanded(child: Text('Receiving document', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
-              if (_signed) TextButton.icon(onPressed: () => setState(() => _strokes.clear()), icon: const Icon(Icons.refresh_rounded, size: 16), style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: EdgeInsets.zero), label: const Text('Clear')),
+              Expanded(child: Text(tr(context, 'Receiving document'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
+              if (_signed) TextButton.icon(onPressed: () => setState(() => _strokes.clear()), icon: const Icon(Icons.refresh_rounded, size: 16), style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: EdgeInsets.zero), label: Text(tr(context, 'Clear'))),
             ]),
             const SizedBox(height: 4),
-            Text('Receiver at ${t.destination} signs to confirm ${t.batch} parcels received.', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text('${tr(context, 'Receiver at')} ${tr(context, t.destination)} ${tr(context, 'signs to confirm')} ${t.batch} ${tr(context, 'parcels received.')}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -375,23 +376,23 @@ class _BatchScanScreenState extends State<BatchScanScreen> {
                   }),
                   child: CustomPaint(
                     painter: _SignPainter(_strokes),
-                    child: _signed ? const SizedBox.expand() : const Center(child: Text('Receiver signs here', style: TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600))),
+                    child: _signed ? const SizedBox.expand() : Center(child: Text(tr(context, 'Receiver signs here'), style: const TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600))),
                   ),
                 ),
               ),
             ),
           ])),
           const SizedBox(height: 14),
-          PrimaryButton('Confirm handover', icon: Icons.check_rounded,
+          PrimaryButton(tr(context, 'Confirm handover'), icon: Icons.check_rounded,
               onPressed: _signed
                   ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.id}: ${t.batch} parcels handed over ✓')));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.id}: ${t.batch} ${tr(context, 'parcels handed over')} ✓')));
                       Navigator.popUntil(context, (r) => r.isFirst);
                     }
                   : null),
         ] else
-          PrimaryButton('Confirm pickup complete', icon: Icons.check_rounded, onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.id}: ${t.batch} parcels picked up ✓')));
+          PrimaryButton(tr(context, 'Confirm pickup complete'), icon: Icons.check_rounded, onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.id}: ${t.batch} ${tr(context, 'parcels picked up')} ✓')));
             Navigator.popUntil(context, (r) => r.isFirst);
           }),
       ]),
@@ -404,16 +405,16 @@ class RiderHistoryScreen extends StatelessWidget {
   const RiderHistoryScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    const items = [
-      ('TSK-8830', 'Marie Dubois · Gombe', 'Delivered · 3 parcels', AppColors.primary, Icons.check_circle_rounded, '\$149'),
-      ('TSK-8829', 'Warehouse pickup', 'Completed · 6 parcels', AppColors.primary, Icons.warehouse_rounded, '—'),
-      ('TSK-8827', 'Gombe → Limete hub', 'Zone transfer · 12 parcels', AppColors.info, Icons.swap_horiz_rounded, '—'),
-      ('TSK-8825', 'Paul Kabeya · Lemba', 'Failed · absent', AppColors.danger, Icons.cancel_rounded, '\$0'),
-      ('TSK-8820', 'Sophie Laurent · Ngaba', 'Delivered · 1 parcel', AppColors.primary, Icons.check_circle_rounded, '\$62'),
-      ('TSK-8814', 'Batch · 4 sellers', 'Delivered · 5 parcels', AppColors.primary, Icons.check_circle_rounded, '\$203'),
+    final items = [
+      ('TSK-8830', 'Marie Dubois · Gombe', tr(context, 'Delivered · 3 parcels'), AppColors.primary, Icons.check_circle_rounded, '\$149'),
+      ('TSK-8829', tr(context, 'Warehouse pickup'), tr(context, 'Completed · 6 parcels'), AppColors.primary, Icons.warehouse_rounded, '—'),
+      ('TSK-8827', 'Gombe → Limete hub', tr(context, 'Zone transfer · 12 parcels'), AppColors.info, Icons.swap_horiz_rounded, '—'),
+      ('TSK-8825', 'Paul Kabeya · Lemba', tr(context, 'Failed · absent'), AppColors.danger, Icons.cancel_rounded, '\$0'),
+      ('TSK-8820', 'Sophie Laurent · Ngaba', tr(context, 'Delivered · 1 parcel'), AppColors.primary, Icons.check_circle_rounded, '\$62'),
+      ('TSK-8814', tr(context, 'Batch · 4 sellers'), tr(context, 'Delivered · 5 parcels'), AppColors.primary, Icons.check_circle_rounded, '\$203'),
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Task history'),
+      appBar: backAppBar(context, tr(context, 'Task history')),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: items.length,
@@ -440,16 +441,16 @@ class RiderNotificationsScreen extends StatelessWidget {
   const RiderNotificationsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    const items = [
-      (Icons.local_shipping_rounded, AppColors.primary, 'New batch assigned', 'TSK-8841 · 3 parcels · 2 sellers · Gombe', '1m', true),
-      (Icons.swap_horiz_rounded, AppColors.info, 'Zone transfer assigned', 'TSK-8843 · Gombe → Limete hub · 12 parcels', '6m', true),
-      (Icons.route_rounded, AppColors.info, 'Route re-optimized', 'Your next 3 stops were reordered.', '12m', true),
-      (Icons.warehouse_rounded, AppColors.accent, 'Pickup ready', 'Warehouse batch BAT-204 (6 parcels) is ready.', '1h', false),
-      (Icons.star_rounded, AppColors.accent, 'New 5★ rating', 'Marie rated your delivery 5 stars.', '3h', false),
-      (Icons.description_rounded, AppColors.info, 'Document reminder', 'Roadworthiness renewal due in 21 days.', '1d', false),
+    final items = [
+      (Icons.local_shipping_rounded, AppColors.primary, tr(context, 'New batch assigned'), 'TSK-8841 · 3 parcels · 2 sellers · Gombe', '1m', true),
+      (Icons.swap_horiz_rounded, AppColors.info, tr(context, 'Zone transfer assigned'), 'TSK-8843 · Gombe → Limete hub · 12 parcels', '6m', true),
+      (Icons.route_rounded, AppColors.info, tr(context, 'Route re-optimized'), tr(context, 'Your next 3 stops were reordered.'), '12m', true),
+      (Icons.warehouse_rounded, AppColors.accent, tr(context, 'Pickup ready'), 'Warehouse batch BAT-204 (6 parcels) is ready.', '1h', false),
+      (Icons.star_rounded, AppColors.accent, tr(context, 'New 5★ rating'), tr(context, 'Marie rated your delivery 5 stars.'), '3h', false),
+      (Icons.description_rounded, AppColors.info, tr(context, 'Document reminder'), tr(context, 'Roadworthiness renewal due in 21 days.'), '1d', false),
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Notifications'),
+      appBar: backAppBar(context, tr(context, 'Notifications')),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: items.length,

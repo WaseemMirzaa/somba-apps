@@ -4,12 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme/app_theme.dart';
 import 'data/mock_tasks.dart';
+import 'screens/rider_shell.dart';
 import 'screens/more/rider_more.dart';
 import 'screens/more/rider_more2.dart';
 import 'screens/more/rider_more3.dart';
 import 'screens/more/rider_auth.dart';
 
 void main() => runApp(const _GalleryApp());
+
+Map<String, WidgetBuilder> _shellScreens(Locale loc) => {
+      'home': (_) => RiderShell(locale: loc, onLocaleChanged: (_) {}, initialIndex: 0),
+      'navigate': (_) => RiderShell(locale: loc, onLocaleChanged: (_) {}, initialIndex: 1),
+      'profile': (_) => RiderShell(locale: loc, onLocaleChanged: (_) {}, initialIndex: 2),
+    };
 
 Map<String, WidgetBuilder> get _screens => {
       'splash': (_) => SplashScreen(onDone: () {}),
@@ -42,10 +49,12 @@ class _GalleryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final key = Uri.base.queryParameters['s'] ?? 'login';
-    final builder = _screens[key] ?? (_) => Scaffold(body: Center(child: Text('Unknown screen: $key')));
+    final loc = Uri.base.queryParameters['lang'] == 'fr' ? const Locale('fr') : const Locale('en');
+    final builder = _shellScreens(loc)[key] ?? _screens[key] ?? (_) => Scaffold(body: Center(child: Text('Unknown screen: $key')));
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      locale: loc,
       supportedLocales: const [Locale('en'), Locale('fr')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

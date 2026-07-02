@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/rider_brand.dart';
 
@@ -42,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
-                Text('Rider partner', style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 13.5, fontWeight: FontWeight.w700)),
+                Text(tr(context, 'Rider partner'), style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 13.5, fontWeight: FontWeight.w700)),
               ]),
             ),
             const SizedBox(height: 34),
@@ -91,29 +92,29 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return RiderAuthPage(
-      title: 'Welcome back',
-      subtitle: 'Sign in to start your shift',
+      title: tr(context, 'Welcome back'),
+      subtitle: tr(context, 'Sign in to start your shift'),
       form: Column(children: [
-        RiderField(label: 'Rider ID', hint: 'RDR-001', icon: Icons.badge_outlined, controller: _id),
+        RiderField(label: tr(context, 'Rider ID'), hint: 'RDR-001', icon: Icons.badge_outlined, controller: _id),
         const SizedBox(height: 16),
-        RiderField(label: 'Password', hint: 'Enter your password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
+        RiderField(label: tr(context, 'Password'), hint: tr(context, 'Enter your password'), icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            child: Text(tr(context, 'Forgot password?'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           ),
         ),
         const SizedBox(height: 4),
-        RiderAuthButton('Sign in', icon: Icons.arrow_forward_rounded, loading: _loading, onPressed: _submit),
+        RiderAuthButton(tr(context, 'Sign in'), icon: Icons.arrow_forward_rounded, loading: _loading, onPressed: _submit),
         const SizedBox(height: 16),
         Row(children: [
           const Icon(Icons.shield_outlined, size: 16, color: AppColors.muted),
           const SizedBox(width: 6),
           Expanded(
-              child: Text('Your account is created by the Somba&Teka fleet team.',
-                  style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
+              child: Text(tr(context, 'Your account is created by the Somba&Teka fleet team.'),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
         ]),
       ]),
     );
@@ -126,14 +127,14 @@ class ForgotPasswordScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RiderAuthPage(
-      title: 'Reset password',
-      subtitle: 'We will send a reset code to your registered phone',
+      title: tr(context, 'Reset password'),
+      subtitle: tr(context, 'We will send a reset code to your registered phone'),
       showBack: true,
       centered: true,
       form: Column(children: [
-        const RiderField(label: 'Rider ID', hint: 'RDR-001', icon: Icons.badge_outlined),
+        RiderField(label: tr(context, 'Rider ID'), hint: 'RDR-001', icon: Icons.badge_outlined),
         const SizedBox(height: 20),
-        RiderAuthButton('Send reset code',
+        RiderAuthButton(tr(context, 'Send reset code'),
             icon: Icons.send_rounded,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OtpScreen()))),
       ]),
@@ -153,8 +154,8 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return RiderAuthPage(
-      title: 'Verify code',
-      subtitle: 'We sent a code to your phone ending •• 82',
+      title: tr(context, 'Verify code'),
+      subtitle: tr(context, 'We sent a code to your phone ending •• 82'),
       showBack: true,
       centered: true,
       form: Column(children: [
@@ -177,10 +178,10 @@ class _OtpScreenState extends State<OtpScreen> {
           onPressed: () => setState(() => _filled = 4),
           icon: const Icon(Icons.refresh_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
+          label: Text(tr(context, 'Resend code'), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         const SizedBox(height: 10),
-        RiderAuthButton('Verify & continue',
+        RiderAuthButton(tr(context, 'Verify & continue'),
             icon: Icons.check_rounded, onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
       ]),
     );

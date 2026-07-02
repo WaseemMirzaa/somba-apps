@@ -4,6 +4,7 @@ import '../../data/mock_tasks.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
 import '../../widgets/rider_brand.dart';
+import '../../l10n/strings.dart';
 import 'rider_auth.dart';
 
 // ---------------- Settings ----------------
@@ -18,21 +19,21 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Settings'),
+      appBar: backAppBar(context, tr(context, 'Settings')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        _group('Notifications', [
-          _toggle(Icons.notifications_active_rounded, 'Push notifications', 'New tasks & route alerts', _push, (v) => setState(() => _push = v)),
-          _toggle(Icons.volume_up_rounded, 'Sound alerts', 'Play a sound on new task', _sound, (v) => setState(() => _sound = v)),
+        _group(tr(context, 'Notifications'), [
+          _toggle(Icons.notifications_active_rounded, tr(context, 'Push notifications'), tr(context, 'New tasks & route alerts'), _push, (v) => setState(() => _push = v)),
+          _toggle(Icons.volume_up_rounded, tr(context, 'Sound alerts'), tr(context, 'Play a sound on new task'), _sound, (v) => setState(() => _sound = v)),
         ]),
         const SizedBox(height: 14),
-        _group('Delivery', [
-          _toggle(Icons.flash_on_rounded, 'Auto-accept tasks', 'Automatically accept nearby tasks', _autoAccept, (v) => setState(() => _autoAccept = v)),
-          _toggle(Icons.record_voice_over_rounded, 'Voice navigation', 'Spoken turn-by-turn guidance', _navVoice, (v) => setState(() => _navVoice = v)),
+        _group(tr(context, 'Delivery'), [
+          _toggle(Icons.flash_on_rounded, tr(context, 'Auto-accept tasks'), tr(context, 'Automatically accept nearby tasks'), _autoAccept, (v) => setState(() => _autoAccept = v)),
+          _toggle(Icons.record_voice_over_rounded, tr(context, 'Voice navigation'), tr(context, 'Spoken turn-by-turn guidance'), _navVoice, (v) => setState(() => _navVoice = v)),
         ]),
         const SizedBox(height: 14),
-        _group('Account', [
-          _nav(Icons.lock_reset_rounded, 'Change password', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()))),
-          _nav(Icons.info_outline_rounded, 'About Somba&Teka', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderAboutScreen()))),
+        _group(tr(context, 'Account'), [
+          _nav(Icons.lock_reset_rounded, tr(context, 'Change password'), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()))),
+          _nav(Icons.info_outline_rounded, tr(context, 'About Somba&Teka'), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderAboutScreen()))),
         ]),
       ]),
     );
@@ -73,14 +74,14 @@ class RiderSupportScreen extends StatelessWidget {
   const RiderSupportScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    const faqs = [
-      ('A customer is not answering', 'Wait 5 minutes, call twice, then report the task as failed with the right reason.'),
-      ('The app shows a wrong address', 'Open the task, tap the address to re-locate, or call the customer to confirm.'),
-      ('I can\'t start my shift', 'Make sure you are On duty in your profile and inside your assigned zone.'),
-      ('How do I report a damaged item?', 'Use “Failed / report a problem” on the task and select “Damaged package”.'),
+    final faqs = [
+      (tr(context, 'A customer is not answering'), tr(context, 'Wait 5 minutes, call twice, then report the task as failed with the right reason.')),
+      (tr(context, 'The app shows a wrong address'), tr(context, 'Open the task, tap the address to re-locate, or call the customer to confirm.')),
+      (tr(context, 'I can\'t start my shift'), tr(context, 'Make sure you are On duty in your profile and inside your assigned zone.')),
+      (tr(context, 'How do I report a damaged item?'), tr(context, 'Use “Failed / report a problem” on the task and select “Damaged package”.')),
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Support'),
+      appBar: backAppBar(context, tr(context, 'Support')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(18),
@@ -88,10 +89,10 @@ class RiderSupportScreen extends StatelessWidget {
           child: Row(children: [
             Container(height: 46, width: 46, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.headset_mic_rounded, color: Colors.white)),
             const SizedBox(width: 14),
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('24/7 rider help', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-              SizedBox(height: 2),
-              Text('Fleet support answers in ~2 min', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr(context, '24/7 rider help'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 2),
+              Text(tr(context, 'Fleet support answers in ~2 min'), style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
             ])),
           ]),
         ),
@@ -102,11 +103,11 @@ class RiderSupportScreen extends StatelessWidget {
           Expanded(child: _action(context, Icons.chat_bubble_rounded, 'Live chat', 'Message us')),
         ]),
         const SizedBox(height: 14),
-        PrimaryButton('Raise a support ticket',
+        PrimaryButton(tr(context, 'Raise a support ticket'),
             icon: Icons.confirmation_number_rounded,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNewTicketScreen()))),
         const SizedBox(height: 20),
-        const Text('Common questions', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(tr(context, 'Common questions'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         ...faqs.map((f) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -117,10 +118,10 @@ class RiderSupportScreen extends StatelessWidget {
                   collapsedShape: const Border(),
                   tilePadding: const EdgeInsets.symmetric(horizontal: 16),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  title: Text(f.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  title: Text(tr(context, f.$1), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   iconColor: AppColors.primary,
                   collapsedIconColor: AppColors.faint,
-                  children: [Align(alignment: Alignment.centerLeft, child: Text(f.$2, style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)))],
+                  children: [Align(alignment: Alignment.centerLeft, child: Text(tr(context, f.$2), style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)))],
                 ),
               ),
             )),
@@ -131,17 +132,17 @@ class RiderSupportScreen extends StatelessWidget {
   Widget _action(BuildContext context, IconData icon, String title, String sub) => SurfaceCard(
         onTap: () {
           if (title == 'Live chat') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen(name: 'Fleet support')));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(name: tr(context, 'Fleet support'))));
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Calling fleet hotline…')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Calling fleet hotline…'))));
           }
         },
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(height: 42, width: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: AppColors.primary)),
           const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-          Text(sub, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          Text(tr(context, title), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+          Text(tr(context, sub), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         ]),
       );
 }
@@ -172,41 +173,41 @@ class _RiderNewTicketScreenState extends State<RiderNewTicketScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'New ticket'),
+      appBar: backAppBar(context, tr(context, 'New ticket')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 24), children: [
-        const Text('Which task or order?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Which task or order?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: List.generate(_tasks.length, (i) {
           final sel = _task == i;
           return GestureDetector(onTap: () => setState(() => _task = i), child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
-            child: Text(_tasks[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+            child: Text(tr(context, _tasks[i]), style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ));
         })),
         const SizedBox(height: 20),
-        const Text('Topic', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Topic'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: List.generate(_topics.length, (i) {
           final sel = _topic == i;
           return GestureDetector(onTap: () => setState(() => _topic = i), child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(color: sel ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
-            child: Text(_topics[i], style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+            child: Text(tr(context, _topics[i]), style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ));
         })),
         const SizedBox(height: 20),
-        const Text('Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Subject'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 8),
-        TextField(controller: _subject, decoration: const InputDecoration(hintText: 'Brief summary')),
+        TextField(controller: _subject, decoration: InputDecoration(hintText: tr(context, 'Brief summary'))),
         const SizedBox(height: 18),
-        const Text('Describe the issue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Describe the issue'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 8),
         TextField(
           controller: _body,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Tell us what happened…',
+            hintText: tr(context, 'Tell us what happened…'),
             filled: true, fillColor: AppColors.surface,
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
@@ -214,15 +215,15 @@ class _RiderNewTicketScreenState extends State<RiderNewTicketScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        PrimaryButton('Open ticket', icon: Icons.send_rounded, onPressed: () {
+        PrimaryButton(tr(context, 'Open ticket'), icon: Icons.send_rounded, onPressed: () {
           final subject = _subject.text.trim().isEmpty ? _topics[_topic] : _subject.text.trim();
-          final ref = _task < mockTasks.length ? mockTasks[_task].id : 'General';
+          final ref = _task < mockTasks.length ? mockTasks[_task].id : tr(context, 'General');
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ChatScreen(
-            name: 'Ticket · $subject',
-            subtitle: 'Ref: $ref · ${_topics[_topic]}',
+            name: '${tr(context, 'Ticket')} · $subject',
+            subtitle: '${tr(context, 'Ref:')} $ref · ${tr(context, _topics[_topic])}',
             seed: [
               if (_body.text.trim().isNotEmpty) (_body.text.trim(), true, false),
-              ('Thanks — fleet support has your ticket and will reply shortly. Feel free to attach a photo.', false, false),
+              (tr(context, 'Thanks — fleet support has your ticket and will reply shortly. Feel free to attach a photo.'), false, false),
             ],
           )));
         }),
@@ -276,7 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _attach() {
     setState(() => _msgs.add(('photo', true, true)));
     _end();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo attached')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Photo attached'))));
   }
 
   @override
@@ -323,9 +324,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: isImage
                       ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Container(height: 128, width: 168, decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.image_rounded, color: Colors.white, size: 40)),
-                          const Padding(padding: EdgeInsets.only(top: 4, left: 2), child: Text('Attachment', style: TextStyle(color: Colors.white70, fontSize: 11))),
+                          Padding(padding: const EdgeInsets.only(top: 4, left: 2), child: Text(tr(context, 'Attachment'), style: const TextStyle(color: Colors.white70, fontSize: 11))),
                         ])
-                      : Text(m.$1, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                      : Text(tr(context, m.$1), style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
                 ),
               );
             },
@@ -336,14 +337,14 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 12, 10),
             child: Row(children: [
-              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_camera_rounded, color: AppColors.primary), tooltip: 'Camera'),
-              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_library_rounded, color: AppColors.primary), tooltip: 'Gallery', padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 36)),
+              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_camera_rounded, color: AppColors.primary), tooltip: tr(context, 'Camera')),
+              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_library_rounded, color: AppColors.primary), tooltip: tr(context, 'Gallery'), padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 36)),
               Expanded(
                 child: TextField(
                   controller: _ctrl,
                   onSubmitted: (_) => _send(),
                   decoration: InputDecoration(
-                    hintText: 'Message…',
+                    hintText: tr(context, 'Message…'),
                     filled: true,
                     fillColor: AppColors.surface,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -410,7 +411,7 @@ class _RiderDocumentsScreenState extends State<RiderDocumentsScreen> {
             _docs.add(entry);
           }
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$type uploaded — pending review')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$type ${tr(context, 'uploaded — pending review')}')));
       }),
     );
   }
@@ -418,7 +419,7 @@ class _RiderDocumentsScreenState extends State<RiderDocumentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Documents'),
+      appBar: backAppBar(context, tr(context, 'Documents')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         ..._docs.map((d) {
           final ok = d.$3;
@@ -432,10 +433,10 @@ class _RiderDocumentsScreenState extends State<RiderDocumentsScreen> {
                 Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(d.$4, color: AppColors.primary)),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(d.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                  Text(d.$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                  Text(tr(context, d.$1), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(tr(context, d.$2), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                 ])),
-                Pill(pending ? 'Pending' : (ok ? 'Valid' : 'Renew'),
+                Pill(pending ? tr(context, 'Pending') : (ok ? tr(context, 'Valid') : tr(context, 'Renew')),
                     color: color.withValues(alpha: 0.14),
                     textColor: color,
                     icon: pending ? Icons.hourglass_top_rounded : (ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded),
@@ -445,7 +446,7 @@ class _RiderDocumentsScreenState extends State<RiderDocumentsScreen> {
           );
         }),
         const SizedBox(height: 4),
-        PrimaryButton('Upload a document', icon: Icons.upload_file_rounded, onPressed: _openUpload),
+        PrimaryButton(tr(context, 'Upload a document'), icon: Icons.upload_file_rounded, onPressed: _openUpload),
       ]),
     );
   }
@@ -472,9 +473,9 @@ class _UploadSheetState extends State<_UploadSheet> {
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(100)))),
         const SizedBox(height: 16),
-        const Text('Upload a document', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+        Text(tr(context, 'Upload a document'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
         const SizedBox(height: 4),
-        const Text('Choose the document type', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+        Text(tr(context, 'Choose the document type'), style: const TextStyle(color: AppColors.muted, fontSize: 13)),
         const SizedBox(height: 14),
         ...List.generate(widget.types.length, (i) {
           final sel = _type == i;
@@ -486,7 +487,7 @@ class _UploadSheetState extends State<_UploadSheet> {
               child: Row(children: [
                 Icon(widget.types[i].$2, color: sel ? AppColors.primary : AppColors.muted, size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text(widget.types[i].$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                Expanded(child: Text(tr(context, widget.types[i].$1), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
                 Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel ? AppColors.primary : AppColors.faint, size: 20),
               ]),
             ),
@@ -504,20 +505,20 @@ class _UploadSheetState extends State<_UploadSheet> {
               border: Border.all(color: _fileChosen ? Colors.transparent : AppColors.line),
             ),
             child: Center(child: _fileChosen
-                ? const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.check_circle_rounded, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text('File selected', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(tr(context, 'File selected'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   ])
-                : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary, size: 28),
-                    SizedBox(height: 6),
-                    Text('Tap to take a photo or choose a file', style: TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary, size: 28),
+                    const SizedBox(height: 6),
+                    Text(tr(context, 'Tap to take a photo or choose a file'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
                   ])),
           ),
         ),
         const SizedBox(height: 16),
-        PrimaryButton('Upload', icon: Icons.upload_rounded, onPressed: _fileChosen
+        PrimaryButton(tr(context, 'Upload'), icon: Icons.upload_rounded, onPressed: _fileChosen
             ? () {
                 Navigator.pop(context);
                 widget.onUploaded(widget.types[_type].$1);
@@ -534,7 +535,7 @@ class RiderVehicleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'My vehicle'),
+      appBar: backAppBar(context, tr(context, 'My vehicle')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(18),
@@ -542,36 +543,36 @@ class RiderVehicleScreen extends StatelessWidget {
           child: Row(children: [
             Container(height: 54, width: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 30)),
             const SizedBox(width: 14),
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Yamaha NMAX', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-              SizedBox(height: 2),
-              Text('Scooter · 125cc', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Yamaha NMAX', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+              const SizedBox(height: 2),
+              Text(tr(context, 'Scooter · 125cc'), style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
             ])),
             const Pill('KN 4821 A', color: Colors.white24, textColor: Colors.white, fontSize: 11),
           ]),
         ),
         const SizedBox(height: 16),
         SurfaceCard(child: Column(children: [
-          _row(Icons.confirmation_number_rounded, 'Plate number', 'KN 4821 A'),
+          _row(Icons.confirmation_number_rounded, tr(context, 'Plate number'), 'KN 4821 A'),
           const Divider(height: 20),
-          _row(Icons.palette_rounded, 'Colour', 'Matte black'),
+          _row(Icons.palette_rounded, tr(context, 'Colour'), tr(context, 'Matte black')),
           const Divider(height: 20),
-          _row(Icons.speed_rounded, 'Odometer', '18,240 km'),
+          _row(Icons.speed_rounded, tr(context, 'Odometer'), '18,240 km'),
           const Divider(height: 20),
-          _row(Icons.local_gas_station_rounded, 'Fuel type', 'Petrol'),
+          _row(Icons.local_gas_station_rounded, tr(context, 'Fuel type'), tr(context, 'Petrol')),
         ])),
         const SizedBox(height: 16),
-        const Text('Maintenance', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(tr(context, 'Maintenance'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         SurfaceCard(child: Column(children: [
-          _row(Icons.build_rounded, 'Last service', '12 May 2026'),
+          _row(Icons.build_rounded, tr(context, 'Last service'), '12 May 2026'),
           const Divider(height: 20),
-          _row(Icons.event_rounded, 'Next service', 'Due in 640 km'),
+          _row(Icons.event_rounded, tr(context, 'Next service'), tr(context, 'Due in 640 km')),
         ])),
         const SizedBox(height: 16),
-        PrimaryButton('Report an issue',
+        PrimaryButton(tr(context, 'Report an issue'),
             icon: Icons.report_problem_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Issue reported to the fleet team')))),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Issue reported to the fleet team'))))),
       ]),
     );
   }
@@ -607,24 +608,24 @@ class _RiderShiftScreenState extends State<RiderShiftScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Shift & attendance'),
+      appBar: backAppBar(context, tr(context, 'Shift & attendance')),
       body: AnimatedBuilder(
         animation: Listenable.merge([_rider.shiftActive, _rider.onBreak]),
         builder: (context, _) {
           final active = _rider.shiftActive.value;
           final onBreak = _rider.onBreak.value;
-          final status = !active ? 'Off shift' : (onBreak ? 'On break' : 'Active');
+          final status = !active ? tr(context, 'Off shift') : (onBreak ? tr(context, 'On break') : tr(context, 'Active'));
           final statusColor = !active ? AppColors.faint : (onBreak ? AppColors.accent : AppColors.primary);
           return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(22)),
               child: Row(children: [
-                _hstat('4', 'Days'),
+                _hstat('4', tr(context, 'Days')),
                 _hdiv(),
-                _hstat('34h', 'This week'),
+                _hstat('34h', tr(context, 'This week')),
                 _hdiv(),
-                _hstat('98%', 'On-time'),
+                _hstat('98%', tr(context, 'On-time')),
               ]),
             ),
             const SizedBox(height: 16),
@@ -632,50 +633,50 @@ class _RiderShiftScreenState extends State<RiderShiftScreen> {
               Container(height: 44, width: 44, decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(active ? Icons.timer_rounded : Icons.timer_off_rounded, color: statusColor)),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Current shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-                Text(active ? 'Started today at ${_rider.shiftStartedAt}' : 'Not clocked in', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                Text(tr(context, 'Current shift'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                Text(active ? '${tr(context, 'Started today at')} ${_rider.shiftStartedAt}' : tr(context, 'Not clocked in'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
               ])),
               Pill(status, color: statusColor.withValues(alpha: 0.14), textColor: statusColor),
             ])),
             const SizedBox(height: 12),
             // Start / break / end controls — connected to the On-duty toggle.
             if (!active)
-              PrimaryButton('Start shift', icon: Icons.play_arrow_rounded, onPressed: () {
+              PrimaryButton(tr(context, 'Start shift'), icon: Icons.play_arrow_rounded, onPressed: () {
                 setState(() => _rider.startShift());
-                _snack('Shift started — you are now On duty');
+                _snack(tr(context, 'Shift started — you are now On duty'));
               })
             else
               Row(children: [
                 Expanded(child: OutlinedButton.icon(
                   onPressed: () {
                     setState(() => _rider.toggleBreak());
-                    _snack(_rider.onBreak.value ? 'On break — new tasks paused' : 'Back from break — On duty');
+                    _snack(_rider.onBreak.value ? tr(context, 'On break — new tasks paused') : tr(context, 'Back from break — On duty'));
                   },
                   icon: Icon(onBreak ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded, size: 20),
-                  label: Text(onBreak ? 'Resume' : 'Take a break'),
+                  label: Text(onBreak ? tr(context, 'Resume') : tr(context, 'Take a break')),
                 )),
                 const SizedBox(width: 12),
                 Expanded(child: FilledButton.icon(
                   style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
                   onPressed: () {
                     setState(() => _rider.endShift());
-                    _snack('Shift ended — have a good rest!');
+                    _snack(tr(context, 'Shift ended — have a good rest!'));
                   },
                   icon: const Icon(Icons.logout_rounded, size: 20),
-                  label: const Text('End shift'),
+                  label: Text(tr(context, 'End shift')),
                 )),
               ]),
             const SizedBox(height: 20),
-            const Text('This week', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            Text(tr(context, 'This week'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
             const SizedBox(height: 10),
             ..._week.map((d) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: SurfaceCard(
                     padding: const EdgeInsets.all(14),
                     child: Row(children: [
-                      SizedBox(width: 40, child: Text(d.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+                      SizedBox(width: 40, child: Text(tr(context, d.$1), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(d.$4 ? 'In ${d.$2}  ·  Out ${d.$3}' : 'No shift', style: TextStyle(color: d.$4 ? AppColors.inkSoft : AppColors.faint, fontSize: 13, fontWeight: FontWeight.w600))),
+                      Expanded(child: Text(d.$4 ? '${tr(context, 'In')} ${d.$2}  ·  ${tr(context, 'Out')} ${d.$3}' : tr(context, 'No shift'), style: TextStyle(color: d.$4 ? AppColors.inkSoft : AppColors.faint, fontSize: 13, fontWeight: FontWeight.w600))),
                       Icon(d.$4 ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded, color: d.$4 ? AppColors.primary : AppColors.faint, size: 20),
                     ]),
                   ),
@@ -699,7 +700,7 @@ class RiderEditProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Edit profile'),
+      appBar: backAppBar(context, tr(context, 'Edit profile')),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
         Center(
           child: Stack(children: [
@@ -719,18 +720,18 @@ class RiderEditProfileScreen extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 24),
-        const RiderField(label: 'Full name', hint: 'Jean Mukendi', icon: Icons.person_outline_rounded),
+        RiderField(label: tr(context, 'Full name'), hint: 'Jean Mukendi', icon: Icons.person_outline_rounded),
         const SizedBox(height: 16),
-        const RiderField(label: 'Phone', hint: '+243 810 000 082', icon: Icons.phone_outlined),
+        RiderField(label: tr(context, 'Phone'), hint: '+243 810 000 082', icon: Icons.phone_outlined),
         const SizedBox(height: 16),
-        const RiderField(label: 'Email', hint: 'jean.m@somba.cd', icon: Icons.email_outlined),
+        RiderField(label: tr(context, 'Email'), hint: 'jean.m@somba.cd', icon: Icons.email_outlined),
         const SizedBox(height: 16),
-        const RiderField(label: 'Emergency contact', hint: '+243 810 000 111', icon: Icons.contact_emergency_outlined),
+        RiderField(label: tr(context, 'Emergency contact'), hint: '+243 810 000 111', icon: Icons.contact_emergency_outlined),
         const SizedBox(height: 24),
-        PrimaryButton('Save changes',
+        PrimaryButton(tr(context, 'Save changes'),
             icon: Icons.check_rounded,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Profile updated'))));
               Navigator.pop(context);
             }),
       ]),
@@ -744,33 +745,33 @@ class RiderAboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'About'),
+      appBar: backAppBar(context, tr(context, 'About')),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 24), children: [
         Center(child: Column(children: [
           const RiderBrandLogo(size: 84, radius: 24),
           const SizedBox(height: 16),
-          const Text('Somba&Teka Rider', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
+          Text(tr(context, 'Somba&Teka Rider'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 4),
-          const Text('Version 1.0.0', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          Text('${tr(context, 'Version')} 1.0.0', style: const TextStyle(color: AppColors.muted, fontSize: 13)),
         ])),
         const SizedBox(height: 24),
         SurfaceCard(child: Column(children: [
-          _link(Icons.description_outlined, 'Terms of service'),
+          _link(context, Icons.description_outlined, 'Terms of service'),
           const Divider(height: 20),
-          _link(Icons.privacy_tip_outlined, 'Privacy policy'),
+          _link(context, Icons.privacy_tip_outlined, 'Privacy policy'),
           const Divider(height: 20),
-          _link(Icons.star_outline_rounded, 'Rate the app'),
+          _link(context, Icons.star_outline_rounded, 'Rate the app'),
         ])),
         const SizedBox(height: 20),
-        const Center(child: Text('© 2026 Somba&Teka. All rights reserved.', style: TextStyle(color: AppColors.faint, fontSize: 12))),
+        Center(child: Text(tr(context, '© 2026 Somba&Teka. All rights reserved.'), style: const TextStyle(color: AppColors.faint, fontSize: 12))),
       ]),
     );
   }
 
-  Widget _link(IconData icon, String label) => Row(children: [
+  Widget _link(BuildContext context, IconData icon, String label) => Row(children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 12),
-        Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+        Expanded(child: Text(tr(context, label), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
         const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
       ]);
 }
