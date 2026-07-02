@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { MarketingHeader } from "@/components/landing/marketing-header";
 import { MarketingFooter } from "@/components/landing/marketing-footer";
-import { BrandMark } from "@/components/landing/brand-mark";
 import { StickyCta } from "@/components/landing/sticky-cta";
 import { PortalExplorer } from "@/components/landing/portal-explorer";
 import { PortalOverviewCards } from "@/components/landing/portal-premium";
@@ -770,8 +769,15 @@ export default function HomePage() {
       {/* ── FINAL CTA ── */}
       <section className="landing-band py-24">
         <div className="relative mx-auto max-w-4xl px-4 text-center">
-          <div className="mx-auto mb-6 flex justify-center">
-            <BrandMark iconOnly tone="light" className="h-14 w-14 shadow-lg shadow-blue-950/20" />
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-white p-2.5 shadow-lg shadow-blue-950/20">
+            <Image
+              src="/brand/logo-stack.png"
+              alt="Somba&Teka"
+              width={80}
+              height={80}
+              priority
+              className="h-full w-full object-contain"
+            />
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight text-balance lg:text-5xl">
             {fr ? "Prêt à acheter ou vendre ?" : "Ready to shop or sell?"}
