@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_card.dart';
+import 'browse.dart';
 
 /// Coupons / promo codes available to the customer (mirrors admin promotions).
 class CouponsScreen extends StatelessWidget {
@@ -63,76 +64,107 @@ class ProductListScreen extends StatefulWidget {
   final Locale locale;
   final String? category;
   final String? title;
-  const ProductListScreen({super.key, this.locale = const Locale('en'), this.category, this.title});
+  final bool dealsOnly;
+  const ProductListScreen({super.key, this.locale = const Locale('en'), this.category, this.title, this.dealsOnly = false});
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
-  int _sort = 0;
-  static const _sorts = ['Popular', 'Price ↑', 'Price ↓', 'Top rated'];
+  final _ctrl = TextEditingController();
+  late final ProductQuery _q = ProductQuery(category: widget.category, dealsOnly: widget.dealsOnly);
+  static const _quickSorts = ['Popular', 'Price ↑', 'Price ↓', 'Top rated', 'Deals'];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final lang = widget.locale.languageCode;
-    final items = [
-      ...products.where((p) => widget.category == null || p.category == widget.category),
-    ];
-    switch (_sort) {
-      case 1:
-        items.sort((a, b) => a.price.compareTo(b.price));
-        break;
-      case 2:
-        items.sort((a, b) => b.price.compareTo(a.price));
-        break;
-      case 3:
-        items.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-    }
+    _q.text = _ctrl.text;
+    final items = runQuery(products, _q);
     return Scaffold(
       appBar: backAppBar(context, widget.title ?? widget.category ?? 'Products'),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: BrowseSearchField(controller: _ctrl, hint: 'Search in ${widget.category ?? 'products'}…', onChanged: (_) => setState(() {})),
+          ),
           SizedBox(
-            height: 44,
+            height: 40,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              itemCount: _sorts.length,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              itemCount: _quickSorts.length + 1,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final sel = _sort == i;
+              itemBuilder: (_, idx) {
+                if (idx == 0) {
+                  final n = _q.activeCount;
+                  return GestureDetector(
+                    onTap: () async {
+                      final res = await showFilterSheet(context, _q);
+                      if (res != null) {
+                        setState(() {
+                          _q.sort = res.sort; _q.category = res.category;
+                          _q.minPrice = res.minPrice; _q.maxPrice = res.maxPrice;
+                          _q.minRating = res.minRating; _q.dealsOnly = res.dealsOnly;
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: n > 0 ? AppColors.primary : AppColors.line)),
+                      child: Row(children: [
+                        Icon(Icons.tune_rounded, size: 15, color: n > 0 ? AppColors.primary : AppColors.muted),
+                        const SizedBox(width: 4),
+                        Text(n > 0 ? 'Filters · $n' : 'Filters', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
+                      ]),
+                    ),
+                  );
+                }
+                final i = idx - 1;
+                final active = (i < 4 && _q.sort == i) || (i == 4 && _q.dealsOnly);
                 return GestureDetector(
-                  onTap: () => setState(() => _sort = i),
+                  onTap: () => setState(() {
+                    if (i == 4) {
+                      _q.dealsOnly = !_q.dealsOnly;
+                    } else {
+                      _q.sort = i;
+                    }
+                  }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: sel ? AppColors.primary : AppColors.surface,
+                      color: active ? AppColors.primary : AppColors.surface,
                       borderRadius: BorderRadius.circular(100),
-                      border: Border.all(color: sel ? AppColors.primary : AppColors.line),
+                      border: Border.all(color: active ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_sorts[i],
-                        style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    child: Text(_quickSorts[i], style: TextStyle(color: active ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
               },
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: Row(children: [
-              Text('${items.length} items', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
-            ]),
+            padding: const EdgeInsets.fromLTRB(20, 6, 16, 4),
+            child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} items', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
           ),
           Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-              itemCount: items.length,
-              itemBuilder: (_, i) => ProductCard(product: items[i], lang: lang),
-            ),
+            child: items.isEmpty
+                ? const Center(child: Text('No products match your filters', style: TextStyle(color: AppColors.muted)))
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) => ProductCard(product: items[i], lang: lang),
+                  ),
           ),
         ],
       ),

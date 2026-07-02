@@ -34,7 +34,26 @@ const _sellers = [
   Seller(id: 'slr-01', name: 'Kinshasa Tech Hub', badge: SellerBadge.sombaAssured, rating: 4.8, followers: 12400, health: 97),
   Seller(id: 'slr-02', name: 'Gombe Fashion House', badge: SellerBadge.gold, rating: 4.6, followers: 8600, health: 92),
   Seller(id: 'slr-03', name: 'Élégance Bijoux', badge: SellerBadge.silver, rating: 4.4, followers: 3100, health: 88),
+  Seller(id: 'slr-04', name: 'Kivu Electronics', badge: SellerBadge.gold, rating: 4.7, followers: 6200, health: 95),
+  Seller(id: 'slr-05', name: 'Matonge Style', badge: SellerBadge.bronze, rating: 4.2, followers: 1800, health: 84),
+  Seller(id: 'slr-06', name: 'Congo Gadget Store', badge: SellerBadge.silver, rating: 4.5, followers: 4400, health: 90),
 ];
+
+/// The full seller directory (browsable / searchable).
+List<Seller> get allSellers => _sellers;
+
+/// The category a seller primarily trades in (for the store product grid).
+String sellerCategory(Seller s) {
+  switch (s.id) {
+    case 'slr-02':
+    case 'slr-05':
+      return 'Fashion';
+    case 'slr-03':
+      return 'Jewelery';
+    default:
+      return 'Electronics';
+  }
+}
 
 /// Deterministic seller for a product (by category), so the catalogue reads
 /// consistently without a backend.

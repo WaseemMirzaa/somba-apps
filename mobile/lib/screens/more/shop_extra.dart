@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/catalog_meta.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
@@ -9,11 +10,38 @@ import 'catalog_extra.dart';
 /// Store front (CF-07).
 class StoreScreen extends StatelessWidget {
   final Locale locale;
-  const StoreScreen({super.key, this.locale = const Locale('en')});
+  final Seller? seller;
+  const StoreScreen({super.key, this.locale = const Locale('en'), this.seller});
+
+  String get _name => seller?.name ?? 'TechSphere Store';
+  String get _initials {
+    final parts = _name.split(' ').where((w) => w.isNotEmpty).toList();
+    return (parts.length >= 2 ? '${parts[0][0]}${parts[1][0]}' : _name.substring(0, 2)).toUpperCase();
+  }
+
+  String get _tagline {
+    if (seller == null) return 'Official electronics partner';
+    switch (sellerCategory(seller!)) {
+      case 'Fashion':
+        return 'Fashion & apparel store';
+      case 'Jewelery':
+        return 'Fine jewelery boutique';
+      default:
+        return 'Electronics & gadgets store';
+    }
+  }
+
+  String get _badgeLabel => (seller?.badge ?? SellerBadge.sombaAssured).label;
+  int get _health => seller?.health ?? 97;
+  String get _rating => (seller?.rating ?? 4.8).toString();
+  int get _productCount => seller == null ? 128 : products.where((p) => p.category == sellerCategory(seller!)).length;
+  String get _followers => seller == null ? '12.4k' : '${((seller!.followers) / 1000).toStringAsFixed(1)}k';
   @override
   Widget build(BuildContext context) {
     final lang = locale.languageCode;
-    final items = products.take(6).toList();
+    final items = seller == null
+        ? products.take(6).toList()
+        : products.where((p) => p.category == sellerCategory(seller!)).toList();
     return Scaffold(
       body: CustomScrollView(slivers: [
         SliverToBoxAdapter(child: _header(context)),
@@ -43,24 +71,24 @@ class StoreScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Row(children: [
           Container(height: 62, width: 62, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-            child: const Center(child: Text('TS', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 24, fontFamily: 'PlusJakartaSans')))),
+            child: Center(child: Text(_initials, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')))),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Row(children: [
-              Text('TechSphere Store', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
-              SizedBox(width: 6),
-              Icon(Icons.verified_rounded, color: Colors.white, size: 18),
+            Row(children: [
+              Flexible(child: Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800))),
+              const SizedBox(width: 6),
+              const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
             ]),
             const SizedBox(height: 2),
-            Text('Official electronics partner', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
+            Text(_tagline, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(100)),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.verified_rounded, color: Colors.white, size: 13),
-                SizedBox(width: 4),
-                Text('Somba Assured · 97% health', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10.5)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.verified_rounded, color: Colors.white, size: 13),
+                const SizedBox(width: 4),
+                Text('$_badgeLabel · $_health% health', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10.5)),
               ]),
             ),
           ])),
@@ -70,7 +98,7 @@ class StoreScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            _stat('4.8★', 'Rating'), _div(), _stat('128', 'Products'), _div(), _stat('12.4k', 'Followers'),
+            _stat('$_rating★', 'Rating'), _div(), _stat('$_productCount', 'Products'), _div(), _stat(_followers, 'Followers'),
           ]),
         ),
         const SizedBox(height: 14),
