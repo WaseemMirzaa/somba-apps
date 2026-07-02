@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
@@ -14,7 +15,7 @@ class WishlistScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = products.where((p) => p.id % 2 == 1).toList();
     return Scaffold(
-      appBar: backAppBar(context, 'Wishlist'),
+      appBar: backAppBar(context, trl(locale.languageCode, 'Wishlist')),
       body: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
@@ -51,16 +52,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     final unreadCount = List.generate(_items.length, (i) => i).where(_isUnread).length;
     return Scaffold(
-      appBar: backAppBar(context, unreadCount > 0 ? 'Notifications ($unreadCount)' : 'Notifications', actions: [
+      appBar: backAppBar(context, unreadCount > 0 ? '${tr(context, 'Notifications')} ($unreadCount)' : tr(context, 'Notifications'), actions: [
         TextButton(
           onPressed: unreadCount == 0
               ? null
               : () {
                   setState(() => _read.addAll(List.generate(_items.length, (i) => i)));
                   ShopState.instance.save();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All notifications marked as read')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'All notifications marked as read'))));
                 },
-          child: const Text('Mark all'),
+          child: Text(tr(context, 'Mark all')),
         ),
       ]),
       body: ListView.separated(
@@ -117,18 +118,19 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedId = shop.selectedAddress?.id;
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, widget.selectMode ? 'Choose address' : 'Addresses'),
+      appBar: backAppBar(context, widget.selectMode ? trl(lang, 'Choose address') : trl(lang, 'Addresses')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           if (shop.addresses.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(children: const [
-                Icon(Icons.location_off_rounded, size: 48, color: AppColors.faint),
-                SizedBox(height: 12),
-                Text('No saved addresses yet', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
+              child: Column(children: [
+                const Icon(Icons.location_off_rounded, size: 48, color: AppColors.faint),
+                const SizedBox(height: 12),
+                Text(trl(lang, 'No saved addresses yet'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
               ]),
             ),
           ...shop.addresses.map((a) {
@@ -165,7 +167,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                       Row(children: [
                         Text(a.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                         const SizedBox(width: 8),
-                        if (a.isDefault) Pill('Default', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
+                        if (a.isDefault) Pill(trl(lang, 'Default'), color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
                       ]),
                       const SizedBox(height: 4),
                       Text('${a.line}, ${a.city}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
@@ -186,7 +188,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressPickerScreen(locale: widget.locale)));
                 if (mounted) setState(() {});
               },
-              icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Add new address')),
+              icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: Text(trl(lang, 'Add new address'))),
         ],
       ),
     );

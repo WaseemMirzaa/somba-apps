@@ -65,7 +65,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           // 1. Review the cart, grouped by store.
-          _sectionTitle('Review your order'),
+          _sectionTitle(trl(lang, 'Review your order')),
           const SizedBox(height: 10),
           ...stores.map((so) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _card(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -94,18 +94,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             TextButton.icon(
               onPressed: _pickAddress,
               icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-              label: Text(address == null ? 'Add' : 'Change'),
+              label: Text(address == null ? trl(lang, 'Add') : trl(lang, 'Change')),
             ),
           ]),
           const SizedBox(height: 6),
           if (address == null)
             GestureDetector(
               onTap: _pickAddress,
-              child: _card(child: Row(children: const [
-                Icon(Icons.add_location_alt_rounded, color: AppColors.primary),
-                SizedBox(width: 12),
-                Expanded(child: Text('Add a delivery address to continue', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
-                Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+              child: _card(child: Row(children: [
+                const Icon(Icons.add_location_alt_rounded, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Expanded(child: Text(trl(lang, 'Add a delivery address to continue'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
               ])),
             )
           else
@@ -117,7 +117,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(height: 2),
                 Text('${address.line}, ${address.city}', style: const TextStyle(color: AppColors.muted, fontSize: 13)),
                 const SizedBox(height: 2),
-                Text('Delivery zone: ${address.zone} · ${deliveryFeeUsd == 0 ? 'FREE' : money(deliveryFeeUsd)}/store', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                Text('${trl(lang, 'Delivery zone')}: ${address.zone} · ${deliveryFeeUsd == 0 ? trl(lang, 'FREE') : money(deliveryFeeUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
               ])),
             ])),
           const SizedBox(height: 22),
@@ -128,7 +128,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             key: 'card:${c.last4}',
             icon: Icons.credit_card_rounded,
             title: '${c.brand} ···· ${c.last4}',
-            subtitle: 'Expires ${c.expiry}',
+            subtitle: '${trl(lang, 'Expires')} ${c.expiry}',
           )),
           ...shop.wallets.map((w) => _paymentTile(
             key: 'wallet:${w.number}',
@@ -144,7 +144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 if (added == true) setState(() => _payment = 'card:${shop.savedCards.last.last4}');
               },
               icon: const Icon(Icons.add_card_rounded, size: 18),
-              label: const Text('Add card'),
+              label: Text(trl(lang, 'Add card')),
             )),
             const SizedBox(width: 10),
             Expanded(child: OutlinedButton.icon(
@@ -153,7 +153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 if (added == true) setState(() => _payment = 'wallet:${shop.wallets.last.number}');
               },
               icon: const Icon(Icons.smartphone_rounded, size: 18),
-              label: const Text('Mobile money'),
+              label: Text(trl(lang, 'Mobile money')),
             )),
           ]),
         ],
@@ -169,7 +169,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ? null
               : () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderSummaryScreen(locale: widget.locale, paymentLabel: _paymentLabel, address: address))),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(address == null ? 'Add an address first' : 'Review order'),
+            Text(address == null ? trl(lang, 'Add an address first') : trl(lang, 'Review order')),
             if (address != null) ...[const SizedBox(width: 6), const Icon(Icons.arrow_forward_rounded, size: 20)],
           ]),
         ),

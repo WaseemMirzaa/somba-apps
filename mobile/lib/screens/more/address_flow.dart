@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 
 /// A selectable place in the mock places search.
@@ -51,8 +52,9 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final matches = _matches;
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, 'Pick your location'),
+      appBar: backAppBar(context, trl(lang, 'Pick your location')),
       body: Stack(children: [
         // Interactive stylized map.
         Positioned.fill(
@@ -93,7 +95,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> with SingleTi
                 controller: _search,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Search places, streets, areas…',
+                  hintText: trl(lang, 'Search places, streets, areas…'),
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: _search.text.isEmpty ? null : IconButton(icon: const Icon(Icons.close_rounded, size: 18), onPressed: () => setState(() => _search.clear())),
                   filled: true, fillColor: AppColors.surface,
@@ -152,7 +154,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> with SingleTi
             Expanded(child: Text('${_picked.name}, ${_picked.area}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
           ]),
           const SizedBox(height: 12),
-          PrimaryButton('Confirm location', icon: Icons.arrow_forward_rounded, onPressed: () async {
+          PrimaryButton(trl(lang, 'Confirm location'), icon: Icons.arrow_forward_rounded, onPressed: () async {
             final nav = Navigator.of(context);
             await nav.push(MaterialPageRoute(builder: (_) => AddressFormScreen(
               locale: widget.locale,
@@ -294,8 +296,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, _editing ? 'Edit address' : 'Address details'),
+      appBar: backAppBar(context, _editing ? trl(lang, 'Edit address') : trl(lang, 'Address details')),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
         if (widget.address != null && !_editing)
           Container(
@@ -305,21 +308,21 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             child: Row(children: [
               const Icon(Icons.map_rounded, color: AppColors.primary, size: 20),
               const SizedBox(width: 10),
-              Expanded(child: Text('Pinned: ${widget.address}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
+              Expanded(child: Text('${trl(lang, 'Pinned')}: ${widget.address}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
             ]),
           ),
-        _labelled('Label', _label, hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded),
+        _labelled(trl(lang, 'Label'), _label, hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded),
         const SizedBox(height: 16),
-        _labelled('Full name', _name, icon: Icons.person_outline_rounded),
+        _labelled(trl(lang, 'Full name'), _name, icon: Icons.person_outline_rounded),
         const SizedBox(height: 16),
-        _labelled('Phone', _phone, keyboard: TextInputType.phone, icon: Icons.phone_outlined),
+        _labelled(trl(lang, 'Phone'), _phone, keyboard: TextInputType.phone, icon: Icons.phone_outlined),
         const SizedBox(height: 16),
-        _labelled('Street address', _address, hint: '12 Commerce Ave', icon: Icons.location_on_outlined),
+        _labelled(trl(lang, 'Street address'), _address, hint: '12 Commerce Ave', icon: Icons.location_on_outlined),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: _labelled('City', _city)),
+          Expanded(child: _labelled(trl(lang, 'City'), _city)),
           const SizedBox(width: 12),
-          Expanded(child: _labelled('Zone', _zone)),
+          Expanded(child: _labelled(trl(lang, 'Zone'), _zone)),
         ]),
         const SizedBox(height: 16),
         GestureDetector(
@@ -327,11 +330,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           child: Row(children: [
             Icon(_default ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary, size: 22),
             const SizedBox(width: 8),
-            const Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+            Text(trl(lang, 'Set as default address'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
           ]),
         ),
         const SizedBox(height: 20),
-        PrimaryButton(_editing ? 'Update address' : 'Save address', icon: Icons.save_rounded, onPressed: _save),
+        PrimaryButton(_editing ? trl(lang, 'Update address') : trl(lang, 'Save address'), icon: Icons.save_rounded, onPressed: _save),
       ]),
     );
   }

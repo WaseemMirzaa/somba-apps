@@ -353,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (Icons.bolt_rounded, s.deals, AppColors.accent, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
       (Icons.local_shipping_rounded, s.freeDelivery, AppColors.mint, () => go(ProductListScreen(locale: widget.locale, title: s.freeDelivery))),
       (Icons.verified_rounded, s.inStock, AppColors.primary, () => go(ProductListScreen(locale: widget.locale, title: s.inStock))),
-      (Icons.percent_rounded, 'Coupons', AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
+      (Icons.percent_rounded, trl(s.lang, 'Coupons'), AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),

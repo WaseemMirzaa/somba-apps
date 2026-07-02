@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import 'returns_extra.dart';
@@ -18,9 +19,10 @@ class OrderDetailScreen extends StatelessWidget {
     final items = products.take(2).toList();
     final subtotal = items.fold<double>(0, (s, p) => s + p.price);
     const fee = 5.0;
+    final lang = locale.languageCode;
 
     return Scaffold(
-      appBar: backAppBar(context, delivered ? 'Order SMB-2026-4712' : 'Order SMB-2026-4821'),
+      appBar: backAppBar(context, '${trl(lang, 'Order')} ${delivered ? 'SMB-2026-4712' : 'SMB-2026-4821'}'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -33,23 +35,23 @@ class OrderDetailScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                  Text('Processing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  SizedBox(height: 2),
-                  Text('Placed today · arrives in 2 days', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(delivered ? trl(lang, 'Delivered') : trl(lang, 'Processing'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text(trl(lang, 'Placed today · arrives in 2 days'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                 ]),
               ),
               FilledButton(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: locale))),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
-                child: const Text('Track'),
+                child: Text(trl(lang, 'Track')),
               ),
             ]),
           ),
           const SizedBox(height: 14),
           Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Items', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(trl(lang, 'Items'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 12),
               ...items.map((p) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -60,7 +62,7 @@ class OrderDetailScreen extends StatelessWidget {
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(p.displayName(locale.languageCode), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                           const SizedBox(height: 2),
-                          const Text('Qty 1', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                          Text('${trl(lang, 'Qty')} 1', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                         ])),
                         Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w800)),
                       ]),
@@ -72,21 +74,21 @@ class OrderDetailScreen extends StatelessWidget {
                             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExchangeScreen(locale: locale, product: p))),
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
                             icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-                            label: const Text('Exchange', style: TextStyle(fontSize: 12.5)),
+                            label: Text(trl(lang, 'Exchange'), style: const TextStyle(fontSize: 12.5)),
                           )),
                           const SizedBox(width: 8),
                           Expanded(child: OutlinedButton.icon(
                             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
                             icon: const Icon(Icons.assignment_return_rounded, size: 16),
-                            label: const Text('Return', style: TextStyle(fontSize: 12.5)),
+                            label: Text(trl(lang, 'Return'), style: const TextStyle(fontSize: 12.5)),
                           )),
                           const SizedBox(width: 8),
                           Expanded(child: OutlinedButton.icon(
                             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale, product: p))),
                             style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
                             icon: const Icon(Icons.rate_review_rounded, size: 16),
-                            label: const Text('Review', style: TextStyle(fontSize: 12.5)),
+                            label: Text(trl(lang, 'Review'), style: const TextStyle(fontSize: 12.5)),
                           )),
                         ]),
                       ],
@@ -97,16 +99,16 @@ class OrderDetailScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Panel(
             child: Column(children: [
-              _row('Subtotal', money(subtotal)),
+              _row(trl(lang, 'Subtotal'), money(subtotal)),
               const SizedBox(height: 8),
-              _row('Delivery', money(fee)),
+              _row(trl(lang, 'Delivery'), money(fee)),
               const Divider(height: 22),
-              _row('Total', money(subtotal + fee), bold: true),
+              _row(trl(lang, 'Total'), money(subtotal + fee), bold: true),
               const SizedBox(height: 12),
               Row(children: [
                 Icon(Icons.verified_rounded, size: 18, color: AppColors.success),
                 const SizedBox(width: 8),
-                const Text('Paid online · Airtel Money', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text('${trl(lang, 'Paid online')} · Airtel Money', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
             ]),
           ),
@@ -114,11 +116,11 @@ class OrderDetailScreen extends StatelessWidget {
           Row(children: [
             Expanded(child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
-                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: const Text('Return'))),
+                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: Text(trl(lang, 'Return')))),
             const SizedBox(width: 12),
             Expanded(child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale))),
-                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: const Text('Help'))),
+                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: Text(trl(lang, 'Help')))),
           ]),
         ],
       ),
@@ -152,7 +154,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Track order'),
+      appBar: backAppBar(context, trl(widget.locale.languageCode, 'Track order')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [

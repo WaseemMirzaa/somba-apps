@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import 'order_screens.dart';
@@ -58,7 +59,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
   Widget build(BuildContext context) {
     final digits = _number.text.replaceAll(RegExp(r'\D'), '');
     return Scaffold(
-      appBar: backAppBar(context, 'Add card'),
+      appBar: backAppBar(context, tr(context, 'Add card')),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
         // Live card preview.
         Container(
@@ -82,13 +83,13 @@ class _AddCardScreenState extends State<AddCardScreen> {
           ]),
         ),
         const SizedBox(height: 20),
-        _field('Card number', _number, hint: '4242 4242 4242 4242', keyboard: TextInputType.number,
+        _field(tr(context, 'Card number'), _number, hint: '4242 4242 4242 4242', keyboard: TextInputType.number,
             formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(16)]),
         const SizedBox(height: 16),
-        _field('Cardholder name', _holder, hint: 'Marie Dubois'),
+        _field(tr(context, 'Cardholder name'), _holder, hint: 'Marie Dubois'),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: _field('Expiry', _expiry, hint: 'MM/YY', keyboard: TextInputType.number,
+          Expanded(child: _field(tr(context, 'Expiry'), _expiry, hint: 'MM/YY', keyboard: TextInputType.number,
               formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)])),
           const SizedBox(width: 12),
           Expanded(child: _field('CVV', _cvv, hint: '123', keyboard: TextInputType.number, obscure: true,
@@ -100,7 +101,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
           child: Row(children: [
             Icon(_makeDefault ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary),
             const SizedBox(width: 8),
-            const Text('Set as default payment method', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+            Text(tr(context, 'Set as default payment method'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
           ]),
         ),
         if (_error != null) ...[
@@ -108,9 +109,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
           Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 12.5, fontWeight: FontWeight.w600)),
         ],
         const SizedBox(height: 20),
-        PrimaryButton('Save card', icon: Icons.lock_rounded, onPressed: _save),
+        PrimaryButton(tr(context, 'Save card'), icon: Icons.lock_rounded, onPressed: _save),
         const SizedBox(height: 10),
-        const Center(child: Text('🔒 Encrypted — we never store your full number', style: TextStyle(color: AppColors.faint, fontSize: 11.5))),
+        Center(child: Text(tr(context, '🔒 Encrypted — we never store your full number'), style: const TextStyle(color: AppColors.faint, fontSize: 11.5))),
       ]),
     );
   }
@@ -178,7 +179,7 @@ class _AddWalletSheetState extends State<_AddWalletSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(100)))),
           const SizedBox(height: 16),
-          const Text('Add mobile money', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          Text(tr(context, 'Add mobile money'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 16),
           ...List.generate(_providers.length, (i) {
             final sel = _provider == i;
@@ -203,10 +204,10 @@ class _AddWalletSheetState extends State<_AddWalletSheet> {
             decoration: const InputDecoration(hintText: '+243 970 000 000', prefixIcon: Icon(Icons.phone_rounded, size: 20)),
           ),
           const SizedBox(height: 18),
-          PrimaryButton('Add wallet', icon: Icons.add_rounded, onPressed: () {
+          PrimaryButton(tr(context, 'Add wallet'), icon: Icons.add_rounded, onPressed: () {
             final n = _number.text.trim();
             if (n.length < 6) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid mobile-money number')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Enter a valid mobile-money number'))));
               return;
             }
             ShopState.instance.addWallet(MobileWallet(provider: _providers[_provider], number: n));
@@ -236,7 +237,7 @@ class OrderSummaryScreen extends StatelessWidget {
     final total = subtotal + delivery - discount;
 
     return Scaffold(
-      appBar: backAppBar(context, 'Order summary'),
+      appBar: backAppBar(context, trl(lang, 'Order summary')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(12),
@@ -245,7 +246,7 @@ class OrderSummaryScreen extends StatelessWidget {
             const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
             const SizedBox(width: 10),
             Expanded(child: Text(
-              stores.length == 1 ? '1 store · 1 order' : '${stores.length} stores · ${stores.length} separate orders',
+              stores.length == 1 ? '1 ${trl(lang, 'store')} · 1 ${trl(lang, 'order')}' : '${stores.length} ${trl(lang, 'stores')} · ${stores.length} ${trl(lang, 'separate orders')}',
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary))),
           ]),
         ),
@@ -280,28 +281,28 @@ class OrderSummaryScreen extends StatelessWidget {
             Text(money(it.product.price * it.qty), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
           ]))),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Store subtotal', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text(trl(lang, 'Store subtotal'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             Text(money(so.subtotal), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           ]),
         ])))),
         const SizedBox(height: 2),
         Panel(child: Column(children: [
-          _row('Subtotal', money(subtotal)),
+          _row(trl(lang, 'Subtotal'), money(subtotal)),
           const SizedBox(height: 8),
-          _row('Delivery · ${stores.length} store${stores.length == 1 ? '' : 's'}', delivery == 0 ? 'FREE' : money(delivery)),
+          _row('${trl(lang, 'Delivery')} · ${stores.length} ${stores.length == 1 ? trl(lang, 'store') : trl(lang, 'stores')}', delivery == 0 ? trl(lang, 'FREE') : money(delivery)),
           if (discount > 0) ...[
             const SizedBox(height: 8),
-            _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
+            _row('${trl(lang, 'Promo')} ${shop.appliedPromo!.code}', '- ${money(discount)}'),
           ],
           const SizedBox(height: 8),
-          _row('Payment', paymentLabel),
+          _row(trl(lang, 'Payment'), paymentLabel),
           const Divider(height: 22),
-          _row('Total', money(total), bold: true),
+          _row(trl(lang, 'Total'), money(total), bold: true),
         ])),
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('Place order · ${money(total)}', icon: Icons.lock_rounded, onPressed: () {
+        child: PrimaryButton('${trl(lang, 'Place order')} · ${money(total)}', icon: Icons.lock_rounded, onPressed: () {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OrderPlacedScreen(locale: locale, stores: stores, paymentLabel: paymentLabel)));
         }),
       ),
@@ -323,8 +324,9 @@ class OrderPlacedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = locale.languageCode;
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Order confirmed')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: Text(trl(lang, 'Order confirmed'))),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
         Column(children: [
           Container(
@@ -334,12 +336,12 @@ class OrderPlacedScreen extends StatelessWidget {
             child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
           ),
           const SizedBox(height: 16),
-          Text(stores.length == 1 ? 'Order placed!' : '${stores.length} orders placed!',
+          Text(stores.length == 1 ? trl(lang, 'Order placed!') : '${stores.length} ${trl(lang, 'orders placed!')}',
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 6),
           Text(stores.length == 1
-              ? 'The store has received your order.'
-              : 'Items from different stores ship as separate orders — each store confirms its own.',
+              ? trl(lang, 'The store has received your order.')
+              : trl(lang, 'Items from different stores ship as separate orders — each store confirms its own.'),
               textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.4)),
         ]),
         const SizedBox(height: 20),
@@ -352,23 +354,23 @@ class OrderPlacedScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(id, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                Text('Confirmed by ${so.seller.name}', style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
+                Text('${trl(lang, 'Confirmed by')} ${so.seller.name}', style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
               ])),
             ]),
             const Divider(height: 18),
             Row(children: [
-              Text('${so.count} item${so.count == 1 ? '' : 's'} · ${money(so.subtotal)}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              Text('${so.count} ${so.count == 1 ? trl(lang, 'item') : trl(lang, 'items')} · ${money(so.subtotal)}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, fontWeight: FontWeight.w600)),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: locale))),
                 icon: const Icon(Icons.local_shipping_rounded, size: 16),
-                label: const Text('Track'),
+                label: Text(trl(lang, 'Track')),
               ),
             ]),
           ])));
         }),
         const SizedBox(height: 4),
-        PrimaryButton('Continue shopping', icon: Icons.storefront_rounded, onPressed: () {
+        PrimaryButton(trl(lang, 'Continue shopping'), icon: Icons.storefront_rounded, onPressed: () {
           ShopState.instance.cart.clear();
           ShopState.instance.appliedPromo = null;
           Navigator.popUntil(context, (r) => r.isFirst);

@@ -44,7 +44,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: BrowseSearchField(
             controller: _ctrl,
-            hint: 'Search categories, products or stores…',
+            hint: trl(lang, 'Search categories, stores…'),
             onChanged: (_) => setState(() {}),
           ),
         ),
@@ -86,11 +86,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
       const SizedBox(height: 22),
       Row(children: [
-        const Text('Popular stores', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        Text(trl(lang, 'Popular stores'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         const Spacer(),
         TextButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellersDirectoryScreen(locale: widget.locale))),
-          child: const Text('See all', style: TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(s.seeAll, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
       const SizedBox(height: 6),
@@ -109,19 +109,19 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           child: Row(children: [
             const Icon(Icons.search_rounded, color: AppColors.primary),
             const SizedBox(width: 10),
-            Expanded(child: Text('Search all products for “${_ctrl.text}”', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+            Expanded(child: Text('${trl(s.lang, 'Search all products for')} “${_ctrl.text}”', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
             const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
           ]),
         ),
       ),
       if (cats.isNotEmpty) ...[
         const SizedBox(height: 18),
-        const Text('Categories', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(s.lang, 'Categories'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 8),
         ...cats.map((c) => ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Container(height: 42, width: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon(c.name), color: AppColors.primary)),
-              title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              title: Text(c.displayName(s.lang), style: const TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text(s.itemsCount(categoryCount(c.name))),
               trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
               onTap: () => _openCategory(c.name),
@@ -129,12 +129,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ],
       if (stores.isNotEmpty) ...[
         const SizedBox(height: 12),
-        const Text('Stores & sellers', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(s.lang, 'Stores & sellers'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 8),
         ...stores.map((x) => _storeRow(x)),
       ],
       if (cats.isEmpty && stores.isEmpty)
-        const Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No matches — try a product search', style: TextStyle(color: AppColors.muted)))),
+        Padding(padding: const EdgeInsets.only(top: 40), child: Center(child: Text(trl(s.lang, 'No matches — try a product search'), style: const TextStyle(color: AppColors.muted)))),
     ]);
   }
 

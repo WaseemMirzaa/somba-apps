@@ -5,6 +5,7 @@ import '../../data/promos.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_card.dart';
 import 'browse.dart';
@@ -16,7 +17,7 @@ class CouponsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Coupons'),
+      appBar: backAppBar(context, tr(context, 'Coupons')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         ...promos.map((p) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -47,12 +48,12 @@ class CouponsScreen extends StatelessWidget {
               ),
             )),
         const SizedBox(height: 4),
-        const Panel(
+        Panel(
           child: Row(children: [
-            Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
-            SizedBox(width: 10),
-            Expanded(child: Text('Apply a coupon code in your cart before checkout.',
-                style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
+            const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(tr(context, 'Apply a coupon code in your cart before checkout.'),
+                style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
           ]),
         ),
       ]),
@@ -88,12 +89,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
     _q.text = _ctrl.text;
     final items = runQuery(products, _q);
     return Scaffold(
-      appBar: backAppBar(context, widget.title ?? widget.category ?? 'Products'),
+      appBar: backAppBar(context, trl(lang, widget.title ?? widget.category ?? 'Products')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: BrowseSearchField(controller: _ctrl, hint: 'Search in ${widget.category ?? 'products'}…', onChanged: (_) => setState(() {})),
+            child: BrowseSearchField(controller: _ctrl, hint: '${trl(lang, 'Search')}…', onChanged: (_) => setState(() {})),
           ),
           SizedBox(
             height: 40,
@@ -123,7 +124,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       child: Row(children: [
                         Icon(Icons.tune_rounded, size: 15, color: n > 0 ? AppColors.primary : AppColors.muted),
                         const SizedBox(width: 4),
-                        Text(n > 0 ? 'Filters · $n' : 'Filters', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
+                        Text(n > 0 ? '${trl(lang, 'Filters')} · $n' : trl(lang, 'Filters'), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
                       ]),
                     ),
                   );
@@ -146,7 +147,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: active ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_quickSorts[i], style: TextStyle(color: active ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    child: Text(trl(lang, _quickSorts[i]), style: TextStyle(color: active ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
               },
@@ -154,11 +155,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 6, 16, 4),
-            child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} items', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+            child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} ${trl(lang, 'items')}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
           ),
           Expanded(
             child: items.isEmpty
-                ? const Center(child: Text('No products match your filters', style: TextStyle(color: AppColors.muted)))
+                ? Center(child: Text(trl(lang, 'No products match your filters'), style: const TextStyle(color: AppColors.muted)))
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -196,8 +197,9 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, 'Write a review'),
+      appBar: backAppBar(context, trl(lang, 'Write a review')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         if (p != null)
           Panel(
@@ -209,7 +211,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
             ]),
           ),
         const SizedBox(height: 18),
-        const Center(child: Text('How would you rate it?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+        Center(child: Text(trl(lang, 'How would you rate it?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) {
           final on = i < _rating;
@@ -222,7 +224,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           );
         })),
         const SizedBox(height: 20),
-        const Text('Add photos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(trl(lang, 'Add photos'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Row(children: [
           for (int i = 0; i < _photos; i++) ...[
@@ -232,13 +234,13 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           if (_photos < 4) _addPhotoBox(),
         ]),
         const SizedBox(height: 20),
-        const Text('Your review', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(trl(lang, 'Your review'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         TextField(
           controller: _ctrl,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Share what you liked or what could be better…',
+            hintText: trl(lang, 'Share what you liked or what could be better…'),
             filled: true,
             fillColor: AppColors.surface,
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
@@ -247,11 +249,11 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        PrimaryButton('Submit review',
+        PrimaryButton(trl(lang, 'Submit review'),
             icon: Icons.send_rounded,
             onPressed: () {
               ShopState.instance.addReview(_rating, _ctrl.text.trim(), _photos);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted — thank you!')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(lang, 'Review submitted — thank you!'))));
               Navigator.maybePop(context);
             }),
       ]),

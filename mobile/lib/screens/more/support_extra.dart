@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 
@@ -81,7 +82,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Support'),
+      appBar: backAppBar(context, tr(context, 'Support')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         ..._tickets.map((t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(id: t.$1, subject: t.$2, status: t.$3, statusColor: t.$4))),
@@ -93,11 +94,11 @@ class _SupportListScreenState extends State<SupportListScreen> {
               Text(t.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               Text(t.$1, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             ])),
-            Pill(t.$3, color: t.$4.withValues(alpha: 0.14), textColor: t.$4, fontSize: 10.5),
+            Pill(tr(context, t.$3), color: t.$4.withValues(alpha: 0.14), textColor: t.$4, fontSize: 10.5),
           ]),
         )))),
         const SizedBox(height: 4),
-        PrimaryButton('New ticket',
+        PrimaryButton(tr(context, 'New ticket'),
             icon: Icons.add_rounded,
             onPressed: () async {
               final created = await Navigator.push<(String, String)>(context, MaterialPageRoute(builder: (_) => NewTicketScreen(locale: widget.locale)));
@@ -137,41 +138,41 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'New ticket'),
+      appBar: backAppBar(context, tr(context, 'New ticket')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 24), children: [
-        const Text('Related order', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Related order'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: List.generate(_orders.length, (i) {
           final sel = _order == i;
           return GestureDetector(onTap: () => setState(() => _order = i), child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
-            child: Text(_orders[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+            child: Text(tr(context, _orders[i]), style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ));
         })),
         const SizedBox(height: 20),
-        const Text('Topic', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Topic'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: List.generate(_topics.length, (i) {
           final sel = _topic == i;
           return GestureDetector(onTap: () => setState(() => _topic = i), child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(color: sel ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
-            child: Text(_topics[i], style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+            child: Text(tr(context, _topics[i]), style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
           ));
         })),
         const SizedBox(height: 20),
-        const Text('Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Subject'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 8),
-        TextField(controller: _subject, decoration: const InputDecoration(hintText: 'Brief summary of the issue')),
+        TextField(controller: _subject, decoration: InputDecoration(hintText: tr(context, 'Brief summary of the issue'))),
         const SizedBox(height: 18),
-        const Text('Describe the issue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(tr(context, 'Describe the issue'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 8),
         TextField(
           controller: _body,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Tell us what happened…',
+            hintText: tr(context, 'Tell us what happened…'),
             filled: true, fillColor: AppColors.surface,
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
@@ -181,7 +182,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('Open ticket', icon: Icons.send_rounded, onPressed: () {
+        child: PrimaryButton(tr(context, 'Open ticket'), icon: Icons.send_rounded, onPressed: () {
           final subject = _subject.text.trim().isEmpty ? _topics[_topic] : _subject.text.trim();
           final id = 'TKT-${3400 + _subject.text.length + _topic}';
           final orderRef = _order < 3 ? _orders[_order] : null;
@@ -208,21 +209,21 @@ class HelpScreen extends StatelessWidget {
       'How do I contact a seller?',
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Help & support'),
+      appBar: backAppBar(context, tr(context, 'Help & support')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Row(children: [
-          Expanded(child: _contact(Icons.chat_bubble_rounded, 'Live chat', AppColors.primary)),
+          Expanded(child: _contact(Icons.chat_bubble_rounded, tr(context, 'Live chat'), AppColors.primary)),
           const SizedBox(width: 12),
-          Expanded(child: _contact(Icons.call_rounded, 'Call us', AppColors.success)),
+          Expanded(child: _contact(Icons.call_rounded, tr(context, 'Call us'), AppColors.success)),
           const SizedBox(width: 12),
-          Expanded(child: _contact(Icons.mail_rounded, 'Email', AppColors.royalBlue)),
+          Expanded(child: _contact(Icons.mail_rounded, tr(context, 'Email'), AppColors.royalBlue)),
         ]),
-        const SectionHeader('FAQs', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
+        SectionHeader(tr(context, 'FAQs'), padding: const EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(padding: EdgeInsets.zero, child: Column(children: [
           for (int i = 0; i < faqs.length; i++) ...[
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              title: Text(faqs[i], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+              title: Text(tr(context, faqs[i]), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
               trailing: const Icon(Icons.expand_more_rounded, color: AppColors.faint),
             ),
             if (i != faqs.length - 1) const Divider(height: 1),
@@ -233,7 +234,7 @@ class HelpScreen extends StatelessWidget {
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen())),
           style: TextButton.styleFrom(foregroundColor: AppColors.accentDark),
           icon: const Icon(Icons.delete_outline_rounded, size: 18),
-          label: const Text('Delete my account'),
+          label: Text(tr(context, 'Delete my account')),
         ),
       ]),
     );
@@ -387,9 +388,9 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(height: 52, width: 52, decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28)),
           const SizedBox(height: 14),
-          const Text('Close this ticket?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          Text(tr(context, 'Close this ticket?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 6),
-          const Text('Mark this issue as resolved. You can always open a new ticket if you need more help.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+          Text(tr(context, 'Mark this issue as resolved. You can always open a new ticket if you need more help.'), style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
           const SizedBox(height: 18),
           FilledButton(onPressed: () {
             Navigator.pop(context);
@@ -399,9 +400,9 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
               _msgs.add(_TicketMsg('You marked this ticket as resolved. Thanks!', false));
             });
             _scrollToEnd();
-          }, child: const Text('Close ticket')),
+          }, child: Text(tr(context, 'Close ticket'))),
           const SizedBox(height: 10),
-          OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Keep open')),
+          OutlinedButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, 'Keep open'))),
         ]),
       )),
     );
@@ -411,7 +412,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: backAppBar(context, widget.id, actions: [
-        if (!_closed) TextButton(onPressed: _closeTicket, child: const Text('Close')),
+        if (!_closed) TextButton(onPressed: _closeTicket, child: Text(tr(context, 'Close'))),
       ]),
       body: Column(children: [
         Container(
@@ -421,14 +422,14 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(widget.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-              Pill(_status, color: _statusColor.withValues(alpha: 0.14), textColor: _statusColor, fontSize: 10.5),
+              Pill(tr(context, _status), color: _statusColor.withValues(alpha: 0.14), textColor: _statusColor, fontSize: 10.5),
             ]),
             if (widget.orderRef != null) ...[
               const SizedBox(height: 6),
               Row(children: [
                 const Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.muted),
                 const SizedBox(width: 6),
-                Text('Order ${widget.orderRef}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                Text('${tr(context, 'Order')} ${widget.orderRef}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
               ]),
             ],
           ]),
@@ -465,9 +466,9 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                             decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(12)),
                             child: const Icon(Icons.image_rounded, color: Colors.white, size: 40),
                           ),
-                          const Padding(padding: EdgeInsets.only(top: 4, left: 4), child: Text('Attachment', style: TextStyle(color: Colors.white70, fontSize: 11))),
+                          Padding(padding: const EdgeInsets.only(top: 4, left: 4), child: Text(tr(context, 'Attachment'), style: const TextStyle(color: Colors.white70, fontSize: 11))),
                         ])
-                      : Text(m.text, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                      : Text(tr(context, m.text), style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
                 ),
               );
             },
@@ -478,10 +479,10 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             color: AppColors.success.withValues(alpha: 0.08),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
-              Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
-              SizedBox(width: 8),
-              Text('This ticket is resolved', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+              const SizedBox(width: 8),
+              Text(tr(context, 'This ticket is resolved'), style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
             ]),
           ))
         else
@@ -500,7 +501,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                     controller: _ctrl,
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
-                      hintText: 'Reply…',
+                      hintText: tr(context, 'Reply…'),
                       filled: true,
                       fillColor: AppColors.surface,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

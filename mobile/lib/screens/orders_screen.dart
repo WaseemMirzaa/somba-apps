@@ -76,7 +76,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: sel ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_tabs[i],
+                    child: Text(trl(s.lang, _tabs[i]),
                         style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
@@ -85,7 +85,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           Expanded(
             child: orders.isEmpty
-                ? const Center(child: Text('No orders here yet', style: TextStyle(color: AppColors.muted)))
+                ? Center(child: Text(trl(s.lang, 'No orders here yet'), style: const TextStyle(color: AppColors.muted)))
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     itemCount: orders.length,

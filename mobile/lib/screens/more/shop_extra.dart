@@ -3,6 +3,7 @@ import '../../data/mock_data.dart';
 import '../../data/catalog_meta.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
@@ -67,19 +68,19 @@ class _StoreScreenState extends State<StoreScreen> {
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(children: [
-            Expanded(child: BrowseSearchField(controller: _ctrl, hint: 'Search in $_name…', onChanged: (_) => setState(() {}))),
+            Expanded(child: BrowseSearchField(controller: _ctrl, hint: '${trl(lang, 'Search')} · $_name', onChanged: (_) => setState(() {}))),
             const SizedBox(width: 10),
             _filterButton(),
           ]),
         )),
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
-          child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} products', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+          child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} ${trl(lang, 'products')}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
         )),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           sliver: items.isEmpty
-              ? const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No products match your filters', style: TextStyle(color: AppColors.muted)))))
+              ? SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(top: 40), child: Center(child: Text(trl(lang, 'No products match your filters'), style: const TextStyle(color: AppColors.muted)))))
               : SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
                   delegate: SliverChildBuilderDelegate((_, i) => ProductCard(product: items[i], lang: lang), childCount: items.length),
@@ -112,6 +113,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
   Widget _header() {
     final top = MediaQuery.of(context).padding.top;
+    final lang = widget.locale.languageCode;
     final following = ShopState.instance.followedStores.contains(_id);
     final followers = _baseFollowers + (following ? 1 : 0);
     return Container(
@@ -122,7 +124,7 @@ class _StoreScreenState extends State<StoreScreen> {
           CircleIconButton(icon: Icons.arrow_back_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white, onTap: () => Navigator.maybePop(context)),
           const Spacer(),
           CircleIconButton(icon: Icons.share_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white,
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store link copied')))),
+              onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(lang, 'Store link copied'))))),
         ]),
         const SizedBox(height: 12),
         Row(children: [
@@ -136,7 +138,7 @@ class _StoreScreenState extends State<StoreScreen> {
               const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
             ]),
             const SizedBox(height: 2),
-            Text(_tagline, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
+            Text(trl(lang, _tagline), style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -144,7 +146,7 @@ class _StoreScreenState extends State<StoreScreen> {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.verified_rounded, color: Colors.white, size: 13),
                 const SizedBox(width: 4),
-                Text('$_badgeLabel · $_health% health', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10.5)),
+                Text('$_badgeLabel · $_health% ${trl(lang, 'health')}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10.5)),
               ]),
             ),
           ])),
@@ -154,11 +156,11 @@ class _StoreScreenState extends State<StoreScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            _stat('$_rating★', 'Rating', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewsScreen(locale: widget.locale)))),
+            _stat('$_rating★', trl(lang, 'Rating'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewsScreen(locale: widget.locale)))),
             _div(),
-            _stat('${_storeProducts.length}', 'Products'),
+            _stat('${_storeProducts.length}', trl(lang, 'Products')),
             _div(),
-            _stat('${(followers / 1000).toStringAsFixed(1)}k', 'Followers'),
+            _stat('${(followers / 1000).toStringAsFixed(1)}k', trl(lang, 'Followers')),
           ]),
         ),
         const SizedBox(height: 14),
@@ -167,13 +169,13 @@ class _StoreScreenState extends State<StoreScreen> {
             onTap: () {
               setState(() => ShopState.instance.toggleFollow(_id));
               final now = ShopState.instance.followedStores.contains(_id);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(now ? 'Following $_name' : 'Unfollowed $_name')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(now ? '${trl(lang, 'Following')} · $_name' : _name)));
             },
-            child: _btn(following ? Icons.check_rounded : Icons.add_rounded, following ? 'Following' : 'Follow', true))),
+            child: _btn(following ? Icons.check_rounded : Icons.add_rounded, following ? trl(lang, 'Following') : trl(lang, 'Follow'), true))),
           const SizedBox(width: 12),
           Expanded(child: GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellerChatScreen(storeName: _name))),
-            child: _btn(Icons.chat_bubble_outline_rounded, 'Chat', false))),
+            child: _btn(Icons.chat_bubble_outline_rounded, trl(lang, 'Chat'), false))),
         ]),
       ]),
     );
@@ -263,7 +265,7 @@ class _SellerChatScreenState extends State<SellerChatScreen> {
                   ),
                   boxShadow: mine ? null : AppShadow.card,
                 ),
-                child: Text(m.$1, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                child: Text(tr(context, m.$1), style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
               ),
             );
           },
@@ -275,7 +277,7 @@ class _SellerChatScreenState extends State<SellerChatScreen> {
               controller: _ctrl,
               onSubmitted: (_) => _send(),
               decoration: InputDecoration(
-                hintText: 'Message the store…',
+                hintText: tr(context, 'Message the store…'),
                 filled: true, fillColor: AppColors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
@@ -307,10 +309,11 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   Locale get locale => widget.locale;
   @override
   Widget build(BuildContext context) {
+    final lang = locale.languageCode;
     final reviews = ShopState.instance.reviews;
     final avg = reviews.isEmpty ? 4.8 : reviews.fold<int>(0, (s, r) => s + r.stars) / reviews.length;
     return Scaffold(
-      appBar: backAppBar(context, 'Reviews'),
+      appBar: backAppBar(context, trl(lang, 'Reviews')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Panel(child: Row(children: [
           Column(children: [
@@ -318,7 +321,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             const SizedBox(height: 4),
             RatingPill(avg),
             const SizedBox(height: 4),
-            Text('${reviews.length} reviews', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            Text('${reviews.length} ${trl(lang, 'reviews')}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
           ]),
           const SizedBox(width: 20),
           Expanded(child: Column(children: List.generate(5, (i) {
@@ -358,7 +361,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('Write a review',
+        child: PrimaryButton(trl(lang, 'Write a review'),
             icon: Icons.rate_review_rounded,
             onPressed: () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale)));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_image.dart';
@@ -36,8 +37,9 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, 'Return · ${_stepTitles[_step]}'),
+      appBar: backAppBar(context, '${trl(lang, 'Return')} · ${trl(lang, _stepTitles[_step])}'),
       body: Column(children: [
         _stepper(),
         Expanded(child: switch (_step) {
@@ -60,7 +62,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
               ClipRRect(borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(value: done ? 1 : 0, minHeight: 5, backgroundColor: AppColors.line, color: AppColors.primary)),
               const SizedBox(height: 5),
-              Text(_stepTitles[i], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: done ? AppColors.primary : AppColors.faint)),
+              Text(trl(widget.locale.languageCode, _stepTitles[i]), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: done ? AppColors.primary : AppColors.faint)),
             ]),
           ));
         })),
@@ -69,7 +71,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   Widget _itemsStep() {
     final lang = widget.locale.languageCode;
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
-      const Text('Which items are you returning?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+      Text(trl(lang, 'Which items are you returning?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
       const SizedBox(height: 10),
       ..._items.map((p) {
         final sel = _selected.contains(p.id);
@@ -91,11 +93,11 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   }
 
   Widget _reasonStep() => ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
-        const Text('Reason for return', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(widget.locale.languageCode, 'Reason for return'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         ..._pick(_reasons, _reason, (i) => setState(() => _reason = i)),
         const SizedBox(height: 8),
-        const Text('Refund to', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(widget.locale.languageCode, 'Refund to'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         ..._pick(_refunds, _refund, (i) => setState(() => _refund = i)),
       ]);
@@ -103,7 +105,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   Widget _reviewStep() {
     final lang = widget.locale.languageCode;
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
-      const Text('Review your return', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+      Text(trl(lang, 'Review your return'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
       const SizedBox(height: 10),
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         ..._items.where((p) => _selected.contains(p.id)).map((p) => Padding(
@@ -113,12 +115,12 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
             Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           ]))),
         const Divider(height: 18),
-        _kv('Reason', _reasons[_reason]),
+        _kv(trl(lang, 'Reason'), trl(lang, _reasons[_reason])),
         const SizedBox(height: 6),
-        _kv('Refund to', _refunds[_refund]),
+        _kv(trl(lang, 'Refund to'), trl(lang, _refunds[_refund])),
         const Divider(height: 18),
         Row(children: [
-          const Text('Estimated refund', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          Text(trl(lang, 'Estimated refund'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const Spacer(),
           Text(money(_refundAmount), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
         ]),
@@ -140,13 +142,13 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
         child: Row(children: [
           if (_step > 0) ...[
-            Expanded(child: OutlinedButton(onPressed: () => setState(() => _step--), child: const Text('Back'))),
+            Expanded(child: OutlinedButton(onPressed: () => setState(() => _step--), child: Text(trl(widget.locale.languageCode, 'Back')))),
             const SizedBox(width: 12),
           ],
           Expanded(
             flex: 2,
             child: PrimaryButton(
-              _step < 2 ? 'Continue' : 'Submit return',
+              _step < 2 ? trl(widget.locale.languageCode, 'Continue') : trl(widget.locale.languageCode, 'Submit return'),
               icon: _step < 2 ? Icons.arrow_forward_rounded : Icons.assignment_return_rounded,
               onPressed: !canNext
                   ? null
@@ -169,7 +171,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
         child: GestureDetector(onTap: () => onTap(i), child: Panel(padding: const EdgeInsets.all(14), child: Row(children: [
           Icon(sel == i ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel == i ? AppColors.primary : AppColors.faint),
           const SizedBox(width: 12),
-          Expanded(child: Text(items[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: sel == i ? AppColors.ink : AppColors.inkSoft))),
+          Expanded(child: Text(trl(widget.locale.languageCode, items[i]), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: sel == i ? AppColors.ink : AppColors.inkSoft))),
         ])))),
       );
 }
@@ -230,9 +232,10 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product ?? products.firstWhere((x) => x.category == 'Fashion', orElse: () => products.first);
+    final lang = widget.locale.languageCode;
     if (_done) return _confirmation(p);
     return Scaffold(
-      appBar: backAppBar(context, 'Exchange item'),
+      appBar: backAppBar(context, trl(lang, 'Exchange item')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Panel(child: Row(children: [
           ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 56, width: 56, child: ProductImage(product: p, iconSize: 24))),
@@ -240,22 +243,22 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(p.displayName(widget.locale.languageCode), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
             const SizedBox(height: 2),
-            Text('From order SMB-2026-4712 · delivered', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+            Text('${trl(lang, 'From order')} SMB-2026-4712 · ${trl(lang, 'delivered')}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
           ])),
         ])),
         const SizedBox(height: 18),
-        const Text('Why are you exchanging?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(lang, 'Why are you exchanging?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         ...List.generate(_reasons.length, (i) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: GestureDetector(onTap: () => setState(() => _reason = i), child: Panel(padding: const EdgeInsets.all(14), child: Row(children: [
             Icon(_reason == i ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: _reason == i ? AppColors.primary : AppColors.faint),
             const SizedBox(width: 12),
-            Expanded(child: Text(_reasons[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _reason == i ? AppColors.ink : AppColors.inkSoft))),
+            Expanded(child: Text(trl(lang, _reasons[i]), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _reason == i ? AppColors.ink : AppColors.inkSoft))),
           ]))),
         )),
         const SizedBox(height: 8),
-        const Text('Exchange for a different size', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(trl(lang, 'Exchange for a different size'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 12),
         Wrap(spacing: 10, children: List.generate(_sizes.length, (i) {
           final sel = _size == i;
@@ -266,28 +269,30 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
           ));
         })),
         const SizedBox(height: 18),
-        Panel(child: Row(children: const [
-          Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
-          SizedBox(width: 10),
-          Expanded(child: Text('Free size exchange within 30 days. A rider will swap it at your door.', style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft, height: 1.3))),
+        Panel(child: Row(children: [
+          const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(child: Text(trl(lang, 'Free size exchange within 30 days. A rider will swap it at your door.'), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, height: 1.3))),
         ])),
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('Request exchange', icon: Icons.swap_horiz_rounded, onPressed: () => setState(() => _done = true)),
+        child: PrimaryButton(trl(lang, 'Request exchange'), icon: Icons.swap_horiz_rounded, onPressed: () => setState(() => _done = true)),
       ),
     );
   }
 
-  Widget _confirmation(Product p) => Scaffold(
-        appBar: backAppBar(context, 'Exchange requested'),
+  Widget _confirmation(Product p) {
+    final lang = widget.locale.languageCode;
+    return Scaffold(
+        appBar: backAppBar(context, trl(lang, 'Exchange requested')),
         body: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
           Column(children: [
             Container(height: 84, width: 84, decoration: BoxDecoration(gradient: AppColors.brandGradient, shape: BoxShape.circle), child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 44)),
             const SizedBox(height: 16),
-            const Text('Exchange requested', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
+            Text(trl(lang, 'Exchange requested'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
             const SizedBox(height: 6),
-            Text('New size ${_sizes[_size]} · reason: ${_reasons[_reason]}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
+            Text('${trl(lang, 'New size')} ${_sizes[_size]} · ${trl(lang, 'reason')}: ${trl(lang, _reasons[_reason])}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
           ]),
           const SizedBox(height: 20),
           Panel(child: const StatusTimeline([
@@ -297,9 +302,10 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
             ('New item delivered', 'Estimated 2–3 days', false),
           ])),
           const SizedBox(height: 16),
-          PrimaryButton('Done', icon: Icons.check_rounded, onPressed: () => Navigator.maybePop(context)),
+          PrimaryButton(trl(lang, 'Done'), icon: Icons.check_rounded, onPressed: () => Navigator.maybePop(context)),
         ]),
       );
+  }
 }
 
 /// CF-29 — Returns & exchanges listing (from profile / my orders) with
@@ -361,9 +367,10 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
   @override
   Widget build(BuildContext context) {
     final q = _search.text.trim().toLowerCase();
+    final lang = widget.locale.languageCode;
     final list = _returns.where((r) => _match(r.$4) && (q.isEmpty || r.$1.toLowerCase().contains(q) || r.$2.toLowerCase().contains(q))).toList();
     return Scaffold(
-      appBar: backAppBar(context, 'Returns & exchanges'),
+      appBar: backAppBar(context, trl(lang, 'Returns & exchanges')),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
@@ -371,7 +378,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
             controller: _search,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Search returns by ID or item…',
+              hintText: trl(lang, 'Search returns by ID or item…'),
               prefixIcon: const Icon(Icons.search_rounded),
               filled: true, fillColor: AppColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
@@ -393,7 +400,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
-                  child: Text(_tabs[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  child: Text(trl(lang, _tabs[i]), style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ),
               );
             },
@@ -401,7 +408,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
         ),
         Expanded(
           child: list.isEmpty
-              ? const Center(child: Text('No returns in this filter', style: TextStyle(color: AppColors.muted)))
+              ? Center(child: Text(trl(lang, 'No returns in this filter'), style: const TextStyle(color: AppColors.muted)))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                   itemCount: list.length,
@@ -418,9 +425,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(r.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                             const SizedBox(height: 2),
-                            Text('${r.$3} · ${r.$2}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                            Text('${trl(lang, r.$3)} · ${r.$2}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                           ])),
-                          Pill(r.$4, color: c.withValues(alpha: 0.14), textColor: c, fontSize: 10.5),
+                          Pill(trl(lang, r.$4), color: c.withValues(alpha: 0.14), textColor: c, fontSize: 10.5),
                         ]),
                         const Divider(height: 20),
                         Row(children: [
