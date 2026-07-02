@@ -9,6 +9,9 @@ regenerated from the current build. Individual screens live in
 
 Splash · Login · Register · OTP · Verify email · Forgot password · Reset password
 
+The shorter flows — number verification, email verification, forgot password
+and set-a-new-password — are vertically centered for a balanced, premium layout.
+
 ## Shopping & discovery
 ![Shopping & discovery](02-shopping-contact-sheet.png)
 

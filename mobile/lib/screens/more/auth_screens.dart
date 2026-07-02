@@ -64,11 +64,24 @@ class _AuthPage extends StatelessWidget {
   final String subtitle;
   final Widget form;
   final bool showBack;
-  const _AuthPage({required this.title, required this.subtitle, required this.form, this.showBack = false});
+  /// When true the logo/title/card group is vertically centered on the page
+  /// (used by the shorter flows: OTP, verify email, forgot & reset password).
+  final bool centered;
+  const _AuthPage({required this.title, required this.subtitle, required this.form, this.showBack = false, this.centered = false});
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
+    final content = <Widget>[
+      const Center(child: BrandLogo(size: 78, radius: 22)),
+      const SizedBox(height: 18),
+      Text(title, textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
+      const SizedBox(height: 6),
+      Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14)),
+      const SizedBox(height: 24),
+      GlassCard(child: form),
+    ];
     return Scaffold(
       body: AuthBackdrop(
         child: SafeArea(
@@ -86,19 +99,18 @@ class _AuthPage extends StatelessWidget {
                   ),
                 ),
               ),
-            ListView(
-              padding: EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
-              children: [
-                const Center(child: BrandLogo(size: 78, radius: 22)),
-                const SizedBox(height: 18),
-                Text(title, textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
-                const SizedBox(height: 6),
-                Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14)),
-                const SizedBox(height: 24),
-                GlassCard(child: form),
-              ],
-            ),
+            if (centered)
+              Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(22, top + 56, 22, 30),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: content),
+                ),
+              )
+            else
+              ListView(
+                padding: EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
+                children: content,
+              ),
           ]),
         ),
       ),
@@ -483,6 +495,7 @@ class _OtpScreenState extends State<OtpScreen> {
       title: tr(context, 'Verify your number'),
       subtitle: '${tr(context, 'Enter the 6-digit code sent to')} ${widget.phone ?? '+243 970 000 000'}',
       showBack: true,
+      centered: true,
       form: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(6, (i) {
           return SizedBox(
@@ -547,6 +560,7 @@ class VerifyEmailScreen extends StatelessWidget {
       title: tr(context, 'Verify your email'),
       subtitle: tr(context, 'We sent a confirmation link to marie@email.com'),
       showBack: true,
+      centered: true,
       form: Column(children: [
         Container(
           padding: const EdgeInsets.all(20),
@@ -605,6 +619,7 @@ class _ForgotScreenState extends State<ForgotScreen> {
       title: tr(context, 'Reset password'),
       subtitle: tr(context, "We'll send a reset link to your email"),
       showBack: true,
+      centered: true,
       form: Column(children: [
         _GlassField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err),
         const SizedBox(height: 20),
@@ -648,6 +663,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       title: tr(context, 'Set a new password'),
       subtitle: tr(context, 'Choose a strong password you have not used before'),
       showBack: true,
+      centered: true,
       form: Column(children: [
         _GlassField(label: tr(context, 'New password'), hint: tr(context, 'Create a password'), icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
         const SizedBox(height: 14),
