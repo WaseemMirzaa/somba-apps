@@ -489,13 +489,10 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
+              padding: const EdgeInsets.fromLTRB(6, 8, 12, 10),
               child: Row(children: [
-                IconButton(
-                  onPressed: _attachImage,
-                  icon: const Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary),
-                  tooltip: 'Attach photo',
-                ),
+                ChatAttachButtons(onCamera: _attachImage, onGallery: _attachImage),
+                const SizedBox(width: 2),
                 Expanded(
                   child: TextField(
                     controller: _ctrl,

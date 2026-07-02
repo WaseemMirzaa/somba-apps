@@ -226,10 +226,11 @@ class SellerChatScreen extends StatefulWidget {
 class _SellerChatScreenState extends State<SellerChatScreen> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
-  final List<(String, bool)> _msgs = [
-    ('Hello! Welcome to our store. How can we help you today?', false),
-    ('Do you deliver to Gombe?', true),
-    ('Yes — same-day delivery in Gombe on orders before 4pm.', false),
+  // (text, mine, isImage)
+  final List<(String, bool, bool)> _msgs = [
+    ('Hello! Welcome to our store. How can we help you today?', false, false),
+    ('Do you deliver to Gombe?', true, false),
+    ('Yes — same-day delivery in Gombe on orders before 4pm.', false, false),
   ];
 
   @override
@@ -239,16 +240,24 @@ class _SellerChatScreenState extends State<SellerChatScreen> {
     super.dispose();
   }
 
+  void _scrollToEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      });
+
   void _send() {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
     setState(() {
-      _msgs.add((t, true));
+      _msgs.add((t, true, false));
       _ctrl.clear();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    });
+    _scrollToEnd();
+  }
+
+  void _attach(String source) {
+    setState(() => _msgs.add((source, true, true)));
+    _scrollToEnd();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Photo attached'))));
   }
 
   @override
@@ -263,11 +272,12 @@ class _SellerChatScreenState extends State<SellerChatScreen> {
           itemBuilder: (_, i) {
             final m = _msgs[i];
             final mine = m.$2;
+            final isImage = m.$3;
             return Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: isImage ? const EdgeInsets.all(6) : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
                 decoration: BoxDecoration(
                   color: mine ? AppColors.primary : AppColors.surface,
@@ -277,14 +287,18 @@ class _SellerChatScreenState extends State<SellerChatScreen> {
                   ),
                   boxShadow: mine ? null : AppShadow.card,
                 ),
-                child: Text(tr(context, m.$1), style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                child: isImage
+                    ? ChatImageBubble(mine: mine)
+                    : Text(tr(context, m.$1), style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
               ),
             );
           },
         )),
         SafeArea(top: false, child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          padding: const EdgeInsets.fromLTRB(6, 8, 12, 10),
           child: Row(children: [
+            ChatAttachButtons(onCamera: () => _attach('camera'), onGallery: () => _attach('gallery')),
+            const SizedBox(width: 2),
             Expanded(child: TextField(
               controller: _ctrl,
               onSubmitted: (_) => _send(),

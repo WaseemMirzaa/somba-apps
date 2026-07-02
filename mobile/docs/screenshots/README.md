@@ -15,8 +15,12 @@ and set-a-new-password — are vertically centered for a balanced, premium layou
 ## Shopping & discovery
 ![Shopping & discovery](02-shopping-contact-sheet.png)
 
-Home · Categories · Search · Stores & sellers · Store front · Product list ·
-Product detail · Product detail (dual-currency) · Deals · Coupons · Wishlist
+Home · Categories · Search · Stores & sellers · Store front · Store chat ·
+Product list · Product detail · Product detail (dual-currency) · Deals ·
+Coupons · Wishlist
+
+Home, Categories and Account are shown inside the app shell with the floating
+bottom navigation bar.
 
 ## Cart, checkout & payments
 ![Cart, checkout & payments](03-checkout-contact-sheet.png)

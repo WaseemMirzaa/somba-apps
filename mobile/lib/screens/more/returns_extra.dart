@@ -459,11 +459,12 @@ class DisputeScreen extends StatefulWidget {
 class _DisputeScreenState extends State<DisputeScreen> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
-  final List<(String, String, bool)> _msgs = [
-    ('You', 'Item arrived damaged. Requesting a replacement.', true),
-    ('Support', "Thanks Marie — we've opened a dispute and asked the seller to respond.", false),
-    ('Support', 'Please share a photo of the damage to speed things up.', false),
-    ('You', 'Photo attached. 📷', true),
+  // (author, text, me, isImage)
+  final List<(String, String, bool, bool)> _msgs = [
+    ('You', 'Item arrived damaged. Requesting a replacement.', true, false),
+    ('Support', "Thanks Marie — we've opened a dispute and asked the seller to respond.", false, false),
+    ('Support', 'Please share a photo of the damage to speed things up.', false, false),
+    ('You', 'photo', true, true),
   ];
 
   @override
@@ -473,16 +474,24 @@ class _DisputeScreenState extends State<DisputeScreen> {
     super.dispose();
   }
 
+  void _scrollToEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      });
+
   void _send() {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
     setState(() {
-      _msgs.add(('You', t, true));
+      _msgs.add(('You', t, true, false));
       _ctrl.clear();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    });
+    _scrollToEnd();
+  }
+
+  void _attach(String source) {
+    setState(() => _msgs.add(('You', source, true, true)));
+    _scrollToEnd();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(widget.locale.languageCode, 'Photo attached'))));
   }
 
   @override
@@ -504,13 +513,15 @@ class _DisputeScreenState extends State<DisputeScreen> {
           controller: _scroll,
           padding: const EdgeInsets.all(16),
           itemCount: _msgs.length,
-          itemBuilder: (_, i) => _msg(_msgs[i].$2, _msgs[i].$3),
+          itemBuilder: (_, i) => _msg(_msgs[i].$2, _msgs[i].$3, _msgs[i].$4),
         )),
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            padding: const EdgeInsets.fromLTRB(6, 8, 16, 10),
             child: Row(children: [
+              ChatAttachButtons(onCamera: () => _attach('camera'), onGallery: () => _attach('gallery')),
+              const SizedBox(width: 2),
               Expanded(child: TextField(
                 controller: _ctrl,
                 onSubmitted: (_) => _send(),
@@ -537,18 +548,20 @@ class _DisputeScreenState extends State<DisputeScreen> {
     );
   }
 
-  Widget _msg(String text, bool me) => Align(
+  Widget _msg(String text, bool me, [bool isImage = false]) => Align(
         alignment: me ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(12),
+          padding: isImage ? const EdgeInsets.all(6) : const EdgeInsets.all(12),
           constraints: const BoxConstraints(maxWidth: 280),
           decoration: BoxDecoration(
             color: me ? AppColors.primary : AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: me ? null : AppShadow.card,
           ),
-          child: Text(text, style: TextStyle(color: me ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+          child: isImage
+              ? ChatImageBubble(mine: me)
+              : Text(text, style: TextStyle(color: me ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
         ),
       );
 }

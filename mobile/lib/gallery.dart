@@ -14,13 +14,10 @@ import 'screens/more/address_flow.dart';
 import 'screens/more/checkout_flow.dart';
 import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
+import 'app.dart';
 import 'screens/product_detail_screen.dart';
-import 'screens/categories_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/checkout_screen.dart';
-import 'screens/deals_screen.dart';
-import 'screens/account_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/more/browse.dart';
 import 'data/mock_data.dart';
@@ -33,11 +30,14 @@ void main() => runApp(const _GalleryApp());
 const _en = Locale('en');
 
 Map<String, WidgetBuilder> get _screens => {
-      'home': (_) => HomeScreen(locale: _en, onLocaleChanged: (_) {}),
+      // Main tab screens rendered inside the real app shell so the floating
+      // bottom navigation bar shows, exactly like the running app.
+      'home': (_) => AppShell(locale: _en, onLocaleChanged: (_) {}, initialIndex: 0),
+      'categories': (_) => AppShell(locale: _en, onLocaleChanged: (_) {}, initialIndex: 1),
+      'deals': (_) => AppShell(locale: _en, onLocaleChanged: (_) {}, initialIndex: 2),
+      'account': (_) => AppShell(locale: _en, onLocaleChanged: (_) {}, initialIndex: 3),
       'cart': (_) => const CartScreen(locale: _en),
       'checkout': (_) => const CheckoutScreen(locale: _en),
-      'deals': (_) => const DealsScreen(locale: _en),
-      'account': (_) => AccountScreen(locale: _en, onLocaleChanged: (_) {}),
       'orders': (_) => const OrdersScreen(locale: _en),
       'splash': (_) => CustomerSplashScreen(onDone: () {}),
       'login': (_) => const LoginScreen(),
@@ -58,7 +58,6 @@ Map<String, WidgetBuilder> get _screens => {
       'edit-profile': (_) => const CustomerEditProfileScreen(locale: _en),
       'support-detail': (_) => const SupportTicketDetailScreen(id: 'TKT-3391', subject: 'Refund not received', status: 'Open', statusColor: AppColors.amber),
       'search': (_) => const SearchScreen(locale: _en, initialText: 'S'),
-      'categories': (_) => const CategoriesScreen(locale: _en),
       'sellers': (_) => const SellersDirectoryScreen(locale: _en),
       'address-select': (_) => const AddressSelectScreen(locale: _en),
       'order-detail': (_) => const OrderDetailScreen(locale: _en),
@@ -67,6 +66,7 @@ Map<String, WidgetBuilder> get _screens => {
       'notifications': (_) => const NotificationsScreen(locale: _en),
       'addresses': (_) => const AddressBookScreen(locale: _en),
       'store': (_) => const StoreScreen(locale: _en),
+      'seller-chat': (_) => const SellerChatScreen(storeName: 'TechSphere Store'),
       'reviews': (_) => const ReviewsScreen(locale: _en),
       'payment': (_) => const PaymentScreen(locale: _en),
       'payment-failed': (_) => const PaymentScreen(locale: _en, failed: true),
