@@ -40,6 +40,17 @@ Account · Edit profile · Settings · Addresses · Choose address · Location p
 Address form · Notifications · Refer & earn · Support · New ticket · Ticket detail ·
 Help · Delete account
 
+## Filter & sort popups
+![Filter & sort popups](06-filters-contact-sheet.png)
+
+The AliExpress-style filter sheet (default and with filters applied): sort,
+category, price range, minimum rating, deals-only, and a live result count.
+
 ---
+
+### Full-screen catalogs (one image per screen — for the client)
+
+- **English:** [`flows/README.md`](flows/README.md)
+- **French:** [`fr/README.md`](fr/README.md) · [`flows-fr/README.md`](flows-fr/README.md)
 
 All screens are localized (English / French) and functional in the mock build.
