@@ -3,7 +3,7 @@ class Strings {
   Strings(this.lang);
   bool get isFr => lang == 'fr';
 
-  String get brand => 'LipCart';
+  String get brand => 'Somba&Teka';
   String get home => isFr ? 'Accueil' : 'Home';
   String get categories => isFr ? 'Catégories' : 'Categories';
   String get deals => isFr ? 'Offres' : 'Deals';
