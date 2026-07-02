@@ -3,6 +3,8 @@ import '../data/mock_data.dart';
 import '../data/shop_state.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
+import '../l10n/strings.dart';
+import '../screens/product_detail_screen.dart';
 import 'common.dart';
 import 'product_image.dart';
 
@@ -31,6 +33,19 @@ class ProductCard extends StatefulWidget {
 class _ProductCardState extends State<ProductCard> {
   bool _pressed = false;
 
+  void _openDetail() {
+    Navigator.push(context, MaterialPageRoute(
+        builder: (_) => ProductDetailScreen(product: widget.product, locale: Locale(widget.lang))));
+  }
+
+  void _quickAdd() {
+    setState(() => ShopState.instance.addToCart(widget.product));
+    final s = Strings(widget.lang);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('${widget.product.displayName(widget.lang)} — ${s.addedToCart}')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
@@ -41,7 +56,7 @@ class _ProductCardState extends State<ProductCard> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
+      onTap: widget.onTap ?? _openDetail,
       child: AnimatedScale(
         scale: _pressed ? 0.97 : 1,
         duration: const Duration(milliseconds: 120),
@@ -153,7 +168,7 @@ class _ProductCardState extends State<ProductCard> {
                             ],
                           ),
                         ),
-                        _AddButton(onTap: widget.onAdd),
+                        _AddButton(onTap: widget.onAdd ?? _quickAdd),
                       ],
                     ),
                   ],

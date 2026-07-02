@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/mock_data.dart';
 import '../../data/promos.dart';
+import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
@@ -183,6 +184,7 @@ class ReviewComposeScreen extends StatefulWidget {
 
 class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
   int _rating = 5;
+  int _photos = 0;
   final _ctrl = TextEditingController();
 
   @override
@@ -223,9 +225,11 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
         const Text('Add photos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         Row(children: [
-          _photoBox(),
-          const SizedBox(width: 10),
-          _photoBox(),
+          for (int i = 0; i < _photos; i++) ...[
+            _photoThumb(i),
+            const SizedBox(width: 10),
+          ],
+          if (_photos < 4) _addPhotoBox(),
         ]),
         const SizedBox(height: 20),
         const Text('Your review', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
@@ -246,21 +250,52 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
         PrimaryButton('Submit review',
             icon: Icons.send_rounded,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted — pending moderation')));
+              ShopState.instance.addReview(_rating, _ctrl.text.trim(), _photos);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted — thank you!')));
               Navigator.maybePop(context);
             }),
       ]),
     );
   }
 
-  Widget _photoBox() => Container(
-        height: 72,
-        width: 72,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.line),
+  Widget _addPhotoBox() => GestureDetector(
+        onTap: () => setState(() => _photos++),
+        child: Container(
+          height: 72,
+          width: 72,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: const Icon(Icons.add_a_photo_rounded, color: AppColors.primary),
         ),
-        child: const Icon(Icons.add_a_photo_rounded, color: AppColors.primary),
+      );
+
+  Widget _photoThumb(int i) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            height: 72,
+            width: 72,
+            decoration: BoxDecoration(
+              gradient: AppColors.brandGradient,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.image_rounded, color: Colors.white),
+          ),
+          Positioned(
+            top: -6,
+            right: -6,
+            child: GestureDetector(
+              onTap: () => setState(() => _photos--),
+              child: Container(
+                decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
+                padding: const EdgeInsets.all(3),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+              ),
+            ),
+          ),
+        ],
       );
 }

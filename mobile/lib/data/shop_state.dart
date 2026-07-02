@@ -10,6 +10,15 @@ class CartItem {
   CartItem({required this.product, this.variant = 'Default', this.qty = 1});
 }
 
+class CustomerReview {
+  final String name;
+  final int stars;
+  final String text;
+  final String date;
+  final int photos;
+  CustomerReview({required this.name, required this.stars, required this.text, required this.date, this.photos = 0});
+}
+
 class ShopState {
   static final ShopState instance = ShopState._();
 
@@ -33,6 +42,18 @@ class ShopState {
   String? selectedAddressLabel;
 
   double promoDiscount(double subtotalUsd) => appliedPromo?.discountFor(subtotalUsd) ?? 0;
+
+  /// Customer reviews (shared so the compose screen can add to the list).
+  final List<CustomerReview> reviews = [
+    CustomerReview(name: 'Aline K.', stars: 5, text: 'Exactly as described, fast delivery. Very happy!', date: '2 days ago', photos: 2),
+    CustomerReview(name: 'Patrick M.', stars: 4, text: 'Good quality for the price. Packaging could be better.', date: '5 days ago', photos: 0),
+    CustomerReview(name: 'Sarah L.', stars: 5, text: 'Second time ordering from this seller — always reliable.', date: '1 week ago', photos: 1),
+    CustomerReview(name: 'Jean B.', stars: 3, text: 'It works but arrived a day late.', date: '2 weeks ago', photos: 0),
+  ];
+
+  void addReview(int stars, String text, int photos) {
+    reviews.insert(0, CustomerReview(name: 'You', stars: stars, text: text.isEmpty ? 'Rated $stars stars.' : text, date: 'Just now', photos: photos));
+  }
 
   SharedPreferences? _prefs;
 

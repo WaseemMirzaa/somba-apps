@@ -1,27 +1,37 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../data/catalog_meta.dart';
+import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
 import 'catalog_extra.dart';
+import 'browse.dart';
 
-/// Store front (CF-07).
-class StoreScreen extends StatelessWidget {
+/// Store front (CF-07) — follow, chat, searchable/filterable products, reviews.
+class StoreScreen extends StatefulWidget {
   final Locale locale;
   final Seller? seller;
   const StoreScreen({super.key, this.locale = const Locale('en'), this.seller});
+  @override
+  State<StoreScreen> createState() => _StoreScreenState();
+}
 
-  String get _name => seller?.name ?? 'TechSphere Store';
+class _StoreScreenState extends State<StoreScreen> {
+  final _ctrl = TextEditingController();
+  late final ProductQuery _q = ProductQuery(category: widget.seller == null ? null : sellerCategory(widget.seller!));
+
+  String get _id => widget.seller?.id ?? 'slr-01';
+  String get _name => widget.seller?.name ?? 'TechSphere Store';
   String get _initials {
     final parts = _name.split(' ').where((w) => w.isNotEmpty).toList();
     return (parts.length >= 2 ? '${parts[0][0]}${parts[1][0]}' : _name.substring(0, 2)).toUpperCase();
   }
 
   String get _tagline {
-    if (seller == null) return 'Official electronics partner';
-    switch (sellerCategory(seller!)) {
+    if (widget.seller == null) return 'Official electronics partner';
+    switch (sellerCategory(widget.seller!)) {
       case 'Fashion':
         return 'Fashion & apparel store';
       case 'Jewelery':
@@ -31,33 +41,79 @@ class StoreScreen extends StatelessWidget {
     }
   }
 
-  String get _badgeLabel => (seller?.badge ?? SellerBadge.sombaAssured).label;
-  int get _health => seller?.health ?? 97;
-  String get _rating => (seller?.rating ?? 4.8).toString();
-  int get _productCount => seller == null ? 128 : products.where((p) => p.category == sellerCategory(seller!)).length;
-  String get _followers => seller == null ? '12.4k' : '${((seller!.followers) / 1000).toStringAsFixed(1)}k';
+  String get _badgeLabel => (widget.seller?.badge ?? SellerBadge.sombaAssured).label;
+  int get _health => widget.seller?.health ?? 97;
+  String get _rating => (widget.seller?.rating ?? 4.8).toString();
+  int get _baseFollowers => widget.seller?.followers ?? 12400;
+
+  List<Product> get _storeProducts => widget.seller == null
+      ? products
+      : products.where((p) => p.category == sellerCategory(widget.seller!)).toList();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final lang = locale.languageCode;
-    final items = seller == null
-        ? products.take(6).toList()
-        : products.where((p) => p.category == sellerCategory(seller!)).toList();
+    final lang = widget.locale.languageCode;
+    _q.text = _ctrl.text;
+    final items = runQuery(_storeProducts, _q);
     return Scaffold(
       body: CustomScrollView(slivers: [
-        SliverToBoxAdapter(child: _header(context)),
+        SliverToBoxAdapter(child: _header()),
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(children: [
+            Expanded(child: BrowseSearchField(controller: _ctrl, hint: 'Search in $_name…', onChanged: (_) => setState(() {}))),
+            const SizedBox(width: 10),
+            _filterButton(),
+          ]),
+        )),
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
+          child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} products', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+        )),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-            delegate: SliverChildBuilderDelegate((_, i) => ProductCard(product: items[i], lang: lang), childCount: items.length),
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          sliver: items.isEmpty
+              ? const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No products match your filters', style: TextStyle(color: AppColors.muted)))))
+              : SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
+                  delegate: SliverChildBuilderDelegate((_, i) => ProductCard(product: items[i], lang: lang), childCount: items.length),
+                ),
         ),
       ]),
     );
   }
 
-  Widget _header(BuildContext context) {
+  Widget _filterButton() {
+    final n = _q.activeCount;
+    return GestureDetector(
+      onTap: () async {
+        final res = await showFilterSheet(context, _q);
+        if (res != null) {
+          setState(() {
+            _q.sort = res.sort; _q.category = res.category;
+            _q.minPrice = res.minPrice; _q.maxPrice = res.maxPrice;
+            _q.minRating = res.minRating; _q.dealsOnly = res.dealsOnly;
+          });
+        }
+      },
+      child: Container(
+        height: 48, width: 48,
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: n > 0 ? AppColors.primary : AppColors.line)),
+        child: Icon(Icons.tune_rounded, color: n > 0 ? AppColors.primary : AppColors.muted),
+      ),
+    );
+  }
+
+  Widget _header() {
     final top = MediaQuery.of(context).padding.top;
+    final following = ShopState.instance.followedStores.contains(_id);
+    final followers = _baseFollowers + (following ? 1 : 0);
     return Container(
       padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
       decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
@@ -98,27 +154,41 @@ class StoreScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            _stat('$_rating★', 'Rating'), _div(), _stat('$_productCount', 'Products'), _div(), _stat(_followers, 'Followers'),
+            _stat('$_rating★', 'Rating', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewsScreen(locale: widget.locale)))),
+            _div(),
+            _stat('${_storeProducts.length}', 'Products'),
+            _div(),
+            _stat('${(followers / 1000).toStringAsFixed(1)}k', 'Followers'),
           ]),
         ),
         const SizedBox(height: 14),
         Row(children: [
           Expanded(child: GestureDetector(
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Following TechSphere Store'))),
-            child: _btn(Icons.add_rounded, 'Follow', true))),
+            onTap: () {
+              setState(() => ShopState.instance.toggleFollow(_id));
+              final now = ShopState.instance.followedStores.contains(_id);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(now ? 'Following $_name' : 'Unfollowed $_name')));
+            },
+            child: _btn(following ? Icons.check_rounded : Icons.add_rounded, following ? 'Following' : 'Follow', true))),
           const SizedBox(width: 12),
           Expanded(child: GestureDetector(
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening chat with the store…'))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellerChatScreen(storeName: _name))),
             child: _btn(Icons.chat_bubble_outline_rounded, 'Chat', false))),
         ]),
       ]),
     );
   }
 
-  Widget _stat(String v, String l) => Expanded(child: Column(children: [
-        Text(v, style: const TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w800)),
-        Text(l, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5)),
-      ]));
+  Widget _stat(String v, String l, {VoidCallback? onTap}) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Column(children: [
+            Text(v, style: const TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w800)),
+            Text(l, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5)),
+          ]),
+        ),
+      );
   Widget _div() => Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.25));
   Widget _btn(IconData i, String l, bool filled) => Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -131,27 +201,124 @@ class StoreScreen extends StatelessWidget {
       );
 }
 
+/// Chat with a seller/store (mock).
+class SellerChatScreen extends StatefulWidget {
+  final String storeName;
+  const SellerChatScreen({super.key, required this.storeName});
+  @override
+  State<SellerChatScreen> createState() => _SellerChatScreenState();
+}
+
+class _SellerChatScreenState extends State<SellerChatScreen> {
+  final _ctrl = TextEditingController();
+  final _scroll = ScrollController();
+  final List<(String, bool)> _msgs = [
+    ('Hello! Welcome to our store. How can we help you today?', false),
+    ('Do you deliver to Gombe?', true),
+    ('Yes — same-day delivery in Gombe on orders before 4pm.', false),
+  ];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final t = _ctrl.text.trim();
+    if (t.isEmpty) return;
+    setState(() {
+      _msgs.add((t, true));
+      _ctrl.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: backAppBar(context, widget.storeName),
+      body: Column(children: [
+        Expanded(child: ListView.builder(
+          controller: _scroll,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          itemCount: _msgs.length,
+          itemBuilder: (_, i) {
+            final m = _msgs[i];
+            final mine = m.$2;
+            return Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                decoration: BoxDecoration(
+                  color: mine ? AppColors.primary : AppColors.surface,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16), topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(mine ? 16 : 4), bottomRight: Radius.circular(mine ? 4 : 16),
+                  ),
+                  boxShadow: mine ? null : AppShadow.card,
+                ),
+                child: Text(m.$1, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+              ),
+            );
+          },
+        )),
+        SafeArea(top: false, child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          child: Row(children: [
+            Expanded(child: TextField(
+              controller: _ctrl,
+              onSubmitted: (_) => _send(),
+              decoration: InputDecoration(
+                hintText: 'Message the store…',
+                filled: true, fillColor: AppColors.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
+              ),
+            )),
+            const SizedBox(width: 8),
+            Material(color: AppColors.primary, shape: const CircleBorder(), child: InkWell(
+              customBorder: const CircleBorder(), onTap: _send,
+              child: const Padding(padding: EdgeInsets.all(13), child: Icon(Icons.send_rounded, color: Colors.white, size: 22)),
+            )),
+          ]),
+        )),
+      ]),
+    );
+  }
+}
+
 /// Product reviews + write a review (CF-27).
-class ReviewsScreen extends StatelessWidget {
+class ReviewsScreen extends StatefulWidget {
   final Locale locale;
   const ReviewsScreen({super.key, this.locale = const Locale('en')});
   @override
+  State<ReviewsScreen> createState() => _ReviewsScreenState();
+}
+
+class _ReviewsScreenState extends State<ReviewsScreen> {
+  Locale get locale => widget.locale;
+  @override
   Widget build(BuildContext context) {
-    const reviews = [
-      ('Aline K.', 5, 'Absolutely love it — fast delivery and exactly as described.', '2d'),
-      ('Patrick M.', 4, 'Great value for the price. Battery could be better.', '5d'),
-      ('Sarah T.', 5, 'Premium quality, would buy again from this seller.', '1w'),
-    ];
+    final reviews = ShopState.instance.reviews;
+    final avg = reviews.isEmpty ? 4.8 : reviews.fold<int>(0, (s, r) => s + r.stars) / reviews.length;
     return Scaffold(
       appBar: backAppBar(context, 'Reviews'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Panel(child: Row(children: [
-          Column(children: const [
-            Text('4.8', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', height: 1)),
-            SizedBox(height: 4),
-            RatingPill(4.8),
-            SizedBox(height: 4),
-            Text('2,341 reviews', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+          Column(children: [
+            Text(avg.toStringAsFixed(1), style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', height: 1)),
+            const SizedBox(height: 4),
+            RatingPill(avg),
+            const SizedBox(height: 4),
+            Text('${reviews.length} reviews', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
           ]),
           const SizedBox(width: 20),
           Expanded(child: Column(children: List.generate(5, (i) {
@@ -168,23 +335,35 @@ class ReviewsScreen extends StatelessWidget {
         const SizedBox(height: 14),
         ...reviews.map((r) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            CircleAvatar(radius: 18, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(r.$1[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800))),
+            CircleAvatar(radius: 18, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(r.name[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800))),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(r.$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-              Row(children: List.generate(5, (i) => Icon(i < r.$2 ? Icons.star_rounded : Icons.star_border_rounded, size: 14, color: AppColors.amber))),
+              Text(r.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+              Row(children: List.generate(5, (i) => Icon(i < r.stars ? Icons.star_rounded : Icons.star_border_rounded, size: 14, color: AppColors.amber))),
             ])),
-            Text(r.$4, style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+            Text(r.date, style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
           ]),
           const SizedBox(height: 8),
-          Text(r.$3, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+          Text(r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+          if (r.photos > 0) ...[
+            const SizedBox(height: 8),
+            Row(children: List.generate(r.photos, (i) => Container(
+              margin: const EdgeInsets.only(right: 8),
+              height: 54, width: 54,
+              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.line)),
+              child: const Icon(Icons.image_rounded, color: AppColors.faint, size: 22),
+            ))),
+          ],
         ])))),
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
         child: PrimaryButton('Write a review',
             icon: Icons.rate_review_rounded,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale)))),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale)));
+              if (mounted) setState(() {});
+            }),
       ),
     );
   }
