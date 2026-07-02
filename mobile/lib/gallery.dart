@@ -16,6 +16,12 @@ import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/categories_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/cart_screen.dart';
+import 'screens/checkout_screen.dart';
+import 'screens/deals_screen.dart';
+import 'screens/account_screen.dart';
+import 'screens/orders_screen.dart';
 import 'screens/more/browse.dart';
 import 'data/mock_data.dart';
 import 'data/shop_state.dart';
@@ -27,6 +33,12 @@ void main() => runApp(const _GalleryApp());
 const _en = Locale('en');
 
 Map<String, WidgetBuilder> get _screens => {
+      'home': (_) => HomeScreen(locale: _en, onLocaleChanged: (_) {}),
+      'cart': (_) => const CartScreen(locale: _en),
+      'checkout': (_) => const CheckoutScreen(locale: _en),
+      'deals': (_) => const DealsScreen(locale: _en),
+      'account': (_) => AccountScreen(locale: _en, onLocaleChanged: (_) {}),
+      'orders': (_) => const OrdersScreen(locale: _en),
       'splash': (_) => CustomerSplashScreen(onDone: () {}),
       'login': (_) => const LoginScreen(),
       'register': (_) => const RegisterScreen(),

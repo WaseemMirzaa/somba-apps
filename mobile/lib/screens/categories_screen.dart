@@ -38,20 +38,66 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final stores = allSellers.where((x) => !searching || x.name.toLowerCase().contains(t)).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.categories)),
       body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: BrowseSearchField(
-            controller: _ctrl,
-            hint: trl(lang, 'Search categories, stores…'),
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
+        _hero(s, lang),
         Expanded(child: searching ? _searchResults(cats, stores, s) : _browse(cats, stores, s, lang)),
       ]),
     );
   }
+
+  // Premium gradient hero header with brand blobs + a frosted glass search.
+  Widget _hero(Strings s, String lang) {
+    final top = MediaQuery.of(context).padding.top;
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      child: Container(
+        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+        child: Stack(children: [
+          Positioned(top: -40, right: -30, child: _blob(160, Colors.white.withValues(alpha: 0.16))),
+          Positioned(bottom: -60, left: -40, child: _blob(180, const Color(0xFFFF5A6E).withValues(alpha: 0.26))),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, top + 14, 20, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(s.categories, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4, fontFamily: 'PlusJakartaSans')),
+              const SizedBox(height: 2),
+              Text(lang == 'fr' ? 'Explorez par catégorie et boutique' : 'Explore by category and store',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+              const SizedBox(height: 14),
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+                  boxShadow: AppShadow.lifted,
+                ),
+                child: Row(children: [
+                  const SizedBox(width: 16),
+                  const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(child: TextField(
+                    controller: _ctrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: trl(lang, 'Search categories, stores…'),
+                      hintStyle: const TextStyle(color: AppColors.faint, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  )),
+                  if (_ctrl.text.isNotEmpty)
+                    IconButton(icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.faint), onPressed: () => setState(() => _ctrl.clear())),
+                  const SizedBox(width: 6),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _blob(double d, Color c) => Container(height: d, width: d, decoration: BoxDecoration(shape: BoxShape.circle, color: c));
 
   // Default browse view: category grid + popular stores.
   Widget _browse(List<Category> cats, List<Seller> stores, Strings s, String lang) {
@@ -74,11 +120,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 boxShadow: AppShadow.card,
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(height: 50, width: 50, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(16)), child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 26)),
+                Row(children: [
+                  Container(height: 52, width: 52, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(16), boxShadow: AppShadow.soft), child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 27)),
+                  const Spacer(),
+                  Container(height: 28, width: 28, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55), shape: BoxShape.circle), child: const Icon(Icons.arrow_outward_rounded, color: AppColors.primary, size: 16)),
+                ]),
                 const Spacer(),
-                Text(cat.displayName(lang), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text(cat.displayName(lang), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5, color: AppColors.ink)),
                 const SizedBox(height: 2),
-                Text(s.itemsCount(categoryCount(cat.name)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                Text(s.itemsCount(categoryCount(cat.name)), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, fontWeight: FontWeight.w600)),
               ]),
             ),
           );

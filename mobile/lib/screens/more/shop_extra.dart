@@ -117,8 +117,13 @@ class _StoreScreenState extends State<StoreScreen> {
     final following = ShopState.instance.followedStores.contains(_id);
     final followers = _baseFollowers + (following ? 1 : 0);
     return Container(
-      padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
+      clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
+      child: Stack(children: [
+      Positioned(top: -50, right: -30, child: Container(height: 170, width: 170, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.14)))),
+      Positioned(bottom: -70, left: -50, child: Container(height: 190, width: 190, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFFF5A6E).withValues(alpha: 0.24)))),
+      Padding(
+      padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleIconButton(icon: Icons.arrow_back_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white, onTap: () => Navigator.maybePop(context)),
@@ -178,6 +183,8 @@ class _StoreScreenState extends State<StoreScreen> {
             child: _btn(Icons.chat_bubble_outline_rounded, trl(lang, 'Chat'), false))),
         ]),
       ]),
+      ),
+      ]),
     );
   }
 
@@ -193,12 +200,17 @@ class _StoreScreenState extends State<StoreScreen> {
       );
   Widget _div() => Container(width: 1, height: 28, color: Colors.white.withValues(alpha: 0.25));
   Widget _btn(IconData i, String l, bool filled) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: filled ? Colors.white : Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: filled ? Colors.white : Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(100),
+          border: filled ? null : Border.all(color: Colors.white.withValues(alpha: 0.5)),
+          boxShadow: filled ? [BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 14, offset: const Offset(0, 6))] : null,
+        ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(i, size: 18, color: filled ? AppColors.primary : Colors.white),
           const SizedBox(width: 6),
-          Text(l, style: TextStyle(color: filled ? AppColors.primary : Colors.white, fontWeight: FontWeight.w700, fontSize: 13.5)),
+          Text(l, style: TextStyle(color: filled ? AppColors.primary : Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5)),
         ]),
       );
 }
