@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/kit.dart';
+import '../../widgets/brand_logo.dart';
 
-// ---------------- Splash ----------------
+// ================= Splash =================
 class CustomerSplashScreen extends StatefulWidget {
   final VoidCallback onDone;
   const CustomerSplashScreen({super.key, required this.onDone});
@@ -11,43 +12,91 @@ class CustomerSplashScreen extends StatefulWidget {
   State<CustomerSplashScreen> createState() => _CustomerSplashScreenState();
 }
 
-class _CustomerSplashScreenState extends State<CustomerSplashScreen> {
+class _CustomerSplashScreenState extends State<CustomerSplashScreen> with SingleTickerProviderStateMixin {
   Timer? _t;
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
+
   @override
   void initState() {
     super.initState();
-    _t = Timer(const Duration(milliseconds: 1600), widget.onDone);
+    // Longer, clearly visible splash.
+    _t = Timer(const Duration(milliseconds: 2800), widget.onDone);
   }
 
   @override
   void dispose() {
     _t?.cancel();
+    _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+      body: AuthBackdrop(
         child: Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              height: 96,
-              width: 96,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), boxShadow: AppShadow.floating),
-              child: const Center(child: Text('S', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 52, fontFamily: 'PlusJakartaSans'))),
+          child: FadeTransition(
+            opacity: _c,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack)),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const BrandLogo(size: 116, radius: 30),
+                const SizedBox(height: 24),
+                const Text('Somba&Teka',
+                    style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
+                const SizedBox(height: 8),
+                Text('Shop everything, delivered', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14.5, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 40),
+                SizedBox(height: 26, width: 26, child: CircularProgressIndicator(strokeWidth: 2.6, valueColor: AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.9)))),
+              ]),
             ),
-            const SizedBox(height: 22),
-            const Text('Somba&Teka',
-                style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
-            const SizedBox(height: 6),
-            Text('Shop everything, delivered', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 34),
-            SizedBox(
-              height: 22,
-              width: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.4, valueColor: AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.9))),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============ Shared glassy layout ============
+class _AuthPage extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget form;
+  final bool showBack;
+  const _AuthPage({required this.title, required this.subtitle, required this.form, this.showBack = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    return Scaffold(
+      body: AuthBackdrop(
+        child: SafeArea(
+          child: Stack(children: [
+            if (showBack)
+              Positioned(
+                left: 8, top: 4,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: const Padding(padding: EdgeInsets.all(9), child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22)),
+                  ),
+                ),
+              ),
+            ListView(
+              padding: EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
+              children: [
+                const Center(child: BrandLogo(size: 78, radius: 22)),
+                const SizedBox(height: 18),
+                Text(title, textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
+                const SizedBox(height: 6),
+                Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14)),
+                const SizedBox(height: 24),
+                GlassCard(child: form),
+              ],
             ),
           ]),
         ),
@@ -56,68 +105,60 @@ class _CustomerSplashScreenState extends State<CustomerSplashScreen> {
   }
 }
 
-class _AuthScaffold extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<Widget> children;
-  final bool showBack;
-  const _AuthScaffold({required this.title, required this.subtitle, required this.children, this.showBack = false});
-
+// A labelled field with an inline error slot.
+class _GlassField extends StatelessWidget {
+  final String label, hint;
+  final IconData icon;
+  final bool obscure;
+  final TextEditingController? controller;
+  final TextInputType? keyboard;
+  final String? error;
+  final Widget? prefix;
+  final List<TextInputFormatter>? formatters;
+  const _GlassField({
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.obscure = false,
+    this.controller,
+    this.keyboard,
+    this.error,
+    this.prefix,
+    this.formatters,
+  });
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
-    return Scaffold(
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          Container(
-            padding: EdgeInsets.fromLTRB(24, top + 40, 24, 40),
-            decoration: const BoxDecoration(
-              gradient: AppColors.brandGradient,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  if (showBack) ...[
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => Navigator.of(context).maybePop(),
-                        child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Container(
-                    height: 54,
-                    width: 54,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                    child: const Center(child: Text('S', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 26, fontFamily: 'PlusJakartaSans'))),
-                  ),
-                ]),
-                const SizedBox(height: 18),
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
-                const SizedBox(height: 6),
-                Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-          ),
-        ],
+    OutlineInputBorder b(Color c, [double w = 1]) =>
+        OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: c, width: w));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: AppColors.inkSoft)),
+      const SizedBox(height: 6),
+      TextField(
+        controller: controller,
+        obscureText: obscure,
+        keyboardType: keyboard,
+        inputFormatters: formatters,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: prefix ?? Icon(icon, size: 20),
+          filled: true,
+          fillColor: AppColors.background,
+          enabledBorder: b(error != null ? AppColors.danger : AppColors.line),
+          focusedBorder: b(error != null ? AppColors.danger : AppColors.primary, 1.6),
+          border: b(AppColors.line),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        ),
       ),
-    );
+      if (error != null) Padding(
+        padding: const EdgeInsets.only(top: 5, left: 4),
+        child: Text(error!, style: const TextStyle(color: AppColors.danger, fontSize: 11.5, fontWeight: FontWeight.w600)),
+      ),
+    ]);
   }
 }
 
+// ============ Sign in ============
 class LoginScreen extends StatefulWidget {
-  /// Fires when the user completes sign-in. Null in gallery/preview mode.
   final VoidCallback? onAuthed;
   const LoginScreen({super.key, this.onAuthed});
   @override
@@ -125,9 +166,26 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  String? _emailErr, _passErr;
   bool _loading = false;
 
+  @override
+  void dispose() {
+    _email.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
+
   void _signIn() {
+    setState(() {
+      _emailErr = _email.text.trim().isEmpty ? 'Enter your email' : (!_validEmail(_email.text.trim()) ? 'Enter a valid email' : null);
+      _passErr = _pass.text.isEmpty ? 'Enter your password' : (_pass.text.length < 4 ? 'Password is too short' : null);
+    });
+    if (_emailErr != null || _passErr != null) return;
     setState(() => _loading = true);
     Future.delayed(const Duration(milliseconds: 700), () {
       if (!mounted) return;
@@ -136,230 +194,466 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  void _social(String name) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Signing in with $name…')));
+    Future.delayed(const Duration(milliseconds: 600), () => widget.onAuthed?.call());
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _AuthScaffold(
+    return _AuthPage(
       title: 'Welcome back',
-      subtitle: 'Sign in to continue shopping on Somba',
-      children: [
-        const AppField(label: 'Phone or email', hint: '+243 970 000 000', icon: Icons.person_outline_rounded),
-        const SizedBox(height: 16),
-        const AppField(label: 'Password', hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true),
-        const SizedBox(height: 10),
+      subtitle: 'Sign in to continue shopping on Somba&Teka',
+      form: Column(children: [
+        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        const SizedBox(height: 14),
+        _GlassField(label: 'Password', hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotScreen())),
-            child: const Text('Forgot password?'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
           ),
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _loading ? null : _signIn,
-            child: _loading
-                ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.login_rounded, size: 20),
-                    SizedBox(width: 8),
-                    Text('Sign in'),
-                  ]),
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Row(children: [
-          Expanded(child: Divider()),
-          Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: TextStyle(color: AppColors.muted))),
-          Expanded(child: Divider()),
+        const SizedBox(height: 4),
+        AuthButton('Sign in', icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
+        const SizedBox(height: 18),
+        Row(children: [
+          const Expanded(child: Divider(color: AppColors.line)),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or continue with', style: TextStyle(color: AppColors.muted, fontSize: 12))),
+          const Expanded(child: Divider(color: AppColors.line)),
         ]),
         const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _signIn,
-          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-          label: const Text('Continue with Google'),
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: () => widget.onAuthed?.call(),
-          child: const Text('Continue as guest'),
-        ),
-        const SizedBox(height: 12),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _socialBtn(bg: Colors.white, border: AppColors.line, child: const GoogleGMark(size: 22), onTap: () => _social('Google')),
+          const SizedBox(width: 16),
+          _socialBtn(bg: Colors.black, child: const Icon(Icons.apple, color: Colors.white, size: 26), onTap: () => _social('Apple')),
+          const SizedBox(width: 16),
+          _socialBtn(bg: const Color(0xFF1877F2), child: const Icon(Icons.facebook, color: Colors.white, size: 26), onTap: () => _social('Facebook')),
+        ]),
+        const SizedBox(height: 16),
+        TextButton(onPressed: () => widget.onAuthed?.call(), child: const Text('Continue as guest', style: TextStyle(fontWeight: FontWeight.w700))),
         Center(
           child: GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen(onAuthed: widget.onAuthed))),
-            child: RichText(
-              text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
-                TextSpan(text: "New here?  "),
-                TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
+              TextSpan(text: "New here?  "),
+              TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            ])),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _socialBtn({required Color bg, Color? border, required Widget child, required VoidCallback onTap}) => Material(
+        color: bg,
+        shape: CircleBorder(side: border != null ? BorderSide(color: border) : BorderSide.none),
+        elevation: 3,
+        shadowColor: Colors.black.withValues(alpha: 0.2),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(height: 52, width: 52, child: Center(child: child)),
+        ),
+      );
+}
+
+// ============ Register ============
+class RegisterScreen extends StatefulWidget {
+  final VoidCallback? onAuthed;
+  const RegisterScreen({super.key, this.onAuthed});
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  final _confirm = TextEditingController();
+  String _dial = '+243';
+  bool _agree = true;
+  bool _hasPhoto = false;
+  String? _nameErr, _phoneErr, _emailErr, _passErr, _confirmErr;
+
+  static const _codes = [
+    ('🇨🇩', '+243', 'DR Congo'),
+    ('🇫🇷', '+33', 'France'),
+    ('🇺🇸', '+1', 'USA'),
+    ('🇬🇧', '+44', 'UK'),
+    ('🇳🇬', '+234', 'Nigeria'),
+    ('🇰🇪', '+254', 'Kenya'),
+    ('🇿🇦', '+27', 'South Africa'),
+  ];
+
+  @override
+  void dispose() {
+    for (final c in [_name, _phone, _email, _pass, _confirm]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
+
+  void _submit() {
+    setState(() {
+      _nameErr = _name.text.trim().isEmpty ? 'Enter your full name' : null;
+      _phoneErr = _phone.text.trim().length < 6 ? 'Enter a valid phone number' : null;
+      _emailErr = !_validEmail(_email.text.trim()) ? 'Enter a valid email' : null;
+      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
+      _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
+    });
+    if ([_nameErr, _phoneErr, _emailErr, _passErr, _confirmErr].any((e) => e != null)) return;
+    if (!_agree) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please accept the Terms & Privacy Policy')));
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(
+      phone: '$_dial ${_phone.text.trim()}',
+      onAuthed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(onVerified: () {
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        widget.onAuthed?.call();
+      }))),
+    )));
+  }
+
+  void _pickPhoto() {
+    setState(() => _hasPhoto = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo added (optional)')));
+  }
+
+  void _pickCode() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Padding(padding: EdgeInsets.all(16), child: Text('Select country code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+        ..._codes.map((c) => ListTile(
+          leading: Text(c.$1, style: const TextStyle(fontSize: 22)),
+          title: Text(c.$3),
+          trailing: Text(c.$2, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+          onTap: () {
+            setState(() => _dial = c.$2);
+            Navigator.pop(context);
+          },
+        )),
+        const SizedBox(height: 8),
+      ])),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AuthPage(
+      title: 'Create account',
+      subtitle: 'Join Somba&Teka in under a minute',
+      showBack: true,
+      form: Column(children: [
+        // Optional profile picture.
+        Center(
+          child: GestureDetector(
+            onTap: _pickPhoto,
+            child: Stack(children: [
+              CircleAvatar(
+                radius: 38,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                child: _hasPhoto
+                    ? const Icon(Icons.person_rounded, color: AppColors.primary, size: 40)
+                    : const Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 26),
+              ),
+              Positioned(right: 0, bottom: 0, child: Container(
+                height: 26, width: 26,
+                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
+              )),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Center(child: Text('Add a photo (optional)', style: TextStyle(color: AppColors.muted, fontSize: 11.5))),
+        const SizedBox(height: 16),
+        _GlassField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, controller: _name, error: _nameErr),
+        const SizedBox(height: 14),
+        _GlassField(
+          label: 'Phone number', hint: '970 000 000', icon: Icons.phone_outlined,
+          controller: _phone, keyboard: TextInputType.phone, error: _phoneErr,
+          formatters: [FilteringTextInputFormatter.digitsOnly],
+          prefix: GestureDetector(
+            onTap: _pickCode,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              alignment: Alignment.center,
+              width: 78,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(_dial, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const Icon(Icons.arrow_drop_down_rounded, size: 20, color: AppColors.muted),
               ]),
             ),
           ),
         ),
-      ],
-    );
-  }
-}
-
-class RegisterScreen extends StatelessWidget {
-  final VoidCallback? onAuthed;
-  const RegisterScreen({super.key, this.onAuthed});
-  @override
-  Widget build(BuildContext context) {
-    return _AuthScaffold(
-      title: 'Create account',
-      subtitle: 'Join Somba&Teka in under a minute',
-      showBack: true,
-      children: [
-        const AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.badge_outlined),
-        const SizedBox(height: 16),
-        const AppField(label: 'Phone number', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone),
-        const SizedBox(height: 16),
-        const AppField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
-        const SizedBox(height: 16),
-        const AppField(label: 'Password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true),
         const SizedBox(height: 14),
-        Row(children: [
-          const Icon(Icons.check_box_rounded, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
-          Expanded(child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
-            TextSpan(text: 'I agree to the '),
-            TextSpan(text: 'Terms & Privacy Policy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
-          ]))),
-        ]),
+        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        const SizedBox(height: 14),
+        _GlassField(label: 'Password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        const SizedBox(height: 14),
+        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => setState(() => _agree = !_agree),
+          child: Row(children: [
+            Icon(_agree ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary, size: 22),
+            const SizedBox(width: 8),
+            Expanded(child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
+              TextSpan(text: 'I agree to the '),
+              TextSpan(text: 'Terms & Privacy Policy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            ]))),
+          ]),
+        ),
         const SizedBox(height: 18),
-        PrimaryButton('Create account',
-            icon: Icons.arrow_forward_rounded,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(
-                  onAuthed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(onVerified: onAuthed))),
-                )))),
-      ],
+        AuthButton('Create account', icon: Icons.arrow_forward_rounded, onPressed: _submit),
+      ]),
     );
   }
 }
 
-class OtpScreen extends StatelessWidget {
+// ============ OTP ============
+class OtpScreen extends StatefulWidget {
   final VoidCallback? onAuthed;
-  const OtpScreen({super.key, this.onAuthed});
+  final String? phone;
+  const OtpScreen({super.key, this.onAuthed, this.phone});
+  @override
+  State<OtpScreen> createState() => _OtpScreenState();
+}
+
+class _OtpScreenState extends State<OtpScreen> {
+  final List<TextEditingController> _c = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _f = List.generate(6, (_) => FocusNode());
+  Timer? _timer;
+  int _seconds = 30;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    setState(() => _seconds = 30);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_seconds <= 0) {
+        t.cancel();
+      } else {
+        setState(() => _seconds--);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    for (final c in _c) {
+      c.dispose();
+    }
+    for (final f in _f) {
+      f.dispose();
+    }
+    super.dispose();
+  }
+
+  String get _code => _c.map((c) => c.text).join();
+
+  void _verify() {
+    if (_code.length < 6 || _c.any((c) => c.text.isEmpty)) {
+      setState(() => _error = 'Enter the full 6-digit code');
+      return;
+    }
+    setState(() => _error = null);
+    widget.onAuthed?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _AuthScaffold(
+    return _AuthPage(
       title: 'Verify your number',
-      subtitle: 'Enter the 6-digit code sent to +243 970 000 000',
+      subtitle: 'Enter the 6-digit code sent to ${widget.phone ?? '+243 970 000 000'}',
       showBack: true,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (i) {
-            final filled = i < 3;
-            return Container(
-              height: 58,
-              width: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: filled ? AppColors.primary : AppColors.line, width: filled ? 1.8 : 1.2),
+      form: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(6, (i) {
+          return SizedBox(
+            width: 46,
+            child: TextField(
+              controller: _c[i],
+              focusNode: _f[i],
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 1,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                counterText: '',
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: _error != null ? AppColors.danger : AppColors.line)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.7)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text(filled ? '${i + 1}' : '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
-            );
-          }),
+              onChanged: (v) {
+                if (v.isNotEmpty && i < 5) _f[i + 1].requestFocus();
+                if (v.isEmpty && i > 0) _f[i - 1].requestFocus();
+                setState(() {});
+              },
+            ),
+          );
+        })),
+        if (_error != null) Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600)),
         ),
-        const SizedBox(height: 22),
-        PrimaryButton('Verify', icon: Icons.verified_rounded, onPressed: () => onAuthed?.call()),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
+        AuthButton('Verify', icon: Icons.verified_rounded, onPressed: _verify),
+        const SizedBox(height: 14),
         Center(
-          child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
-            TextSpan(text: "Didn't get it?  "),
-            TextSpan(text: 'Resend in 0:24', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
-          ])),
+          child: _seconds > 0
+              ? Text('Resend code in 0:${_seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))
+              : TextButton.icon(
+                  onPressed: () {
+                    _startTimer();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('New code sent')));
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                  label: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
         ),
-      ],
+      ]),
     );
   }
 }
 
-class ForgotScreen extends StatelessWidget {
-  const ForgotScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return _AuthScaffold(
-      title: 'Reset password',
-      subtitle: "We'll send a reset link to your email",
-      showBack: true,
-      children: [
-        const AppField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress),
-        const SizedBox(height: 20),
-        PrimaryButton('Send reset link',
-            icon: Icons.send_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
-            }),
-      ],
-    );
-  }
-}
-
-// CF-18 — Reset password (set a new password from the reset link).
-class ResetPasswordScreen extends StatelessWidget {
-  const ResetPasswordScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return _AuthScaffold(
-      title: 'Set a new password',
-      subtitle: 'Choose a strong password you have not used before',
-      showBack: true,
-      children: [
-        const AppField(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true),
-        const SizedBox(height: 16),
-        const AppField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true),
-        const SizedBox(height: 20),
-        PrimaryButton('Save new password',
-            icon: Icons.check_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
-              Navigator.popUntil(context, (r) => r.isFirst);
-            }),
-      ],
-    );
-  }
-}
-
-// CF-16 — Email verification.
+// ============ Email verification ============
 class VerifyEmailScreen extends StatelessWidget {
   final VoidCallback? onVerified;
   const VerifyEmailScreen({super.key, this.onVerified});
   @override
   Widget build(BuildContext context) {
-    return _AuthScaffold(
+    return _AuthPage(
       title: 'Verify your email',
       subtitle: 'We sent a confirmation link to marie@email.com',
       showBack: true,
-      children: [
+      form: Column(children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
           child: Column(children: const [
-            Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 44),
+            Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 46),
             SizedBox(height: 12),
             Text('Check your inbox', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
             SizedBox(height: 6),
-            Text('Tap the link in the email to activate your account. It may take a minute to arrive.',
+            Text('Tap the link in the email to activate your account, then continue to start shopping.',
                 textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
           ]),
         ),
-        const SizedBox(height: 20),
-        PrimaryButton("I've verified — continue",
-            icon: Icons.check_circle_rounded,
+        const SizedBox(height: 18),
+        AuthButton("I've verified — continue", icon: Icons.check_circle_rounded,
             onPressed: () => onVerified != null ? onVerified!() : Navigator.maybePop(context)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         TextButton.icon(
           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification email resent'))),
           icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: const Text('Resend email'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          label: const Text('Resend email', style: TextStyle(fontWeight: FontWeight.w700)),
         ),
-      ],
+      ]),
+    );
+  }
+}
+
+// ============ Forgot password ============
+class ForgotScreen extends StatefulWidget {
+  const ForgotScreen({super.key});
+  @override
+  State<ForgotScreen> createState() => _ForgotScreenState();
+}
+
+class _ForgotScreenState extends State<ForgotScreen> {
+  final _email = TextEditingController();
+  String? _err;
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
+    setState(() => _err = ok ? null : 'Enter a valid email');
+    if (!ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AuthPage(
+      title: 'Reset password',
+      subtitle: "We'll send a reset link to your email",
+      showBack: true,
+      form: Column(children: [
+        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err),
+        const SizedBox(height: 20),
+        AuthButton('Send reset link', icon: Icons.send_rounded, onPressed: _send),
+      ]),
+    );
+  }
+}
+
+// ============ Reset password ============
+class ResetPasswordScreen extends StatefulWidget {
+  const ResetPasswordScreen({super.key});
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _pass = TextEditingController();
+  final _confirm = TextEditingController();
+  String? _passErr, _confirmErr;
+  @override
+  void dispose() {
+    _pass.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    setState(() {
+      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
+      _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
+    });
+    if (_passErr != null || _confirmErr != null) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+    Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AuthPage(
+      title: 'Set a new password',
+      subtitle: 'Choose a strong password you have not used before',
+      showBack: true,
+      form: Column(children: [
+        _GlassField(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        const SizedBox(height: 14),
+        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        const SizedBox(height: 20),
+        AuthButton('Save new password', icon: Icons.check_rounded, onPressed: _save),
+      ]),
     );
   }
 }

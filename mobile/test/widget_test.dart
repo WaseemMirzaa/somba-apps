@@ -13,7 +13,7 @@ void main() {
     expect(find.text('Somba&Teka'), findsOneWidget);
 
     // Advance past the splash timer to reach the sign-in screen.
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 3));
     await tester.pump();
 
     expect(find.text('Welcome back'), findsOneWidget);
