@@ -81,7 +81,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(it.product.displayName(lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
-                  Text('Qty ${it.qty} · ${it.variant}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+                  Text('${trl(lang, 'Qty')} ${it.qty} · ${it.variant}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
                 ])),
                 Text(money(it.product.price * it.qty), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
               ]))),

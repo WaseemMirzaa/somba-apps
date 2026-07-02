@@ -385,28 +385,28 @@ class PaymentScreen extends StatelessWidget {
       ('M-Pesa', Icons.account_balance_wallet_rounded, false),
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Payment'),
+      appBar: backAppBar(context, tr(context, 'Payment')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         if (failed)
           Container(
             padding: const EdgeInsets.all(14),
             margin: const EdgeInsets.only(bottom: 14),
             decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.accent.withValues(alpha: 0.3))),
-            child: Row(children: const [
-              Icon(Icons.error_outline_rounded, color: AppColors.accentDark),
-              SizedBox(width: 10),
-              Expanded(child: Text('Payment failed. No money was taken — please try another method.', style: TextStyle(color: AppColors.accentDark, fontWeight: FontWeight.w600, fontSize: 12.5))),
+            child: Row(children: [
+              const Icon(Icons.error_outline_rounded, color: AppColors.accentDark),
+              const SizedBox(width: 10),
+              Expanded(child: Text(tr(context, 'Payment failed. No money was taken — please try another method.'), style: const TextStyle(color: AppColors.accentDark, fontWeight: FontWeight.w600, fontSize: 12.5))),
             ]),
           ),
         Panel(child: Column(children: [
-          _row('Order total', '\$1,104'),
+          _row(tr(context, 'Order total'), '\$1,104'),
           const SizedBox(height: 8),
-          _row('Delivery', '\$5'),
+          _row(tr(context, 'Delivery'), '\$5'),
           const Divider(height: 22),
-          _row('To pay', '\$1,109', bold: true),
+          _row(tr(context, 'To pay'), '\$1,109', bold: true),
         ])),
         const SizedBox(height: 16),
-        const Text('Payment method', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(tr(context, 'Payment method'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         ...methods.map((m) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Container(
           padding: const EdgeInsets.all(14),

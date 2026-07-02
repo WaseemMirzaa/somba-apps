@@ -149,7 +149,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
     if (status == 'cancelled' || status == 'returned') {
       return TextButton(
-        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Re-ordering these items…'))),
+        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(s.lang, 'Re-ordering these items…')))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Recommander' : 'Reorder'),
       );

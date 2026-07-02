@@ -51,7 +51,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
       holder: _holder.text.trim(),
       expiry: _expiry.text.trim(),
     ));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Card saved to your account')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Card saved to your account'))));
     Navigator.pop(context, true);
   }
 
@@ -276,7 +276,7 @@ class OrderSummaryScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(it.product.displayName(lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
-              Text('Qty ${it.qty} · ${it.variant}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+              Text('${trl(lang, 'Qty')} ${it.qty} · ${it.variant}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
             ])),
             Text(money(it.product.price * it.qty), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
           ]))),

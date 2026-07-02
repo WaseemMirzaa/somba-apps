@@ -11,7 +11,7 @@ class ReferScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Refer & Earn'),
+      appBar: backAppBar(context, tr(context, 'Refer & Earn')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(22),
@@ -19,13 +19,13 @@ class ReferScreen extends StatelessWidget {
           child: Column(children: [
             const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 44),
             const SizedBox(height: 12),
-            const Text('Give \$5, get \$5', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans')),
+            Text(tr(context, 'Give \$5, get \$5'), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans')),
             const SizedBox(height: 6),
-            Text('Invite friends — you both earn \$5 in store credit on their first order.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+            Text(tr(context, 'Invite friends — you both earn \$5 in store credit on their first order.'), textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
           ]),
         ),
         const SizedBox(height: 18),
-        const Text('Your referral code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(tr(context, 'Your referral code'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -37,20 +37,20 @@ class ReferScreen extends StatelessWidget {
             TextButton.icon(
               onPressed: () {
                 Clipboard.setData(const ClipboardData(text: 'MARIE-5X9K'));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Referral code copied'))));
               },
               icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy'),
+              label: Text(tr(context, 'Copy')),
             ),
           ]),
         ),
         const SizedBox(height: 12),
-        PrimaryButton('Share invite link',
+        PrimaryButton(tr(context, 'Share invite link'),
             icon: Icons.share_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sharing your invite link…')))),
-        const SectionHeader('Your rewards', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Sharing your invite link…'))))),
+        SectionHeader(tr(context, 'Your rewards'), padding: const EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(child: Row(children: [
-          _stat('7', 'Friends joined'), _div(), _stat('\$35', 'Earned'), _div(), _stat('3', 'Pending'),
+          _stat('7', tr(context, 'Friends joined')), _div(), _stat('\$35', tr(context, 'Earned')), _div(), _stat('3', tr(context, 'Pending')),
         ])),
       ]),
     );
@@ -256,38 +256,38 @@ class AccountDeleteScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Delete account'),
+      appBar: backAppBar(context, tr(context, 'Delete account')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-          child: Column(children: const [
-            Icon(Icons.warning_amber_rounded, color: AppColors.accentDark, size: 40),
-            SizedBox(height: 10),
-            Text('This action is permanent', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
-            SizedBox(height: 6),
-            Text('Deleting your account removes your orders, coupons, wishlist and addresses. This cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
+          child: Column(children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.accentDark, size: 40),
+            const SizedBox(height: 10),
+            Text(tr(context, 'This action is permanent'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
+            const SizedBox(height: 6),
+            Text(tr(context, 'Deleting your account removes your orders, coupons, wishlist and addresses. This cannot be undone.'), textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
           ]),
         ),
         const SizedBox(height: 16),
-        Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-          Text("Before you go", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-          SizedBox(height: 10),
-          _Bullet('Any unused coupons will be forfeited'),
-          _Bullet('Active orders must be completed or cancelled'),
-          _Bullet('You can create a new account anytime'),
+        Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr(context, 'Before you go'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          const SizedBox(height: 10),
+          _Bullet(tr(context, 'Any unused coupons will be forfeited')),
+          _Bullet(tr(context, 'Active orders must be completed or cancelled')),
+          _Bullet(tr(context, 'You can create a new account anytime')),
         ])),
         const SizedBox(height: 20),
         SizedBox(width: double.infinity, child: FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deletion requested')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Account deletion requested'))));
             Navigator.maybePop(context);
           },
-          child: const Text('Permanently delete account'),
+          child: Text(tr(context, 'Permanently delete account')),
         )),
         const SizedBox(height: 10),
-        SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: const Text('Keep my account'))),
+        SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: Text(tr(context, 'Keep my account')))),
       ]),
     );
   }
@@ -377,7 +377,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
       _msgs.add(_TicketMsg('Photo $_photoSeq', true, isImage: true));
     });
     _scrollToEnd();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo attached')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Photo attached'))));
   }
 
   void _closeTicket() {

@@ -149,13 +149,13 @@ class AccountScreen extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(100),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text('Gold member',
-                              style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(trl(s.lang, 'Gold member'),
+                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
                         ],
                       ),
                     ),
@@ -296,9 +296,9 @@ class AccountScreen extends StatelessWidget {
               child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 28),
             ),
             const SizedBox(height: 16),
-            const Text('Log out?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+            Text(tr(context, 'Log out?'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
             const SizedBox(height: 6),
-            const Text('You can sign back in anytime to see your orders and wishlist.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+            Text(tr(context, 'You can sign back in anytime to see your orders and wishlist.'), style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
             const SizedBox(height: 20),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
@@ -306,10 +306,10 @@ class AccountScreen extends StatelessWidget {
                 Navigator.pop(context);
                 onLogout?.call();
               },
-              child: const Text('Log out'),
+              child: Text(tr(context, 'Log out')),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            OutlinedButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, 'Cancel'))),
           ]),
         ),
       ),

@@ -34,7 +34,7 @@ class CouponsScreen extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(p.description, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                     if (p.minOrderUsd > 0)
-                      Text('Min. order ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                      Text('${tr(context, 'Min. order')} ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
                   ])),
                   TextButton.icon(
                     onPressed: () {
@@ -42,7 +42,7 @@ class CouponsScreen extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p.code} copied')));
                     },
                     icon: const Icon(Icons.copy_rounded, size: 15),
-                    label: const Text('Copy'),
+                    label: Text(tr(context, 'Copy')),
                   ),
                 ]),
               ),

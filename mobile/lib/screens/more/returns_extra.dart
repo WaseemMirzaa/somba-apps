@@ -193,7 +193,7 @@ class ReturnStatusScreen extends StatelessWidget {
             const Icon(Icons.replay_rounded, color: Colors.white, size: 28),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Refund on the way', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(trl(locale.languageCode, 'Refund on the way'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 2),
               Text('$amount to original payment · 3–5 days', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
             ])),
@@ -494,10 +494,10 @@ class _DisputeScreenState extends State<DisputeScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           color: AppColors.amber.withValues(alpha: 0.12),
-          child: Row(children: const [
-            Icon(Icons.gavel_rounded, color: Color(0xFF92610A), size: 20),
-            SizedBox(width: 10),
-            Expanded(child: Text('Under review — our team responds within 24h.', style: TextStyle(color: Color(0xFF92610A), fontWeight: FontWeight.w600, fontSize: 12.5))),
+          child: Row(children: [
+            const Icon(Icons.gavel_rounded, color: Color(0xFF92610A), size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(trl(widget.locale.languageCode, 'Under review — our team responds within 24h.'), style: const TextStyle(color: Color(0xFF92610A), fontWeight: FontWeight.w600, fontSize: 12.5))),
           ]),
         ),
         Expanded(child: ListView.builder(
@@ -515,7 +515,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                 controller: _ctrl,
                 onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
-                  hintText: 'Type a message…',
+                  hintText: trl(widget.locale.languageCode, 'Type a message…'),
                   isDense: true,
                   filled: true,
                   fillColor: AppColors.surface,

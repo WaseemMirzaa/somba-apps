@@ -137,7 +137,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> with SingleTi
                 _picked = _places.first;
                 _pan = Offset.zero;
                 _pin.forward(from: 0);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Centred on your current location')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(widget.locale.languageCode, 'Centred on your current location'))));
               }),
               child: const Padding(padding: EdgeInsets.all(12), child: Icon(Icons.my_location_rounded, color: AppColors.primary)),
             ),
@@ -258,7 +258,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   void _save() {
     if (_address.text.trim().isEmpty || _name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add a name and street address')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(widget.locale.languageCode, 'Please add a name and street address'))));
       return;
     }
     final shop = ShopState.instance;

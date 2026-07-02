@@ -178,7 +178,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Text('Arriving in ~$minsLeft min', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                      Text('${trl(widget.locale.languageCode, 'Arriving in')} ~$minsLeft min', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
                     ]),
                   )),
                 ]);
@@ -190,9 +190,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             child: Row(children: [
               const CircleAvatar(radius: 22, backgroundColor: AppColors.background, child: Text('JM', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary))),
               const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                Text('Jean Mukendi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-                Text('Your rider · ⭐ 4.9', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Jean Mukendi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                Text('${trl(widget.locale.languageCode, 'Your rider')} · ⭐ 4.9', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
               ])),
               Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
                 child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary),

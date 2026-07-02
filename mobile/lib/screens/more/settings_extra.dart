@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/market_profiles.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import 'support_extra.dart';
 
@@ -19,32 +20,32 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Settings'),
+      appBar: backAppBar(context, tr(context, 'Settings')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        _group('Notifications', [
-          _toggle(Icons.notifications_active_rounded, 'Push notifications', 'Order updates & offers', _push, (v) => setState(() => _push = v)),
-          _toggle(Icons.mail_outline_rounded, 'Email', 'Receipts & newsletters', _email, (v) => setState(() => _email = v)),
-          _toggle(Icons.sms_outlined, 'SMS', 'Delivery alerts by text', _sms, (v) => setState(() => _sms = v)),
+        _group(tr(context, 'Notifications'), [
+          _toggle(Icons.notifications_active_rounded, tr(context, 'Push notifications'), tr(context, 'Order updates & offers'), _push, (v) => setState(() => _push = v)),
+          _toggle(Icons.mail_outline_rounded, tr(context, 'Email'), tr(context, 'Receipts & newsletters'), _email, (v) => setState(() => _email = v)),
+          _toggle(Icons.sms_outlined, tr(context, 'SMS'), tr(context, 'Delivery alerts by text'), _sms, (v) => setState(() => _sms = v)),
         ]),
         const SizedBox(height: 14),
-        _group('Market & currency', [
-          _market('France (Demo)', 'Prices in USD', MarketProfileId.france),
-          _market('DR Congo', 'Prices in Congolese Franc (FC)', MarketProfileId.drc),
+        _group(tr(context, 'Market & currency'), [
+          _market('France (Demo)', tr(context, 'Prices in USD'), MarketProfileId.france),
+          _market('DR Congo', tr(context, 'Prices in Congolese Franc (FC)'), MarketProfileId.drc),
         ]),
         const SizedBox(height: 14),
-        _group('Privacy', [
-          _toggle(Icons.auto_awesome_rounded, 'Personalized recommendations', 'Use my activity to improve results', _personalized, (v) => setState(() => _personalized = v)),
+        _group(tr(context, 'Privacy'), [
+          _toggle(Icons.auto_awesome_rounded, tr(context, 'Personalized recommendations'), tr(context, 'Use my activity to improve results'), _personalized, (v) => setState(() => _personalized = v)),
         ]),
         const SizedBox(height: 14),
-        _group('Account', [
-          _nav(Icons.lock_reset_rounded, 'Change password', () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset link sent')))),
-          _nav(Icons.info_outline_rounded, 'About Somba&Teka', () => showAboutDialog(
+        _group(tr(context, 'Account'), [
+          _nav(Icons.lock_reset_rounded, tr(context, 'Change password'), () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Password reset link sent'))))),
+          _nav(Icons.info_outline_rounded, tr(context, 'About Somba&Teka'), () => showAboutDialog(
                 context: context,
                 applicationName: 'Somba&Teka',
                 applicationVersion: '1.0.0',
                 applicationLegalese: '© 2026 Somba&Teka',
               )),
-          _nav(Icons.delete_outline_rounded, 'Delete account', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen()))),
+          _nav(Icons.delete_outline_rounded, tr(context, 'Delete account'), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen()))),
         ]),
       ]),
     );
@@ -85,7 +86,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
       onTap: () {
         marketNotifier.value = id;
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Market set to $title')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, 'Market set to')} $title')));
       },
     );
   }
@@ -104,7 +105,7 @@ class CustomerEditProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Edit profile'),
+      appBar: backAppBar(context, tr(context, 'Edit profile')),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
         Center(
           child: Stack(children: [
@@ -124,16 +125,16 @@ class CustomerEditProfileScreen extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 24),
-        const AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, initial: 'Marie Dubois'),
+        AppField(label: tr(context, 'Full name'), hint: 'Marie Dubois', icon: Icons.person_outline_rounded, initial: 'Marie Dubois'),
         const SizedBox(height: 16),
-        const AppField(label: 'Phone', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, initial: '+243 970 000 000'),
+        AppField(label: tr(context, 'Phone'), hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, initial: '+243 970 000 000'),
         const SizedBox(height: 16),
-        const AppField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress, initial: 'marie@email.com'),
+        AppField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress, initial: 'marie@email.com'),
         const SizedBox(height: 24),
-        PrimaryButton('Save changes',
+        PrimaryButton(tr(context, 'Save changes'),
             icon: Icons.check_rounded,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Profile updated'))));
               Navigator.pop(context);
             }),
       ]),

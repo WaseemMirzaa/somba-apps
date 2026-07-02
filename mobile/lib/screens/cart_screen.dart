@@ -107,7 +107,7 @@ class _CartScreenState extends State<CartScreen> {
             child: Row(children: [
               const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
               const SizedBox(width: 10),
-              Expanded(child: Text('Your cart has items from ${stores.length} stores — they ship as separate orders.',
+              Expanded(child: Text('${trl(lang, 'Your cart has items from')} ${stores.length} ${trl(lang, 'stores — they ship as separate orders.')}',
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: AppColors.primary))),
             ]),
           ),
