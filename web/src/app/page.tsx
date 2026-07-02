@@ -769,14 +769,14 @@ export default function HomePage() {
       {/* ── FINAL CTA ── */}
       <section className="landing-band py-24">
         <div className="relative mx-auto max-w-4xl px-4 text-center">
-          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-blue-950/20">
+          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-lg shadow-blue-950/20">
             <Image
               src="/brand/logo-stack.png"
               alt="Somba&Teka"
               width={96}
               height={96}
               priority
-              className="h-full w-full scale-[1.45] object-contain"
+              className="h-full w-full scale-[1.3] object-contain"
             />
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight text-balance lg:text-5xl">
