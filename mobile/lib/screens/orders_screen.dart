@@ -76,7 +76,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: sel ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_tabs[i],
+                    child: Text(trl(s.lang, _tabs[i]),
                         style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
@@ -85,7 +85,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           Expanded(
             child: orders.isEmpty
-                ? const Center(child: Text('No orders here yet', style: TextStyle(color: AppColors.muted)))
+                ? Center(child: Text(trl(s.lang, 'No orders here yet'), style: const TextStyle(color: AppColors.muted)))
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     itemCount: orders.length,
@@ -102,7 +102,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final status = o['status'] as String;
     final c = _statusColor(status);
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: status == 'delivered'))),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -142,14 +142,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     // Status-specific primary action, mirroring the web order detail.
     if (status == 'delivered') {
       return TextButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: true))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Évaluer' : 'Review'),
       );
     }
     if (status == 'cancelled' || status == 'returned') {
       return TextButton(
-        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Re-ordering these items…'))),
+        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(s.lang, 'Re-ordering these items…')))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Recommander' : 'Reorder'),
       );

@@ -87,7 +87,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 background: Colors.white,
                 onTap: () => ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('Link copied'))),
+                  ..showSnackBar(SnackBar(content: Text(tr(context, 'Link copied')))),
               ),
               const SizedBox(width: 12),
             ],
@@ -220,7 +220,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 24),
                     _sellerCard(p),
                     const SizedBox(height: 24),
-                    Text('Specifications', style: Theme.of(context).textTheme.titleMedium),
+                    Text(tr(context, 'Specifications'), style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 10),
                     _specs(p),
                     const SizedBox(height: 24),
@@ -273,7 +273,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(child: FilledButton.icon(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale))),
             icon: const Icon(Icons.storefront_rounded, size: 18),
-            label: const Text('Visit store'),
+            label: Text(tr(context, 'Visit store')),
           )),
         ]),
       ]),
@@ -332,7 +332,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${p.rating} · ${p.reviews} reviews', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-            const Text('Read what buyers say', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text(tr(context, 'Read what buyers say'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ])),
           const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
         ]),
@@ -343,13 +343,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _qaSection() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text('Questions & answers', style: Theme.of(context).textTheme.titleMedium),
+        Text(tr(context, 'Questions & answers'), style: Theme.of(context).textTheme.titleMedium),
         const Spacer(),
         TextButton.icon(
           onPressed: _askQuestion,
           icon: const Icon(Icons.help_outline_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: const Text('Ask'),
+          label: Text(tr(context, 'Ask')),
         ),
       ]),
       const SizedBox(height: 4),
@@ -385,14 +385,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Ask a question', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          Text(tr(context, 'Ask a question'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 12),
           TextField(
             controller: ctrl,
             autofocus: true,
             maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'Ask the seller about this product…',
+              hintText: tr(context, 'Ask the seller about this product…'),
               filled: true,
               fillColor: AppColors.background,
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
@@ -407,9 +407,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               if (q.isEmpty) return;
               setState(() => _qa.add((q, null)));
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Question sent to the seller')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Question sent to the seller'))));
             },
-            child: const Text('Submit question'),
+            child: Text(tr(context, 'Submit question')),
           ),
         ]),
       ),
@@ -420,7 +420,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final items = relatedTo(p);
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('You may also like', style: Theme.of(context).textTheme.titleMedium),
+      Text(tr(context, 'You may also like'), style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 12),
       SizedBox(
         height: 170,

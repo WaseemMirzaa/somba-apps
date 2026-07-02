@@ -72,6 +72,52 @@ class AppField extends StatelessWidget {
   }
 }
 
+/// Camera + gallery attach buttons for a chat composer.
+class ChatAttachButtons extends StatelessWidget {
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+  const ChatAttachButtons({super.key, required this.onCamera, required this.onGallery});
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        _round(Icons.photo_camera_rounded, onCamera),
+        const SizedBox(width: 2),
+        _round(Icons.photo_library_rounded, onGallery),
+      ]);
+  Widget _round(IconData icon, VoidCallback onTap) => Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.all(7), child: Icon(icon, color: AppColors.primary, size: 23)),
+        ),
+      );
+}
+
+/// A chat bubble showing an attached image placeholder (mock).
+class ChatImageBubble extends StatelessWidget {
+  final bool mine;
+  final String? caption;
+  const ChatImageBubble({super.key, required this.mine, this.caption});
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 132, width: 172,
+            decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.image_rounded, color: Colors.white, size: 42),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 2),
+            child: Text(caption ?? 'Photo',
+                style: TextStyle(color: mine ? Colors.white70 : AppColors.muted, fontSize: 11)),
+          ),
+        ],
+      );
+}
+
 /// Full-width primary button.
 class PrimaryButton extends StatelessWidget {
   final String label;

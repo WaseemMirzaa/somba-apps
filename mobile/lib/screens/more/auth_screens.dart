@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/brand_logo.dart';
 
 // ================= Splash =================
@@ -45,7 +46,7 @@ class _CustomerSplashScreenState extends State<CustomerSplashScreen> with Single
                 const Text('Somba&Teka',
                     style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
                 const SizedBox(height: 8),
-                Text('Shop everything, delivered', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14.5, fontWeight: FontWeight.w600)),
+                Text(tr(context, 'Shop everything, delivered'), style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14.5, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 40),
                 SizedBox(height: 26, width: 26, child: CircularProgressIndicator(strokeWidth: 2.6, valueColor: AlwaysStoppedAnimation(Colors.white.withValues(alpha: 0.9)))),
               ]),
@@ -63,11 +64,24 @@ class _AuthPage extends StatelessWidget {
   final String subtitle;
   final Widget form;
   final bool showBack;
-  const _AuthPage({required this.title, required this.subtitle, required this.form, this.showBack = false});
+  /// When true the logo/title/card group is vertically centered on the page
+  /// (used by the shorter flows: OTP, verify email, forgot & reset password).
+  final bool centered;
+  const _AuthPage({required this.title, required this.subtitle, required this.form, this.showBack = false, this.centered = false});
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
+    final content = <Widget>[
+      const Center(child: BrandLogo(size: 78, radius: 22)),
+      const SizedBox(height: 18),
+      Text(title, textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
+      const SizedBox(height: 6),
+      Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14)),
+      const SizedBox(height: 24),
+      GlassCard(child: form),
+    ];
     return Scaffold(
       body: AuthBackdrop(
         child: SafeArea(
@@ -85,19 +99,18 @@ class _AuthPage extends StatelessWidget {
                   ),
                 ),
               ),
-            ListView(
-              padding: EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
-              children: [
-                const Center(child: BrandLogo(size: 78, radius: 22)),
-                const SizedBox(height: 18),
-                Text(title, textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
-                const SizedBox(height: 6),
-                Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14)),
-                const SizedBox(height: 24),
-                GlassCard(child: form),
-              ],
-            ),
+            if (centered)
+              Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(22, top + 56, 22, 30),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: content),
+                ),
+              )
+            else
+              ListView(
+                padding: EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
+                children: content,
+              ),
           ]),
         ),
       ),
@@ -195,33 +208,33 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _social(String name) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Signing in with $name…')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${tr(context, 'Signing in with')} $name…')));
     Future.delayed(const Duration(milliseconds: 600), () => widget.onAuthed?.call());
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Welcome back',
-      subtitle: 'Sign in to continue shopping on Somba&Teka',
+      title: tr(context, 'Welcome back'),
+      subtitle: tr(context, 'Sign in to continue shopping on Somba&Teka'),
       form: Column(children: [
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        _GlassField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
         const SizedBox(height: 14),
-        _GlassField(label: 'Password', hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        _GlassField(label: tr(context, 'Password'), hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotScreen())),
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+            child: Text(tr(context, 'Forgot password?'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
           ),
         ),
         const SizedBox(height: 4),
-        AuthButton('Sign in', icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
+        AuthButton(tr(context, 'Sign in'), icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
         const SizedBox(height: 18),
         Row(children: [
           const Expanded(child: Divider(color: AppColors.line)),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or continue with', style: TextStyle(color: AppColors.muted, fontSize: 12))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text(tr(context, 'or continue with'), style: const TextStyle(color: AppColors.muted, fontSize: 12))),
           const Expanded(child: Divider(color: AppColors.line)),
         ]),
         const SizedBox(height: 16),
@@ -233,13 +246,13 @@ class _LoginScreenState extends State<LoginScreen> {
           _socialBtn(bg: const Color(0xFF1877F2), child: const Icon(Icons.facebook, color: Colors.white, size: 26), onTap: () => _social('Facebook')),
         ]),
         const SizedBox(height: 16),
-        TextButton(onPressed: () => widget.onAuthed?.call(), child: const Text('Continue as guest', style: TextStyle(fontWeight: FontWeight.w700))),
+        TextButton(onPressed: () => widget.onAuthed?.call(), child: Text(tr(context, 'Continue as guest'), style: const TextStyle(fontWeight: FontWeight.w700))),
         Center(
           child: GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen(onAuthed: widget.onAuthed))),
-            child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
-              TextSpan(text: "New here?  "),
-              TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            child: RichText(text: TextSpan(style: const TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
+              TextSpan(text: "${tr(context, 'New here?')}  "),
+              TextSpan(text: tr(context, 'Create an account'), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
             ])),
           ),
         ),
@@ -301,15 +314,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _submit() {
     setState(() {
-      _nameErr = _name.text.trim().isEmpty ? 'Enter your full name' : null;
-      _phoneErr = _phone.text.trim().length < 6 ? 'Enter a valid phone number' : null;
-      _emailErr = !_validEmail(_email.text.trim()) ? 'Enter a valid email' : null;
-      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
-      _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
+      _nameErr = _name.text.trim().isEmpty ? tr(context, 'Enter your full name') : null;
+      _phoneErr = _phone.text.trim().length < 6 ? tr(context, 'Enter a valid phone number') : null;
+      _emailErr = !_validEmail(_email.text.trim()) ? tr(context, 'Enter a valid email') : null;
+      _passErr = _pass.text.length < 6 ? tr(context, 'Use at least 6 characters') : null;
+      _confirmErr = _confirm.text != _pass.text ? tr(context, 'Passwords do not match') : null;
     });
     if ([_nameErr, _phoneErr, _emailErr, _passErr, _confirmErr].any((e) => e != null)) return;
     if (!_agree) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please accept the Terms & Privacy Policy')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Please accept the Terms & Privacy Policy'))));
       return;
     }
     Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(
@@ -323,14 +336,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _pickPhoto() {
     setState(() => _hasPhoto = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo added (optional)')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Profile photo added (optional)'))));
   }
 
   void _pickCode() {
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Padding(padding: EdgeInsets.all(16), child: Text('Select country code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+        Padding(padding: const EdgeInsets.all(16), child: Text(tr(context, 'Select country code'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
         ..._codes.map((c) => ListTile(
           leading: Text(c.$1, style: const TextStyle(fontSize: 22)),
           title: Text(c.$3),
@@ -348,8 +361,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Create account',
-      subtitle: 'Join Somba&Teka in under a minute',
+      title: tr(context, 'Create account'),
+      subtitle: tr(context, 'Join Somba&Teka in under a minute'),
       showBack: true,
       form: Column(children: [
         // Optional profile picture.
@@ -373,12 +386,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        const Center(child: Text('Add a photo (optional)', style: TextStyle(color: AppColors.muted, fontSize: 11.5))),
+        Center(child: Text(tr(context, 'Add a photo (optional)'), style: const TextStyle(color: AppColors.muted, fontSize: 11.5))),
         const SizedBox(height: 16),
-        _GlassField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, controller: _name, error: _nameErr),
+        _GlassField(label: tr(context, 'Full name'), hint: 'Marie Dubois', icon: Icons.person_outline_rounded, controller: _name, error: _nameErr),
         const SizedBox(height: 14),
         _GlassField(
-          label: 'Phone number', hint: '970 000 000', icon: Icons.phone_outlined,
+          label: tr(context, 'Phone number'), hint: '970 000 000', icon: Icons.phone_outlined,
           controller: _phone, keyboard: TextInputType.phone, error: _phoneErr,
           formatters: [FilteringTextInputFormatter.digitsOnly],
           prefix: GestureDetector(
@@ -395,25 +408,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        _GlassField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
         const SizedBox(height: 14),
-        _GlassField(label: 'Password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        _GlassField(label: tr(context, 'Password'), hint: tr(context, 'Create a password'), icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
         const SizedBox(height: 14),
-        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        _GlassField(label: tr(context, 'Confirm password'), hint: tr(context, 'Re-enter password'), icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
         const SizedBox(height: 14),
         GestureDetector(
           onTap: () => setState(() => _agree = !_agree),
           child: Row(children: [
             Icon(_agree ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary, size: 22),
             const SizedBox(width: 8),
-            Expanded(child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
-              TextSpan(text: 'I agree to the '),
-              TextSpan(text: 'Terms & Privacy Policy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            Expanded(child: RichText(text: TextSpan(style: const TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
+              TextSpan(text: '${tr(context, 'I agree to the')} '),
+              TextSpan(text: tr(context, 'Terms & Privacy Policy'), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
             ]))),
           ]),
         ),
         const SizedBox(height: 18),
-        AuthButton('Create account', icon: Icons.arrow_forward_rounded, onPressed: _submit),
+        AuthButton(tr(context, 'Create account'), icon: Icons.arrow_forward_rounded, onPressed: _submit),
       ]),
     );
   }
@@ -469,7 +482,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   void _verify() {
     if (_code.length < 6 || _c.any((c) => c.text.isEmpty)) {
-      setState(() => _error = 'Enter the full 6-digit code');
+      setState(() => _error = tr(context, 'Enter the full 6-digit code'));
       return;
     }
     setState(() => _error = null);
@@ -479,9 +492,10 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Verify your number',
-      subtitle: 'Enter the 6-digit code sent to ${widget.phone ?? '+243 970 000 000'}',
+      title: tr(context, 'Verify your number'),
+      subtitle: '${tr(context, 'Enter the 6-digit code sent to')} ${widget.phone ?? '+243 970 000 000'}',
       showBack: true,
+      centered: true,
       form: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(6, (i) {
           return SizedBox(
@@ -516,19 +530,19 @@ class _OtpScreenState extends State<OtpScreen> {
           child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600)),
         ),
         const SizedBox(height: 18),
-        AuthButton('Verify', icon: Icons.verified_rounded, onPressed: _verify),
+        AuthButton(tr(context, 'Verify'), icon: Icons.verified_rounded, onPressed: _verify),
         const SizedBox(height: 14),
         Center(
           child: _seconds > 0
-              ? Text('Resend code in 0:${_seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))
+              ? Text('${tr(context, 'Resend code in')} 0:${_seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))
               : TextButton.icon(
                   onPressed: () {
                     _startTimer();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('New code sent')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'New code sent'))));
                   },
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                  label: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
+                  label: Text(tr(context, 'Resend code'), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
         ),
       ]),
@@ -543,31 +557,32 @@ class VerifyEmailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Verify your email',
-      subtitle: 'We sent a confirmation link to marie@email.com',
+      title: tr(context, 'Verify your email'),
+      subtitle: tr(context, 'We sent a confirmation link to marie@email.com'),
       showBack: true,
+      centered: true,
       form: Column(children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
-          child: Column(children: const [
-            Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 46),
-            SizedBox(height: 12),
-            Text('Check your inbox', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            SizedBox(height: 6),
-            Text('Tap the link in the email to activate your account, then continue to start shopping.',
-                textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
+          child: Column(children: [
+            const Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 46),
+            const SizedBox(height: 12),
+            Text(tr(context, 'Check your inbox'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text(tr(context, 'Tap the link in the email to activate your account, then continue to start shopping.'),
+                textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
           ]),
         ),
         const SizedBox(height: 18),
-        AuthButton("I've verified — continue", icon: Icons.check_circle_rounded,
+        AuthButton(tr(context, "I've verified — continue"), icon: Icons.check_circle_rounded,
             onPressed: () => onVerified != null ? onVerified!() : Navigator.maybePop(context)),
         const SizedBox(height: 10),
         TextButton.icon(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification email resent'))),
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Verification email resent')))),
           icon: const Icon(Icons.refresh_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: const Text('Resend email', style: TextStyle(fontWeight: FontWeight.w700)),
+          label: Text(tr(context, 'Resend email'), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
     );
@@ -592,22 +607,23 @@ class _ForgotScreenState extends State<ForgotScreen> {
 
   void _send() {
     final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
-    setState(() => _err = ok ? null : 'Enter a valid email');
+    setState(() => _err = ok ? null : tr(context, 'Enter a valid email'));
     if (!ok) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Reset link sent to your email'))));
     Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Reset password',
-      subtitle: "We'll send a reset link to your email",
+      title: tr(context, 'Reset password'),
+      subtitle: tr(context, "We'll send a reset link to your email"),
       showBack: true,
+      centered: true,
       form: Column(children: [
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err),
+        _GlassField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err),
         const SizedBox(height: 20),
-        AuthButton('Send reset link', icon: Icons.send_rounded, onPressed: _send),
+        AuthButton(tr(context, 'Send reset link'), icon: Icons.send_rounded, onPressed: _send),
       ]),
     );
   }
@@ -633,26 +649,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   void _save() {
     setState(() {
-      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
-      _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
+      _passErr = _pass.text.length < 6 ? tr(context, 'Use at least 6 characters') : null;
+      _confirmErr = _confirm.text != _pass.text ? tr(context, 'Passwords do not match') : null;
     });
     if (_passErr != null || _confirmErr != null) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Password updated — please sign in'))));
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
-      title: 'Set a new password',
-      subtitle: 'Choose a strong password you have not used before',
+      title: tr(context, 'Set a new password'),
+      subtitle: tr(context, 'Choose a strong password you have not used before'),
       showBack: true,
+      centered: true,
       form: Column(children: [
-        _GlassField(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        _GlassField(label: tr(context, 'New password'), hint: tr(context, 'Create a password'), icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
         const SizedBox(height: 14),
-        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        _GlassField(label: tr(context, 'Confirm password'), hint: tr(context, 'Re-enter password'), icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
         const SizedBox(height: 20),
-        AuthButton('Save new password', icon: Icons.check_rounded, onPressed: _save),
+        AuthButton(tr(context, 'Save new password'), icon: Icons.check_rounded, onPressed: _save),
       ]),
     );
   }
