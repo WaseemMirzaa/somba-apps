@@ -9,8 +9,10 @@ import '../widgets/product_card.dart';
 import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
+import 'categories_screen.dart';
 import 'more/search_screen.dart';
-import 'more/account_more.dart';
+import 'more/browse.dart';
+import 'more/catalog_extra.dart';
 
 class HomeScreen extends StatefulWidget {
   final Locale locale;
@@ -72,11 +74,29 @@ class _HomeScreenState extends State<HomeScreen> {
       ..showSnackBar(SnackBar(content: Text('${p.displayName(widget.locale.languageCode)} — ${s.addedToCart}')));
   }
 
+  // Recommended feed, filtered by the selected chip in real time.
+  List<Product> _feed() {
+    final list = [...products];
+    switch (_feedTab) {
+      case 1: // Trending — most reviewed
+        list.sort((a, b) => b.reviews.compareTo(a.reviews));
+        break;
+      case 2: // New — newest ids first
+        list.sort((a, b) => b.id.compareTo(a.id));
+        break;
+      case 3: // Popular — highest rated
+        list.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
     final deals = products.where((p) => p.discount >= 15).toList();
+    final feed = _feed();
 
     return CustomScrollView(
       slivers: [
@@ -85,14 +105,14 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(child: _quickActions(s)),
         SliverToBoxAdapter(
           child: SectionHeader(s.topCategories, actionLabel: s.seeAll,
-              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale)))),
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoriesScreen(locale: widget.locale)))),
         ),
         SliverToBoxAdapter(child: _categories(lang)),
         SliverToBoxAdapter(child: _flashSaleStrip(s)),
         SliverToBoxAdapter(child: _dealsRow(deals, lang)),
         SliverToBoxAdapter(
           child: SectionHeader(s.recommended, actionLabel: s.seeAll,
-              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale)))),
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, title: s.recommended)))),
         ),
         SliverToBoxAdapter(child: _feedChips(s)),
         SliverPadding(
@@ -106,12 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             delegate: SliverChildBuilderDelegate(
               (_, i) => ProductCard(
-                product: products[i],
+                product: feed[i],
                 lang: lang,
-                onTap: () => _openProduct(products[i]),
-                onAdd: () => _add(products[i]),
+                onTap: () => _openProduct(feed[i]),
+                onAdd: () => _add(feed[i]),
               ),
-              childCount: products.length,
+              childCount: feed.length,
             ),
           ),
         ),
@@ -144,18 +164,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 5),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale))),
+                    onTap: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressSelectScreen(locale: widget.locale)));
+                      if (mounted) setState(() {});
+                    },
                     child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(s.deliverTo,
                           style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
-                      const Row(
+                      Row(
                         children: [
-                          Text('Kinshasa, Gombe',
-                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                          Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
+                          Text(ShopState.instance.selectedAddressLabel ?? 'Kinshasa, Gombe',
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                          const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
                         ],
                       ),
                     ],
@@ -218,7 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              Container(
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale))),
+                child: Container(
                 height: 50,
                 width: 50,
                 decoration: BoxDecoration(
@@ -227,6 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   boxShadow: AppShadow.soft,
                 ),
                 child: const Icon(Icons.tune_rounded, color: AppColors.primary),
+              ),
               ),
             ],
           ),
@@ -322,34 +348,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---- Quick action tiles ----
   Widget _quickActions(Strings s) {
+    void go(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     final items = [
-      (Icons.bolt_rounded, s.deals, AppColors.accent),
-      (Icons.local_shipping_rounded, s.freeDelivery, AppColors.mint),
-      (Icons.verified_rounded, s.inStock, AppColors.primary),
-      (Icons.percent_rounded, 'Coupons', AppColors.amber),
+      (Icons.bolt_rounded, s.deals, AppColors.accent, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
+      (Icons.local_shipping_rounded, s.freeDelivery, AppColors.mint, () => go(ProductListScreen(locale: widget.locale, title: s.freeDelivery))),
+      (Icons.verified_rounded, s.inStock, AppColors.primary, () => go(ProductListScreen(locale: widget.locale, title: s.inStock))),
+      (Icons.percent_rounded, 'Coupons', AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Row(
         children: items.map((it) {
           return Expanded(
-            child: Column(
-              children: [
-                Container(
-                  height: 52,
-                  width: 52,
-                  decoration: BoxDecoration(
-                    color: it.$3.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: it.$4,
+              child: Column(
+                children: [
+                  Container(
+                    height: 52,
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: it.$3.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(it.$1, color: it.$3, size: 24),
                   ),
-                  child: Icon(it.$1, color: it.$3, size: 24),
-                ),
-                const SizedBox(height: 6),
-                Text(it.$2,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ],
+                  const SizedBox(height: 6),
+                  Text(it.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -412,23 +443,27 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (_, i) {
           final cat = categories[i];
           final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
-          return Column(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topLeft, end: Alignment.bottomRight, colors: grad),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppShadow.card,
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: cat.name))),
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight, colors: grad),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: AppShadow.card,
+                  ),
+                  child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 28),
                 ),
-                child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 28),
-              ),
-              const SizedBox(height: 7),
-              Text(cat.displayName(lang),
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-            ],
+                const SizedBox(height: 7),
+                Text(cat.displayName(lang),
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+              ],
+            ),
           );
         },
       ),

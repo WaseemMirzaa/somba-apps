@@ -29,6 +29,9 @@ class ShopState {
   /// Selected delivery zone id (drives the delivery fee); null → first zone.
   String? selectedZoneId;
 
+  /// Delivery address label shown in the home top bar; null → default.
+  String? selectedAddressLabel;
+
   double promoDiscount(double subtotalUsd) => appliedPromo?.discountFor(subtotalUsd) ?? 0;
 
   SharedPreferences? _prefs;

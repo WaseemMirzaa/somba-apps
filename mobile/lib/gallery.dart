@@ -13,6 +13,8 @@ import 'screens/more/support_extra.dart';
 import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
 import 'screens/product_detail_screen.dart';
+import 'screens/categories_screen.dart';
+import 'screens/more/browse.dart';
 import 'data/mock_data.dart';
 import 'data/market_profiles.dart';
 import 'util/format.dart';
@@ -40,7 +42,10 @@ Map<String, WidgetBuilder> get _screens => {
       'settings': (_) => const CustomerSettingsScreen(locale: _en),
       'edit-profile': (_) => const CustomerEditProfileScreen(locale: _en),
       'support-detail': (_) => const SupportTicketDetailScreen(id: 'TKT-3391', subject: 'Refund not received', status: 'Open', statusColor: AppColors.amber),
-      'search': (_) => const SearchScreen(locale: _en),
+      'search': (_) => const SearchScreen(locale: _en, initialText: 'S'),
+      'categories': (_) => const CategoriesScreen(locale: _en),
+      'sellers': (_) => const SellersDirectoryScreen(locale: _en),
+      'address-select': (_) => const AddressSelectScreen(locale: _en),
       'order-detail': (_) => const OrderDetailScreen(locale: _en),
       'order-tracking': (_) => const OrderTrackingScreen(locale: _en),
       'wishlist': (_) => const WishlistScreen(locale: _en),
