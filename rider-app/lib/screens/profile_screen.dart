@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/rider_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'more/rider_more.dart';
@@ -17,8 +18,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _online = true;
-
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
@@ -81,19 +80,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SurfaceCard(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppColors.primary,
-              value: _online,
-              onChanged: (v) => setState(() => _online = v),
-              secondary: Container(
-                height: 40,
-                width: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.bolt_rounded, color: AppColors.primary),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: RiderState.instance.onDuty,
+              builder: (_, online, __) => SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                activeThumbColor: AppColors.primary,
+                value: online,
+                onChanged: (v) => RiderState.instance.setOnDuty(v),
+                secondary: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.bolt_rounded, color: AppColors.primary),
+                ),
+                title: const Text('On duty', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                subtitle: Text(online ? 'Receiving new tasks' : 'Paused — no new tasks', style: const TextStyle(fontSize: 12.5)),
               ),
-              title: const Text('On duty', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-              subtitle: Text(_online ? 'Receiving new tasks' : 'Paused — no new tasks', style: const TextStyle(fontSize: 12.5)),
             ),
           ),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/mock_tasks.dart';
+import '../data/rider_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'more/rider_more.dart';
@@ -13,7 +14,7 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  bool _online = true;
+  final _duty = RiderState.instance.onDuty;
 
   @override
   Widget build(BuildContext context) {
@@ -73,22 +74,25 @@ class _TasksScreenState extends State<TasksScreen> {
                   ],
                 ),
               ),
-              // Online toggle
-              GestureDetector(
-                onTap: () => setState(() => _online = !_online),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _online ? Colors.white : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(100),
+              // Online toggle (shared rider state — syncs with profile & shift)
+              ValueListenableBuilder<bool>(
+                valueListenable: _duty,
+                builder: (_, online, __) => GestureDetector(
+                  onTap: () => RiderState.instance.setOnDuty(!online),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: online ? Colors.white : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Row(children: [
+                      Container(width: 8, height: 8, decoration: BoxDecoration(color: online ? AppColors.primary : Colors.white, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text(online ? 'On duty' : 'Off',
+                          style: TextStyle(color: online ? AppColors.primary : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                    ]),
                   ),
-                  child: Row(children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: _online ? AppColors.primary : Colors.white, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text(_online ? 'On duty' : 'Off',
-                        style: TextStyle(color: _online ? AppColors.primary : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
-                  ]),
                 ),
               ),
             ],

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../data/rider_state.dart';
+import '../../data/mock_tasks.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
+import '../../widgets/rider_brand.dart';
 import 'rider_auth.dart';
 
 // ---------------- Settings ----------------
@@ -98,6 +101,10 @@ class RiderSupportScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: _action(context, Icons.chat_bubble_rounded, 'Live chat', 'Message us')),
         ]),
+        const SizedBox(height: 14),
+        PrimaryButton('Raise a support ticket',
+            icon: Icons.confirmation_number_rounded,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNewTicketScreen()))),
         const SizedBox(height: 20),
         const Text('Common questions', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
@@ -139,35 +146,137 @@ class RiderSupportScreen extends StatelessWidget {
       );
 }
 
-// ---------------- Chat (customer / support) ----------------
+// ---------------- New support ticket (against a task/order) ----------------
+class RiderNewTicketScreen extends StatefulWidget {
+  const RiderNewTicketScreen({super.key});
+  @override
+  State<RiderNewTicketScreen> createState() => _RiderNewTicketScreenState();
+}
+
+class _RiderNewTicketScreenState extends State<RiderNewTicketScreen> {
+  final _subject = TextEditingController();
+  final _body = TextEditingController();
+  int _task = 0;
+  int _topic = 0;
+
+  late final List<String> _tasks = [...mockTasks.map((t) => '${t.id} · ${t.customer}'), 'Not task-related'];
+  static const _topics = ['Address / navigation', 'Customer issue', 'Damaged / missing item', 'Payment / COD', 'App problem', 'Other'];
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: backAppBar(context, 'New ticket'),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 24), children: [
+        const Text('Which task or order?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: List.generate(_tasks.length, (i) {
+          final sel = _task == i;
+          return GestureDetector(onTap: () => setState(() => _task = i), child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
+            child: Text(_tasks[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ));
+        })),
+        const SizedBox(height: 20),
+        const Text('Topic', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: List.generate(_topics.length, (i) {
+          final sel = _topic == i;
+          return GestureDetector(onTap: () => setState(() => _topic = i), child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: sel ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
+            child: Text(_topics[i], style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ));
+        })),
+        const SizedBox(height: 20),
+        const Text('Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 8),
+        TextField(controller: _subject, decoration: const InputDecoration(hintText: 'Brief summary')),
+        const SizedBox(height: 18),
+        const Text('Describe the issue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _body,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: 'Tell us what happened…',
+            filled: true, fillColor: AppColors.surface,
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+          ),
+        ),
+        const SizedBox(height: 18),
+        PrimaryButton('Open ticket', icon: Icons.send_rounded, onPressed: () {
+          final subject = _subject.text.trim().isEmpty ? _topics[_topic] : _subject.text.trim();
+          final ref = _task < mockTasks.length ? mockTasks[_task].id : 'General';
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ChatScreen(
+            name: 'Ticket · $subject',
+            subtitle: 'Ref: $ref · ${_topics[_topic]}',
+            seed: [
+              if (_body.text.trim().isNotEmpty) (_body.text.trim(), true, false),
+              ('Thanks — fleet support has your ticket and will reply shortly. Feel free to attach a photo.', false, false),
+            ],
+          )));
+        }),
+      ]),
+    );
+  }
+}
+
+// ---------------- Chat (customer / support / ticket) ----------------
 class ChatScreen extends StatefulWidget {
   final String name;
-  const ChatScreen({super.key, required this.name});
+  final String? subtitle;
+  final List<(String, bool, bool)>? seed;
+  const ChatScreen({super.key, required this.name, this.subtitle, this.seed});
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
   final _ctrl = TextEditingController();
-  final List<(String, bool)> _msgs = [
-    ('Hi! I\'m on my way with your order.', true),
-    ('Great, thank you! I\'m at the main gate.', false),
-    ('Perfect, I\'ll be there in about 5 minutes.', true),
-  ];
+  final _scroll = ScrollController();
+  // (text, mine, isImage)
+  late final List<(String, bool, bool)> _msgs = widget.seed ??
+      [
+        ('Hi! I\'m on my way with your order.', true, false),
+        ('Great, thank you! I\'m at the main gate.', false, false),
+        ('Perfect, I\'ll be there in about 5 minutes.', true, false),
+      ];
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
+
+  void _end() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      });
 
   void _send() {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
     setState(() {
-      _msgs.add((t, true));
+      _msgs.add((t, true, false));
       _ctrl.clear();
     });
+    _end();
+  }
+
+  void _attach() {
+    setState(() => _msgs.add(('photo', true, true)));
+    _end();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo attached')));
   }
 
   @override
@@ -175,18 +284,31 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: backAppBar(context, widget.name),
       body: Column(children: [
+        if (widget.subtitle != null)
+          Container(
+            width: double.infinity,
+            color: AppColors.surface,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(children: [
+              const Icon(Icons.receipt_long_rounded, size: 15, color: AppColors.muted),
+              const SizedBox(width: 6),
+              Expanded(child: Text(widget.subtitle!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+            ]),
+          ),
         Expanded(
           child: ListView.builder(
+            controller: _scroll,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             itemCount: _msgs.length,
             itemBuilder: (_, i) {
               final m = _msgs[i];
               final mine = m.$2;
+              final isImage = m.$3;
               return Align(
                 alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: isImage ? const EdgeInsets.all(6) : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
                   decoration: BoxDecoration(
                     color: mine ? AppColors.primary : AppColors.surface,
@@ -198,7 +320,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     boxShadow: mine ? null : AppShadow.card,
                   ),
-                  child: Text(m.$1, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                  child: isImage
+                      ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(height: 128, width: 168, decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.image_rounded, color: Colors.white, size: 40)),
+                          const Padding(padding: EdgeInsets.only(top: 4, left: 2), child: Text('Attachment', style: TextStyle(color: Colors.white70, fontSize: 11))),
+                        ])
+                      : Text(m.$1, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
                 ),
               );
             },
@@ -207,8 +334,10 @@ class _ChatScreenState extends State<ChatScreen> {
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            padding: const EdgeInsets.fromLTRB(6, 8, 12, 10),
             child: Row(children: [
+              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_camera_rounded, color: AppColors.primary), tooltip: 'Camera'),
+              IconButton(onPressed: _attach, icon: const Icon(Icons.photo_library_rounded, color: AppColors.primary), tooltip: 'Gallery', padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 36)),
               Expanded(
                 child: TextField(
                   controller: _ctrl,
@@ -242,22 +371,59 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ---------------- Documents ----------------
-class RiderDocumentsScreen extends StatelessWidget {
+// ---------------- Documents (with upload flow) ----------------
+class RiderDocumentsScreen extends StatefulWidget {
   const RiderDocumentsScreen({super.key});
   @override
+  State<RiderDocumentsScreen> createState() => _RiderDocumentsScreenState();
+}
+
+class _RiderDocumentsScreenState extends State<RiderDocumentsScreen> {
+  // (title, status, valid?, icon)
+  final List<(String, String, bool, IconData)> _docs = [
+    ('Driver licence', 'Valid until Mar 2028', true, Icons.badge_rounded),
+    ('National ID', 'Verified', true, Icons.credit_card_rounded),
+    ('Vehicle insurance', 'Valid until Sep 2026', true, Icons.verified_user_rounded),
+    ('Roadworthiness', 'Renewal due in 21 days', false, Icons.build_circle_rounded),
+  ];
+
+  static const _types = [
+    ('Driver licence', Icons.badge_rounded),
+    ('National ID', Icons.credit_card_rounded),
+    ('Vehicle insurance', Icons.verified_user_rounded),
+    ('Roadworthiness', Icons.build_circle_rounded),
+    ('Other document', Icons.description_rounded),
+  ];
+
+  void _openUpload() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => _UploadSheet(types: _types, onUploaded: (type) {
+        setState(() {
+          final idx = _docs.indexWhere((d) => d.$1 == type);
+          final entry = (type, 'Uploaded — pending review', true, _types.firstWhere((t) => t.$1 == type, orElse: () => _types.last).$2);
+          if (idx >= 0) {
+            _docs[idx] = entry;
+          } else {
+            _docs.add(entry);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$type uploaded — pending review')));
+      }),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const docs = [
-      ('Driver licence', 'Valid until Mar 2028', true, Icons.badge_rounded),
-      ('National ID', 'Verified', true, Icons.credit_card_rounded),
-      ('Vehicle insurance', 'Valid until Sep 2026', true, Icons.verified_user_rounded),
-      ('Roadworthiness', 'Renewal due in 21 days', false, Icons.build_circle_rounded),
-    ];
     return Scaffold(
       appBar: backAppBar(context, 'Documents'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        ...docs.map((d) {
+        ..._docs.map((d) {
           final ok = d.$3;
+          final pending = d.$2.contains('pending');
+          final color = pending ? AppColors.info : (ok ? AppColors.primary : AppColors.accent);
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: SurfaceCard(
@@ -269,19 +435,94 @@ class RiderDocumentsScreen extends StatelessWidget {
                   Text(d.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                   Text(d.$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                 ])),
-                Pill(ok ? 'Valid' : 'Renew',
-                    color: (ok ? AppColors.primary : AppColors.accent).withValues(alpha: 0.14),
-                    textColor: ok ? AppColors.primary : AppColors.accent,
-                    icon: ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                Pill(pending ? 'Pending' : (ok ? 'Valid' : 'Renew'),
+                    color: color.withValues(alpha: 0.14),
+                    textColor: color,
+                    icon: pending ? Icons.hourglass_top_rounded : (ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded),
                     fontSize: 10.5),
               ]),
             ),
           );
         }),
         const SizedBox(height: 4),
-        PrimaryButton('Upload a document',
-            icon: Icons.upload_file_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening document upload…')))),
+        PrimaryButton('Upload a document', icon: Icons.upload_file_rounded, onPressed: _openUpload),
+      ]),
+    );
+  }
+}
+
+/// Bottom sheet: pick a document type + capture/choose file, then upload (mock).
+class _UploadSheet extends StatefulWidget {
+  final List<(String, IconData)> types;
+  final ValueChanged<String> onUploaded;
+  const _UploadSheet({required this.types, required this.onUploaded});
+  @override
+  State<_UploadSheet> createState() => _UploadSheetState();
+}
+
+class _UploadSheetState extends State<_UploadSheet> {
+  int _type = 0;
+  bool _fileChosen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).padding.bottom),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(child: Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(100)))),
+        const SizedBox(height: 16),
+        const Text('Upload a document', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+        const SizedBox(height: 4),
+        const Text('Choose the document type', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+        const SizedBox(height: 14),
+        ...List.generate(widget.types.length, (i) {
+          final sel = _type == i;
+          return Padding(padding: const EdgeInsets.only(bottom: 8), child: GestureDetector(
+            onTap: () => setState(() => _type = i),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: sel ? AppColors.primary : AppColors.line, width: sel ? 1.8 : 1.2)),
+              child: Row(children: [
+                Icon(widget.types[i].$2, color: sel ? AppColors.primary : AppColors.muted, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(widget.types[i].$1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel ? AppColors.primary : AppColors.faint, size: 20),
+              ]),
+            ),
+          ));
+        }),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => setState(() => _fileChosen = true),
+          child: Container(
+            height: 96,
+            decoration: BoxDecoration(
+              gradient: _fileChosen ? AppColors.brandGradient : null,
+              color: _fileChosen ? null : AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _fileChosen ? Colors.transparent : AppColors.line),
+            ),
+            child: Center(child: _fileChosen
+                ? const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.check_circle_rounded, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('File selected', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  ])
+                : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary, size: 28),
+                    SizedBox(height: 6),
+                    Text('Tap to take a photo or choose a file', style: TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  ])),
+          ),
+        ),
+        const SizedBox(height: 16),
+        PrimaryButton('Upload', icon: Icons.upload_rounded, onPressed: _fileChosen
+            ? () {
+                Navigator.pop(context);
+                widget.onUploaded(widget.types[_type].$1);
+              }
+            : null),
       ]),
     );
   }
@@ -343,67 +584,105 @@ class RiderVehicleScreen extends StatelessWidget {
       ]);
 }
 
-// ---------------- Shift & attendance ----------------
-class RiderShiftScreen extends StatelessWidget {
+// ---------------- Shift & attendance (functional, wired to duty state) ----------------
+class RiderShiftScreen extends StatefulWidget {
   const RiderShiftScreen({super.key});
   @override
+  State<RiderShiftScreen> createState() => _RiderShiftScreenState();
+}
+
+class _RiderShiftScreenState extends State<RiderShiftScreen> {
+  final _rider = RiderState.instance;
+
+  static const _week = [
+    ('Mon', '08:02', '17:34', true),
+    ('Tue', '07:58', '17:40', true),
+    ('Wed', '08:10', '18:02', true),
+    ('Thu', '08:00', '17:20', true),
+    ('Fri', '—', '—', false),
+  ];
+
+  void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  @override
   Widget build(BuildContext context) {
-    const week = [
-      ('Mon', '08:02', '17:34', true),
-      ('Tue', '07:58', '17:40', true),
-      ('Wed', '08:10', '18:02', true),
-      ('Thu', '08:00', '17:20', true),
-      ('Fri', '—', '—', false),
-    ];
     return Scaffold(
       appBar: backAppBar(context, 'Shift & attendance'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(22)),
-          child: Column(children: [
-            Row(children: [
-              _hstat('4', 'Days'),
-              _hdiv(),
-              _hstat('34h', 'This week'),
-              _hdiv(),
-              _hstat('98%', 'On-time'),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        SurfaceCard(child: Row(children: [
-          Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.timer_rounded, color: AppColors.primary)),
-          const SizedBox(width: 12),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Current shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-            Text('Started today at 08:00', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
-          ])),
-          Pill('Active', color: AppColors.primary.withValues(alpha: 0.14), textColor: AppColors.primary),
-        ])),
-        const SizedBox(height: 16),
-        const Text('This week', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-        const SizedBox(height: 10),
-        ...week.map((d) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: SurfaceCard(
-                padding: const EdgeInsets.all(14),
-                child: Row(children: [
-                  SizedBox(width: 40, child: Text(d.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(d.$4 ? 'In ${d.$2}  ·  Out ${d.$3}' : 'No shift', style: TextStyle(color: d.$4 ? AppColors.inkSoft : AppColors.faint, fontSize: 13, fontWeight: FontWeight.w600))),
-                  Icon(d.$4 ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded, color: d.$4 ? AppColors.primary : AppColors.faint, size: 20),
-                ]),
-              ),
-            )),
-        const SizedBox(height: 4),
-        PrimaryButton('End shift',
-            icon: Icons.logout_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shift ended — have a good rest!')));
-              Navigator.maybePop(context);
-            }),
-      ]),
+      body: AnimatedBuilder(
+        animation: Listenable.merge([_rider.shiftActive, _rider.onBreak]),
+        builder: (context, _) {
+          final active = _rider.shiftActive.value;
+          final onBreak = _rider.onBreak.value;
+          final status = !active ? 'Off shift' : (onBreak ? 'On break' : 'Active');
+          final statusColor = !active ? AppColors.faint : (onBreak ? AppColors.accent : AppColors.primary);
+          return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(22)),
+              child: Row(children: [
+                _hstat('4', 'Days'),
+                _hdiv(),
+                _hstat('34h', 'This week'),
+                _hdiv(),
+                _hstat('98%', 'On-time'),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SurfaceCard(child: Row(children: [
+              Container(height: 44, width: 44, decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(active ? Icons.timer_rounded : Icons.timer_off_rounded, color: statusColor)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Current shift', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                Text(active ? 'Started today at ${_rider.shiftStartedAt}' : 'Not clocked in', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              ])),
+              Pill(status, color: statusColor.withValues(alpha: 0.14), textColor: statusColor),
+            ])),
+            const SizedBox(height: 12),
+            // Start / break / end controls — connected to the On-duty toggle.
+            if (!active)
+              PrimaryButton('Start shift', icon: Icons.play_arrow_rounded, onPressed: () {
+                setState(() => _rider.startShift());
+                _snack('Shift started — you are now On duty');
+              })
+            else
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _rider.toggleBreak());
+                    _snack(_rider.onBreak.value ? 'On break — new tasks paused' : 'Back from break — On duty');
+                  },
+                  icon: Icon(onBreak ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded, size: 20),
+                  label: Text(onBreak ? 'Resume' : 'Take a break'),
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+                  onPressed: () {
+                    setState(() => _rider.endShift());
+                    _snack('Shift ended — have a good rest!');
+                  },
+                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  label: const Text('End shift'),
+                )),
+              ]),
+            const SizedBox(height: 20),
+            const Text('This week', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 10),
+            ..._week.map((d) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SurfaceCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(children: [
+                      SizedBox(width: 40, child: Text(d.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(d.$4 ? 'In ${d.$2}  ·  Out ${d.$3}' : 'No shift', style: TextStyle(color: d.$4 ? AppColors.inkSoft : AppColors.faint, fontSize: 13, fontWeight: FontWeight.w600))),
+                      Icon(d.$4 ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded, color: d.$4 ? AppColors.primary : AppColors.faint, size: 20),
+                    ]),
+                  ),
+                )),
+          ]);
+        },
+      ),
     );
   }
 
@@ -468,7 +747,7 @@ class RiderAboutScreen extends StatelessWidget {
       appBar: backAppBar(context, 'About'),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 24), children: [
         Center(child: Column(children: [
-          Container(height: 84, width: 84, decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(24)), child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 46)),
+          const RiderBrandLogo(size: 84, radius: 24),
           const SizedBox(height: 16),
           const Text('Somba&Teka Rider', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 4),
