@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { MarketingHeader } from "@/components/landing/marketing-header";
 import { MarketingFooter } from "@/components/landing/marketing-footer";
+import { BrandMark } from "@/components/landing/brand-mark";
 import { StickyCta } from "@/components/landing/sticky-cta";
 import { PortalExplorer } from "@/components/landing/portal-explorer";
 import { PortalOverviewCards } from "@/components/landing/portal-premium";
@@ -769,8 +770,8 @@ export default function HomePage() {
       {/* ── FINAL CTA ── */}
       <section className="landing-band py-24">
         <div className="relative mx-auto max-w-4xl px-4 text-center">
-          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm">
-            <ShoppingBag className="h-7 w-7 text-white" />
+          <div className="mx-auto mb-6 flex justify-center">
+            <BrandMark iconOnly tone="light" className="h-14 w-14 shadow-lg shadow-blue-950/20" />
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold tracking-tight text-balance lg:text-5xl">
             {fr ? "Prêt à acheter ou vendre ?" : "Ready to shop or sell?"}
