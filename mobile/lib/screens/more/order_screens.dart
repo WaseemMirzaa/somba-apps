@@ -6,10 +6,12 @@ import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import 'returns_extra.dart';
 import 'support_extra.dart';
+import 'catalog_extra.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final Locale locale;
-  const OrderDetailScreen({super.key, this.locale = const Locale('en')});
+  final bool delivered;
+  const OrderDetailScreen({super.key, this.locale = const Locale('en'), this.delivered = false});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +20,7 @@ class OrderDetailScreen extends StatelessWidget {
     const fee = 5.0;
 
     return Scaffold(
-      appBar: backAppBar(context, 'Order SMB-2026-4821'),
+      appBar: backAppBar(context, delivered ? 'Order SMB-2026-4712' : 'Order SMB-2026-4821'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -51,15 +53,43 @@ class OrderDetailScreen extends StatelessWidget {
               const SizedBox(height: 12),
               ...items.map((p) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 60, width: 60, child: ProductImage(product: p, iconSize: 26))),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(p.displayName(locale.languageCode), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                        const SizedBox(height: 2),
-                        const Text('Qty 1', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                      ])),
-                      Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    child: Column(children: [
+                      Row(children: [
+                        ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 60, width: 60, child: ProductImage(product: p, iconSize: 26))),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(p.displayName(locale.languageCode), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          const SizedBox(height: 2),
+                          const Text('Qty 1', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        ])),
+                        Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w800)),
+                      ]),
+                      // Delivered orders: per-product exchange / return actions.
+                      if (delivered) ...[
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExchangeScreen(locale: locale, product: p))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                            label: const Text('Exchange', style: TextStyle(fontSize: 12.5)),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.assignment_return_rounded, size: 16),
+                            label: const Text('Return', style: TextStyle(fontSize: 12.5)),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale, product: p))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.rate_review_rounded, size: 16),
+                            label: const Text('Review', style: TextStyle(fontSize: 12.5)),
+                          )),
+                        ]),
+                      ],
                     ]),
                   )),
             ]),

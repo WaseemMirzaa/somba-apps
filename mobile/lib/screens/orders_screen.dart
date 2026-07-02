@@ -102,7 +102,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final status = o['status'] as String;
     final c = _statusColor(status);
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: status == 'delivered'))),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -142,7 +142,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     // Status-specific primary action, mirroring the web order detail.
     if (status == 'delivered') {
       return TextButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: true))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Évaluer' : 'Review'),
       );

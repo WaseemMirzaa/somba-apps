@@ -3,6 +3,7 @@ import '../../data/mock_data.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
+import '../../widgets/common.dart';
 import '../../widgets/product_image.dart';
 
 class ReturnRequestScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   int _reason = 0;
   int _refund = 0;
   final _reasons = ['Damaged / defective', 'Wrong item received', 'Not as described', 'No longer needed', 'Other'];
-  final _refunds = ['Store credit (instant)', 'Original payment method', 'Bank transfer'];
+  final _refunds = ['Original payment method', 'Bank transfer'];
 
   // The order's items (mock: first three products); selection drives the refund.
   late final List<Product> _items = products.take(3).toList();
@@ -192,7 +193,7 @@ class ReturnStatusScreen extends StatelessWidget {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Refund on the way', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 2),
-              Text('$amount to store credit · 1–2 days', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+              Text('$amount to original payment · 3–5 days', style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
             ])),
           ]),
         ),
@@ -209,28 +210,51 @@ class ReturnStatusScreen extends StatelessWidget {
   }
 }
 
+/// CF-30 — Exchange a delivered item (launched from a completed order's product,
+/// not from the product page). Choose a different size/variant and a reason.
 class ExchangeScreen extends StatefulWidget {
   final Locale locale;
-  const ExchangeScreen({super.key, this.locale = const Locale('en')});
+  final Product? product;
+  const ExchangeScreen({super.key, this.locale = const Locale('en'), this.product});
   @override
   State<ExchangeScreen> createState() => _ExchangeScreenState();
 }
 
 class _ExchangeScreenState extends State<ExchangeScreen> {
   int _size = 1;
+  int _reason = 0;
+  bool _done = false;
   final _sizes = ['S', 'M', 'L', 'XL'];
+  final _reasons = ['Wrong size', 'Changed my mind', 'Defective', 'Different colour wanted'];
+
   @override
   Widget build(BuildContext context) {
-    final p = products.firstWhere((x) => x.category == 'Fashion', orElse: () => products.first);
+    final p = widget.product ?? products.firstWhere((x) => x.category == 'Fashion', orElse: () => products.first);
+    if (_done) return _confirmation(p);
     return Scaffold(
       appBar: backAppBar(context, 'Exchange item'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Panel(child: Row(children: [
           ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 56, width: 56, child: ProductImage(product: p, iconSize: 24))),
           const SizedBox(width: 12),
-          Expanded(child: Text(p.displayName(widget.locale.languageCode), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(p.displayName(widget.locale.languageCode), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+            const SizedBox(height: 2),
+            Text('From order SMB-2026-4712 · delivered', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+          ])),
         ])),
         const SizedBox(height: 18),
+        const Text('Why are you exchanging?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        const SizedBox(height: 10),
+        ...List.generate(_reasons.length, (i) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: GestureDetector(onTap: () => setState(() => _reason = i), child: Panel(padding: const EdgeInsets.all(14), child: Row(children: [
+            Icon(_reason == i ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: _reason == i ? AppColors.primary : AppColors.faint),
+            const SizedBox(width: 12),
+            Expanded(child: Text(_reasons[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _reason == i ? AppColors.ink : AppColors.inkSoft))),
+          ]))),
+        )),
+        const SizedBox(height: 8),
         const Text('Exchange for a different size', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 12),
         Wrap(spacing: 10, children: List.generate(_sizes.length, (i) {
@@ -247,13 +271,172 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
           SizedBox(width: 10),
           Expanded(child: Text('Free size exchange within 30 days. A rider will swap it at your door.', style: TextStyle(fontSize: 12.5, color: AppColors.inkSoft, height: 1.3))),
         ])),
-        const SizedBox(height: 16),
-        PrimaryButton('Request exchange',
-            icon: Icons.swap_horiz_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exchange requested — size ${_sizes[_size]}')));
-              Navigator.maybePop(context);
-            }),
+      ]),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
+        child: PrimaryButton('Request exchange', icon: Icons.swap_horiz_rounded, onPressed: () => setState(() => _done = true)),
+      ),
+    );
+  }
+
+  Widget _confirmation(Product p) => Scaffold(
+        appBar: backAppBar(context, 'Exchange requested'),
+        body: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
+          Column(children: [
+            Container(height: 84, width: 84, decoration: BoxDecoration(gradient: AppColors.brandGradient, shape: BoxShape.circle), child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 44)),
+            const SizedBox(height: 16),
+            const Text('Exchange requested', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, fontFamily: 'PlusJakartaSans')),
+            const SizedBox(height: 6),
+            Text('New size ${_sizes[_size]} · reason: ${_reasons[_reason]}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
+          ]),
+          const SizedBox(height: 20),
+          Panel(child: const StatusTimeline([
+            ('Exchange requested', 'Just now', true),
+            ('Pickup scheduled', 'Rider assigned', true),
+            ('Old item collected', 'At your door', false),
+            ('New item delivered', 'Estimated 2–3 days', false),
+          ])),
+          const SizedBox(height: 16),
+          PrimaryButton('Done', icon: Icons.check_rounded, onPressed: () => Navigator.maybePop(context)),
+        ]),
+      );
+}
+
+/// CF-29 — Returns & exchanges listing (from profile / my orders) with
+/// search, status filter and per-return tracking.
+class ReturnsListScreen extends StatefulWidget {
+  final Locale locale;
+  const ReturnsListScreen({super.key, this.locale = const Locale('en')});
+  @override
+  State<ReturnsListScreen> createState() => _ReturnsListScreenState();
+}
+
+class _ReturnsListScreenState extends State<ReturnsListScreen> {
+  final _search = TextEditingController();
+  int _tab = 0;
+  static const _tabs = ['All', 'In review', 'Approved', 'Refunded', 'Rejected'];
+
+  // (id, item, kind, status, date, amount)
+  static const _returns = [
+    ('RET-2026-118', 'Mens Cotton Jacket', 'Return', 'In review', 'Jun 28', 56.0),
+    ('RET-2026-102', 'White Gold Earrings', 'Return', 'Refunded', 'Jun 20', 10.0),
+    ('EXC-2026-077', 'Casual Slim Fit Shirt', 'Exchange', 'Approved', 'Jun 18', 0.0),
+    ('RET-2026-064', 'WD 2TB Hard Drive', 'Return', 'Rejected', 'Jun 10', 64.0),
+    ('RET-2026-051', 'Pierced Owl Earrings', 'Return', 'Refunded', 'Jun 2', 11.0),
+  ];
+
+  Color _statusColor(String s) {
+    switch (s) {
+      case 'Refunded':
+      case 'Approved':
+        return AppColors.success;
+      case 'Rejected':
+        return AppColors.danger;
+      default:
+        return AppColors.amber;
+    }
+  }
+
+  bool _match(String status) {
+    switch (_tab) {
+      case 1:
+        return status == 'In review';
+      case 2:
+        return status == 'Approved';
+      case 3:
+        return status == 'Refunded';
+      case 4:
+        return status == 'Rejected';
+      default:
+        return true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _search.text.trim().toLowerCase();
+    final list = _returns.where((r) => _match(r.$4) && (q.isEmpty || r.$1.toLowerCase().contains(q) || r.$2.toLowerCase().contains(q))).toList();
+    return Scaffold(
+      appBar: backAppBar(context, 'Returns & exchanges'),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+          child: TextField(
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search returns by ID or item…',
+              prefixIcon: const Icon(Icons.search_rounded),
+              filled: true, fillColor: AppColors.surface,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            itemCount: _tabs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final sel = _tab == i;
+              return GestureDetector(
+                onTap: () => setState(() => _tab = i),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
+                  child: Text(_tabs[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                ),
+              );
+            },
+          ),
+        ),
+        Expanded(
+          child: list.isEmpty
+              ? const Center(child: Text('No returns in this filter', style: TextStyle(color: AppColors.muted)))
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) {
+                    final r = list[i];
+                    final c = _statusColor(r.$4);
+                    return GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnStatusScreen(locale: widget.locale, refund: r.$6))),
+                      child: Panel(child: Column(children: [
+                        Row(children: [
+                          Container(height: 44, width: 44, decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(r.$3 == 'Exchange' ? Icons.swap_horiz_rounded : Icons.assignment_return_rounded, color: c)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(r.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                            const SizedBox(height: 2),
+                            Text('${r.$3} · ${r.$2}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                          ])),
+                          Pill(r.$4, color: c.withValues(alpha: 0.14), textColor: c, fontSize: 10.5),
+                        ]),
+                        const Divider(height: 20),
+                        Row(children: [
+                          Icon(Icons.event_rounded, size: 15, color: AppColors.faint),
+                          const SizedBox(width: 6),
+                          Text(r.$5, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                          const Spacer(),
+                          if (r.$6 > 0) Text(money(r.$6), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.primary)),
+                          const SizedBox(width: 10),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.faint, size: 20),
+                        ]),
+                      ])),
+                    );
+                  },
+                ),
+        ),
       ]),
     );
   }

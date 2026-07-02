@@ -10,12 +10,15 @@ import 'screens/more/account_more.dart';
 import 'screens/more/shop_extra.dart';
 import 'screens/more/returns_extra.dart';
 import 'screens/more/support_extra.dart';
+import 'screens/more/address_flow.dart';
+import 'screens/more/checkout_flow.dart';
 import 'screens/more/catalog_extra.dart';
 import 'screens/more/settings_extra.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/more/browse.dart';
 import 'data/mock_data.dart';
+import 'data/shop_state.dart';
 import 'data/market_profiles.dart';
 import 'util/format.dart';
 
@@ -57,11 +60,16 @@ Map<String, WidgetBuilder> get _screens => {
       'payment-failed': (_) => const PaymentScreen(locale: _en, failed: true),
       'return-request': (_) => const ReturnRequestScreen(locale: _en),
       'return-status': (_) => const ReturnStatusScreen(locale: _en),
+      'returns-list': (_) => const ReturnsListScreen(locale: _en),
       'exchange': (_) => const ExchangeScreen(locale: _en),
       'dispute': (_) => const DisputeScreen(locale: _en),
       'address-form': (_) => const AddressFormScreen(locale: _en),
+      'address-picker': (_) => const AddressPickerScreen(locale: _en),
+      'add-card': (_) => const AddCardScreen(),
+      'order-summary': (_) => OrderSummaryScreen(locale: _en, paymentLabel: 'Visa ···· 4242', address: ShopState.instance.addresses.first),
       'refer': (_) => const ReferScreen(locale: _en),
       'support': (_) => const SupportListScreen(locale: _en),
+      'new-ticket': (_) => const NewTicketScreen(locale: _en),
       'help': (_) => const HelpScreen(locale: _en),
       'account-delete': (_) => const AccountDeleteScreen(),
     };

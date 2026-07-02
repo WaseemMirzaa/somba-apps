@@ -3,7 +3,8 @@ import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
-import 'order_success_screen.dart';
+import '../widgets/product_image.dart';
+import 'more/checkout_flow.dart';
 import 'more/account_more.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -17,181 +18,197 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
-  String payment = 'stripe_card';
+  // Selected payment: 'card:<last4>' or 'wallet:<number>'.
+  String _payment = '';
 
-  static const _methods = [
-    ('stripe_card', Icons.credit_card_rounded),
-    ('airtel_money', Icons.smartphone_rounded),
-    ('orange_money', Icons.smartphone_rounded),
-    ('vodacom_mpesa', Icons.account_balance_wallet_rounded),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _selectFirstPayment();
+  }
+
+  void _selectFirstPayment() {
+    if (shop.savedCards.isNotEmpty) {
+      _payment = 'card:${shop.savedCards.first.last4}';
+    } else if (shop.wallets.isNotEmpty) {
+      _payment = 'wallet:${shop.wallets.first.number}';
+    }
+  }
+
+  String get _paymentLabel {
+    if (_payment.startsWith('card:')) {
+      final last4 = _payment.substring(5);
+      final c = shop.savedCards.firstWhere((c) => c.last4 == last4, orElse: () => shop.savedCards.first);
+      return '${c.brand} ···· ${c.last4}';
+    }
+    if (_payment.startsWith('wallet:')) {
+      final num = _payment.substring(7);
+      final w = shop.wallets.firstWhere((w) => w.number == num, orElse: () => shop.wallets.first);
+      return '${w.provider} · ${w.number}';
+    }
+    return 'Select payment';
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
-    final deliveryFee = deliveryFeeUsd;
-    final discount = shop.promoDiscount(shop.subtotal);
-    final total = shop.subtotal + deliveryFee - discount;
+    final stores = shop.cartByStore;
+    final address = shop.selectedAddress;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(s.checkout),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.pop(context)),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          _sectionTitle(s.deliveryAddress),
+          // 1. Review the cart, grouped by store.
+          _sectionTitle('Review your order'),
           const SizedBox(height: 10),
-          _card(
-            child: Row(
-              children: [
-                Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.location_on_rounded, color: AppColors.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Marie Dubois · +243 970 000 000',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      const SizedBox(height: 2),
-                      Text(lang == 'fr' ? 'Av. du Commerce, Gombe, Kinshasa' : '12 Commerce Ave, Gombe, Kinshasa',
-                          style: const TextStyle(color: AppColors.muted, fontSize: 13)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.muted),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale))),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 22),
-          _sectionTitle('Delivery zone'),
-          const SizedBox(height: 10),
-          _card(
-            child: Column(children: [
-              for (final z in currentMarket.zones) ...[
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() {
-                    shop.selectedZoneId = z.id;
-                    shop.save();
-                  }),
-                  child: Row(children: [
-                    Icon(selectedZone.id == z.id ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                        color: selectedZone.id == z.id ? AppColors.primary : AppColors.faint, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('${lang == 'fr' ? z.nameFr : z.name} · ${z.city}',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-                    Text(z.deliveryFeeUsd == 0 ? 'FREE' : money(z.deliveryFeeUsd),
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: z.deliveryFeeUsd == 0 ? AppColors.success : AppColors.ink)),
-                  ]),
-                ),
-                if (z != currentMarket.zones.last) const Divider(height: 20),
-              ],
+          ...stores.map((so) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _card(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.storefront_outlined, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(so.seller.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+                Text('${so.count} item${so.count == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+              ]),
+              const Divider(height: 18),
+              ...so.items.map((it) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
+                ClipRRect(borderRadius: BorderRadius.circular(10), child: SizedBox(height: 48, width: 48, child: ProductImage(product: it.product, iconSize: 20))),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(it.product.displayName(lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                  Text('Qty ${it.qty} · ${it.variant}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+                ])),
+                Text(money(it.product.price * it.qty), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              ]))),
             ]),
-          ),
+          ))),
+          const SizedBox(height: 10),
+          // 2. Delivery address (zone is auto-derived from the address).
+          Row(children: [
+            Expanded(child: _sectionTitle(s.deliveryAddress)),
+            TextButton.icon(
+              onPressed: _pickAddress,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+              label: Text(address == null ? 'Add' : 'Change'),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          if (address == null)
+            GestureDetector(
+              onTap: _pickAddress,
+              child: _card(child: Row(children: const [
+                Icon(Icons.add_location_alt_rounded, color: AppColors.primary),
+                SizedBox(width: 12),
+                Expanded(child: Text('Add a delivery address to continue', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+                Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+              ])),
+            )
+          else
+            _card(child: Row(children: [
+              Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.location_on_rounded, color: AppColors.primary)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${address.label} · ${address.name}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text('${address.line}, ${address.city}', style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text('Delivery zone: ${address.zone} · ${deliveryFeeUsd == 0 ? 'FREE' : money(deliveryFeeUsd)}/store', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+              ])),
+            ])),
           const SizedBox(height: 22),
+          // 3. Payment — cards + mobile money only.
           _sectionTitle(s.payment),
           const SizedBox(height: 10),
-          ..._methods.map((m) {
-            final selected = payment == m.$1;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: GestureDetector(
-                onTap: () => setState(() => payment = m.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: selected ? AppColors.primary : AppColors.line,
-                      width: selected ? 1.8 : 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(m.$2, color: selected ? AppColors.primary : AppColors.muted, size: 22),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(s.paymentLabel(m.$1),
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                color: selected ? AppColors.ink : AppColors.inkSoft)),
-                      ),
-                      Icon(
-                        selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                        color: selected ? AppColors.primary : AppColors.faint,
-                        size: 22,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 12),
-          _sectionTitle(s.orderSummary),
-          const SizedBox(height: 10),
-          _card(
-            child: Column(
-              children: [
-                _row(s.subtotal, money(shop.subtotal)),
-                const SizedBox(height: 8),
-                _row('${s.delivery} · ${selectedZone.name}', deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
-                if (discount > 0) ...[
-                  const SizedBox(height: 8),
-                  _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
-                ],
-                const Divider(height: 22),
-                _row(s.total, money(total), bold: true),
-                if (secondaryMoney(total) != null)
-                  Align(alignment: Alignment.centerRight, child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(secondaryMoney(total)!, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                  )),
-              ],
-            ),
-          ),
+          ...shop.savedCards.map((c) => _paymentTile(
+            key: 'card:${c.last4}',
+            icon: Icons.credit_card_rounded,
+            title: '${c.brand} ···· ${c.last4}',
+            subtitle: 'Expires ${c.expiry}',
+          )),
+          ...shop.wallets.map((w) => _paymentTile(
+            key: 'wallet:${w.number}',
+            icon: Icons.smartphone_rounded,
+            title: w.provider,
+            subtitle: w.number,
+          )),
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: () async {
+                final added = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const AddCardScreen()));
+                if (added == true) setState(() => _payment = 'card:${shop.savedCards.last.last4}');
+              },
+              icon: const Icon(Icons.add_card_rounded, size: 18),
+              label: const Text('Add card'),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: OutlinedButton.icon(
+              onPressed: () async {
+                final added = await showAddWalletSheet(context);
+                if (added == true) setState(() => _payment = 'wallet:${shop.wallets.last.number}');
+              },
+              icon: const Icon(Icons.smartphone_rounded, size: 18),
+              label: const Text('Mobile money'),
+            )),
+          ]),
         ],
       ),
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 12 + MediaQuery.of(context).padding.bottom),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1E293B).withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: const Color(0xFF1E293B).withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, -4))],
         ),
         child: FilledButton(
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrderSuccessScreen(locale: widget.locale, orderId: 'SMB-2026-4821'),
-            ),
+          onPressed: (address == null || _payment.isEmpty)
+              ? null
+              : () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderSummaryScreen(locale: widget.locale, paymentLabel: _paymentLabel, address: address))),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(address == null ? 'Add an address first' : 'Review order'),
+            if (address != null) ...[const SizedBox(width: 6), const Icon(Icons.arrow_forward_rounded, size: 20)],
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAddress() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale, selectMode: true)));
+    if (mounted) setState(_selectFirstPaymentIfNeeded);
+  }
+
+  void _selectFirstPaymentIfNeeded() {
+    if (_payment.isEmpty) _selectFirstPayment();
+  }
+
+  Widget _paymentTile({required String key, required IconData icon, required String title, required String subtitle}) {
+    final selected = _payment == key;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: () => setState(() => _payment = key),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? AppColors.primary : AppColors.line, width: selected ? 1.8 : 1.2),
           ),
-          child: Text('${s.placeOrder}  ·  ${money(total)}'),
+          child: Row(children: [
+            Icon(icon, color: selected ? AppColors.primary : AppColors.muted, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: selected ? AppColors.ink : AppColors.inkSoft)),
+              Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            ])),
+            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: selected ? AppColors.primary : AppColors.faint, size: 22),
+          ]),
         ),
       ),
     );
@@ -201,27 +218,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _card({required Widget child}) => Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: AppShadow.card,
-        ),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18), boxShadow: AppShadow.card),
         child: child,
-      );
-
-  Widget _row(String label, String value, {bool bold = false}) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: bold ? 16 : 14,
-                  fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-                  color: bold ? AppColors.ink : AppColors.muted)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: bold ? 18 : 14,
-                  fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
-                  color: bold ? AppColors.primary : AppColors.ink)),
-        ],
       );
 }

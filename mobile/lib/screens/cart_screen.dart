@@ -95,75 +95,87 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _cartList(Strings s, String lang) {
-    return ListView.separated(
+    final stores = shop.cartByStore;
+    return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      itemCount: shop.cart.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) {
-        final item = shop.cart[i];
-        return Dismissible(
-          key: ValueKey('${item.product.id}-${item.variant}'),
-          direction: DismissDirection.endToStart,
-          onDismissed: (_) => setState(() => shop.cart.removeAt(i)),
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 24),
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: AppRadius.card,
-            ),
-            child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      children: [
+        if (stores.length > 1)
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text('Your cart has items from ${stores.length} stores — they ship as separate orders.',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: AppColors.primary))),
+            ]),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppRadius.card,
-              boxShadow: AppShadow.card,
+        for (final so in stores) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+            child: Row(children: [
+              const Icon(Icons.storefront_outlined, size: 17, color: AppColors.inkSoft),
+              const SizedBox(width: 6),
+              Text(so.seller.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+              const Spacer(),
+              Text('${so.count} item${so.count == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            ]),
+          ),
+          ...so.items.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _cartTile(item, lang),
+          )),
+        ],
+      ],
+    );
+  }
+
+  Widget _cartTile(CartItem item, String lang) {
+    return Dismissible(
+      key: ValueKey('${item.product.id}-${item.variant}'),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => setState(() => shop.cart.remove(item)),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.card),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.card, boxShadow: AppShadow.card),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(height: 78, width: 78, child: ProductImage(product: item.product, iconSize: 32)),
             ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
-                    height: 78,
-                    width: 78,
-                    child: ProductImage(product: item.product, iconSize: 32),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.product.displayName(lang),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  const SizedBox(height: 3),
+                  Text(item.variant, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      Text(item.product.displayName(lang),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      const SizedBox(height: 3),
-                      Text(item.variant,
-                          style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(money(item.product.price),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary)),
-                          const Spacer(),
-                          QuantityStepper(
-                            value: item.qty,
-                            onChanged: (v) => setState(() => item.qty = v),
-                          ),
-                        ],
-                      ),
+                      Text(money(item.product.price),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary)),
+                      const Spacer(),
+                      QuantityStepper(value: item.qty, onChanged: (v) => setState(() => item.qty = v)),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 

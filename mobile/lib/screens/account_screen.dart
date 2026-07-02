@@ -4,6 +4,7 @@ import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
 import 'more/account_more.dart';
+import 'more/returns_extra.dart';
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
 import 'more/catalog_extra.dart';
@@ -29,6 +30,8 @@ class AccountScreen extends StatelessWidget {
           _menuCard(context, [
             _MenuItem(Icons.shopping_bag_outlined, s.myOrders, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(locale: locale)))),
+            _MenuItem(Icons.assignment_return_outlined, 'Returns & exchanges', AppColors.royalBlue,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnsListScreen(locale: locale)))),
             _MenuItem(Icons.favorite_border_rounded, s.wishlist, AppColors.accent,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => WishlistScreen(locale: locale)))),
             _MenuItem(Icons.location_on_outlined, s.addresses, AppColors.mint,

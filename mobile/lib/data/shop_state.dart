@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mock_data.dart';
+import 'catalog_meta.dart';
 import 'promos.dart';
 
 class CartItem {
@@ -8,6 +9,58 @@ class CartItem {
   int qty;
 
   CartItem({required this.product, this.variant = 'Default', this.qty = 1});
+}
+
+/// A saved payment card associated with the account.
+class SavedCard {
+  final String brand; // Visa · Mastercard
+  final String last4;
+  final String holder;
+  final String expiry; // MM/YY
+  const SavedCard({required this.brand, required this.last4, required this.holder, required this.expiry});
+}
+
+/// A saved mobile-money wallet associated with the account.
+class MobileWallet {
+  final String provider; // Airtel Money · Orange Money · M-Pesa
+  final String number;
+  const MobileWallet({required this.provider, required this.number});
+}
+
+/// A customer delivery address. The delivery zone is auto-derived from the
+/// city/zone fields (no separate zone picker in checkout).
+class CustomerAddress {
+  final String id;
+  String label;
+  String name;
+  String phone;
+  String line;
+  String city;
+  String zone;
+  bool isDefault;
+  final double lat;
+  final double lng;
+  CustomerAddress({
+    required this.id,
+    required this.label,
+    required this.name,
+    required this.phone,
+    required this.line,
+    this.city = 'Kinshasa',
+    this.zone = 'Gombe',
+    this.isDefault = false,
+    this.lat = -4.325,
+    this.lng = 15.322,
+  });
+}
+
+/// A group of cart items that ship from a single store (one order per store).
+class StoreOrder {
+  final Seller seller;
+  final List<CartItem> items;
+  StoreOrder(this.seller, this.items);
+  double get subtotal => items.fold(0.0, (s, i) => s + i.product.price * i.qty);
+  int get count => items.fold(0, (s, i) => s + i.qty);
 }
 
 class CustomerReview {
@@ -40,6 +93,60 @@ class ShopState {
 
   /// Delivery address label shown in the home top bar; null → default.
   String? selectedAddressLabel;
+
+  /// Saved payment cards (associated with the account).
+  final List<SavedCard> savedCards = [
+    const SavedCard(brand: 'Visa', last4: '4242', holder: 'Marie Dubois', expiry: '08/27'),
+  ];
+
+  /// Saved mobile-money wallets.
+  final List<MobileWallet> wallets = [
+    const MobileWallet(provider: 'Airtel Money', number: '+243 970 000 000'),
+  ];
+
+  void addCard(SavedCard c) => savedCards.add(c);
+  void addWallet(MobileWallet w) => wallets.add(w);
+
+  /// Saved delivery addresses (associated with the account).
+  final List<CustomerAddress> addresses = [
+    CustomerAddress(id: 'addr-1', label: 'Home', name: 'Marie Dubois', phone: '+243 970 000 000', line: '12 Commerce Ave, Gombe', city: 'Kinshasa', zone: 'Gombe', isDefault: true),
+    CustomerAddress(id: 'addr-2', label: 'Work', name: 'Marie Dubois', phone: '+243 971 111 222', line: 'Tower B, Limete Industrial', city: 'Kinshasa', zone: 'Limete'),
+  ];
+
+  /// The address selected for delivery (defaults to the default/first address).
+  String? selectedDeliveryAddressId;
+  CustomerAddress? get selectedAddress {
+    if (addresses.isEmpty) return null;
+    final id = selectedDeliveryAddressId;
+    return addresses.firstWhere(
+      (a) => a.id == id,
+      orElse: () => addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first),
+    );
+  }
+
+  void addAddress(CustomerAddress a) {
+    if (a.isDefault) {
+      for (final x in addresses) {
+        x.isDefault = false;
+      }
+    }
+    addresses.add(a);
+    selectedDeliveryAddressId = a.id;
+  }
+
+  int _addrSeq = 3;
+  String nextAddressId() => 'addr-${_addrSeq++}';
+
+  /// Groups the cart into one [StoreOrder] per store (different stores =
+  /// different orders at checkout).
+  List<StoreOrder> get cartByStore {
+    final map = <String, StoreOrder>{};
+    for (final item in cart) {
+      final s = sellerFor(item.product);
+      map.putIfAbsent(s.id, () => StoreOrder(s, [])).items.add(item);
+    }
+    return map.values.toList();
+  }
 
   double promoDiscount(double subtotalUsd) => appliedPromo?.discountFor(subtotalUsd) ?? 0;
 

@@ -4,61 +4,6 @@ import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 
-class AddressFormScreen extends StatelessWidget {
-  final Locale locale;
-  final String? label;
-  final String? name;
-  final String? phone;
-  final String? address;
-  final String? city;
-  final String? zone;
-  const AddressFormScreen({
-    super.key,
-    this.locale = const Locale('en'),
-    this.label,
-    this.name,
-    this.phone,
-    this.address,
-    this.city,
-    this.zone,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final editing = label != null;
-    return Scaffold(
-      appBar: backAppBar(context, editing ? 'Edit address' : 'Add address'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
-        AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded, initial: label),
-        const SizedBox(height: 16),
-        AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, initial: name),
-        const SizedBox(height: 16),
-        AppField(label: 'Phone', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, initial: phone),
-        const SizedBox(height: 16),
-        AppField(label: 'Address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined, initial: address),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: AppField(label: 'City', hint: 'Kinshasa', initial: city)),
-          const SizedBox(width: 12),
-          Expanded(child: AppField(label: 'Zone', hint: 'Gombe', initial: zone)),
-        ]),
-        const SizedBox(height: 16),
-        const Row(children: [
-          Icon(Icons.check_box_rounded, color: AppColors.primary, size: 22),
-          SizedBox(width: 8),
-          Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-        ]),
-        const SizedBox(height: 20),
-        PrimaryButton(editing ? 'Update address' : 'Save address',
-            icon: Icons.save_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(editing ? 'Address updated' : 'Address saved')));
-              Navigator.maybePop(context);
-            }),
-      ]),
-    );
-  }
-}
-
 class ReferScreen extends StatelessWidget {
   final Locale locale;
   const ReferScreen({super.key, this.locale = const Locale('en')});
@@ -118,20 +63,27 @@ class ReferScreen extends StatelessWidget {
   Widget _div() => Container(width: 1, height: 30, color: AppColors.line);
 }
 
-class SupportListScreen extends StatelessWidget {
+class SupportListScreen extends StatefulWidget {
   final Locale locale;
   const SupportListScreen({super.key, this.locale = const Locale('en')});
   @override
+  State<SupportListScreen> createState() => _SupportListScreenState();
+}
+
+class _SupportListScreenState extends State<SupportListScreen> {
+  // Mutable so a newly-created ticket appears at the top of the list.
+  final List<(String, String, String, Color)> _tickets = [
+    ('TKT-3391', 'Refund not received', 'Open', AppColors.amber),
+    ('TKT-3382', 'Wrong item delivered', 'In progress', AppColors.primary),
+    ('TKT-3360', 'Change delivery address', 'Resolved', AppColors.success),
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    const tickets = [
-      ('TKT-3391', 'Refund not received', 'Open', AppColors.amber),
-      ('TKT-3382', 'Wrong item delivered', 'In progress', AppColors.primary),
-      ('TKT-3360', 'Change delivery address', 'Resolved', AppColors.success),
-    ];
     return Scaffold(
       appBar: backAppBar(context, 'Support'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        ...tickets.map((t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: GestureDetector(
+        ..._tickets.map((t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(id: t.$1, subject: t.$2, status: t.$3, statusColor: t.$4))),
           child: Panel(
           child: Row(children: [
@@ -147,8 +99,98 @@ class SupportListScreen extends StatelessWidget {
         const SizedBox(height: 4),
         PrimaryButton('New ticket',
             icon: Icons.add_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening a new support ticket…')))),
+            onPressed: () async {
+              final created = await Navigator.push<(String, String)>(context, MaterialPageRoute(builder: (_) => NewTicketScreen(locale: widget.locale)));
+              if (created != null) {
+                setState(() => _tickets.insert(0, (created.$1, created.$2, 'Open', AppColors.amber)));
+              }
+            }),
       ]),
+    );
+  }
+}
+
+/// CF-34 — Create a support ticket: choose an order/product, subject + issue.
+class NewTicketScreen extends StatefulWidget {
+  final Locale locale;
+  const NewTicketScreen({super.key, this.locale = const Locale('en')});
+  @override
+  State<NewTicketScreen> createState() => _NewTicketScreenState();
+}
+
+class _NewTicketScreenState extends State<NewTicketScreen> {
+  final _subject = TextEditingController();
+  final _body = TextEditingController();
+  int _order = 0;
+  int _topic = 0;
+
+  static const _orders = ['SMB-2026-4821', 'SMB-2026-4805', 'SMB-2026-4712', 'Not order-related'];
+  static const _topics = ['Refund / payment', 'Delivery issue', 'Wrong / damaged item', 'Account help', 'Other'];
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: backAppBar(context, 'New ticket'),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 24), children: [
+        const Text('Related order', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: List.generate(_orders.length, (i) {
+          final sel = _order == i;
+          return GestureDetector(onTap: () => setState(() => _order = i), child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: sel ? AppColors.primary : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
+            child: Text(_orders[i], style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ));
+        })),
+        const SizedBox(height: 20),
+        const Text('Topic', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: List.generate(_topics.length, (i) {
+          final sel = _topic == i;
+          return GestureDetector(onTap: () => setState(() => _topic = i), child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: sel ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface, borderRadius: BorderRadius.circular(100), border: Border.all(color: sel ? AppColors.primary : AppColors.line)),
+            child: Text(_topics[i], style: TextStyle(color: sel ? AppColors.primary : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ));
+        })),
+        const SizedBox(height: 20),
+        const Text('Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 8),
+        TextField(controller: _subject, decoration: const InputDecoration(hintText: 'Brief summary of the issue')),
+        const SizedBox(height: 18),
+        const Text('Describe the issue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _body,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: 'Tell us what happened…',
+            filled: true, fillColor: AppColors.surface,
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+          ),
+        ),
+      ]),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
+        child: PrimaryButton('Open ticket', icon: Icons.send_rounded, onPressed: () {
+          final subject = _subject.text.trim().isEmpty ? _topics[_topic] : _subject.text.trim();
+          final id = 'TKT-${3400 + _subject.text.length + _topic}';
+          final orderRef = _order < 3 ? _orders[_order] : null;
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(
+            id: id, subject: subject, status: 'Open', statusColor: AppColors.amber,
+            orderRef: orderRef, firstMessage: _body.text.trim().isEmpty ? null : _body.text.trim(),
+          )));
+        }),
+      ),
     );
   }
 }
@@ -250,74 +292,161 @@ class AccountDeleteScreen extends StatelessWidget {
   }
 }
 
-// CF-35 — Support ticket detail (conversation thread + reply).
+// CF-35 — Support ticket detail (conversation thread + reply, image
+// attachments, and the ability to close the ticket).
+class _TicketMsg {
+  final String text;
+  final bool mine;
+  final bool isImage;
+  _TicketMsg(this.text, this.mine, {this.isImage = false});
+}
+
 class SupportTicketDetailScreen extends StatefulWidget {
   final String id;
   final String subject;
   final String status;
   final Color statusColor;
-  const SupportTicketDetailScreen({super.key, required this.id, required this.subject, required this.status, required this.statusColor});
+  final String? orderRef;
+  final String? firstMessage;
+  const SupportTicketDetailScreen({
+    super.key,
+    required this.id,
+    required this.subject,
+    required this.status,
+    required this.statusColor,
+    this.orderRef,
+    this.firstMessage,
+  });
   @override
   State<SupportTicketDetailScreen> createState() => _SupportTicketDetailScreenState();
 }
 
 class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   final _ctrl = TextEditingController();
-  final List<(String, bool)> _msgs = [];
+  final _scroll = ScrollController();
+  final List<_TicketMsg> _msgs = [];
+  late String _status;
+  late Color _statusColor;
+  int _photoSeq = 0;
+
+  bool get _closed => _status == 'Resolved' || _status == 'Closed';
 
   @override
   void initState() {
     super.initState();
-    _msgs.addAll([
-      ('Hi, I need help with this order.', true),
-      ('Thanks for reaching out! Could you share the order number so we can look into it?', false),
-      ('It is order SMB-2026-4821.', true),
-      ('Got it — our team is reviewing it now and will update you shortly.', false),
-    ]);
+    _status = widget.status;
+    _statusColor = widget.statusColor;
+    if (widget.firstMessage != null) {
+      _msgs.add(_TicketMsg(widget.firstMessage!, true));
+      _msgs.add(_TicketMsg('Thanks for reaching out! Our team is reviewing your ticket and will reply shortly.', false));
+    } else {
+      _msgs.addAll([
+        _TicketMsg('Hi, I need help with this order.', true),
+        _TicketMsg('Thanks for reaching out! Could you share the order number so we can look into it?', false),
+        _TicketMsg('It is order ${widget.orderRef ?? 'SMB-2026-4821'}.', true),
+        _TicketMsg('Got it — our team is reviewing it now and will update you shortly.', false),
+      ]);
+    }
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
+
+  void _scrollToEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      });
 
   void _send() {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
     setState(() {
-      _msgs.add((t, true));
+      _msgs.add(_TicketMsg(t, true));
       _ctrl.clear();
     });
+    _scrollToEnd();
+  }
+
+  void _attachImage() {
+    setState(() {
+      _photoSeq++;
+      _msgs.add(_TicketMsg('Photo $_photoSeq', true, isImage: true));
+    });
+    _scrollToEnd();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo attached')));
+  }
+
+  void _closeTicket() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(height: 52, width: 52, decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28)),
+          const SizedBox(height: 14),
+          const Text('Close this ticket?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          const SizedBox(height: 6),
+          const Text('Mark this issue as resolved. You can always open a new ticket if you need more help.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+          const SizedBox(height: 18),
+          FilledButton(onPressed: () {
+            Navigator.pop(context);
+            setState(() {
+              _status = 'Resolved';
+              _statusColor = AppColors.success;
+              _msgs.add(_TicketMsg('You marked this ticket as resolved. Thanks!', false));
+            });
+            _scrollToEnd();
+          }, child: const Text('Close ticket')),
+          const SizedBox(height: 10),
+          OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Keep open')),
+        ]),
+      )),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, widget.id),
+      appBar: backAppBar(context, widget.id, actions: [
+        if (!_closed) TextButton(onPressed: _closeTicket, child: const Text('Close')),
+      ]),
       body: Column(children: [
         Container(
           width: double.infinity,
           color: AppColors.surface,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-          child: Row(children: [
-            Expanded(child: Text(widget.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-            Pill(widget.status, color: widget.statusColor.withValues(alpha: 0.14), textColor: widget.statusColor, fontSize: 10.5),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(widget.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+              Pill(_status, color: _statusColor.withValues(alpha: 0.14), textColor: _statusColor, fontSize: 10.5),
+            ]),
+            if (widget.orderRef != null) ...[
+              const SizedBox(height: 6),
+              Row(children: [
+                const Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.muted),
+                const SizedBox(width: 6),
+                Text('Order ${widget.orderRef}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              ]),
+            ],
           ]),
         ),
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
+            controller: _scroll,
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             itemCount: _msgs.length,
             itemBuilder: (_, i) {
               final m = _msgs[i];
-              final mine = m.$2;
+              final mine = m.mine;
               return Align(
                 alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: m.isImage ? const EdgeInsets.all(6) : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
                   decoration: BoxDecoration(
                     color: mine ? AppColors.primary : AppColors.surface,
@@ -329,46 +458,71 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                     ),
                     boxShadow: mine ? null : AppShadow.card,
                   ),
-                  child: Text(m.$1,
-                      style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                  child: m.isImage
+                      ? Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                          Container(
+                            height: 130, width: 170,
+                            decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.image_rounded, color: Colors.white, size: 40),
+                          ),
+                          const Padding(padding: EdgeInsets.only(top: 4, left: 4), child: Text('Attachment', style: TextStyle(color: Colors.white70, fontSize: 11))),
+                        ])
+                      : Text(m.text, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
                 ),
               );
             },
           ),
         ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _ctrl,
-                  onSubmitted: (_) => _send(),
-                  decoration: InputDecoration(
-                    hintText: 'Reply…',
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
+        if (_closed)
+          SafeArea(top: false, child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: AppColors.success.withValues(alpha: 0.08),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+              Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+              SizedBox(width: 8),
+              Text('This ticket is resolved', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
+            ]),
+          ))
+        else
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
+              child: Row(children: [
+                IconButton(
+                  onPressed: _attachImage,
+                  icon: const Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary),
+                  tooltip: 'Attach photo',
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _ctrl,
+                    onSubmitted: (_) => _send(),
+                    decoration: InputDecoration(
+                      hintText: 'Reply…',
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Material(
-                color: AppColors.primary,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _send,
-                  child: const Padding(padding: EdgeInsets.all(13), child: Icon(Icons.send_rounded, color: Colors.white, size: 22)),
+                const SizedBox(width: 8),
+                Material(
+                  color: AppColors.primary,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _send,
+                    child: const Padding(padding: EdgeInsets.all(13), child: Icon(Icons.send_rounded, color: Colors.white, size: 22)),
+                  ),
                 ),
-              ),
-            ]),
+              ]),
+            ),
           ),
-        ),
       ]),
     );
   }
