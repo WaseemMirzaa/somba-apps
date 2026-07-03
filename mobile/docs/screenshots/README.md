@@ -4,6 +4,19 @@ Full screen-by-screen captures of every customer-app flow (390×844 @2x),
 regenerated from the current build. Individual screens live in
 [`flows/`](flows/); the grouped contact sheets below index them.
 
+## 🎬 Complete flow video (French)
+
+A narrated-style walkthrough that steps through **all 51 screens in French**, one
+by one, in the order a real user moves through the app — sign-in, browsing,
+product, cart, checkout, payment, orders, returns, support and account.
+
+<video src="https://raw.githubusercontent.com/WaseemMirzaa/somba-apps/claude/customer-app-cicd-ui-xjwzda/mobile/docs/screenshots/customer-flow-fr.webm" controls muted width="320"></video>
+
+▶ **[Play / download the flow video (customer-flow-fr.webm)](customer-flow-fr.webm)**
+— if the inline player doesn't load in your Markdown viewer, open the file link
+(GitHub shows a built-in player). After PR #79 merges, replace the branch name in
+the URL with `main`.
+
 ## Auth & onboarding
 ![Auth & onboarding](01-auth-contact-sheet.png)
 
