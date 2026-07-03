@@ -15,17 +15,19 @@ and `flows-fr/05-tasks.png` are the same screen in EN and FR respectively.
 
 ---
 
-## 🎬 Complete flow video
+## 🎬 Complete flow video — live screen recording (French)
 
-A walkthrough that steps through **all 26 rider screens**, one by one, in the
-order a rider moves through the app — sign-in, tasks & route, the three task
-types (delivery / warehouse pickup / zone transfer), batch scan, proof of
-delivery, support, documents, vehicle, shift & attendance and settings.
+A real screen recording of the running rider app in French, driven like a normal
+rider with a moving cursor: signing in, scrolling today's route, opening a
+**delivery** task and its checklist, opening a **zone-to-zone transfer** task,
+switching to the **Navigate** map, then through the profile into **Shift &
+attendance** (clock-in log) and **Documents** — every scrollable screen shown in
+motion.
 
-<video src="https://raw.githubusercontent.com/WaseemMirzaa/somba-apps/claude/customer-app-cicd-ui-xjwzda/rider-app/docs/screenshots/rider-flow.webm" controls muted width="320"></video>
+<video src="https://raw.githubusercontent.com/WaseemMirzaa/somba-apps/claude/customer-app-cicd-ui-xjwzda/rider-app/docs/screenshots/rider-live-fr.webm" controls muted width="320"></video>
 
-▶ **[Play / download the flow video (rider-flow.webm)](rider-flow.webm)** — if the
-inline player doesn't load in your Markdown viewer, open the file link (GitHub
+▶ **[Play / download the flow video (rider-live-fr.webm)](rider-live-fr.webm)** — if
+the inline player doesn't load in your Markdown viewer, open the file link (GitHub
 shows a built-in player). After the PR merges, replace the branch name in the URL
 with `main`.
 
