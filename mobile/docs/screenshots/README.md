@@ -8,9 +8,9 @@ regenerated from the current build. Individual screens live in
 
 A real screen recording of the running app in French, driven like a normal user
 with a moving cursor: typing the sign-in, scrolling the home feed, opening a
-product and scrolling its details, adding to cart, viewing the cart, browsing
-categories, and going through the account into **My Orders** — every scrollable
-screen shown in motion.
+product and scrolling its details, adding it to the cart, then a **complete
+checkout** — cart → review (address + payment) → order summary → **order
+confirmation** ("Commande passée !"). Every scrollable screen is shown in motion.
 
 <video src="https://raw.githubusercontent.com/WaseemMirzaa/somba-apps/claude/customer-app-cicd-ui-xjwzda/mobile/docs/screenshots/customer-live-fr.webm" controls muted width="320"></video>
 
