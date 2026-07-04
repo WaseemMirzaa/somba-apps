@@ -15,7 +15,7 @@ class RiderSettingsScreen extends StatefulWidget {
 }
 
 class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
-  bool _push = true, _sound = true, _autoAccept = false, _navVoice = true;
+  bool _push = true, _sound = true, _navVoice = true;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,7 +27,6 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
         ]),
         const SizedBox(height: 14),
         _group(tr(context, 'Delivery'), [
-          _toggle(Icons.flash_on_rounded, tr(context, 'Auto-accept tasks'), tr(context, 'Automatically accept nearby tasks'), _autoAccept, (v) => setState(() => _autoAccept = v)),
           _toggle(Icons.record_voice_over_rounded, tr(context, 'Voice navigation'), tr(context, 'Spoken turn-by-turn guidance'), _navVoice, (v) => setState(() => _navVoice = v)),
         ]),
         const SizedBox(height: 14),

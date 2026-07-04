@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
-                Text(tr(context, 'Rider partner'), style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 13.5, fontWeight: FontWeight.w700)),
+                Text(tr(context, 'Fleet rider'), style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 13.5, fontWeight: FontWeight.w700)),
               ]),
             ),
             const SizedBox(height: 34),

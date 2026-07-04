@@ -15,6 +15,7 @@ const Map<String, String> kFr = {
   'All': 'Tout',
   'Other': 'Autre',
   'General': 'Général',
+  'Yesterday': 'Hier',
   'You': 'Vous',
   'Active': 'Actif',
   'Pending': 'En attente',
@@ -40,7 +41,7 @@ const Map<String, String> kFr = {
   'delivered': 'livré',
 
   // ---- Auth: splash / login / forgot / OTP ----
-  'Rider partner': 'Partenaire livreur',
+  'Fleet rider': 'Livreur de la flotte',
   'Welcome back': 'Bon retour',
   'Sign in to start your shift': 'Connectez-vous pour commencer votre service',
   'Rider ID': 'Identifiant livreur',
@@ -215,8 +216,6 @@ const Map<String, String> kFr = {
   'New tasks & route alerts': 'Nouvelles tâches et alertes d\'itinéraire',
   'Sound alerts': 'Alertes sonores',
   'Play a sound on new task': 'Émettre un son à chaque nouvelle tâche',
-  'Auto-accept tasks': 'Accepter les tâches automatiquement',
-  'Automatically accept nearby tasks': 'Accepter automatiquement les tâches à proximité',
   'Voice navigation': 'Navigation vocale',
   'Spoken turn-by-turn guidance': 'Guidage vocal détaillé',
   'Account': 'Compte',

@@ -406,12 +406,12 @@ class RiderHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      ('TSK-8830', 'Marie Dubois · Gombe', tr(context, 'Delivered · 3 parcels'), AppColors.primary, Icons.check_circle_rounded, '\$149'),
-      ('TSK-8829', tr(context, 'Warehouse pickup'), tr(context, 'Completed · 6 parcels'), AppColors.primary, Icons.warehouse_rounded, '—'),
-      ('TSK-8827', 'Gombe → Limete hub', tr(context, 'Zone transfer · 12 parcels'), AppColors.info, Icons.swap_horiz_rounded, '—'),
-      ('TSK-8825', 'Paul Kabeya · Lemba', tr(context, 'Failed · absent'), AppColors.danger, Icons.cancel_rounded, '\$0'),
-      ('TSK-8820', 'Sophie Laurent · Ngaba', tr(context, 'Delivered · 1 parcel'), AppColors.primary, Icons.check_circle_rounded, '\$62'),
-      ('TSK-8814', tr(context, 'Batch · 4 sellers'), tr(context, 'Delivered · 5 parcels'), AppColors.primary, Icons.check_circle_rounded, '\$203'),
+      ('TSK-8830', 'Marie Dubois · Gombe', tr(context, 'Delivered · 3 parcels'), AppColors.primary, Icons.check_circle_rounded, '10:24'),
+      ('TSK-8829', tr(context, 'Warehouse pickup'), tr(context, 'Completed · 6 parcels'), AppColors.primary, Icons.warehouse_rounded, '09:50'),
+      ('TSK-8827', 'Gombe → Limete hub', tr(context, 'Zone transfer · 12 parcels'), AppColors.info, Icons.swap_horiz_rounded, '09:05'),
+      ('TSK-8825', 'Paul Kabeya · Lemba', tr(context, 'Failed · absent'), AppColors.danger, Icons.cancel_rounded, '08:32'),
+      ('TSK-8820', 'Sophie Laurent · Ngaba', tr(context, 'Delivered · 1 parcel'), AppColors.primary, Icons.check_circle_rounded, '08:10'),
+      ('TSK-8814', tr(context, 'Batch · 4 sellers'), tr(context, 'Delivered · 5 parcels'), AppColors.primary, Icons.check_circle_rounded, 'Yesterday'),
     ];
     return Scaffold(
       appBar: backAppBar(context, tr(context, 'Task history')),
@@ -428,7 +428,7 @@ class RiderHistoryScreen extends StatelessWidget {
               Text(h.$2, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
               Text('${h.$1} · ${h.$3}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             ])),
-            Text(h.$6, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            Text(tr(context, h.$6), style: const TextStyle(color: AppColors.faint, fontWeight: FontWeight.w600, fontSize: 12.5)),
           ]));
         },
       ),
