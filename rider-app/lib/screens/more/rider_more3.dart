@@ -21,12 +21,9 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
     return Scaffold(
       appBar: backAppBar(context, tr(context, 'Settings')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        _group(tr(context, 'Notifications'), [
+        _group(tr(context, 'Preferences'), [
           _toggle(Icons.notifications_active_rounded, tr(context, 'Push notifications'), tr(context, 'New tasks & route alerts'), _push, (v) => setState(() => _push = v)),
           _toggle(Icons.volume_up_rounded, tr(context, 'Sound alerts'), tr(context, 'Play a sound on new task'), _sound, (v) => setState(() => _sound = v)),
-        ]),
-        const SizedBox(height: 14),
-        _group(tr(context, 'Delivery'), [
           _toggle(Icons.record_voice_over_rounded, tr(context, 'Voice navigation'), tr(context, 'Spoken turn-by-turn guidance'), _navVoice, (v) => setState(() => _navVoice = v)),
         ]),
         const SizedBox(height: 14),

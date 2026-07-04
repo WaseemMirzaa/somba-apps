@@ -15,6 +15,7 @@ const Map<String, String> kFr = {
   'All': 'Tout',
   'Other': 'Autre',
   'General': 'Général',
+  'Preferences': 'Préférences',
   'Yesterday': 'Hier',
   'You': 'Vous',
   'Active': 'Actif',

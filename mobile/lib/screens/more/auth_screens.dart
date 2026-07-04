@@ -217,6 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return _AuthPage(
       title: tr(context, 'Welcome back'),
       subtitle: tr(context, 'Sign in to continue shopping on Somba&Teka'),
+      centered: true,
       form: Column(children: [
         _GlassField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
         const SizedBox(height: 14),
@@ -364,6 +365,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       title: tr(context, 'Create account'),
       subtitle: tr(context, 'Join Somba&Teka in under a minute'),
       showBack: true,
+      centered: true,
       form: Column(children: [
         // Optional profile picture.
         Center(

@@ -94,6 +94,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     return RiderAuthPage(
       title: tr(context, 'Welcome back'),
       subtitle: tr(context, 'Sign in to start your shift'),
+      centered: true,
       form: Column(children: [
         RiderField(label: tr(context, 'Rider ID'), hint: 'RDR-001', icon: Icons.badge_outlined, controller: _id),
         const SizedBox(height: 16),
