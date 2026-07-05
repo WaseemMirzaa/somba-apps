@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: somba-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: somba
+      MYSQL_DATABASE: somba
+    ports:
+      - '3306:3306'
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - somba-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-psomba']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  somba-mysql-data:
