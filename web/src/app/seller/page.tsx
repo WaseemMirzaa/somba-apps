@@ -34,6 +34,7 @@ import {
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
 import { useSellerGoals } from "@/context/seller-goals-context";
+import { useApiResource } from "@/lib/use-api";
 import {
   sellerStore,
   sellerDashboardStats,
@@ -58,6 +59,27 @@ import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const PERIODS = ["7D", "30D", "90D"] as const;
+
+type SellerDashboardResponse = {
+  totalProducts: number;
+  liveProducts: number;
+  pendingProducts: number;
+  totalOrders: number;
+  revenue: number;
+  ordersThisWeek: number;
+  rating: number;
+  healthScore: number;
+  balance: number;
+  pendingPayouts: number;
+  recentOrders: {
+    orderCode: string;
+    product: string;
+    qty: number;
+    status: string;
+    net: number;
+    date: string;
+  }[];
+};
 
 function KpiCard({
   title,
@@ -112,6 +134,23 @@ export default function SellerDashboard() {
   const k = sellerExtendedKpis;
   const s = sellerDashboardStats;
   const { goals } = useSellerGoals();
+  const { data: dash, live } = useApiResource<SellerDashboardResponse>("/seller/dashboard", "seller");
+
+  // Prefer live headline values when the API is reachable; mock is the fallback.
+  const revenue = live && dash ? dash.revenue : k.mtdRevenue;
+  const orders = live && dash ? dash.totalOrders : k.mtdOrders;
+  const balance = live && dash ? dash.balance : sellerFinanceStats.availableBalance;
+  const healthScore = live && dash ? dash.healthScore : s.healthScore;
+  const rating = live && dash ? dash.rating : sellerStore.rating;
+  const recentOrdersData =
+    live && dash
+      ? dash.recentOrders.map((o) => ({
+          id: o.orderCode,
+          customer: o.product,
+          amount: o.net,
+          orderStatus: o.status,
+        }))
+      : (sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]);
 
   const revenueSpark = sellerRevenueTrend.map((d) => d.revenue);
   const ordersSpark = sellerRevenueTrend.map((d) => d.orders);
@@ -135,7 +174,7 @@ export default function SellerDashboard() {
   const quickActions = [
     { href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
     { href: "/seller/products/create", label: t("createProduct"), sub: fr ? "Ajouter une annonce" : "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/seller/finance/payouts/request", label: fr ? "Demander un paiement" : "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
+    { href: "/seller/finance/payouts/request", label: fr ? "Demander un paiement" : "Request payout", sub: formatCurrency(balance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
     { href: "/seller/promotions/create", label: fr ? "Demander une promotion" : "Request promotion", sub: fr ? "Booster les ventes" : "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
   ];
 
@@ -143,9 +182,10 @@ export default function SellerDashboard() {
     <div className="space-y-6">
       <PageHeader
         title={sellerStore.name}
-        subtitle={fr ? `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Vendeur · ⭐ ${sellerStore.rating} · Santé ${sellerStore.healthScore}%` : `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Seller · ⭐ ${sellerStore.rating} · Health ${sellerStore.healthScore}%`}
+        subtitle={fr ? `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Vendeur · ⭐ ${rating} · Santé ${healthScore}%` : `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Seller · ⭐ ${rating} · Health ${healthScore}%`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {live && <Badge variant="success">Live API</Badge>}
             <Link href="/seller/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
               {t("analytics")}
             </Link>
@@ -158,8 +198,8 @@ export default function SellerDashboard() {
 
       {/* KPI grid with sparklines */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={fr ? "Revenu (mois)" : "Revenue (MTD)"} value={formatCurrency(k.mtdRevenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} />
-        <KpiCard title={fr ? "Commandes (mois)" : "Orders (MTD)"} value={String(k.mtdOrders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} />
+        <KpiCard title={fr ? "Revenu (mois)" : "Revenue (MTD)"} value={formatCurrency(revenue, locale)} change={k.mtdRevenueChange} spark={revenueSpark} icon={DollarSign} />
+        <KpiCard title={fr ? "Commandes (mois)" : "Orders (MTD)"} value={String(orders)} change={k.mtdOrdersChange} spark={ordersSpark} icon={ShoppingCart} />
         <KpiCard title={fr ? "Panier moyen" : "Avg. order value"} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
         <KpiCard title={fr ? "Taux de conversion" : "Conversion rate"} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} />
         <KpiCard title={fr ? "Rétention client" : "Customer retention"} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} />
@@ -319,7 +359,7 @@ export default function SellerDashboard() {
         <Card>
           <CardHeader>
             <h2 className="font-semibold text-slate-900">{fr ? "Score de santé de la boutique" : "Store health score"}</h2>
-            <p className="text-3xl font-bold text-[var(--primary)]">{s.healthScore}%</p>
+            <p className="text-3xl font-bold text-[var(--primary)]">{healthScore}%</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {sellerHealthBreakdown.map((h) => (
@@ -477,7 +517,7 @@ export default function SellerDashboard() {
                 { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
                 { key: "orderStatus", label: t("status"), render: (row) => <Badge variant="info">{fr ? (orderStatusFr[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
               ]}
-              data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
+              data={recentOrdersData}
               rowAction={(row) => (
                 <Link href={`/seller/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
@@ -526,7 +566,7 @@ export default function SellerDashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-blue-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Solde disponible" : "Available balance"}</p>
-                  <p className="text-xl font-bold text-[var(--primary)]">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
+                  <p className="text-xl font-bold text-[var(--primary)]">{formatCurrency(balance, locale)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Chiffre d'affaires en attente" : "Pending revenue"}</p>

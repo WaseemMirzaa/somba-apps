@@ -14,6 +14,24 @@ import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 import { useModeration } from "@/context/moderation-context";
 import { useToast } from "@/context/toast-context";
+import { api } from "@/lib/api";
+import { useApiResource, useApiAction } from "@/lib/use-api";
+
+interface SellerLive {
+  id: string;
+  storeName: string;
+  slug: string;
+  status: "pending" | "active" | "suspended" | "rejected";
+  badge: string;
+  commissionRate: number;
+  rating: number;
+  healthScore: number;
+  city?: string;
+  phone?: string;
+  balanceUsd: number;
+  productCount: number;
+  orderCount: number;
+}
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -38,7 +56,27 @@ export default function AdminSellersPage() {
   const { isSellerBlocked, blockSeller, unblockSeller } = useModeration();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const filtered = useMemo(
+  const { data: liveSellers, live, reload } = useApiResource<SellerLive[]>("/admin/sellers");
+  const { busy, run } = useApiAction();
+
+  const liveRows = useMemo(
+    () =>
+      (liveSellers ?? []).map((s) => ({
+        id: s.id,
+        storeName: s.storeName,
+        owner: s.city ?? "—",
+        email: s.phone ?? "—",
+        category: s.badge,
+        orders: s.orderCount,
+        revenue: s.balanceUsd,
+        status: s.status === "active" ? "approved" : s.status,
+        rawStatus: s.status,
+        date: "—",
+      })),
+    [liveSellers]
+  );
+
+  const mockFiltered = useMemo(
     () =>
       applyListFilters(sellerEntities, filters, {
         searchFields: ["storeName", "owner", "email", "category", "id"],
@@ -48,12 +86,25 @@ export default function AdminSellersPage() {
     [filters]
   );
 
+  const liveFiltered = useMemo(
+    () =>
+      applyListFilters(liveRows, filters, {
+        searchFields: ["storeName", "owner", "email", "category", "id"],
+        dateField: "date",
+        statusField: "status",
+      }),
+    [liveRows, filters]
+  );
+
+  const filtered = live ? liveFiltered : mockFiltered;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("sellers")}
         subtitle={fr ? "Vue liste — survol rapide uniquement. Infos complètes sur la page de détail." : "List View — quick scanning only. Full info on detail page."}
         breadcrumbs={[adminBreadcrumb(locale), { label: t("sellers") }]}
+        actions={live ? <Badge variant="success">Live API</Badge> : undefined}
       />
 
       <ListFilters
@@ -110,6 +161,43 @@ export default function AdminSellersPage() {
                 key: "actions",
                 label: t("action"),
                 render: (row) => {
+                  if (live) {
+                    const id = String(row.id);
+                    const raw = String(row.rawStatus);
+                    return (
+                      <div className="flex items-center gap-3">
+                        <Link href={`/admin/sellers/${id}`} className="text-sm text-[var(--primary)] hover:underline">
+                          {t("view")}
+                        </Link>
+                        {raw === "pending" && (
+                          <button
+                            disabled={busy === `approve-${id}`}
+                            onClick={async () => {
+                              await run(`approve-${id}`, () => api.post(`/admin/sellers/${id}/approve`));
+                              toast(fr ? `${row.storeName} approuvé` : `${row.storeName} approved`);
+                              reload();
+                            }}
+                            className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50"
+                          >
+                            {t("approve")}
+                          </button>
+                        )}
+                        {(raw === "pending" || raw === "active") && (
+                          <button
+                            disabled={busy === `suspend-${id}`}
+                            onClick={async () => {
+                              await run(`suspend-${id}`, () => api.post(`/admin/sellers/${id}/suspend`));
+                              toast(fr ? `${row.storeName} suspendu` : `${row.storeName} suspended`, "info");
+                              reload();
+                            }}
+                            className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            {fr ? "Suspendre" : "Suspend"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
                   const blocked = isSellerBlocked(Number(row.id));
                   return (
                     <div className="flex items-center gap-3">
