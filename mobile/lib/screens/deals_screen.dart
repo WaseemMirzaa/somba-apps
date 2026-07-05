@@ -82,7 +82,7 @@ class _DealsScreenState extends State<DealsScreen> {
                 (_, i) => ProductCard(
                   product: deals[i],
                   lang: lang,
-                  soldPercent: 60 + (deals[i].id * 13) % 38,
+                  soldPercent: 60 + (i * 13) % 38,
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => ProductDetailScreen(product: deals[i], locale: widget.locale))),
                   onAdd: () {

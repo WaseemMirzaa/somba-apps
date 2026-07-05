@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/repository.dart';
 import '../data/shop_state.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -94,9 +95,13 @@ class _ProductCardState extends State<ProductCard> {
                         background: Colors.white.withValues(alpha: 0.9),
                         onTap: () {
                           setState(() {
-                            wished
-                                ? shop.wishlist.remove(p.id)
-                                : shop.wishlist.add(p.id);
+                            if (wished) {
+                              shop.wishlist.remove(p.id);
+                              Repo.instance.removeFavorite(p.id);
+                            } else {
+                              shop.wishlist.add(p.id);
+                              Repo.instance.addFavorite(p.id);
+                            }
                           });
                         },
                       ),

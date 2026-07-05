@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterSellerDto } from './dto';
+import { LoginDto, RegisterCustomerDto, RegisterSellerDto } from './dto';
 import { CurrentUser, Public } from '../common/decorators';
 import type { AuthUser } from '../common/decorators';
 
@@ -15,6 +15,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Log in and receive a JWT' })
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Public()
+  @Post('register/customer')
+  @ApiOperation({ summary: 'Self-register as a customer (shopper)' })
+  registerCustomer(@Body() dto: RegisterCustomerDto) {
+    return this.auth.registerCustomer(dto);
   }
 
   @Public()

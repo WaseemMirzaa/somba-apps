@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/strings.dart';
@@ -256,7 +257,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_address.text.trim().isEmpty || _name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(widget.locale.languageCode, 'Please add a name and street address'))));
       return;
@@ -279,17 +280,30 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         a.isDefault = true;
       }
     } else {
+      final makeDefault = _default || shop.addresses.isEmpty;
+      // Persist to the backend when signed in; use the server id so checkout
+      // and future edits reference the same record.
+      final created = await Repo.instance.createAddress({
+        'label': label,
+        'name': _name.text.trim(),
+        'phone': _phone.text.trim(),
+        'line': _address.text.trim(),
+        'city': _city.text.trim(),
+        'zone': _zone.text.trim(),
+        'isDefault': makeDefault,
+      });
       shop.addAddress(CustomerAddress(
-        id: shop.nextAddressId(),
+        id: created?['id']?.toString() ?? shop.nextAddressId(),
         label: label,
         name: _name.text.trim(),
         phone: _phone.text.trim(),
         line: _address.text.trim(),
         city: _city.text.trim(),
         zone: _zone.text.trim(),
-        isDefault: _default || shop.addresses.isEmpty,
+        isDefault: makeDefault,
       ));
     }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_editing ? 'Address updated' : 'Address saved')));
     Navigator.maybePop(context);
   }

@@ -11,7 +11,7 @@ import { User } from '../entities/user.entity';
 import { Seller } from '../entities/seller.entity';
 import { SellerStatus, UserRole } from '../common/enums';
 import { slugify } from '../common/util';
-import { LoginDto, RegisterSellerDto } from './dto';
+import { LoginDto, RegisterCustomerDto, RegisterSellerDto } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -59,6 +59,23 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.validateUser(dto.email, dto.password);
+    return this.sign(user);
+  }
+
+  async registerCustomer(dto: RegisterCustomerDto) {
+    const email = dto.email.toLowerCase();
+    const existing = await this.users.findOne({ where: { email } });
+    if (existing) throw new ConflictException('Email already registered');
+
+    const user = await this.users.save(
+      this.users.create({
+        email,
+        name: dto.name,
+        phone: dto.phone,
+        role: UserRole.CUSTOMER,
+        passwordHash: await bcrypt.hash(dto.password, 10),
+      }),
+    );
     return this.sign(user);
   }
 

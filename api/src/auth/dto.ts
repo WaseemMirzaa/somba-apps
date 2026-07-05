@@ -17,6 +17,26 @@ export class LoginDto {
   password: string;
 }
 
+export class RegisterCustomerDto {
+  @ApiProperty({ example: 'marie@mail.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: 'password123' })
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @ApiProperty({ example: 'Marie Dubois' })
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({ example: '+243 970 000 000' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}
+
 export class RegisterSellerDto {
   @ApiProperty({ example: 'boutique@somba.com' })
   @IsEmail()

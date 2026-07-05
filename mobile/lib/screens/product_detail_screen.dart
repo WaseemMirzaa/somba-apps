@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/repository.dart';
 import '../data/shop_state.dart';
 import '../data/catalog_meta.dart';
 import '../l10n/strings.dart';
@@ -36,6 +37,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     ShopState.instance.addRecentlyViewed(widget.product.id);
     _variants = _variantsFor(widget.product.category);
+    _loadReviews();
+  }
+
+  /// Pull this product's live reviews into ShopState so the reviews screen and
+  /// summary reflect real data (no-op offline).
+  Future<void> _loadReviews() async {
+    final rows = await Repo.instance.productReviews(widget.product.id);
+    if (!mounted || rows.isEmpty) return;
+    setState(() {
+      ShopState.instance.reviews
+        ..clear()
+        ..addAll(rows.map((r) => CustomerReview(
+              name: (r['authorName'] ?? 'Customer').toString(),
+              stars: (r['stars'] as num?)?.toInt() ?? 5,
+              text: (r['text'] ?? '').toString(),
+              date: (r['createdAt']?.toString() ?? '').length >= 10
+                  ? r['createdAt'].toString().substring(0, 10)
+                  : 'Recently',
+              photos: (r['photos'] as num?)?.toInt() ?? 0,
+            )));
+    });
   }
 
   List<String> _variantsFor(String category) {
@@ -78,8 +100,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 icon: wished ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                 color: wished ? AppColors.accent : AppColors.ink,
                 background: Colors.white,
-                onTap: () => setState(() =>
-                    wished ? shop.wishlist.remove(p.id) : shop.wishlist.add(p.id)),
+                onTap: () => setState(() {
+                  if (wished) {
+                    shop.wishlist.remove(p.id);
+                    Repo.instance.removeFavorite(p.id);
+                  } else {
+                    shop.wishlist.add(p.id);
+                    Repo.instance.addFavorite(p.id);
+                  }
+                }),
               ),
               const SizedBox(width: 8),
               CircleIconButton(
@@ -301,7 +330,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _specs(Product p) {
-    final specs = specsFor(p);
+    final specs = specsFor(p, widget.locale.languageCode);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),

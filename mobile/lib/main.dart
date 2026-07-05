@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app.dart';
 import 'data/shop_state.dart';
+import 'data/repository.dart';
 import 'screens/more/auth_screens.dart';
 import 'theme/app_theme.dart';
 import 'util/format.dart';
@@ -10,6 +11,10 @@ import 'util/format.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ShopState.instance.load();
+  // Hydrate the catalogue (+ session, if a token is stored) from the live API.
+  // Fails soft to the bundled fallback data when the backend is unreachable.
+  await Repo.instance.bootstrap();
+  ShopState.instance.seedDemoIfEmpty();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -27,7 +32,8 @@ class SombaApp extends StatefulWidget {
 class _SombaAppState extends State<SombaApp> {
   Locale _locale = const Locale('en');
   bool _splashDone = false;
-  bool _authed = false;
+  // Skip the login gate when a stored session was restored at startup.
+  bool _authed = Repo.instance.isAuthed;
 
   void _setLocale(Locale locale) {
     setState(() => _locale = locale);
@@ -43,7 +49,10 @@ class _SombaAppState extends State<SombaApp> {
     return AppShell(
       onLocaleChanged: _setLocale,
       locale: _locale,
-      onLogout: () => setState(() => _authed = false),
+      onLogout: () {
+        Repo.instance.logout();
+        setState(() => _authed = false);
+      },
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../data/repository.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/brand_logo.dart';
@@ -193,18 +194,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
 
-  void _signIn() {
+  Future<void> _signIn() async {
     setState(() {
       _emailErr = _email.text.trim().isEmpty ? 'Enter your email' : (!_validEmail(_email.text.trim()) ? 'Enter a valid email' : null);
       _passErr = _pass.text.isEmpty ? 'Enter your password' : (_pass.text.length < 4 ? 'Password is too short' : null);
     });
     if (_emailErr != null || _passErr != null) return;
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      setState(() => _loading = false);
+    final ok = await Repo.instance.login(_email.text.trim(), _pass.text);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (ok) {
       widget.onAuthed?.call();
-    });
+      return;
+    }
+    // Backend unreachable → allow a local (guest) session so the demo build
+    // still works offline. Backend reachable but rejected → show the error.
+    if (!Repo.instance.live) {
+      widget.onAuthed?.call();
+      return;
+    }
+    setState(() => _passErr = 'Invalid email or password');
   }
 
   void _social(String name) {
@@ -313,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
 
-  void _submit() {
+  Future<void> _submit() async {
     setState(() {
       _nameErr = _name.text.trim().isEmpty ? tr(context, 'Enter your full name') : null;
       _phoneErr = _phone.text.trim().length < 6 ? tr(context, 'Enter a valid phone number') : null;
@@ -324,6 +334,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if ([_nameErr, _phoneErr, _emailErr, _passErr, _confirmErr].any((e) => e != null)) return;
     if (!_agree) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Please accept the Terms & Privacy Policy'))));
+      return;
+    }
+    // Create the account on the backend. If the email is taken (and the API is
+    // reachable), surface the error; if the API is down, continue offline.
+    final ok = await Repo.instance.register(
+      _email.text.trim(), _pass.text, _name.text.trim(),
+      phone: '$_dial ${_phone.text.trim()}',
+    );
+    if (!mounted) return;
+    if (!ok && Repo.instance.live) {
+      setState(() => _emailErr = tr(context, 'Email already registered'));
       return;
     }
     Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(

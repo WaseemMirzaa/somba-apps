@@ -49,10 +49,29 @@ curl -s localhost:3001/api/admin/dashboard -H "Authorization: Bearer $TOKEN" | j
 ## Auth
 
 - `POST /api/auth/login` → `{ accessToken, user }`
+- `POST /api/auth/register/customer` → self-register as a shopper
 - `POST /api/auth/register/seller` → self-register (status **pending**, admin approves)
 - `GET /api/auth/me`
 - Send `Authorization: Bearer <token>`. Routes are guarded by role
   (`@Roles`); admin routes accept any admin sub-role.
+
+Seeded customer login: `marie@mail.com` (password from `SEED_PASSWORD`).
+
+## Catalog (public — powers the customer mobile app)
+
+`GET /api/catalog/categories` (with product counts), `products` (browse +
+`category`/`q`/`seller`/`sort`/`page`/`limit`), `deals`, `featured`,
+`products/:id`, `products/:id/related`, `products/:id/reviews`, `stores`,
+`stores/:slug`. All products carry EN + FR fields (`name`/`nameFr`,
+`description`/`descriptionFr`, bilingual `specs`).
+
+## Customer endpoints (`/api/customer/...`, role `customer`)
+
+`me` (get/update), `addresses` (CRUD), `favorites` (list/add/remove wishlist),
+`orders` (checkout `POST`, list, detail), `products/:id/reviews` (write a
+review), `coupons` (list active + `coupons/validate`). Checkout computes
+per-item commission/net and applies a coupon; placing an order bumps each
+product's sold count.
 
 ## Seller endpoints (`/api/seller/...`, role `seller`)
 

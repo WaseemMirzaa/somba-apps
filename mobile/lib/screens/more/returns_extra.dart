@@ -23,7 +23,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
 
   // The order's items (mock: first three products); selection drives the refund.
   late final List<Product> _items = products.take(3).toList();
-  final Set<int> _selected = {};
+  final Set<String> _selected = {};
 
   double get _refundAmount => _items.where((p) => _selected.contains(p.id)).fold(0.0, (s, p) => s + p.price);
 

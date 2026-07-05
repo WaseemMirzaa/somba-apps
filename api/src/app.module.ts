@@ -11,6 +11,7 @@ import { JwtAuthGuard, RolesGuard } from './common/guards';
 import { AuthModule } from './auth/auth.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { CustomerModule } from './customer/customer.module';
 import { SellerModule } from './seller/seller.module';
 import { AdminModule } from './admin/admin.module';
 
@@ -28,6 +29,7 @@ import { AdminModule } from './admin/admin.module';
     AuthModule,
     UploadsModule,
     CatalogModule,
+    CustomerModule,
     SellerModule,
     AdminModule,
   ],

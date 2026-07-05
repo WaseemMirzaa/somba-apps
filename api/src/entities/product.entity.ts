@@ -67,8 +67,19 @@ export class Product {
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0, transformer: numeric })
   rating: number;
 
+  /** Number of published reviews (denormalised for fast catalog rendering). */
+  @Column({ type: 'int', default: 0 })
+  reviewCount: number;
+
   @Column({ type: 'int', default: 0 })
   sold: number;
+
+  /**
+   * Bilingual spec sheet: `[{ label, labelFr, value, valueFr }]`.
+   * Replaces the app's hardcoded `specsFor()` mock.
+   */
+  @Column({ type: 'simple-json', nullable: true })
+  specs?: Array<{ label: string; labelFr?: string; value: string; valueFr?: string }>;
 
   @OneToMany(() => ProductImage, (img) => img.product, { cascade: true, eager: true })
   images: ProductImage[];

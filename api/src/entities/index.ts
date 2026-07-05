@@ -10,6 +10,10 @@ export * from './promotion.entity';
 export * from './dispute.entity';
 export * from './audit-log.entity';
 export * from './upload.entity';
+export * from './address.entity';
+export * from './review.entity';
+export * from './favorite.entity';
+export * from './coupon.entity';
 
 import { User } from './user.entity';
 import { Seller } from './seller.entity';
@@ -23,6 +27,10 @@ import { Promotion } from './promotion.entity';
 import { Dispute } from './dispute.entity';
 import { AuditLog } from './audit-log.entity';
 import { Upload } from './upload.entity';
+import { Address } from './address.entity';
+import { Review } from './review.entity';
+import { Favorite } from './favorite.entity';
+import { Coupon } from './coupon.entity';
 
 export const ALL_ENTITIES = [
   User,
@@ -37,4 +45,8 @@ export const ALL_ENTITIES = [
   Dispute,
   AuditLog,
   Upload,
+  Address,
+  Review,
+  Favorite,
+  Coupon,
 ];

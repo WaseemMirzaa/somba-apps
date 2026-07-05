@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/repository.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -15,6 +16,38 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   int _tab = 0;
+
+  /// Live orders from the API (empty until loaded / when signed out).
+  List<Map<String, Object>> _apiOrders = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await Repo.instance.myOrders();
+    if (!mounted) return;
+    setState(() {
+      _apiOrders = rows.map(_mapOrder).toList();
+      _loading = false;
+    });
+  }
+
+  Map<String, Object> _mapOrder(Map<String, dynamic> o) {
+    final items = (o['items'] as List?) ?? const [];
+    final qty = items.fold<int>(0, (s, it) => s + ((it is Map ? (it['qty'] as num?)?.toInt() : 1) ?? 1));
+    final total = o['totalUsd'];
+    return {
+      'id': (o['code'] ?? '').toString(),
+      'status': (o['status'] ?? 'pending').toString(),
+      'amount': total is num ? total : num.tryParse('$total') ?? 0,
+      'items': qty == 0 ? items.length : qty,
+      'icon': Icons.inventory_2_rounded,
+    };
+  }
 
   static const _orders = [
     {'id': 'SMB-2026-4821', 'status': 'processing', 'amount': 1498, 'items': 2, 'icon': Icons.devices_other_rounded},
@@ -45,7 +78,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
-    final orders = _orders.where((o) => _match(o['status'] as String)).toList();
+    // Prefer live orders; fall back to the sample list when signed out/offline.
+    final source = _apiOrders.isNotEmpty ? _apiOrders : _orders;
+    final orders = source.where((o) => _match(o['status'] as String)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -84,7 +119,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
           Expanded(
-            child: orders.isEmpty
+            child: _loading && _apiOrders.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : orders.isEmpty
                 ? Center(child: Text(trl(s.lang, 'No orders here yet'), style: const TextStyle(color: AppColors.muted)))
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
@@ -117,7 +154,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(o['id'] as String, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
               const SizedBox(height: 3),
-              Text('${s.itemsCount(o['items'] as int)} · ${money(o['amount'] as int)}',
+              Text('${s.itemsCount(o['items'] as int)} · ${money(o['amount'] as num)}',
                   style: const TextStyle(color: AppColors.muted, fontSize: 13)),
             ])),
             Container(

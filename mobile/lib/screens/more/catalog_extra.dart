@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/mock_data.dart';
 import '../../data/promos.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -253,6 +254,9 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
             icon: Icons.send_rounded,
             onPressed: () {
               ShopState.instance.addReview(_rating, _ctrl.text.trim(), _photos);
+              // Persist to the backend when signed in (best-effort).
+              final pid = widget.product?.id;
+              if (pid != null) Repo.instance.submitReview(pid, _rating, _ctrl.text.trim(), _photos);
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(lang, 'Review submitted — thank you!'))));
               Navigator.maybePop(context);
             }),

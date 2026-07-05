@@ -76,8 +76,10 @@ class ShopState {
   static final ShopState instance = ShopState._();
 
   final List<CartItem> cart = [];
-  final List<int> wishlist = [1, 3];
-  final List<int> recentlyViewed = [1, 3, 5];
+  /// Wishlisted product ids. Hydrated from the API when signed in; seeded with a
+  /// couple of demo items offline (see [seedDemoIfEmpty]).
+  final List<String> wishlist = [];
+  final List<String> recentlyViewed = [];
 
   /// Applied promo code (null when none). Set from the cart/checkout.
   Promo? appliedPromo;
@@ -137,6 +139,49 @@ class ShopState {
   int _addrSeq = 3;
   String nextAddressId() => 'addr-${_addrSeq++}';
 
+  /// Replace the local address book with the customer's server-side addresses.
+  void setAddressesFromApi(List<Map<String, dynamic>> rows) {
+    double d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+    addresses
+      ..clear()
+      ..addAll(rows.map((a) => CustomerAddress(
+            id: (a['id'] ?? '').toString(),
+            label: (a['label'] ?? 'Home').toString(),
+            name: (a['name'] ?? '').toString(),
+            phone: (a['phone'] ?? '').toString(),
+            line: (a['line'] ?? '').toString(),
+            city: (a['city'] ?? 'Kinshasa').toString(),
+            zone: (a['zone'] ?? 'Gombe').toString(),
+            isDefault: a['isDefault'] == true,
+            lat: d(a['lat']),
+            lng: d(a['lng']),
+          )));
+    final def = addresses.where((a) => a.isDefault);
+    selectedDeliveryAddressId =
+        def.isNotEmpty ? def.first.id : (addresses.isNotEmpty ? addresses.first.id : null);
+  }
+
+  /// Clear all account-scoped state on logout.
+  void clearSession() {
+    wishlist.clear();
+    followedStores.clear();
+    appliedPromo = null;
+    selectedDeliveryAddressId = null;
+  }
+
+  /// Seed a couple of demo items so the cart/wishlist aren't empty for a first
+  /// look. Uses the (already hydrated) live catalogue so ids are real.
+  void seedDemoIfEmpty() {
+    if (cart.isEmpty && products.isNotEmpty) {
+      cart.add(CartItem(product: products[0], variant: '256GB Black'));
+      if (products.length > 2) cart.add(CartItem(product: products[2], variant: 'White', qty: 2));
+    }
+    if (wishlist.isEmpty && products.isNotEmpty) {
+      wishlist.add(products[0].id);
+      if (products.length > 2) wishlist.add(products[2].id);
+    }
+  }
+
   /// Groups the cart into one [StoreOrder] per store (different stores =
   /// different orders at checkout).
   List<StoreOrder> get cartByStore {
@@ -191,12 +236,7 @@ class ShopState {
     save();
   }
 
-  ShopState._() {
-    if (products.isNotEmpty) {
-      cart.add(CartItem(product: products[0], variant: '256GB Black'));
-      cart.add(CartItem(product: products[2], variant: 'White', qty: 2));
-    }
-  }
+  ShopState._();
 
   void addToCart(Product p, {String variant = 'Default', int qty = 1}) {
     CartItem? existing;
@@ -216,7 +256,7 @@ class ShopState {
   double get subtotal => cart.fold(0.0, (s, i) => s + i.product.price * i.qty);
   int get cartCount => cart.fold(0, (s, i) => s + i.qty);
 
-  void addRecentlyViewed(int id) {
+  void addRecentlyViewed(String id) {
     recentlyViewed.remove(id);
     recentlyViewed.insert(0, id);
     if (recentlyViewed.length > 12) recentlyViewed.removeLast();

@@ -13,7 +13,9 @@ class WishlistScreen extends StatelessWidget {
   const WishlistScreen({super.key, this.locale = const Locale('en')});
   @override
   Widget build(BuildContext context) {
-    final items = products.where((p) => p.id % 2 == 1).toList();
+    // The customer's real wishlist (hydrated from the API when signed in).
+    final wl = ShopState.instance.wishlist;
+    final items = products.where((p) => wl.contains(p.id)).toList();
     return Scaffold(
       appBar: backAppBar(context, trl(locale.languageCode, 'Wishlist')),
       body: GridView.builder(

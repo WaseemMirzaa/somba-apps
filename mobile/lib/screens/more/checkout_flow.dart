@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -302,8 +303,22 @@ class OrderSummaryScreen extends StatelessWidget {
       ]),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('${trl(lang, 'Place order')} · ${money(total)}', icon: Icons.lock_rounded, onPressed: () {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OrderPlacedScreen(locale: locale, stores: stores, paymentLabel: paymentLabel)));
+        child: PrimaryButton('${trl(lang, 'Place order')} · ${money(total)}', icon: Icons.lock_rounded, onPressed: () async {
+          // Persist the order on the backend when signed in; fall back to a
+          // local confirmation otherwise (offline / guest).
+          final code = await Repo.instance.placeOrder(
+            addressId: address.id,
+            name: address.name,
+            phone: address.phone,
+            line: address.line,
+            city: address.city,
+            zone: address.zone,
+            paymentMethod: paymentLabel.toLowerCase().contains('cash') ? 'cod' : 'stripe_card',
+            couponCode: shop.appliedPromo?.code,
+            deliveryFeeUsd: deliveryFeeUsd,
+          );
+          if (!context.mounted) return;
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => OrderPlacedScreen(locale: locale, stores: stores, paymentLabel: paymentLabel, orderCode: code)));
         }),
       ),
     );
@@ -320,7 +335,9 @@ class OrderPlacedScreen extends StatelessWidget {
   final Locale locale;
   final List<StoreOrder> stores;
   final String paymentLabel;
-  const OrderPlacedScreen({super.key, this.locale = const Locale('en'), required this.stores, required this.paymentLabel});
+  /// Real order code from the API (null when placed offline).
+  final String? orderCode;
+  const OrderPlacedScreen({super.key, this.locale = const Locale('en'), required this.stores, required this.paymentLabel, this.orderCode});
 
   @override
   Widget build(BuildContext context) {
@@ -347,7 +364,9 @@ class OrderPlacedScreen extends StatelessWidget {
         const SizedBox(height: 20),
         ...List.generate(stores.length, (i) {
           final so = stores[i];
-          final id = 'SMB-2026-${4821 + i}';
+          final id = orderCode != null
+              ? (stores.length == 1 ? orderCode! : '$orderCode-${i + 1}')
+              : 'SMB-2026-${4821 + i}';
           return Padding(padding: const EdgeInsets.only(bottom: 12), child: Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Container(height: 40, width: 40, decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.storefront_rounded, color: AppColors.success)),
