@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
@@ -57,20 +58,39 @@ class ProductImage extends StatelessWidget {
                 ),
               ),
             ),
-            // Real product photo (white-background studio shot).
+            // Real product photo (white-background studio shot). Prefer the
+            // live network image; fall back to a bundled asset (offline mock
+            // ids 1–12); finally a category glyph.
             Padding(
               padding: EdgeInsets.all(pad),
-              child: Image.asset(
-                'assets/products/${product.id}.jpg',
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Center(
-                  child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
-                ),
-              ),
+              child: _photo(size, glyph),
             ),
           ],
         );
       },
     );
   }
+
+  Widget _glyph(double size, IconData glyph) => Center(
+        child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
+      );
+
+  Widget _photo(double size, IconData glyph) {
+    final url = product.image;
+    if (url.isNotEmpty && (url.startsWith('http://') || url.startsWith('https://'))) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.contain,
+        placeholder: (_, __) => _glyph(size, glyph),
+        errorWidget: (_, __, ___) => _assetOrGlyph(size, glyph),
+      );
+    }
+    return _assetOrGlyph(size, glyph);
+  }
+
+  Widget _assetOrGlyph(double size, IconData glyph) => Image.asset(
+        'assets/products/${product.id}.jpg',
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => _glyph(size, glyph),
+      );
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'tasks_screen.dart';
 import 'map_screen.dart';
@@ -8,15 +9,16 @@ class RiderShell extends StatefulWidget {
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
   final VoidCallback? onLogout;
+  final int initialIndex;
 
-  const RiderShell({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
+  const RiderShell({super.key, required this.locale, required this.onLocaleChanged, this.onLogout, this.initialIndex = 0});
 
   @override
   State<RiderShell> createState() => _RiderShellState();
 }
 
 class _RiderShellState extends State<RiderShell> {
-  int _index = 0;
+  late int _index = widget.initialIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +28,9 @@ class _RiderShellState extends State<RiderShell> {
       ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
     final items = <_NavItem>[
-      _NavItem(Icons.assignment_rounded, 'Tasks'),
-      _NavItem(Icons.navigation_rounded, 'Navigate'),
-      _NavItem(Icons.person_rounded, 'Profile'),
+      _NavItem(Icons.assignment_rounded, tr(context, 'Tasks')),
+      _NavItem(Icons.navigation_rounded, tr(context, 'Navigate')),
+      _NavItem(Icons.person_rounded, tr(context, 'Profile')),
     ];
 
     return Scaffold(

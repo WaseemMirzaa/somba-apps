@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../data/catalog_meta.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/product_card.dart';
 import 'browse.dart';
 import 'shop_extra.dart';
@@ -46,7 +47,7 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.only(right: 12),
           child: BrowseSearchField(
             controller: _ctrl,
-            hint: 'Search products or stores…',
+            hint: trl(lang, 'Search products, stores…'),
             autofocus: widget.initialText == null,
             onChanged: (_) => setState(() {}),
           ),
@@ -57,7 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
           child: Row(children: [
-            _seg('Products', 0), const SizedBox(width: 8), _seg('Stores', 1),
+            _seg(trl(lang, 'Products'), 0), const SizedBox(width: 8), _seg(trl(lang, 'Stores'), 1),
             const Spacer(),
             if (_tab == 0)
               _filterButton(),
@@ -108,7 +109,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(children: [
           Icon(Icons.tune_rounded, size: 16, color: n > 0 ? AppColors.primary : AppColors.muted),
           const SizedBox(width: 5),
-          Text(n > 0 ? 'Filters · $n' : 'Filters', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
+          Text(n > 0 ? '${trl(widget.locale.languageCode, 'Filters')} · $n' : trl(widget.locale.languageCode, 'Filters'), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
         ]),
       ),
     );
@@ -139,7 +140,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(color: active ? AppColors.primary : AppColors.line),
                 ),
-                child: Text(_quickSorts[i], style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: active ? Colors.white : AppColors.muted)),
+                child: Text(trl(widget.locale.languageCode, _quickSorts[i]), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: active ? Colors.white : AppColors.muted)),
               ),
             );
           },
@@ -147,11 +148,11 @@ class _SearchScreenState extends State<SearchScreen> {
       );
 
   Widget _productResults(List<Product> results, String lang) {
-    if (results.isEmpty) return _empty('No products match “${_ctrl.text}”');
+    if (results.isEmpty) return _empty('${trl(lang, 'No products match')} “${_ctrl.text}”');
     return CustomScrollView(slivers: [
       SliverToBoxAdapter(child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-        child: Text('${results.length} results', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+        child: Text('${results.length} ${trl(lang, 'results')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
       )),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -164,7 +165,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _storeResults(List<Seller> stores) {
-    if (stores.isEmpty) return _empty('No stores match “${_ctrl.text}”');
+    if (stores.isEmpty) return _empty('${trl(widget.locale.languageCode, 'No stores match')} “${_ctrl.text}”');
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: stores.length,

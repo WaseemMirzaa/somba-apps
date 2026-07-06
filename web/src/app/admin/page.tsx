@@ -37,6 +37,7 @@ import {
 import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { useApiResource } from "@/lib/use-api";
 import { orderEntities, sellerEntities } from "@/lib/entities";
 import {
   adminRevenueTrend,
@@ -52,6 +53,21 @@ import {
   adminMarketplaceHealth,
 } from "@/lib/admin-analytics";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
+
+interface DashType {
+  gmv: number;
+  ordersCount: number;
+  deliveredCount: number;
+  sellersActive: number;
+  sellersPending: number;
+  productsLive: number;
+  productsPending: number;
+  commissionRevenue: number;
+  payoutsDue: number;
+  disputesOpen: number;
+  recentOrders: { code: string; customer: string; total: number; status: string; date: string }[];
+  topSellers: { storeName: string; orders: number; revenue: number }[];
+}
 
 const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
   delivered: "success",
@@ -83,6 +99,20 @@ export default function AdminDashboard() {
   const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
   const k = adminExtendedKpis;
 
+  const { data: dash, live } = useApiResource<DashType>("/admin/dashboard");
+  const gmv = live && dash ? dash.gmv : k.gmvMtd;
+  const ordersCount = live && dash ? dash.ordersCount : k.ordersMtd;
+  const activeSellers = live && dash ? dash.sellersActive : k.activeSellers;
+  const recentOrdersRows =
+    live && dash
+      ? dash.recentOrders.map((o) => ({
+          id: o.code,
+          customer: o.customer,
+          amount: o.total,
+          status: o.status,
+        }))
+      : (orderEntities.slice(0, 5) as unknown as Record<string, unknown>[]);
+
   const revenueSpark = adminRevenueTrend.map((d) => d.revenue);
   const ordersSpark = adminRevenueTrend.map((d) => d.orders);
 
@@ -103,11 +133,12 @@ export default function AdminDashboard() {
         title={fr ? "Tableau de bord marketplace" : "Marketplace dashboard"}
         subtitle={
           fr
-            ? `GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} clients · Score santé ${adminMarketplaceHealth.overallScore}/100`
-            : `GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} customers · Health score ${adminMarketplaceHealth.overallScore}/100`
+            ? `GMV ${formatCurrency(gmv, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} clients · Score santé ${adminMarketplaceHealth.overallScore}/100`
+            : `GMV ${formatCurrency(gmv, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} customers · Health score ${adminMarketplaceHealth.overallScore}/100`
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
+            {live && <Badge variant="success">Live API</Badge>}
             <AnalyticsPeriodControls
               period={period}
               onPeriodChange={setPeriod}
@@ -122,9 +153,9 @@ export default function AdminDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AnalyticsKpiCard title={fr ? "GMV (MTD)" : "GMV (MTD)"} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} />
-        <AnalyticsKpiCard title={fr ? "Commandes (MTD)" : "Orders (MTD)"} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} />
-        <AnalyticsKpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} />
+        <AnalyticsKpiCard title={fr ? "GMV (MTD)" : "GMV (MTD)"} value={formatCurrency(gmv, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} />
+        <AnalyticsKpiCard title={fr ? "Commandes (MTD)" : "Orders (MTD)"} value={formatNumber(ordersCount, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} />
+        <AnalyticsKpiCard title={t("activeSellers")} value={formatNumber(activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} />
         <AnalyticsKpiCard title={fr ? "Clients actifs" : "Active customers"} value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} />
         <AnalyticsKpiCard title={fr ? "Taux de conversion" : "Conversion rate"} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} />
         <AnalyticsKpiCard title={fr ? "Panier moyen" : "Avg. order value"} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
@@ -322,7 +353,7 @@ export default function AdminDashboard() {
                   ),
                 },
               ]}
-              data={orderEntities.slice(0, 5) as unknown as Record<string, unknown>[]}
+              data={recentOrdersRows}
               rowAction={(row) => (
                 <Link href={`/admin/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}

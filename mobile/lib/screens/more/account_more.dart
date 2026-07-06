@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../data/mock_data.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_card.dart';
-import 'support_extra.dart';
+import 'address_flow.dart';
 
 class WishlistScreen extends StatelessWidget {
   final Locale locale;
   const WishlistScreen({super.key, this.locale = const Locale('en')});
   @override
   Widget build(BuildContext context) {
-    final items = products.where((p) => p.id % 2 == 1).toList();
+    // The customer's real wishlist (hydrated from the API when signed in).
+    final wl = ShopState.instance.wishlist;
+    final items = products.where((p) => wl.contains(p.id)).toList();
     return Scaffold(
-      appBar: backAppBar(context, 'Wishlist'),
+      appBar: backAppBar(context, trl(locale.languageCode, 'Wishlist')),
       body: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
@@ -45,30 +50,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false, false),
   ];
 
-  bool _isUnread(int i) => _items[i].$6 && !_read.contains(i);
+  // Live notifications from the API; falls back to [_items] when empty (offline/guest).
+  List<(IconData, Color, String, String, String, bool, bool)>? _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final data = await Repo.instance.notifications();
+    if (!mounted || data.isEmpty) return;
+    setState(() => _live = data.map(_mapNotif).toList());
+  }
+
+  (IconData, Color, String, String, String, bool, bool) _mapNotif(Map<String, dynamic> n) {
+    final (icon, color) = switch ((n['kind'] ?? '').toString()) {
+      'order' => (Icons.shopping_bag_rounded, AppColors.primary),
+      'delivery' => (Icons.local_shipping_rounded, AppColors.royalBlue),
+      'refund' => (Icons.payments_rounded, AppColors.success),
+      _ => (Icons.warning_amber_rounded, AppColors.amber),
+    };
+    final dt = DateTime.tryParse((n['date'] ?? '').toString());
+    final time = dt != null ? DateFormat('MMM d').format(dt) : '';
+    return (icon, color, (n['title'] ?? '').toString(), (n['body'] ?? '').toString(), time, true, false);
+  }
+
+  // The active source: live notifications when present, otherwise the mock.
+  List<(IconData, Color, String, String, String, bool, bool)> get _source =>
+      (_live != null && _live!.isNotEmpty) ? _live! : _items;
+
+  bool _isUnread(int i) => _source[i].$6 && !_read.contains(i);
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = List.generate(_items.length, (i) => i).where(_isUnread).length;
+    final unreadCount = List.generate(_source.length, (i) => i).where(_isUnread).length;
     return Scaffold(
-      appBar: backAppBar(context, unreadCount > 0 ? 'Notifications ($unreadCount)' : 'Notifications', actions: [
+      appBar: backAppBar(context, unreadCount > 0 ? '${tr(context, 'Notifications')} ($unreadCount)' : tr(context, 'Notifications'), actions: [
         TextButton(
           onPressed: unreadCount == 0
               ? null
               : () {
-                  setState(() => _read.addAll(List.generate(_items.length, (i) => i)));
+                  setState(() => _read.addAll(List.generate(_source.length, (i) => i)));
                   ShopState.instance.save();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All notifications marked as read')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'All notifications marked as read'))));
                 },
-          child: const Text('Mark all'),
+          child: Text(tr(context, 'Mark all')),
         ),
       ]),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: _items.length,
+        itemCount: _source.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
-          final n = _items[i];
+          final n = _source[i];
           final unread = _isUnread(i);
           return GestureDetector(
             onTap: () {
@@ -103,48 +139,79 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-class AddressBookScreen extends StatelessWidget {
+class AddressBookScreen extends StatefulWidget {
   final Locale locale;
-  const AddressBookScreen({super.key, this.locale = const Locale('en')});
+  final bool selectMode;
+  const AddressBookScreen({super.key, this.locale = const Locale('en'), this.selectMode = false});
+  @override
+  State<AddressBookScreen> createState() => _AddressBookScreenState();
+}
+
+class _AddressBookScreenState extends State<AddressBookScreen> {
+  final shop = ShopState.instance;
+
   @override
   Widget build(BuildContext context) {
-    const addrs = [
-      ('Home', '12 Commerce Ave, Gombe, Kinshasa', '+243 970 000 000', true, Icons.home_rounded),
-      ('Work', 'Tower B, Limete Industrial, Kinshasa', '+243 971 111 222', false, Icons.work_rounded),
-    ];
+    final selectedId = shop.selectedAddress?.id;
+    final lang = widget.locale.languageCode;
     return Scaffold(
-      appBar: backAppBar(context, 'Addresses'),
+      appBar: backAppBar(context, widget.selectMode ? trl(lang, 'Choose address') : trl(lang, 'Addresses')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          ...addrs.map((a) {
-            void openEdit() => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(
-                  locale: locale,
-                  label: a.$1,
-                  name: 'Marie Dubois',
-                  phone: a.$3,
-                  address: a.$2,
-                )));
+          if (shop.addresses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(children: [
+                const Icon(Icons.location_off_rounded, size: 48, color: AppColors.faint),
+                const SizedBox(height: 12),
+                Text(trl(lang, 'No saved addresses yet'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ...shop.addresses.map((a) {
+            final icon = a.label.toLowerCase().contains('work') ? Icons.work_rounded : Icons.home_rounded;
+            final selected = widget.selectMode && a.id == selectedId;
+            void openEdit() async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(
+                    locale: widget.locale, editingId: a.id, label: a.label, name: a.name, phone: a.phone, address: a.line, city: a.city, zone: a.zone)));
+              if (mounted) setState(() {});
+            }
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: GestureDetector(
-                onTap: openEdit,
-                child: Panel(
+                onTap: () {
+                  if (widget.selectMode) {
+                    setState(() => shop.selectedDeliveryAddressId = a.id);
+                    Navigator.pop(context, a.id);
+                  } else {
+                    openEdit();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: selected ? AppColors.primary : Colors.transparent, width: 1.8),
+                    boxShadow: AppShadow.card,
+                  ),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(a.$5, color: AppColors.primary)),
+                    Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: AppColors.primary)),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
-                        Text(a.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                        Text(a.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                         const SizedBox(width: 8),
-                        if (a.$4) Pill('Default', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
+                        if (a.isDefault) Pill(trl(lang, 'Default'), color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
                       ]),
                       const SizedBox(height: 4),
-                      Text(a.$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                      Text('${a.line}, ${a.city}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
                       const SizedBox(height: 2),
-                      Text(a.$3, style: const TextStyle(color: AppColors.faint, fontSize: 12)),
+                      Text('${a.phone} · Zone ${a.zone}', style: const TextStyle(color: AppColors.faint, fontSize: 12)),
                     ])),
-                    IconButton(icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.faint), onPressed: openEdit),
+                    widget.selectMode
+                        ? Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: selected ? AppColors.primary : AppColors.faint)
+                        : IconButton(icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.faint), onPressed: openEdit),
                   ]),
                 ),
               ),
@@ -152,8 +219,11 @@ class AddressBookScreen extends StatelessWidget {
           }),
           const SizedBox(height: 4),
           OutlinedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),
-              icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Add new address')),
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressPickerScreen(locale: widget.locale)));
+                if (mounted) setState(() {});
+              },
+              icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: Text(trl(lang, 'Add new address'))),
         ],
       ),
     );

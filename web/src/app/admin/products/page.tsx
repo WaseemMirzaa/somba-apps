@@ -13,6 +13,26 @@ import { useLocale } from "@/context/locale-context";
 import { moderationQueue } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
+import { useToast } from "@/context/toast-context";
+import { api } from "@/lib/api";
+import { useApiResource, useApiAction } from "@/lib/use-api";
+
+interface ProductLive {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  discountPrice?: number;
+  stock: number;
+  status: "draft" | "pending" | "approved" | "rejected" | "live";
+  rejectionReason?: string;
+  rating: number;
+  sold: number;
+  seller: { storeName: string };
+  category?: { name: string };
+  images: { url: string }[];
+  createdAt: string;
+}
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -37,9 +57,29 @@ const CATEGORY_FR: Record<string, string> = {
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const filtered = useMemo(
+  const { data: liveProducts, live, reload } = useApiResource<ProductLive[]>("/admin/products");
+  const { busy, run } = useApiAction();
+
+  const liveRows = useMemo(
+    () =>
+      (liveProducts ?? []).map((p) => ({
+        id: p.id,
+        image: p.images?.[0]?.url ?? "",
+        name: p.name,
+        sellerId: "",
+        seller: p.seller?.storeName ?? "",
+        category: p.category?.name ?? "",
+        price: p.price,
+        status: p.status,
+        submittedDate: p.createdAt?.slice(0, 10) ?? "",
+      })),
+    [liveProducts]
+  );
+
+  const mockFiltered = useMemo(
     () =>
       applyListFilters(moderationQueue, filters, {
         searchFields: ["id", "name", "seller", "category"],
@@ -49,12 +89,25 @@ export default function AdminProductsPage() {
     [filters]
   );
 
+  const liveFiltered = useMemo(
+    () =>
+      applyListFilters(liveRows, filters, {
+        searchFields: ["id", "name", "seller", "category"],
+        dateField: "submittedDate",
+        statusField: "status",
+      }),
+    [liveRows, filters]
+  );
+
+  const filtered = live ? liveFiltered : mockFiltered;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Modération des produits" : "Product Moderation"}
         subtitle={fr ? "Vue liste — ID produit, image, nom, vendeur, catégorie, prix, statut, date de soumission" : "List View — Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"}
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Modération des produits" : "Product Moderation" }]}
+        actions={live ? <Badge variant="success">Live API</Badge> : undefined}
       />
 
       <ListFilters
@@ -116,11 +169,42 @@ export default function AdminProductsPage() {
               {
                 key: "actions",
                 label: t("action"),
-                render: (row) => (
-                  <Link href={`/admin/products/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
-                    {fr ? "Examiner" : "Review"}
-                  </Link>
-                ),
+                render: (row) => {
+                  if (live) {
+                    const id = String(row.id);
+                    return (
+                      <div className="flex items-center gap-3">
+                        <button
+                          disabled={busy === `approve-${id}`}
+                          onClick={async () => {
+                            await run(`approve-${id}`, () => api.post(`/admin/products/${id}/approve`));
+                            toast(fr ? `${row.name} approuvé` : `${row.name} approved`);
+                            reload();
+                          }}
+                          className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50"
+                        >
+                          {t("approve")}
+                        </button>
+                        <button
+                          disabled={busy === `reject-${id}`}
+                          onClick={async () => {
+                            await run(`reject-${id}`, () => api.post(`/admin/products/${id}/reject`, { reason: "Rejected by admin" }));
+                            toast(fr ? `${row.name} rejeté` : `${row.name} rejected`, "info");
+                            reload();
+                          }}
+                          className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          {t("reject")}
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <Link href={`/admin/products/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
+                      {fr ? "Examiner" : "Review"}
+                    </Link>
+                  );
+                },
               },
             ]}
             data={filtered as unknown as Record<string, unknown>[]}

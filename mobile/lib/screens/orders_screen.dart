@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../data/repository.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -15,6 +17,48 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   int _tab = 0;
+
+  /// Live orders from the API (empty until loaded / when signed out).
+  List<Map<String, Object>> _apiOrders = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await Repo.instance.myOrders();
+    if (!mounted) return;
+    setState(() {
+      _apiOrders = rows.map(_mapOrder).toList();
+      _loading = false;
+    });
+  }
+
+  Map<String, Object> _mapOrder(Map<String, dynamic> o) {
+    final items = (o['items'] as List?) ?? const [];
+    final qty = items.fold<int>(0, (s, it) => s + ((it is Map ? (it['qty'] as num?)?.toInt() : 1) ?? 1));
+    final total = o['totalUsd'];
+    // Derive a short date (e.g. `Jul 5`) from the order timestamps for the hint.
+    final ts = o['updatedAt'] ?? o['createdAt'];
+    var date = '';
+    if (ts != null) {
+      final dt = DateTime.tryParse(ts.toString());
+      if (dt != null) date = DateFormat('MMM d').format(dt.toLocal());
+    }
+    return {
+      'id': (o['code'] ?? '').toString(),
+      // Raw order id, used to open the live detail / tracking screens.
+      'orderId': (o['id'] ?? '').toString(),
+      'date': date,
+      'status': (o['status'] ?? 'pending').toString(),
+      'amount': total is num ? total : num.tryParse('$total') ?? 0,
+      'items': qty == 0 ? items.length : qty,
+      'icon': Icons.inventory_2_rounded,
+    };
+  }
 
   static const _orders = [
     {'id': 'SMB-2026-4821', 'status': 'processing', 'amount': 1498, 'items': 2, 'icon': Icons.devices_other_rounded},
@@ -45,7 +89,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
-    final orders = _orders.where((o) => _match(o['status'] as String)).toList();
+    // Prefer live orders; fall back to the sample list when signed out/offline.
+    final source = _apiOrders.isNotEmpty ? _apiOrders : _orders;
+    final orders = source.where((o) => _match(o['status'] as String)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -76,7 +122,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: sel ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_tabs[i],
+                    child: Text(trl(s.lang, _tabs[i]),
                         style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
@@ -84,8 +130,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
           Expanded(
-            child: orders.isEmpty
-                ? const Center(child: Text('No orders here yet', style: TextStyle(color: AppColors.muted)))
+            child: _loading && _apiOrders.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : orders.isEmpty
+                ? Center(child: Text(trl(s.lang, 'No orders here yet'), style: const TextStyle(color: AppColors.muted)))
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     itemCount: orders.length,
@@ -98,11 +146,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  /// The raw order id for a live order, or null for the mock fallback rows.
+  String? _liveId(Map<String, Object> o) {
+    final oid = o['orderId'] as String?;
+    return (oid != null && oid.isNotEmpty) ? oid : null;
+  }
+
   Widget _orderCard(Map<String, Object> o, Strings s) {
     final status = o['status'] as String;
+    final orderId = _liveId(o);
     final c = _statusColor(status);
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: status == 'delivered', orderId: orderId))),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -117,7 +172,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(o['id'] as String, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
               const SizedBox(height: 3),
-              Text('${s.itemsCount(o['items'] as int)} · ${money(o['amount'] as int)}',
+              Text('${s.itemsCount(o['items'] as int)} · ${money(o['amount'] as num)}',
                   style: const TextStyle(color: AppColors.muted, fontSize: 13)),
             ])),
             Container(
@@ -130,32 +185,34 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Row(children: [
             Icon(_statusIcon(status), size: 16, color: c),
             const SizedBox(width: 6),
-            Expanded(child: Text(_statusHint(status, s), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
-            _actionFor(status, s),
+            Expanded(child: Text(_statusHint(o, s), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
+            _actionFor(o, s),
           ]),
         ]),
       ),
     );
   }
 
-  Widget _actionFor(String status, Strings s) {
+  Widget _actionFor(Map<String, Object> o, Strings s) {
+    final status = o['status'] as String;
+    final orderId = _liveId(o);
     // Status-specific primary action, mirroring the web order detail.
     if (status == 'delivered') {
       return TextButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale))),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: true, orderId: orderId))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Évaluer' : 'Review'),
       );
     }
     if (status == 'cancelled' || status == 'returned') {
       return TextButton(
-        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Re-ordering these items…'))),
+        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trl(s.lang, 'Re-ordering these items…')))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Recommander' : 'Reorder'),
       );
     }
     return TextButton(
-      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale))),
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, status: orderId != null ? status : null))),
       style: _btnStyle(),
       child: Text(s.trackOrder),
     );
@@ -205,10 +262,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  String _statusHint(String status, Strings s) {
+  String _statusHint(Map<String, Object> o, Strings s) {
+    final status = o['status'] as String;
     final fr = s.isFr;
+    final date = (o['date'] as String?) ?? '';
     switch (status) {
       case 'delivered':
+        // Live orders: use the real order date; mock rows keep the sample text.
+        if (date.isNotEmpty) return fr ? 'Livré le $date' : 'Delivered on $date';
         return fr ? 'Livré le 24 juin' : 'Delivered on Jun 24';
       case 'out_for_delivery':
         return fr ? 'Le livreur arrive' : 'Rider is on the way';

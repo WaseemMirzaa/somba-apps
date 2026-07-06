@@ -1,24 +1,230 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/repository.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import 'returns_extra.dart';
 import 'support_extra.dart';
+import 'catalog_extra.dart';
 
-class OrderDetailScreen extends StatelessWidget {
+class OrderDetailScreen extends StatefulWidget {
   final Locale locale;
-  const OrderDetailScreen({super.key, this.locale = const Locale('en')});
+  final bool delivered;
+  final String? orderId;
+  const OrderDetailScreen({super.key, this.locale = const Locale('en'), this.delivered = false, this.orderId});
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  Map<String, dynamic>? _order;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.orderId != null) {
+      _loading = true;
+      _fetch();
+    }
+  }
+
+  Future<void> _fetch() async {
+    final o = await Repo.instance.orderDetail(widget.orderId!);
+    if (!mounted) return;
+    setState(() {
+      _order = o;
+      _loading = false;
+    });
+  }
+
+  double _d(dynamic v) => v is num ? v.toDouble() : (double.tryParse('$v') ?? 0);
+  int _i(dynamic v) => v is num ? v.toInt() : (int.tryParse('$v') ?? 0);
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.locale.languageCode;
+    if (_loading) {
+      return Scaffold(
+        appBar: backAppBar(context, trl(lang, 'Order')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    final order = _order;
+    if (order != null) return _buildReal(context, order, lang);
+    return _buildMock(context, lang);
+  }
+
+  // ---- Live order rendering (real API data) --------------------------------
+
+  Widget _buildReal(BuildContext context, Map<String, dynamic> order, String lang) {
+    final s = Strings(lang);
+    final code = (order['code'] ?? '').toString();
+    final status = (order['status'] ?? 'pending').toString();
+    final delivered = status == 'delivered';
+    final items = ((order['items'] as List?) ?? const []).whereType<Map>().toList();
+    final subtotal = _d(order['subtotalUsd']);
+    final fee = _d(order['deliveryFeeUsd']);
+    final total = _d(order['totalUsd']);
+    final payment = (order['paymentMethod'] ?? '').toString();
+    final addressLine = (order['addressLine'] ?? '').toString();
+    final city = (order['city'] ?? '').toString();
+    final zone = (order['zone'] ?? '').toString();
+    final address = [addressLine, city, zone].where((e) => e.isNotEmpty).join(', ');
+    final c = delivered ? AppColors.success : AppColors.amber;
+
+    return Scaffold(
+      appBar: backAppBar(context, '${trl(lang, 'Order')} $code'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          Panel(
+            child: Row(children: [
+              Container(
+                height: 44, width: 44,
+                decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
+                child: Icon(delivered ? Icons.check_circle_rounded : Icons.inventory_2_rounded, color: c),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(s.orderStatus(status), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text('${s.itemsCount(items.length)} · ${money(total)}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                ]),
+              ),
+              if (!delivered)
+                FilledButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, status: status))),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
+                  child: Text(trl(lang, 'Track')),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          Panel(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(trl(lang, 'Items'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              const SizedBox(height: 12),
+              ...items.map((it) {
+                final pj = it['product'];
+                final product = pj is Map ? Product.fromJson(pj.cast<String, dynamic>()) : null;
+                final name = product != null && product.displayName(lang).isNotEmpty
+                    ? product.displayName(lang)
+                    : (it['nameSnapshot'] ?? '').toString();
+                final qty = _i(it['qty']);
+                final lineTotal = _d(it['lineTotal']);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(children: [
+                    Row(children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          height: 60, width: 60,
+                          child: product != null
+                              ? ProductImage(product: product, iconSize: 26)
+                              : Container(color: AppColors.background, child: const Icon(Icons.inventory_2_rounded, color: AppColors.muted)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                        const SizedBox(height: 2),
+                        Text('${trl(lang, 'Qty')} $qty', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                      ])),
+                      Text(money(lineTotal), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ]),
+                    if (delivered && product != null) ...[
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        Expanded(child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExchangeScreen(locale: widget.locale, product: product))),
+                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                          icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                          label: Text(trl(lang, 'Exchange'), style: const TextStyle(fontSize: 12.5)),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale))),
+                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                          icon: const Icon(Icons.assignment_return_rounded, size: 16),
+                          label: Text(trl(lang, 'Return'), style: const TextStyle(fontSize: 12.5)),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: widget.locale, product: product))),
+                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                          icon: const Icon(Icons.rate_review_rounded, size: 16),
+                          label: Text(trl(lang, 'Review'), style: const TextStyle(fontSize: 12.5)),
+                        )),
+                      ]),
+                    ],
+                  ]),
+                );
+              }),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          if (address.isNotEmpty) ...[
+            Panel(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(trl(lang, 'Delivery address'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                const SizedBox(height: 10),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.location_on_rounded, size: 18, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(address, style: const TextStyle(fontSize: 13, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
+          Panel(
+            child: Column(children: [
+              _row(trl(lang, 'Subtotal'), money(subtotal)),
+              const SizedBox(height: 8),
+              _row(trl(lang, 'Delivery'), money(fee)),
+              const Divider(height: 22),
+              _row(trl(lang, 'Total'), money(total), bold: true),
+              const SizedBox(height: 12),
+              Row(children: [
+                Icon(Icons.verified_rounded, size: 18, color: AppColors.success),
+                const SizedBox(width: 8),
+                Text(s.paymentLabel(payment), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              ]),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale))),
+                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: Text(trl(lang, 'Return')))),
+            const SizedBox(width: 12),
+            Expanded(child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: widget.locale))),
+                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: Text(trl(lang, 'Help')))),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  // ---- Mock fallback (offline / no order id) -------------------------------
+
+  Widget _buildMock(BuildContext context, String lang) {
+    final locale = widget.locale;
+    final delivered = widget.delivered;
     final items = products.take(2).toList();
     final subtotal = items.fold<double>(0, (s, p) => s + p.price);
     const fee = 5.0;
 
     return Scaffold(
-      appBar: backAppBar(context, 'Order SMB-2026-4821'),
+      appBar: backAppBar(context, '${trl(lang, 'Order')} ${delivered ? 'SMB-2026-4712' : 'SMB-2026-4821'}'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -31,35 +237,63 @@ class OrderDetailScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                  Text('Processing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  SizedBox(height: 2),
-                  Text('Placed today · arrives in 2 days', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(delivered ? trl(lang, 'Delivered') : trl(lang, 'Processing'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text(trl(lang, 'Placed today · arrives in 2 days'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                 ]),
               ),
               FilledButton(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: locale))),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
-                child: const Text('Track'),
+                child: Text(trl(lang, 'Track')),
               ),
             ]),
           ),
           const SizedBox(height: 14),
           Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Items', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(trl(lang, 'Items'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 12),
               ...items.map((p) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 60, width: 60, child: ProductImage(product: p, iconSize: 26))),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(p.displayName(locale.languageCode), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                        const SizedBox(height: 2),
-                        const Text('Qty 1', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                      ])),
-                      Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    child: Column(children: [
+                      Row(children: [
+                        ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(height: 60, width: 60, child: ProductImage(product: p, iconSize: 26))),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(p.displayName(locale.languageCode), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          const SizedBox(height: 2),
+                          Text('${trl(lang, 'Qty')} 1', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        ])),
+                        Text(money(p.price), style: const TextStyle(fontWeight: FontWeight.w800)),
+                      ]),
+                      // Delivered orders: per-product exchange / return actions.
+                      if (delivered) ...[
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExchangeScreen(locale: locale, product: p))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                            label: Text(trl(lang, 'Exchange'), style: const TextStyle(fontSize: 12.5)),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.assignment_return_rounded, size: 16),
+                            label: Text(trl(lang, 'Return'), style: const TextStyle(fontSize: 12.5)),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: locale, product: p))),
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                            icon: const Icon(Icons.rate_review_rounded, size: 16),
+                            label: Text(trl(lang, 'Review'), style: const TextStyle(fontSize: 12.5)),
+                          )),
+                        ]),
+                      ],
                     ]),
                   )),
             ]),
@@ -67,16 +301,16 @@ class OrderDetailScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Panel(
             child: Column(children: [
-              _row('Subtotal', money(subtotal)),
+              _row(trl(lang, 'Subtotal'), money(subtotal)),
               const SizedBox(height: 8),
-              _row('Delivery', money(fee)),
+              _row(trl(lang, 'Delivery'), money(fee)),
               const Divider(height: 22),
-              _row('Total', money(subtotal + fee), bold: true),
+              _row(trl(lang, 'Total'), money(subtotal + fee), bold: true),
               const SizedBox(height: 12),
               Row(children: [
                 Icon(Icons.verified_rounded, size: 18, color: AppColors.success),
                 const SizedBox(width: 8),
-                const Text('Paid online · Airtel Money', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text('${trl(lang, 'Paid online')} · Airtel Money', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
             ]),
           ),
@@ -84,11 +318,11 @@ class OrderDetailScreen extends StatelessWidget {
           Row(children: [
             Expanded(child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: locale))),
-                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: const Text('Return'))),
+                icon: const Icon(Icons.assignment_return_rounded, size: 18), label: Text(trl(lang, 'Return')))),
             const SizedBox(width: 12),
             Expanded(child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale))),
-                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: const Text('Help'))),
+                icon: const Icon(Icons.headset_mic_rounded, size: 18), label: Text(trl(lang, 'Help')))),
           ]),
         ],
       ),
@@ -103,7 +337,8 @@ class OrderDetailScreen extends StatelessWidget {
 
 class OrderTrackingScreen extends StatefulWidget {
   final Locale locale;
-  const OrderTrackingScreen({super.key, this.locale = const Locale('en')});
+  final String? status;
+  const OrderTrackingScreen({super.key, this.locale = const Locale('en'), this.status});
 
   @override
   State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
@@ -119,10 +354,48 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
     super.dispose();
   }
 
+  /// The order-status flow, in fulfillment order.
+  static const _flow = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered'];
+  static const _flowLabels = {
+    'pending': 'Order placed',
+    'confirmed': 'Order confirmed',
+    'processing': 'Packed at warehouse',
+    'shipped': 'Shipped',
+    'out_for_delivery': 'Out for delivery',
+    'delivered': 'Delivered',
+  };
+
+  /// Build the timeline from the live order status (stages up to and including
+  /// the current one are marked done). Falls back to the sample list when no
+  /// status was supplied.
+  List<(String, String, bool)> _timeline() {
+    final status = widget.status;
+    if (status == null) {
+      return const [
+        ('Order placed', 'Today, 09:14', true),
+        ('Packed at warehouse', 'Today, 10:02', true),
+        ('Shipped', 'Today, 11:20', true),
+        ('Out for delivery', 'Rider on the way', true),
+        ('Delivered', 'Estimated 14:30', false),
+      ];
+    }
+    final lang = widget.locale.languageCode;
+    var idx = _flow.indexOf(status);
+    if (idx < 0) idx = 0;
+    return [
+      for (var i = 0; i < _flow.length; i++)
+        (
+          trl(lang, _flowLabels[_flow[i]]!),
+          trl(lang, i < idx ? 'Completed' : i == idx ? 'In progress' : 'Pending'),
+          i <= idx,
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, 'Track order'),
+      appBar: backAppBar(context, trl(widget.locale.languageCode, 'Track order')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -146,7 +419,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Text('Arriving in ~$minsLeft min', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                      Text('${trl(widget.locale.languageCode, 'Arriving in')} ~$minsLeft min', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
                     ]),
                   )),
                 ]);
@@ -158,9 +431,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
             child: Row(children: [
               const CircleAvatar(radius: 22, backgroundColor: AppColors.background, child: Text('JM', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary))),
               const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                Text('Jean Mukendi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-                Text('Your rider · ⭐ 4.9', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Jean Mukendi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                Text('${trl(widget.locale.languageCode, 'Your rider')} · ⭐ 4.9', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
               ])),
               Container(decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
                 child: IconButton(icon: const Icon(Icons.call_rounded, color: AppColors.primary),
@@ -169,13 +442,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> with SingleTi
           ),
           const SizedBox(height: 14),
           Panel(
-            child: const StatusTimeline([
-              ('Order placed', 'Today, 09:14', true),
-              ('Packed at warehouse', 'Today, 10:02', true),
-              ('Shipped', 'Today, 11:20', true),
-              ('Out for delivery', 'Rider on the way', true),
-              ('Delivered', 'Estimated 14:30', false),
-            ]),
+            child: StatusTimeline(_timeline()),
           ),
         ],
       ),

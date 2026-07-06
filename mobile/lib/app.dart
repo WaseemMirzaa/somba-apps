@@ -10,15 +10,16 @@ class AppShell extends StatefulWidget {
   final void Function(Locale) onLocaleChanged;
   final Locale locale;
   final VoidCallback? onLogout;
+  final int initialIndex;
 
-  const AppShell({super.key, required this.onLocaleChanged, required this.locale, this.onLogout});
+  const AppShell({super.key, required this.onLocaleChanged, required this.locale, this.onLogout, this.initialIndex = 0});
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 0;
+  late int _index = widget.initialIndex;
 
   @override
   Widget build(BuildContext context) {

@@ -16,6 +16,12 @@ The customer-facing marketplace app for **Somba&Teka**, built with Flutter.
   visuals (gradient tiles with category glyphs) that fall back gracefully when
   network images are unavailable.
 - English / French localisation.
+- **Live data** — the app is wired to the NestJS + MySQL backend in [`../api`](../api).
+  The catalogue (categories, products, deals, stores, coupons) hydrates from the
+  API at startup, and auth, wishlist, addresses, orders (real checkout),
+  reviews, and coupon validation all persist server-side. Everything **fails
+  soft**: when the backend is unreachable the app falls back to bundled data so
+  a demo build still works fully offline.
 
 ## Run locally
 
@@ -27,6 +33,20 @@ flutter run -d chrome  # web
 ```
 
 Requires Flutter **3.35.7**.
+
+### Connecting to the backend
+
+The API base URL is a build-time define (default `http://localhost:3001/api`):
+
+```bash
+# Start the backend first (see ../api/README.md), then:
+flutter run --dart-define=API_BASE=http://localhost:3001/api
+# Android emulator reaches the host via 10.0.2.2:
+flutter run --dart-define=API_BASE=http://10.0.2.2:3001/api
+```
+
+Seeded customer login: `marie@mail.com` / `password123`. "Continue as guest"
+browses the live catalogue without an account.
 
 ## CI/CD — Android APK
 

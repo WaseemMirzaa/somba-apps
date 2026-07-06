@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/repository.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/product_card.dart';
 import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
@@ -29,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _page = 0;
   int _feedTab = 0;
   Timer? _autoplay;
+  // Live promotion label overriding the flash-sale banner badge (null → static).
+  String? _promoLabel;
 
   late final List<_Banner> _banners = [
     _Banner(AppColors.brandGradient, Icons.auto_awesome_rounded),
@@ -52,7 +56,43 @@ class _HomeScreenState extends State<HomeScreen> {
       _pageController.animateToPage(next,
           duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
     });
+    _loadPromo();
   }
+
+  // Pull live promotions and, if one is active, build the flash-sale badge label.
+  Future<void> _loadPromo() async {
+    final promos = await Repo.instance.promotions();
+    if (!mounted || promos.isEmpty) return;
+    final now = DateTime.now();
+    Map<String, dynamic>? active;
+    for (final p in promos) {
+      final starts = DateTime.tryParse((p['startsAt'] ?? '').toString());
+      final ends = DateTime.tryParse((p['endsAt'] ?? '').toString());
+      final started = starts == null || !now.isBefore(starts);
+      final notEnded = ends == null || !now.isAfter(ends);
+      if (started && notEnded) {
+        active = p;
+        break;
+      }
+    }
+    active ??= promos.first;
+    final title = (active['title'] ?? '').toString();
+    final type = (active['type'] ?? '').toString();
+    final raw = active['value'];
+    final num? value = raw is num ? raw : num.tryParse('$raw');
+    String label;
+    if (value != null && (type == 'percent' || type == 'flash_sale')) {
+      label = '$title · -${_fmtNum(value)}%';
+    } else if (value != null && type == 'flat') {
+      label = '$title · -\$${_fmtNum(value)}';
+    } else {
+      label = title;
+    }
+    if (label.trim().isEmpty) return;
+    setState(() => _promoLabel = label);
+  }
+
+  String _fmtNum(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
   @override
   void dispose() {
@@ -139,75 +179,87 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---- Header (gradient app bar with location + search) ----
+  // ---- Header (premium gradient app bar: brand, greeting, glass search) ----
   Widget _header(Strings s, String lang) {
+    final greeting = lang == 'fr' ? 'Bonjour 👋' : 'Hello 👋';
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 150,
+      expandedHeight: 164,
       collapsedHeight: 74,
       backgroundColor: AppColors.primaryDark,
       automaticallyImplyLeading: false,
-      flexibleSpace: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.brandGradient,
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(26)),
-        ),
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 12, 0),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on_rounded, color: Colors.white70, size: 18),
-                  const SizedBox(width: 5),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () async {
-                      await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressSelectScreen(locale: widget.locale)));
-                      if (mounted) setState(() {});
-                    },
-                    child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+      flexibleSpace: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        child: Container(
+          decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+          child: Stack(
+            children: [
+              // Soft decorative blobs — same premium language as the auth screens.
+              Positioned(top: -50, right: -30, child: _blob(180, Colors.white.withValues(alpha: 0.16))),
+              Positioned(bottom: -70, left: -40, child: _blob(200, const Color(0xFFFF5A6E).withValues(alpha: 0.28))),
+              Padding(
+                padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 12, 0),
+                  child: Row(
                     children: [
-                      Text(s.deliverTo,
-                          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
-                      Row(
-                        children: [
-                          Text(ShopState.instance.selectedAddressLabel ?? 'Kinshasa, Gombe',
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                          const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
-                        ],
+                      const BrandLogo(size: 40, radius: 13),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () async {
+                            await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressSelectScreen(locale: widget.locale)));
+                            if (mounted) setState(() {});
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(greeting,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 1),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_rounded, color: Colors.white, size: 15),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(ShopState.instance.selectedAddressLabel ?? 'Kinshasa, Gombe',
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800)),
+                                  ),
+                                  const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
+                      CircleIconButton(
+                        icon: Icons.translate_rounded,
+                        background: Colors.white.withValues(alpha: 0.18),
+                        color: Colors.white,
+                        onTap: () => widget.onLocaleChanged(lang == 'en' ? const Locale('fr') : const Locale('en')),
+                      ),
+                      const SizedBox(width: 8),
+                      CircleIconButton(
+                        icon: Icons.shopping_bag_outlined,
+                        background: Colors.white.withValues(alpha: 0.18),
+                        color: Colors.white,
+                        badgeCount: ShopState.instance.cartCount,
+                        onTap: () async {
+                          await Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => CartScreen(locale: widget.locale)));
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                      const SizedBox(width: 4),
                     ],
-                    ),
                   ),
-                  const Spacer(),
-                  CircleIconButton(
-                    icon: Icons.translate_rounded,
-                    background: Colors.white.withValues(alpha: 0.18),
-                    color: Colors.white,
-                    onTap: () => widget.onLocaleChanged(lang == 'en' ? const Locale('fr') : const Locale('en')),
-                  ),
-                  const SizedBox(width: 8),
-                  CircleIconButton(
-                    icon: Icons.shopping_bag_outlined,
-                    background: Colors.white.withValues(alpha: 0.18),
-                    color: Colors.white,
-                    badgeCount: ShopState.instance.cartCount,
-                    onTap: () async {
-                      await Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => CartScreen(locale: widget.locale)));
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       bottom: PreferredSize(
@@ -224,14 +276,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.white.withValues(alpha: 0.96),
                       borderRadius: BorderRadius.circular(100),
-                      boxShadow: AppShadow.soft,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+                      boxShadow: AppShadow.lifted,
                     ),
                     child: Row(
                       children: [
                         const SizedBox(width: 16),
-                        const Icon(Icons.search_rounded, color: AppColors.muted, size: 22),
+                        const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
                         const SizedBox(width: 10),
                         Text(s.search,
                             style: const TextStyle(color: AppColors.faint, fontSize: 14.5, fontWeight: FontWeight.w500)),
@@ -244,15 +297,15 @@ class _HomeScreenState extends State<HomeScreen> {
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SearchScreen(locale: widget.locale))),
                 child: Container(
-                height: 50,
-                width: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppShadow.soft,
+                  height: 50,
+                  width: 50,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.brandGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppShadow.lifted,
+                  ),
+                  child: const Icon(Icons.tune_rounded, color: Colors.white),
                 ),
-                child: const Icon(Icons.tune_rounded, color: AppColors.primary),
-              ),
               ),
             ],
           ),
@@ -260,6 +313,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _blob(double d, Color c) => Container(
+        height: d, width: d,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: c),
+      );
 
   // ---- Hero carousel ----
   Widget _heroCarousel(Strings s) {
@@ -302,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Text(
-                                i == 1 ? '${s.flashSale} · -30%' : (i == 2 ? s.freeDelivery : s.prototype),
+                                i == 1 ? (_promoLabel ?? '${s.flashSale} · -30%') : (i == 2 ? s.freeDelivery : s.prototype),
                                 style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -346,17 +404,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---- Quick action tiles ----
+  // ---- Quick action tiles (floating glass card) ----
   Widget _quickActions(Strings s) {
     void go(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     final items = [
-      (Icons.bolt_rounded, s.deals, AppColors.accent, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
-      (Icons.local_shipping_rounded, s.freeDelivery, AppColors.mint, () => go(ProductListScreen(locale: widget.locale, title: s.freeDelivery))),
-      (Icons.verified_rounded, s.inStock, AppColors.primary, () => go(ProductListScreen(locale: widget.locale, title: s.inStock))),
-      (Icons.percent_rounded, 'Coupons', AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
+      (Icons.bolt_rounded, s.deals, AppColors.dealGradient, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
+      (Icons.local_shipping_rounded, s.freeDelivery, const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF34D399)]), () => go(ProductListScreen(locale: widget.locale, title: s.freeDelivery))),
+      (Icons.verified_rounded, s.inStock, AppColors.brandGradient, () => go(ProductListScreen(locale: widget.locale, title: s.inStock))),
+      (Icons.percent_rounded, trl(s.lang, 'Coupons'), const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)]), () => go(CouponsScreen(locale: widget.locale))),
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.line.withValues(alpha: 0.6)),
+        boxShadow: AppShadow.card,
+      ),
       child: Row(
         children: items.map((it) {
           return Expanded(
@@ -369,16 +434,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 52,
                     width: 52,
                     decoration: BoxDecoration(
-                      color: it.$3.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: it.$3,
+                      borderRadius: BorderRadius.circular(17),
+                      boxShadow: AppShadow.lifted,
                     ),
-                    child: Icon(it.$1, color: it.$3, size: 24),
+                    child: Icon(it.$1, color: Colors.white, size: 25),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(it.$2,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
                 ],
               ),
             ),

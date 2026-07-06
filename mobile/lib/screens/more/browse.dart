@@ -4,6 +4,7 @@ import '../../data/catalog_meta.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/kit.dart';
 import 'shop_extra.dart';
 
@@ -107,24 +108,24 @@ class _FilterSheetState extends State<_FilterSheet> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
             child: Row(children: [
-              const Text('Filters', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+              Text(tr(context, 'Filters'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
               const Spacer(),
-              TextButton(onPressed: () => setState(() => q = ProductQuery(text: q.text)), child: const Text('Reset')),
+              TextButton(onPressed: () => setState(() => q = ProductQuery(text: q.text)), child: Text(tr(context, 'Reset'))),
             ]),
           ),
           Expanded(
             child: ListView(controller: controller, padding: const EdgeInsets.fromLTRB(20, 4, 20, 20), children: [
-              _label('Sort by'),
-              Wrap(spacing: 8, runSpacing: 8, children: List.generate(_sorts.length, (i) => _chip(_sorts[i], q.sort == i, () => setState(() => q.sort = i)))),
+              _label(tr(context, 'Sort by')),
+              Wrap(spacing: 8, runSpacing: 8, children: List.generate(_sorts.length, (i) => _chip(tr(context, _sorts[i]), q.sort == i, () => setState(() => q.sort = i)))),
               const SizedBox(height: 20),
-              _label('Category'),
+              _label(tr(context, 'Category')),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                _chip('All', q.category == null, () => setState(() => q.category = null)),
-                ...categories.map((c) => _chip(c.name, q.category == c.name, () => setState(() => q.category = c.name))),
+                _chip(tr(context, 'All'), q.category == null, () => setState(() => q.category = null)),
+                ...categories.map((c) => _chip(c.displayName(Localizations.localeOf(context).languageCode), q.category == c.name, () => setState(() => q.category = c.name))),
               ]),
               const SizedBox(height: 20),
               Row(children: [
-                _label('Price range'),
+                _label(tr(context, 'Price range')),
                 const Spacer(),
                 Text('${money(q.minPrice)} – ${money(q.maxPrice)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
               ]),
@@ -139,9 +140,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                 }),
               ),
               const SizedBox(height: 12),
-              _label('Minimum rating'),
+              _label(tr(context, 'Minimum rating')),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                _chip('Any', q.minRating == 0, () => setState(() => q.minRating = 0)),
+                _chip(tr(context, 'Any'), q.minRating == 0, () => setState(() => q.minRating = 0)),
                 _chip('4.0★+', q.minRating == 4.0, () => setState(() => q.minRating = 4.0)),
                 _chip('4.5★+', q.minRating == 4.5, () => setState(() => q.minRating = 4.5)),
               ]),
@@ -151,8 +152,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                 activeThumbColor: AppColors.primary,
                 value: q.dealsOnly,
                 onChanged: (v) => setState(() => q.dealsOnly = v),
-                title: const Text('Deals only', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                subtitle: const Text('Show items with 15%+ off', style: TextStyle(fontSize: 12.5)),
+                title: Text(tr(context, 'Deals only'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                subtitle: Text(tr(context, 'Show items with 15%+ off'), style: const TextStyle(fontSize: 12.5)),
               ),
             ]),
           ),
@@ -164,7 +165,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context, q),
-                  child: Text('Show ${runQuery(products, q).length} results'),
+                  child: Text('${tr(context, 'Show')} ${runQuery(products, q).length} ${tr(context, 'results')}'),
                 ),
               ),
             ),
@@ -210,22 +211,23 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.locale.languageCode;
     final t = _ctrl.text.trim().toLowerCase();
     final list = allSellers.where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
     return Scaffold(
-      appBar: backAppBar(context, 'Stores & sellers'),
+      appBar: backAppBar(context, trl(lang, 'Stores & sellers')),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: _SearchField(controller: _ctrl, hint: 'Search stores or businesses…', onChanged: (_) => setState(() {})),
+          child: _SearchField(controller: _ctrl, hint: trl(lang, 'Search stores or businesses…'), onChanged: (_) => setState(() {})),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-          child: Align(alignment: Alignment.centerLeft, child: Text('${list.length} stores', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+          child: Align(alignment: Alignment.centerLeft, child: Text('${list.length} ${trl(lang, 'stores')}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
         ),
         Expanded(
           child: list.isEmpty
-              ? const Center(child: Text('No stores match your search', style: TextStyle(color: AppColors.muted)))
+              ? Center(child: Text(trl(lang, 'No stores match your search'), style: const TextStyle(color: AppColors.muted)))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   itemCount: list.length,
@@ -257,7 +259,7 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
           Row(children: [
             const Icon(Icons.star_rounded, size: 14, color: AppColors.amber),
             const SizedBox(width: 3),
-            Text('${s.rating} · ${(s.followers / 1000).toStringAsFixed(1)}k followers', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text('${s.rating} · ${(s.followers / 1000).toStringAsFixed(1)}k ${trl(widget.locale.languageCode, 'followers')}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ]),
           const SizedBox(height: 5),
           Container(
@@ -269,7 +271,7 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
         FilledButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, seller: s))),
           style: FilledButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 16)),
-          child: const Text('Visit'),
+          child: Text(trl(widget.locale.languageCode, 'Visit')),
         ),
       ]),
     );
@@ -295,7 +297,7 @@ class _AddressSelectScreenState extends State<AddressSelectScreen> {
   Widget build(BuildContext context) {
     final selected = ShopState.instance.selectedAddressLabel ?? _addrs.first.$1;
     return Scaffold(
-      appBar: backAppBar(context, 'Deliver to'),
+      appBar: backAppBar(context, trl(widget.locale.languageCode, 'Deliver to')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         ..._addrs.map((a) {
           final sel = a.$1 == selected;
@@ -322,7 +324,7 @@ class _AddressSelectScreenState extends State<AddressSelectScreen> {
           );
         }),
         const SizedBox(height: 4),
-        OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Use current location')),
+        OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: Text(trl(widget.locale.languageCode, 'Use current location'))),
       ]),
     );
   }

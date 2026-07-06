@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../data/mock_tasks.dart';
+import '../data/rider_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'more/rider_more.dart';
@@ -13,7 +15,7 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  bool _online = true;
+  final _duty = RiderState.instance.onDuty;
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +23,9 @@ class _TasksScreenState extends State<TasksScreen> {
       slivers: [
         SliverToBoxAdapter(child: _header(context)),
         SliverToBoxAdapter(
-            child: SectionHeader("Today's route",
-                actionLabel: 'Optimize',
-                onAction: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Route optimized — 3 stops reordered'))))),
+            child: SectionHeader(tr(context, "Today's route"),
+                actionLabel: tr(context, 'Optimize'),
+                onAction: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Route optimized — 3 stops reordered')))))),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
           sliver: SliverList.separated(
@@ -73,22 +75,25 @@ class _TasksScreenState extends State<TasksScreen> {
                   ],
                 ),
               ),
-              // Online toggle
-              GestureDetector(
-                onTap: () => setState(() => _online = !_online),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _online ? Colors.white : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(100),
+              // Online toggle (shared rider state — syncs with profile & shift)
+              ValueListenableBuilder<bool>(
+                valueListenable: _duty,
+                builder: (_, online, __) => GestureDetector(
+                  onTap: () => RiderState.instance.setOnDuty(!online),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: online ? Colors.white : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Row(children: [
+                      Container(width: 8, height: 8, decoration: BoxDecoration(color: online ? AppColors.primary : Colors.white, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text(online ? tr(context, 'On duty') : tr(context, 'Off'),
+                          style: TextStyle(color: online ? AppColors.primary : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                    ]),
                   ),
-                  child: Row(children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: _online ? AppColors.primary : Colors.white, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text(_online ? 'On duty' : 'Off',
-                        style: TextStyle(color: _online ? AppColors.primary : Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5)),
-                  ]),
                 ),
               ),
             ],
@@ -98,9 +103,9 @@ class _TasksScreenState extends State<TasksScreen> {
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(18)),
             child: Row(children: [
-              _stat('${mockTasks.length}', 'Active'),
+              _stat('${mockTasks.length}', tr(context, 'Active')),
               _divider(),
-              _stat('12', 'Done'),
+              _stat('12', tr(context, 'Done')),
               _divider(),
               _stat('12.4', 'km'),
             ]),
@@ -141,7 +146,7 @@ class _TasksScreenState extends State<TasksScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Pill(t.typeLabel, color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
+                      Pill(tr(context, t.typeLabel), color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
                       const SizedBox(width: 6),
                       Text(t.id, style: const TextStyle(color: AppColors.faint, fontSize: 11.5, fontWeight: FontWeight.w600)),
                     ]),
@@ -172,10 +177,10 @@ class _TasksScreenState extends State<TasksScreen> {
             const SizedBox(width: 8),
             _meta(Icons.schedule_rounded, '${t.etaMin} min'),
             const SizedBox(width: 8),
-            _meta(Icons.inventory_2_outlined, '${t.items} item${t.items > 1 ? 's' : ''}'),
+            _meta(Icons.inventory_2_outlined, '${t.items} ${tr(context, t.items > 1 ? 'items' : 'item')}'),
             const Spacer(),
             if (t.openBox)
-              Pill('Open box', color: AppColors.info.withValues(alpha: 0.14), textColor: AppColors.info, icon: Icons.inventory_rounded, fontSize: 11),
+              Pill(tr(context, 'Open box'), color: AppColors.info.withValues(alpha: 0.14), textColor: AppColors.info, icon: Icons.inventory_rounded, fontSize: 11),
           ]),
         ],
       ),
