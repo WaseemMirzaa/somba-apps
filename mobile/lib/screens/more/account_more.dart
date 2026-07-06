@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../data/mock_data.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/strings.dart';
@@ -48,18 +50,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     (Icons.local_offer_rounded, AppColors.amber, 'Coupon unlocked', 'SAVE10 — 10% off your next order.', '3d', false, false),
   ];
 
-  bool _isUnread(int i) => _items[i].$6 && !_read.contains(i);
+  // Live notifications from the API; falls back to [_items] when empty (offline/guest).
+  List<(IconData, Color, String, String, String, bool, bool)>? _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final data = await Repo.instance.notifications();
+    if (!mounted || data.isEmpty) return;
+    setState(() => _live = data.map(_mapNotif).toList());
+  }
+
+  (IconData, Color, String, String, String, bool, bool) _mapNotif(Map<String, dynamic> n) {
+    final (icon, color) = switch ((n['kind'] ?? '').toString()) {
+      'order' => (Icons.shopping_bag_rounded, AppColors.primary),
+      'delivery' => (Icons.local_shipping_rounded, AppColors.royalBlue),
+      'refund' => (Icons.payments_rounded, AppColors.success),
+      _ => (Icons.warning_amber_rounded, AppColors.amber),
+    };
+    final dt = DateTime.tryParse((n['date'] ?? '').toString());
+    final time = dt != null ? DateFormat('MMM d').format(dt) : '';
+    return (icon, color, (n['title'] ?? '').toString(), (n['body'] ?? '').toString(), time, true, false);
+  }
+
+  // The active source: live notifications when present, otherwise the mock.
+  List<(IconData, Color, String, String, String, bool, bool)> get _source =>
+      (_live != null && _live!.isNotEmpty) ? _live! : _items;
+
+  bool _isUnread(int i) => _source[i].$6 && !_read.contains(i);
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = List.generate(_items.length, (i) => i).where(_isUnread).length;
+    final unreadCount = List.generate(_source.length, (i) => i).where(_isUnread).length;
     return Scaffold(
       appBar: backAppBar(context, unreadCount > 0 ? '${tr(context, 'Notifications')} ($unreadCount)' : tr(context, 'Notifications'), actions: [
         TextButton(
           onPressed: unreadCount == 0
               ? null
               : () {
-                  setState(() => _read.addAll(List.generate(_items.length, (i) => i)));
+                  setState(() => _read.addAll(List.generate(_source.length, (i) => i)));
                   ShopState.instance.save();
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'All notifications marked as read'))));
                 },
@@ -68,10 +101,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ]),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: _items.length,
+        itemCount: _source.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
-          final n = _items[i];
+          final n = _source[i];
           final unread = _isUnread(i);
           return GestureDetector(
             onTap: () {

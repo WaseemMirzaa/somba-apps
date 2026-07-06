@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/market_profiles.dart';
+import '../../data/repository.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../l10n/strings.dart';
@@ -99,9 +100,59 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
 }
 
 // CF-19 — Edit profile.
-class CustomerEditProfileScreen extends StatelessWidget {
+class CustomerEditProfileScreen extends StatefulWidget {
   final Locale locale;
   const CustomerEditProfileScreen({super.key, this.locale = const Locale('en')});
+  @override
+  State<CustomerEditProfileScreen> createState() => _CustomerEditProfileScreenState();
+}
+
+class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
+  final _name = TextEditingController(text: 'Marie Dubois');
+  final _phone = TextEditingController(text: '+243 970 000 000');
+  final _email = TextEditingController(text: 'marie@email.com');
+
+  @override
+  void initState() {
+    super.initState();
+    _prefill();
+  }
+
+  Future<void> _prefill() async {
+    final me = await Repo.instance.me();
+    if (me == null || !mounted) return;
+    final name = (me['name'] as String?)?.trim();
+    final phone = (me['phone'] as String?)?.trim();
+    final email = (me['email'] as String?)?.trim();
+    setState(() {
+      if (name != null && name.isNotEmpty) _name.text = name;
+      if (phone != null && phone.isNotEmpty) _phone.text = phone;
+      if (email != null && email.isNotEmpty) _email.text = email;
+    });
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final res = await Repo.instance.updateProfile(name: _name.text.trim(), phone: _phone.text.trim());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Profile updated'))));
+    if (res != null) Navigator.pop(context);
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -112,7 +163,7 @@ class CustomerEditProfileScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 2)),
-              child: const CircleAvatar(radius: 44, backgroundColor: AppColors.primary, child: Text('MD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 28))),
+              child: CircleAvatar(radius: 44, backgroundColor: AppColors.primary, child: Text(_initials(_name.text), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 28))),
             ),
             Positioned(
               right: 0, bottom: 0,
@@ -125,18 +176,15 @@ class CustomerEditProfileScreen extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 24),
-        AppField(label: tr(context, 'Full name'), hint: 'Marie Dubois', icon: Icons.person_outline_rounded, initial: 'Marie Dubois'),
+        AppField(label: tr(context, 'Full name'), hint: 'Marie Dubois', icon: Icons.person_outline_rounded, controller: _name),
         const SizedBox(height: 16),
-        AppField(label: tr(context, 'Phone'), hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, initial: '+243 970 000 000'),
+        AppField(label: tr(context, 'Phone'), hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone),
         const SizedBox(height: 16),
-        AppField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress, initial: 'marie@email.com'),
+        AppField(label: tr(context, 'Email'), hint: 'marie@email.com', icon: Icons.mail_outline_rounded, keyboard: TextInputType.emailAddress, controller: _email),
         const SizedBox(height: 24),
         PrimaryButton(tr(context, 'Save changes'),
             icon: Icons.check_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(context, 'Profile updated'))));
-              Navigator.pop(context);
-            }),
+            onPressed: _save),
       ]),
     );
   }

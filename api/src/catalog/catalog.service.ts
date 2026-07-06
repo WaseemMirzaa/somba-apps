@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { Category } from '../entities/category.entity';
 import { Product } from '../entities/product.entity';
 import { Seller } from '../entities/seller.entity';
 import { Review } from '../entities/review.entity';
+import { Promotion } from '../entities/promotion.entity';
 import { ProductStatus, SellerStatus } from '../common/enums';
 
 @Injectable()
@@ -14,7 +16,29 @@ export class CatalogService {
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     @InjectRepository(Review) private readonly reviews: Repository<Review>,
+    @InjectRepository(Promotion) private readonly promotions: Repository<Promotion>,
   ) {}
+
+  /** Active platform-wide promotions (flash sales) for the home banner. */
+  async listPromotions() {
+    const now = Date.now();
+    const rows = await this.promotions.find({
+      where: { seller: IsNull() },
+      order: { startsAt: 'DESC' },
+    });
+    return rows
+      .filter((p) => new Date(p.startsAt).getTime() <= now && new Date(p.endsAt).getTime() >= now)
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        type: p.type,
+        value: p.value,
+        bannerUrl: p.bannerUrl,
+        productIds: p.productIds ?? [],
+        startsAt: p.startsAt,
+        endsAt: p.endsAt,
+      }));
+  }
 
   /** Active categories, each with a live-product count. */
   async listCategories() {

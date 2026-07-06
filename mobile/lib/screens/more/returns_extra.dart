@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../data/mock_data.dart';
+import '../../data/repository.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../l10n/strings.dart';
@@ -152,12 +154,18 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
               icon: _step < 2 ? Icons.arrow_forward_rounded : Icons.assignment_return_rounded,
               onPressed: !canNext
                   ? null
-                  : () {
+                  : () async {
                       if (_step < 2) {
                         setState(() => _step++);
-                      } else {
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReturnStatusScreen(locale: widget.locale, refund: _refundAmount)));
+                        return;
                       }
+                      final code = await Repo.instance.createDispute(
+                        reason: _reasons[_reason],
+                        detail: _refunds[_refund],
+                        amountUsd: _refundAmount,
+                      );
+                      if (!mounted) return;
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReturnStatusScreen(locale: widget.locale, refund: _refundAmount, code: code)));
                     },
             ),
           ),
@@ -179,12 +187,13 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
 class ReturnStatusScreen extends StatelessWidget {
   final Locale locale;
   final double? refund;
-  const ReturnStatusScreen({super.key, this.locale = const Locale('en'), this.refund});
+  final String? code;
+  const ReturnStatusScreen({super.key, this.locale = const Locale('en'), this.refund, this.code});
   @override
   Widget build(BuildContext context) {
     final amount = refund != null ? money(refund!) : money(349);
     return Scaffold(
-      appBar: backAppBar(context, 'Return RET-2026-118'),
+      appBar: backAppBar(context, code != null ? 'Return $code' : 'Return RET-2026-118'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(16),
@@ -331,6 +340,44 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     ('RET-2026-051', 'Pierced Owl Earrings', 'Return', 'Refunded', 'Jun 2', 11.0),
   ];
 
+  // Live disputes from the API; falls back to [_returns] when empty (offline/guest).
+  List<(String, String, String, String, String, double)>? _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final data = await Repo.instance.myDisputes();
+    if (!mounted || data.isEmpty) return;
+    setState(() => _live = data.map(_mapDispute).toList());
+  }
+
+  (String, String, String, String, String, double) _mapDispute(Map<String, dynamic> d) {
+    final code = (d['code'] ?? d['id'] ?? '').toString();
+    final reason = (d['reason'] ?? '').toString();
+    final amount = (d['amountUsd'] as num?)?.toDouble() ?? 0.0;
+    final dt = DateTime.tryParse((d['createdAt'] ?? '').toString());
+    final date = dt != null ? DateFormat('MMM d').format(dt) : '';
+    return (code, reason.isEmpty ? 'Return' : reason, 'Return', _displayStatus((d['status'] ?? '').toString()), date, amount);
+  }
+
+  // Map the API dispute status to the existing display/filter buckets.
+  String _displayStatus(String s) {
+    switch (s) {
+      case 'resolved':
+        return 'Refunded';
+      case 'rejected':
+        return 'Rejected';
+      case 'open':
+      case 'in_review':
+      default:
+        return 'In review';
+    }
+  }
+
   Color _statusColor(String s) {
     switch (s) {
       case 'Refunded':
@@ -368,7 +415,8 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
   Widget build(BuildContext context) {
     final q = _search.text.trim().toLowerCase();
     final lang = widget.locale.languageCode;
-    final list = _returns.where((r) => _match(r.$4) && (q.isEmpty || r.$1.toLowerCase().contains(q) || r.$2.toLowerCase().contains(q))).toList();
+    final source = (_live != null && _live!.isNotEmpty) ? _live! : _returns;
+    final list = source.where((r) => _match(r.$4) && (q.isEmpty || r.$1.toLowerCase().contains(q) || r.$2.toLowerCase().contains(q))).toList();
     return Scaffold(
       appBar: backAppBar(context, trl(lang, 'Returns & exchanges')),
       body: Column(children: [

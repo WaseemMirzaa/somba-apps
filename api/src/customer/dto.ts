@@ -159,6 +159,28 @@ export class CreateOrderDto {
   deliveryFeeUsd?: number;
 }
 
+export class CreateDisputeDto {
+  @ApiPropertyOptional({ description: 'Order this return/dispute is about' })
+  @IsOptional()
+  @IsString()
+  orderId?: string;
+
+  @ApiProperty({ example: 'Item not as described' })
+  @IsString()
+  @MinLength(3)
+  reason: string;
+
+  @ApiPropertyOptional({ example: 'The colour differs from the listing photos.' })
+  @IsOptional()
+  @IsString()
+  detail?: string;
+
+  @ApiPropertyOptional({ example: 56 })
+  @IsOptional()
+  @IsNumber()
+  amountUsd?: number;
+}
+
 export class ValidateCouponDto {
   @ApiProperty({ example: 'SOMBA10' })
   @IsString()

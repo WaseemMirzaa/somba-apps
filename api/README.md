@@ -61,15 +61,18 @@ Seeded customer login: `marie@mail.com` (password from `SEED_PASSWORD`).
 
 `GET /api/catalog/categories` (with product counts), `products` (browse +
 `category`/`q`/`seller`/`sort`/`page`/`limit`), `deals`, `featured`,
-`products/:id`, `products/:id/related`, `products/:id/reviews`, `stores`,
-`stores/:slug`. All products carry EN + FR fields (`name`/`nameFr`,
+`products/:id`, `products/:id/related`, `products/:id/reviews`, `promotions`
+(active platform flash sales), `stores`, `stores/:slug` (store + its products).
+All products carry EN + FR fields (`name`/`nameFr`,
 `description`/`descriptionFr`, bilingual `specs`).
 
 ## Customer endpoints (`/api/customer/...`, role `customer`)
 
 `me` (get/update), `addresses` (CRUD), `favorites` (list/add/remove wishlist),
 `orders` (checkout `POST`, list, detail), `products/:id/reviews` (write a
-review), `coupons` (list active + `coupons/validate`). Checkout computes
+review), `disputes` (open + list returns/refunds — same records the admin
+console resolves), `notifications` (derived from the customer's orders +
+disputes), `coupons` (list active + `coupons/validate`). Checkout computes
 per-item commission/net and applies a coupon; placing an order bumps each
 product's sold count.
 

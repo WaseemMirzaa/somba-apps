@@ -203,7 +203,131 @@ class Repo {
     }
   }
 
+  // ---- Profile -------------------------------------------------------------
+
+  Future<Map<String, dynamic>?> me() async {
+    if (!isAuthed) return null;
+    try {
+      final res = await _api.get('/customer/me');
+      return res is Map ? res.cast<String, dynamic>() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateProfile({String? name, String? phone}) async {
+    if (!isAuthed) return null;
+    try {
+      final res = await _api.patch('/customer/me', {
+        if (name != null) 'name': name,
+        if (phone != null) 'phone': phone,
+      });
+      return res is Map ? res.cast<String, dynamic>() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Number of active coupons (for the account summary).
+  int get couponCount => promos.length;
+
+  // ---- Stores & related ----------------------------------------------------
+
+  /// A store's live products (by slug). Empty when offline.
+  Future<List<Product>> storeProducts(String slug) async {
+    if (slug.isEmpty) return const [];
+    try {
+      final res = await _api.get('/catalog/stores/$slug');
+      final items = res is Map ? (res['products'] as List?) : null;
+      if (items != null) {
+        return items.whereType<Map>().map((p) => Product.fromJson(p.cast<String, dynamic>())).toList();
+      }
+    } catch (_) {/* fall through */}
+    return const [];
+  }
+
+  /// Related products for a product (same category). Falls back to the local
+  /// same-category filter when offline.
+  Future<List<Product>> relatedProducts(String productId) async {
+    try {
+      final res = await _api.get('/catalog/products/$productId/related');
+      if (res is List) {
+        return res.whereType<Map>().map((p) => Product.fromJson(p.cast<String, dynamic>())).toList();
+      }
+    } catch (_) {/* fall through */}
+    return const [];
+  }
+
+  // ---- Promotions ----------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> promotions() async {
+    try {
+      final res = await _api.get('/catalog/promotions');
+      if (res is List) {
+        return res.whereType<Map>().map((p) => p.cast<String, dynamic>()).toList();
+      }
+    } catch (_) {/* fall through */}
+    return const [];
+  }
+
+  // ---- Notifications -------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> notifications() async {
+    if (!isAuthed) return const [];
+    try {
+      final res = await _api.get('/customer/notifications');
+      if (res is List) {
+        return res.whereType<Map>().map((n) => n.cast<String, dynamic>()).toList();
+      }
+    } catch (_) {/* fall through */}
+    return const [];
+  }
+
+  // ---- Returns / disputes --------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> myDisputes() async {
+    if (!isAuthed) return const [];
+    try {
+      final res = await _api.get('/customer/disputes');
+      if (res is List) {
+        return res.whereType<Map>().map((d) => d.cast<String, dynamic>()).toList();
+      }
+    } catch (_) {/* fall through */}
+    return const [];
+  }
+
+  Future<String?> createDispute({
+    String? orderId,
+    required String reason,
+    String? detail,
+    double? amountUsd,
+  }) async {
+    if (!isAuthed) return null;
+    try {
+      final res = await _api.post('/customer/disputes', {
+        if (orderId != null) 'orderId': orderId,
+        'reason': reason,
+        if (detail != null) 'detail': detail,
+        if (amountUsd != null) 'amountUsd': amountUsd,
+      });
+      return res is Map ? res['code']?.toString() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ---- Orders --------------------------------------------------------------
+
+  /// Full detail for one of my orders (items, totals, address, status).
+  Future<Map<String, dynamic>?> orderDetail(String id) async {
+    if (!isAuthed) return null;
+    try {
+      final res = await _api.get('/customer/orders/$id');
+      return res is Map ? res.cast<String, dynamic>() : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> myOrders() async {
     if (!isAuthed) return const [];

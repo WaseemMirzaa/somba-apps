@@ -16,9 +16,12 @@ import { FavoritesService } from './favorites.service';
 import { OrdersService } from './orders.service';
 import { ReviewsService } from './reviews.service';
 import { CouponsService } from './coupons.service';
+import { DisputesService } from './disputes.service';
+import { NotificationsService } from './notifications.service';
 import { Public } from '../common/decorators';
 import {
   AddressDto,
+  CreateDisputeDto,
   CreateOrderDto,
   CreateReviewDto,
   UpdateProfileDto,
@@ -36,6 +39,8 @@ export class CustomerController {
     private readonly orders: OrdersService,
     private readonly reviews: ReviewsService,
     private readonly coupons: CouponsService,
+    private readonly disputes: DisputesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ---- Profile ----
@@ -115,6 +120,26 @@ export class CustomerController {
     @Body() dto: CreateReviewDto,
   ) {
     return this.reviews.create(user.id, productId, dto);
+  }
+
+  // ---- Returns / disputes ----
+  @Get('disputes')
+  @ApiOperation({ summary: 'My returns / disputes' })
+  listDisputes(@CurrentUser() user: AuthUser) {
+    return this.disputes.listMine(user.id);
+  }
+
+  @Post('disputes')
+  @ApiOperation({ summary: 'Open a return / dispute' })
+  createDispute(@CurrentUser() user: AuthUser, @Body() dto: CreateDisputeDto) {
+    return this.disputes.create(user.id, dto);
+  }
+
+  // ---- Notifications (derived from orders + disputes) ----
+  @Get('notifications')
+  @ApiOperation({ summary: 'My notifications' })
+  listNotifications(@CurrentUser() user: AuthUser) {
+    return this.notifications.listMine(user.id);
   }
 
   // ---- Coupons ----

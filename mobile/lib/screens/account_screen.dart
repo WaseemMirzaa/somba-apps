@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
+import '../data/repository.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
@@ -9,7 +10,7 @@ import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
 import 'more/catalog_extra.dart';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   final Locale locale;
   final void Function(Locale) onLocaleChanged;
   final VoidCallback? onLogout;
@@ -17,7 +18,41 @@ class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
 
   @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
+  Map<String, dynamic>? _me;
+  int? _orderCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final me = await Repo.instance.me();
+    if (me == null) return;
+    final orders = await Repo.instance.myOrders();
+    if (!mounted) return;
+    setState(() {
+      _me = me;
+      _orderCount = orders.length;
+    });
+  }
+
+  /// Avatar initials from the first letters of the first two words of [name].
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final locale = widget.locale;
     final s = Strings(locale.languageCode);
     final lang = locale.languageCode;
 
@@ -93,7 +128,7 @@ class AccountScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      lang == 'fr' ? 'Mode prototype — données simulées.' : 'Prototype mode — mock data, no backend.',
+                      _bannerText(lang),
                       style: const TextStyle(color: Color(0xFF92610A), fontSize: 12.5, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -107,8 +142,23 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
+  String _bannerText(String lang) {
+    if (Repo.instance.isAuthed && Repo.instance.live) {
+      return lang == 'fr' ? 'Connecté au backend en direct.' : 'Connected to live backend.';
+    }
+    return lang == 'fr' ? 'Mode démo — connectez-vous pour vos données.' : 'Demo mode — sign in for your data.';
+  }
+
   Widget _profileHeader(BuildContext context, Strings s) {
     final top = MediaQuery.of(context).padding.top;
+    final me = _me;
+    final name = (me?['name'] as String?)?.trim();
+    final displayName = (name != null && name.isNotEmpty) ? name : 'Marie Dubois';
+    final email = (me?['email'] as String?)?.trim();
+    final displayEmail = (email != null && email.isNotEmpty) ? email : 'marie@email.com';
+    final initials = _initials(displayName);
+    final orders = me != null ? (_orderCount ?? 0) : 12;
+    final coupons = me != null ? Repo.instance.couponCount : 3;
     return Container(
       padding: EdgeInsets.fromLTRB(20, top + 24, 20, 24),
       decoration: const BoxDecoration(
@@ -125,11 +175,11 @@ class AccountScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2),
                 ),
-                child: const CircleAvatar(
+                child: CircleAvatar(
                   radius: 32,
                   backgroundColor: Colors.white,
-                  child: Text('MD',
-                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22)),
+                  child: Text(initials,
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22)),
                 ),
               ),
               const SizedBox(width: 16),
@@ -137,10 +187,10 @@ class AccountScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Marie Dubois',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text(displayName,
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 2),
-                    Text('marie@email.com',
+                    Text(displayEmail,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                     const SizedBox(height: 8),
                     Container(
@@ -173,11 +223,11 @@ class AccountScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _stat('12', s.orders),
+                _stat('$orders', s.orders),
                 _divider(),
                 _stat('${ShopState.instance.wishlist.length}', s.wishlist),
                 _divider(),
-                _stat('3', trl(s.lang, 'Coupons')),
+                _stat('$coupons', trl(s.lang, 'Coupons')),
               ],
             ),
           ),
@@ -274,8 +324,8 @@ class AccountScreen extends StatelessWidget {
                 ButtonSegment(value: 'en', label: Text('EN')),
                 ButtonSegment(value: 'fr', label: Text('FR')),
               ],
-              selected: {locale.languageCode},
-              onSelectionChanged: (v) => onLocaleChanged(Locale(v.first)),
+              selected: {widget.locale.languageCode},
+              onSelectionChanged: (v) => widget.onLocaleChanged(Locale(v.first)),
             ),
           ],
         ),
@@ -304,7 +354,7 @@ class AccountScreen extends StatelessWidget {
               style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
               onPressed: () {
                 Navigator.pop(context);
-                onLogout?.call();
+                widget.onLogout?.call();
               },
               child: Text(tr(context, 'Log out')),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../data/repository.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
@@ -40,8 +41,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final items = (o['items'] as List?) ?? const [];
     final qty = items.fold<int>(0, (s, it) => s + ((it is Map ? (it['qty'] as num?)?.toInt() : 1) ?? 1));
     final total = o['totalUsd'];
+    // Derive a short date (e.g. `Jul 5`) from the order timestamps for the hint.
+    final ts = o['updatedAt'] ?? o['createdAt'];
+    var date = '';
+    if (ts != null) {
+      final dt = DateTime.tryParse(ts.toString());
+      if (dt != null) date = DateFormat('MMM d').format(dt.toLocal());
+    }
     return {
       'id': (o['code'] ?? '').toString(),
+      // Raw order id, used to open the live detail / tracking screens.
+      'orderId': (o['id'] ?? '').toString(),
+      'date': date,
       'status': (o['status'] ?? 'pending').toString(),
       'amount': total is num ? total : num.tryParse('$total') ?? 0,
       'items': qty == 0 ? items.length : qty,
@@ -135,11 +146,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  /// The raw order id for a live order, or null for the mock fallback rows.
+  String? _liveId(Map<String, Object> o) {
+    final oid = o['orderId'] as String?;
+    return (oid != null && oid.isNotEmpty) ? oid : null;
+  }
+
   Widget _orderCard(Map<String, Object> o, Strings s) {
     final status = o['status'] as String;
+    final orderId = _liveId(o);
     final c = _statusColor(status);
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: status == 'delivered'))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: status == 'delivered', orderId: orderId))),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -167,19 +185,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Row(children: [
             Icon(_statusIcon(status), size: 16, color: c),
             const SizedBox(width: 6),
-            Expanded(child: Text(_statusHint(status, s), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
-            _actionFor(status, s),
+            Expanded(child: Text(_statusHint(o, s), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
+            _actionFor(o, s),
           ]),
         ]),
       ),
     );
   }
 
-  Widget _actionFor(String status, Strings s) {
+  Widget _actionFor(Map<String, Object> o, Strings s) {
+    final status = o['status'] as String;
+    final orderId = _liveId(o);
     // Status-specific primary action, mirroring the web order detail.
     if (status == 'delivered') {
       return TextButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: true))),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, delivered: true, orderId: orderId))),
         style: _btnStyle(),
         child: Text(s.isFr ? 'Évaluer' : 'Review'),
       );
@@ -192,7 +212,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
     }
     return TextButton(
-      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale))),
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, status: orderId != null ? status : null))),
       style: _btnStyle(),
       child: Text(s.trackOrder),
     );
@@ -242,10 +262,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  String _statusHint(String status, Strings s) {
+  String _statusHint(Map<String, Object> o, Strings s) {
+    final status = o['status'] as String;
     final fr = s.isFr;
+    final date = (o['date'] as String?) ?? '';
     switch (status) {
       case 'delivered':
+        // Live orders: use the real order date; mock rows keep the sample text.
+        if (date.isNotEmpty) return fr ? 'Livré le $date' : 'Delivered on $date';
         return fr ? 'Livré le 24 juin' : 'Delivered on Jun 24';
       case 'out_for_delivery':
         return fr ? 'Le livreur arrive' : 'Rider is on the way';

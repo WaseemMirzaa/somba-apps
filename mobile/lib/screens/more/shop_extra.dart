@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
 import '../../data/catalog_meta.dart';
+import '../../data/repository.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/strings.dart';
@@ -22,6 +23,24 @@ class StoreScreen extends StatefulWidget {
 class _StoreScreenState extends State<StoreScreen> {
   final _ctrl = TextEditingController();
   late final ProductQuery _q = ProductQuery(category: widget.seller == null ? null : sellerCategory(widget.seller!));
+
+  /// The store's live products (from the API). Null until loaded; stays null
+  /// when offline / no slug / empty so we fall back to the local heuristic.
+  List<Product>? _apiProducts;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStore();
+  }
+
+  Future<void> _loadStore() async {
+    final slug = widget.seller?.slug ?? '';
+    if (slug.isEmpty) return;
+    final items = await Repo.instance.storeProducts(slug);
+    if (!mounted || items.isEmpty) return;
+    setState(() => _apiProducts = items);
+  }
 
   String get _id => widget.seller?.id ?? 'slr-01';
   String get _name => widget.seller?.name ?? 'TechSphere Store';
@@ -47,9 +66,13 @@ class _StoreScreenState extends State<StoreScreen> {
   String get _rating => (widget.seller?.rating ?? 4.8).toString();
   int get _baseFollowers => widget.seller?.followers ?? 12400;
 
-  List<Product> get _storeProducts => widget.seller == null
+  /// Offline heuristic: global catalogue filtered by the seller's category.
+  List<Product> get _fallbackProducts => widget.seller == null
       ? products
       : products.where((p) => p.category == sellerCategory(widget.seller!)).toList();
+
+  /// Real store products when available, else the local heuristic (fail-soft).
+  List<Product> get _storeProducts => _apiProducts ?? _fallbackProducts;
 
   @override
   void dispose() {

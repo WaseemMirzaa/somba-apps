@@ -72,6 +72,13 @@ export class CatalogController {
   }
 
   @Public()
+  @Get('promotions')
+  @ApiOperation({ summary: 'Active platform promotions (flash sales)' })
+  promotions() {
+    return this.catalog.listPromotions();
+  }
+
+  @Public()
   @Get('stores')
   @ApiOperation({ summary: 'Active seller directory' })
   stores() {

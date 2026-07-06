@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/repository.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
@@ -30,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _page = 0;
   int _feedTab = 0;
   Timer? _autoplay;
+  // Live promotion label overriding the flash-sale banner badge (null → static).
+  String? _promoLabel;
 
   late final List<_Banner> _banners = [
     _Banner(AppColors.brandGradient, Icons.auto_awesome_rounded),
@@ -53,7 +56,43 @@ class _HomeScreenState extends State<HomeScreen> {
       _pageController.animateToPage(next,
           duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
     });
+    _loadPromo();
   }
+
+  // Pull live promotions and, if one is active, build the flash-sale badge label.
+  Future<void> _loadPromo() async {
+    final promos = await Repo.instance.promotions();
+    if (!mounted || promos.isEmpty) return;
+    final now = DateTime.now();
+    Map<String, dynamic>? active;
+    for (final p in promos) {
+      final starts = DateTime.tryParse((p['startsAt'] ?? '').toString());
+      final ends = DateTime.tryParse((p['endsAt'] ?? '').toString());
+      final started = starts == null || !now.isBefore(starts);
+      final notEnded = ends == null || !now.isAfter(ends);
+      if (started && notEnded) {
+        active = p;
+        break;
+      }
+    }
+    active ??= promos.first;
+    final title = (active['title'] ?? '').toString();
+    final type = (active['type'] ?? '').toString();
+    final raw = active['value'];
+    final num? value = raw is num ? raw : num.tryParse('$raw');
+    String label;
+    if (value != null && (type == 'percent' || type == 'flash_sale')) {
+      label = '$title · -${_fmtNum(value)}%';
+    } else if (value != null && type == 'flat') {
+      label = '$title · -\$${_fmtNum(value)}';
+    } else {
+      label = title;
+    }
+    if (label.trim().isEmpty) return;
+    setState(() => _promoLabel = label);
+  }
+
+  String _fmtNum(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
   @override
   void dispose() {
@@ -321,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Text(
-                                i == 1 ? '${s.flashSale} · -30%' : (i == 2 ? s.freeDelivery : s.prototype),
+                                i == 1 ? (_promoLabel ?? '${s.flashSale} · -30%') : (i == 2 ? s.freeDelivery : s.prototype),
                                 style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
                               ),
                             ),

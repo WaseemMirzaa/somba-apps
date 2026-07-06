@@ -33,6 +33,10 @@ export class Dispute {
   @Column()
   customerName: string;
 
+  /** Set when a customer opens the dispute from the app (scopes "my returns"). */
+  @Column({ nullable: true })
+  customerEmail?: string;
+
   @Column()
   reason: string;
 

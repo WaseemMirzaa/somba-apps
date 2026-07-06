@@ -26,6 +26,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _qty = 1;
   late final List<String> _variants;
 
+  /// Live related products from the API; empty until loaded (or offline), in
+  /// which case we fall back to the local same-category filter.
+  List<Product> _relatedApi = const [];
+
   // (question, answer?) — answer null while awaiting the seller.
   final List<(String, String?)> _qa = [
     ('Is this the latest model?', 'Yes — it is the current 2026 edition.'),
@@ -38,6 +42,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ShopState.instance.addRecentlyViewed(widget.product.id);
     _variants = _variantsFor(widget.product.category);
     _loadReviews();
+    _loadRelated();
+  }
+
+  /// Pull this product's live related items (no-op / fallback when offline).
+  Future<void> _loadRelated() async {
+    final items = await Repo.instance.relatedProducts(widget.product.id);
+    if (!mounted || items.isEmpty) return;
+    setState(() => _relatedApi = items);
   }
 
   /// Pull this product's live reviews into ShopState so the reviews screen and
@@ -446,7 +458,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _related(Product p, String lang) {
-    final items = relatedTo(p);
+    final items = _relatedApi.isNotEmpty ? _relatedApi : relatedTo(p);
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(tr(context, 'You may also like'), style: Theme.of(context).textTheme.titleMedium),
