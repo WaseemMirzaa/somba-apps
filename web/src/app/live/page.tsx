@@ -5,10 +5,13 @@ import {
   Activity,
   Bell,
   CheckCircle2,
+  CreditCard,
   MapPin,
   Package,
   Radio,
+  RotateCcw,
   Truck,
+  Wallet,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -69,6 +72,8 @@ export default function LiveConsolePage() {
   const isAdmin = rt.user?.role.startsWith("admin") || rt.user?.role === "warehouse_staff";
   const isRider = rt.user?.role === "rider";
   const isCustomer = rt.user?.role === "customer";
+  const canRefund =
+    rt.user?.role === "admin" || rt.user?.role === "admin_finance";
 
   const doLogin = useCallback(
     async (e: string) => {
@@ -100,20 +105,34 @@ export default function LiveConsolePage() {
     refreshUnassigned();
   }, [isRider, rt.status, rt.orders.length, refreshUnassigned]);
 
-  const placeTestOrder = useCallback(async () => {
-    const p = rt.products[0];
-    if (!p) return;
+  const placeTestOrder = useCallback(
+    async (paymentMethod: "cod" | "wallet") => {
+      const p = rt.products[0];
+      if (!p) return;
+      setBusy(true);
+      try {
+        await rt.placeOrder({
+          items: [{ productId: p.id, qty: 1 }],
+          paymentMethod,
+          deliveryFeeUsd: 3,
+          shippingAddress: JSON.stringify({
+            city: "Kinshasa",
+            line1: "12 Ave du Commerce",
+          }),
+        });
+      } catch (e) {
+        alert((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [rt],
+  );
+
+  const topUp = useCallback(async () => {
     setBusy(true);
     try {
-      await rt.placeOrder({
-        items: [{ productId: p.id, qty: 1 }],
-        paymentMethod: "cod",
-        deliveryFeeUsd: 3,
-        shippingAddress: JSON.stringify({
-          city: "Kinshasa",
-          line1: "12 Ave du Commerce",
-        }),
-      });
+      await rt.topUpWallet(50, "airtel_money");
     } finally {
       setBusy(false);
     }
@@ -249,6 +268,41 @@ export default function LiveConsolePage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {/* Customer: wallet */}
+          {isCustomer && (
+            <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-sky-600 to-indigo-600 p-4 text-white shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-sky-100">
+                    <Wallet className="h-4 w-4" /> Wallet balance
+                  </p>
+                  <p className="mt-1 text-3xl font-bold">
+                    ${rt.walletBalance.toFixed(2)}
+                  </p>
+                </div>
+                <button
+                  onClick={topUp}
+                  disabled={busy}
+                  className="rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold backdrop-blur hover:bg-white/25 disabled:opacity-50"
+                >
+                  + Top up $50
+                </button>
+              </div>
+              {rt.walletTransactions.length > 0 && (
+                <div className="mt-3 space-y-1 border-t border-white/20 pt-2 text-xs text-sky-50">
+                  {rt.walletTransactions.slice(0, 3).map((t) => (
+                    <div key={t.id} className="flex justify-between">
+                      <span>{t.description}</span>
+                      <span className="font-semibold">
+                        {t.type === "debit" ? "-" : "+"}${t.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Customer: place an order */}
           {isCustomer && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -256,13 +310,22 @@ export default function LiveConsolePage() {
                 <h2 className="flex items-center gap-2 font-semibold text-slate-800">
                   <Package className="h-4 w-4" /> Storefront
                 </h2>
-                <button
-                  onClick={placeTestOrder}
-                  disabled={busy || !rt.products.length}
-                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  Place test order
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => placeTestOrder("cod")}
+                    disabled={busy || !rt.products.length}
+                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Order (COD)
+                  </button>
+                  <button
+                    onClick={() => placeTestOrder("wallet")}
+                    disabled={busy || !rt.products.length}
+                    className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    <Wallet className="h-3 w-3" /> Pay w/ wallet
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {rt.products.slice(0, 6).map((p) => (
@@ -322,9 +385,9 @@ export default function LiveConsolePage() {
                         {loc.lng.toFixed(3)}
                       </p>
                     )}
-                    {isAdmin && NEXT_ORDER_STATUS[o.status] && (
+                    {isAdmin && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {NEXT_ORDER_STATUS[o.status].map((s) => (
+                        {(NEXT_ORDER_STATUS[o.status] ?? []).map((s) => (
                           <button
                             key={s}
                             onClick={() => rt.updateOrderStatus(o.id, s)}
@@ -333,6 +396,16 @@ export default function LiveConsolePage() {
                             → {s.replace(/_/g, " ")}
                           </button>
                         ))}
+                        {(canRefund) &&
+                          o.status !== "returned" &&
+                          o.status !== "cancelled" && (
+                            <button
+                              onClick={() => rt.refundOrder(o.id, true)}
+                              className="flex items-center gap-1 rounded-md border border-rose-300 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50"
+                            >
+                              <RotateCcw className="h-3 w-3" /> Refund → wallet
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>
@@ -438,6 +511,30 @@ export default function LiveConsolePage() {
               <p className="text-slate-500">{n.body}</p>
             </button>
           ))}
+
+          {rt.payments.length > 0 && (
+            <>
+              <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
+                <CreditCard className="h-4 w-4" /> Payments
+              </h2>
+              {rt.payments.slice(0, 12).map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-slate-100 p-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">
+                      {p.orderReference}
+                    </span>
+                    <StatusPill status={p.status} />
+                  </div>
+                  <p className="text-slate-500">
+                    ${p.amountUsd.toFixed(2)} · {p.method.replace(/_/g, " ")}
+                  </p>
+                </div>
+              ))}
+            </>
+          )}
         </aside>
       </div>
     </main>

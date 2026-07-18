@@ -120,5 +120,27 @@ export interface RiderLocation {
   lng: number;
 }
 
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  type: "credit" | "debit" | "cashback" | "refund" | "topup";
+  amount: number;
+  balance: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface Payment {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string;
+  userId: string;
+  method: string;
+  amountUsd: number;
+  status: "pending" | "succeeded" | "failed" | "refunded";
+  createdAt: string;
+}
+
 /** Standard ack envelope returned by every request→ack socket handler. */
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: string };

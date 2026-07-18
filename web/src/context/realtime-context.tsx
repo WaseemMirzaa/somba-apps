@@ -18,8 +18,10 @@ import type {
   DeliveryTask,
   Order,
   OrderStatus,
+  Payment,
   Product,
   RiderLocation,
+  WalletTransaction,
 } from "@/lib/realtime/types";
 
 type ConnState = "disconnected" | "connecting" | "connected" | "error";
@@ -34,6 +36,9 @@ interface RealtimeValue {
   notifications: AppNotification[];
   riderLocations: Record<string, RiderLocation>;
   unreadCount: number;
+  walletBalance: number;
+  walletTransactions: WalletTransaction[];
+  payments: Payment[];
 
   login: (email: string, password: string) => Promise<void>;
   register: (input: {
@@ -63,6 +68,8 @@ interface RealtimeValue {
   updateDeliveryStatus: (taskId: string, status: DeliveryStatus) => Promise<void>;
   sendLocation: (taskId: string, lat: number, lng: number) => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  topUpWallet: (amountUsd: number, method?: string) => Promise<void>;
+  refundOrder: (orderId: string, toWallet?: boolean) => Promise<void>;
 }
 
 const RealtimeContext = createContext<RealtimeValue | null>(null);
@@ -86,6 +93,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [riderLocations, setRiderLocations] = useState<
     Record<string, RiderLocation>
   >({});
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletTransactions, setWalletTransactions] = useState<
+    WalletTransaction[]
+  >([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const booted = useRef(false);
 
   const logout = useCallback(() => {
@@ -97,6 +109,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     setDeliveries([]);
     setNotifications([]);
     setRiderLocations({});
+    setWalletBalance(0);
+    setWalletTransactions([]);
+    setPayments([]);
   }, []);
 
   /** Wire socket listeners + hydrate initial state after connect. */
@@ -131,6 +146,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("product:updated", (p: Product) =>
       setProducts((cur) => upsert(cur, p)),
     );
+    s.on("wallet:updated", (w: { balance: number }) =>
+      setWalletBalance(w.balance),
+    );
+    s.on("wallet:transaction", (t: WalletTransaction) =>
+      setWalletTransactions((cur) => upsert(cur, t)),
+    );
+    s.on("payment:created", (p: Payment) =>
+      setPayments((cur) => upsert(cur, p)),
+    );
+    s.on("payment:updated", (p: Payment) =>
+      setPayments((cur) => upsert(cur, p)),
+    );
 
     // Initial hydration (one-shot reads over the socket).
     try {
@@ -146,6 +173,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         .request<DeliveryTask[]>("delivery:list")
         .catch(() => []);
       setDeliveries(del);
+      const [wallet, walletTx, pays] = await Promise.all([
+        socketClient
+          .request<{ balance: number }>("wallet:get")
+          .catch(() => ({ balance: 0 })),
+        socketClient
+          .request<WalletTransaction[]>("wallet:transactions")
+          .catch(() => []),
+        socketClient.request<Payment[]>("payments:list").catch(() => []),
+      ]);
+      setWalletBalance(wallet.balance);
+      setWalletTransactions(walletTx);
+      setPayments(pays);
     } catch {
       /* hydration is best-effort; live events still flow */
     }
@@ -251,6 +290,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const topUpWallet = useCallback(async (amountUsd: number, method?: string) => {
+    await socketClient.request("wallet:topup", { amountUsd, method });
+    // wallet:updated / wallet:transaction arrive via push.
+  }, []);
+
+  const refundOrder = useCallback(
+    async (orderId: string, toWallet = true) => {
+      await socketClient.request("orders:refund", { orderId, toWallet });
+    },
+    [],
+  );
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],
@@ -267,6 +318,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       notifications,
       riderLocations,
       unreadCount,
+      walletBalance,
+      walletTransactions,
+      payments,
       login,
       register,
       logout,
@@ -276,6 +330,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       updateDeliveryStatus,
       sendLocation,
       markRead,
+      topUpWallet,
+      refundOrder,
     }),
     [
       user,
@@ -287,6 +343,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       notifications,
       riderLocations,
       unreadCount,
+      walletBalance,
+      walletTransactions,
+      payments,
       login,
       register,
       logout,
@@ -296,6 +355,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       updateDeliveryStatus,
       sendLocation,
       markRead,
+      topUpWallet,
+      refundOrder,
     ],
   );
 
