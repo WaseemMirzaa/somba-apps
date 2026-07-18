@@ -128,6 +128,48 @@ async function main() {
   const snapPushed = await adminSawSnapshot;
   check('admin saw snapshot order LIVE', snapPushed.id === snapOrder.id);
 
+  // ---- Wallet + payments ----
+  const startBal = (await emit<{ balance: number }>(cSock, 'wallet:get')).balance;
+  check(`customer wallet has a balance ($${startBal})`, startBal > 0);
+
+  const walletUpdated = waitFor<{ balance: number }>(cSock, 'wallet:updated');
+  await emit(cSock, 'wallet:topup', { amountUsd: 100, method: 'airtel_money' });
+  const afterTopup = await walletUpdated;
+  check('wallet top-up pushed new balance live', afterTopup.balance === startBal + 100);
+
+  // Pay for an order with the wallet — balance must drop live.
+  const walletDebited = waitFor<{ balance: number }>(cSock, 'wallet:updated');
+  const walletOrder = await emit<any>(cSock, 'orders:create', {
+    items: [{ name: 'Wallet Item', priceUsd: 40, qty: 1 }],
+    paymentMethod: 'wallet',
+    deliveryFeeUsd: 0,
+  });
+  check('wallet order confirmed immediately', walletOrder.status === 'confirmed');
+  const afterDebit = await walletDebited;
+  check('wallet debited live on payment', afterDebit.balance === afterTopup.balance - 40);
+
+  const payments = await emit<any[]>(cSock, 'payments:list');
+  check(`customer has ${payments.length} payment records`, payments.length >= 1);
+
+  // Admin/finance refund to wallet — balance must rise live.
+  const walletRefunded = waitFor<{ balance: number }>(cSock, 'wallet:updated');
+  await emit(aSock, 'orders:refund', { orderId: walletOrder.id, toWallet: true });
+  const afterRefund = await walletRefunded;
+  check('refund credited wallet live', afterRefund.balance === afterDebit.balance + 40);
+
+  // Insufficient-funds guard.
+  let rejected = false;
+  try {
+    await emit(cSock, 'orders:create', {
+      items: [{ name: 'Too expensive', priceUsd: 999999, qty: 1 }],
+      paymentMethod: 'wallet',
+      deliveryFeeUsd: 0,
+    });
+  } catch {
+    rejected = true;
+  }
+  check('wallet order rejected when funds insufficient', rejected);
+
   // Notifications were persisted + pushed.
   const notifs = await emit<any[]>(cSock, 'notifications:list');
   check(`customer has ${notifs.length} realtime notifications`, notifs.length >= 2);

@@ -14,6 +14,8 @@ import {
   NotificationsService,
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { PaymentsService } from '../payments/payments.service';
+import { WalletService } from '../wallet/wallet.service';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -48,6 +50,8 @@ export class OrdersService {
     private readonly products: ProductsService,
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
+    private readonly payments: PaymentsService,
+    private readonly wallet: WalletService,
   ) {}
 
   async create(
@@ -98,6 +102,19 @@ export class OrdersService {
     }
 
     const deliveryFee = input.deliveryFeeUsd ?? 0;
+    const total = Number((subtotal + deliveryFee).toFixed(2));
+
+    // Fail fast on wallet payments with insufficient funds — before creating
+    // any order/delivery rows.
+    if (input.paymentMethod === 'wallet') {
+      const balance = await this.wallet.getBalance(customer.id);
+      if (balance < total) {
+        throw new BadRequestException(
+          `Insufficient wallet balance ($${balance.toFixed(2)} < $${total.toFixed(2)}).`,
+        );
+      }
+    }
+
     const order = this.orders.create({
       reference: OrdersService.newReference(),
       customerId: customer.id,
@@ -106,12 +123,20 @@ export class OrdersService {
       paymentMethod: input.paymentMethod,
       subtotalUsd: subtotal,
       deliveryFeeUsd: deliveryFee,
-      totalUsd: subtotal + deliveryFee,
+      totalUsd: total,
       zoneId: input.zoneId ?? null,
       shippingAddress: input.shippingAddress ?? null,
       items,
     });
-    const saved = await this.orders.save(order);
+    let saved = await this.orders.save(order);
+
+    // Charge for the order. Prepaid methods confirm immediately; COD stays
+    // pending until the rider collects on delivery.
+    const payment = await this.payments.processForOrder(saved);
+    if (payment.status === 'succeeded') {
+      saved.status = 'confirmed';
+      saved = await this.orders.save(saved);
+    }
 
     // Reserve stock only for lines that resolved to a real seeded product.
     for (const reserve of stockToReserve) {
@@ -192,6 +217,11 @@ export class OrdersService {
 
   get(id: string): Promise<Order | null> {
     return this.orders.findOne({ where: { id } });
+  }
+
+  /** Admin/finance refund; delegates to the payments service. */
+  refund(orderId: string, toWallet: boolean) {
+    return this.payments.refund(orderId, toWallet);
   }
 
   private static newReference(): string {

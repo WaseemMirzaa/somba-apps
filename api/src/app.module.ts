@@ -11,6 +11,8 @@ import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WalletModule } from './wallet/wallet.module';
+import { PaymentsModule } from './payments/payments.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -28,6 +30,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     OrdersModule,
     DeliveryModule,
     NotificationsModule,
+    WalletModule,
+    PaymentsModule,
     RealtimeModule,
   ],
   controllers: [AppController],

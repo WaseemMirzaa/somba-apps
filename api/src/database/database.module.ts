@@ -6,6 +6,7 @@ import {
   Notification,
   Order,
   OrderItem,
+  Payment,
   Product,
   Seller,
   User,
@@ -21,6 +22,7 @@ const ENTITIES = [
   Notification,
   DeliveryTask,
   WalletTransaction,
+  Payment,
 ];
 
 /**

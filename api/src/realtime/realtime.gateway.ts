@@ -17,6 +17,8 @@ import { OrdersService } from '../orders/orders.service';
 import type { CreateOrderInput } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
 import { UsersService } from '../users/users.service';
+import { WalletService } from '../wallet/wallet.service';
+import { PaymentsService } from '../payments/payments.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type { DeliveryStatus, OrderStatus } from '../database/entities';
 
@@ -60,6 +62,8 @@ export class RealtimeGateway
     private readonly orders: OrdersService,
     private readonly delivery: DeliveryService,
     private readonly notifications: NotificationsService,
+    private readonly wallet: WalletService,
+    private readonly payments: PaymentsService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -229,6 +233,67 @@ export class RealtimeGateway
       if (user.role !== 'rider') return fail('Riders only.');
       await this.delivery.updateLocation(body.taskId, user.id, body.lat, body.lng);
       return ok({ received: true });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Wallet -------------------------------------------------------------
+  @SubscribeMessage('wallet:get')
+  async walletGet(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok({ balance: await this.wallet.getBalance(user.id) });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('wallet:transactions')
+  async walletTransactions(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.wallet.list(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('wallet:topup')
+  async walletTopup(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { amountUsd: number; method?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.wallet.topUp(user.id, body.amountUsd, body.method));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Payments -----------------------------------------------------------
+  @SubscribeMessage('payments:list')
+  async paymentsList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.payments.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('orders:refund')
+  async ordersRefund(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId: string; toWallet?: boolean },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const canRefund =
+        user.role === 'admin' || user.role === 'admin_finance';
+      if (!canRefund) return fail('Only admin/finance can issue refunds.');
+      return ok(await this.orders.refund(body.orderId, body.toWallet ?? true));
     } catch (e) {
       return fail((e as Error).message);
     }

@@ -9,6 +9,7 @@ import {
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { PaymentsService } from '../payments/payments.service';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 
@@ -28,6 +29,7 @@ export class DeliveryService {
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
+    private readonly payments: PaymentsService,
   ) {}
 
   listUnassigned(): Promise<DeliveryTask[]> {
@@ -86,6 +88,11 @@ export class DeliveryService {
     if (!task) throw new NotFoundException('Delivery task not found.');
     task.status = status;
     const saved = await this.tasks.save(task);
+
+    // Collect COD when the parcel is delivered.
+    if (status === 'delivered') {
+      await this.payments.markCollected(task.orderId);
+    }
 
     const order = await this.orders.findOne({ where: { id: task.orderId } });
     const mapped = ORDER_STATUS_FOR[status];

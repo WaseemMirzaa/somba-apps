@@ -84,7 +84,7 @@ async function run() {
   );
   for (const u of DEMO_USERS) {
     if (u.email === 'seller@somba.app') continue;
-    await userRepo.save(
+    const created = await userRepo.save(
       userRepo.create({
         email: u.email,
         emailHash: UsersService.emailHash(u.email),
@@ -92,8 +92,21 @@ async function run() {
         name: u.name,
         role: u.role,
         phone: u.phone ?? null,
+        // Give the demo customer some store credit to exercise the wallet.
+        walletBalance: u.role === 'customer' ? 250 : 0,
       }),
     );
+    if (u.role === 'customer') {
+      await ds.getRepository(WalletTransaction).save(
+        ds.getRepository(WalletTransaction).create({
+          userId: created.id,
+          type: 'topup',
+          amount: 250,
+          balance: 250,
+          description: 'Welcome store credit',
+        }),
+      );
+    }
   }
 
   console.log('Seeding seller + products…');

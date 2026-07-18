@@ -9,3 +9,5 @@ export { Notification } from './notification.entity';
 export { DeliveryTask } from './delivery-task.entity';
 export type { DeliveryStatus } from './delivery-task.entity';
 export { WalletTransaction } from './wallet-transaction.entity';
+export { Payment } from './payment.entity';
+export type { PaymentStatus } from './payment.entity';
