@@ -206,6 +206,23 @@ async function main() {
 
   sSock.close();
 
+  // ---- Token revocation (logout-all) ----
+  const wh = await login('warehouse@somba.app');
+  const whSock = await connect(wh.token);
+  whSock.close();
+  await fetch(`${API}/api/v1/auth/logout-all`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${wh.token}` },
+  });
+  let revoked = false;
+  try {
+    const again = await connect(wh.token);
+    again.close();
+  } catch {
+    revoked = true;
+  }
+  check('revoked token rejected on socket reconnect', revoked);
+
   // Notifications were persisted + pushed.
   const notifs = await emit<any[]>(cSock, 'notifications:list');
   check(`customer has ${notifs.length} realtime notifications`, notifs.length >= 2);

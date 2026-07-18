@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto, RegisterDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -17,6 +18,7 @@ import { UsersService } from '../users/users.service';
  * exchange credentials for a JWT, then open the WebSocket for everything else.
  */
 @Controller('api/v1/auth')
+@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
@@ -46,5 +48,14 @@ export class AuthController {
   async me(@Req() req: { user: { id: string } }) {
     const user = await this.users.findById(req.user.id);
     return user ? UsersService.toPublic(user) : null;
+  }
+
+  /** Revoke every token for the current user ("log out everywhere"). */
+  @Post('logout-all')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  async logoutAll(@Req() req: { user: { id: string } }) {
+    await this.auth.revokeSessions(req.user.id);
+    return { revoked: true };
   }
 }

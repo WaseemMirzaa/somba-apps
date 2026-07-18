@@ -52,9 +52,12 @@ npm run smoke                 # end-to-end realtime test (server must be running
 |--------|------|---------|
 | POST | `/api/v1/auth/register` | Create account → `{user, accessToken, refreshToken}` |
 | POST | `/api/v1/auth/login` | Exchange credentials for tokens |
-| POST | `/api/v1/auth/refresh` | Rotate access token |
+| POST | `/api/v1/auth/refresh` | Rotate access token (rejected if the session was revoked) |
+| POST | `/api/v1/auth/logout-all` | Revoke every token for the user (Bearer token) |
 | GET | `/api/v1/auth/me` | Current user (Bearer token) |
 | GET | `/api/v1/health` | Liveness + db type |
+
+Auth endpoints are rate-limited (30 requests / minute / IP).
 
 ## WebSocket protocol
 
@@ -79,6 +82,15 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `delivery:accept` | `{taskId}` | rider |
 | `delivery:updateStatus` | `{taskId, status}` | rider |
 | `delivery:location` | `{taskId, lat, lng}` | rider |
+| `products:create` / `products:update` | product fields | seller/admin |
+| `wallet:get` / `wallet:transactions` | – | all |
+| `wallet:topup` | `{amountUsd, method?}` | customer |
+| `payments:list` | – | scoped |
+| `orders:refund` | `{orderId, toWallet?}` | admin/finance |
+| `payouts:request` | `{amountUsd, method?}` | seller |
+| `payouts:approve` / `payouts:reject` | `{payoutId, note?}` | admin/finance |
+| `disputes:open` | `{orderId, type, reason}` | customer |
+| `disputes:resolve` / `disputes:reject` | `{disputeId, refund?, resolution?}` | admin |
 | `notifications:list` / `notifications:markRead` | `{id}` | all |
 
 ### Server → client (pushed live, no polling)
@@ -91,6 +103,10 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `delivery:location` | rider streams position → customer + ops |
 | `notification:new` | any notification → target user/role |
 | `product:created` / `product:updated` | catalog changes → shoppers + admins |
+| `wallet:updated` / `wallet:transaction` | balance change → the wallet owner |
+| `payment:created` / `payment:updated` | charge/refund → customer + finance |
+| `payout:created` / `payout:updated` | payout lifecycle → seller + finance |
+| `dispute:created` / `dispute:updated` | dispute lifecycle → customer + admins |
 
 ## Environment
 

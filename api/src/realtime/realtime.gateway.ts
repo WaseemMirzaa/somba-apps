@@ -93,6 +93,9 @@ export class RealtimeGateway
       const payload = await this.auth.verifyAccess(token);
       const user = await this.users.findById(payload.sub);
       if (!user) throw new Error('unknown user');
+      if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+        throw new Error('revoked session');
+      }
 
       const socketUser: SocketUser = {
         id: user.id,

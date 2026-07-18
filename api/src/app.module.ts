@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import configuration from './config/configuration';
 import { CryptoModule } from './common/crypto/crypto.module';
@@ -23,6 +24,8 @@ import { RealtimeModule } from './realtime/realtime.module';
       isGlobal: true,
       load: [configuration],
     }),
+    // Rate-limit the REST auth endpoints (30 requests / minute / IP).
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 30 }]),
     CryptoModule,
     RealtimeCoreModule,
     DatabaseModule,

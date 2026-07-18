@@ -66,6 +66,14 @@ export class User {
   @Column({ type: 'boolean', default: true })
   active: boolean;
 
+  /**
+   * Bumped to invalidate all previously issued tokens ("log out everywhere").
+   * Access/refresh tokens carry the version they were minted at; a mismatch is
+   * rejected on refresh and on socket connect.
+   */
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

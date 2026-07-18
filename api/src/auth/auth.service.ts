@@ -14,6 +14,7 @@ export interface JwtPayload {
   sub: string;
   role: string;
   email: string;
+  tokenVersion?: number;
 }
 
 export interface AuthResult {
@@ -66,6 +67,9 @@ export class AuthService {
     }
     const user = await this.users.findById(payload.sub);
     if (!user) throw new UnauthorizedException('Account no longer exists.');
+    if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+      throw new UnauthorizedException('Session has been revoked.');
+    }
     return this.issue(user);
   }
 
@@ -76,11 +80,20 @@ export class AuthService {
     });
   }
 
+  /** Invalidate every token previously issued to this user. */
+  async revokeSessions(userId: string): Promise<void> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException('Account no longer exists.');
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await this.users.save(user);
+  }
+
   private async issue(user: User): Promise<AuthResult> {
     const payload: JwtPayload = {
       sub: user.id,
       role: user.role,
       email: user.email,
+      tokenVersion: user.tokenVersion ?? 0,
     };
     const accessToken = await this.jwt.signAsync(payload, {
       secret: this.config.get<string>('jwt.secret'),
