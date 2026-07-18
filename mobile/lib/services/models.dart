@@ -1,4 +1,4 @@
-/// Lightweight DTOs mirroring the API payloads (api/src/database/entities).
+// Lightweight DTOs mirroring the API payloads (api/src/database/entities).
 
 class BackendUser {
   final String id;
