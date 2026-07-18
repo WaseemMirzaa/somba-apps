@@ -37,3 +37,9 @@ npm-debug.log*
 .vercel
 .turbo
 coverage/
+
+# Local SQLite dev database
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
