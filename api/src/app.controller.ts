@@ -1,12 +1,22 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { ConfigService } from '@nestjs/config';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly config: ConfigService) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  root() {
+    return { name: 'Somba&Teka API', realtime: 'socket.io', docs: '/api/v1/health' };
+  }
+
+  @Get('api/v1/health')
+  health() {
+    return {
+      status: 'ok',
+      db: this.config.get('db.type'),
+      transport: 'rest(auth) + websocket(everything else)',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

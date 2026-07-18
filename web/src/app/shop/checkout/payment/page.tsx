@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { useLocale } from "@/context/locale-context";
 import { useMarket } from "@/context/market-context";
+import { useShop } from "@/context/shop-context";
+import { useRealtime } from "@/context/realtime-context";
 import { PAYMENTS } from "@/lib/config";
 import { useToast } from "@/context/toast-context";
 import { PageLoader } from "@/components/ui/loader";
@@ -17,13 +19,53 @@ function PaymentContent() {
   const { locale } = useLocale();
   const { profile } = useMarket();
   const { toast } = useToast();
+  const { cart } = useShop();
+  const rt = useRealtime();
   const router = useRouter();
   const params = useSearchParams();
   const total = Number(params.get("total") || 1498);
+  const fee = Number(params.get("fee") || 0);
+  const zone = params.get("zone") || undefined;
+  const addressId = params.get("address") || undefined;
   const [payment, setPayment] = useState("stripe_card");
   const [msisdn, setMsisdn] = useState("");
   const [paymentError, setPaymentError] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [placing, setPlacing] = useState(false);
+
+  /**
+   * When a backend realtime session is connected, place a REAL order over the
+   * socket (line snapshots from the cart) so it appears live on the admin,
+   * warehouse and rider dashboards. Otherwise fall back to the mock confirmation.
+   */
+  async function finalizeOrder() {
+    if (rt.status === "connected" && cart.length > 0) {
+      setPlacing(true);
+      try {
+        const order = await rt.placeOrder({
+          items: cart.map((i) => ({
+            name: i.name,
+            priceUsd: i.price,
+            qty: i.qty,
+            variant: i.variant,
+          })),
+          paymentMethod: payment as "stripe_card" | "cod" | "airtel_money" | "wallet",
+          deliveryFeeUsd: fee,
+          zoneId: zone,
+          shippingAddress: JSON.stringify({ addressId }),
+        });
+        toast(locale === "fr" ? "Commande passée" : "Order placed");
+        router.push(`/shop/orders/${order.reference}/confirmed`);
+        return;
+      } catch (e) {
+        toast((e as Error).message);
+      } finally {
+        setPlacing(false);
+      }
+    }
+    // Mock fallback (no backend session or empty cart).
+    router.push("/shop/orders/ORD-2024-001/confirmed");
+  }
 
   function placeOrder() {
     if (paymentError && !retrying) {
@@ -37,7 +79,7 @@ function PaymentContent() {
       toast(locale === "fr" ? "Paiement échoué — réessayez" : "Payment failed — retry");
       return;
     }
-    router.push("/shop/orders/ORD-2024-001/confirmed");
+    void finalizeOrder();
   }
 
   return (
@@ -77,8 +119,17 @@ function PaymentContent() {
         )}
 
         <p className="mt-4 text-lg font-bold">{locale === "fr" ? "Total" : "Total"}: <DualCurrency amount={total} /></p>
-        <Button onClick={placeOrder} className="mt-4 w-full">
-          {locale === "fr" ? "Payer" : "Pay"}
+        {rt.status === "connected" && (
+          <p className="mt-1 text-xs text-emerald-600">
+            {locale === "fr"
+              ? "Session en direct — cette commande sera envoyée au backend."
+              : "Live session — this order will be placed on the backend."}
+          </p>
+        )}
+        <Button onClick={placeOrder} disabled={placing} className="mt-4 w-full">
+          {placing
+            ? locale === "fr" ? "Traitement…" : "Placing…"
+            : locale === "fr" ? "Payer" : "Pay"}
         </Button>
         <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">{locale === "fr" ? "← Retour" : "← Back"}</Link>
       </DetailSection>

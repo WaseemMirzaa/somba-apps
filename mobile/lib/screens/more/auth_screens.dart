@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/brand_logo.dart';
 
@@ -166,8 +167,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController();
-  final _pass = TextEditingController();
+  // Pre-filled with the demo customer so the backend session connects out of
+  // the box; users can type their own credentials over these.
+  final _email = TextEditingController(text: 'customer@somba.app');
+  final _pass = TextEditingController(text: 'Somba@2026');
   String? _emailErr, _passErr;
   bool _loading = false;
 
@@ -180,18 +183,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
 
-  void _signIn() {
+  /// Authenticate against the backend (JWT). On success the whole app is
+  /// gated behind a real session; on failure the user can still "Continue as
+  /// guest" (offline/mock) via the button below.
+  Future<void> _signIn() async {
     setState(() {
       _emailErr = _email.text.trim().isEmpty ? 'Enter your email' : (!_validEmail(_email.text.trim()) ? 'Enter a valid email' : null);
       _passErr = _pass.text.isEmpty ? 'Enter your password' : (_pass.text.length < 4 ? 'Password is too short' : null);
     });
     if (_emailErr != null || _passErr != null) return;
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
+    try {
+      await RealtimeStore.instance.login(_email.text.trim(), _pass.text);
       if (!mounted) return;
-      setState(() => _loading = false);
       widget.onAuthed?.call();
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _passErr = 'Sign-in failed — check the server or continue as guest');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _social(String name) {

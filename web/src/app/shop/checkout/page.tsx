@@ -40,6 +40,7 @@ export default function ShopCheckoutPage() {
     const params = new URLSearchParams({
       address: String(selectedAddress),
       zone: addr.zoneId,
+      fee: String(deliveryFee),
       total: String(total),
       crossCity: String(crossCity),
       openBox: String(openBox),

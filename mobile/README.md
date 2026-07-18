@@ -28,6 +28,32 @@ flutter run -d chrome  # web
 
 Requires Flutter **3.35.7**.
 
+## Realtime backend connection
+
+The **Live** tab connects to the NestJS backend (`../api`) over a single
+authenticated **Socket.IO** connection. A one-shot REST call logs in; every read,
+write, and live update then flows over the socket — no polling.
+
+- Services live in `lib/services/` (`env.dart`, `auth_service.dart`,
+  `socket_service.dart`, `realtime_store.dart`).
+- Configure the endpoint at run time (no `.env` file in Flutter — use
+  `--dart-define`):
+
+```bash
+# Android emulator (default): host is reachable at 10.0.2.2
+flutter run
+# iOS simulator / desktop:
+flutter run --dart-define=API_URL=http://localhost:3001 \
+            --dart-define=SOCKET_URL=http://localhost:3001
+# physical device on your LAN:
+flutter run --dart-define=API_URL=http://192.168.1.20:3001 \
+            --dart-define=SOCKET_URL=http://192.168.1.20:3001
+```
+
+Demo login: `customer@somba.app` / `Somba@2026` (see `../api/README.md`). Place an
+order on the Live tab and watch it appear instantly on the web admin console
+(`/live`) — same backend, same live state.
+
 ## CI/CD — Android APK
 
 `.github/workflows/customer-app-apk.yml` builds the release APK on every push that

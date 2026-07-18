@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../services/rider_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
 
@@ -66,8 +67,10 @@ class RiderLoginScreen extends StatefulWidget {
 }
 
 class _RiderLoginScreenState extends State<RiderLoginScreen> {
-  final _id = TextEditingController(text: 'RDR-001');
-  final _pass = TextEditingController();
+  // Pre-filled with the demo rider so the backend session connects out of the
+  // box; type your own credentials to override.
+  final _id = TextEditingController(text: 'rider@somba.app');
+  final _pass = TextEditingController(text: 'Somba@2026');
   bool _loading = false;
 
   @override
@@ -77,13 +80,23 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  /// Authenticate against the backend; the whole rider app is then gated
+  /// behind a real session. On failure the rider can still enter (offline).
+  Future<void> _submit() async {
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
+    try {
+      await RiderStore.instance.login(_id.text.trim(), _pass.text);
       if (!mounted) return;
-      setState(() => _loading = false);
       widget.onSignedIn?.call();
-    });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign-in failed: $e')),
+      );
+      widget.onSignedIn?.call(); // allow offline entry
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -110,7 +123,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
         Padding(
           padding: const EdgeInsets.all(20),
           child: Column(children: [
-            RiderField(label: 'Rider ID', hint: 'RDR-001', icon: Icons.badge_outlined, controller: _id),
+            RiderField(label: 'Email', hint: 'rider@somba.app', icon: Icons.mail_outline_rounded, controller: _id),
             const SizedBox(height: 16),
             RiderField(label: 'Password', hint: 'Enter your password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
             const SizedBox(height: 10),

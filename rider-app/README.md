@@ -4,6 +4,23 @@ The rider/courier app for the Somba&Teka marketplace: manage delivery, pickup an
 return tasks, collect cash on delivery, navigate an optimized route, and track
 earnings.
 
+## Realtime backend connection
+
+The **Live** tab connects to the NestJS backend (`../api`) over a single
+authenticated **Socket.IO** connection (services in `lib/services/`). The rider
+accepts tasks from the unassigned pool, advances delivery status, and streams
+GPS — each action pushes live to the customer app and the web dashboards.
+
+Configure the endpoint with `--dart-define` (defaults target the Android
+emulator loopback `10.0.2.2`):
+
+```bash
+flutter run --dart-define=API_URL=http://localhost:3001 \
+            --dart-define=SOCKET_URL=http://localhost:3001
+```
+
+Demo login: `rider@somba.app` / `Somba@2026`.
+
 ## Highlights
 
 - Modern royal-blue identity (logo colour) with a **floating capsule navigation** (animated

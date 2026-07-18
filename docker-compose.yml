@@ -1,0 +1,62 @@
+# Somba&Teka — full local stack (MySQL + API + Web).
+#
+#   docker compose up --build
+#   docker compose exec api npm run seed     # first run: create demo data
+#
+# Web → http://localhost:3000   API → http://localhost:3001
+# For production put nginx in front (see docs/DEPLOYMENT.md) and override the
+# secrets/NEXT_PUBLIC_* below with real values.
+
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass_change_me
+      MYSQL_DATABASE: somba
+      MYSQL_USER: somba
+      MYSQL_PASSWORD: somba_change_me
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-psomba_change_me']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      CORS_ORIGINS: http://localhost:3000
+      JWT_SECRET: dev_change_me_0000000000000000000000000000000000000000000000000000
+      JWT_REFRESH_SECRET: dev_change_me_1111111111111111111111111111111111111111111111111111
+      DATA_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      DB_TYPE: mysql
+      DB_SYNCHRONIZE: 'true'
+      DB_HOST: mysql
+      DB_PORT: '3306'
+      DB_USERNAME: somba
+      DB_PASSWORD: somba_change_me
+      DB_DATABASE: somba
+    ports:
+      - '3001:3001'
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '3000:3000'
+
+volumes:
+  mysql-data:

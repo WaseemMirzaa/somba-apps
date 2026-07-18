@@ -17,6 +17,7 @@ import { SupportProvider } from "@/context/support-context";
 import { ReviewsProvider } from "@/context/reviews-context";
 import { ReplacementProvider } from "@/context/replacement-context";
 import { RiderZoneProvider } from "@/context/rider-zone-context";
+import { RealtimeProvider } from "@/context/realtime-context";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -45,6 +46,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
         <LocaleProvider>
+          <RealtimeProvider>
           <MarketProvider>
             <WarehouseStaffProvider>
               <AuthProvider>
@@ -74,6 +76,7 @@ export default function RootLayout({
               </AuthProvider>
             </WarehouseStaffProvider>
           </MarketProvider>
+          </RealtimeProvider>
         </LocaleProvider>
       </body>
     </html>
