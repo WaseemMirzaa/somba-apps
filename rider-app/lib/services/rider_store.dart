@@ -72,11 +72,11 @@ class RiderStore extends ChangeNotifier {
     notifyListeners();
 
     final socket = _socket.connect(result.accessToken);
-    socket.onConnect((_) {
+    socket.on('connect', (_) {
       status = ConnStatus.connected;
       notifyListeners();
     });
-    socket.onDisconnect((_) {
+    socket.on('disconnect', (_) {
       status = ConnStatus.connecting;
       notifyListeners();
     });
