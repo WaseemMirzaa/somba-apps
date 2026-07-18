@@ -24,6 +24,9 @@ class RealtimeStore extends ChangeNotifier {
   final List<OrderDto> orders = [];
   final List<NotificationDto> notifications = [];
   final Map<String, RiderLocationDto> riderLocations = {};
+  double walletBalance = 0;
+  final List<WalletTransactionDto> walletTransactions = [];
+  final List<PaymentDto> payments = [];
 
   bool get isConnected => status == ConnStatus.connected;
   int get unreadCount => notifications.where((n) => !n.read).length;
@@ -88,6 +91,9 @@ class RealtimeStore extends ChangeNotifier {
     orders.clear();
     notifications.clear();
     riderLocations.clear();
+    walletBalance = 0;
+    walletTransactions.clear();
+    payments.clear();
     notifyListeners();
   }
 
@@ -119,6 +125,16 @@ class RealtimeStore extends ChangeNotifier {
       riderLocations[loc.orderId] = loc;
       notifyListeners();
     });
+    _socket.on('wallet:updated', (d) {
+      walletBalance = (_map(d)['balance'] as num?)?.toDouble() ?? walletBalance;
+      notifyListeners();
+    });
+    _socket.on('wallet:transaction', (d) {
+      walletTransactions.insert(0, WalletTransactionDto.fromJson(_map(d)));
+      notifyListeners();
+    });
+    _socket.on('payment:created', (d) => _upsertPayment(d));
+    _socket.on('payment:updated', (d) => _upsertPayment(d));
 
     await _hydrate();
   }
@@ -137,11 +153,42 @@ class RealtimeStore extends ChangeNotifier {
       notifications
         ..clear()
         ..addAll((notif as List).map((e) => NotificationDto.fromJson(_map(e))));
+      final wallet = await _socket.request('wallet:get');
+      walletBalance = (_map(wallet)['balance'] as num?)?.toDouble() ?? 0;
+      final tx = await _socket.request('wallet:transactions');
+      walletTransactions
+        ..clear()
+        ..addAll(
+            (tx as List).map((e) => WalletTransactionDto.fromJson(_map(e))));
+      final pays = await _socket.request('payments:list');
+      payments
+        ..clear()
+        ..addAll((pays as List).map((e) => PaymentDto.fromJson(_map(e))));
       status = ConnStatus.connected;
       notifyListeners();
     } catch (_) {
       // Hydration is best-effort; live events keep flowing.
     }
+  }
+
+  Future<WalletTransactionDto> topUpWallet(double amountUsd,
+      {String method = 'airtel_money'}) async {
+    final res = await _socket.request('wallet:topup', {
+      'amountUsd': amountUsd,
+      'method': method,
+    });
+    return WalletTransactionDto.fromJson(_map(res));
+  }
+
+  void _upsertPayment(dynamic data) {
+    final p = PaymentDto.fromJson(_map(data));
+    final idx = payments.indexWhere((x) => x.id == p.id);
+    if (idx == -1) {
+      payments.insert(0, p);
+    } else {
+      payments[idx] = p;
+    }
+    notifyListeners();
   }
 
   // ---- actions (writes over the socket) ----

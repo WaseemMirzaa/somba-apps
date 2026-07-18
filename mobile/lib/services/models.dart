@@ -105,6 +105,55 @@ class NotificationDto {
       );
 }
 
+class WalletTransactionDto {
+  final String id;
+  final String type;
+  final double amount;
+  final double balance;
+  final String description;
+
+  WalletTransactionDto({
+    required this.id,
+    required this.type,
+    required this.amount,
+    required this.balance,
+    required this.description,
+  });
+
+  factory WalletTransactionDto.fromJson(Map<String, dynamic> j) =>
+      WalletTransactionDto(
+        id: j['id'] as String,
+        type: j['type'] as String? ?? 'topup',
+        amount: (j['amount'] as num?)?.toDouble() ?? 0,
+        balance: (j['balance'] as num?)?.toDouble() ?? 0,
+        description: j['description'] as String? ?? '',
+      );
+}
+
+class PaymentDto {
+  final String id;
+  final String orderReference;
+  final String method;
+  final double amountUsd;
+  final String status;
+
+  PaymentDto({
+    required this.id,
+    required this.orderReference,
+    required this.method,
+    required this.amountUsd,
+    required this.status,
+  });
+
+  factory PaymentDto.fromJson(Map<String, dynamic> j) => PaymentDto(
+        id: j['id'] as String,
+        orderReference: j['orderReference'] as String? ?? '',
+        method: j['method'] as String? ?? '',
+        amountUsd: (j['amountUsd'] as num?)?.toDouble() ?? 0,
+        status: j['status'] as String? ?? 'pending',
+      );
+}
+
 class RiderLocationDto {
   final String orderId;
   final double lat;

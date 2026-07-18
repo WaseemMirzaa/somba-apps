@@ -42,12 +42,13 @@ class _LiveConsoleScreenState extends State<LiveConsoleScreen> {
     }
   }
 
-  Future<void> _placeOrder() async {
+  Future<void> _placeOrder({String paymentMethod = 'cod'}) async {
     if (store.products.isEmpty) return;
     setState(() => _busy = true);
     try {
       await store.placeOrder(
         productId: store.products.first.id,
+        paymentMethod: paymentMethod,
         address: {'city': 'Kinshasa', 'line1': '12 Ave du Commerce'},
       );
       if (mounted) {
@@ -161,13 +162,33 @@ class _LiveConsoleScreenState extends State<LiveConsoleScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy || store.products.isEmpty ? null : _placeOrder,
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            icon: const Icon(Icons.add_shopping_cart_rounded),
-            label: const Text('Place test order'),
-          ),
+          const SizedBox(height: 12),
+          _walletCard(),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed:
+                    _busy || store.products.isEmpty ? null : () => _placeOrder(),
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                label: const Text('Order (COD)'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _busy || store.products.isEmpty
+                    ? null
+                    : () => _placeOrder(paymentMethod: 'wallet'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.royalBlue),
+                icon: const Icon(Icons.account_balance_wallet_rounded, size: 18),
+                label: const Text('Wallet'),
+              ),
+            ),
+          ]),
           const SizedBox(height: 20),
           _sectionTitle('My orders', trailing: 'live'),
           if (store.orders.isEmpty)
@@ -179,6 +200,64 @@ class _LiveConsoleScreenState extends State<LiveConsoleScreen> {
           if (store.notifications.isEmpty) _emptyHint('Nothing yet.'),
           ...store.notifications.take(15).map(_notifTile),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _topUp() async {
+    setState(() => _busy = true);
+    try {
+      await store.topUpWallet(50);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _walletCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.royalBlue, AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: AppRadius.card,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(children: [
+                  Icon(Icons.account_balance_wallet_rounded,
+                      color: Colors.white70, size: 16),
+                  SizedBox(width: 6),
+                  Text('Wallet balance',
+                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ]),
+                const SizedBox(height: 6),
+                Text('\$${store.walletBalance.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+          FilledButton(
+            onPressed: _busy ? null : _topUp,
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.18)),
+            child: const Text('+ \$50'),
+          ),
         ],
       ),
     );
