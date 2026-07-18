@@ -129,6 +129,66 @@ export class RealtimeGateway
     return p ? ok(p) : fail('Product not found.');
   }
 
+  @SubscribeMessage('products:create')
+  async productsCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      name: string;
+      nameFr?: string;
+      price: number;
+      category: string;
+      stock?: number;
+      image?: string;
+      description?: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller' && !user.role.startsWith('admin')) {
+        return fail('Only sellers or admins can publish products.');
+      }
+      if (!body?.name || body.price == null || !body.category) {
+        return fail('name, price and category are required.');
+      }
+      // Seller-published products go live immediately in this prototype.
+      const product = await this.products.create({
+        name: body.name,
+        nameFr: body.nameFr ?? null,
+        price: Number(body.price),
+        category: body.category,
+        stock: body.stock ?? 0,
+        image: body.image ?? null,
+        description: body.description ?? null,
+        status: 'live',
+        sellerId: user.id,
+        sellerName: user.name,
+      });
+      return ok(product);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('products:update')
+  async productsUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; patch: Record<string, unknown> },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const existing = await this.products.get(body.id);
+      if (!existing) return fail('Product not found.');
+      const isOwner = existing.sellerId === user.id;
+      if (!isOwner && !user.role.startsWith('admin')) {
+        return fail('You can only edit your own products.');
+      }
+      return ok(await this.products.update(body.id, body.patch));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   // ---- Orders -------------------------------------------------------------
   @SubscribeMessage('orders:list')
   async ordersList(@ConnectedSocket() client: AuthedSocket) {

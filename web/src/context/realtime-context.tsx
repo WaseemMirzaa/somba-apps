@@ -70,6 +70,14 @@ interface RealtimeValue {
   markRead: (id: string) => Promise<void>;
   topUpWallet: (amountUsd: number, method?: string) => Promise<void>;
   refundOrder: (orderId: string, toWallet?: boolean) => Promise<void>;
+  createProduct: (input: {
+    name: string;
+    nameFr?: string;
+    price: number;
+    category: string;
+    stock?: number;
+    image?: string;
+  }) => Promise<Product>;
 }
 
 const RealtimeContext = createContext<RealtimeValue | null>(null);
@@ -302,6 +310,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const createProduct = useCallback<RealtimeValue["createProduct"]>(
+    async (input) => {
+      const product = await socketClient.request<Product>(
+        "products:create",
+        input,
+      );
+      setProducts((cur) => upsert(cur, product));
+      return product;
+    },
+    [],
+  );
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],
@@ -332,6 +352,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       markRead,
       topUpWallet,
       refundOrder,
+      createProduct,
     }),
     [
       user,
@@ -357,6 +378,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       markRead,
       topUpWallet,
       refundOrder,
+      createProduct,
     ],
   );
 

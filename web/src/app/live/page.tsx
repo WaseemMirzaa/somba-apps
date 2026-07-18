@@ -68,10 +68,17 @@ export default function LiveConsolePage() {
   const [busy, setBusy] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [unassigned, setUnassigned] = useState<DeliveryTask[]>([]);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    price: "",
+    category: "Electronics",
+    stock: "10",
+  });
 
   const isAdmin = rt.user?.role.startsWith("admin") || rt.user?.role === "warehouse_staff";
   const isRider = rt.user?.role === "rider";
   const isCustomer = rt.user?.role === "customer";
+  const isSeller = rt.user?.role === "seller";
   const canRefund =
     rt.user?.role === "admin" || rt.user?.role === "admin_finance";
 
@@ -137,6 +144,24 @@ export default function LiveConsolePage() {
       setBusy(false);
     }
   }, [rt]);
+
+  const publishProduct = useCallback(async () => {
+    if (!newProduct.name || !newProduct.price) return;
+    setBusy(true);
+    try {
+      await rt.createProduct({
+        name: newProduct.name,
+        price: Number(newProduct.price),
+        category: newProduct.category,
+        stock: Number(newProduct.stock) || 0,
+      });
+      setNewProduct({ name: "", price: "", category: "Electronics", stock: "10" });
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }, [rt, newProduct]);
 
   const streamLocation = useCallback(
     async (task: DeliveryTask) => {
@@ -341,6 +366,84 @@ export default function LiveConsolePage() {
                     </p>
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {/* Seller: publish a product (appears live in customers' storefronts) */}
+          {isSeller && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-800">
+                <Package className="h-4 w-4" /> Publish a product
+              </h2>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  placeholder="Product name"
+                  value={newProduct.name}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, name: e.target.value }))
+                  }
+                  className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <input
+                  placeholder="Price (USD)"
+                  type="number"
+                  value={newProduct.price}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, price: e.target.value }))
+                  }
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <input
+                  placeholder="Stock"
+                  type="number"
+                  value={newProduct.stock}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, stock: e.target.value }))
+                  }
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <select
+                  value={newProduct.category}
+                  onChange={(e) =>
+                    setNewProduct((p) => ({ ...p, category: e.target.value }))
+                  }
+                  className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  {["Electronics", "Fashion", "Jewelery", "Home & Living", "Beauty"].map(
+                    (c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ),
+                  )}
+                </select>
+                <button
+                  onClick={publishProduct}
+                  disabled={busy || !newProduct.name || !newProduct.price}
+                  className="col-span-2 rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  Publish → live to all shoppers
+                </button>
+              </div>
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                My catalog ({rt.products.filter((p) => p.sellerName === rt.user?.name).length})
+              </p>
+              <div className="mt-1 space-y-1">
+                {rt.products
+                  .filter((p) => p.sellerName === rt.user?.name)
+                  .slice(0, 8)
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex justify-between rounded-lg border border-slate-100 px-2 py-1 text-xs"
+                    >
+                      <span className="text-slate-700">{p.name}</span>
+                      <span className="text-slate-500">
+                        ${p.price} · stock {p.stock}
+                      </span>
+                    </div>
+                  ))}
               </div>
             </section>
           )}
