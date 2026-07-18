@@ -142,5 +142,31 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface Payout {
+  id: string;
+  reference: string;
+  sellerId: string;
+  sellerName: string;
+  amountUsd: number;
+  method: string;
+  status: "requested" | "approved" | "rejected" | "paid";
+  note: string | null;
+  createdAt: string;
+}
+
+export interface Dispute {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string;
+  customerId: string;
+  customerName: string;
+  type: "dispute" | "return";
+  reason: string;
+  status: "open" | "resolved" | "rejected";
+  resolution: string | null;
+  createdAt: string;
+}
+
 /** Standard ack envelope returned by every request→ack socket handler. */
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: string };

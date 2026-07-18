@@ -145,6 +145,31 @@ export default function LiveConsolePage() {
     }
   }, [rt]);
 
+  const requestPayout = useCallback(async () => {
+    setBusy(true);
+    try {
+      await rt.requestPayout(100, "bank");
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }, [rt]);
+
+  const openReturn = useCallback(
+    async (orderId: string) => {
+      setBusy(true);
+      try {
+        await rt.openDispute(orderId, "return", "Item not as described");
+      } catch (e) {
+        alert((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [rt],
+  );
+
   const publishProduct = useCallback(async () => {
     if (!newProduct.name || !newProduct.price) return;
     setBusy(true);
@@ -445,6 +470,35 @@ export default function LiveConsolePage() {
                     </div>
                   ))}
               </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <Wallet className="h-4 w-4" /> Payouts
+                </h3>
+                <button
+                  onClick={requestPayout}
+                  disabled={busy}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Request $100 payout
+                </button>
+              </div>
+              <div className="mt-2 space-y-1">
+                {rt.payouts.length === 0 && (
+                  <p className="text-xs text-slate-400">No payouts yet.</p>
+                )}
+                {rt.payouts.slice(0, 6).map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 px-2 py-1 text-xs"
+                  >
+                    <span className="text-slate-700">
+                      {p.reference} · ${p.amountUsd.toFixed(2)}
+                    </span>
+                    <StatusPill status={p.status} />
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
@@ -488,6 +542,18 @@ export default function LiveConsolePage() {
                         {loc.lng.toFixed(3)}
                       </p>
                     )}
+                    {isCustomer &&
+                      (o.status === "delivered" ||
+                        o.status === "out_for_delivery" ||
+                        o.status === "confirmed") && (
+                        <button
+                          onClick={() => openReturn(o.id)}
+                          disabled={busy}
+                          className="mt-2 flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          <RotateCcw className="h-3 w-3" /> Open return
+                        </button>
+                      )}
                     {isAdmin && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {(NEXT_ORDER_STATUS[o.status] ?? []).map((s) => (
@@ -634,6 +700,83 @@ export default function LiveConsolePage() {
                   <p className="text-slate-500">
                     ${p.amountUsd.toFixed(2)} · {p.method.replace(/_/g, " ")}
                   </p>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Finance: approve/reject payouts */}
+          {canRefund && rt.payouts.length > 0 && (
+            <>
+              <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
+                <Wallet className="h-4 w-4" /> Payout requests
+              </h2>
+              {rt.payouts.slice(0, 10).map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-slate-100 p-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">
+                      {p.sellerName} · ${p.amountUsd.toFixed(2)}
+                    </span>
+                    <StatusPill status={p.status} />
+                  </div>
+                  {p.status === "requested" && (
+                    <div className="mt-1 flex gap-1.5">
+                      <button
+                        onClick={() => rt.approvePayout(p.id)}
+                        className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => rt.rejectPayout(p.id, "Declined")}
+                        className="rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Disputes / returns */}
+          {rt.disputes.length > 0 && (
+            <>
+              <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
+                <RotateCcw className="h-4 w-4" /> Disputes / returns
+              </h2>
+              {rt.disputes.slice(0, 10).map((d) => (
+                <div
+                  key={d.id}
+                  className="rounded-lg border border-slate-100 p-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">
+                      {d.orderReference} · {d.type}
+                    </span>
+                    <StatusPill status={d.status} />
+                  </div>
+                  <p className="text-slate-500">{d.reason}</p>
+                  {isAdmin && d.status === "open" && (
+                    <div className="mt-1 flex gap-1.5">
+                      <button
+                        onClick={() => rt.resolveDispute(d.id, true)}
+                        className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
+                      >
+                        Resolve + refund
+                      </button>
+                      <button
+                        onClick={() => rt.resolveDispute(d.id, false)}
+                        className="rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600"
+                      >
+                        Resolve
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </>

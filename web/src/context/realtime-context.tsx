@@ -16,9 +16,11 @@ import type {
   BackendUser,
   DeliveryStatus,
   DeliveryTask,
+  Dispute,
   Order,
   OrderStatus,
   Payment,
+  Payout,
   Product,
   RiderLocation,
   WalletTransaction,
@@ -39,6 +41,8 @@ interface RealtimeValue {
   walletBalance: number;
   walletTransactions: WalletTransaction[];
   payments: Payment[];
+  payouts: Payout[];
+  disputes: Dispute[];
 
   login: (email: string, password: string) => Promise<void>;
   register: (input: {
@@ -78,6 +82,15 @@ interface RealtimeValue {
     stock?: number;
     image?: string;
   }) => Promise<Product>;
+  requestPayout: (amountUsd: number, method?: string) => Promise<void>;
+  approvePayout: (payoutId: string) => Promise<void>;
+  rejectPayout: (payoutId: string, note?: string) => Promise<void>;
+  openDispute: (
+    orderId: string,
+    type: "dispute" | "return",
+    reason: string,
+  ) => Promise<void>;
+  resolveDispute: (disputeId: string, refund?: boolean) => Promise<void>;
 }
 
 const RealtimeContext = createContext<RealtimeValue | null>(null);
@@ -106,6 +119,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     WalletTransaction[]
   >([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
   const booted = useRef(false);
 
   const logout = useCallback(() => {
@@ -120,6 +135,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     setWalletBalance(0);
     setWalletTransactions([]);
     setPayments([]);
+    setPayouts([]);
+    setDisputes([]);
   }, []);
 
   /** Wire socket listeners + hydrate initial state after connect. */
@@ -166,6 +183,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("payment:updated", (p: Payment) =>
       setPayments((cur) => upsert(cur, p)),
     );
+    s.on("payout:created", (p: Payout) => setPayouts((cur) => upsert(cur, p)));
+    s.on("payout:updated", (p: Payout) => setPayouts((cur) => upsert(cur, p)));
+    s.on("dispute:created", (d: Dispute) =>
+      setDisputes((cur) => upsert(cur, d)),
+    );
+    s.on("dispute:updated", (d: Dispute) =>
+      setDisputes((cur) => upsert(cur, d)),
+    );
 
     // Initial hydration (one-shot reads over the socket).
     try {
@@ -193,6 +218,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       setWalletBalance(wallet.balance);
       setWalletTransactions(walletTx);
       setPayments(pays);
+      const [pos, disp] = await Promise.all([
+        socketClient.request<Payout[]>("payouts:list").catch(() => []),
+        socketClient.request<Dispute[]>("disputes:list").catch(() => []),
+      ]);
+      setPayouts(pos);
+      setDisputes(disp);
     } catch {
       /* hydration is best-effort; live events still flow */
     }
@@ -322,6 +353,31 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const requestPayout = useCallback(
+    async (amountUsd: number, method?: string) => {
+      await socketClient.request("payouts:request", { amountUsd, method });
+    },
+    [],
+  );
+  const approvePayout = useCallback(async (payoutId: string) => {
+    await socketClient.request("payouts:approve", { payoutId });
+  }, []);
+  const rejectPayout = useCallback(async (payoutId: string, note?: string) => {
+    await socketClient.request("payouts:reject", { payoutId, note });
+  }, []);
+  const openDispute = useCallback(
+    async (orderId: string, type: "dispute" | "return", reason: string) => {
+      await socketClient.request("disputes:open", { orderId, type, reason });
+    },
+    [],
+  );
+  const resolveDispute = useCallback(
+    async (disputeId: string, refund = false) => {
+      await socketClient.request("disputes:resolve", { disputeId, refund });
+    },
+    [],
+  );
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],
@@ -341,6 +397,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       walletBalance,
       walletTransactions,
       payments,
+      payouts,
+      disputes,
       login,
       register,
       logout,
@@ -353,6 +411,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       topUpWallet,
       refundOrder,
       createProduct,
+      requestPayout,
+      approvePayout,
+      rejectPayout,
+      openDispute,
+      resolveDispute,
     }),
     [
       user,
@@ -367,6 +430,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       walletBalance,
       walletTransactions,
       payments,
+      payouts,
+      disputes,
       login,
       register,
       logout,
@@ -379,6 +444,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       topUpWallet,
       refundOrder,
       createProduct,
+      requestPayout,
+      approvePayout,
+      rejectPayout,
+      openDispute,
+      resolveDispute,
     ],
   );
 
