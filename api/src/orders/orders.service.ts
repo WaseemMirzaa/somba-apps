@@ -15,8 +15,22 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 
+/**
+ * An order line is EITHER a reference to a seeded product (`productId`, which
+ * decrements stock) OR a snapshot (`name` + `priceUsd`) so any storefront —
+ * even one on its own mock catalog — can check out for real. `qty` is required
+ * in both cases.
+ */
+export interface OrderLineInput {
+  productId?: string;
+  name?: string;
+  priceUsd?: number;
+  qty: number;
+  variant?: string;
+}
+
 export interface CreateOrderInput {
-  items: { productId: string; qty: number; variant?: string }[];
+  items: OrderLineInput[];
   paymentMethod: PaymentMethod;
   zoneId?: string;
   deliveryFeeUsd?: number;
@@ -45,20 +59,41 @@ export class OrdersService {
     }
 
     const items: OrderItem[] = [];
+    const stockToReserve: { productId: string; qty: number }[] = [];
     let subtotal = 0;
     for (const line of input.items) {
-      const product = await this.products.get(line.productId);
-      if (!product) {
-        throw new BadRequestException(`Unknown product ${line.productId}`);
+      const qty = Math.max(1, line.qty ?? 1);
+      // Prefer a seeded product (authoritative name/price + stock control);
+      // fall back to a client-supplied snapshot line.
+      const product = line.productId
+        ? await this.products.get(line.productId)
+        : null;
+
+      let name: string;
+      let price: number;
+      let productId: string;
+      if (product) {
+        name = product.name;
+        price = product.price;
+        productId = product.id;
+        stockToReserve.push({ productId: product.id, qty });
+      } else if (line.name != null && line.priceUsd != null) {
+        name = line.name;
+        price = line.priceUsd;
+        productId = line.productId ?? `ext:${line.name}`;
+      } else {
+        throw new BadRequestException(
+          'Each line needs a known productId or a {name, priceUsd} snapshot.',
+        );
       }
-      const qty = Math.max(1, line.qty);
-      subtotal += product.price * qty;
+
+      subtotal += price * qty;
       const item = new OrderItem();
-      item.productId = product.id;
-      item.productName = product.name;
+      item.productId = productId;
+      item.productName = name;
       item.variant = line.variant ?? 'Default';
       item.qty = qty;
-      item.priceUsd = product.price;
+      item.priceUsd = price;
       items.push(item);
     }
 
@@ -78,9 +113,9 @@ export class OrdersService {
     });
     const saved = await this.orders.save(order);
 
-    // Reserve stock.
-    for (const line of input.items) {
-      await this.products.decrementStock(line.productId, Math.max(1, line.qty));
+    // Reserve stock only for lines that resolved to a real seeded product.
+    for (const reserve of stockToReserve) {
+      await this.products.decrementStock(reserve.productId, reserve.qty);
     }
 
     // Create an unassigned delivery task so the warehouse/riders see it.

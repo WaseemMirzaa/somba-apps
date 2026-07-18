@@ -112,6 +112,22 @@ async function main() {
   const loc = await custLoc;
   check('customer received live rider location', loc.lat === -4.325 && loc.lng === 15.322);
 
+  // Snapshot-line checkout (a storefront on its own catalog, no productId).
+  const adminSawSnapshot = waitFor<any>(aSock, 'order:created');
+  const snapOrder = await emit<any>(cSock, 'orders:create', {
+    items: [
+      { name: 'Samsung Galaxy S24 Ultra', priceUsd: 1199, qty: 1, variant: 'Titanium' },
+    ],
+    paymentMethod: 'stripe_card',
+    deliveryFeeUsd: 0,
+  });
+  check(
+    'snapshot-line order created (no productId)',
+    !!snapOrder.id && snapOrder.totalUsd === 1199,
+  );
+  const snapPushed = await adminSawSnapshot;
+  check('admin saw snapshot order LIVE', snapPushed.id === snapOrder.id);
+
   // Notifications were persisted + pushed.
   const notifs = await emit<any[]>(cSock, 'notifications:list');
   check(`customer has ${notifs.length} realtime notifications`, notifs.length >= 2);

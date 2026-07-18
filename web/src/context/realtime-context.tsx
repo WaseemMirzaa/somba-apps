@@ -46,7 +46,13 @@ interface RealtimeValue {
   logout: () => void;
 
   placeOrder: (input: {
-    items: { productId: string; qty: number; variant?: string }[];
+    items: {
+      productId?: string;
+      name?: string;
+      priceUsd?: number;
+      qty: number;
+      variant?: string;
+    }[];
     paymentMethod: Order["paymentMethod"];
     deliveryFeeUsd?: number;
     zoneId?: string;
