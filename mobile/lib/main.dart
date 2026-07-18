@@ -1,15 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app.dart';
 import 'data/shop_state.dart';
 import 'screens/more/auth_screens.dart';
+import 'services/realtime_store.dart';
 import 'theme/app_theme.dart';
 import 'util/format.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ShopState.instance.load();
+  // Best-effort: silently restore a backend session from a stored refresh
+  // token so the Live tab reconnects without a fresh login.
+  unawaited(RealtimeStore.instance.tryRestore());
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
