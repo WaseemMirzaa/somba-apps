@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
+import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import 'order_success_screen.dart';
@@ -18,6 +19,59 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
   String payment = 'stripe_card';
+  bool _placing = false;
+
+  /// Place the order. When a backend session is live, the cart is submitted
+  /// over the socket (line snapshots) and the real order reference is shown —
+  /// it appears instantly on the web admin/warehouse/rider dashboards.
+  /// Falls back to the mock success screen offline.
+  Future<void> _placeOrder(double deliveryFee) async {
+    final store = RealtimeStore.instance;
+    if (store.isConnected && shop.cart.isNotEmpty) {
+      setState(() => _placing = true);
+      try {
+        final order = await store.placeOrderLines(
+          items: shop.cart
+              .map((c) => {
+                    'name': c.product.name,
+                    'priceUsd': c.product.price,
+                    'qty': c.qty,
+                    'variant': c.variant,
+                  })
+              .toList(),
+          paymentMethod: payment,
+          deliveryFeeUsd: deliveryFee,
+          address: {'city': 'Kinshasa', 'zone': shop.selectedZoneId},
+        );
+        shop.cart.clear();
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                OrderSuccessScreen(locale: widget.locale, orderId: order.reference),
+          ),
+        );
+        return;
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+      } finally {
+        if (mounted) setState(() => _placing = false);
+      }
+    }
+    // Offline / mock fallback.
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            OrderSuccessScreen(locale: widget.locale, orderId: 'SMB-2026-4821'),
+      ),
+    );
+  }
 
   static const _methods = [
     ('stripe_card', Icons.credit_card_rounded),
@@ -185,13 +239,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
         child: FilledButton(
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrderSuccessScreen(locale: widget.locale, orderId: 'SMB-2026-4821'),
-            ),
-          ),
-          child: Text('${s.placeOrder}  ·  ${money(total)}'),
+          onPressed: _placing ? null : () => _placeOrder(deliveryFee),
+          child: Text(_placing
+              ? '…'
+              : '${s.placeOrder}  ·  ${money(total)}'),
         ),
       ),
     );

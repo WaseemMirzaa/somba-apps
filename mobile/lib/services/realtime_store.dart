@@ -163,6 +163,23 @@ class RealtimeStore extends ChangeNotifier {
     return OrderDto.fromJson(_map(res));
   }
 
+  /// Place an order from arbitrary cart lines (name + priceUsd snapshots), so
+  /// the storefront's own catalogue can check out for real.
+  Future<OrderDto> placeOrderLines({
+    required List<Map<String, dynamic>> items,
+    String paymentMethod = 'cod',
+    double deliveryFeeUsd = 3,
+    Map<String, dynamic>? address,
+  }) async {
+    final res = await _socket.request('orders:create', {
+      'items': items,
+      'paymentMethod': paymentMethod,
+      'deliveryFeeUsd': deliveryFeeUsd,
+      if (address != null) 'shippingAddress': jsonEncode(address),
+    });
+    return OrderDto.fromJson(_map(res));
+  }
+
   Future<void> markRead(String id) async {
     await _socket.request('notifications:markRead', {'id': id});
     final idx = notifications.indexWhere((n) => n.id == id);
