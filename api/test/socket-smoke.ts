@@ -170,6 +170,42 @@ async function main() {
   }
   check('wallet order rejected when funds insufficient', rejected);
 
+  // ---- Payouts (seller ⇄ finance) ----
+  const seller = await login('seller@somba.app');
+  const sSock = await connect(seller.token);
+  const financeSawPayout = waitFor<any>(aSock, 'payout:created');
+  const payout = await emit<any>(sSock, 'payouts:request', {
+    amountUsd: 120,
+    method: 'bank',
+  });
+  check('seller requested a payout', payout.status === 'requested');
+  const payoutSeen = await financeSawPayout;
+  check('admin/finance saw payout:created LIVE', payoutSeen.id === payout.id);
+
+  const sellerBalBefore = (await emit<{ balance: number }>(sSock, 'wallet:get')).balance;
+  const sellerCredited = waitFor<{ balance: number }>(sSock, 'wallet:updated');
+  await emit(aSock, 'payouts:approve', { payoutId: payout.id });
+  const sellerAfter = await sellerCredited;
+  check('approved payout credited seller wallet live', sellerAfter.balance === sellerBalBefore + 120);
+
+  // ---- Disputes / returns (customer ⇄ admin) ----
+  const adminSawDispute = waitFor<any>(aSock, 'dispute:created');
+  const dispute = await emit<any>(cSock, 'disputes:open', {
+    orderId: created.id,
+    type: 'return',
+    reason: 'Item arrived damaged',
+  });
+  check('customer opened a return', dispute.status === 'open');
+  const disputeSeen = await adminSawDispute;
+  check('admin saw dispute:created LIVE', disputeSeen.id === dispute.id);
+
+  const custDisputeResolved = waitFor<any>(cSock, 'dispute:updated');
+  await emit(aSock, 'disputes:resolve', { disputeId: dispute.id, refund: false });
+  const resolved = await custDisputeResolved;
+  check('customer got dispute resolution live', resolved.status === 'resolved');
+
+  sSock.close();
+
   // Notifications were persisted + pushed.
   const notifs = await emit<any[]>(cSock, 'notifications:list');
   check(`customer has ${notifs.length} realtime notifications`, notifs.length >= 2);

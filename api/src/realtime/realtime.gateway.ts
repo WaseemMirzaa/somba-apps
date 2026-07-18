@@ -19,8 +19,14 @@ import { ProductsService } from '../products/products.service';
 import { UsersService } from '../users/users.service';
 import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
+import { PayoutsService } from '../payouts/payouts.service';
+import { DisputesService } from '../disputes/disputes.service';
 import { RealtimeEmitter } from './realtime-emitter';
-import type { DeliveryStatus, OrderStatus } from '../database/entities';
+import type {
+  DeliveryStatus,
+  DisputeType,
+  OrderStatus,
+} from '../database/entities';
 
 interface SocketUser {
   id: string;
@@ -64,6 +70,8 @@ export class RealtimeGateway
     private readonly notifications: NotificationsService,
     private readonly wallet: WalletService,
     private readonly payments: PaymentsService,
+    private readonly payouts: PayoutsService,
+    private readonly disputes: DisputesService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -354,6 +362,132 @@ export class RealtimeGateway
         user.role === 'admin' || user.role === 'admin_finance';
       if (!canRefund) return fail('Only admin/finance can issue refunds.');
       return ok(await this.orders.refund(body.orderId, body.toWallet ?? true));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Payouts (seller ⇄ finance) -----------------------------------------
+  @SubscribeMessage('payouts:list')
+  async payoutsList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.payouts.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('payouts:request')
+  async payoutsRequest(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { amountUsd: number; method?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Sellers only.');
+      return ok(
+        await this.payouts.request(
+          { id: user.id, name: user.name },
+          body.amountUsd,
+          body.method,
+        ),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('payouts:approve')
+  async payoutsApprove(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { payoutId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin' && user.role !== 'admin_finance') {
+        return fail('Only admin/finance can approve payouts.');
+      }
+      return ok(await this.payouts.approve(body.payoutId));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('payouts:reject')
+  async payoutsReject(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { payoutId: string; note?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin' && user.role !== 'admin_finance') {
+        return fail('Only admin/finance can reject payouts.');
+      }
+      return ok(await this.payouts.reject(body.payoutId, body.note));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Disputes / returns (customer ⇄ admin) ------------------------------
+  @SubscribeMessage('disputes:list')
+  async disputesList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.disputes.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('disputes:open')
+  async disputesOpen(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId: string; type: DisputeType; reason: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'customer') return fail('Customers only.');
+      return ok(
+        await this.disputes.open(
+          { id: user.id, name: user.name },
+          { orderId: body.orderId, type: body.type, reason: body.reason },
+        ),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('disputes:resolve')
+  async disputesResolve(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { disputeId: string; resolution?: string; refund?: boolean },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(
+        await this.disputes.resolve(body.disputeId, {
+          resolution: body.resolution,
+          refund: body.refund,
+        }),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('disputes:reject')
+  async disputesReject(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { disputeId: string; resolution?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.disputes.reject(body.disputeId, body.resolution));
     } catch (e) {
       return fail((e as Error).message);
     }

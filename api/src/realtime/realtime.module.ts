@@ -7,6 +7,8 @@ import { ProductsModule } from '../products/products.module';
 import { UsersModule } from '../users/users.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { PayoutsModule } from '../payouts/payouts.module';
+import { DisputesModule } from '../disputes/disputes.module';
 import { RealtimeGateway } from './realtime.gateway';
 
 @Module({
@@ -19,6 +21,8 @@ import { RealtimeGateway } from './realtime.gateway';
     NotificationsModule,
     WalletModule,
     PaymentsModule,
+    PayoutsModule,
+    DisputesModule,
   ],
   providers: [RealtimeGateway],
 })

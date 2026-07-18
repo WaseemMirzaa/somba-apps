@@ -3,10 +3,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import {
   DeliveryTask,
+  Dispute,
   Notification,
   Order,
   OrderItem,
   Payment,
+  Payout,
   Product,
   Seller,
   User,
@@ -23,6 +25,8 @@ const ENTITIES = [
   DeliveryTask,
   WalletTransaction,
   Payment,
+  Payout,
+  Dispute,
 ];
 
 /**
