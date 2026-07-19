@@ -61,6 +61,7 @@ export interface Order {
   totalUsd: number;
   zoneId: string | null;
   riderId: string | null;
+  shippingAddress: string | null;
   items: OrderItem[];
   createdAt: string;
   updatedAt: string;

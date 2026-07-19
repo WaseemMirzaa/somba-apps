@@ -4,13 +4,14 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { orderEntities } from "@/lib/entities";
+import { useMyOrders } from "@/lib/orders";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
 export default function ShopOrdersPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const orders = useMyOrders();
 
   const statusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -34,7 +35,7 @@ export default function ShopOrdersPage() {
       <DataTable
         columns={[
           { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
-            <Link href={`/shop/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+            <Link href={`/shop/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
           )},
           { key: "date", label: fr ? "Date" : "Date" },
           { key: "itemsCount", label: fr ? "Articles" : "Items" },
@@ -50,7 +51,7 @@ export default function ShopOrdersPage() {
             </div>
           )},
         ]}
-        data={orderEntities.slice(0, 4) as unknown as Record<string, unknown>[]}
+        data={orders as unknown as Record<string, unknown>[]}
       />
     </div>
   );

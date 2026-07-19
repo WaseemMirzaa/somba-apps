@@ -4,14 +4,14 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getOrder } from "@/lib/entities";
+import { useMyOrder } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 import { MapPin } from "lucide-react";
 
 export default function OrderTrackingPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
-  const order = getOrder(id);
+  const order = useMyOrder(id);
   const fr = locale === "fr";
 
   if (!order) return <div className="text-center text-slate-500">{fr ? "Commande introuvable" : "Order not found"}</div>;

@@ -14,9 +14,11 @@ const SOCKET_URL =
 class SocketClient {
   private socket: Socket | null = null;
 
-  /** Connect with a JWT, or anonymously (guest, read-only) when omitted. */
+  /** Connect with a JWT, or anonymously (guest, read-only) when omitted.
+   * Always tears down any existing socket so a guest→authenticated upgrade
+   * (or account switch) re-runs the handshake with the new credentials. */
   connect(token?: string): Socket {
-    if (this.socket?.connected) return this.socket;
+    this.socket?.removeAllListeners();
     this.socket?.close();
     this.socket = io(SOCKET_URL, {
       auth: token ? { token } : {},

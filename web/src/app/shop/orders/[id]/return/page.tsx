@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { getOrder } from "@/lib/entities";
+import { useMyOrder } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 import { formatPaymentMethod } from "@/lib/utils";
 
@@ -24,7 +24,7 @@ export default function ShopOrderReturnPage() {
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const order = getOrder(id);
+  const order = useMyOrder(id);
 
   if (!order) {
     return <div className="text-center text-slate-500">{fr ? "Commande introuvable" : "Order not found"}</div>;

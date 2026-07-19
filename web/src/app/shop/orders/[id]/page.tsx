@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getOrder } from "@/lib/entities";
+import { useMyOrder } from "@/lib/orders";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -76,7 +76,7 @@ export default function ShopOrderDetailPage() {
     toast(fr ? "Articles ajoutés au panier" : "Items added to cart");
     router.push("/shop/cart");
   }
-  const order = getOrder(id);
+  const order = useMyOrder(id);
 
   if (!order) {
     return <div className="text-center text-slate-500">{fr ? "Commande introuvable" : "Order not found"}</div>;

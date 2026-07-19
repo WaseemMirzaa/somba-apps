@@ -8,7 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import { useNotifications } from "@/context/notification-context";
+import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 
 const READ_STATUS_OPTIONS = [
@@ -17,10 +17,22 @@ const READ_STATUS_OPTIONS = [
 ];
 
 export default function ShopNotificationsPage() {
-  const { forPortal, markRead, markAllRead } = useNotifications();
+  const { notifications, markRead } = useRealtime();
   const { t, locale } = useLocale();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const items = forPortal("customer");
+  // Live backend notifications, shaped for the bilingual list UI.
+  const items = useMemo(
+    () =>
+      notifications.map((n) => ({
+        ...n,
+        titleFr: n.title,
+        bodyFr: n.body,
+        typeFr: n.type,
+      })),
+    [notifications],
+  );
+  const markAllRead = () =>
+    notifications.filter((n) => !n.read).forEach((n) => void markRead(n.id));
 
   const filtered = useMemo(
     () =>
@@ -58,7 +70,7 @@ export default function ShopNotificationsPage() {
         actions={
           unreadCount > 0 ? (
             <button
-              onClick={() => markAllRead("customer")}
+              onClick={() => markAllRead()}
               className="text-sm font-medium text-[var(--primary)] hover:underline"
             >
               {locale === "fr" ? "Tout marquer lu" : "Mark all read"}
