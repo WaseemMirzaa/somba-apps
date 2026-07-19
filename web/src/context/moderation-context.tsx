@@ -19,9 +19,9 @@ type ModerationContextType = {
   blockedProducts: BlockedProduct[];
   isSellerBlocked: (id: number) => boolean;
   isStoreBlocked: (storeName: string) => boolean;
-  isProductBlocked: (id: number) => boolean;
+  isProductBlocked: (id: number | string) => boolean;
   /** A product is hidden from customers if it — or its store — is blocked. */
-  isProductVisible: (product: { id: number; seller: string }) => boolean;
+  isProductVisible: (product: { id: number | string; seller: string }) => boolean;
   blockSeller: (id: number, reason?: string) => void;
   unblockSeller: (id: number) => void;
   blockProduct: (id: number, reason?: string) => void;
@@ -75,12 +75,12 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   );
 
   const isProductBlocked = useCallback(
-    (id: number) => blockedProducts.some((p) => p.id === id),
+    (id: number | string) => blockedProducts.some((p) => p.id === id),
     [blockedProducts]
   );
 
   const isProductVisible = useCallback(
-    (product: { id: number; seller: string }) =>
+    (product: { id: number | string; seller: string }) =>
       !isProductBlocked(product.id) && !isStoreBlocked(product.seller),
     [isProductBlocked, isStoreBlocked]
   );

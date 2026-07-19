@@ -2,11 +2,12 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
-import { products } from "@/lib/mock-data";
+import { useCatalog } from "@/lib/catalog";
 import { useLocale } from "@/context/locale-context";
 
 export default function ShopDealsPage() {
   const { locale } = useLocale();
+  const products = useCatalog();
   const deals = products.filter((p) => p.discount >= 13);
 
   return (

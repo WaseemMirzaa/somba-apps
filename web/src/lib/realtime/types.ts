@@ -70,13 +70,29 @@ export interface Product {
   id: string;
   name: string;
   nameFr: string | null;
+  description: string | null;
   price: number;
+  originalPrice: number | null;
+  discount: number;
   category: string;
+  categoryFr: string | null;
   image: string | null;
   stock: number;
   rating: number;
+  reviewsCount: number;
+  deliveryDays: number;
   status: string;
+  sellerId: string | null;
   sellerName: string | null;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  nameFr: string | null;
+  icon: string | null;
+  image: string | null;
+  sortOrder: number;
 }
 
 export type DeliveryStatus =

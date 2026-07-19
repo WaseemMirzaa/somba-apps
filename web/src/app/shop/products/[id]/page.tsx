@@ -12,8 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ProductCard } from "@/components/landing/product-card";
-import { getProductDetail } from "@/lib/entities";
-import { products } from "@/lib/mock-data";
+import { useProductDetail, useCatalog } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
@@ -33,7 +32,8 @@ export default function ShopProductDetailPage() {
   const [zoneChecked, setZoneChecked] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [extraQuestions, setExtraQuestions] = useState<{ q: string; a: string; author: string }[]>([]);
-  const product = getProductDetail(Number(id));
+  const product = useProductDetail(typeof id === "string" ? id : undefined);
+  const catalog = useCatalog();
 
   useEffect(() => {
     if (product) addRecentlyViewed(product.id);
@@ -74,7 +74,7 @@ export default function ShopProductDetailPage() {
   const fr = locale === "fr";
   const name = fr ? product.nameFr : product.name;
   const category = fr ? product.categoryFr : product.category;
-  const related = products.filter((p) => p.id !== product.id).slice(0, 4);
+  const related = catalog.filter((p) => p.id !== product.id).slice(0, 4);
 
   return (
     <div className="space-y-8">

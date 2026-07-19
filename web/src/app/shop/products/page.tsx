@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageHeader } from "@/components/ui/page-header";
-import { products } from "@/lib/mock-data";
+import { useCatalog } from "@/lib/catalog";
 import { useShop } from "@/context/shop-context";
 import { useLocale } from "@/context/locale-context";
 import { useModeration } from "@/context/moderation-context";
@@ -12,6 +12,7 @@ import { useModeration } from "@/context/moderation-context";
 export default function ShopProductsPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const products = useCatalog();
   const { isProductVisible } = useModeration();
   const [sort, setSort] = useState("popularity");
   const [category, setCategory] = useState("all");
@@ -39,7 +40,7 @@ export default function ShopProductsPage() {
     if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
     if (sort === "discount") list.sort((a, b) => b.discount - a.discount);
     return list;
-  }, [sort, category, brand, minRating, minDiscount, priceMax, isProductVisible]);
+  }, [products, sort, category, brand, minRating, minDiscount, priceMax, isProductVisible]);
 
   const buyAgain = products.filter((p) => recentlyViewed.includes(p.id)).slice(0, 4);
 

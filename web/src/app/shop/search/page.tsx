@@ -7,7 +7,7 @@ import { ProductCard } from "@/components/landing/product-card";
 import { PageLoader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
 import { useModeration } from "@/context/moderation-context";
-import { products } from "@/lib/mock-data";
+import { useCatalog } from "@/lib/catalog";
 
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -15,6 +15,7 @@ function SearchResults() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { isProductVisible } = useModeration();
+  const products = useCatalog();
 
   const visible = products.filter(isProductVisible);
   const results = query

@@ -14,11 +14,12 @@ const SOCKET_URL =
 class SocketClient {
   private socket: Socket | null = null;
 
-  connect(token: string): Socket {
+  /** Connect with a JWT, or anonymously (guest, read-only) when omitted. */
+  connect(token?: string): Socket {
     if (this.socket?.connected) return this.socket;
     this.socket?.close();
     this.socket = io(SOCKET_URL, {
-      auth: { token },
+      auth: token ? { token } : {},
       transports: ["websocket"],
       reconnection: true,
       reconnectionAttempts: Infinity,

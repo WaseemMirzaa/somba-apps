@@ -1,11 +1,10 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
-import { products } from "@/lib/mock-data";
 import { MOCK_PROMOS } from "@/lib/shared-entities";
 
 export type CartItem = {
-  id: number;
+  id: string;
   name: string;
   nameFr: string;
   price: number;
@@ -17,39 +16,34 @@ export type CartItem = {
 
 type ShopContextType = {
   cart: CartItem[];
-  wishlist: number[];
+  wishlist: string[];
   followedStores: string[];
   promoCode: string | null;
   promoDiscount: number;
   addToCart: (item: Omit<CartItem, "qty"> & { qty?: number }) => void;
-  removeFromCart: (id: number, variant: string) => void;
-  updateQty: (id: number, variant: string, qty: number) => void;
+  removeFromCart: (id: string, variant: string) => void;
+  updateQty: (id: string, variant: string, qty: number) => void;
   cartCount: number;
-  toggleWishlist: (productId: number) => void;
-  isInWishlist: (productId: number) => boolean;
-  moveToWishlist: (id: number, variant: string) => void;
+  toggleWishlist: (productId: string) => void;
+  isInWishlist: (productId: string) => boolean;
+  moveToWishlist: (id: string, variant: string) => void;
   applyPromo: (code: string) => boolean;
   removePromo: () => void;
   toggleFollowStore: (storeName: string) => void;
   isFollowingStore: (storeName: string) => boolean;
-  recentlyViewed: number[];
-  addRecentlyViewed: (productId: number) => void;
+  recentlyViewed: string[];
+  addRecentlyViewed: (productId: string) => void;
 };
-
-const defaultCart: CartItem[] = [
-  { ...products[0], qty: 1, variant: "256GB Black" },
-  { ...products[2], qty: 2, variant: "White" },
-];
 
 const ShopContext = createContext<ShopContextType | null>(null);
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>(defaultCart);
-  const [wishlist, setWishlist] = useState<number[]>([1, 3]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
   const [followedStores, setFollowedStores] = useState<string[]>([]);
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
-  const [recentlyViewed, setRecentlyViewed] = useState<number[]>([1, 3, 5]);
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
   const addToCart = useCallback((item: Omit<CartItem, "qty"> & { qty?: number }) => {
     setCart((prev) => {
@@ -65,28 +59,28 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const removeFromCart = useCallback((id: number, variant: string) => {
+  const removeFromCart = useCallback((id: string, variant: string) => {
     setCart((prev) => prev.filter((x) => !(x.id === id && x.variant === variant)));
   }, []);
 
-  const updateQty = useCallback((id: number, variant: string, qty: number) => {
+  const updateQty = useCallback((id: string, variant: string, qty: number) => {
     setCart((prev) =>
       prev.map((x) => (x.id === id && x.variant === variant ? { ...x, qty } : x))
     );
   }, []);
 
-  const toggleWishlist = useCallback((productId: number) => {
+  const toggleWishlist = useCallback((productId: string) => {
     setWishlist((prev) =>
       prev.includes(productId) ? prev.filter((x) => x !== productId) : [...prev, productId]
     );
   }, []);
 
   const isInWishlist = useCallback(
-    (productId: number) => wishlist.includes(productId),
+    (productId: string) => wishlist.includes(productId),
     [wishlist]
   );
 
-  const moveToWishlist = useCallback((id: number, variant: string) => {
+  const moveToWishlist = useCallback((id: string, variant: string) => {
     setCart((prev) => {
       const item = prev.find((x) => x.id === id && x.variant === variant);
       if (item) setWishlist((w) => (w.includes(id) ? w : [...w, id]));
@@ -121,7 +115,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     [followedStores]
   );
 
-  const addRecentlyViewed = useCallback((productId: number) => {
+  const addRecentlyViewed = useCallback((productId: string) => {
     setRecentlyViewed((prev) => [productId, ...prev.filter((id) => id !== productId)].slice(0, 12));
   }, []);
 

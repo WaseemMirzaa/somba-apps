@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
-import { useCategories } from "@/context/categories-context";
+import { useShopCategories } from "@/lib/catalog";
 
 export default function ShopCategoriesPage() {
   const { t, locale } = useLocale();
-  const { categories } = useCategories();
+  const categories = useShopCategories();
 
   return (
     <div className="space-y-8">

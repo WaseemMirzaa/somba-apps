@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
   product: {
-    id: number;
+    id: number | string;
     name: string;
     nameFr: string;
     price: number;
@@ -37,13 +37,13 @@ export function ProductCard({ product, flash }: ProductCardProps) {
     <Link href={`/shop/products/${product.id}`} className="group block">
       <article className="card-premium relative overflow-hidden">
         <button
-          onClick={(e) => { e.preventDefault(); toggleWishlist(product.id); }}
+          onClick={(e) => { e.preventDefault(); toggleWishlist(String(product.id)); }}
           className={cn(
             "absolute right-3 top-3 z-10 rounded-full bg-white/90 p-2 shadow-md backdrop-blur transition-all hover:scale-110",
-            isInWishlist(product.id) ? "text-red-500" : "text-slate-400"
+            isInWishlist(String(product.id)) ? "text-red-500" : "text-slate-400"
           )}
         >
-          <Heart className={cn("h-4 w-4", isInWishlist(product.id) && "fill-red-500")} />
+          <Heart className={cn("h-4 w-4", isInWishlist(String(product.id)) && "fill-red-500")} />
         </button>
 
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/50">

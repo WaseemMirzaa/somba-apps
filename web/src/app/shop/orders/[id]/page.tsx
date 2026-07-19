@@ -71,7 +71,7 @@ export default function ShopOrderDetailPage() {
 
   function reorder() {
     order?.items.forEach((item) => {
-      addToCart({ id: item.productId, name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: order.seller, variant: item.variant });
+      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: order.seller, variant: item.variant });
     });
     toast(fr ? "Articles ajoutés au panier" : "Items added to cart");
     router.push("/shop/cart");

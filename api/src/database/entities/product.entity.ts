@@ -27,9 +27,20 @@ export class Product {
   @Column({ type: 'float' })
   price: number;
 
+  /** Pre-discount reference price (for the struck-through UI price). */
+  @Column({ type: 'float', nullable: true })
+  originalPrice: number | null;
+
+  /** Percentage discount shown on cards. */
+  @Column({ type: 'int', default: 0 })
+  discount: number;
+
   @Index()
   @Column({ type: 'varchar' })
   category: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  categoryFr: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   image: string | null;
@@ -39,6 +50,14 @@ export class Product {
 
   @Column({ type: 'float', default: 0 })
   rating: number;
+
+  /** Number of customer reviews (denormalised for cards/listings). */
+  @Column({ type: 'int', default: 0 })
+  reviewsCount: number;
+
+  /** Estimated delivery time in days. */
+  @Column({ type: 'int', default: 3 })
+  deliveryDays: number;
 
   @Index()
   @Column({ type: 'varchar', length: 20, default: 'live' })

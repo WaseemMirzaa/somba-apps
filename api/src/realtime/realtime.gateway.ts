@@ -21,6 +21,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { DisputesService } from '../disputes/disputes.service';
+import { CategoriesService } from '../catalog/categories.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -72,6 +73,7 @@ export class RealtimeGateway
     private readonly payments: PaymentsService,
     private readonly payouts: PayoutsService,
     private readonly disputes: DisputesService,
+    private readonly categories: CategoriesService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -89,7 +91,18 @@ export class RealtimeGateway
           /^Bearer\s+/i,
           '',
         );
-      if (!token) throw new Error('missing token');
+      // Anonymous browsing: guests may open a read-only socket (public
+      // catalog/categories/reviews). Mutations still require a real account.
+      if (!token) {
+        const guest: SocketUser = { id: 'guest', role: 'guest', name: 'Guest' };
+        client.data.user = guest;
+        await client.join(RealtimeEmitter.roleRoom('guest'));
+        client.emit('ready', {
+          user: { id: 'guest', role: 'guest', name: 'Guest' },
+          serverTime: new Date().toISOString(),
+        });
+        return;
+      }
       const payload = await this.auth.verifyAccess(token);
       const user = await this.users.findById(payload.sub);
       if (!user) throw new Error('unknown user');
@@ -122,9 +135,12 @@ export class RealtimeGateway
     if (u) this.logger.log(`disconnected ${u.role} ${u.id}`);
   }
 
+  /** Require a real, signed-in account (rejects anonymous guests). */
   private requireUser(client: AuthedSocket): SocketUser {
     const user = client.data.user;
-    if (!user) throw new Error('Not authenticated.');
+    if (!user || user.role === 'guest') {
+      throw new Error('Sign in to continue.');
+    }
     return user;
   }
 
@@ -138,6 +154,12 @@ export class RealtimeGateway
   async productsGet(@MessageBody() body: { id: string }) {
     const p = await this.products.get(body.id);
     return p ? ok(p) : fail('Product not found.');
+  }
+
+  // Public — categories for the storefront (guests included).
+  @SubscribeMessage('categories:list')
+  async categoriesList() {
+    return ok(await this.categories.list());
   }
 
   @SubscribeMessage('products:create')

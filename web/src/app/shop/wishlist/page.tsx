@@ -4,12 +4,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
 import { useShop } from "@/context/shop-context";
 import { useLocale } from "@/context/locale-context";
-import { products } from "@/lib/mock-data";
+import { useCatalog } from "@/lib/catalog";
 
 export default function ShopWishlistPage() {
   const { wishlist } = useShop();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const products = useCatalog();
   const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
 
   return (

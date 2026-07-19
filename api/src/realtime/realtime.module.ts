@@ -9,6 +9,7 @@ import { WalletModule } from '../wallet/wallet.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { DisputesModule } from '../disputes/disputes.module';
+import { CatalogModule } from '../catalog/catalog.module';
 import { RealtimeGateway } from './realtime.gateway';
 
 @Module({
@@ -23,6 +24,7 @@ import { RealtimeGateway } from './realtime.gateway';
     PaymentsModule,
     PayoutsModule,
     DisputesModule,
+    CatalogModule,
   ],
   providers: [RealtimeGateway],
 })

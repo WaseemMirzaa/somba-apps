@@ -6,7 +6,8 @@ import { useParams } from "next/navigation";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { ProductCard } from "@/components/landing/product-card";
 import { getSeller } from "@/lib/entities";
-import { products, stores, categories } from "@/lib/mock-data";
+import { stores, categories } from "@/lib/mock-data";
+import { useCatalog } from "@/lib/catalog";
 import { useLocale } from "@/context/locale-context";
 import { useModeration } from "@/context/moderation-context";
 
@@ -15,6 +16,7 @@ export default function ShopStoreDetailPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { isSellerBlocked, isProductVisible } = useModeration();
+  const products = useCatalog();
   const seller = getSeller(Number(id));
   const store = stores.find((s) => s.name === seller?.storeName) ?? stores[0];
   const storeProducts = products.filter(

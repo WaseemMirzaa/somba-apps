@@ -14,6 +14,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import type {
   AppNotification,
   BackendUser,
+  Category,
   DeliveryStatus,
   DeliveryTask,
   Dispute,
@@ -34,6 +35,7 @@ interface RealtimeValue {
   error: string | null;
   orders: Order[];
   products: Product[];
+  categories: Category[];
   deliveries: DeliveryTask[];
   notifications: AppNotification[];
   riderLocations: Record<string, RiderLocation>;
@@ -109,6 +111,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryTask[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [riderLocations, setRiderLocations] = useState<
@@ -192,15 +195,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       setDisputes((cur) => upsert(cur, d)),
     );
 
-    // Initial hydration (one-shot reads over the socket).
+    // Public reads — always available (guests included).
+    const [prod, cats] = await Promise.all([
+      socketClient.request<Product[]>("products:list").catch(() => []),
+      socketClient.request<Category[]>("categories:list").catch(() => []),
+    ]);
+    setProducts(prod);
+    setCategories(cats);
+
+    // Personal reads — only for a signed-in account (guests would fail).
+    if (!authApi.getAccess()) return; // guest: nothing personal to load
     try {
-      const [ord, prod, notif] = await Promise.all([
-        socketClient.request<Order[]>("orders:list"),
-        socketClient.request<Product[]>("products:list"),
-        socketClient.request<AppNotification[]>("notifications:list"),
+      const [ord, notif] = await Promise.all([
+        socketClient.request<Order[]>("orders:list").catch(() => []),
+        socketClient
+          .request<AppNotification[]>("notifications:list")
+          .catch(() => []),
       ]);
       setOrders(ord);
-      setProducts(prod);
       setNotifications(notif);
       const del = await socketClient
         .request<DeliveryTask[]>("delivery:list")
@@ -228,6 +240,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       /* hydration is best-effort; live events still flow */
     }
   }, [logout]);
+
+  /** Open an anonymous (guest) socket so the public catalog loads. */
+  const connectGuest = useCallback(async () => {
+    setStatus("connecting");
+    const s = socketClient.connect();
+    s.on("ready", () => setStatus("connected"));
+    await bind();
+  }, [bind]);
 
   const connectWith = useCallback(
     async (accessToken: string, backendUser: BackendUser) => {
@@ -271,17 +291,22 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     if (booted.current) return;
     booted.current = true;
     const refresh = authApi.getRefresh();
-    if (!refresh) return;
     (async () => {
+      if (!refresh) {
+        // No session — browse the public catalog as a guest.
+        await connectGuest();
+        return;
+      }
       try {
         const result = await authApi.refresh(refresh);
         authApi.saveTokens(result);
         await connectWith(result.accessToken, result.user);
       } catch {
         authApi.clear();
+        await connectGuest();
       }
     })();
-  }, [connectWith]);
+  }, [connectWith, connectGuest]);
 
   const placeOrder = useCallback<RealtimeValue["placeOrder"]>((input) => {
     return socketClient.request<Order>("orders:create", input);
@@ -390,6 +415,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       error,
       orders,
       products,
+      categories,
       deliveries,
       notifications,
       riderLocations,
@@ -423,6 +449,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       error,
       orders,
       products,
+      categories,
       deliveries,
       notifications,
       riderLocations,

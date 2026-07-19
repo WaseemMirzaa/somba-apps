@@ -15,3 +15,4 @@ export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
 export { Dispute } from './dispute.entity';
 export type { DisputeType, DisputeStatus } from './dispute.entity';
+export { Category } from './category.entity';
