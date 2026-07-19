@@ -16,3 +16,4 @@ export type { PayoutStatus } from './payout.entity';
 export { Dispute } from './dispute.entity';
 export type { DisputeType, DisputeStatus } from './dispute.entity';
 export { Category } from './category.entity';
+export { Address } from './address.entity';

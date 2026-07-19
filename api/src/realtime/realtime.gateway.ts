@@ -22,6 +22,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { DisputesService } from '../disputes/disputes.service';
 import { CategoriesService } from '../catalog/categories.service';
+import { AddressesService } from '../addresses/addresses.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -74,6 +75,7 @@ export class RealtimeGateway
     private readonly payouts: PayoutsService,
     private readonly disputes: DisputesService,
     private readonly categories: CategoriesService,
+    private readonly addresses: AddressesService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -513,6 +515,57 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
       return ok(await this.disputes.reject(body.disputeId, body.resolution));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Addresses (customer) ----------------------------------------------
+  @SubscribeMessage('addresses:list')
+  async addressesList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.addresses.list(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('addresses:create')
+  async addressesCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.addresses.create(user.id, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('addresses:update')
+  async addressesUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; patch: Record<string, unknown> },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.addresses.update(user.id, body.id, body.patch));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('addresses:remove')
+  async addressesRemove(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      await this.addresses.remove(user.id, body.id);
+      return ok({ id: body.id });
     } catch (e) {
       return fail((e as Error).message);
     }

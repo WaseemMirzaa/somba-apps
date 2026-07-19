@@ -14,6 +14,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import type {
   AppNotification,
   BackendUser,
+  Address,
   Category,
   DeliveryStatus,
   DeliveryTask,
@@ -36,6 +37,7 @@ interface RealtimeValue {
   orders: Order[];
   products: Product[];
   categories: Category[];
+  addresses: Address[];
   deliveries: DeliveryTask[];
   notifications: AppNotification[];
   riderLocations: Record<string, RiderLocation>;
@@ -84,6 +86,9 @@ interface RealtimeValue {
     stock?: number;
     image?: string;
   }) => Promise<Product>;
+  addAddress: (input: Record<string, unknown>) => Promise<void>;
+  updateAddress: (id: string, patch: Record<string, unknown>) => Promise<void>;
+  removeAddress: (id: string) => Promise<void>;
   requestPayout: (amountUsd: number, method?: string) => Promise<void>;
   approvePayout: (payoutId: string) => Promise<void>;
   rejectPayout: (payoutId: string, note?: string) => Promise<void>;
@@ -112,6 +117,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryTask[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [riderLocations, setRiderLocations] = useState<
@@ -140,6 +146,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     setPayments([]);
     setPayouts([]);
     setDisputes([]);
+    setAddresses([]);
   }, []);
 
   /** Wire socket listeners + hydrate initial state after connect. */
@@ -174,6 +181,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("product:updated", (p: Product) =>
       setProducts((cur) => upsert(cur, p)),
     );
+    s.on("addresses:updated", (a: Address[]) => setAddresses(a));
     s.on("wallet:updated", (w: { balance: number }) =>
       setWalletBalance(w.balance),
     );
@@ -236,6 +244,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       ]);
       setPayouts(pos);
       setDisputes(disp);
+      const addr = await socketClient
+        .request<Address[]>("addresses:list")
+        .catch(() => []);
+      setAddresses(addr);
     } catch {
       /* hydration is best-effort; live events still flow */
     }
@@ -378,6 +390,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const addAddress = useCallback(async (input: Record<string, unknown>) => {
+    await socketClient.request("addresses:create", input);
+  }, []);
+  const updateAddress = useCallback(
+    async (id: string, patch: Record<string, unknown>) => {
+      await socketClient.request("addresses:update", { id, patch });
+    },
+    [],
+  );
+  const removeAddress = useCallback(async (id: string) => {
+    await socketClient.request("addresses:remove", { id });
+  }, []);
+
   const requestPayout = useCallback(
     async (amountUsd: number, method?: string) => {
       await socketClient.request("payouts:request", { amountUsd, method });
@@ -416,6 +441,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       orders,
       products,
       categories,
+      addresses,
       deliveries,
       notifications,
       riderLocations,
@@ -437,6 +463,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       topUpWallet,
       refundOrder,
       createProduct,
+      addAddress,
+      updateAddress,
+      removeAddress,
       requestPayout,
       approvePayout,
       rejectPayout,
@@ -450,6 +479,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       orders,
       products,
       categories,
+      addresses,
       deliveries,
       notifications,
       riderLocations,
@@ -471,6 +501,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       topUpWallet,
       refundOrder,
       createProduct,
+      addAddress,
+      updateAddress,
+      removeAddress,
       requestPayout,
       approvePayout,
       rejectPayout,

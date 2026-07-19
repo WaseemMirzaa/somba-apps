@@ -17,6 +17,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { AddressesModule } from './addresses/addresses.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     PayoutsModule,
     DisputesModule,
     CatalogModule,
+    AddressesModule,
     RealtimeModule,
   ],
   controllers: [AppController],

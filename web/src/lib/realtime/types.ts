@@ -96,6 +96,23 @@ export interface Category {
   sortOrder: number;
 }
 
+export interface Address {
+  id: string;
+  userId: string;
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  commune: string | null;
+  region: string | null;
+  country: string | null;
+  postalCode: string | null;
+  phone: string | null;
+  zoneId: string | null;
+  isDefault: boolean;
+  createdAt: string;
+}
+
 export type DeliveryStatus =
   | "unassigned"
   | "assigned"
