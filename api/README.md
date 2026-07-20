@@ -91,7 +91,21 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `payouts:approve` / `payouts:reject` | `{payoutId, note?}` | admin/finance |
 | `disputes:open` | `{orderId, type, reason}` | customer |
 | `disputes:resolve` / `disputes:reject` | `{disputeId, refund?, resolution?}` | admin |
+| `addresses:list/create/update/remove` | address fields | customer |
+| `reviews:list/create`, `questions:list/ask/answer` | product review + Q&A | all/customer |
+| `support:list/open/reply/setStatus` | support tickets | customer + support |
+| `promos:list/validate/create`, `flashsales:list/create` | promotions | all/admin |
+| `cms:list/upsert`, `settings:get/set`, `categories:create/update/remove` | content/config | admin |
+| `sellers:list/storefront/register/setStatus/stats` | seller lifecycle | seller/admin |
+| `analytics:admin/warehouse/revenue` | dashboard KPIs | admin/staff |
+| `audit:list`, `fraud:list/setStatus`, `customers:list/setActive` | admin ops | admin |
+| `broadcasts:list/send`, `roles:defs/staff/setRole` | marketing + roles | admin |
+| `warehouse:hubs/parcels/aged/inventory/batches/buildBatch/reconcile/transfers` | WMS | staff |
+| `rider:earnings` | rider shift summary | rider |
 | `notifications:list` / `notifications:markRead` | `{id}` | all |
+
+**81 realtime handlers across 16 domain modules and 26 entities** cover every
+portal (customer, seller, admin, warehouse, rider).
 
 ### Server → client (pushed live, no polling)
 
