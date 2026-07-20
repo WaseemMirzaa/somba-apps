@@ -10,6 +10,7 @@ import {
   Notification,
   Order,
   OrderItem,
+  Payment,
   Product,
   Promo,
   Review,
@@ -20,6 +21,7 @@ import {
   WalletTransaction,
 } from './entities';
 import { UsersService } from '../users/users.service';
+import { OrdersService } from '../orders/orders.service';
 import type { UserRole } from './entities';
 import { seedCategories, seedProducts } from './seed-catalog';
 
@@ -70,6 +72,7 @@ async function run() {
     ds.getRepository(entity).createQueryBuilder().delete().execute();
   await wipe(OrderItem);
   await wipe(DeliveryTask);
+  await wipe(Payment);
   await wipe(Order);
   await wipe(Notification);
   await wipe(WalletTransaction);
@@ -137,14 +140,17 @@ async function run() {
   );
 
   const productRepo = ds.getRepository(Product);
+  const createdProducts: Product[] = [];
   for (const p of CATALOG) {
-    await productRepo.save(
-      productRepo.create({
-        ...p,
-        status: 'live',
-        sellerId: seller.id,
-        sellerName: seller.name,
-      }),
+    createdProducts.push(
+      await productRepo.save(
+        productRepo.create({
+          ...p,
+          status: 'live',
+          sellerId: seller.id,
+          sellerName: seller.name,
+        }),
+      ),
     );
   }
 
@@ -194,6 +200,69 @@ async function run() {
       reviewRepo.create({ productId: firstProduct.id, userId: 'seed', author: 'Marie D.', rating: 5, text: 'Excellent product, fast delivery!' }),
       reviewRepo.create({ productId: firstProduct.id, userId: 'seed', author: 'Jean K.', rating: 4, text: 'Good value for money.' }),
     ]);
+  }
+
+  // ── Order pipeline ──────────────────────────────────────────────────────────
+  // Seed a handful of real orders through OrdersService so the whole live
+  // pipeline lights up: the customer sees orders, the seller sees incoming
+  // sales, admin sees GMV, the warehouse sees parcels (delivery tasks), and the
+  // rider gets deliveries + earnings. Statuses are then advanced to cover the
+  // pending → processing → out-for-delivery → delivered lifecycle.
+  console.log('Seeding orders + delivery pipeline…');
+  const ordersSvc = app.get(OrdersService);
+  const customer = await userRepo.findOne({
+    where: { emailHash: UsersService.emailHash('customer@somba.app') },
+  });
+  const riderUser = await userRepo.findOne({
+    where: { emailHash: UsersService.emailHash('rider@somba.app') },
+  });
+  const orderRepo = ds.getRepository(Order);
+  const taskRepo = ds.getRepository(DeliveryTask);
+  const pick = (i: number) => createdProducts[i % createdProducts.length];
+
+  if (customer && createdProducts.length) {
+    const specs: {
+      items: { productId: string; qty: number }[];
+      paymentMethod: 'cod' | 'stripe_card' | 'wallet';
+      advanceTo?: 'processing' | 'out_for_delivery' | 'delivered';
+    }[] = [
+      { items: [{ productId: pick(0).id, qty: 1 }], paymentMethod: 'cod' },
+      { items: [{ productId: pick(1).id, qty: 1 }, { productId: pick(2).id, qty: 2 }], paymentMethod: 'stripe_card', advanceTo: 'processing' },
+      { items: [{ productId: pick(3).id, qty: 1 }], paymentMethod: 'cod', advanceTo: 'out_for_delivery' },
+      { items: [{ productId: pick(4).id, qty: 1 }], paymentMethod: 'cod', advanceTo: 'delivered' },
+      { items: [{ productId: pick(2).id, qty: 3 }], paymentMethod: 'cod', advanceTo: 'delivered' },
+    ];
+
+    for (const spec of specs) {
+      const order = await ordersSvc.create(
+        { id: customer.id, name: customer.name },
+        {
+          items: spec.items,
+          paymentMethod: spec.paymentMethod,
+          deliveryFeeUsd: 5,
+          shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
+        },
+      );
+      if (spec.advanceTo) {
+        order.status = spec.advanceTo;
+        await orderRepo.save(order);
+        // Assign + advance the delivery task so warehouse/rider surfaces fill.
+        const task = await taskRepo.findOne({ where: { orderId: order.id } });
+        if (task) {
+          if (spec.advanceTo === 'processing') {
+            task.status = 'assigned';
+            task.riderId = riderUser?.id ?? null;
+          } else if (spec.advanceTo === 'out_for_delivery') {
+            task.status = 'in_transit';
+            task.riderId = riderUser?.id ?? null;
+          } else if (spec.advanceTo === 'delivered') {
+            task.status = 'delivered';
+            task.riderId = riderUser?.id ?? null;
+          }
+          await taskRepo.save(task);
+        }
+      }
+    }
   }
 
   console.log('\n✅ Seed complete.');

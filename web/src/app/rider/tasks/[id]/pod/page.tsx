@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
-import { getRiderTask } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -15,6 +15,7 @@ export default function RiderPodPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
+  const { getRiderTask } = useRiderData();
   const task = getRiderTask(id);
   const [otp, setOtp] = useState("");
   const [recipient, setRecipient] = useState("");

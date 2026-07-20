@@ -1,8 +1,8 @@
-import type { RiderTask } from "./rider-entities";
+import type { RiderTask } from "./rider";
 import type { DeliveryEntity } from "./warehouse-entities";
 
 export type DeliveryProduct = {
-  productId: number;
+  productId: number | string;
   name: string;
   sku: string;
   variant: string;

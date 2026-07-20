@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-import { getRiderTask } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 
 const REASONS = [
   { value: "Customer unavailable", labelFr: "Client indisponible" },
@@ -21,6 +21,7 @@ export default function RiderFailedDeliveryPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
+  const { getRiderTask } = useRiderData();
   const task = getRiderTask(id);
   const [reason, setReason] = useState(REASONS[0].value);
 

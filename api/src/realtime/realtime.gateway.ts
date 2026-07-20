@@ -1222,6 +1222,17 @@ export class RealtimeGateway
     }
   }
 
+  /** The rider's delivery queue, enriched with order snapshots. */
+  @SubscribeMessage('rider:tasks')
+  async riderTasks(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.rider.queue(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   // ---- Notifications ------------------------------------------------------
   @SubscribeMessage('notifications:list')
   async notificationsList(@ConnectedSocket() client: AuthedSocket) {

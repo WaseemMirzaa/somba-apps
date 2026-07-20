@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
-import { riderProfile, getActiveRiderTasks } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { riderTaskToDeliveryDetail } from "@/lib/delivery-detail";
 import { useLocale } from "@/context/locale-context";
 import { useRiderZones } from "@/context/rider-zone-context";
@@ -16,6 +16,7 @@ export default function RiderProfilePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { getRiderZone } = useRiderZones();
+  const { riderProfile, getActiveRiderTasks } = useRiderData();
   const [onDuty, setOnDuty] = useState(true);
   const activeTasks = getActiveRiderTasks();
   const assignedZone = getRiderZone(riderProfile.id) || riderProfile.zone;

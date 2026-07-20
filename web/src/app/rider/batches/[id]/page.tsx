@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getRiderTask } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 
 const BATCH_STOPS = [
@@ -27,6 +27,7 @@ export default function RiderBatchPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getRiderTask } = useRiderData();
 
   return (
     <div className="space-y-6">

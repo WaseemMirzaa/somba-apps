@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useRiderZones } from "@/context/rider-zone-context";
-import { riderProfile, riderTasks } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { ADMIN_ZONES } from "@/lib/zones-admin";
 import { DualCurrency } from "@/components/ui/dual-currency";
 
@@ -15,6 +15,7 @@ export default function RiderZonePage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { getRiderZone } = useRiderZones();
+  const { riderProfile, riderTasks } = useRiderData();
 
   const zone = getRiderZone(riderProfile.id) || riderProfile.zone;
   // The assigned zone may read like "Kinshasa — Gombe"; tasks carry the commune.

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLocale } from "@/context/locale-context";
-import { riderTasks } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 
 export default function RiderHistoryPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { riderTasks } = useRiderData();
   const completed = riderTasks.filter((t) => t.status === "delivered");
 
   return (

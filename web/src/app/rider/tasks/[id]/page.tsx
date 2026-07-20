@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getRiderTask } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -59,6 +59,7 @@ export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getRiderTask } = useRiderData();
   const task = getRiderTask(id);
   const [delivered, setDelivered] = useState(task?.status === "delivered");
 

@@ -16,7 +16,7 @@ import {
   Sparkline,
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
-import { riderProfile, getActiveRiderTasks, riderTasks } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 import { riderTaskToDeliveryDetail } from "@/lib/delivery-detail";
 import {
   riderEarningsTrend,
@@ -74,6 +74,7 @@ function KpiCard({
 export default function RiderDashboardPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { riderProfile, getActiveRiderTasks, riderTasks } = useRiderData();
   const [period] = useState("7D");
   const k = riderExtendedKpis;
   const activeTasks = getActiveRiderTasks();

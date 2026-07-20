@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { riderTasks } from "@/lib/rider-entities";
+import { useRiderData } from "@/lib/rider";
 
 const STATUS_OPTIONS = [
   { value: "assigned", label: "Assigned", labelFr: "Assigné" },
@@ -28,6 +28,7 @@ const TYPE_FR: Record<string, string> = {
 export default function RiderTasksPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { riderTasks } = useRiderData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -36,7 +37,7 @@ export default function RiderTasksPage() {
         searchFields: ["id", "customer", "address", "type"],
         statusField: "status",
       }),
-    [filters]
+    [filters, riderTasks]
   );
 
   return (
