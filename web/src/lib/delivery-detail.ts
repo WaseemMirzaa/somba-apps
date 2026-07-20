@@ -26,8 +26,8 @@ export type DeliveryDetailData = {
   paymentType: string;
   currentStop?: number;
   totalStops?: number;
-  customer: { name: string; phone: string; address: string; id?: number };
-  seller: { name: string; store: string; phone: string; id?: number };
+  customer: { name: string; phone: string; address: string; id?: number | string };
+  seller: { name: string; store: string; phone: string; id?: number | string };
   products: DeliveryProduct[];
   timeline: DeliveryTimelineEvent[];
   detailHref?: string;

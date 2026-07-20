@@ -10,7 +10,8 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useRiderZones } from "@/context/rider-zone-context";
-import { riderEntities, type RiderEntity } from "@/lib/warehouse-entities";
+import { type RiderEntity } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
@@ -28,6 +29,7 @@ export default function WarehouseRidersPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { zoneOptions, getRiderZone, setRiderZone } = useRiderZones();
+  const { riderEntities } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [assignRider, setAssignRider] = useState<RiderEntity | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -38,7 +40,7 @@ export default function WarehouseRidersPage() {
         searchFields: ["name", "zone", "location", "phone"],
         statusField: "status",
       }),
-    [filters]
+    [riderEntities, filters]
   );
 
   return (

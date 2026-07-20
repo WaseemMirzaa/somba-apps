@@ -9,7 +9,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
-import { getRider, getDeliveriesByRider } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { deliveryEntityToDetail } from "@/lib/delivery-detail";
 import { batchEntities } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
@@ -33,7 +33,8 @@ export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const rider = getRider(Number(id));
+  const { getRider, getDeliveriesByRider } = useWarehouseData();
+  const rider = getRider(id);
 
   if (!rider) {
     return (

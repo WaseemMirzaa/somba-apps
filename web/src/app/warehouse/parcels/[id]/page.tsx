@@ -9,7 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
-import { getInboundParcel } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -55,6 +55,7 @@ export default function WarehouseParcelDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { getInboundParcel } = useWarehouseData();
   const parcel = getInboundParcel(id);
 
   if (!parcel) {

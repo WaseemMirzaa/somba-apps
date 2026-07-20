@@ -11,7 +11,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { getOrder } from "@/lib/entities";
-import { riderEntities } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -39,6 +39,7 @@ export default function WarehouseReplacementDetailPage() {
   const { toast } = useToast();
   const fr = locale === "fr";
   const { getReplacement, advance, assignRider } = useReplacements();
+  const { riderEntities } = useWarehouseData();
   const rep = getReplacement(id);
   const order = rep ? getOrder(rep.orderId) : undefined;
   const [riderName, setRiderName] = useState("");

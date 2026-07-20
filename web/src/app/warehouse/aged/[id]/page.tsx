@@ -10,7 +10,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getAgedParcel } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { getOrder } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -88,6 +88,7 @@ export default function WarehouseAgedParcelDetailPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
+  const { getAgedParcel } = useWarehouseData();
   const parcel = getAgedParcel(id);
   const order = parcel ? getOrder(parcel.orderId) : undefined;
 

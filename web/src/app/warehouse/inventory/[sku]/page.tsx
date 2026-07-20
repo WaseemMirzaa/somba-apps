@@ -8,7 +8,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getInventory } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -17,6 +17,7 @@ export default function WarehouseInventoryDetailPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { getInventory } = useWarehouseData();
   const item = getInventory(decodeURIComponent(sku));
 
   if (!item) {

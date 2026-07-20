@@ -30,27 +30,52 @@ class BackendUser {
 class ProductDto {
   final String id;
   final String name;
+  final String nameFr;
   final double price;
+  final double originalPrice;
+  final int discount;
   final String category;
+  final String categoryFr;
+  final String image;
   final int stock;
   final double rating;
+  final int reviews;
 
   ProductDto({
     required this.id,
     required this.name,
+    required this.nameFr,
     required this.price,
+    required this.originalPrice,
+    required this.discount,
     required this.category,
+    required this.categoryFr,
+    required this.image,
     required this.stock,
     required this.rating,
+    required this.reviews,
   });
+
+  /// Localised display name (falls back to the English name).
+  String displayName(String lang) => lang == 'fr' && nameFr.isNotEmpty ? nameFr : name;
 
   factory ProductDto.fromJson(Map<String, dynamic> j) => ProductDto(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
+        nameFr: j['nameFr'] as String? ?? '',
         price: (j['price'] as num?)?.toDouble() ?? 0,
+        originalPrice: (j['originalPrice'] as num?)?.toDouble() ??
+            (j['price'] as num?)?.toDouble() ??
+            0,
+        discount: (j['discount'] as num?)?.toInt() ?? 0,
         category: j['category'] as String? ?? '',
+        categoryFr: j['categoryFr'] as String? ?? '',
+        image: j['image'] as String? ?? '',
         stock: (j['stock'] as num?)?.toInt() ?? 0,
         rating: (j['rating'] as num?)?.toDouble() ?? 0,
+        reviews: (j['reviewsCount'] as num?)?.toInt() ??
+            (j['reviews'] as num?)?.toInt() ??
+            0,
       );
 }
 

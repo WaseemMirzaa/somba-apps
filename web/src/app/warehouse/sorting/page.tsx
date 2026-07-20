@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
@@ -8,7 +8,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { sortingParcels as initialParcels } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import type { SortingParcel } from "@/lib/warehouse-entities";
 
 const SORTING_ZONES = ["Zone A", "Zone B", "Zone C"];
@@ -32,8 +32,10 @@ export default function WarehouseSortingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { sortingParcels } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [parcels, setParcels] = useState(initialParcels);
+  const [parcels, setParcels] = useState(sortingParcels);
+  useEffect(() => setParcels(sortingParcels), [sortingParcels]);
   const [assignTarget, setAssignTarget] = useState<SortingParcel | null>(null);
   const [selectedZone, setSelectedZone] = useState("");
   const [confirmStep, setConfirmStep] = useState(false);

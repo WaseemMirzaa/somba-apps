@@ -7,7 +7,7 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { agedParcelEntities } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 
 const STATUS_OPTIONS = [
   { value: "inbound", label: "Inbound", labelFr: "Entrant" },
@@ -60,6 +60,7 @@ function priorityVariant(priority: string): "success" | "warning" | "info" | "da
 export default function WarehouseAgedPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { agedParcelEntities } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -69,7 +70,7 @@ export default function WarehouseAgedPage() {
         dateField: "arrivalDate",
         statusField: "status",
       }),
-    [filters]
+    [agedParcelEntities, filters]
   );
 
   return (

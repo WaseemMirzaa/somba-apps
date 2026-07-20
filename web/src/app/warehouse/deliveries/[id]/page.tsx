@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getDelivery } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -45,6 +45,7 @@ export default function WarehouseDeliveryDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { getDelivery } = useWarehouseData();
   const delivery = getDelivery(id);
 
   if (!delivery) {

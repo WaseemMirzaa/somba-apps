@@ -10,7 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { inboundParcels } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -32,6 +32,7 @@ export default function WarehouseReceivingPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
+  const { inboundParcels } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const data = inboundParcels.slice(0, 5);
 

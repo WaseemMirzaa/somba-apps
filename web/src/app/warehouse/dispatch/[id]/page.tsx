@@ -11,7 +11,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { getBatch } from "@/lib/entities";
-import { getRider, type RiderEntity } from "@/lib/warehouse-entities";
+import { type RiderEntity } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
@@ -29,6 +30,7 @@ export default function WarehouseBatchDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { getRider } = useWarehouseData();
   const batch = getBatch(id);
   const [status, setStatus] = useState(batch?.status ?? "ready");
   const [assignedRider, setAssignedRider] = useState<RiderEntity | null>(null);

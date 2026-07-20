@@ -7,11 +7,12 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { inventoryEntities } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 
 export default function WarehouseInventoryPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { inventoryEntities } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -19,7 +20,7 @@ export default function WarehouseInventoryPage() {
       applyListFilters(inventoryEntities, filters, {
         searchFields: ["sku", "product", "category", "location"],
       }),
-    [filters]
+    [inventoryEntities, filters]
   );
 
   return (

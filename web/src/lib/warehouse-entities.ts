@@ -54,7 +54,7 @@ export type InventoryEntity = {
 };
 
 export type DeliveryProduct = {
-  productId: number;
+  productId: number | string;
   name: string;
   sku: string;
   variant: string;
@@ -65,11 +65,11 @@ export type DeliveryProduct = {
 export type DeliveryEntity = {
   id: string;
   orderId: string;
-  customerId: number;
+  customerId: number | string;
   customer: string;
   customerPhone: string;
   customerAddress: string;
-  sellerId: number;
+  sellerId: number | string;
   seller: string;
   sellerStore: string;
   sellerPhone: string;

@@ -10,7 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { inboundParcels } from "@/lib/warehouse-entities";
+import { useWarehouseData } from "@/lib/warehouse";
 import { useOpsPath, useOpsBase } from "@/lib/ops-path";
 
 const STATUS_OPTIONS = [
@@ -39,6 +39,7 @@ export default function WarehouseInboundPage() {
   const base = useOpsBase();
   const homeLabel = base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse");
   const homeHref = base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse";
+  const { inboundParcels } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -47,7 +48,7 @@ export default function WarehouseInboundPage() {
         searchFields: ["id", "orderId", "seller", "pickupRider"],
         statusField: "status",
       }),
-    [filters]
+    [inboundParcels, filters]
   );
 
   return (
