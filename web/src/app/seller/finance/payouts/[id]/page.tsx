@@ -11,11 +11,8 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import {
-  getPayout,
-  getPayoutItemsByPayoutId,
-  type SellerPayoutItemStatus,
-} from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
+import type { SellerPayoutItemStatus } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -43,6 +40,7 @@ export default function SellerPayoutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getPayout, getPayoutItemsByPayoutId } = useSellerData();
   const payout = getPayout(id);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 

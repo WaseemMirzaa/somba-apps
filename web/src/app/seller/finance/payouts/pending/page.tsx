@@ -11,12 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/ui/tabs";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import {
-  sellerPayoutSummary,
-  getPendingPayoutItems,
-  getPaidOutPayoutItems,
-  type SellerPayoutItemStatus,
-} from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
+import type { SellerPayoutItemStatus } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -50,6 +46,7 @@ function statusBadgeVariant(status: SellerPayoutItemStatus) {
 export default function SellerPayoutPendingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { sellerPayoutSummary, getPendingPayoutItems, getPaidOutPayoutItems } = useSellerData();
   const summary = sellerPayoutSummary;
   const [tab, setTab] = useState<"pending" | "paid">("pending");
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);

@@ -9,11 +9,11 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useAuth } from "@/context/auth-context";
 import { useReviews } from "@/context/reviews-context";
-import { sellerReviewList } from "@/lib/seller-entities";
+import { useSellerData, type SellerData } from "@/lib/seller";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
-type SellerReview = (typeof sellerReviewList)[number];
+type SellerReview = SellerData["sellerReviewList"][number];
 
 const REPORT_REASONS = [
   { value: "Spam / external contact", fr: "Spam / contact externe" },
@@ -28,6 +28,7 @@ export default function SellerReviewsPage() {
   const { toast } = useToast();
   const { persona } = useAuth();
   const { getReply, addReply, reportReview } = useReviews();
+  const { sellerReviewList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const [replyFor, setReplyFor] = useState<SellerReview | null>(null);
@@ -37,7 +38,7 @@ export default function SellerReviewsPage() {
 
   const filtered = useMemo(
     () => applyListFilters(sellerReviewList, filters, { searchFields: ["customer", "product", "review"], dateField: "date" }),
-    [filters]
+    [sellerReviewList, filters]
   );
 
   function submitReply() {

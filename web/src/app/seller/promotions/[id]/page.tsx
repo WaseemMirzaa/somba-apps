@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { getPromotion } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -12,6 +12,7 @@ export default function SellerPromotionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { getPromotion } = useSellerData();
   const promo = getPromotion(id);
 
   if (!promo) {

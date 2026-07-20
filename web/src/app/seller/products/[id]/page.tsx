@@ -9,7 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { getSellerProductFull } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -37,7 +37,8 @@ export default function SellerProductDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const product = getSellerProductFull(Number(id));
+  const { getSellerProductFull } = useSellerData();
+  const product = getSellerProductFull(id);
   const [status, setStatus] = useState<SellerProductStatus>((product?.status as SellerProductStatus) ?? "draft");
 
   if (!product) {

@@ -7,7 +7,7 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import { payoutList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
 export default function SellerPayoutsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { payoutList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -30,7 +31,7 @@ export default function SellerPayoutsPage() {
         dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    [payoutList, filters]
   );
 
   return (

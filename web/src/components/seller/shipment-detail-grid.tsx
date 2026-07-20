@@ -7,7 +7,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
-import type { ShipmentDetail } from "@/lib/seller-entities";
+import type { ShipmentDetail } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { customerColumnLabel, zoneColumnLabel } from "@/lib/admin-i18n";
 

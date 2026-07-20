@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
-import { getShipment } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { useLocale } from "@/context/locale-context";
 
 function formatStatus(status: string) {
@@ -15,6 +15,7 @@ export default function SellerShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { getShipment } = useSellerData();
   const shipment = getShipment(id);
 
   if (!shipment) {

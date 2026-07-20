@@ -7,7 +7,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getSellerInventory } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
@@ -16,6 +16,7 @@ export default function SellerInventoryDetailPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { getSellerInventory } = useSellerData();
   const item = getSellerInventory(decodeURIComponent(sku));
 
   if (!item) {

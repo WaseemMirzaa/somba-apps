@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { sellerProductList as initialProducts } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 
 type SellerProductStatus = "live" | "draft" | "paused" | "out_of_stock" | "unavailable";
@@ -45,8 +45,13 @@ export default function SellerProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { sellerProductList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(sellerProductList);
+  // Resync when the live catalogue hydrates/changes over the socket.
+  useEffect(() => {
+    setProducts(sellerProductList);
+  }, [sellerProductList]);
 
   const filtered = useMemo(
     () =>
@@ -57,7 +62,7 @@ export default function SellerProductsPage() {
     [products, filters]
   );
 
-  function setProductStatus(id: number, status: SellerProductStatus) {
+  function setProductStatus(id: string, status: SellerProductStatus) {
     setProducts((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
     toast(
       status === "unavailable"
@@ -110,12 +115,12 @@ export default function SellerProductsPage() {
             <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
             <Link href="/seller/products/create" className="text-slate-500 hover:underline">{fr ? "Modifier" : "Edit"}</Link>
             {row.status === "live" && (
-              <button type="button" onClick={() => setProductStatus(row.id as number, "unavailable")} className="text-amber-700 hover:underline">
+              <button type="button" onClick={() => setProductStatus(row.id as string, "unavailable")} className="text-amber-700 hover:underline">
                 {fr ? "Indisponible" : "Unavailable"}
               </button>
             )}
             {row.status === "unavailable" && (
-              <button type="button" onClick={() => setProductStatus(row.id as number, "live")} className="text-emerald-700 hover:underline">
+              <button type="button" onClick={() => setProductStatus(row.id as string, "live")} className="text-emerald-700 hover:underline">
                 {fr ? "Remettre en ligne" : "Mark live"}
               </button>
             )}

@@ -34,14 +34,7 @@ import {
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
 import { useSellerGoals } from "@/context/seller-goals-context";
-import {
-  sellerStore,
-  sellerDashboardStats,
-  sellerOrderList,
-  lowStockProducts,
-  promotionList,
-  sellerFinanceStats,
-} from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import {
   sellerRevenueTrend,
   sellerRetentionTrend,
@@ -109,8 +102,26 @@ export default function SellerDashboard() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
-  const k = sellerExtendedKpis;
+  const {
+    sellerStore,
+    sellerDashboardStats,
+    sellerOrderList,
+    lowStockProducts,
+    promotionList,
+    sellerFinanceStats,
+  } = useSellerData();
   const s = sellerDashboardStats;
+  // Headline KPIs: real revenue/orders/AOV/net from the live socket; the
+  // longer-horizon behavioural metrics (retention, CLV, conversion) keep their
+  // presentational projections since the backend has no cohort history yet.
+  const liveOrders = sellerOrderList.length;
+  const k = {
+    ...sellerExtendedKpis,
+    mtdRevenue: sellerFinanceStats.revenue,
+    mtdOrders: liveOrders,
+    avgOrderValue: liveOrders > 0 ? Number((sellerFinanceStats.revenue / liveOrders).toFixed(2)) : 0,
+    netEarnings: Number((sellerFinanceStats.revenue - sellerFinanceStats.commissionPaid).toFixed(2)),
+  };
   const { goals } = useSellerGoals();
 
   const revenueSpark = sellerRevenueTrend.map((d) => d.revenue);

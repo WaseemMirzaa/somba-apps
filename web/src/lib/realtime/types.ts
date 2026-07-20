@@ -202,5 +202,35 @@ export interface Dispute {
   createdAt: string;
 }
 
+export interface Seller {
+  id: string;
+  name: string;
+  userId: string | null;
+  status: "pending" | "approved" | "rejected" | "suspended";
+  badge: "gold" | "silver" | "bronze" | "somba_assured";
+  rating: number;
+  productCount: number;
+  createdAt: string;
+}
+
+export interface SellerStats {
+  products: number;
+  orders: number;
+  revenue: number;
+  paidOut: number;
+  pendingPayouts: number;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  productName?: string;
+  userId: string;
+  author: string;
+  rating: number;
+  text: string;
+  createdAt: string;
+}
+
 /** Standard ack envelope returned by every request→ack socket handler. */
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: string };

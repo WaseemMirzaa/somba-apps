@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { getSellerOrder, getShipmentByOrderId } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
@@ -56,6 +56,7 @@ export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const { toast } = useToast();
+  const { getSellerOrder, getShipmentByOrderId } = useSellerData();
   const order = getSellerOrder(id);
   const shipment = order ? getShipmentByOrderId(order.id) : undefined;
   const [ready, setReady] = useState(false);

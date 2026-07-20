@@ -7,7 +7,7 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { shipmentList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -24,6 +24,7 @@ function formatStatus(status: string) {
 export default function SellerShippingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { shipmentList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -41,7 +42,7 @@ export default function SellerShippingPage() {
           statusField: "status",
         }
       ),
-    [filters]
+    [shipmentList, filters]
   );
 
   return (

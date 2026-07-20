@@ -44,13 +44,14 @@ import {
   sellerFulfillmentMetrics,
   sellerRecentActivity,
 } from "@/lib/seller-analytics";
-import { topSellingProducts } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 
 export default function SellerAnalyticsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { topSellingProducts } = useSellerData();
   const [period, setPeriod] = useState<AnalyticsPeriod>("30D");
   const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
   const k = sellerExtendedKpis;

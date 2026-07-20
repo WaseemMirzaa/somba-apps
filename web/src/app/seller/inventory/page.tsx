@@ -8,12 +8,13 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { sellerInventoryList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 
 export default function SellerInventoryPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { sellerInventoryList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -21,7 +22,7 @@ export default function SellerInventoryPage() {
       applyListFilters(sellerInventoryList, filters, {
         searchFields: ["sku", "product", "category", "location"],
       }),
-    [filters]
+    [sellerInventoryList, filters]
   );
 
   function exportCsv() {

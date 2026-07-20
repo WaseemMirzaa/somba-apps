@@ -7,7 +7,7 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { sellerReplacementList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
 
 const STATUS_OPTIONS = [
@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
 export default function SellerReplacementsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { sellerReplacementList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -30,7 +31,7 @@ export default function SellerReplacementsPage() {
         dateField: timelineRequestDate,
         statusField: "status",
       }),
-    [filters]
+    [sellerReplacementList, filters]
   );
 
   return (

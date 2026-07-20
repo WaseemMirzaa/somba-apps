@@ -7,7 +7,7 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { sellerReturnList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -35,6 +35,7 @@ function returnStatusLabel(status: string, fr: boolean) {
 export default function SellerReturnsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { sellerReturnList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -44,7 +45,7 @@ export default function SellerReturnsPage() {
         dateField: timelineRequestDate,
         statusField: "status",
       }),
-    [filters]
+    [sellerReturnList, filters]
   );
 
   return (

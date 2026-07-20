@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import { transactionList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -27,6 +27,7 @@ const STATUS_FR: Record<string, string> = {
 export default function SellerTransactionsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { transactionList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -36,7 +37,7 @@ export default function SellerTransactionsPage() {
         dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    [transactionList, filters]
   );
 
   return (

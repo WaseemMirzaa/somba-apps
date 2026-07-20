@@ -12,16 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { RevenueAreaChart, HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
 import {
-  sellerFinanceStats,
-  sellerPayoutSummary,
-  transactionList,
-  payoutList,
   sellerFinanceRevenueByCategory,
   sellerCommissionByTier,
   sellerFinanceNetCommissionTrend,
-  getPendingPayoutItems,
-  type SellerPayoutItemStatus,
 } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
+import type { SellerPayoutItemStatus } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_LABELS: Record<SellerPayoutItemStatus, { en: string; fr: string }> = {
@@ -54,6 +50,13 @@ const PAYMENT_STATUS_FR: Record<string, string> = {
 export default function SellerFinancePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const {
+    sellerFinanceStats,
+    sellerPayoutSummary,
+    transactionList,
+    payoutList,
+    getPendingPayoutItems,
+  } = useSellerData();
   const f = sellerFinanceStats;
   const summary = sellerPayoutSummary;
   const recentTransactions = transactionList.slice(0, 8);

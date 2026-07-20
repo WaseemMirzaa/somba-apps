@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { INITIAL_WAREHOUSES, warehousePersonaId } from "@/lib/warehouses-admin";
 import {
   WAREHOUSE_STAFF_ROLE_LABELS,
@@ -8,6 +8,7 @@ import {
   warehouseStaffPersonaId,
 } from "@/lib/admin-entities";
 import { useWarehouseStaff } from "@/context/warehouse-staff-context";
+import { useRealtime } from "@/context/realtime-context";
 import type { AdminDepartment } from "@/lib/admin-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 
@@ -34,15 +35,15 @@ const STATIC_PERSONAS: Persona[] = [
     role: "customer",
     name: "Marie Dubois",
     nameFr: "Marie Dubois",
-    email: "marie@email.com",
+    email: "customer@somba.app",
     portal: "/shop/account",
   },
   {
     id: "seller-1",
     role: "seller",
-    name: "TechZone Store",
-    nameFr: "TechZone Store",
-    email: "seller@techzone.com",
+    name: "Kinshasa Traders",
+    nameFr: "Kinshasa Traders",
+    email: "seller@somba.app",
     portal: "/seller",
     subRole: "Subscribed",
     subRoleFr: "Abonné",
@@ -61,9 +62,9 @@ const STATIC_PERSONAS: Persona[] = [
     id: "admin-1",
     role: "admin",
     department: "super",
-    name: "Admin User",
-    nameFr: "Utilisateur admin",
-    email: "admin@somba.com",
+    name: "Admin Root",
+    nameFr: "Admin Root",
+    email: "admin@somba.app",
     portal: "/admin",
     subRole: "Super Admin",
     subRoleFr: "Super admin",
@@ -74,7 +75,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "operations",
     name: "Ops Manager",
     nameFr: "Responsable des opérations",
-    email: "ops@somba.com",
+    email: "ops@somba.app",
     portal: "/admin/orders",
     subRole: "Operations",
     subRoleFr: "Opérations",
@@ -85,7 +86,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "finance",
     name: "Finance Lead",
     nameFr: "Responsable finance",
-    email: "finance@somba.com",
+    email: "finance@somba.app",
     portal: "/admin/finance",
     subRole: "Finance",
     subRoleFr: "Finance",
@@ -96,7 +97,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "warehouse",
     name: "Warehouse Admin",
     nameFr: "Admin entrepôt",
-    email: "warehouse-admin@somba.com",
+    email: "admin@somba.app",
     portal: "/admin/warehouses",
     subRole: "Warehouse Admin",
     subRoleFr: "Admin entrepôt",
@@ -107,7 +108,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "support",
     name: "Support Agent",
     nameFr: "Agent support",
-    email: "support@somba.com",
+    email: "admin@somba.app",
     portal: "/admin/support",
     subRole: "Support",
     subRoleFr: "Support",
@@ -118,7 +119,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "marketing",
     name: "Marketing Mgr",
     nameFr: "Responsable marketing",
-    email: "marketing@somba.com",
+    email: "admin@somba.app",
     portal: "/admin/flash-sales",
     subRole: "Marketing",
     subRoleFr: "Marketing",
@@ -129,7 +130,7 @@ const STATIC_PERSONAS: Persona[] = [
     department: "moderation",
     name: "Moderator",
     nameFr: "Modérateur",
-    email: "mod@somba.com",
+    email: "admin@somba.app",
     portal: "/admin/moderation",
     subRole: "Moderation",
     subRoleFr: "Modération",
@@ -137,9 +138,9 @@ const STATIC_PERSONAS: Persona[] = [
   {
     id: "rider-1",
     role: "rider",
-    name: "Jean Mukendi",
-    nameFr: "Jean Mukendi",
-    email: "rider@somba.com",
+    name: "Jean Rider",
+    nameFr: "Jean Rider",
+    email: "rider@somba.app",
     portal: "/rider",
   },
 ];
@@ -195,8 +196,38 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 const STORAGE_KEY = "somba-persona-id";
 
+/**
+ * Bridge each demo persona to its seeded backend account so selecting a role in
+ * the login screen also authenticates the real Socket.IO session — that is what
+ * makes every portal (seller/admin/warehouse/rider) show live backend data.
+ * All seeded demo accounts share one password (see api/src/database/seed.ts).
+ */
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "Somba@2026";
+
+function backendEmailFor(persona: Persona): string | null {
+  if (persona.role === "guest") return null;
+  // Specific admin sub-roles map to their own seeded operator accounts.
+  if (persona.id === "admin-ops") return "ops@somba.app";
+  if (persona.id === "admin-fin") return "finance@somba.app";
+  switch (persona.role) {
+    case "customer":
+      return "customer@somba.app";
+    case "seller":
+      return "seller@somba.app";
+    case "admin":
+      return "admin@somba.app";
+    case "warehouse":
+      return "warehouse@somba.app";
+    case "rider":
+      return "rider@somba.app";
+    default:
+      return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { staff } = useWarehouseStaff();
+  const rt = useRealtime();
   const [persona, setPersona] = useState<Persona>(STATIC_PERSONAS[0]);
   const [authReady, setAuthReady] = useState(false);
 
@@ -240,7 +271,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     setPersona(STATIC_PERSONAS[0]);
     localStorage.removeItem(STORAGE_KEY);
-  }, []);
+    rt.logout();
+  }, [rt]);
+
+  // Keep the real backend socket session in sync with the selected persona, so
+  // every portal reads live data over the authenticated socket. Runs after the
+  // persona is resolved/restored and whenever it changes.
+  const bridgingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authReady) return;
+    const email = backendEmailFor(persona);
+    if (!email) {
+      bridgingRef.current = null;
+      return;
+    }
+    if (rt.user?.email === email) {
+      bridgingRef.current = email;
+      return;
+    }
+    if (bridgingRef.current === email) return; // attempt already in flight
+    bridgingRef.current = email;
+    rt.login(email, DEMO_PASSWORD).catch(() => {
+      bridgingRef.current = null; // allow a retry on next persona change
+    });
+  }, [authReady, persona, rt]);
 
   const switchPersona = login;
 

@@ -7,7 +7,7 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { promotionList } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
@@ -18,6 +18,7 @@ const STATUS_OPTIONS = [
 export default function SellerPromotionsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { promotionList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -27,7 +28,7 @@ export default function SellerPromotionsPage() {
         dateField: "startDate",
         statusField: "status",
       }),
-    [filters]
+    [promotionList, filters]
   );
 
   return (

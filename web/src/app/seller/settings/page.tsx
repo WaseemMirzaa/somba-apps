@@ -8,7 +8,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { GoalProgress } from "@/components/charts/dashboard-charts";
-import { storeSettings } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -194,6 +194,7 @@ export default function SellerSettingsPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
+  const { storeSettings } = useSellerData();
 
   const permissions: { en: string; fr: string }[] = [
     { en: "Products", fr: "Produits" },

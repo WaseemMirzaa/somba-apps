@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
@@ -8,7 +8,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { sellerOrderList as initialOrders } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -32,8 +32,13 @@ export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { sellerOrderList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState(() => sellerOrderList);
+
+  useEffect(() => {
+    setOrders(sellerOrderList);
+  }, [sellerOrderList]);
 
   const filtered = useMemo(
     () =>

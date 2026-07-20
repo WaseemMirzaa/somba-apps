@@ -222,6 +222,10 @@ export class RealtimeGateway
       if (!body?.name || body.price == null || !body.category) {
         return fail('name, price and category are required.');
       }
+      // Products are keyed to the Seller entity (not the user row) so seller
+      // dashboards, stats, and payouts all join on the same id. Sellers who
+      // haven't registered a storefront yet fall back to their user id.
+      const seller = await this.sellersSvc.byUser(user.id);
       // Seller-published products go live immediately in this prototype.
       const product = await this.products.create({
         name: body.name,
@@ -232,8 +236,8 @@ export class RealtimeGateway
         image: body.image ?? null,
         description: body.description ?? null,
         status: 'live',
-        sellerId: user.id,
-        sellerName: user.name,
+        sellerId: seller?.id ?? user.id,
+        sellerName: seller?.name ?? user.name,
       });
       return ok(product);
     } catch (e) {
@@ -250,7 +254,10 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       const existing = await this.products.get(body.id);
       if (!existing) return fail('Product not found.');
-      const isOwner = existing.sellerId === user.id;
+      const seller = await this.sellersSvc.byUser(user.id);
+      const isOwner =
+        existing.sellerId === user.id ||
+        (seller != null && existing.sellerId === seller.id);
       if (!isOwner && !user.role.startsWith('admin')) {
         return fail('You can only edit your own products.');
       }
@@ -618,6 +625,19 @@ export class RealtimeGateway
     return ok(await this.reviews.listForProduct(body.productId));
   }
 
+  /** All reviews across the signed-in seller's catalogue. */
+  @SubscribeMessage('reviews:seller')
+  async reviewsSeller(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const seller = await this.sellersSvc.byUser(user.id);
+      if (!seller) return ok([]);
+      return ok(await this.reviews.listForSeller(seller.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('reviews:create')
   async reviewsCreate(
     @ConnectedSocket() client: AuthedSocket,
@@ -910,6 +930,18 @@ export class RealtimeGateway
       const sellerId = seller?.id;
       if (!sellerId) return ok({ products: 0, orders: 0, revenue: 0, paidOut: 0, pendingPayouts: 0 });
       return ok(await this.sellersSvc.stats(sellerId));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The signed-in seller's own store entity (id, rating, status, badge). */
+  @SubscribeMessage('sellers:mine')
+  async sellersMine(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const seller = await this.sellersSvc.byUser(user.id);
+      return ok(seller ?? null);
     } catch (e) {
       return fail((e as Error).message);
     }

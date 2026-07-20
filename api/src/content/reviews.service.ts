@@ -22,6 +22,21 @@ export class ReviewsService {
     });
   }
 
+  /** Every review across a seller's catalogue, newest first. */
+  async listForSeller(sellerId: string): Promise<Review[]> {
+    const owned = await this.products.find({ where: { sellerId } });
+    if (owned.length === 0) return [];
+    const byId = new Map(owned.map((p) => [p.id, p.name]));
+    const rows = await this.reviews.find({
+      where: owned.map((p) => ({ productId: p.id })),
+      order: { createdAt: 'DESC' },
+    });
+    // Attach the product name so the seller UI needn't re-join client-side.
+    return rows.map((r) =>
+      Object.assign(r, { productName: byId.get(r.productId) ?? '' }),
+    );
+  }
+
   async create(
     user: { id: string; name: string },
     input: { productId: string; rating: number; text: string },

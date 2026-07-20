@@ -7,7 +7,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getSellerReturn } from "@/lib/seller-entities";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -40,6 +40,7 @@ export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getSellerReturn } = useSellerData();
   const ret = getSellerReturn(id);
 
   if (!ret) {
