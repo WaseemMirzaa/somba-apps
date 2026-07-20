@@ -25,3 +25,6 @@ export { Promo } from './promo.entity';
 export { FlashSale } from './flash-sale.entity';
 export { CmsBlock } from './cms-block.entity';
 export { Setting } from './setting.entity';
+export { AuditLog } from './audit-log.entity';
+export { FraudAlert } from './fraud-alert.entity';
+export { Broadcast } from './broadcast.entity';

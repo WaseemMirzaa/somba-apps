@@ -28,6 +28,13 @@ import { SupportService } from '../content/support.service';
 import { PromosService } from '../content/promos.service';
 import { CmsService } from '../content/cms.service';
 import { SettingsService } from '../content/settings.service';
+import { SellersService } from '../ops/sellers.service';
+import { AnalyticsService } from '../ops/analytics.service';
+import { AuditService } from '../ops/audit.service';
+import { FraudService } from '../ops/fraud.service';
+import { CustomersService } from '../ops/customers.service';
+import { BroadcastsService } from '../ops/broadcasts.service';
+import { RolesService } from '../ops/roles.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -86,8 +93,19 @@ export class RealtimeGateway
     private readonly promos: PromosService,
     private readonly cms: CmsService,
     private readonly settings: SettingsService,
+    private readonly sellersSvc: SellersService,
+    private readonly analytics: AnalyticsService,
+    private readonly audit: AuditService,
+    private readonly fraud: FraudService,
+    private readonly customers: CustomersService,
+    private readonly broadcasts: BroadcastsService,
+    private readonly roles: RolesService,
     private readonly emitter: RealtimeEmitter,
   ) {}
+
+  private isAdmin(role: string) {
+    return role.startsWith('admin');
+  }
 
   afterInit(server: Server): void {
     this.emitter.register(server);
@@ -256,6 +274,11 @@ export class RealtimeGateway
         { id: user.id, name: user.name },
         body,
       );
+      // Raise a COD-risk fraud alert for large cash orders.
+      if (order.paymentMethod === 'cod') {
+        const cap = Number((await this.settings.get('codCapUsd')) ?? '500');
+        await this.fraud.flagCodRisk(user.name, order.id, order.totalUsd, cap);
+      }
       return ok(order);
     } catch (e) {
       return fail((e as Error).message);
@@ -808,6 +831,234 @@ export class RealtimeGateway
       if (!user.role.startsWith('admin')) return fail('Admins only.');
       await this.categories.remove(body.id);
       return ok({ id: body.id });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Sellers ------------------------------------------------------------
+  @SubscribeMessage('sellers:list')
+  async sellersList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { status?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.sellersSvc.list(body?.status as never));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('sellers:storefront')
+  async sellersStorefront(@MessageBody() body: { id: string }) {
+    const s = await this.sellersSvc.storefront(body.id);
+    return s ? ok(s) : fail('Store not found.');
+  }
+
+  @SubscribeMessage('sellers:register')
+  async sellersRegister(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { name?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(
+        await this.sellersSvc.register({ id: user.id, name: user.name }, body),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('sellers:setStatus')
+  async sellersSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; status: 'approved' | 'rejected' | 'suspended' | 'pending' },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      const seller = await this.sellersSvc.setStatus(body.id, body.status);
+      await this.audit.record({
+        actor: user.name,
+        role: user.role,
+        action: `seller:${body.status}`,
+        entity: 'seller',
+        entityId: body.id,
+      });
+      return ok(seller);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('sellers:stats')
+  async sellersStats(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const seller = await this.sellersSvc.byUser(user.id);
+      const sellerId = seller?.id;
+      if (!sellerId) return ok({ products: 0, orders: 0, revenue: 0, paidOut: 0, pendingPayouts: 0 });
+      return ok(await this.sellersSvc.stats(sellerId));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Analytics ----------------------------------------------------------
+  @SubscribeMessage('analytics:admin')
+  async analyticsAdmin(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
+        return fail('Admins only.');
+      }
+      return ok(await this.analytics.adminStats());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('analytics:warehouse')
+  async analyticsWarehouse(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
+        return fail('Staff only.');
+      }
+      return ok(await this.analytics.warehouseStats());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('analytics:revenue')
+  async analyticsRevenue(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.analytics.revenueSeries());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Audit / fraud / customers / broadcasts / roles (admin) ------------
+  @SubscribeMessage('audit:list')
+  async auditList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.audit.list());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('fraud:list')
+  async fraudList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.fraud.list());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('fraud:setStatus')
+  async fraudSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; status: 'open' | 'reviewed' | 'blocked' },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.fraud.setStatus(body.id, body.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('customers:list')
+  async customersList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.customers.list());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('customers:setActive')
+  async customersSetActive(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; active: boolean },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      await this.customers.setActive(body.id, body.active);
+      return ok({ id: body.id, active: body.active });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('broadcasts:list')
+  async broadcastsList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.broadcasts.list());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('broadcasts:send')
+  async broadcastsSend(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { title: string; body: string; audience?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.broadcasts.send(user.name, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('roles:defs')
+  async rolesDefs() {
+    return ok(this.roles.defs());
+  }
+
+  @SubscribeMessage('roles:staff')
+  async rolesStaff(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.roles.staff());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('roles:setRole')
+  async rolesSetRole(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; role: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin') return fail('Super admin only.');
+      await this.roles.setRole(body.id, body.role as never);
+      return ok({ id: body.id, role: body.role });
     } catch (e) {
       return fail((e as Error).message);
     }

@@ -12,6 +12,7 @@ import { DisputesModule } from '../disputes/disputes.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { AddressesModule } from '../addresses/addresses.module';
 import { ContentModule } from '../content/content.module';
+import { OpsModule } from '../ops/ops.module';
 import { RealtimeGateway } from './realtime.gateway';
 
 @Module({
@@ -29,6 +30,7 @@ import { RealtimeGateway } from './realtime.gateway';
     CatalogModule,
     AddressesModule,
     ContentModule,
+    OpsModule,
   ],
   providers: [RealtimeGateway],
 })

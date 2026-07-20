@@ -11,6 +11,9 @@ import {
   FlashSale,
   CmsBlock,
   Setting,
+  AuditLog,
+  FraudAlert,
+  Broadcast,
   DeliveryTask,
   Dispute,
   Notification,
@@ -45,6 +48,9 @@ const ENTITIES = [
   FlashSale,
   CmsBlock,
   Setting,
+  AuditLog,
+  FraudAlert,
+  Broadcast,
 ];
 
 /**

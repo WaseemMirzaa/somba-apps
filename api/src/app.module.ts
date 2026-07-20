@@ -19,6 +19,7 @@ import { DisputesModule } from './disputes/disputes.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { ContentModule } from './content/content.module';
+import { OpsModule } from './ops/ops.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     CatalogModule,
     AddressesModule,
     ContentModule,
+    OpsModule,
     RealtimeModule,
   ],
   controllers: [AppController],
