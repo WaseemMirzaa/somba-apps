@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/mock_data.dart';
+import '../../data/catalog_live.dart';
 import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -85,7 +86,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     final lang = widget.locale.languageCode;
     _q.text = _ctrl.text;
-    final items = runQuery(products, _q);
+    final items = runQuery(liveCatalog(), _q);
     return Scaffold(
       appBar: backAppBar(context, widget.title ?? widget.category ?? 'Products'),
       body: Column(

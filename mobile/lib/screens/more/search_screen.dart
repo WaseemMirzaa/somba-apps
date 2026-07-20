@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/catalog_live.dart';
 import '../../data/catalog_meta.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_card.dart';
@@ -34,7 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final lang = widget.locale.languageCode;
     _q.text = _ctrl.text;
-    final results = runQuery(products, _q);
+    final results = runQuery(liveCatalog(), _q);
     final t = _ctrl.text.trim().toLowerCase();
     final stores = allSellers.where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
 

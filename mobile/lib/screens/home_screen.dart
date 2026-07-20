@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
+import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -46,6 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Rebuild when the live catalog hydrates/changes over the socket.
+    RealtimeStore.instance.addListener(_onStore);
     _autoplay = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_pageController.hasClients) return;
       final next = (_page + 1) % _banners.length;
@@ -54,8 +58,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _onStore() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    RealtimeStore.instance.removeListener(_onStore);
     _autoplay?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -76,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Recommended feed, filtered by the selected chip in real time.
   List<Product> _feed() {
-    final list = [...products];
+    final list = [...liveCatalog()];
     switch (_feedTab) {
       case 1: // Trending — most reviewed
         list.sort((a, b) => b.reviews.compareTo(a.reviews));
@@ -95,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
-    final deals = products.where((p) => p.discount >= 15).toList();
+    final deals = liveCatalog().where((p) => p.discount >= 15).toList();
     final feed = _feed();
 
     return CustomScrollView(

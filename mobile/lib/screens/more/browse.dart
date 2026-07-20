@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/catalog_live.dart';
 import '../../data/catalog_meta.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
@@ -164,7 +165,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context, q),
-                  child: Text('Show ${runQuery(products, q).length} results'),
+                  child: Text('Show ${runQuery(liveCatalog(), q).length} results'),
                 ),
               ),
             ),

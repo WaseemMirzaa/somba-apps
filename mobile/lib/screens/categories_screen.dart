@@ -1,3 +1,4 @@
+import '../data/catalog_live.dart';
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
 import '../data/catalog_meta.dart';
@@ -78,7 +79,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 const Spacer(),
                 Text(cat.displayName(lang), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 2),
-                Text(s.itemsCount(categoryCount(cat.name)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                Text(s.itemsCount(liveCategoryCount(cat.name)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
               ]),
             ),
           );
@@ -122,7 +123,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               contentPadding: EdgeInsets.zero,
               leading: Container(height: 42, width: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon(c.name), color: AppColors.primary)),
               title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(s.itemsCount(categoryCount(c.name))),
+              subtitle: Text(s.itemsCount(liveCategoryCount(c.name))),
               trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
               onTap: () => _openCategory(c.name),
             )),

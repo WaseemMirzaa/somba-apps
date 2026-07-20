@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/catalog_live.dart';
 import '../../data/catalog_meta.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
@@ -34,14 +35,14 @@ class StoreScreen extends StatelessWidget {
   String get _badgeLabel => (seller?.badge ?? SellerBadge.sombaAssured).label;
   int get _health => seller?.health ?? 97;
   String get _rating => (seller?.rating ?? 4.8).toString();
-  int get _productCount => seller == null ? 128 : products.where((p) => p.category == sellerCategory(seller!)).length;
+  int get _productCount => seller == null ? 128 : liveCatalog().where((p) => p.category == sellerCategory(seller!)).length;
   String get _followers => seller == null ? '12.4k' : '${((seller!.followers) / 1000).toStringAsFixed(1)}k';
   @override
   Widget build(BuildContext context) {
     final lang = locale.languageCode;
     final items = seller == null
-        ? products.take(6).toList()
-        : products.where((p) => p.category == sellerCategory(seller!)).toList();
+        ? liveCatalog().take(6).toList()
+        : liveCatalog().where((p) => p.category == sellerCategory(seller!)).toList();
     return Scaffold(
       body: CustomScrollView(slivers: [
         SliverToBoxAdapter(child: _header(context)),

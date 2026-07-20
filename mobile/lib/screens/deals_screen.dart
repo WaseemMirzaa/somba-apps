@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/mock_data.dart';
+import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
@@ -20,7 +21,7 @@ class _DealsScreenState extends State<DealsScreen> {
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
-    final deals = [...products.where((p) => p.discount >= 15)]
+    final deals = [...liveCatalog().where((p) => p.discount >= 15)]
       ..sort((a, b) => b.discount.compareTo(a.discount));
 
     return Scaffold(
