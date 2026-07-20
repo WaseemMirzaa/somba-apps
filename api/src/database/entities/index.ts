@@ -31,3 +31,15 @@ export { Broadcast } from './broadcast.entity';
 export { Hub } from './hub.entity';
 export { WarehouseBatch } from './warehouse-batch.entity';
 export { StockTransfer } from './stock-transfer.entity';
+export { Campaign } from './campaign.entity';
+export type { CampaignStatus } from './campaign.entity';
+export { Replacement } from './replacement.entity';
+export type { ReplacementStatus } from './replacement.entity';
+export { Exchange } from './exchange.entity';
+export type { ExchangeStatus } from './exchange.entity';
+export { WarehouseException } from './warehouse-exception.entity';
+export type {
+  ExceptionType,
+  ExceptionSeverity,
+  ExceptionStatus,
+} from './warehouse-exception.entity';

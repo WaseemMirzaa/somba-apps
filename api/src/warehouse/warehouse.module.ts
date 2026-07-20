@@ -7,6 +7,7 @@ import {
   Product,
   StockTransfer,
   WarehouseBatch,
+  WarehouseException,
 } from '../database/entities';
 import { WarehouseService } from './warehouse.service';
 import { RiderService } from './rider.service';
@@ -20,6 +21,7 @@ import { RiderService } from './rider.service';
       DeliveryTask,
       Product,
       Order,
+      WarehouseException,
     ]),
   ],
   providers: [WarehouseService, RiderService],

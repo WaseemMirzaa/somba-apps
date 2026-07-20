@@ -8,6 +8,12 @@ import {
   Product,
   StockTransfer,
   WarehouseBatch,
+  WarehouseException,
+} from '../database/entities';
+import type {
+  ExceptionSeverity,
+  ExceptionStatus,
+  ExceptionType,
 } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
@@ -26,8 +32,61 @@ export class WarehouseService {
     private readonly tasks: Repository<DeliveryTask>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(WarehouseException)
+    private readonly exceptions: Repository<WarehouseException>,
     private readonly emitter: RealtimeEmitter,
   ) {}
+
+  // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
+  listExceptions(status?: string): Promise<WarehouseException[]> {
+    return this.exceptions.find({
+      where: status && status !== 'all' ? { status: status as ExceptionStatus } : undefined,
+      order: { createdAt: 'DESC' },
+      take: 200,
+    });
+  }
+
+  async createException(
+    raisedBy: string,
+    input: {
+      taskId?: string;
+      orderReference?: string;
+      type?: ExceptionType;
+      severity?: ExceptionSeverity;
+      hub?: string;
+      notes: string;
+    },
+  ): Promise<WarehouseException> {
+    const exc = await this.exceptions.save(
+      this.exceptions.create({
+        reference: `INC-${Date.now().toString().slice(-8)}`,
+        taskId: input.taskId ?? null,
+        orderReference: input.orderReference ?? null,
+        type: input.type ?? 'other',
+        severity: input.severity ?? 'medium',
+        status: 'open',
+        hub: input.hub ?? null,
+        notes: input.notes,
+        raisedBy,
+      }),
+    );
+    this.emitter.toRoles(OPS_ROOMS, 'exception:updated', exc);
+    return exc;
+  }
+
+  async setExceptionStatus(
+    id: string,
+    status: ExceptionStatus,
+    resolution?: string,
+  ): Promise<WarehouseException> {
+    const exc = await this.exceptions.findOne({ where: { id } });
+    if (!exc) throw new Error('Exception not found.');
+    exc.status = status;
+    if (resolution != null) exc.resolution = resolution;
+    const saved = await this.exceptions.save(exc);
+    this.emitter.toRoles(OPS_ROOMS, 'exception:updated', saved);
+    return saved;
+  }
 
   listHubs(): Promise<Hub[]> {
     return this.hubs.find();

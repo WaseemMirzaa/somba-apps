@@ -14,6 +14,7 @@ import { AddressesModule } from '../addresses/addresses.module';
 import { ContentModule } from '../content/content.module';
 import { OpsModule } from '../ops/ops.module';
 import { WarehouseModule } from '../warehouse/warehouse.module';
+import { FlowsModule } from '../flows/flows.module';
 import { RealtimeGateway } from './realtime.gateway';
 
 @Module({
@@ -33,6 +34,7 @@ import { RealtimeGateway } from './realtime.gateway';
     ContentModule,
     OpsModule,
     WarehouseModule,
+    FlowsModule,
   ],
   providers: [RealtimeGateway],
 })

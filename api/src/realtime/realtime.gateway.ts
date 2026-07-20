@@ -37,6 +37,9 @@ import { BroadcastsService } from '../ops/broadcasts.service';
 import { RolesService } from '../ops/roles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { RiderService } from '../warehouse/rider.service';
+import { CampaignsService } from '../flows/campaigns.service';
+import { ReplacementsService } from '../flows/replacements.service';
+import { ExchangesService } from '../flows/exchanges.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -104,6 +107,9 @@ export class RealtimeGateway
     private readonly roles: RolesService,
     private readonly warehouse: WarehouseService,
     private readonly rider: RiderService,
+    private readonly campaigns: CampaignsService,
+    private readonly replacements: ReplacementsService,
+    private readonly exchanges: ExchangesService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -1228,6 +1234,236 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       return ok(await this.rider.queue(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Marketing campaigns -----------------------------------------------
+  @SubscribeMessage('campaigns:list')
+  async campaignsList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.campaigns.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('campaigns:create')
+  async campaignsCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      name: string;
+      nameFr?: string;
+      discount?: number;
+      productCount?: number;
+      budgetUsd?: number;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller' && !this.isAdmin(user.role)) {
+        return fail('Only sellers or admins can create campaigns.');
+      }
+      if (!body?.name) return fail('name is required.');
+      return ok(await this.campaigns.create(user, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('campaigns:update')
+  async campaignsUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; patch: Record<string, unknown> },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller' && !this.isAdmin(user.role)) {
+        return fail('Not allowed.');
+      }
+      return ok(await this.campaigns.update(body.id, body.patch));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('campaigns:setStatus')
+  async campaignsSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      id: string;
+      status: 'draft' | 'pending' | 'scheduled' | 'active' | 'ended' | 'rejected';
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.campaigns.setStatus(body.id, body.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Replacements -------------------------------------------------------
+  @SubscribeMessage('replacements:list')
+  async replacementsList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.replacements.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('replacements:create')
+  async replacementsCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      orderId: string;
+      sku: string;
+      productName: string;
+      reason?: string;
+      condition?: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.replacements.create(user, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('replacements:setStatus')
+  async replacementsSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      id: string;
+      status: 'requested' | 'approved' | 'received' | 'allocated' | 'dispatched' | 'rejected';
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(await this.replacements.setStatus(body.id, body.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Exchanges ----------------------------------------------------------
+  @SubscribeMessage('exchanges:list')
+  async exchangesList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.exchanges.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('exchanges:create')
+  async exchangesCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      orderId: string;
+      fromSku: string;
+      fromName: string;
+      toSku: string;
+      toName: string;
+      priceDiffUsd?: number;
+      reason?: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.exchanges.create(user, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('exchanges:setStatus')
+  async exchangesSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      id: string;
+      status: 'requested' | 'approved' | 'received' | 'ready' | 'dispatched' | 'rejected';
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(await this.exchanges.setStatus(body.id, body.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Warehouse exceptions ----------------------------------------------
+  @SubscribeMessage('exceptions:list')
+  async exceptionsList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { status?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(await this.warehouse.listExceptions(body?.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('exceptions:create')
+  async exceptionsCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      taskId?: string;
+      orderReference?: string;
+      type?: 'damaged' | 'missing_item' | 'wrong_item' | 'address_issue' | 'lost' | 'other';
+      severity?: 'low' | 'medium' | 'high';
+      hub?: string;
+      notes: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!body?.notes) return fail('notes is required.');
+      return ok(await this.warehouse.createException(user.name, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('exceptions:setStatus')
+  async exceptionsSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: {
+      id: string;
+      status: 'open' | 'investigating' | 'resolved' | 'escalated';
+      resolution?: string;
+    },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(
+        await this.warehouse.setExceptionStatus(body.id, body.status, body.resolution),
+      );
     } catch (e) {
       return fail((e as Error).message);
     }

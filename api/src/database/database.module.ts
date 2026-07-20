@@ -17,6 +17,10 @@ import {
   Hub,
   WarehouseBatch,
   StockTransfer,
+  Campaign,
+  Replacement,
+  Exchange,
+  WarehouseException,
   DeliveryTask,
   Dispute,
   Notification,
@@ -57,6 +61,10 @@ const ENTITIES = [
   Hub,
   WarehouseBatch,
   StockTransfer,
+  Campaign,
+  Replacement,
+  Exchange,
+  WarehouseException,
 ];
 
 /**

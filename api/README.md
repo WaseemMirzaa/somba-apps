@@ -101,11 +101,16 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `audit:list`, `fraud:list/setStatus`, `customers:list/setActive` | admin ops | admin |
 | `broadcasts:list/send`, `roles:defs/staff/setRole` | marketing + roles | admin |
 | `warehouse:hubs/parcels/aged/inventory/batches/buildBatch/reconcile/transfers` | WMS | staff |
-| `rider:earnings` | rider shift summary | rider |
+| `rider:earnings` / `rider:tasks` | rider shift summary + enriched queue | rider |
+| `campaigns:list/create/update/setStatus` | seller marketing campaigns | seller/admin |
+| `replacements:list/create/setStatus` | item replacements | customer/ops |
+| `exchanges:list/create/setStatus` | item exchanges | customer/ops |
+| `exceptions:list/create/setStatus` | warehouse parcel incidents | staff |
 | `notifications:list` / `notifications:markRead` | `{id}` | all |
 
-**81 realtime handlers across 16 domain modules and 26 entities** cover every
-portal (customer, seller, admin, warehouse, rider).
+**94 realtime handlers across 17 domain modules and 30 entities** cover every
+portal (customer, seller, admin, warehouse, rider) — including marketing
+campaigns, replacements, exchanges, and warehouse exceptions.
 
 ### Server → client (pushed live, no polling)
 
@@ -121,6 +126,9 @@ portal (customer, seller, admin, warehouse, rider).
 | `payment:created` / `payment:updated` | charge/refund → customer + finance |
 | `payout:created` / `payout:updated` | payout lifecycle → seller + finance |
 | `dispute:created` / `dispute:updated` | dispute lifecycle → customer + admins |
+| `campaign:updated` | campaign created/approved → seller + marketing |
+| `replacement:updated` / `exchange:updated` | RMA lifecycle → customer + ops |
+| `exception:updated` | parcel incident raised/resolved → ops |
 
 ## Environment
 

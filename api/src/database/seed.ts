@@ -4,21 +4,25 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../app.module';
 import {
+  Campaign,
   Category,
   CmsBlock,
   DeliveryTask,
+  Exchange,
   Notification,
   Order,
   OrderItem,
   Payment,
   Product,
   Promo,
+  Replacement,
   Review,
   Seller,
   Hub,
   Setting,
   User,
   WalletTransaction,
+  WarehouseException,
 } from './entities';
 import { UsersService } from '../users/users.service';
 import { OrdersService } from '../orders/orders.service';
@@ -85,6 +89,10 @@ async function run() {
   await wipe(CmsBlock);
   await wipe(Setting);
   await wipe(Review);
+  await wipe(Campaign);
+  await wipe(Replacement);
+  await wipe(Exchange);
+  await wipe(WarehouseException);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const userRepo = ds.getRepository(User);
@@ -264,6 +272,109 @@ async function run() {
       }
     }
   }
+
+  // ── Marketing campaigns, replacements, exchanges, exceptions ────────────────
+  console.log('Seeding campaigns / replacements / exchanges / exceptions…');
+  const campaignRepo = ds.getRepository(Campaign);
+  await campaignRepo.save([
+    campaignRepo.create({
+      reference: 'CMP-0001',
+      sellerId: seller.id,
+      sellerName: seller.name,
+      name: 'Kinshasa Electronics Week',
+      nameFr: "Semaine électronique Kinshasa",
+      discount: 20,
+      productCount: Math.min(4, CATALOG.length),
+      budgetUsd: 500,
+      startDate: '2026-07-15',
+      endDate: '2026-07-30',
+      status: 'active',
+      views: 1240,
+      clicks: 210,
+      orders: 18,
+      revenueUsd: 4210,
+    }),
+    campaignRepo.create({
+      reference: 'CMP-0002',
+      sellerId: seller.id,
+      sellerName: seller.name,
+      name: 'Weekend Flash',
+      nameFr: 'Flash du week-end',
+      discount: 30,
+      productCount: 2,
+      budgetUsd: 200,
+      startDate: '2026-08-01',
+      endDate: '2026-08-03',
+      status: 'pending',
+    }),
+  ]);
+
+  const allOrders = await orderRepo.find({ order: { createdAt: 'DESC' } });
+  const firstOrder = allOrders[0];
+  const deliveredOrder = allOrders.find((o) => o.status === 'delivered');
+  if (deliveredOrder) {
+    const repRepo = ds.getRepository(Replacement);
+    const item = deliveredOrder.items?.[0];
+    await repRepo.save(
+      repRepo.create({
+        reference: 'REP-0001',
+        orderId: deliveredOrder.id,
+        orderReference: deliveredOrder.reference,
+        customerId: deliveredOrder.customerId,
+        customerName: deliveredOrder.customerName,
+        sellerId: seller.id,
+        sku: item ? `SKU-${item.productId.slice(0, 6)}` : 'SKU-000000',
+        productName: item?.productName ?? 'Product',
+        reason: 'Defective on arrival',
+        condition: 'Damaged',
+        status: 'approved',
+        dispatchStatus: 'pending',
+      }),
+    );
+    const exRepo = ds.getRepository(Exchange);
+    await exRepo.save(
+      exRepo.create({
+        reference: 'EXC-0001',
+        orderId: deliveredOrder.id,
+        orderReference: deliveredOrder.reference,
+        customerId: deliveredOrder.customerId,
+        customerName: deliveredOrder.customerName,
+        fromSku: item ? `SKU-${item.productId.slice(0, 6)}` : 'SKU-000000',
+        fromName: item?.productName ?? 'Product',
+        toSku: 'SKU-VARIANT',
+        toName: `${item?.productName ?? 'Product'} (alt variant)`,
+        priceDiffUsd: 15,
+        reason: 'Wrong size',
+        status: 'requested',
+      }),
+    );
+  }
+
+  const excRepo = ds.getRepository(WarehouseException);
+  const anyTask = await taskRepo.findOne({ where: {} });
+  await excRepo.save([
+    excRepo.create({
+      reference: 'INC-0001',
+      taskId: anyTask?.id ?? null,
+      orderReference: firstOrder?.reference ?? null,
+      type: 'missing_item',
+      severity: 'high',
+      status: 'open',
+      hub: 'Kinshasa Hub',
+      notes: 'Parcel arrived with one item missing — awaiting seller response.',
+      raisedBy: 'Hub Kinshasa',
+    }),
+    excRepo.create({
+      reference: 'INC-0002',
+      orderReference: firstOrder?.reference ?? null,
+      type: 'damaged',
+      severity: 'medium',
+      status: 'investigating',
+      hub: 'Kinshasa Hub',
+      notes: 'Outer box crushed in transit; inspecting contents.',
+      raisedBy: 'Hub Kinshasa',
+    }),
+  ]);
 
   console.log('\n✅ Seed complete.');
   console.log(`   Users: ${DEMO_USERS.length}  ·  Products: ${CATALOG.length}`);
