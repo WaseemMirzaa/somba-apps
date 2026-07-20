@@ -14,6 +14,7 @@ import {
   Promo,
   Review,
   Seller,
+  Hub,
   Setting,
   User,
   WalletTransaction,
@@ -76,6 +77,11 @@ async function run() {
   await wipe(Seller);
   await wipe(User);
   await wipe(Category);
+  await wipe(Hub);
+  await wipe(Promo);
+  await wipe(CmsBlock);
+  await wipe(Setting);
+  await wipe(Review);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const userRepo = ds.getRepository(User);
@@ -166,6 +172,12 @@ async function run() {
   await cmsRepo.save([
     cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa & Paris.', type: 'banner', active: true }),
     cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
+  ]);
+  const hubRepo = ds.getRepository(Hub);
+  await hubRepo.save([
+    hubRepo.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
+    hubRepo.create({ name: 'Lubumbashi Hub', city: 'Lubumbashi', country: 'DRC', capacity: 400 }),
+    hubRepo.create({ name: 'Paris Hub', city: 'Paris', country: 'France', capacity: 600 }),
   ]);
   const setRepo = ds.getRepository(Setting);
   await setRepo.save([

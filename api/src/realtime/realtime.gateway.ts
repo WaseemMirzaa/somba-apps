@@ -35,6 +35,8 @@ import { FraudService } from '../ops/fraud.service';
 import { CustomersService } from '../ops/customers.service';
 import { BroadcastsService } from '../ops/broadcasts.service';
 import { RolesService } from '../ops/roles.service';
+import { WarehouseService } from '../warehouse/warehouse.service';
+import { RiderService } from '../warehouse/rider.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -100,8 +102,14 @@ export class RealtimeGateway
     private readonly customers: CustomersService,
     private readonly broadcasts: BroadcastsService,
     private readonly roles: RolesService,
+    private readonly warehouse: WarehouseService,
+    private readonly rider: RiderService,
     private readonly emitter: RealtimeEmitter,
   ) {}
+
+  private isOps(role: string) {
+    return role.startsWith('admin') || role === 'warehouse_staff';
+  }
 
   private isAdmin(role: string) {
     return role.startsWith('admin');
@@ -1059,6 +1067,124 @@ export class RealtimeGateway
       if (user.role !== 'admin') return fail('Super admin only.');
       await this.roles.setRole(body.id, body.role as never);
       return ok({ id: body.id, role: body.role });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Warehouse (staff/admin) -------------------------------------------
+  @SubscribeMessage('warehouse:hubs')
+  async whHubs(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.listHubs());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:parcels')
+  async whParcels(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { stage?: string },
+  ) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.parcels(body?.stage));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:aged')
+  async whAged(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.aged());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:inventory')
+  async whInventory(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.inventory());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:batches')
+  async whBatches(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.listBatches());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:buildBatch')
+  async whBuildBatch(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: { hubId?: string; taskIds: string[]; riderId: string; riderName?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      return ok(
+        await this.warehouse.buildBatch(body.hubId ?? null, body.taskIds ?? [], {
+          id: body.riderId,
+          name: body.riderName ?? 'Rider',
+        }),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:reconcile')
+  async whReconcile(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.reconcile());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:transfers')
+  async whTransfers(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.listTransfers());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('warehouse:createTransfer')
+  async whCreateTransfer(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      return ok(await this.warehouse.createTransfer(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Rider earnings -----------------------------------------------------
+  @SubscribeMessage('rider:earnings')
+  async riderEarnings(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.rider.earnings(user.id));
     } catch (e) {
       return fail((e as Error).message);
     }

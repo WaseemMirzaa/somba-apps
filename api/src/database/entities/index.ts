@@ -28,3 +28,6 @@ export { Setting } from './setting.entity';
 export { AuditLog } from './audit-log.entity';
 export { FraudAlert } from './fraud-alert.entity';
 export { Broadcast } from './broadcast.entity';
+export { Hub } from './hub.entity';
+export { WarehouseBatch } from './warehouse-batch.entity';
+export { StockTransfer } from './stock-transfer.entity';

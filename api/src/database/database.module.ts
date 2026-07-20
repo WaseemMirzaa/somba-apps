@@ -14,6 +14,9 @@ import {
   AuditLog,
   FraudAlert,
   Broadcast,
+  Hub,
+  WarehouseBatch,
+  StockTransfer,
   DeliveryTask,
   Dispute,
   Notification,
@@ -51,6 +54,9 @@ const ENTITIES = [
   AuditLog,
   FraudAlert,
   Broadcast,
+  Hub,
+  WarehouseBatch,
+  StockTransfer,
 ];
 
 /**
