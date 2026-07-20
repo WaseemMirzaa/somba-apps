@@ -11,21 +11,21 @@ import { sellerEntities } from "@/lib/entities";
  * localStorage so the demo survives reloads.
  */
 
-type BlockedSeller = { id: number; reason?: string; at: string };
-type BlockedProduct = { id: number; reason?: string; at: string };
+type BlockedSeller = { id: number | string; reason?: string; at: string };
+type BlockedProduct = { id: number | string; reason?: string; at: string };
 
 type ModerationContextType = {
   blockedSellers: BlockedSeller[];
   blockedProducts: BlockedProduct[];
-  isSellerBlocked: (id: number) => boolean;
+  isSellerBlocked: (id: number | string) => boolean;
   isStoreBlocked: (storeName: string) => boolean;
   isProductBlocked: (id: number | string) => boolean;
   /** A product is hidden from customers if it — or its store — is blocked. */
   isProductVisible: (product: { id: number | string; seller: string }) => boolean;
-  blockSeller: (id: number, reason?: string) => void;
-  unblockSeller: (id: number) => void;
-  blockProduct: (id: number, reason?: string) => void;
-  unblockProduct: (id: number) => void;
+  blockSeller: (id: number | string, reason?: string) => void;
+  unblockSeller: (id: number | string) => void;
+  blockProduct: (id: number | string, reason?: string) => void;
+  unblockProduct: (id: number | string) => void;
 };
 
 const ModerationContext = createContext<ModerationContextType | null>(null);
@@ -65,7 +65,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   }, [blockedSellers]);
 
   const isSellerBlocked = useCallback(
-    (id: number) => blockedSellers.some((s) => s.id === id),
+    (id: number | string) => blockedSellers.some((s) => s.id === id),
     [blockedSellers]
   );
 
@@ -86,7 +86,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   );
 
   const blockSeller = useCallback(
-    (id: number, reason?: string) => {
+    (id: number | string, reason?: string) => {
       setBlockedSellers((prev) => {
         if (prev.some((s) => s.id === id)) return prev;
         const next = [...prev, { id, reason, at: new Date().toISOString() }];
@@ -98,7 +98,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   );
 
   const unblockSeller = useCallback(
-    (id: number) => {
+    (id: number | string) => {
       setBlockedSellers((prev) => {
         const next = prev.filter((s) => s.id !== id);
         persist(next, blockedProducts);
@@ -109,7 +109,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   );
 
   const blockProduct = useCallback(
-    (id: number, reason?: string) => {
+    (id: number | string, reason?: string) => {
       setBlockedProducts((prev) => {
         if (prev.some((p) => p.id === id)) return prev;
         const next = [...prev, { id, reason, at: new Date().toISOString() }];
@@ -121,7 +121,7 @@ export function ModerationProvider({ children }: { children: React.ReactNode }) 
   );
 
   const unblockProduct = useCallback(
-    (id: number) => {
+    (id: number | string) => {
       setBlockedProducts((prev) => {
         const next = prev.filter((p) => p.id !== id);
         persist(blockedSellers, next);

@@ -10,7 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { Shield, AlertTriangle, Ban } from "lucide-react";
-import { fraudAlerts } from "@/lib/admin-entities";
+import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
 
@@ -43,6 +43,7 @@ const STATUS_OPTIONS = [
 export default function AdminFraudPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { fraudAlerts } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -52,7 +53,7 @@ export default function AdminFraudPage() {
         dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    [fraudAlerts, filters]
   );
 
   return (

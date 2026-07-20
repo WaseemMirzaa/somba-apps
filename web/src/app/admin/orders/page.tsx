@@ -10,7 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { orderEntities } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -34,6 +34,7 @@ const PAYMENT_METHOD_FR: Record<string, string> = {
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { orderEntities } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -43,7 +44,7 @@ export default function AdminOrdersPage() {
         dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    [orderEntities, filters]
   );
 
   return (

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { sellerEntities } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 import { useModeration } from "@/context/moderation-context";
@@ -36,6 +36,7 @@ export default function AdminSellersPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { isSellerBlocked, blockSeller, unblockSeller } = useModeration();
+  const { sellerEntities } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -45,7 +46,7 @@ export default function AdminSellersPage() {
         dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    [sellerEntities, filters]
   );
 
   return (
@@ -97,7 +98,7 @@ export default function AdminSellersPage() {
                 key: "status",
                 label: t("status"),
                 render: (row) =>
-                  isSellerBlocked(Number(row.id)) ? (
+                  isSellerBlocked(String(row.id)) ? (
                     <Badge variant="danger">{fr ? "Bloqué" : "Blocked"}</Badge>
                   ) : (
                     <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
@@ -110,7 +111,7 @@ export default function AdminSellersPage() {
                 key: "actions",
                 label: t("action"),
                 render: (row) => {
-                  const blocked = isSellerBlocked(Number(row.id));
+                  const blocked = isSellerBlocked(String(row.id));
                   return (
                     <div className="flex items-center gap-3">
                       <Link href={`/admin/sellers/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
@@ -119,10 +120,10 @@ export default function AdminSellersPage() {
                       <button
                         onClick={() => {
                           if (blocked) {
-                            unblockSeller(Number(row.id));
+                            unblockSeller(String(row.id));
                             toast(fr ? `${row.storeName} débloqué` : `${row.storeName} unblocked`);
                           } else {
-                            blockSeller(Number(row.id));
+                            blockSeller(String(row.id));
                             toast(fr ? `${row.storeName} bloqué` : `${row.storeName} blocked`, "info");
                           }
                         }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,8 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
-import { adminPayoutEntities, type AdminPayoutEntity, type AdminPayoutStatus } from "@/lib/admin-entities";
+import { useAdminData } from "@/lib/admin";
+import { type AdminPayoutEntity, type AdminPayoutStatus } from "@/lib/admin-entities";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -40,8 +41,13 @@ export default function AdminPayoutsPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
+  const { adminPayoutEntities } = useAdminData();
   const [payouts, setPayouts] = useState<AdminPayoutEntity[]>(adminPayoutEntities);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+
+  useEffect(() => {
+    setPayouts(adminPayoutEntities);
+  }, [adminPayoutEntities]);
 
   const filtered = useMemo(
     () =>

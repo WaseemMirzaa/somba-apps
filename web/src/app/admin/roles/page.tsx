@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { adminRoles as initialRoles } from "@/lib/admin-entities";
+import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb, permissionLabel } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -30,7 +30,7 @@ const ROLE_MANAGERS: Record<string, string> = {
   warehouse: "warehouse-admin@somba.com",
 };
 
-function roleDisplayName(role: (typeof initialRoles)[number], fr: boolean) {
+function roleDisplayName(role: { id: string; name: string }, fr: boolean) {
   return fr ? (ROLE_NAMES_FR[role.id] ?? role.name) : role.name;
 }
 
@@ -38,8 +38,10 @@ export default function AdminRolesPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { adminRoles } = useAdminData();
   const [editingRole, setEditingRole] = useState<string | null>(null);
-  const [roles] = useState(initialRoles);
+  const [roles, setRoles] = useState(adminRoles);
+  useEffect(() => setRoles(adminRoles), [adminRoles]);
 
   return (
     <div className="space-y-6">

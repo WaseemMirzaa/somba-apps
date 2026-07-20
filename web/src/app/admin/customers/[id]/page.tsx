@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { getCustomer, orderEntities } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -26,8 +26,13 @@ export default function AdminCustomerDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const customer = getCustomer(Number(id));
+  const { getCustomer, orderEntities } = useAdminData();
+  const customer = getCustomer(id);
   const [status, setStatus] = useState(customer?.status ?? "active");
+
+  useEffect(() => {
+    setStatus(customer?.status ?? "active");
+  }, [customer?.status]);
 
   if (!customer) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Client introuvable" : "Customer not found"}</div>;

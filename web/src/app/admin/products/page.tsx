@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { moderationQueue } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 
@@ -37,6 +37,7 @@ const CATEGORY_FR: Record<string, string> = {
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { moderationQueue } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -46,7 +47,7 @@ export default function AdminProductsPage() {
         dateField: "submittedDate",
         statusField: "status",
       }),
-    [filters]
+    [moderationQueue, filters]
   );
 
   return (

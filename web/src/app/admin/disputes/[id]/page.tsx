@@ -14,7 +14,7 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DisputeChat } from "@/components/disputes/dispute-chat";
 import { useDisputes } from "@/context/dispute-context";
 import { useToast } from "@/context/toast-context";
-import { getOrder } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -71,6 +71,7 @@ function disputeStatusVariant(status: string): "success" | "warning" | "info" | 
 export default function AdminDisputeResolutionPage() {
   const { id } = useParams<{ id: string }>();
   const { getDispute, addMessage, resolveDispute } = useDisputes();
+  const { getOrder } = useAdminData();
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";

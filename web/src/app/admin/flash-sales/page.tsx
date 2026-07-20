@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { flashSales as initialSales } from "@/lib/admin-entities";
+import { useAdminData } from "@/lib/admin";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
@@ -15,7 +15,9 @@ export default function AdminFlashSalesPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const [sales, setSales] = useState(initialSales);
+  const { flashSales } = useAdminData();
+  const [sales, setSales] = useState(flashSales);
+  useEffect(() => setSales(flashSales), [flashSales]);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [discount, setDiscount] = useState("");

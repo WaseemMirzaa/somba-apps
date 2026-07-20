@@ -9,7 +9,8 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getSeller, orderEntities, sellerProductDetails } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
+import { sellerProductDetails } from "@/lib/entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -42,7 +43,8 @@ export default function AdminSellerDetailPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { isSellerBlocked, blockSeller, unblockSeller } = useModeration();
-  const seller = getSeller(Number(id));
+  const { getSeller, orderEntities } = useAdminData();
+  const seller = getSeller(id);
 
   if (!seller) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Vendeur introuvable" : "Seller not found"}</div>;

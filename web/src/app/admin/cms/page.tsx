@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cmsBlocks as initialBlocks } from "@/lib/admin-entities";
+import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb, cmsBlockTitle, cmsBlockTypeLabel } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -15,7 +15,9 @@ export default function AdminCmsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const [blocks, setBlocks] = useState(initialBlocks);
+  const { cmsBlocks } = useAdminData();
+  const [blocks, setBlocks] = useState(cmsBlocks);
+  useEffect(() => setBlocks(cmsBlocks), [cmsBlocks]);
   const [editing, setEditing] = useState<string | null>(null);
 
   return (

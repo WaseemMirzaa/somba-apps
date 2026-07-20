@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
-import { getModerationProduct } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -43,8 +43,9 @@ export default function AdminProductModerationDetailPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { isProductBlocked, blockProduct, unblockProduct } = useModeration();
+  const { getModerationProduct } = useAdminData();
   const router = useRouter();
-  const product = getModerationProduct(Number(id));
+  const product = getModerationProduct(id);
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "changes_requested">(product?.status ?? "pending");
   const [notes, setNotes] = useState("");
 

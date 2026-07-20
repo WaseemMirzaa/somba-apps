@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { moderationQueue as initialQueue } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 
@@ -24,10 +24,12 @@ export default function AdminModerationPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const [queue, setQueue] = useState(initialQueue);
+  const { moderationQueue } = useAdminData();
+  const [queue, setQueue] = useState(moderationQueue);
+  useEffect(() => setQueue(moderationQueue), [moderationQueue]);
   const pending = queue.filter((p) => p.status === "pending");
 
-  function updateStatus(id: number, status: "approved" | "rejected") {
+  function updateStatus(id: string, status: "approved" | "rejected") {
     setQueue((q) => q.map((p) => (p.id === id ? { ...p, status } : p)));
     toast(fr ? `Produit ${status === "approved" ? "approuvé" : "rejeté"}` : `Product ${status}`);
   }

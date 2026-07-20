@@ -37,7 +37,7 @@ import {
 import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { orderEntities, sellerEntities } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import {
   adminRevenueTrend,
   adminExtendedKpis,
@@ -81,6 +81,7 @@ export default function AdminDashboard() {
   const fr = locale === "fr";
   const [period, setPeriod] = useState<AnalyticsPeriod>("30D");
   const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
+  const { orderEntities, sellerEntities } = useAdminData();
   const k = adminExtendedKpis;
 
   const revenueSpark = adminRevenueTrend.map((d) => d.revenue);

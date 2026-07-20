@@ -10,7 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { customerEntities } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -27,6 +27,7 @@ const STATUS_FR: Record<string, string> = {
 export default function AdminCustomersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { customerEntities } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -35,7 +36,7 @@ export default function AdminCustomersPage() {
         searchFields: ["id", "name", "email", "phone", "city"],
         statusField: "status",
       }),
-    [filters]
+    [customerEntities, filters]
   );
 
   return (

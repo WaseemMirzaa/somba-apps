@@ -10,7 +10,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { getOrder } from "@/lib/entities";
+import { useAdminData } from "@/lib/admin";
 import { getReturn } from "@/lib/warehouse-entities";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -86,6 +86,7 @@ export default function AdminReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getOrder } = useAdminData();
   const ret = getReturn(id);
   const order = ret ? getOrder(ret.orderId) : undefined;
 

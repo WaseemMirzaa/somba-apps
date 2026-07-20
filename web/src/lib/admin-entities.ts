@@ -41,7 +41,7 @@ export type AdminPayoutStatus = "requested" | "approved" | "rejected" | "paid";
 
 export type AdminPayoutEntity = {
   id: string;
-  sellerId: number;
+  sellerId: string | number;
   seller: string;
   amount: number;
   method: string;
