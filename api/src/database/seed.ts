@@ -5,12 +5,16 @@ import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../app.module';
 import {
   Category,
+  CmsBlock,
   DeliveryTask,
   Notification,
   Order,
   OrderItem,
   Product,
+  Promo,
+  Review,
   Seller,
+  Setting,
   User,
   WalletTransaction,
 } from './entities';
@@ -150,6 +154,34 @@ async function run() {
         sortOrder: i,
       }),
     );
+  }
+
+  console.log('Seeding promos, CMS, settings…');
+  const promoRepo = ds.getRepository(Promo);
+  await promoRepo.save([
+    promoRepo.create({ code: 'SOMBA10', type: 'percent', value: 10, minOrder: 50, description: '10% off orders over $50', active: true }),
+    promoRepo.create({ code: 'SAVE20', type: 'fixed', value: 20, minOrder: 100, description: '$20 off orders over $100', active: true }),
+  ]);
+  const cmsRepo = ds.getRepository(CmsBlock);
+  await cmsRepo.save([
+    cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa & Paris.', type: 'banner', active: true }),
+    cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
+  ]);
+  const setRepo = ds.getRepository(Setting);
+  await setRepo.save([
+    setRepo.create({ key: 'fxRate', value: '2850' }),
+    setRepo.create({ key: 'codCapUsd', value: '500' }),
+    setRepo.create({ key: 'commissionPct', value: '12' }),
+  ]);
+
+  // A couple of seed reviews on the first product.
+  const firstProduct = await productRepo.findOne({ where: {} });
+  if (firstProduct) {
+    const reviewRepo = ds.getRepository(Review);
+    await reviewRepo.save([
+      reviewRepo.create({ productId: firstProduct.id, userId: 'seed', author: 'Marie D.', rating: 5, text: 'Excellent product, fast delivery!' }),
+      reviewRepo.create({ productId: firstProduct.id, userId: 'seed', author: 'Jean K.', rating: 4, text: 'Good value for money.' }),
+    ]);
   }
 
   console.log('\n✅ Seed complete.');

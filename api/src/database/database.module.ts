@@ -4,6 +4,13 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import {
   Address,
   Category,
+  Review,
+  ProductQuestion,
+  SupportTicket,
+  Promo,
+  FlashSale,
+  CmsBlock,
+  Setting,
   DeliveryTask,
   Dispute,
   Notification,
@@ -31,6 +38,13 @@ const ENTITIES = [
   Dispute,
   Category,
   Address,
+  Review,
+  ProductQuestion,
+  SupportTicket,
+  Promo,
+  FlashSale,
+  CmsBlock,
+  Setting,
 ];
 
 /**

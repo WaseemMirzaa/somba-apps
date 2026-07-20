@@ -23,6 +23,11 @@ import { PayoutsService } from '../payouts/payouts.service';
 import { DisputesService } from '../disputes/disputes.service';
 import { CategoriesService } from '../catalog/categories.service';
 import { AddressesService } from '../addresses/addresses.service';
+import { ReviewsService } from '../content/reviews.service';
+import { SupportService } from '../content/support.service';
+import { PromosService } from '../content/promos.service';
+import { CmsService } from '../content/cms.service';
+import { SettingsService } from '../content/settings.service';
 import { RealtimeEmitter } from './realtime-emitter';
 import type {
   DeliveryStatus,
@@ -76,6 +81,11 @@ export class RealtimeGateway
     private readonly disputes: DisputesService,
     private readonly categories: CategoriesService,
     private readonly addresses: AddressesService,
+    private readonly reviews: ReviewsService,
+    private readonly support: SupportService,
+    private readonly promos: PromosService,
+    private readonly cms: CmsService,
+    private readonly settings: SettingsService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -565,6 +575,238 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       await this.addresses.remove(user.id, body.id);
+      return ok({ id: body.id });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Reviews & Q&A (public read; customer writes) ----------------------
+  @SubscribeMessage('reviews:list')
+  async reviewsList(@MessageBody() body: { productId: string }) {
+    return ok(await this.reviews.listForProduct(body.productId));
+  }
+
+  @SubscribeMessage('reviews:create')
+  async reviewsCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { productId: string; rating: number; text: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(
+        await this.reviews.create({ id: user.id, name: user.name }, body),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('questions:list')
+  async questionsList(@MessageBody() body: { productId: string }) {
+    return ok(await this.reviews.listQuestions(body.productId));
+  }
+
+  @SubscribeMessage('questions:ask')
+  async questionsAsk(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { productId: string; question: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.reviews.ask({ id: user.id, name: user.name }, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('questions:answer')
+  async questionsAnswer(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; answer: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role === 'customer') return fail('Not allowed.');
+      return ok(await this.reviews.answer(body.id, body.answer, user.name));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Support tickets ----------------------------------------------------
+  @SubscribeMessage('support:list')
+  async supportList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      return ok(await this.support.list(this.requireUser(client)));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('support:open')
+  async supportOpen(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: { subject: string; category?: string; message: string; orderId?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.support.open({ id: user.id, name: user.name }, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('support:reply')
+  async supportReply(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; text: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(
+        await this.support.reply(body.id, { name: user.name, role: user.role }, body.text),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('support:setStatus')
+  async supportSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; status: 'open' | 'pending' | 'resolved' | 'closed' },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role === 'customer') return fail('Not allowed.');
+      return ok(await this.support.setStatus(body.id, body.status));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Promotions & flash sales ------------------------------------------
+  @SubscribeMessage('promos:list')
+  async promosList() {
+    return ok(await this.promos.list());
+  }
+
+  @SubscribeMessage('promos:validate')
+  async promosValidate(@MessageBody() body: { code: string; subtotalUsd: number }) {
+    return ok(await this.promos.validate(body.code, body.subtotalUsd));
+  }
+
+  @SubscribeMessage('promos:create')
+  async promosCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.promos.create(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('flashsales:list')
+  async flashSalesList() {
+    return ok(await this.promos.listFlashSales());
+  }
+
+  @SubscribeMessage('flashsales:create')
+  async flashSalesCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.promos.createFlashSale(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- CMS + settings + categories CRUD (admin) --------------------------
+  @SubscribeMessage('cms:list')
+  async cmsList() {
+    return ok(await this.cms.list());
+  }
+
+  @SubscribeMessage('cms:upsert')
+  async cmsUpsert(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { key: string } & Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.cms.upsert(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('settings:get')
+  async settingsGet() {
+    return ok(await this.settings.all());
+  }
+
+  @SubscribeMessage('settings:set')
+  async settingsSet(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { key: string; value: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.settings.set(body.key, body.value));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('categories:create')
+  async categoriesCreate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.categories.create(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('categories:update')
+  async categoriesUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; patch: Record<string, unknown> },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      return ok(await this.categories.update(body.id, body.patch));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('categories:remove')
+  async categoriesRemove(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      await this.categories.remove(body.id);
       return ok({ id: body.id });
     } catch (e) {
       return fail((e as Error).message);
