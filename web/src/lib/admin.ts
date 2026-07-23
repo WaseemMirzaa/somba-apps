@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Dispute, Order, Payout, Product, Seller } from "@/lib/realtime/types";
@@ -354,7 +354,7 @@ function buildAdminData(
 
 export type AdminData = ReturnType<typeof buildAdminData>;
 
-export function useAdminData(): AdminData {
+export function useAdminData() {
   const rt = useRealtime();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -368,40 +368,37 @@ export function useAdminData(): AdminData {
 
   const isAdmin = rt.user?.role?.startsWith("admin") ?? false;
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (rt.status !== "connected" || !isAdmin) return;
-    let alive = true;
-    (async () => {
-      const req = <T,>(ev: string, fallback: T) =>
-        socketClient.request<T>(ev).catch(() => fallback);
-      const [st, cus, sel, aud, fr, fl, cm, rl, br] = await Promise.all([
-        req<AdminStats | null>("analytics:admin", null),
-        req<CustomerRow[]>("customers:list", []),
-        req<Seller[]>("sellers:list", []),
-        req<AuditRow[]>("audit:list", []),
-        req<FraudRow[]>("fraud:list", []),
-        req<FlashSaleRow[]>("flashsales:list", []),
-        req<CmsRow[]>("cms:list", []),
-        req<RoleDef[]>("roles:defs", []),
-        req<Broadcast[]>("broadcasts:list", []),
-      ]);
-      if (!alive) return;
-      setStats(st);
-      setCustomers(cus ?? []);
-      setSellers(sel ?? []);
-      setAudit(aud ?? []);
-      setFraud(fr ?? []);
-      setFlash(fl ?? []);
-      setCms(cm ?? []);
-      setRoles(rl ?? []);
-      setBroadcasts(br ?? []);
-    })();
-    return () => {
-      alive = false;
-    };
+    const req = <T,>(ev: string, fallback: T) =>
+      socketClient.request<T>(ev).catch(() => fallback);
+    const [st, cus, sel, aud, fr, fl, cm, rl, br] = await Promise.all([
+      req<AdminStats | null>("analytics:admin", null),
+      req<CustomerRow[]>("customers:list", []),
+      req<Seller[]>("sellers:list", []),
+      req<AuditRow[]>("audit:list", []),
+      req<FraudRow[]>("fraud:list", []),
+      req<FlashSaleRow[]>("flashsales:list", []),
+      req<CmsRow[]>("cms:list", []),
+      req<RoleDef[]>("roles:defs", []),
+      req<Broadcast[]>("broadcasts:list", []),
+    ]);
+    setStats(st);
+    setCustomers(cus ?? []);
+    setSellers(sel ?? []);
+    setAudit(aud ?? []);
+    setFraud(fr ?? []);
+    setFlash(fl ?? []);
+    setCms(cm ?? []);
+    setRoles(rl ?? []);
+    setBroadcasts(br ?? []);
   }, [rt.status, isAdmin]);
 
-  return useMemo(
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const data = useMemo(
     () =>
       buildAdminData(
         rt.orders,
@@ -420,4 +417,43 @@ export function useAdminData(): AdminData {
       ),
     [rt.orders, rt.products, rt.payouts, rt.disputes, stats, customers, sellers, audit, fraud, flash, cms, roles, broadcasts],
   );
+
+  // ── Write actions: call the live handler, then refresh the one-shot lists ──
+  const actions = useMemo(() => {
+    const run = async <T,>(ev: string, body?: Record<string, unknown>) => {
+      const res = await socketClient.request<T>(ev, body);
+      void refresh();
+      return res;
+    };
+    return {
+      refresh,
+      setSellerStatus: (id: string, status: "approved" | "rejected" | "suspended" | "pending") =>
+        run("sellers:setStatus", { id, status }),
+      moderateProduct: (id: string, approve: boolean) =>
+        run("products:update", { id, patch: { status: approve ? "live" : "rejected" } }),
+      deleteProduct: (id: string) => run("products:delete", { id }),
+      resolveDispute: (disputeId: string, refund = false) =>
+        run("disputes:resolve", { disputeId, refund }),
+      rejectDispute: (disputeId: string, note?: string) =>
+        run("disputes:reject", { disputeId, note }),
+      setCustomerActive: (id: string, active: boolean) =>
+        run("customers:setActive", { id, active }),
+      setFraudStatus: (id: string, status: string) =>
+        run("fraud:setStatus", { id, status }),
+      setRole: (userId: string, role: string) => run("roles:setRole", { id: userId, role }),
+      sendBroadcast: (input: Record<string, unknown>) => run("broadcasts:send", input),
+      createFlashSale: (input: Record<string, unknown>) => run("flashsales:create", input),
+      createPromo: (input: Record<string, unknown>) => run("promos:create", input),
+      upsertCms: (input: Record<string, unknown>) => run("cms:upsert", input),
+      setSetting: (key: string, value: string) => run("settings:set", { key, value }),
+      createCategory: (input: Record<string, unknown>) => run("categories:create", input),
+      updateCategory: (id: string, patch: Record<string, unknown>) =>
+        run("categories:update", { id, patch }),
+      removeCategory: (id: string) => run("categories:remove", { id }),
+      setCampaignStatus: (id: string, status: string) =>
+        run("campaigns:setStatus", { id, status }),
+    };
+  }, [refresh]);
+
+  return useMemo(() => ({ ...data, ...actions }), [data, actions]);
 }

@@ -32,7 +32,7 @@ export default function WarehouseReceivingPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
-  const { inboundParcels } = useWarehouseData();
+  const { inboundParcels, advanceDelivery } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const data = inboundParcels.slice(0, 5);
 
@@ -74,7 +74,7 @@ export default function WarehouseReceivingPage() {
         { key: "weight", label: fr ? "Poids" : "Weight" },
         { key: "status", label: t("status"), render: (row) => <Badge variant="info">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
-          <button onClick={() => toast(fr ? `${row.id} reçu` : `Received ${row.id}`)} className="text-xs text-emerald-600">{t("receive")}</button>
+          <button onClick={async () => { await advanceDelivery(String(row.taskId), "assigned"); toast(fr ? `${row.id} reçu` : `Received ${row.id}`); }} className="text-xs text-emerald-600">{t("receive")}</button>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

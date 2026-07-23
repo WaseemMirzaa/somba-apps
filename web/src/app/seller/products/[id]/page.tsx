@@ -37,7 +37,7 @@ export default function SellerProductDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerProductFull } = useSellerData();
+  const { getSellerProductFull, pauseProduct, publishProduct } = useSellerData();
   const product = getSellerProductFull(id);
   const [status, setStatus] = useState<SellerProductStatus>((product?.status as SellerProductStatus) ?? "draft");
 
@@ -45,13 +45,15 @@ export default function SellerProductDetailPage() {
     return <div className="p-8 text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
   }
 
-  function markUnavailable() {
+  async function markUnavailable() {
     setStatus("unavailable");
+    if (product) await pauseProduct(product.id);
     toast(fr ? "Produit marqué indisponible — masqué de la boutique" : "Product marked unavailable — hidden from storefront");
   }
 
-  function markLive() {
+  async function markLive() {
     setStatus("live");
+    if (product) await publishProduct(product.id);
     toast(fr ? "Produit remis en ligne" : "Product marked live");
   }
 

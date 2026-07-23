@@ -76,6 +76,9 @@ interface RealtimeValue {
   updateDeliveryStatus: (taskId: string, status: DeliveryStatus) => Promise<void>;
   sendLocation: (taskId: string, lat: number, lng: number) => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  cancelOrder: (orderId: string) => Promise<void>;
+  markReviewHelpful: (id: string) => Promise<void>;
   topUpWallet: (amountUsd: number, method?: string) => Promise<void>;
   refundOrder: (orderId: string, toWallet?: boolean) => Promise<void>;
   createProduct: (input: {
@@ -366,6 +369,22 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const markAllRead = useCallback(async () => {
+    await socketClient.request("notifications:markAllRead");
+    setNotifications((cur) => cur.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const cancelOrder = useCallback(async (orderId: string) => {
+    const updated = await socketClient.request<Order>("orders:cancel", {
+      orderId,
+    });
+    setOrders((cur) => upsert(cur, updated));
+  }, []);
+
+  const markReviewHelpful = useCallback(async (id: string) => {
+    await socketClient.request("reviews:helpful", { id });
+  }, []);
+
   const topUpWallet = useCallback(async (amountUsd: number, method?: string) => {
     await socketClient.request("wallet:topup", { amountUsd, method });
     // wallet:updated / wallet:transaction arrive via push.
@@ -460,6 +479,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       updateDeliveryStatus,
       sendLocation,
       markRead,
+      markAllRead,
+      cancelOrder,
+      markReviewHelpful,
       topUpWallet,
       refundOrder,
       createProduct,
@@ -498,6 +520,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       updateDeliveryStatus,
       sendLocation,
       markRead,
+      markAllRead,
+      cancelOrder,
+      markReviewHelpful,
       topUpWallet,
       refundOrder,
       createProduct,

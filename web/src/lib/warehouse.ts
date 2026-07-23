@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { DeliveryTask, Order } from "@/lib/realtime/types";
@@ -281,7 +281,7 @@ function buildWarehouseData(
 
 export type WarehouseData = ReturnType<typeof buildWarehouseData>;
 
-export function useWarehouseData(): WarehouseData {
+export function useWarehouseData() {
   const rt = useRealtime();
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
 
@@ -302,8 +302,41 @@ export function useWarehouseData(): WarehouseData {
     };
   }, [rt.status, isWarehouse]);
 
-  return useMemo(
+  const data = useMemo(
     () => buildWarehouseData(rt.deliveries, rt.orders, inventory),
     [rt.deliveries, rt.orders, inventory],
   );
+
+  const refreshInventory = useCallback(async () => {
+    const inv = await socketClient
+      .request<InventoryRow[]>("warehouse:inventory")
+      .catch(() => []);
+    setInventory(inv ?? []);
+  }, []);
+
+  // ── Write actions (dispatch, transfers, incidents, RMA) ──
+  const actions = useMemo(
+    () => ({
+      refreshInventory,
+      buildBatch: (hubId: string | null, taskIds: string[], riderId: string, riderName?: string) =>
+        socketClient.request("warehouse:buildBatch", { hubId, taskIds, riderId, riderName }),
+      createTransfer: (input: Record<string, unknown>) =>
+        socketClient.request("warehouse:createTransfer", input),
+      advanceDelivery: (taskId: string, status: string) =>
+        socketClient.request("delivery:updateStatus", { taskId, status }),
+      assignDelivery: (taskId: string, riderId: string, riderName?: string) =>
+        socketClient.request("delivery:assign", { taskId, riderId, riderName }),
+      createException: (input: Record<string, unknown>) =>
+        socketClient.request("exceptions:create", input),
+      setExceptionStatus: (id: string, status: string, resolution?: string) =>
+        socketClient.request("exceptions:setStatus", { id, status, resolution }),
+      setReplacementStatus: (id: string, status: string) =>
+        socketClient.request("replacements:setStatus", { id, status }),
+      setExchangeStatus: (id: string, status: string) =>
+        socketClient.request("exchanges:setStatus", { id, status }),
+    }),
+    [refreshInventory],
+  );
+
+  return useMemo(() => ({ ...data, ...actions }), [data, actions]);
 }

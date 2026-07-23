@@ -26,7 +26,7 @@ export default function AdminCustomerDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getCustomer, orderEntities } = useAdminData();
+  const { getCustomer, orderEntities, setCustomerActive } = useAdminData();
   const customer = getCustomer(id);
   const [status, setStatus] = useState(customer?.status ?? "active");
 
@@ -54,8 +54,9 @@ export default function AdminCustomerDetailPage() {
         actions={
           <>
             <button
-              onClick={() => {
+              onClick={async () => {
                 const next = status === "active" ? "suspended" : "active";
+                await setCustomerActive(customer.id, next === "active");
                 setStatus(next);
                 toast(
                   fr

@@ -194,7 +194,7 @@ export default function SellerSettingsPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
-  const { storeSettings } = useSellerData();
+  const { storeSettings, updateStore } = useSellerData();
 
   const permissions: { en: string; fr: string }[] = [
     { en: "Products", fr: "Produits" },
@@ -256,7 +256,7 @@ export default function SellerSettingsPage() {
         </DetailGridSection>
       </DetailGrid>
 
-      <button onClick={() => toast(fr ? "Paramètres enregistrés avec succès" : "Settings saved successfully")} className="btn-primary rounded-lg px-6 py-2 text-sm font-medium">{fr ? "Enregistrer les paramètres" : "Save Settings"}</button>
+      <button onClick={async () => { await updateStore({ name: storeSettings.storeName }); toast(fr ? "Paramètres enregistrés avec succès" : "Settings saved successfully"); }} className="btn-primary rounded-lg px-6 py-2 text-sm font-medium">{fr ? "Enregistrer les paramètres" : "Save Settings"}</button>
     </div>
   );
 }

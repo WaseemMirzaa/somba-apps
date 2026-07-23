@@ -17,7 +17,7 @@ const READ_STATUS_OPTIONS = [
 ];
 
 export default function ShopNotificationsPage() {
-  const { notifications, markRead } = useRealtime();
+  const { notifications, markRead, markAllRead: markAllReadLive } = useRealtime();
   const { t, locale } = useLocale();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   // Live backend notifications, shaped for the bilingual list UI.
@@ -31,8 +31,7 @@ export default function ShopNotificationsPage() {
       })),
     [notifications],
   );
-  const markAllRead = () =>
-    notifications.filter((n) => !n.read).forEach((n) => void markRead(n.id));
+  const markAllRead = () => void markAllReadLive();
 
   const filtered = useMemo(
     () =>

@@ -71,7 +71,7 @@ function disputeStatusVariant(status: string): "success" | "warning" | "info" | 
 export default function AdminDisputeResolutionPage() {
   const { id } = useParams<{ id: string }>();
   const { getDispute, addMessage, resolveDispute } = useDisputes();
-  const { getOrder } = useAdminData();
+  const { getOrder, resolveDispute: resolveDisputeLive } = useAdminData();
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
@@ -226,7 +226,8 @@ export default function AdminDisputeResolutionPage() {
               <>
                 <Button
                   className="ml-1"
-                  onClick={() => {
+                  onClick={async () => {
+                    await resolveDisputeLive(id, true);
                     resolveDispute(id);
                     setResolvedAs("buyer");
                     toast(fr ? "Litige résolu — en faveur de l'acheteur" : "Dispute resolved — favor buyer");
@@ -236,7 +237,8 @@ export default function AdminDisputeResolutionPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() => {
+                  onClick={async () => {
+                    await resolveDisputeLive(id, false);
                     resolveDispute(id);
                     setResolvedAs("seller");
                     toast(fr ? "Litige résolu — en faveur du vendeur" : "Dispute resolved — favor seller");

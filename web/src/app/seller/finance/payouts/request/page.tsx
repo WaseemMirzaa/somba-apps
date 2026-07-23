@@ -6,11 +6,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { useSellerData } from "@/lib/seller";
 
 export default function SellerPayoutRequestPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { requestPayout } = useSellerData();
   const [submitted, setSubmitted] = useState(false);
+  const [amount, setAmount] = useState("");
   const available = 12450;
 
   if (submitted) {
@@ -27,10 +30,10 @@ export default function SellerPayoutRequestPage() {
     <div className="mx-auto max-w-xl space-y-6">
       <PageHeader title={fr ? "Demander un versement" : "Request Payout"} subtitle={fr ? `Disponible : ${formatCurrency(available, locale)}` : `Available: ${formatCurrency(available, locale)}`} backHref="/seller/finance/payouts" />
 
-      <form onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }} className="card-premium space-y-4 p-6">
+      <form onSubmit={async (e) => { e.preventDefault(); await requestPayout(Number(amount) || 0); setSubmitted(true); }} className="card-premium space-y-4 p-6">
         <div>
           <label className="mb-1 block text-sm font-medium">{fr ? "Montant (USD)" : "Amount (USD)"}</label>
-          <input type="number" className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Max 12 450" : "Max 12,450"} max={available} />
+          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Max 12 450" : "Max 12,450"} max={available} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">{fr ? "Nom de la banque" : "Bank Name"}</label>

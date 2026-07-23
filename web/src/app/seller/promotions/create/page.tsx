@@ -6,11 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection } from "@/components/ui/info-grid";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { useSellerData } from "@/lib/seller";
 
 export default function SellerPromotionCreatePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { locale } = useLocale();
+  const { createCampaign } = useSellerData();
   const fr = locale === "fr";
   const [form, setForm] = useState({ name: "", discount: "", start: "", end: "" });
 
@@ -25,8 +27,9 @@ export default function SellerPromotionCreatePage() {
           <input className="rounded-lg border border-sky-200 px-4 py-2 text-sm" type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
         </div>
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!form.name.trim()) { toast(fr ? "Saisissez un nom de campagne" : "Enter a campaign name", "error"); return; }
+            await createCampaign({ name: form.name, discount: Number(form.discount) || 0, startDate: form.start, endDate: form.end });
             toast(fr ? "Campagne soumise pour approbation" : "Campaign submitted for approval");
             router.push("/seller/promotions");
           }}

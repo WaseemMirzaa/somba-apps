@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useRealtime } from "@/context/realtime-context";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
@@ -42,6 +43,7 @@ export default function ShopOrderDetailPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { addToCart } = useShop();
+  const { cancelOrder } = useRealtime();
   const router = useRouter();
   const [cancelled, setCancelled] = useState(false);
 
@@ -96,7 +98,7 @@ export default function ShopOrderDetailPage() {
               <Link href={`/shop/products/${order.items[0]?.productId}/reviews`} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium">{fr ? "Avis" : "Review"}</Link>
             </div>
           ) : order.status !== "cancelled" && !cancelled ? (
-            <button onClick={() => { setCancelled(true); toast(fr ? "Commande annulée" : "Order cancelled"); }} className="rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600">{fr ? "Annuler" : "Cancel"}</button>
+            <button onClick={async () => { try { await cancelOrder(order.id); setCancelled(true); toast(fr ? "Commande annulée" : "Order cancelled"); } catch (e) { toast((e as Error).message, "error"); } }} className="rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600">{fr ? "Annuler" : "Cancel"}</button>
           ) : null
         }
       />

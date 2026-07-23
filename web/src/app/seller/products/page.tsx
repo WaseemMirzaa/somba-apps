@@ -45,7 +45,7 @@ export default function SellerProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { sellerProductList } = useSellerData();
+  const { sellerProductList, pauseProduct, publishProduct } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [products, setProducts] = useState(sellerProductList);
   // Resync when the live catalogue hydrates/changes over the socket.
@@ -62,8 +62,13 @@ export default function SellerProductsPage() {
     [products, filters]
   );
 
-  function setProductStatus(id: string, status: SellerProductStatus) {
+  async function setProductStatus(id: string, status: SellerProductStatus) {
     setProducts((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
+    if (status === "unavailable") {
+      await pauseProduct(id);
+    } else {
+      await publishProduct(id);
+    }
     toast(
       status === "unavailable"
         ? (fr ? "Produit marqué indisponible" : "Product marked unavailable")

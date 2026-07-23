@@ -24,12 +24,13 @@ export default function AdminModerationPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { moderationQueue } = useAdminData();
+  const { moderationQueue, moderateProduct } = useAdminData();
   const [queue, setQueue] = useState(moderationQueue);
   useEffect(() => setQueue(moderationQueue), [moderationQueue]);
   const pending = queue.filter((p) => p.status === "pending");
 
-  function updateStatus(id: string, status: "approved" | "rejected") {
+  async function updateStatus(id: string, status: "approved" | "rejected") {
+    await moderateProduct(id, status === "approved");
     setQueue((q) => q.map((p) => (p.id === id ? { ...p, status } : p)));
     toast(fr ? `Produit ${status === "approved" ? "approuvé" : "rejeté"}` : `Product ${status}`);
   }

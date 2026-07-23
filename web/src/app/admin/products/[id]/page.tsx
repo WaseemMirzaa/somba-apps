@@ -43,7 +43,7 @@ export default function AdminProductModerationDetailPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { isProductBlocked, blockProduct, unblockProduct } = useModeration();
-  const { getModerationProduct } = useAdminData();
+  const { getModerationProduct, moderateProduct } = useAdminData();
   const router = useRouter();
   const product = getModerationProduct(id);
   const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "changes_requested">(product?.status ?? "pending");
@@ -66,7 +66,11 @@ export default function AdminProductModerationDetailPage() {
     }
   }
 
-  function updateStatus(newStatus: "approved" | "rejected" | "changes_requested") {
+  async function updateStatus(newStatus: "approved" | "rejected" | "changes_requested") {
+    if (!product) return;
+    if (newStatus === "approved" || newStatus === "rejected") {
+      await moderateProduct(product.id, newStatus === "approved");
+    }
     setStatus(newStatus);
     toast(
       fr

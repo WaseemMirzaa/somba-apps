@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 
 const STEPS = [
   { en: "Basic Info", fr: "Infos de base" },
@@ -34,6 +35,7 @@ export function ProductWizard() {
   const router = useRouter();
   const { toast } = useToast();
   const { locale } = useLocale();
+  const { createProduct } = useRealtime();
   const fr = locale === "fr";
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
@@ -169,7 +171,7 @@ export function ProductWizard() {
         {step < 6 ? (
           <Button onClick={() => setStep(step + 1)}>{fr ? "Étape suivante" : "Next Step"}</Button>
         ) : (
-          <Button onClick={() => { toast(fr ? "Soumis pour modération" : "Submitted for moderation"); router.push("/seller/products"); }}>{fr ? "Soumettre pour modération" : "Submit for Moderation"}</Button>
+          <Button onClick={async () => { await createProduct({ name: form.title, nameFr: form.titleFr || undefined, price: Number(form.price) || 0, category: form.category, stock: Number(form.stock) || 0 }); toast(fr ? "Soumis pour modération" : "Submitted for moderation"); router.push("/seller/products"); }}>{fr ? "Soumettre pour modération" : "Submit for Moderation"}</Button>
         )}
         <Button variant="ghost" onClick={() => toast(fr ? "Brouillon enregistré" : "Draft saved")}>{fr ? "Enregistrer le brouillon" : "Save Draft"}</Button>
       </div>

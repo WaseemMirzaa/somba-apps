@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type {
@@ -582,7 +582,7 @@ export type ShipmentTimelineEvent = ShipmentDetail["timeline"][number];
  * dispute pushes; fetches the seller entity, KPI stats and review roll-up once
  * on mount (and refetches when the socket reconnects).
  */
-export function useSellerData(): SellerData {
+export function useSellerData() {
   const rt = useRealtime();
   const [seller, setSeller] = useState<Seller | null>(null);
   const [stats, setStats] = useState<SellerStats | null>(null);
@@ -609,7 +609,14 @@ export function useSellerData(): SellerData {
 
   const storeName = seller?.name ?? rt.user?.name ?? "My Store";
 
-  return useMemo(
+  const refreshStore = useCallback(async () => {
+    const mine = await socketClient
+      .request<Seller | null>("sellers:mine")
+      .catch(() => null);
+    setSeller(mine);
+  }, []);
+
+  const data = useMemo(
     () =>
       buildSellerData(
         storeName,
@@ -623,4 +630,28 @@ export function useSellerData(): SellerData {
       ),
     [storeName, seller, stats, rt.products, rt.orders, rt.payouts, rt.disputes, reviews],
   );
+
+  // ── Write actions (products, store profile, campaigns, payouts) ──
+  const actions = useMemo(
+    () => ({
+      updateStore: async (patch: { name?: string }) => {
+        await socketClient.request("sellers:update", patch);
+        await refreshStore();
+      },
+      updateProduct: (id: string, patch: Record<string, unknown>) =>
+        socketClient.request("products:update", { id, patch }),
+      pauseProduct: (id: string) =>
+        socketClient.request("products:update", { id, patch: { status: "draft" } }),
+      publishProduct: (id: string) =>
+        socketClient.request("products:update", { id, patch: { status: "live" } }),
+      deleteProduct: (id: string) => socketClient.request("products:delete", { id }),
+      createCampaign: (input: Record<string, unknown>) =>
+        socketClient.request("campaigns:create", input),
+      requestPayout: (amountUsd: number, method?: string) =>
+        socketClient.request("payouts:request", { amountUsd, method }),
+    }),
+    [refreshStore],
+  );
+
+  return useMemo(() => ({ ...data, ...actions }), [data, actions]);
 }

@@ -39,7 +39,7 @@ export default function WarehouseInboundPage() {
   const base = useOpsBase();
   const homeLabel = base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse");
   const homeHref = base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse";
-  const { inboundParcels } = useWarehouseData();
+  const { inboundParcels, advanceDelivery } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -88,7 +88,7 @@ export default function WarehouseInboundPage() {
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex gap-2 text-xs">
             <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            <button onClick={() => toast(fr ? `${row.id} reçu` : `Received ${row.id}`)} className="text-emerald-600">{t("receive")}</button>
+            <button onClick={async () => { await advanceDelivery(String(row.taskId), "assigned"); toast(fr ? `${row.id} reçu` : `Received ${row.id}`); }} className="text-emerald-600">{t("receive")}</button>
             <Link href={ops(`/parcels/${row.id}`)} className="text-amber-600">{fr ? "Inspecter" : "Inspect"}</Link>
           </div>
         )},
