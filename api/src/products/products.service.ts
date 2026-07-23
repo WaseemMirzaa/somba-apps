@@ -12,14 +12,16 @@ export class ProductsService {
     private readonly emitter: RealtimeEmitter,
   ) {}
 
-  list(filter?: { category?: string; status?: string }): Promise<Product[]> {
+  async list(filter?: { category?: string; status?: string }): Promise<Product[]> {
     const where: Record<string, string> = {};
     if (filter?.category) where.category = filter.category;
     if (filter?.status) where.status = filter.status;
-    return this.repo.find({
+    const rows = await this.repo.find({
       where: Object.keys(where).length ? where : undefined,
       order: { createdAt: 'DESC' },
     });
+    // Soft-removed listings never appear unless explicitly requested.
+    return filter?.status ? rows : rows.filter((p) => p.status !== 'removed');
   }
 
   get(id: string): Promise<Product | null> {
@@ -61,5 +63,32 @@ export class ProductsService {
       'product:updated',
       product,
     );
+  }
+
+  /** Return reserved units to stock (e.g. when an order is cancelled). */
+  async restock(id: string, qty: number): Promise<void> {
+    const product = await this.get(id);
+    if (!product) return;
+    product.stock = product.stock + qty;
+    await this.repo.save(product);
+    this.emitter.toRoles(
+      ['customer', ...ADMIN_ROLES],
+      'product:updated',
+      product,
+    );
+  }
+
+  /** Soft-remove a listing: hidden from storefront, kept for order history. */
+  async remove(id: string): Promise<Product | null> {
+    const product = await this.get(id);
+    if (!product) return null;
+    product.status = 'removed';
+    const saved = await this.repo.save(product);
+    this.emitter.toRoles(
+      ['customer', 'guest', ...ADMIN_ROLES],
+      'product:updated',
+      saved,
+    );
+    return saved;
   }
 }

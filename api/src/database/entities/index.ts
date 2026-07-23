@@ -43,3 +43,4 @@ export type {
   ExceptionSeverity,
   ExceptionStatus,
 } from './warehouse-exception.entity';
+export { WishlistItem } from './wishlist-item.entity';

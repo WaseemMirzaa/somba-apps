@@ -22,6 +22,16 @@ export class ReviewsService {
     });
   }
 
+  /** Mark a review helpful (increments the counter). */
+  async markHelpful(id: string): Promise<Review> {
+    const review = await this.reviews.findOne({ where: { id } });
+    if (!review) throw new Error('Review not found.');
+    review.helpful = (review.helpful ?? 0) + 1;
+    const saved = await this.reviews.save(review);
+    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'review:updated', saved);
+    return saved;
+  }
+
   /** Every review across a seller's catalogue, newest first. */
   async listForSeller(sellerId: string): Promise<Review[]> {
     const owned = await this.products.find({ where: { sellerId } });

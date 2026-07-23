@@ -78,4 +78,10 @@ export class NotificationsService {
   async markRead(id: string): Promise<void> {
     await this.repo.update({ id }, { read: true });
   }
+
+  /** Mark every one of a user's notifications read in a single call. */
+  async markAllRead(userId: string): Promise<number> {
+    const res = await this.repo.update({ userId, read: false }, { read: true });
+    return res.affected ?? 0;
+  }
 }

@@ -59,6 +59,20 @@ export class SellersService {
     return seller;
   }
 
+  /** A seller edits their own store profile (name). */
+  async updateProfile(
+    userId: string,
+    patch: { name?: string },
+  ): Promise<Seller> {
+    const seller = await this.byUser(userId);
+    if (!seller) throw new NotFoundException('Store not found.');
+    if (patch.name != null && patch.name.trim()) seller.name = patch.name.trim();
+    const saved = await this.sellers.save(seller);
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', saved);
+    if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', saved);
+    return saved;
+  }
+
   async setStatus(id: string, status: SellerStatus): Promise<Seller> {
     const seller = await this.sellers.findOne({ where: { id } });
     if (!seller) throw new NotFoundException('Seller not found.');

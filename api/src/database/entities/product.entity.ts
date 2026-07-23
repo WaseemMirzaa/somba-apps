@@ -7,7 +7,13 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export type ProductStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'live';
+export type ProductStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'live'
+  | 'removed';
 
 @Entity('products')
 export class Product {

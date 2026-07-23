@@ -27,6 +27,10 @@ export class Review {
   @Column({ type: 'text' })
   text: string;
 
+  /** How many shoppers found this review helpful. */
+  @Column({ type: 'int', default: 0 })
+  helpful: number;
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -198,6 +198,65 @@ export class OrdersService {
     return saved;
   }
 
+  /**
+   * Customer cancels their own order while it's still cancellable (before it
+   * ships). Restocks the items, refunds prepaid orders to the wallet, and voids
+   * the delivery task.
+   */
+  async cancel(
+    user: { id: string; role: string },
+    orderId: string,
+  ): Promise<Order> {
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (user.role === 'customer' && order.customerId !== user.id) {
+      throw new BadRequestException('You can only cancel your own orders.');
+    }
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      throw new BadRequestException(
+        `Order can no longer be cancelled (status: ${order.status}).`,
+      );
+    }
+
+    order.status = 'cancelled';
+    const saved = await this.orders.save(order);
+
+    // Return reserved stock.
+    for (const item of saved.items ?? []) {
+      if (!item.productId.startsWith('ext:')) {
+        await this.products.restock(item.productId, item.qty);
+      }
+    }
+
+    // Refund prepaid orders to the wallet (COD never charged).
+    if (saved.paymentMethod !== 'cod' && saved.status !== 'pending') {
+      await this.wallet.refund(
+        saved.customerId,
+        saved.totalUsd,
+        `Refund for cancelled order ${saved.reference}`,
+      );
+    }
+
+    // Void the delivery task.
+    const task = await this.deliveries.findOne({ where: { orderId: saved.id } });
+    if (task && task.status !== 'delivered') {
+      task.status = 'failed';
+      await this.deliveries.save(task);
+      this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+      if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+    }
+
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    await this.notifications.toUser(saved.customerId, {
+      title: 'Order cancelled',
+      body: `${saved.reference} was cancelled.${saved.paymentMethod !== 'cod' ? ' Refund credited to your wallet.' : ''}`,
+      type: 'order',
+      entityId: saved.id,
+    });
+    return saved;
+  }
+
   async list(user: { id: string; role: string }): Promise<Order[]> {
     if (user.role === 'customer') {
       return this.orders.find({

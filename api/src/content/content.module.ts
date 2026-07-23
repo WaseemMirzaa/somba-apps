@@ -9,6 +9,7 @@ import {
   Review,
   Setting,
   SupportTicket,
+  WishlistItem,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ReviewsService } from './reviews.service';
@@ -16,6 +17,7 @@ import { SupportService } from './support.service';
 import { PromosService } from './promos.service';
 import { CmsService } from './cms.service';
 import { SettingsService } from './settings.service';
+import { WishlistService } from './wishlist.service';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { SettingsService } from './settings.service';
       FlashSale,
       CmsBlock,
       Setting,
+      WishlistItem,
     ]),
     NotificationsModule,
   ],
@@ -37,6 +40,7 @@ import { SettingsService } from './settings.service';
     PromosService,
     CmsService,
     SettingsService,
+    WishlistService,
   ],
   exports: [
     ReviewsService,
@@ -44,6 +48,7 @@ import { SettingsService } from './settings.service';
     PromosService,
     CmsService,
     SettingsService,
+    WishlistService,
   ],
 })
 export class ContentModule {}

@@ -106,9 +106,15 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `replacements:list/create/setStatus` | item replacements | customer/ops |
 | `exchanges:list/create/setStatus` | item exchanges | customer/ops |
 | `exceptions:list/create/setStatus` | warehouse parcel incidents | staff |
-| `notifications:list` / `notifications:markRead` | `{id}` | all |
+| `orders:cancel` | `{orderId}` — restock + refund + void delivery | customer |
+| `products:delete` | `{id}` — soft-remove a listing | seller/admin |
+| `sellers:update` | `{name?}` — edit own store | seller |
+| `wishlist:list` / `wishlist:toggle` | `{productId}` — persistent wishlist | customer |
+| `reviews:helpful` | `{id}` — upvote a review | all |
+| `delivery:assign` | `{taskId, riderId}` — dispatch to a rider | ops |
+| `notifications:list` / `notifications:markRead` / `notifications:markAllRead` | `{id?}` | all |
 
-**94 realtime handlers across 17 domain modules and 30 entities** cover every
+**105 realtime handlers across 17 domain modules and 31 entities** cover every
 portal (customer, seller, admin, warehouse, rider) — including marketing
 campaigns, replacements, exchanges, and warehouse exceptions.
 

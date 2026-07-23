@@ -24,6 +24,7 @@ import { DisputesService } from '../disputes/disputes.service';
 import { CategoriesService } from '../catalog/categories.service';
 import { AddressesService } from '../addresses/addresses.service';
 import { ReviewsService } from '../content/reviews.service';
+import { WishlistService } from '../content/wishlist.service';
 import { SupportService } from '../content/support.service';
 import { PromosService } from '../content/promos.service';
 import { CmsService } from '../content/cms.service';
@@ -94,6 +95,7 @@ export class RealtimeGateway
     private readonly categories: CategoriesService,
     private readonly addresses: AddressesService,
     private readonly reviews: ReviewsService,
+    private readonly wishlist: WishlistService,
     private readonly support: SupportService,
     private readonly promos: PromosService,
     private readonly cms: CmsService,
@@ -1469,6 +1471,118 @@ export class RealtimeGateway
     }
   }
 
+  // ---- Additional flows (audit gaps) -------------------------------------
+  /** Customer cancels their own order (restock + refund + void delivery). */
+  @SubscribeMessage('orders:cancel')
+  async ordersCancel(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.orders.cancel(user, body.orderId));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Seller/admin remove one of their listings (soft-delete). */
+  @SubscribeMessage('products:delete')
+  async productsDelete(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const existing = await this.products.get(body.id);
+      if (!existing) return fail('Product not found.');
+      const seller = await this.sellersSvc.byUser(user.id);
+      const isOwner =
+        existing.sellerId === user.id ||
+        (seller != null && existing.sellerId === seller.id);
+      if (!isOwner && !this.isAdmin(user.role)) {
+        return fail('You can only remove your own products.');
+      }
+      return ok(await this.products.remove(body.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Seller updates their own store profile. */
+  @SubscribeMessage('sellers:update')
+  async sellersUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { name?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Sellers only.');
+      return ok(await this.sellersSvc.updateProfile(user.id, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Mark a review helpful. */
+  @SubscribeMessage('reviews:helpful')
+  async reviewsHelpful(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      this.requireUser(client);
+      return ok(await this.reviews.markHelpful(body.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Wishlist -----------------------------------------------------------
+  @SubscribeMessage('wishlist:list')
+  async wishlistList(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.wishlist.list(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('wishlist:toggle')
+  async wishlistToggle(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { productId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!body?.productId) return fail('productId is required.');
+      return ok(await this.wishlist.toggle(user.id, body.productId));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Ops assign an unassigned delivery task to a specific rider. */
+  @SubscribeMessage('delivery:assign')
+  async deliveryAssign(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { taskId: string; riderId: string; riderName?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(
+        await this.delivery.assign(body.taskId, {
+          id: body.riderId,
+          name: body.riderName ?? 'Rider',
+        }),
+      );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   // ---- Notifications ------------------------------------------------------
   @SubscribeMessage('notifications:list')
   async notificationsList(@ConnectedSocket() client: AuthedSocket) {
@@ -1484,5 +1598,16 @@ export class RealtimeGateway
   async notificationsMarkRead(@MessageBody() body: { id: string }) {
     await this.notifications.markRead(body.id);
     return ok({ id: body.id });
+  }
+
+  @SubscribeMessage('notifications:markAllRead')
+  async notificationsMarkAllRead(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const count = await this.notifications.markAllRead(user.id);
+      return ok({ count });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 }

@@ -21,6 +21,7 @@ import {
   Replacement,
   Exchange,
   WarehouseException,
+  WishlistItem,
   DeliveryTask,
   Dispute,
   Notification,
@@ -65,6 +66,7 @@ const ENTITIES = [
   Replacement,
   Exchange,
   WarehouseException,
+  WishlistItem,
 ];
 
 /**

@@ -79,6 +79,14 @@ export class DeliveryService {
     return saved;
   }
 
+  /** Ops assign an unassigned task to a specific rider (dispatch desk). */
+  async assign(
+    taskId: string,
+    rider: { id: string; name: string },
+  ): Promise<DeliveryTask> {
+    return this.accept(taskId, rider);
+  }
+
   /** Rider advances the delivery; the customer order status follows along. */
   async updateStatus(
     taskId: string,
