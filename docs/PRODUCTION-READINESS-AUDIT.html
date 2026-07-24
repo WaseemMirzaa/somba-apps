@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Somba&Teka production-readiness audit — severity-ranked findings across backend, modules, and frontend connectivity.">
+<title>Somba&Teka — Production-Readiness Audit</title>
+<style>
+  :root{
+    --bg:#F7F9FB; --surface:#FFFFFF; --surface-2:#F1F5F9; --border:#E2E8F0;
+    --ink:#0F1B2D; --muted:#5B6B7F; --accent:#0E7490; --accent-soft:#0e748015;
+    --p0:#DC2626; --p1:#EA580C; --p2:#CA8A04; --p3:#0284C7; --ok:#059669;
+    --p0-soft:#DC26260f; --p1-soft:#EA580C0f; --p2-soft:#CA8A040f; --ok-soft:#0596690f;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --shadow:0 1px 2px rgba(15,27,45,.04),0 8px 24px rgba(15,27,45,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0B1220; --surface:#121C2E; --surface-2:#0F1829; --border:#26344D;
+      --ink:#E6EDF5; --muted:#93A4BC; --accent:#22B8CE; --accent-soft:#22b8ce1a;
+      --p0:#F87171; --p1:#FB923C; --p2:#FACC15; --p3:#38BDF8; --ok:#34D399;
+      --p0-soft:#F871711a; --p1-soft:#FB923C1a; --p2-soft:#FACC151a; --ok-soft:#34D3991a;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#F7F9FB; --surface:#FFFFFF; --surface-2:#F1F5F9; --border:#E2E8F0;
+    --ink:#0F1B2D; --muted:#5B6B7F; --accent:#0E7490; --accent-soft:#0e748015;
+    --p0:#DC2626; --p1:#EA580C; --p2:#CA8A04; --p3:#0284C7; --ok:#059669;
+    --p0-soft:#DC26260f; --p1-soft:#EA580C0f; --p2-soft:#CA8A040f; --ok-soft:#0596690f;
+    --shadow:0 1px 2px rgba(15,27,45,.04),0 8px 24px rgba(15,27,45,.05);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1220; --surface:#121C2E; --surface-2:#0F1829; --border:#26344D;
+    --ink:#E6EDF5; --muted:#93A4BC; --accent:#22B8CE; --accent-soft:#22b8ce1a;
+    --p0:#F87171; --p1:#FB923C; --p2:#FACC15; --p3:#38BDF8; --ok:#34D399;
+    --p0-soft:#F871711a; --p1-soft:#FB923C1a; --p2-soft:#FACC151a; --ok-soft:#34D3991a;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+    margin:0;-webkit-font-smoothing:antialiased;font-size:16px}
+  .wrap{max-width:920px;margin:0 auto;padding:clamp(24px,5vw,64px) clamp(18px,4vw,40px)}
+  a{color:var(--accent)}
+  h1,h2,h3{text-wrap:balance;line-height:1.2;margin:0}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent);font-weight:600}
+  header.top{border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:32px}
+  h1{font-size:clamp(28px,5vw,42px);font-weight:800;letter-spacing:-.02em;margin:10px 0 8px}
+  .lede{color:var(--muted);font-size:clamp(15px,2vw,17px);max-width:60ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:18px;font-family:var(--mono);
+    font-size:12.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+
+  /* Verdict */
+  .verdict{display:grid;grid-template-columns:6px 1fr;gap:0;border:1px solid var(--border);
+    border-radius:14px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);margin:28px 0}
+  .verdict .stripe{background:var(--p1)}
+  .verdict .body{padding:20px 24px}
+  .verdict h2{font-size:19px;font-weight:700;margin-bottom:6px}
+  .verdict p{margin:0;color:var(--muted);font-size:15px}
+
+  /* Scoreboard */
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:28px 0 40px}
+  @media(max-width:640px){.board{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 16px 14px;
+    position:relative;overflow:hidden}
+  .tile .n{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+  .tile .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);margin-top:8px}
+  .tile.p0{background:var(--p0-soft)} .tile.p0 .n{color:var(--p0)}
+  .tile.p1{background:var(--p1-soft)} .tile.p1 .n{color:var(--p1)}
+  .tile.p2{background:var(--p2-soft)} .tile.p2 .n{color:var(--p2)}
+  .tile.ok{background:var(--ok-soft)} .tile.ok .n{color:var(--ok)}
+  .tile.tot .n{color:var(--accent)}
+
+  section{margin:40px 0}
+  h2.sec{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  h2.sec::after{content:"";flex:1;height:1px;background:var(--border)}
+
+  /* Production-grade list */
+  ul.good{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  ul.good li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;
+    font-size:15px;color:var(--ink)}
+  ul.good li::before{content:"✓";color:var(--ok);font-weight:800;line-height:1.5}
+  ul.good li b{font-weight:600}
+  ul.good li span{color:var(--muted)}
+
+  /* Finding cards */
+  .find{display:grid;grid-template-columns:5px 1fr;border:1px solid var(--border);border-radius:14px;
+    overflow:hidden;background:var(--surface);box-shadow:var(--shadow);margin-bottom:16px}
+  .find .rail{background:var(--accent)}
+  .find.p0 .rail{background:var(--p0)} .find.p1 .rail{background:var(--p1)}
+  .find.p2 .rail{background:var(--p2)} .find.p3 .rail{background:var(--p3)}
+  .find .in{padding:18px 22px 20px}
+  .find .hd{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
+    padding:3px 8px;border-radius:6px;color:#fff;white-space:nowrap}
+  .chip.p0{background:var(--p0)} .chip.p1{background:var(--p1)}
+  .chip.p2{background:var(--p2)} .chip.p3{background:var(--p3)}
+  .find .id{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-weight:600}
+  .find h3{font-size:17px;font-weight:700;flex:1 1 100%;letter-spacing:-.01em}
+  @media(min-width:560px){.find h3{flex:1 1 auto}}
+  .find p{margin:0 0 10px;font-size:14.5px;color:var(--ink)}
+  .find p.impact{color:var(--muted)}
+  .find .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);font-weight:600;margin-right:6px}
+  pre{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+    padding:12px 14px;overflow-x:auto;margin:0 0 12px;font-family:var(--mono);font-size:12.5px;
+    line-height:1.55;color:var(--ink)}
+  pre .c{color:var(--muted)}
+  .fix{border-left:2px solid var(--accent);padding-left:12px;font-size:14px}
+  .fix .lbl{color:var(--accent)}
+
+  /* Order list */
+  ol.order{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  ol.order li{counter-increment:s;display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:baseline;
+    font-size:15px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px}
+  ol.order li::before{content:counter(s);font-family:var(--mono);font-weight:700;color:var(--accent);
+    font-size:14px}
+  ol.order code{font-family:var(--mono);font-size:13px;background:var(--surface-2);padding:1px 6px;border-radius:5px}
+
+  footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--border);
+    color:var(--muted);font-size:13px;font-family:var(--mono)}
+  code.inl{font-family:var(--mono);font-size:.88em;background:var(--surface-2);padding:1px 5px;border-radius:5px;
+    border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Production-Readiness Audit</div>
+    <h1>Somba&amp;Teka — Launch Audit</h1>
+    <p class="lede">A code-level assessment of the NestJS backend, all 17 domain modules, and
+      frontend↔backend connectivity — measured against real deployment concerns, not a checklist.</p>
+    <div class="meta">
+      <span><b>Stack</b> NestJS · Socket.IO · TypeORM · Next.js · Flutter</span>
+      <span><b>Surface</b> 105 handlers · 31 entities · 17 modules</span>
+      <span><b>Method</b> static + runtime, evidence-cited</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <div class="stripe"></div>
+    <div class="body">
+      <h2>Not yet production-ready as a live multi-user system</h2>
+      <p>Architecture, domain coverage and the data model are solid and fully live. But this is
+        currently an excellent <b>demo / prototype</b>: four P0 blockers stand between it and a real
+        launch. All are well-scoped and fixable.</p>
+    </div>
+  </div>
+
+  <div class="board" role="list" aria-label="Findings by severity">
+    <div class="tile p0" role="listitem"><div class="n">4</div><div class="k">P0 · Blockers</div></div>
+    <div class="tile p1" role="listitem"><div class="n">4</div><div class="k">P1 · High</div></div>
+    <div class="tile p2" role="listitem"><div class="n">5</div><div class="k">P2 · Medium</div></div>
+    <div class="tile" role="listitem"><div class="n">5</div><div class="k">P3 · Polish</div></div>
+    <div class="tile ok" role="listitem"><div class="n">6</div><div class="k">Prod-grade</div></div>
+  </div>
+
+  <section>
+    <h2 class="sec">Already production-grade</h2>
+    <ul class="good">
+      <li><span><b>Transport &amp; CORS</b> — REST locked to an allow-list; the Socket.IO adapter applies the same list. WebSocket-first, no polling.</span></li>
+      <li><span><b>Auth crypto</b> — bcrypt (cost 12); JWT access+refresh with token revocation (<code class="inl">tokenVersion</code>).</span></li>
+      <li><span><b>Encryption at rest</b> — AES-256-GCM on email/phone/address, with a deterministic <code class="inl">emailHash</code> for lookups.</span></li>
+      <li><span><b>Validation &amp; limits</b> — global <code class="inl">ValidationPipe</code> on REST; auth endpoints throttled (30/min/IP).</span></li>
+      <li><span><b>Coverage</b> — 105 role-scoped handlers; end-to-end smoke passes 26/26; per-flow socket smokes pass.</span></li>
+      <li><span><b>Ops artifacts</b> — Docker (API + web), compose, nginx, pm2, CI (build + seed + smoke), health endpoint.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="sec">P0 — Blockers</h2>
+
+    <div class="find p0">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p0">P0</span><span class="id">P0-1</span><h3>Frontend auth is a demo shell — no real users</h3></div>
+        <p>The login / register form ignores the credentials the user types and signs into a <b>shared seeded account</b>.</p>
+        <pre><span class="c">// web/src/components/shop/auth-form.tsx:23</span>
+login("customer");   <span class="c">// ignores entered email/password</span>
+<span class="c">// web/src/context/auth-context.tsx</span>
+DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "Somba@2026";</pre>
+        <p class="impact">Every visitor becomes one of 7 demo accounts. The real backend auth (<code class="inl">/auth/register|login|refresh</code>) works, but the UI never calls it with real input — no registration, no per-user data, no real sessions.</p>
+        <div class="fix"><span class="lbl">Fix</span>Wire <code class="inl">auth-form.tsx</code> and the portal entries to <code class="inl">useRealtime().login/register</code>; keep the persona picker behind a dev-only flag.</div>
+      </div>
+    </div>
+
+    <div class="find p0">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p0">P0</span><span class="id">P0-2</span><h3><code class="inl">DB_SYNCHRONIZE</code> defaults to true — data-loss risk</h3></div>
+        <pre><span class="c">// api/src/config/configuration.ts</span>
+synchronize: (process.env.DB_SYNCHRONIZE ?? 'true') === 'true'
+<span class="c">// database.module.ts — applied to MySQL too</span></pre>
+        <p class="impact">TypeORM <code class="inl">synchronize</code> auto-alters the live schema on boot — it can drop/rename columns and destroy data. There are no migrations.</p>
+        <div class="fix"><span class="lbl">Fix</span>Default to <code class="inl">false</code>; generate TypeORM migrations; run them in the deploy step with <code class="inl">DB_SYNCHRONIZE=false</code>.</div>
+      </div>
+    </div>
+
+    <div class="find p0">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p0">P0</span><span class="id">P0-3</span><h3>Insecure default secrets, no fail-fast</h3></div>
+        <pre><span class="c">// api/src/config/configuration.ts</span>
+jwt.secret        ?? 'dev-insecure-jwt-secret-change-me'
+jwt.refreshSecret ?? 'dev-insecure-refresh-secret-change-me'
+dataEncryptionKey ?? '0000…0000'   <span class="c">// all-zero 32-byte key</span></pre>
+        <p class="impact">The app boots in production with these if env is unset — forgeable tokens and worthless encryption.</p>
+        <div class="fix"><span class="lbl">Fix</span>On startup, if <code class="inl">NODE_ENV=production</code> and any secret is missing or equals its dev default, throw and refuse to boot.</div>
+      </div>
+    </div>
+
+    <div class="find p0">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p0">P0</span><span class="id">P0-4</span><h3>Payments are a mock gateway</h3></div>
+        <pre><span class="c">// api/src/payments/payments.service.ts:49</span>
+<span class="c">// stripe_card / airtel_money — mock authorize (always succeeds)</span>
+status = 'succeeded';</pre>
+        <p class="impact">Card and mobile-money charges always “succeed”; no real PSP, no idempotency keys, no webhook reconciliation. Fine for demo, unacceptable for real money.</p>
+        <div class="fix"><span class="lbl">Fix</span>Integrate a real PSP (Stripe / Flutterwave / mobile-money) behind the existing <code class="inl">PaymentsService</code> seam; add idempotency + webhook confirmation before marking orders paid.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">P1 — High</h2>
+
+    <div class="find p1">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p1">P1</span><span class="id">P1-1</span><h3>No socket token refresh — users drop every 15 min</h3></div>
+        <p class="impact">Access TTL is 15 min and the socket carries it in the handshake. On expiry the server rejects it → <code class="inl">unauthorized</code> → logout; reconnection retries with the same stale token.</p>
+        <div class="fix"><span class="lbl">Fix</span>On <code class="inl">unauthorized</code>/<code class="inl">connect_error</code>, call <code class="inl">/auth/refresh</code> and reconnect with the new token; refresh proactively before expiry.</div>
+      </div>
+    </div>
+
+    <div class="find p1">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p1">P1</span><span class="id">P1-2</span><h3>WebSocket layer is unthrottled</h3></div>
+        <p class="impact"><code class="inl">ThrottlerGuard</code> covers only the auth REST controller. Every read/write flows through the socket with no rate limiting — an authenticated client can flood any handler.</p>
+        <div class="fix"><span class="lbl">Fix</span>Add per-socket, per-event rate limiting in the gateway (token-bucket keyed by user id).</div>
+      </div>
+    </div>
+
+    <div class="find p1">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p1">P1</span><span class="id">P1-3</span><h3>WebSocket payloads are unvalidated</h3></div>
+        <p class="impact">Handlers use untyped <code class="inl">@MessageBody()</code>; the global <code class="inl">ValidationPipe</code> only acts on decorated DTO classes — none exist under <code class="inl">src/realtime/</code>. Only manual null checks, no type/enum/bounds validation.</p>
+        <div class="fix"><span class="lbl">Fix</span>Define DTO classes per event (or validate with zod at each handler head) and apply validation to the gateway.</div>
+      </div>
+    </div>
+
+    <div class="find p1">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p1">P1</span><span class="id">P1-4</span><h3>No automated test suite (0 unit/integration tests)</h3></div>
+        <p class="impact">Only the e2e smoke exists. Business logic — cancel/restock, refunds, payouts, disputes — has no regression net across 105 handlers.</p>
+        <div class="fix"><span class="lbl">Fix</span>Unit-test services (orders, payments, wallet, payouts) + integration-test critical socket flows; wire into CI.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">P2 — Medium · P3 — Polish</h2>
+
+    <div class="find p2">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p2">P2</span><h3>Hardening &amp; resilience gaps</h3></div>
+        <ul class="good" style="gap:8px">
+          <li><span><b>No <code class="inl">helmet</code></b> on REST — missing HSTS / CSP / X-Frame-Options headers.</span></li>
+          <li><span><b>No React error boundaries</b> (<code class="inl">0 app/**/error.tsx</code>) — a render throw white-screens the route.</span></li>
+          <li><span><b>No graceful shutdown</b> — <code class="inl">enableShutdownHooks()</code> not called; in-flight sockets dropped on deploy.</span></li>
+          <li><span><b>No structured logging / error monitoring</b> — <code class="inl">console.log</code> only; no request ids, no Sentry/OTel.</span></li>
+          <li><span><b>SQLite is the default DB</b> — production must set <code class="inl">DB_TYPE=mysql</code> with a connection pool.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="find p3">
+      <div class="rail"></div><div class="in">
+        <div class="hd"><span class="chip p3">P3</span><h3>Polish</h3></div>
+        <ul class="good" style="gap:8px">
+          <li><span>Hardcoded <code class="inl">api/v1</code> prefix per controller — prefer <code class="inl">setGlobalPrefix</code> + versioning.</span></li>
+          <li><span>No OpenAPI/Swagger for REST; no documented socket-event contract.</span></li>
+          <li><span>No request-id / correlation-id propagation.</span></li>
+          <li><span>~A dozen mock-only frontend write-actions + RMA/exception list pages remain (see <code class="inl">docs/BACKEND-AUDIT.md</code>) — feature-complete, not launch-blocking.</span></li>
+          <li><span>Product images reference remote Unsplash URLs (blocked by CSP in some envs) — move to owned/CDN assets.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">Recommended order of work</h2>
+    <ol class="order">
+      <li><span><b>P0-3</b> — fail-fast on default secrets. One file, immediate safety.</span></li>
+      <li><span><b>P0-2</b> — <code>synchronize:false</code> + generate migrations. Prevents data loss.</span></li>
+      <li><span><b>P0-1</b> — wire real login / register. Unlocks real users.</span></li>
+      <li><span><b>P1-1</b> — socket token refresh. Sessions survive past 15 minutes.</span></li>
+      <li><span><b>P0-4</b> — real payment gateway. Largest external dependency; scope separately (needs a PSP + credentials).</span></li>
+      <li><span><b>P1-2 / P1-3</b> — WebSocket throttle + payload validation, then <b>P1-4</b> tests, then P2 / P3.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    Somba&amp;Teka production-readiness audit · evidence-cited against branch <b>claude/somba-api-analysis-4rg0y7</b> ·
+    companion document: docs/PRODUCTION-READINESS-AUDIT.md
+  </footer>
+</div>
+</body>
+</html>
