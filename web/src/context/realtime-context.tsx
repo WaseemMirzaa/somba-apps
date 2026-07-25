@@ -134,6 +134,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const booted = useRef(false);
+  // Assigned below; lets the socket's `unauthorized` handler trigger a token
+  // refresh + reconnect without a circular hook dependency.
+  const reauthRef = useRef<() => void>(() => {});
 
   const logout = useCallback(() => {
     authApi.clear();
@@ -161,10 +164,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("connect", () => setStatus("connected"));
     s.on("disconnect", () => setStatus("connecting"));
     s.on("connect_error", () => setStatus("error"));
-    s.on("unauthorized", () => {
-      setError("Session expired. Please sign in again.");
-      logout();
-    });
+    // Access token likely expired. Try to refresh + reconnect before giving up.
+    s.on("unauthorized", () => reauthRef.current());
 
     // Server pushes — no polling.
     s.on("order:created", (o: Order) => setOrders((cur) => upsert(cur, o)));
@@ -274,6 +275,33 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     },
     [bind],
   );
+
+  /**
+   * The access token expired and the socket was rejected. Rotate it with the
+   * stored refresh token and reconnect — no forced logout, no lost session.
+   * Only falls back to logout if the refresh itself fails (revoked / expired).
+   */
+  const handleUnauthorized = useCallback(async () => {
+    const refresh = authApi.getRefresh();
+    if (!refresh) {
+      setError("Session expired. Please sign in again.");
+      logout();
+      return;
+    }
+    try {
+      const result = await authApi.refresh(refresh);
+      authApi.saveTokens(result);
+      await connectWith(result.accessToken, result.user);
+    } catch {
+      authApi.clear();
+      setError("Session expired. Please sign in again.");
+      logout();
+    }
+  }, [connectWith, logout]);
+
+  useEffect(() => {
+    reauthRef.current = () => void handleUnauthorized();
+  }, [handleUnauthorized]);
 
   const login = useCallback(
     async (email: string, password: string) => {

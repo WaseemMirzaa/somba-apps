@@ -189,12 +189,15 @@ type AuthContextType = {
   isAuthenticated: boolean;
   authReady: boolean;
   login: (personaId: string) => void;
+  signInReal: (role: Persona["role"]) => void;
   logout: () => void;
   switchPersona: (personaId: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 const STORAGE_KEY = "somba-persona-id";
+/** Marks that a REAL backend user is signed in (not a demo persona bridge). */
+const REAL_SESSION_KEY = "somba-real-session";
 
 /**
  * Bridge each demo persona to its seeded backend account so selecting a role in
@@ -257,10 +260,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthReady(true);
   }, [personas]);
 
+  // Selecting a DEMO persona (the role picker) drops any real session and lets
+  // the bridge sign into the seeded demo account for that role.
   const login = useCallback(
     (personaId: string) => {
       const p = personas.find((x) => x.id === personaId);
       if (p) {
+        localStorage.removeItem(REAL_SESSION_KEY);
         setPersona(p);
         localStorage.setItem(STORAGE_KEY, personaId);
       }
@@ -268,18 +274,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [personas]
   );
 
+  /**
+   * A REAL user has signed in/registered against the backend (the socket is
+   * already authenticated as them via rt.login/rt.register). Set the persona to
+   * their role for portal gating, and mark the session real so the demo bridge
+   * never overwrites it with a seeded account.
+   */
+  const signInReal = useCallback(
+    (role: Persona["role"]) => {
+      localStorage.setItem(REAL_SESSION_KEY, "1");
+      const p =
+        personas.find((x) => x.role === role && x.id !== "guest") ??
+        STATIC_PERSONAS[0];
+      setPersona(p);
+      localStorage.setItem(STORAGE_KEY, p.id);
+    },
+    [personas]
+  );
+
   const logout = useCallback(() => {
     setPersona(STATIC_PERSONAS[0]);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REAL_SESSION_KEY);
     rt.logout();
   }, [rt]);
 
   // Keep the real backend socket session in sync with the selected persona, so
-  // every portal reads live data over the authenticated socket. Runs after the
-  // persona is resolved/restored and whenever it changes.
+  // every DEMO portal reads live data over the authenticated socket. Skipped
+  // entirely when a real user session is active (they manage their own auth).
   const bridgingRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authReady) return;
+    if (localStorage.getItem(REAL_SESSION_KEY)) return; // real session — hands off
     const email = backendEmailFor(persona);
     if (!email) {
       bridgingRef.current = null;
@@ -306,6 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: persona.role !== "guest",
         authReady,
         login,
+        signInReal,
         logout,
         switchPersona,
       }}
