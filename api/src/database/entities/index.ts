@@ -44,3 +44,70 @@ export type {
   ExceptionStatus,
 } from './warehouse-exception.entity';
 export { WishlistItem } from './wishlist-item.entity';
+
+// ── Single source of truth for the entity set (runtime + migration CLI) ──
+import { User } from './user.entity';
+import { Seller } from './seller.entity';
+import { Product } from './product.entity';
+import { Order } from './order.entity';
+import { OrderItem } from './order-item.entity';
+import { Notification } from './notification.entity';
+import { DeliveryTask } from './delivery-task.entity';
+import { WalletTransaction } from './wallet-transaction.entity';
+import { Payment } from './payment.entity';
+import { Payout } from './payout.entity';
+import { Dispute } from './dispute.entity';
+import { Category } from './category.entity';
+import { Address } from './address.entity';
+import { Review } from './review.entity';
+import { ProductQuestion } from './product-question.entity';
+import { SupportTicket } from './support-ticket.entity';
+import { Promo } from './promo.entity';
+import { FlashSale } from './flash-sale.entity';
+import { CmsBlock } from './cms-block.entity';
+import { Setting } from './setting.entity';
+import { AuditLog } from './audit-log.entity';
+import { FraudAlert } from './fraud-alert.entity';
+import { Broadcast } from './broadcast.entity';
+import { Hub } from './hub.entity';
+import { WarehouseBatch } from './warehouse-batch.entity';
+import { StockTransfer } from './stock-transfer.entity';
+import { Campaign } from './campaign.entity';
+import { Replacement } from './replacement.entity';
+import { Exchange } from './exchange.entity';
+import { WarehouseException } from './warehouse-exception.entity';
+import { WishlistItem } from './wishlist-item.entity';
+
+export const ENTITIES = [
+  User,
+  Seller,
+  Product,
+  Order,
+  OrderItem,
+  Notification,
+  DeliveryTask,
+  WalletTransaction,
+  Payment,
+  Payout,
+  Dispute,
+  Category,
+  Address,
+  Review,
+  ProductQuestion,
+  SupportTicket,
+  Promo,
+  FlashSale,
+  CmsBlock,
+  Setting,
+  AuditLog,
+  FraudAlert,
+  Broadcast,
+  Hub,
+  WarehouseBatch,
+  StockTransfer,
+  Campaign,
+  Replacement,
+  Exchange,
+  WarehouseException,
+  WishlistItem,
+];

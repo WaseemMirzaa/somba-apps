@@ -1,73 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
-import {
-  Address,
-  Category,
-  Review,
-  ProductQuestion,
-  SupportTicket,
-  Promo,
-  FlashSale,
-  CmsBlock,
-  Setting,
-  AuditLog,
-  FraudAlert,
-  Broadcast,
-  Hub,
-  WarehouseBatch,
-  StockTransfer,
-  Campaign,
-  Replacement,
-  Exchange,
-  WarehouseException,
-  WishlistItem,
-  DeliveryTask,
-  Dispute,
-  Notification,
-  Order,
-  OrderItem,
-  Payment,
-  Payout,
-  Product,
-  Seller,
-  User,
-  WalletTransaction,
-} from './entities';
-
-const ENTITIES = [
-  User,
-  Seller,
-  Product,
-  Order,
-  OrderItem,
-  Notification,
-  DeliveryTask,
-  WalletTransaction,
-  Payment,
-  Payout,
-  Dispute,
-  Category,
-  Address,
-  Review,
-  ProductQuestion,
-  SupportTicket,
-  Promo,
-  FlashSale,
-  CmsBlock,
-  Setting,
-  AuditLog,
-  FraudAlert,
-  Broadcast,
-  Hub,
-  WarehouseBatch,
-  StockTransfer,
-  Campaign,
-  Replacement,
-  Exchange,
-  WarehouseException,
-  WishlistItem,
-];
+import { ENTITIES } from './entities';
 
 /**
  * TypeORM wiring. `DB_TYPE=sqlite` (default) runs anywhere with a local file;
@@ -91,6 +25,14 @@ const ENTITIES = [
           synchronize: boolean;
         }>('db')!;
 
+        // In production, apply pending migrations on boot (safe) instead of
+        // auto-syncing the schema (destructive). Toggle with DB_MIGRATIONS_RUN.
+        const migrations = [__dirname + '/migrations/*.{ts,js}'];
+        const migrationsRun =
+          (process.env.DB_MIGRATIONS_RUN ??
+            (process.env.NODE_ENV === 'production' ? 'true' : 'false')) ===
+          'true';
+
         if (db.type === 'mysql') {
           return {
             type: 'mysql',
@@ -100,6 +42,8 @@ const ENTITIES = [
             password: db.password,
             database: db.mysqlDatabase,
             entities: ENTITIES,
+            migrations,
+            migrationsRun,
             synchronize: db.synchronize,
             charset: 'utf8mb4',
           };
@@ -108,6 +52,8 @@ const ENTITIES = [
           type: 'better-sqlite3',
           database: db.database,
           entities: ENTITIES,
+          migrations,
+          migrationsRun,
           synchronize: db.synchronize,
         };
       },

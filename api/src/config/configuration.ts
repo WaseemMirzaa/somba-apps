@@ -59,7 +59,12 @@ export default (): AppConfig => ({
     username: process.env.DB_USERNAME ?? 'root',
     password: process.env.DB_PASSWORD ?? '',
     mysqlDatabase: process.env.DB_DATABASE ?? 'somba',
-    // Auto-sync schema in dev; in prod use migrations instead.
-    synchronize: (process.env.DB_SYNCHRONIZE ?? 'true') === 'true',
+    // Auto-sync schema in dev only. Defaults to OFF in production so TypeORM
+    // never auto-alters (and risks dropping) live columns — prod uses
+    // migrations. An explicit DB_SYNCHRONIZE overrides the default, but the
+    // production guard (assert-production.ts) still refuses to boot if it's on.
+    synchronize:
+      (process.env.DB_SYNCHRONIZE ??
+        (process.env.NODE_ENV === 'production' ? 'false' : 'true')) === 'true',
   },
 });
