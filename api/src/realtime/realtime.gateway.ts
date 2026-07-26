@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseInterceptors } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -9,6 +9,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { WsThrottleInterceptor } from './ws-throttle.interceptor';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
@@ -64,12 +65,22 @@ function fail(error: string) {
   return { ok: false as const, error };
 }
 
+/** Validate a positive money amount (USD), rounded to cents. Throws otherwise. */
+function assertAmount(x: unknown): number {
+  const n = typeof x === 'number' ? x : Number(x);
+  if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) {
+    throw new Error('Amount must be a positive number.');
+  }
+  return Number(n.toFixed(2));
+}
+
 /**
  * The single real-time surface of the app. After a one-shot REST login, every
  * client opens ONE socket (JWT in the handshake) and does all reads, writes,
  * and live updates here — no repeated HTTP polling. Handlers return acks for
  * request/response; the server pushes events into user/role rooms for updates.
  */
+@UseInterceptors(WsThrottleInterceptor)
 @WebSocketGateway({
   cors: { origin: true, credentials: true },
 })
@@ -113,6 +124,7 @@ export class RealtimeGateway
     private readonly replacements: ReplacementsService,
     private readonly exchanges: ExchangesService,
     private readonly emitter: RealtimeEmitter,
+    private readonly throttle: WsThrottleInterceptor,
   ) {}
 
   private isOps(role: string) {
@@ -179,6 +191,7 @@ export class RealtimeGateway
   handleDisconnect(client: AuthedSocket): void {
     const u = client.data.user;
     if (u) this.logger.log(`disconnected ${u.role} ${u.id}`);
+    this.throttle.release(client.id);
   }
 
   /** Require a real, signed-in account (rejects anonymous guests). */
@@ -417,7 +430,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.wallet.topUp(user.id, body.amountUsd, body.method));
+      const amount = assertAmount(body?.amountUsd);
+      return ok(await this.wallet.topUp(user.id, amount, body.method));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -469,10 +483,11 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'seller') return fail('Sellers only.');
+      const amount = assertAmount(body?.amountUsd);
       return ok(
         await this.payouts.request(
           { id: user.id, name: user.name },
-          body.amountUsd,
+          amount,
           body.method,
         ),
       );

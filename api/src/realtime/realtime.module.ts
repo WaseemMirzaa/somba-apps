@@ -16,6 +16,7 @@ import { OpsModule } from '../ops/ops.module';
 import { WarehouseModule } from '../warehouse/warehouse.module';
 import { FlowsModule } from '../flows/flows.module';
 import { RealtimeGateway } from './realtime.gateway';
+import { WsThrottleInterceptor } from './ws-throttle.interceptor';
 
 @Module({
   imports: [
@@ -36,6 +37,6 @@ import { RealtimeGateway } from './realtime.gateway';
     WarehouseModule,
     FlowsModule,
   ],
-  providers: [RealtimeGateway],
+  providers: [RealtimeGateway, WsThrottleInterceptor],
 })
 export class RealtimeModule {}
