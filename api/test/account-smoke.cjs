@@ -5,10 +5,12 @@
  *   API_URL=http://localhost:3001 ADMIN_EMAIL=... ADMIN_PASSWORD=... node test/account-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { createHmac } = require('crypto');
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@somba.app';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Somba@2026';
+const MM_SECRET = process.env.MM_WEBHOOK_SECRET ?? 'dev-only-mm-webhook-secret';
 const tag = Date.now().toString().slice(-8);
 
 let pass = 0;
@@ -161,14 +163,111 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     products = [p.data];
   }
   const pid = products[0].id;
-  for (const method of ['orange_money', 'vodacom_mpesa']) {
-    a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: method, deliveryFeeUsd: 5 });
-    ok(a.ok && a.data.paymentMethod === method, `order paid with ${method}`, a.error ?? '');
-  }
+  const PHONE = '+243 81 234 5678';
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const orderOf = async (id) => (await req(s, 'orders:list')).data.find((o) => o.id === id);
+  const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
+  const balance = async () => (await req(s, 'wallet:get')).data.balance;
+  const webhook = (obj, secret = MM_SECRET) => {
+    const raw = JSON.stringify(obj);
+    return fetch(API + '/api/v1/payments/webhook/mobile-money', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-sandbox-signature': createHmac('sha256', secret).update(raw).digest('hex') },
+      body: raw,
+    });
+  };
+  const payOf = async (orderId) => (await req(s, 'payments:list')).data.find((p) => p.orderId === orderId);
+
+  console.log('\n— Cash on delivery is off by default');
+  await req(admin, 'settings:set', { key: 'codEnabled', value: 'false' }); // (another suite may have enabled it)
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'cod', deliveryFeeUsd: 5 });
+  ok(!a.ok && /not available/i.test(a.error ?? ''), 'COD refused while codEnabled is false', a.error ?? '');
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'bitcoin', deliveryFeeUsd: 5 });
+  ok(!a.ok, 'unknown payment method refused');
+
+  console.log('\n— Mobile money (Airtel / Orange / M-Pesa): pending until the network confirms');
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5 });
+  ok(!a.ok && /phone/i.test(a.error ?? ''), 'mobile money needs a phone number', a.error ?? '');
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, paymentPhone: 'abc' });
+  ok(!a.ok, 'invalid phone number refused');
+  const stockBefore = (await req(s, 'products:get', { id: pid })).data.stock;
+
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  ok(a.ok && a.data.status === 'pending', 'mobile-money order starts PENDING (not paid yet)', a.error ?? '');
+  const mm1 = a.data;
+  let pay = await payOf(mm1.id);
+  ok(pay && pay.status === 'pending' && pay.purpose === 'order' && pay.providerRef?.startsWith('sbx_'), 'payment is pending with a provider reference');
+  ok(pay && !pay.phone.includes('81 234') && pay.phone.includes('…'), 'subscriber number is masked in payment records');
+  const unassignedNow = (await req(admin, 'delivery:unassigned')).data;
+  ok(a.ok && !unassignedNow.some((t) => t.orderId === mm1.id), 'unpaid order is NOT visible to the warehouse/riders yet');
+  a = await req(admin, 'orders:updateStatus', { orderId: mm1.id, status: 'shipped' });
+  ok(!a.ok && /payment/i.test(a.error ?? ''), 'staff cannot ship an unpaid order', a.error ?? '');
+  ok((await req(s, 'products:get', { id: pid })).data.stock === stockBefore - 1, 'stock is reserved while waiting for approval');
+
+  const confirmed = await until(async () => { const o = await orderOf(mm1.id); return o?.status === 'confirmed' ? o : null; });
+  ok(!!confirmed, 'subscriber approves → order becomes CONFIRMED (live)');
+  ok((await req(admin, 'delivery:unassigned')).data.some((t) => t.orderId === mm1.id), 'confirmed order now reaches the warehouse');
+  ok((await payOf(mm1.id))?.status === 'succeeded', 'payment is succeeded');
+
+  // declined by the subscriber (sandbox: number ending 0000) → cancelled + restocked
+  const stock2 = (await req(s, 'products:get', { id: pid })).data.stock;
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'vodacom_mpesa', deliveryFeeUsd: 5, paymentPhone: '+243810000000' });
+  ok(a.ok, 'M-Pesa order placed');
+  const declined = await until(async () => { const o = await orderOf(a.data.id); return o?.status === 'cancelled' ? o : null; });
+  ok(!!declined, 'declined payment → order CANCELLED');
+  ok((await req(s, 'products:get', { id: pid })).data.stock === stock2, 'declined payment → stock released');
+
+  console.log('\n— Webhook security + idempotency');
+  const body = (ref, extra = {}) => ({ reference: ref, status: 'succeeded', providerRef: `agg_${ref}`, ...extra });
+  const bal0 = await balance();
+  a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'orange_money', phone: PHONE });
+  ok(a.ok && a.data.status === 'pending' && a.data.purpose === 'topup', 'top-up returns a PENDING payment (wallet not credited yet)', a.error ?? '');
+  const topRef = a.data.reference;
+  ok((await balance()) === bal0, 'wallet is NOT credited before confirmation');
+  let w = await webhook(body(topRef), 'wrong-secret');
+  ok(w.status === 401, 'webhook with a bad signature is rejected (401)');
+  w = await fetch(API + '/api/v1/payments/webhook/mobile-money', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(topRef)) });
+  ok(w.status === 401, 'unsigned webhook is rejected (401)');
+  w = await webhook(body(topRef, { amountUsd: 1 }));
+  ok(w.status === 200 && (await balance()) === bal0, 'webhook reporting the WRONG amount does not credit the wallet');
+  w = await webhook(body(topRef, { amountUsd: 25 }));
+  ok(w.status === 200, 'correctly signed webhook accepted');
+  ok((await until(async () => (await balance()) === bal0 + 25)) !== null, 'wallet credited +$25 by the webhook');
+  await webhook(body(topRef, { amountUsd: 25 })); // replay
+  await sleep(2200); // sandbox auto-confirm timer also fires — must not double-credit
+  ok((await balance()) === bal0 + 25, 'replayed webhook + sandbox timer do NOT double-credit');
+  w = await webhook(body('PAY-DOESNOTEXIST'));
+  ok(w.status === 200, 'webhook for an unknown reference is acknowledged, not an error');
+  a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'stripe_card', phone: PHONE });
+  ok(!a.ok, 'top-up only via mobile money');
+  a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'airtel_money' });
+  ok(!a.ok, 'top-up needs a phone number');
+
+  console.log('\n— Cancelling an UNPAID order gives no free refund; a late payment is not lost');
+  const bal1 = await balance();
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  const unpaid = a.data;
+  const unpaidPay = await payOf(unpaid.id);
+  a = await req(s, 'orders:cancel', { orderId: unpaid.id });
+  ok(a.ok && a.data.status === 'cancelled', 'customer cancels the unpaid order');
+  ok((await balance()) === bal1, 'cancelling an unpaid order does NOT credit the wallet');
+  ok((await payOf(unpaid.id))?.status === 'failed', 'its pending payment is closed');
+  await webhook(body(unpaidPay.reference, { amountUsd: unpaid.totalUsd }));
+  ok((await until(async () => (await balance()) === bal1 + unpaid.totalUsd)) !== null, 'money that arrives after cancellation is credited to the wallet (not lost)');
+  ok((await orderOf(unpaid.id))?.status === 'cancelled', 'the cancelled order stays cancelled');
+
+  console.log('\n— Cancelling a PAID order refunds exactly once');
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  const paid = a.data;
+  await until(async () => (await orderOf(paid.id))?.status === 'confirmed');
+  const bal2 = await balance();
+  a = await req(s, 'orders:cancel', { orderId: paid.id });
+  ok(a.ok, 'customer cancels the paid order');
+  ok((await balance()) === bal2 + paid.totalUsd, `paid order refunded to wallet (+$${paid.totalUsd})`);
 
   console.log('\n— Order integrity (the server, not the client, decides the price)');
   const real = (await req(s, 'products:get', { id: pid })).data;
-  const mk = (over) => ({ items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, ...over });
+  const mk = (over) => ({ items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 5, ...over });
   a = await req(s, 'orders:create', mk({ deliveryFeeUsd: -5 }));
   ok(!a.ok, 'negative delivery fee rejected');
   a = await req(s, 'orders:create', mk({ deliveryFeeUsd: 9999 }));

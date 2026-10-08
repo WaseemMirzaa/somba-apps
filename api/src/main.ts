@@ -9,7 +9,9 @@ import { SocketIoAdapter } from './realtime/socket-io.adapter';
 import { UPLOAD_DIR } from './uploads/uploads.controller';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true, // payment webhooks are signed over the exact bytes received
+  });
   const config = app.get(ConfigService);
 
   // Refuse to boot in production with insecure defaults.

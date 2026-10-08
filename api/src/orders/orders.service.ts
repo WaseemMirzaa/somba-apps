@@ -37,6 +37,8 @@ export interface CreateOrderInput {
   zoneId?: string;
   deliveryFeeUsd?: number;
   shippingAddress?: string; // JSON string; encrypted at rest
+  /** Mobile-money subscriber number that will approve the charge. */
+  paymentPhone?: string;
 }
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
@@ -52,7 +54,13 @@ export class OrdersService {
     private readonly emitter: RealtimeEmitter,
     private readonly payments: PaymentsService,
     private readonly wallet: WalletService,
-  ) {}
+  ) {
+    // Mobile-money confirmations arrive asynchronously (webhook): the payment
+    // service tells us when an order's payment is finally settled.
+    this.payments.registerOrderSettledHandler((payment, outcome) =>
+      this.onPaymentSettled(payment, outcome),
+    );
+  }
 
   async create(
     customer: { id: string; name: string },
@@ -61,6 +69,9 @@ export class OrdersService {
     if (!input.items?.length) {
       throw new BadRequestException('An order needs at least one item.');
     }
+
+    // Refuse a disabled/unavailable method BEFORE any row is written.
+    await this.payments.assertMethodAllowed(input.paymentMethod);
 
     const MAX_QTY = 100;
     const MAX_DELIVERY_FEE = Number(process.env.MAX_DELIVERY_FEE_USD ?? 50);
@@ -159,9 +170,18 @@ export class OrdersService {
     });
     let saved = await this.orders.save(order);
 
-    // Charge for the order. Prepaid methods confirm immediately; COD stays
-    // pending until the rider collects on delivery.
-    const payment = await this.payments.processForOrder(saved);
+    // Charge for the order. Wallet/card confirm immediately; COD stays pending
+    // until the rider collects; mobile money stays pending until the subscriber
+    // approves on their phone (the webhook then confirms).
+    let payment;
+    try {
+      payment = await this.payments.processForOrder(saved, input.paymentPhone);
+    } catch (err) {
+      saved.status = 'cancelled'; // never leave a dangling unpaid order behind
+      await this.orders.save(saved);
+      throw err;
+    }
+    const awaitingPayment = payment.status === 'pending' && payment.method !== 'cod';
     if (payment.status === 'succeeded') {
       saved.status = 'confirmed';
       saved = await this.orders.save(saved);
@@ -172,35 +192,80 @@ export class OrdersService {
       await this.products.decrementStock(reserve.productId, reserve.qty);
     }
 
-    // Create an unassigned delivery task so the warehouse/riders see it.
-    await this.deliveries.save(
-      this.deliveries.create({
-        orderId: saved.id,
-        orderReference: saved.reference,
-        status: 'unassigned',
-        address: saved.shippingAddress,
-        zoneId: saved.zoneId,
-        codAmountUsd: saved.paymentMethod === 'cod' ? saved.totalUsd : 0,
-      }),
-    );
-
-    // Push the new order live to the customer AND every ops dashboard.
     this.emitter.toUser(customer.id, 'order:created', saved);
-    this.emitter.toRoles(OPS_ROOMS, 'order:created', saved);
-    await this.notifications.toAdmins({
-      title: 'New order',
-      body: `${saved.reference} · $${saved.totalUsd.toFixed(2)} from ${customer.name}`,
-      type: 'order',
-      entityId: saved.id,
-    });
-    await this.notifications.toUser(customer.id, {
-      title: 'Order placed',
-      body: `We received ${saved.reference}. You'll get updates here in real time.`,
-      type: 'order',
-      entityId: saved.id,
-    });
+    if (awaitingPayment) {
+      // Not fulfillable yet: ops hear about it only once the money is in.
+      await this.notifications.toUser(customer.id, {
+        title: 'Approve your payment',
+        body: `Approve the ${payment.method.replace(/_/g, ' ')} request on your phone to confirm ${saved.reference}.`,
+        type: 'order',
+        entityId: saved.id,
+      });
+    } else {
+      await this.openFulfilment(saved);
+      await this.notifications.toUser(customer.id, {
+        title: 'Order placed',
+        body: `We received ${saved.reference}. You'll get updates here in real time.`,
+        type: 'order',
+        entityId: saved.id,
+      });
+    }
 
     return saved;
+  }
+
+  /** Make a paid (or COD) order visible to the warehouse, riders and admins. */
+  private async openFulfilment(order: Order): Promise<void> {
+    await this.deliveries.save(
+      this.deliveries.create({
+        orderId: order.id,
+        orderReference: order.reference,
+        status: 'unassigned',
+        address: order.shippingAddress,
+        zoneId: order.zoneId,
+        codAmountUsd: order.paymentMethod === 'cod' ? order.totalUsd : 0,
+      }),
+    );
+    this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
+    await this.notifications.toAdmins({
+      title: 'New order',
+      body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
+      type: 'order',
+      entityId: order.id,
+    });
+  }
+
+  /** A mobile-money payment reached its final state (webhook, sandbox, or timeout). */
+  private async onPaymentSettled(
+    payment: { orderId: string | null; failureReason: string | null },
+    outcome: 'succeeded' | 'failed',
+  ): Promise<void> {
+    if (!payment.orderId) return;
+    const order = await this.orders.findOne({ where: { id: payment.orderId } });
+    if (!order || order.status !== 'pending') return;
+
+    if (outcome === 'succeeded') {
+      order.status = 'confirmed';
+      const saved = await this.orders.save(order);
+      await this.openFulfilment(saved);
+      this.emitter.toUser(saved.customerId, 'order:updated', saved);
+      return;
+    }
+
+    order.status = 'cancelled';
+    const saved = await this.orders.save(order);
+    for (const item of saved.items ?? []) {
+      if (!item.productId.startsWith('ext:')) {
+        await this.products.restock(item.productId, item.qty);
+      }
+    }
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    await this.notifications.toUser(saved.customerId, {
+      title: 'Order cancelled',
+      body: `${saved.reference} was cancelled: ${payment.failureReason ?? 'payment was not completed'}.`,
+      type: 'order',
+      entityId: saved.id,
+    });
   }
 
   async updateStatus(
@@ -209,6 +274,12 @@ export class OrdersService {
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
+    if (order.status === 'pending' && status !== 'cancelled' && order.paymentMethod !== 'cod') {
+      const pay = await this.payments.forOrder(order.id);
+      if (pay && pay.status === 'pending') {
+        throw new BadRequestException('Awaiting payment — this order cannot be fulfilled yet.');
+      }
+    }
     order.status = status;
     const saved = await this.orders.save(order);
 
@@ -247,6 +318,11 @@ export class OrdersService {
       );
     }
 
+    // Was the money actually received? (pending mobile money / COD: no refund due)
+    const payment = await this.payments.forOrder(order.id);
+    const wasPaid = payment?.status === 'succeeded' && order.paymentMethod !== 'cod';
+    if (!wasPaid) await this.payments.abandonPending(order.id);
+
     order.status = 'cancelled';
     const saved = await this.orders.save(order);
 
@@ -257,8 +333,8 @@ export class OrdersService {
       }
     }
 
-    // Refund prepaid orders to the wallet (COD never charged).
-    if (saved.paymentMethod !== 'cod' && saved.status !== 'pending') {
+    // Refund only money we actually collected.
+    if (wasPaid) {
       await this.wallet.refund(
         saved.customerId,
         saved.totalUsd,
@@ -279,7 +355,7 @@ export class OrdersService {
     this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
-      body: `${saved.reference} was cancelled.${saved.paymentMethod !== 'cod' ? ' Refund credited to your wallet.' : ''}`,
+      body: `${saved.reference} was cancelled.${wasPaid ? ' Refund credited to your wallet.' : ''}`,
       type: 'order',
       entityId: saved.id,
     });

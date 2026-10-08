@@ -79,6 +79,20 @@ async function main() {
   const products = await emit<any[]>(cSock, 'products:list');
   check(`customer fetched ${products.length} products over socket`, products.length > 0);
 
+  // COD is off by default (client scope: codEnabled=false) — refused until an admin enables it.
+  let codRefused = false;
+  try {
+    await emit(cSock, 'orders:create', {
+      items: [{ productId: products[0].id, qty: 1 }],
+      paymentMethod: 'cod',
+      deliveryFeeUsd: 0,
+    });
+  } catch {
+    codRefused = true;
+  }
+  check('COD refused while codEnabled is false (default)', codRefused);
+  await emit(aSock, 'settings:set', { key: 'codEnabled', value: 'true' });
+
   // Admin dashboard listens for the new order pushed in real time.
   const adminSawOrder = waitFor<any>(aSock, 'order:created');
   const created = await emit<any>(cSock, 'orders:create', {
@@ -133,7 +147,7 @@ async function main() {
   check(`customer wallet has a balance ($${startBal})`, startBal > 0);
 
   const walletUpdated = waitFor<{ balance: number }>(cSock, 'wallet:updated');
-  await emit(cSock, 'wallet:topup', { amountUsd: 100, method: 'airtel_money' });
+  await emit(cSock, 'wallet:topup', { amountUsd: 100, method: 'airtel_money', phone: '+243812345678' });
   const afterTopup = await walletUpdated;
   check('wallet top-up pushed new balance live', afterTopup.balance === startBal + 100);
 

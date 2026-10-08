@@ -197,6 +197,7 @@ async function run() {
   await setRepo.save([
     setRepo.create({ key: 'fxRate', value: '2850' }),
     setRepo.create({ key: 'codCapUsd', value: '500' }),
+    setRepo.create({ key: 'codEnabled', value: 'false' }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
   ]);
 

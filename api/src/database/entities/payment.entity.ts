@@ -6,9 +6,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { encryptedColumn } from '../../common/crypto/field-crypto';
+
+export type PaymentPurpose = 'order' | 'topup';
 
 export type PaymentStatus =
-  | 'pending' // COD — collected on delivery
+  | 'pending' // COD collected on delivery, or mobile money awaiting approval
   | 'succeeded'
   | 'failed'
   | 'refunded';
@@ -22,12 +25,25 @@ export class Payment {
   @Column({ type: 'varchar', length: 24 })
   reference: string;
 
+  /** null for wallet top-ups, which have no order. */
   @Index()
-  @Column({ type: 'varchar' })
-  orderId: string;
+  @Column({ type: 'varchar', nullable: true })
+  orderId: string | null;
 
-  @Column({ type: 'varchar' })
-  orderReference: string;
+  @Column({ type: 'varchar', nullable: true })
+  orderReference: string | null;
+
+  /** What the money is for: an order, or a wallet top-up. */
+  @Column({ type: 'varchar', length: 10, default: 'order' })
+  purpose: PaymentPurpose;
+
+  /** The mobile-money aggregator's own transaction id (for reconciliation). */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  providerRef: string | null;
+
+  /** Subscriber number that approves the charge. Encrypted at rest. */
+  @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
+  phone: string | null;
 
   @Index()
   @Column({ type: 'varchar' })

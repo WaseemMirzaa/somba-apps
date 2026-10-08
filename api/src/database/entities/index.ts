@@ -10,7 +10,7 @@ export { DeliveryTask } from './delivery-task.entity';
 export type { DeliveryStatus } from './delivery-task.entity';
 export { WalletTransaction } from './wallet-transaction.entity';
 export { Payment } from './payment.entity';
-export type { PaymentStatus } from './payment.entity';
+export type { PaymentStatus, PaymentPurpose } from './payment.entity';
 export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
 export { Dispute } from './dispute.entity';

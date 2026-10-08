@@ -75,6 +75,7 @@ async function run() {
   const defaults: Record<string, string> = {
     fxRate: '2850',
     codCapUsd: '500',
+    codEnabled: 'false', // matches the client scope: no cash on delivery at launch
     commissionPct: '12',
   };
   for (const [key, value] of Object.entries(defaults)) {

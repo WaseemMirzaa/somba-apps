@@ -53,6 +53,10 @@ export function assertProductionConfig(config: ConfigService): void {
     );
   }
 
+  if ((process.env.MM_PROVIDER ?? '').toLowerCase() === 'sandbox') {
+    problems.push('MM_PROVIDER=sandbox is not allowed in production (it moves no real money).');
+  }
+
   if (problems.length) {
     for (const p of problems) logger.error(p);
     throw new Error(
@@ -69,6 +73,9 @@ export function assertProductionConfig(config: ConfigService): void {
   }
   if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     logger.warn('Firebase not configured — push notifications disabled (in-app realtime still works).');
+  }
+  if (!process.env.MM_PROVIDER || process.env.MM_PROVIDER.toLowerCase() === 'none') {
+    logger.warn('No mobile-money provider configured — mobile-money checkout and wallet top-ups are refused until MM_PROVIDER is set.');
   }
   logger.log('Production config validated ✓');
 }

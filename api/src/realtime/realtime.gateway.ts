@@ -353,8 +353,15 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('delivery:unassigned')
-  async deliveryUnassigned() {
-    return ok(await this.delivery.listUnassigned());
+  async deliveryUnassigned(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      // Tasks carry customers' delivery addresses: riders and ops only.
+      const user = this.requireUser(client);
+      if (user.role !== 'rider' && !this.isOps(user.role)) return fail('Not allowed.');
+      return ok(await this.delivery.listUnassigned());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 
   @SubscribeMessage('delivery:accept')
@@ -426,15 +433,19 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * Top up the wallet through mobile money. Returns the PENDING payment; the
+   * wallet is credited only when the network confirms (wallet:updated push).
+   */
   @SubscribeMessage('wallet:topup')
   async walletTopup(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { amountUsd: number; method?: string },
+    @MessageBody() body: { amountUsd: number; method?: string; phone?: string },
   ) {
     try {
       const user = this.requireUser(client);
       const amount = assertAmount(body?.amountUsd);
-      return ok(await this.wallet.topUp(user.id, amount, body.method));
+      return ok(await this.payments.startTopUp(user.id, amount, String(body?.method ?? ''), body?.phone));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -446,6 +457,19 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       return ok(await this.payments.list(user));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('payments:status')
+  async paymentsStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { reference: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.payments.status(user, String(body?.reference ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1613,9 +1637,17 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('notifications:markRead')
-  async notificationsMarkRead(@MessageBody() body: { id: string }) {
-    await this.notifications.markRead(body.id);
-    return ok({ id: body.id });
+  async notificationsMarkRead(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      await this.notifications.markRead(String(body?.id ?? ''), user.id);
+      return ok({ id: body.id });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 
   // ---- Own account: profile, preferences, password, deletion -------------

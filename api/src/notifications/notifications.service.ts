@@ -93,8 +93,9 @@ export class NotificationsService {
     });
   }
 
-  async markRead(id: string): Promise<void> {
-    await this.repo.update({ id }, { read: true });
+  /** Scoped to the owner so one user cannot touch another's notifications. */
+  async markRead(id: string, userId: string): Promise<void> {
+    await this.repo.update({ id, userId }, { read: true });
   }
 
   /** Mark every one of a user's notifications read in a single call. */
