@@ -58,6 +58,20 @@ export class User {
   @Column({ type: 'varchar', length: 4, default: 'en' })
   locale: 'en' | 'fr';
 
+  @Column({ type: 'boolean', default: false })
+  emailVerified: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  phoneVerified: boolean;
+
+  /** Public URL of the profile picture (from POST /api/v1/uploads). */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  avatar: string | null;
+
+  /** JSON: { push, email, sms, personalize, market } — see UsersService.prefs. */
+  @Column({ type: 'text', nullable: true })
+  prefs: string | null;
+
   /** Wallet store-credit balance in USD. */
   @Column({ type: 'float', default: 0 })
   walletBalance: number;

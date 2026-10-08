@@ -37,5 +37,5 @@ const options: DataSourceOptions =
         synchronize: false,
       };
 
-export const AppDataSource = new DataSource(options);
-export default AppDataSource;
+// The TypeORM CLI requires exactly ONE exported DataSource instance.
+export default new DataSource(options);

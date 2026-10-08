@@ -12,14 +12,14 @@ services:
     image: mysql:8
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass_change_me
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: somba
       MYSQL_USER: somba
-      MYSQL_PASSWORD: somba_change_me
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-psomba_change_me']
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-p${DB_PASSWORD}']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -31,18 +31,22 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      NODE_ENV: production
       PORT: 3001
-      CORS_ORIGINS: http://localhost:3000
-      JWT_SECRET: dev_change_me_0000000000000000000000000000000000000000000000000000
-      JWT_REFRESH_SECRET: dev_change_me_1111111111111111111111111111111111111111111111111111
-      DATA_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      # All secrets come from a root .env file (see .env.example). `:?` makes
+      # compose refuse to start if one is missing — no insecure fallbacks.
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?set DATA_ENCRYPTION_KEY in .env}
       DB_TYPE: mysql
-      DB_SYNCHRONIZE: 'true'
+      DB_SYNCHRONIZE: 'false'   # schema is managed by migrations (run on boot)
       DB_HOST: mysql
       DB_PORT: '3306'
       DB_USERNAME: somba
-      DB_PASSWORD: somba_change_me
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       DB_DATABASE: somba
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
     ports:
       - '3001:3001'
 

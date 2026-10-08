@@ -171,8 +171,9 @@ JWT_REFRESH_TTL=30d
 
 DATA_ENCRYPTION_KEY=<paste 64-hex>   # encrypts email/phone/address at rest
 
+NODE_ENV=production                  # turns on the fail-fast config guard
 DB_TYPE=mysql
-DB_SYNCHRONIZE=true                  # creates tables on first boot
+DB_SYNCHRONIZE=false                 # NEVER true in production — schema comes from migrations
 DB_HOST=localhost
 DB_PORT=3306
 DB_USERNAME=somba
@@ -180,8 +181,13 @@ DB_PASSWORD=CHANGE_ME_STRONG_DB_PASSWORD
 DB_DATABASE=somba
 ```
 
-> Keep `DB_SYNCHRONIZE=true` for the first boot so TypeORM creates the schema.
-> Once stable you can set it to `false` and manage schema with migrations.
+> With `NODE_ENV=production` the API **refuses to boot** if a secret is missing or
+> still a dev default, if `DATA_ENCRYPTION_KEY` isn't 64 hex chars, if
+> `DB_TYPE=sqlite`, or if `DB_SYNCHRONIZE=true`. That is deliberate — read the
+> error it prints. **Back up `DATA_ENCRYPTION_KEY`**: losing it makes every
+> encrypted email/phone/address unrecoverable.
+
+Optional push notifications (Firebase) — see **Step 6b**.
 
 ### Build + seed
 
@@ -189,10 +195,37 @@ DB_DATABASE=somba
 cd ~/somba-apps/api
 npm ci
 npm run build
-npm run seed        # creates tables + the demo accounts/catalog from Step 0
 ```
 
-`npm run seed` prints the account list on success.
+The schema is created by **migrations** (applied automatically when the API
+boots in production; to apply them manually: `npm run migration:run`).
+
+Then create your first admin and the base data. This is **safe to re-run** — it
+only inserts what's missing and never deletes anything:
+
+```bash
+ADMIN_EMAIL=you@yourdomain.com \
+ADMIN_PASSWORD='a-long-random-passphrase-12+chars' \
+ADMIN_NAME='Your Name' \
+npm run bootstrap:prod
+```
+
+> ⚠️ **Do NOT run `npm run seed` on a production server.** It is demo-data only:
+> it **wipes every table** and creates accounts that share the public password
+> `Somba@2026`. The demo credentials in Step 0 exist only on a staging/demo box
+> where you deliberately ran `npm run seed`. On production, the only login is the
+> admin you create above; create staff via the admin panel.
+
+### 6b. (Optional) Firebase push notifications
+
+1. Firebase console → *Project settings → Service accounts → Generate new private key*.
+2. Put the JSON in `api/.env` as one line (raw JSON or `base64 -w0 key.json`):
+   `FIREBASE_SERVICE_ACCOUNT_JSON=<json-or-base64>`
+3. `pm2 restart somba-api` — the log line *“Push disabled …”* disappears.
+
+The mobile apps register their FCM token over the socket (`devices:register`);
+the API then pushes every notification to a closed app. Without this variable the
+API runs normally and delivers in-app only.
 
 ---
 
@@ -300,11 +333,14 @@ cd ~/somba-apps
 git pull
 cd api  && npm ci && npm run build && cd ..
 cd web  && npm ci && npm run build && cd ..
-pm2 restart all
+pm2 restart all          # the API applies any new migrations on boot
 ```
 
-Only run `npm run seed` again if you intend to **wipe and reseed** the database
-(it clears existing data).
+**Back up the database first** (`mysqldump somba > backup.sql`). Never run
+`npm run seed` on production — it wipes all data.
+
+When you change an entity, generate a migration and commit it (see
+`api/src/database/migrations/`): `npm run migration:generate -- src/database/migrations/<Name>`.
 
 ---
 
@@ -316,13 +352,16 @@ Only run `npm run seed` again if you intend to **wipe and reseed** the database
 | `NEXT_PUBLIC_*` changes ignored | They're baked at build time — rerun `npm run build` then `pm2 restart somba-web`. |
 | API won't boot | Check `pm2 logs somba-api`; usually MySQL creds in `api/.env` or `DATA_ENCRYPTION_KEY` not 64 hex chars. |
 | `ER_ACCESS_DENIED` | Recheck the MySQL user/grant in Step 4 and `DB_*` in `api/.env`. |
-| Login fails for everyone | Run `npm run seed` (Step 6) so the demo accounts exist. |
+| Login fails for everyone | Run `npm run bootstrap:prod` (Step 6) to create the admin. Demo accounts only exist if you ran `seed` on a demo box. |
+| API exits with “Refusing to start” | Production guard — the log lists exactly which secret/DB setting is unsafe. |
 | Native module build error | `sudo apt install -y build-essential` then `npm ci` again. |
 
 ## Production hardening checklist
 
 - [ ] Rotate all demo passwords and the three secrets; never commit `.env`.
-- [ ] Set `DB_SYNCHRONIZE=false` and adopt migrations once schema is stable.
+- [x] `DB_SYNCHRONIZE=false` + migrations (enforced by the production guard).
+- [ ] Back up `DATA_ENCRYPTION_KEY` somewhere other than the droplet.
+- [ ] Replace the mock payment gateway before taking real money (see docs/BACKEND-REMAINING.md).
 - [ ] Restrict `CORS_ORIGINS` to your real domain(s).
 - [ ] Enable automatic security updates (`unattended-upgrades`).
 - [ ] Take DigitalOcean backups / a managed MySQL if this goes real.

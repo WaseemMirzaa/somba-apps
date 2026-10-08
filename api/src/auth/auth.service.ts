@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -53,6 +55,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid email or password.');
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid email or password.');
+    this.assertNotSuspended(user);
     return this.issue(user);
   }
 
@@ -70,7 +73,61 @@ export class AuthService {
     if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
       throw new UnauthorizedException('Session has been revoked.');
     }
+    this.assertNotSuspended(user);
     return this.issue(user);
+  }
+
+  /**
+   * An admin-suspended CUSTOMER (customers:setActive false) must not get new
+   * sessions. (`active` doubles as an availability toggle for riders/warehouse
+   * staff, so only customers are hard-blocked here.)
+   */
+  assertNotSuspended(user: User): void {
+    if (user.role === 'customer' && !user.active) {
+      throw new UnauthorizedException('This account has been suspended. Contact support.');
+    }
+  }
+
+  /** Change password, keep the current device signed in, sign out all others. */
+  async changePassword(userId: string, current: string, next: string): Promise<AuthResult> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException('Account no longer exists.');
+    if (!(await bcrypt.compare(current ?? '', user.passwordHash))) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+    if (!next || next.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters.');
+    }
+    user.passwordHash = await bcrypt.hash(next, 12);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    await this.users.save(user);
+    return this.issue(user);
+  }
+
+  /**
+   * Delete an account: personal data is erased and the login is destroyed, but
+   * the row stays so past orders/payments remain consistent for accounting.
+   */
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException('Account no longer exists.');
+    if (!(await bcrypt.compare(password ?? '', user.passwordHash))) {
+      throw new BadRequestException('Password is incorrect.');
+    }
+    const tombstone = `deleted+${user.id}@deleted.invalid`;
+    user.name = 'Deleted user';
+    user.email = tombstone;
+    user.emailHash = UsersService.emailHash(tombstone);
+    user.phone = null;
+    user.address = null;
+    user.avatar = null;
+    user.prefs = null;
+    user.emailVerified = false;
+    user.phoneVerified = false;
+    user.passwordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    user.active = false;
+    await this.users.save(user);
   }
 
   /** Verify an access token (used by the WebSocket handshake). */

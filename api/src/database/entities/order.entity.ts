@@ -20,7 +20,13 @@ export type OrderStatus =
   | 'cancelled'
   | 'returned';
 
-export type PaymentMethod = 'stripe_card' | 'cod' | 'airtel_money' | 'wallet';
+export type PaymentMethod =
+  | 'stripe_card'
+  | 'cod'
+  | 'airtel_money'
+  | 'orange_money'
+  | 'vodacom_mpesa'
+  | 'wallet';
 
 @Entity('orders')
 export class Order {

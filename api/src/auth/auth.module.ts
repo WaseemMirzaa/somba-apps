@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { VerificationToken } from '../database/entities';
+import { VerificationService } from './verification.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -9,6 +12,7 @@ import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([VerificationToken]),
     UsersModule,
     PassportModule,
     JwtModule.registerAsync({
@@ -23,7 +27,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, VerificationService],
+  exports: [AuthService, VerificationService],
 })
 export class AuthModule {}

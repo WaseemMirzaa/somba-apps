@@ -60,5 +60,15 @@ export function assertProductionConfig(config: ConfigService): void {
         'Set the required secrets and disable schema auto-sync before deploying.',
     );
   }
+  // Non-fatal: the app runs without these, but the features that need them don't.
+  if (!process.env.SMTP_HOST) {
+    logger.warn('SMTP_HOST not set — password-reset and email-verification emails will NOT be delivered.');
+  }
+  if (!process.env.TWILIO_ACCOUNT_SID) {
+    logger.warn('TWILIO_* not set — phone OTP codes will NOT be delivered by SMS.');
+  }
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    logger.warn('Firebase not configured — push notifications disabled (in-app realtime still works).');
+  }
   logger.log('Production config validated ✓');
 }

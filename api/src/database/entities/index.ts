@@ -44,6 +44,10 @@ export type {
   ExceptionStatus,
 } from './warehouse-exception.entity';
 export { WishlistItem } from './wishlist-item.entity';
+export { DeviceToken } from './device-token.entity';
+export { VerificationToken } from './verification-token.entity';
+export type { VerificationKind } from './verification-token.entity';
+export type { DevicePlatform, DeviceApp } from './device-token.entity';
 
 // ── Single source of truth for the entity set (runtime + migration CLI) ──
 import { User } from './user.entity';
@@ -77,6 +81,8 @@ import { Replacement } from './replacement.entity';
 import { Exchange } from './exchange.entity';
 import { WarehouseException } from './warehouse-exception.entity';
 import { WishlistItem } from './wishlist-item.entity';
+import { DeviceToken } from './device-token.entity';
+import { VerificationToken } from './verification-token.entity';
 
 export const ENTITIES = [
   User,
@@ -110,4 +116,6 @@ export const ENTITIES = [
   Exchange,
   WarehouseException,
   WishlistItem,
+  DeviceToken,
+  VerificationToken,
 ];

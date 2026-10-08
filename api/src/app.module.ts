@@ -22,6 +22,8 @@ import { ContentModule } from './content/content.module';
 import { OpsModule } from './ops/ops.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { FlowsModule } from './flows/flows.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
@@ -51,6 +53,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     OpsModule,
     WarehouseModule,
     FlowsModule,
+    MessagingModule,
+    UploadsModule,
     RealtimeModule,
   ],
   controllers: [AppController],

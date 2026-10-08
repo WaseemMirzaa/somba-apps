@@ -56,3 +56,27 @@ export class RefreshDto {
   @IsString()
   refreshToken: string;
 }
+
+export class ForgotDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetDto {
+  @IsString()
+  token: string;
+
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters.' })
+  password: string;
+}
+
+export class TokenDto {
+  @IsString()
+  token: string;
+}
+
+export class CodeDto {
+  @IsString()
+  code: string;
+}

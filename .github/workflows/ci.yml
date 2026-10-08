@@ -23,6 +23,8 @@ jobs:
           cache-dependency-path: api/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: Unit tests
+        run: npm test -- --silent
       # End-to-end realtime smoke test against a seeded SQLite DB. Start the
       # server and run the test in ONE step so the background process persists.
       - name: Seed + smoke test
@@ -34,6 +36,71 @@ jobs:
             curl -sf http://localhost:3001/api/v1/health && break || sleep 1
           done
           npm run smoke
+          STATUS=$?
+          if [ $STATUS -eq 0 ]; then npm run smoke:account; STATUS=$?; fi
+          kill $SERVER_PID || true
+          exit $STATUS
+
+  # Proves the production path on REAL MySQL: schema comes from migrations only
+  # (never synchronize), the migrations match the entities, bootstrap works, and
+  # the account/upload/payment flows pass against it.
+  api-mysql:
+    name: API (MySQL migrations + e2e)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: somba
+          MYSQL_USER: somba
+          MYSQL_PASSWORD: somba_ci_pw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_TYPE: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USERNAME: somba
+      DB_PASSWORD: somba_ci_pw
+      DB_DATABASE: somba
+      DB_SYNCHRONIZE: 'false'
+      JWT_SECRET: ci-jwt-secret-0000000000000000000000000000000000000000000000000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-111111111111111111111111111111111111111111111
+      DATA_ENCRYPTION_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+      ADMIN_EMAIL: admin@ci.test
+      ADMIN_PASSWORD: ci-Admin-Passw0rd!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Apply migrations
+        run: npm run migration:run
+      # Advisory for now: detection was verified locally (a new entity column is
+      # caught) but only on MariaDB, which reports nullable defaults differently
+      # from MySQL 8. Remove `continue-on-error` once this has run green here.
+      - name: Migrations should match the entities (warns if an entity changed without a migration)
+        continue-on-error: true
+        run: npm run migration:generate -- src/database/migrations/DriftCheck --check
+      - name: Bootstrap + e2e
+        run: |
+          npm run bootstrap:prod
+          node dist/main.js &
+          SERVER_PID=$!
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3001/api/v1/health && break || sleep 1
+          done
+          ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD npm run smoke:account
           STATUS=$?
           kill $SERVER_PID || true
           exit $STATUS

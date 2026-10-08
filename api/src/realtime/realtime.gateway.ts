@@ -14,6 +14,7 @@ import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PushService } from '../notifications/push.service';
 import { OrdersService } from '../orders/orders.service';
 import type { CreateOrderInput } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
@@ -99,6 +100,7 @@ export class RealtimeGateway
     private readonly orders: OrdersService,
     private readonly delivery: DeliveryService,
     private readonly notifications: NotificationsService,
+    private readonly push: PushService,
     private readonly wallet: WalletService,
     private readonly payments: PaymentsService,
     private readonly payouts: PayoutsService,
@@ -167,6 +169,7 @@ export class RealtimeGateway
       if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
         throw new Error('revoked session');
       }
+      this.auth.assertNotSuspended(user);
 
       const socketUser: SocketUser = {
         id: user.id,
@@ -1613,6 +1616,130 @@ export class RealtimeGateway
   async notificationsMarkRead(@MessageBody() body: { id: string }) {
     await this.notifications.markRead(body.id);
     return ok({ id: body.id });
+  }
+
+  // ---- Own account: profile, preferences, password, deletion -------------
+  @SubscribeMessage('me:get')
+  async meGet(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const row = await this.users.findById(user.id);
+      return row ? ok(UsersService.toPublic(row)) : fail('Account not found.');
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('me:update')
+  async meUpdate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: { name?: string; phone?: string | null; locale?: string; avatar?: string | null },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const saved = await this.users.updateProfile(user.id, body ?? {});
+      client.data.user = { ...user, name: saved.name };
+      const pub = UsersService.toPublic(saved);
+      this.emitter.toUser(user.id, 'me:updated', pub);
+      return ok(pub);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('me:prefs')
+  async mePrefs(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      const row = await this.users.findById(user.id);
+      return ok(UsersService.parsePrefs(row?.prefs ?? null));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('me:setPrefs')
+  async meSetPrefs(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.users.setPrefs(user.id, body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Returns FRESH tokens: other devices are signed out, this one continues. */
+  @SubscribeMessage('me:changePassword')
+  async meChangePassword(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { current: string; next: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.auth.changePassword(user.id, body?.current, body?.next));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Customers/sellers erase their own account (staff accounts are managed by admins). */
+  @SubscribeMessage('me:delete')
+  async meDelete(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { password: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'customer' && user.role !== 'seller') {
+        return fail('Staff accounts are removed by an administrator.');
+      }
+      await this.auth.deleteAccount(user.id, body?.password);
+      for (const a of await this.addresses.list(user.id)) {
+        await this.addresses.remove(user.id, a.id);
+      }
+      await this.push.unregisterUser(user.id);
+      // Let the ack flush before dropping the connection.
+      setTimeout(() => client.disconnect(true), 150);
+      return ok({ deleted: true });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Push (FCM) device registry ----------------------------------------
+  /** Register this device's FCM token so the backend can push to a closed app. */
+  @SubscribeMessage('devices:register')
+  async devicesRegister(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    body: { token: string; platform?: 'android' | 'ios' | 'web'; app?: 'customer' | 'rider' | 'web' },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      await this.push.register(user, body);
+      return ok({ registered: true, pushEnabled: this.push.enabled });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Forget this device's token (call on logout). */
+  @SubscribeMessage('devices:unregister')
+  async devicesUnregister(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { token: string },
+  ) {
+    try {
+      this.requireUser(client);
+      await this.push.unregister(body.token);
+      return ok({ unregistered: true });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 
   @SubscribeMessage('notifications:markAllRead')

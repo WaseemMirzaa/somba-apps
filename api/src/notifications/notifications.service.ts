@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { PushService } from './push.service';
 
 export const ADMIN_ROLES = [
   'admin',
@@ -19,6 +20,7 @@ export class NotificationsService {
     @InjectRepository(Notification)
     private readonly repo: Repository<Notification>,
     private readonly emitter: RealtimeEmitter,
+    private readonly push: PushService,
   ) {}
 
   /** Persist + push a notification to a single user. */
@@ -36,6 +38,13 @@ export class NotificationsService {
       }),
     );
     this.emitter.toUser(userId, 'notification:new', n);
+    // Also reach the user when the app is closed. Fire-and-forget: push is
+    // best-effort and must never slow down or fail the triggering action.
+    void this.push.sendToUser(userId, {
+      title: n.title,
+      body: n.body,
+      data: { type: n.type, entityId: n.entityId ?? '', notificationId: n.id },
+    });
     return n;
   }
 
@@ -54,6 +63,15 @@ export class NotificationsService {
       }),
     );
     this.emitter.toRole(role, 'notification:new', n);
+    // Role pushes are for marketing broadcasts only — ops/admin alerts stay
+    // in-app so staff aren't buzzed on every order.
+    if ((data.type ?? 'system') === 'marketing') {
+      void this.push.sendToRole(role, {
+        title: n.title,
+        body: n.body,
+        data: { type: 'marketing', notificationId: n.id },
+      });
+    }
     return n;
   }
 

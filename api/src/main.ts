@@ -1,20 +1,29 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { assertProductionConfig } from './config/assert-production';
 import { SocketIoAdapter } from './realtime/socket-io.adapter';
+import { UPLOAD_DIR } from './uploads/uploads.controller';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
   // Refuse to boot in production with insecure defaults.
   assertProductionConfig(config);
 
   // Security headers on the REST surface (P2 hardening).
-  app.use(helmet());
+  // Cross-origin resource policy relaxed so the web/mobile apps can render /uploads images.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // Uploaded images are served read-only; nosniff stops them being treated as HTML.
+  app.useStaticAssets(UPLOAD_DIR, {
+    prefix: '/uploads/',
+    index: false,
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  });
   // Drain in-flight work on SIGTERM/SIGINT instead of dropping connections.
   app.enableShutdownHooks();
 

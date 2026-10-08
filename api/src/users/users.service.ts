@@ -14,7 +14,30 @@ export interface PublicUser {
   locale: 'en' | 'fr';
   walletBalance: number;
   active: boolean;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  avatar: string | null;
+  prefs: UserPrefs;
 }
+
+/** Notification + privacy + market preferences (customer Settings screen). */
+export interface UserPrefs {
+  push: boolean;
+  email: boolean;
+  sms: boolean;
+  personalize: boolean;
+  market: 'FR' | 'DRC';
+}
+
+export const DEFAULT_PREFS: UserPrefs = {
+  push: true,
+  email: true,
+  sms: false,
+  personalize: true,
+  market: 'FR',
+};
+
+const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
 
 @Injectable()
 export class UsersService {
@@ -63,6 +86,63 @@ export class UsersService {
     return this.repo.save(user);
   }
 
+  static parsePrefs(raw: string | null): UserPrefs {
+    try {
+      return { ...DEFAULT_PREFS, ...(raw ? (JSON.parse(raw) as Partial<UserPrefs>) : {}) };
+    } catch {
+      return { ...DEFAULT_PREFS };
+    }
+  }
+
+  /** Whitelisted profile edit. Changing the phone number un-verifies it. */
+  async updateProfile(
+    userId: string,
+    patch: { name?: string; phone?: string | null; locale?: string; avatar?: string | null },
+  ): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('Account not found.');
+    if (patch.name !== undefined) {
+      const name = String(patch.name).trim();
+      if (name.length < 2 || name.length > 80) throw new Error('Name must be 2–80 characters.');
+      user.name = name;
+    }
+    if (patch.phone !== undefined) {
+      const phone = patch.phone === null || patch.phone === '' ? null : String(patch.phone).trim();
+      if (phone !== null && !PHONE_RE.test(phone)) throw new Error('Enter a valid phone number.');
+      if (phone !== user.phone) user.phoneVerified = false;
+      user.phone = phone;
+    }
+    if (patch.locale !== undefined) {
+      if (patch.locale !== 'en' && patch.locale !== 'fr') throw new Error('Locale must be en or fr.');
+      user.locale = patch.locale;
+    }
+    if (patch.avatar !== undefined) {
+      const a = patch.avatar === null || patch.avatar === '' ? null : String(patch.avatar);
+      if (a !== null && (a.length > 255 || !/^https?:\/\//.test(a))) throw new Error('Invalid avatar URL.');
+      user.avatar = a;
+    }
+    return this.repo.save(user);
+  }
+
+  async setPrefs(userId: string, patch: Partial<UserPrefs>): Promise<UserPrefs> {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('Account not found.');
+    const next = UsersService.parsePrefs(user.prefs);
+    for (const k of ['push', 'email', 'sms', 'personalize'] as const) {
+      if (patch[k] !== undefined) {
+        if (typeof patch[k] !== 'boolean') throw new Error(`${k} must be true or false.`);
+        next[k] = patch[k] as boolean;
+      }
+    }
+    if (patch.market !== undefined) {
+      if (patch.market !== 'FR' && patch.market !== 'DRC') throw new Error('market must be FR or DRC.');
+      next.market = patch.market;
+    }
+    user.prefs = JSON.stringify(next);
+    await this.repo.save(user);
+    return next;
+  }
+
   findByRole(role: UserRole): Promise<User[]> {
     return this.repo.find({ where: { role } });
   }
@@ -77,6 +157,10 @@ export class UsersService {
       locale: user.locale,
       walletBalance: user.walletBalance,
       active: user.active,
+      emailVerified: !!user.emailVerified,
+      phoneVerified: !!user.phoneVerified,
+      avatar: user.avatar ?? null,
+      prefs: UsersService.parsePrefs(user.prefs),
     };
   }
 }
