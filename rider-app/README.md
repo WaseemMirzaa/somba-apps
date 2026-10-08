@@ -60,7 +60,7 @@ flutter run            # device / emulator
 flutter run -d chrome  # web
 ```
 
-Requires Flutter **3.35.7**.
+Requires Flutter **3.35.7** or newer (verified with 3.47.6).
 
 ## CI/CD — Android APK
 
