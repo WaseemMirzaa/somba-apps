@@ -45,6 +45,14 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const email = `acct${tag}@smoke.test`;
   const pw = 'Smoke-Pass-2026';
 
+  console.log('\n— Nobody can register themselves as staff');
+  for (const role of ['admin', 'admin_finance', 'warehouse_staff', 'rider']) {
+    const x = await rest('POST', '/api/v1/auth/register', { email: `esc-${role}-${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Eve', role });
+    ok(x.status === 403, `register as ${role} is refused (403)`, `(got ${x.status})`);
+  }
+  const sx = await rest('POST', '/api/v1/auth/register', { email: `seller-${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Sam', role: 'seller' });
+  ok(sx.status === 201 && sx.json.user.role === 'seller', 'a seller can still sign up');
+
   console.log('\n— Registration & email verification');
   let r = await rest('POST', '/api/v1/auth/register', { email, password: pw, name: 'Smoke User', phone: '+243 970 000 111' });
   ok(r.status === 201 && r.json.user.emailVerified === false && r.json.user.prefs.push === true, 'register → unverified, default prefs');

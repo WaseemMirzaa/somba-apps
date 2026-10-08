@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -33,7 +34,17 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Roles anyone may sign up as. Staff, riders and admins are provisioned by an
+   * admin (`roles:setRole`) — otherwise `POST /auth/register {role:"admin"}`
+   * would hand out full control of the platform.
+   */
+  static readonly SELF_SERVICE_ROLES: readonly string[] = ['customer', 'seller'];
+
   async register(dto: RegisterDto): Promise<AuthResult> {
+    if (dto.role && !AuthService.SELF_SERVICE_ROLES.includes(dto.role)) {
+      throw new ForbiddenException('That account type cannot be created by self-registration.');
+    }
     const existing = await this.users.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
