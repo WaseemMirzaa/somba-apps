@@ -16,6 +16,7 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { WalletService } from '../wallet/wallet.service';
+import { PromosService } from '../content/promos.service';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -39,6 +40,8 @@ export interface CreateOrderInput {
   shippingAddress?: string; // JSON string; encrypted at rest
   /** Mobile-money subscriber number that will approve the charge. */
   paymentPhone?: string;
+  /** Promo code; validated and applied by the SERVER (the app only previews it). */
+  promoCode?: string;
 }
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
@@ -54,6 +57,7 @@ export class OrdersService {
     private readonly emitter: RealtimeEmitter,
     private readonly payments: PaymentsService,
     private readonly wallet: WalletService,
+    private readonly promos: PromosService,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -142,7 +146,17 @@ export class OrdersService {
     if (!Number.isFinite(deliveryFee) || deliveryFee < 0 || deliveryFee > MAX_DELIVERY_FEE) {
       throw new BadRequestException('Invalid delivery fee.');
     }
-    const total = Number((subtotal + deliveryFee).toFixed(2));
+
+    let discount = 0;
+    let promoCode: string | null = null;
+    if (input.promoCode?.trim()) {
+      const res = await this.promos.validate(input.promoCode.trim(), subtotal);
+      if (!res.ok) throw new BadRequestException(res.reason ?? 'Invalid promo code.');
+      discount = Math.min(Number(res.discount.toFixed(2)), subtotal); // never below zero
+      promoCode = res.code ?? null;
+    }
+    const total = Number((subtotal - discount + deliveryFee).toFixed(2));
+    if (!(total > 0)) throw new BadRequestException('Order total must be greater than zero.');
 
     // Fail fast on wallet payments with insufficient funds — before creating
     // any order/delivery rows.
@@ -163,6 +177,8 @@ export class OrdersService {
       paymentMethod: input.paymentMethod,
       subtotalUsd: subtotal,
       deliveryFeeUsd: deliveryFee,
+      discountUsd: discount,
+      promoCode,
       totalUsd: total,
       zoneId: input.zoneId ?? null,
       shippingAddress: input.shippingAddress ?? null,

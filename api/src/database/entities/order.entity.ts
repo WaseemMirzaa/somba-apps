@@ -58,6 +58,13 @@ export class Order {
   @Column({ type: 'float', default: 0 })
   deliveryFeeUsd: number;
 
+  /** Promo discount already deducted from the total (server-validated). */
+  @Column({ type: 'float', default: 0 })
+  discountUsd: number;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  promoCode: string | null;
+
   @Column({ type: 'float', default: 0 })
   totalUsd: number;
 

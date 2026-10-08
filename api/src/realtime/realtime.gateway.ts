@@ -208,13 +208,26 @@ export class RealtimeGateway
 
   // ---- Products -----------------------------------------------------------
   @SubscribeMessage('products:list')
-  async productsList(@MessageBody() body: { category?: string; status?: string }) {
-    return ok(await this.products.list(body ?? {}));
+  async productsList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { category?: string; status?: string },
+  ) {
+    // Shoppers (and guests) only ever see live listings, whatever they ask for.
+    const role = client.data.user?.role ?? 'guest';
+    const filter = role === 'customer' || role === 'guest' ? { ...(body ?? {}), status: 'live' } : (body ?? {});
+    return ok(await this.products.list(filter));
   }
 
   @SubscribeMessage('products:get')
-  async productsGet(@MessageBody() body: { id: string }) {
+  async productsGet(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
     const p = await this.products.get(body.id);
+    const role = client.data.user?.role ?? 'guest';
+    if (p && p.status !== 'live' && (role === 'customer' || role === 'guest')) {
+      return fail('Product not found.');
+    }
     return p ? ok(p) : fail('Product not found.');
   }
 

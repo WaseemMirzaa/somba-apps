@@ -299,6 +299,18 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(!a.ok && /out of stock/i.test(a.error ?? ''), 'sold-out product cannot be ordered', a.error ?? '');
   await req(admin, 'products:update', { id: pid, patch: { stock: 50 } });
 
+  console.log('\n— Promo codes are applied by the server');
+  const promoCode = `T${tag}`;
+  a = await req(admin, 'promos:create', { code: promoCode, type: 'percent', value: 10, minOrder: 5, description: 'test' });
+  ok(a.ok, 'admin creates a promo');
+  const lineA = { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 0 };
+  a = await req(s, 'orders:create', { ...lineA, promoCode });
+  ok(a.ok && a.data.promoCode === promoCode.toUpperCase() && a.data.discountUsd > 0 && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd)) < 0.011, `discount applied on the server (-$${a.data?.discountUsd})`, a.error ?? '');
+  a = await req(s, 'orders:create', { ...lineA, promoCode: 'NOPE-NOT-REAL' });
+  ok(!a.ok, 'unknown promo code is rejected (not silently ignored)');
+  a = await req(s, 'orders:create', { ...lineA, promoCode, deliveryFeeUsd: 5 });
+  ok(a.ok && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + 5)) < 0.011, 'promo + delivery fee add up');
+
   console.log('\n— Suspended customers are locked out');
   a = await req(admin, 'customers:setActive', { id: userId, active: false });
   ok(a.ok, 'admin suspends the customer');
