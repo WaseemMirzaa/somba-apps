@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { str } from '../common/validate';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, Payout, Product, Seller } from '../database/entities';
@@ -43,7 +44,7 @@ export class SellersService {
     if (existing) return existing;
     const seller = await this.sellers.save(
       this.sellers.create({
-        name: data.name ?? user.name,
+        name: str(data?.name ?? user.name, 'Store name', { min: 2, max: 100 }),
         userId: user.id,
         status: 'pending',
         badge: 'bronze',
@@ -66,7 +67,7 @@ export class SellersService {
   ): Promise<Seller> {
     const seller = await this.byUser(userId);
     if (!seller) throw new NotFoundException('Store not found.');
-    if (patch.name != null && patch.name.trim()) seller.name = patch.name.trim();
+    if (patch.name != null) seller.name = str(patch.name, 'Store name', { min: 2, max: 100 });
     const saved = await this.sellers.save(seller);
     this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', saved);
     if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', saved);
@@ -78,6 +79,15 @@ export class SellersService {
     if (!seller) throw new NotFoundException('Seller not found.');
     seller.status = status;
     const saved = await this.sellers.save(seller);
+    // A suspended/rejected store's listings leave the storefront straight away.
+    if (status === 'suspended' || status === 'rejected') {
+      const owned = await this.products.find({ where: [{ sellerId: saved.id, status: 'live' }, ...(saved.userId ? [{ sellerId: saved.userId, status: 'live' as const }] : [])] });
+      for (const p of owned) {
+        p.status = 'draft';
+        await this.products.save(p);
+        this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'product:updated', p);
+      }
+    }
     this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', saved);
     if (saved.userId) {
       this.emitter.toUser(saved.userId, 'seller:updated', saved);

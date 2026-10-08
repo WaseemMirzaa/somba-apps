@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { User, WalletTransaction } from '../database/entities';
 import type { WalletTxType } from '../database/entities/wallet-transaction.entity';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -36,42 +36,43 @@ export class WalletService {
   }
 
   /**
-   * Apply a balance change atomically-ish: recompute the running balance,
-   * persist the user + a transaction row, and push both live to the owner.
-   * Debits that would overdraw are rejected.
+   * Apply a balance change ATOMICALLY. The balance is changed with a single
+   * conditional `UPDATE` (a debit only matches while enough money is left), so
+   * concurrent requests can never double-spend, and the ledger row is written
+   * in the same transaction. Pass `manager` to join a caller's transaction.
    */
   async apply(
     userId: string,
     type: WalletTxType,
     amount: number,
     description: string,
+    manager?: EntityManager,
   ): Promise<WalletTransaction> {
-    const value = Math.abs(amount);
-    const user = await this.users.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found.');
-
+    const value = Number(Math.abs(amount).toFixed(2));
+    if (!(value > 0)) throw new BadRequestException('Amount must be greater than zero.');
     const isCredit = CREDIT_TYPES.includes(type);
-    if (!isCredit && user.walletBalance < value) {
-      throw new BadRequestException('Insufficient wallet balance.');
-    }
-    user.walletBalance = Number(
-      (user.walletBalance + (isCredit ? value : -value)).toFixed(2),
-    );
-    await this.users.save(user);
 
-    const tx = await this.txs.save(
-      this.txs.create({
-        userId,
-        type,
-        amount: value,
-        balance: user.walletBalance,
-        description,
-      }),
-    );
+    const run = async (m: EntityManager) => {
+      const res = await m
+        .createQueryBuilder()
+        .update(User)
+        .set({ walletBalance: () => `ROUND(walletBalance ${isCredit ? '+' : '-'} ${value}, 2)` })
+        .where(isCredit ? 'id = :id' : 'id = :id AND walletBalance >= :v', { id: userId, v: value })
+        .execute();
+      if (!res.affected) {
+        const exists = await m.findOne(User, { where: { id: userId } });
+        if (!exists) throw new NotFoundException('User not found.');
+        throw new BadRequestException('Insufficient wallet balance.');
+      }
+      const user = (await m.findOne(User, { where: { id: userId } }))!;
+      const tx = await m.save(
+        m.create(WalletTransaction, { userId, type, amount: value, balance: user.walletBalance, description }),
+      );
+      return { tx, balance: user.walletBalance };
+    };
 
-    this.emitter.toUser(userId, 'wallet:updated', {
-      balance: user.walletBalance,
-    });
+    const { tx, balance } = manager ? await run(manager) : await this.users.manager.transaction(run);
+    this.emitter.toUser(userId, 'wallet:updated', { balance });
     this.emitter.toUser(userId, 'wallet:transaction', tx);
     return tx;
   }

@@ -38,6 +38,7 @@ jobs:
           npm run smoke
           STATUS=$?
           if [ $STATUS -eq 0 ]; then npm run smoke:account; STATUS=$?; fi
+          if [ $STATUS -eq 0 ]; then npm run smoke:authz; STATUS=$?; fi
           kill $SERVER_PID || true
           exit $STATUS
 

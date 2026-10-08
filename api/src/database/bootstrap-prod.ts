@@ -76,6 +76,11 @@ async function run() {
     fxRate: '2850',
     codCapUsd: '500',
     codEnabled: 'false', // matches the client scope: no cash on delivery at launch
+    // Delivery fee is decided by the SERVER from these zones (edit in Admin → Settings).
+    deliveryZones: JSON.stringify([
+      { id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 },
+      { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 },
+    ]),
     commissionPct: '12',
   };
   for (const [key, value] of Object.entries(defaults)) {

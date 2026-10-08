@@ -89,12 +89,12 @@ export class AuthService {
   }
 
   /**
-   * An admin-suspended CUSTOMER (customers:setActive false) must not get new
-   * sessions. (`active` doubles as an availability toggle for riders/warehouse
-   * staff, so only customers are hard-blocked here.)
+   * An admin-suspended customer or seller (customers:setActive false) must not
+   * get new sessions. (`active` doubles as an availability toggle for riders and
+   * warehouse staff, so only these roles are hard-blocked here.)
    */
   assertNotSuspended(user: User): void {
-    if (user.role === 'customer' && !user.active) {
+    if ((user.role === 'customer' || user.role === 'seller') && !user.active) {
       throw new UnauthorizedException('This account has been suspended. Contact support.');
     }
   }

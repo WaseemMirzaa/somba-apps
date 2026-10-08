@@ -28,27 +28,33 @@ export class DisputesService {
     customer: { id: string; name: string },
     input: { orderId: string; type: DisputeType; reason: string },
   ): Promise<Dispute> {
-    const order = await this.orders.findOne({ where: { id: input.orderId } });
-    if (!order) throw new NotFoundException('Order not found.');
-    if (order.customerId !== customer.id) {
-      throw new BadRequestException('You can only dispute your own orders.');
+    const order = await this.orders.findOne({ where: { id: String(input?.orderId ?? '') } });
+    // Same answer for "missing" and "not yours".
+    if (!order || order.customerId !== customer.id) throw new NotFoundException('Order not found.');
+    const type: DisputeType = input.type === 'return' ? 'return' : 'dispute';
+    const reason = String(input?.reason ?? '').trim();
+    if (reason.length < 5) throw new BadRequestException('Please describe the problem (at least a few words).');
+    if (['pending', 'cancelled'].includes(order.status)) {
+      throw new BadRequestException('This order has not been paid for or was cancelled.');
     }
+    const already = await this.disputes.count({ where: { orderId: order.id, customerId: customer.id, status: 'open' } });
+    if (already) throw new BadRequestException('You already have an open request for this order.');
     const dispute = await this.disputes.save(
       this.disputes.create({
-        reference: DisputesService.newReference(input.type),
+        reference: DisputesService.newReference(type),
         orderId: order.id,
         orderReference: order.reference,
         customerId: customer.id,
         customerName: customer.name,
-        type: input.type ?? 'dispute',
-        reason: input.reason,
+        type,
+        reason: reason.slice(0, 2000),
         status: 'open',
       }),
     );
     this.emitter.toUser(customer.id, 'dispute:created', dispute);
     this.emitter.toRoles(ADMIN_ROLES, 'dispute:created', dispute);
     await this.notifications.toRole('admin_support', {
-      title: input.type === 'return' ? 'Return requested' : 'Dispute opened',
+      title: type === 'return' ? 'Return requested' : 'Dispute opened',
       body: `${dispute.reference} · ${order.reference} · ${customer.name}`,
       type: 'dispute',
       entityId: dispute.id,
@@ -56,21 +62,36 @@ export class DisputesService {
     return dispute;
   }
 
-  /** Admin resolves; optionally refunds the order to the customer wallet. */
+  /**
+   * Admin resolves an OPEN dispute; optionally refunds the order to the customer
+   * wallet. Refunding moves money, so it needs finance/admin (`canRefund`) — and
+   * if the refund cannot be made the dispute is NOT marked resolved.
+   */
   async resolve(
     disputeId: string,
     opts: { resolution?: string; refund?: boolean },
+    canRefund: boolean,
   ): Promise<Dispute> {
     const dispute = await this.disputes.findOne({ where: { id: disputeId } });
     if (!dispute) throw new NotFoundException('Dispute not found.');
-    dispute.status = 'resolved';
-    dispute.resolution = opts.resolution ?? (opts.refund ? 'Refunded to wallet' : 'Resolved');
-    const saved = await this.disputes.save(dispute);
-
-    if (opts.refund) {
-      // Reuse the payments refund path (credits wallet + marks order returned).
-      await this.payments.refund(saved.orderId, true).catch(() => undefined);
+    if (dispute.status !== 'open') throw new BadRequestException('This request was already handled.');
+    if (opts.refund && !canRefund) {
+      throw new BadRequestException('Only admin or finance can issue a refund.');
     }
+    if (opts.refund) {
+      await this.payments.refund(dispute.orderId, true); // throws if it can't be refunded
+    }
+    const claim = await this.disputes
+      .createQueryBuilder()
+      .update(Dispute)
+      .set({
+        status: 'resolved',
+        resolution: String(opts.resolution ?? (opts.refund ? 'Refunded to wallet' : 'Resolved')).slice(0, 1000),
+      })
+      .where("id = :id AND status = 'open'", { id: disputeId })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This request was already handled.');
+    const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
 
     this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
     this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
@@ -86,9 +107,14 @@ export class DisputesService {
   async reject(disputeId: string, resolution?: string): Promise<Dispute> {
     const dispute = await this.disputes.findOne({ where: { id: disputeId } });
     if (!dispute) throw new NotFoundException('Dispute not found.');
-    dispute.status = 'rejected';
-    dispute.resolution = resolution ?? 'Rejected';
-    const saved = await this.disputes.save(dispute);
+    const claim = await this.disputes
+      .createQueryBuilder()
+      .update(Dispute)
+      .set({ status: 'rejected', resolution: String(resolution ?? 'Rejected').slice(0, 1000) })
+      .where("id = :id AND status = 'open'", { id: disputeId })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This request was already handled.');
+    const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
     this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
     this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
     await this.notifications.toUser(saved.customerId, {
@@ -101,13 +127,11 @@ export class DisputesService {
   }
 
   list(user: { id: string; role: string }): Promise<Dispute[]> {
-    if (user.role === 'customer') {
-      return this.disputes.find({
-        where: { customerId: user.id },
-        order: { createdAt: 'DESC' },
-      });
+    // Admin roles (support/finance…) see all; everyone else only their own.
+    if (user.role.startsWith('admin')) {
+      return this.disputes.find({ order: { createdAt: 'DESC' }, take: 200 });
     }
-    return this.disputes.find({ order: { createdAt: 'DESC' }, take: 200 });
+    return this.disputes.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
   }
 
   private static newReference(type: DisputeType): string {

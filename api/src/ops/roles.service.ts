@@ -39,7 +39,14 @@ export class RolesService {
   }
 
   async setRole(id: string, role: UserRole): Promise<void> {
-    await this.users.update({ id }, { role });
+    const target = await this.users.findOne({ where: { id } });
+    if (!target) throw new Error('Account not found.');
+    if (target.role === 'admin' && role !== 'admin') {
+      const admins = await this.users.count({ where: { role: 'admin', active: true } });
+      if (admins <= 1) throw new Error('You cannot remove the last administrator.');
+    }
+    // New role => old tokens must stop working (they carry the old privileges).
+    await this.users.update({ id }, { role, tokenVersion: (target.tokenVersion ?? 0) + 1 });
     this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role });
   }
 }

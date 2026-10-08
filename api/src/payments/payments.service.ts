@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThan, Repository } from 'typeorm';
+import { EntityManager, In, LessThan, Repository } from 'typeorm';
 import { Order, Payment } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
 import {
@@ -31,6 +31,9 @@ export type OrderPaymentSettledHandler = (
   payment: Payment,
   outcome: 'succeeded' | 'failed',
 ) => Promise<void>;
+
+/** Only these admin roles see payment records (live pushes included). */
+const FINANCE_ROLES = ['admin', 'admin_finance'];
 
 const mask = (phone: string | null) =>
   phone ? `${phone.slice(0, 4)}…${phone.slice(-2)}` : null;
@@ -156,7 +159,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.emitter.toUser(order.customerId, 'payment:created', this.view(payment));
-    this.emitter.toRoles(ADMIN_ROLES, 'payment:created', this.view(payment));
+    this.emitter.toRoles(FINANCE_ROLES, 'payment:created', this.view(payment));
     await this.notifications.toRole('admin_finance', {
       title: 'Payment',
       body: `${payment.reference} · ${order.paymentMethod} · $${order.totalUsd.toFixed(2)} · ${payment.status}`,
@@ -176,6 +179,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException(`Top-up method must be one of: ${MOBILE_MONEY_METHODS.join(', ')}.`);
     }
     await this.assertMethodAllowed(method);
+    // Don't let one account fire unlimited approval prompts at arbitrary numbers.
+    const open = await this.payments.count({ where: { userId, purpose: 'topup', status: 'pending' } });
+    if (open >= 3) {
+      throw new BadRequestException('You already have pending top-ups. Approve or wait for them to expire first.');
+    }
     const payment = await this.payments.save(
       this.payments.create({
         reference: PaymentsService.newReference(),
@@ -243,9 +251,28 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.mobileMoney.parseWebhook(rawBody, headers);
   }
 
+  /** Move a payment between states ONLY if it is still in one of `from` (atomic). */
+  private async claim(
+    m: EntityManager,
+    id: string,
+    from: PaymentStatus[],
+    to: PaymentStatus,
+    failureReason?: string | null,
+  ): Promise<boolean> {
+    const res = await m
+      .createQueryBuilder()
+      .update(Payment)
+      .set({ status: to, ...(failureReason !== undefined ? { failureReason } : {}) })
+      .where('id = :id AND status IN (:...from)', { id, from })
+      .execute();
+    return !!res.affected;
+  }
+
   /**
-   * Apply a final result to a payment. Idempotent: a payment settles once, so
-   * webhook retries and the sandbox timer cannot double-credit.
+   * Apply a final result to a payment. Idempotent AND race-free: each state
+   * change is a conditional UPDATE (so a retried webhook arriving at the same
+   * instant as another can only win once), and the money movement happens in the
+   * same transaction as the state change.
    */
   async settle(event: MobileMoneyEvent): Promise<Payment | null> {
     const payment = await this.payments.findOne({ where: { reference: event.reference } });
@@ -268,13 +295,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return payment;
     }
 
-    if (event.providerRef) payment.providerRef = event.providerRef;
+    if (event.providerRef && payment.providerRef !== event.providerRef) {
+      await this.payments.update({ id: payment.id }, { providerRef: event.providerRef });
+    }
 
     if (event.outcome === 'failed') {
-      if (payment.status !== 'pending') return payment; // already failed
-      payment.status = 'failed';
-      payment.failureReason = event.reason ?? 'Payment was not approved.';
-      const saved = await this.payments.save(payment);
+      const won = await this.claim(this.payments.manager, payment.id, ['pending'], 'failed', event.reason ?? 'Payment was not approved.');
+      const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
+      if (!won) return saved; // already settled by someone else
       this.publish(saved);
       if (saved.purpose === 'order' && this.orderSettled) await this.orderSettled(saved, 'failed');
       await this.notifications.toUser(saved.userId, {
@@ -288,23 +316,30 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     // Success. If it arrives AFTER we gave up (timeout / cancelled order), the
     // customer's money is real, so it must not vanish: credit it to their wallet.
-    const wasPending = payment.status === 'pending';
-    if (payment.purpose === 'topup') {
-      await this.wallet.topUp(payment.userId, payment.amountUsd, payment.method);
-      payment.status = 'succeeded';
-      payment.failureReason = null;
-    } else if (wasPending) {
-      payment.status = 'succeeded';
-      payment.failureReason = null;
-    } else {
-      await this.wallet.refund(
+    let wasPending = false;
+    const won = await this.payments.manager.transaction(async (m) => {
+      if (payment.purpose === 'topup') {
+        if (!(await this.claim(m, payment.id, ['pending', 'failed'], 'succeeded', null))) return false;
+        await this.wallet.apply(payment.userId, 'topup', payment.amountUsd, `Wallet top-up via ${payment.method}`, m);
+        return true;
+      }
+      if (await this.claim(m, payment.id, ['pending'], 'succeeded', null)) {
+        wasPending = true;
+        return true;
+      }
+      // Late success on a payment we already failed: park the money in the wallet.
+      if (!(await this.claim(m, payment.id, ['failed'], 'refunded'))) return false;
+      await this.wallet.apply(
         payment.userId,
+        'refund',
         payment.amountUsd,
         `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`,
+        m,
       );
-      payment.status = 'refunded';
-    }
-    const saved = await this.payments.save(payment);
+      return true;
+    });
+    const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
+    if (!won) return saved;
     this.publish(saved);
     if (saved.purpose === 'order' && wasPending && this.orderSettled) {
       await this.orderSettled(saved, 'succeeded');
@@ -339,22 +374,38 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.payments.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
   }
 
-  /** The customer abandons an unpaid order: a late approval is then refunded to the wallet. */
-  async abandonPending(orderId: string): Promise<void> {
-    const p = await this.forOrder(orderId);
-    if (p && p.status === 'pending' && isMobileMoney(p.method)) {
-      p.status = 'failed';
-      p.failureReason = 'Cancelled by customer.';
-      this.publish(await this.payments.save(p));
-    }
-  }
-
   /** COD collected when the parcel is delivered. */
   async markCollected(orderId: string): Promise<void> {
     const payment = await this.payments.findOne({ where: { orderId } });
     if (!payment || payment.status !== 'pending' || payment.method !== 'cod') return;
     payment.status = 'succeeded';
     this.publish(await this.payments.save(payment));
+  }
+
+  /**
+   * Called when an order is cancelled. If we actually collected money for it
+   * (prepaid, not COD), the payment is marked refunded and the wallet credited in
+   * ONE transaction; a pending payment is simply abandoned (a late approval is
+   * then credited to the wallet by [settle]). Returns whether a refund was made.
+   */
+  async refundCancelledOrder(order: Order): Promise<boolean> {
+    const payment = await this.forOrder(order.id);
+    if (!payment) return false;
+    if (payment.status === 'pending') {
+      if (isMobileMoney(payment.method)) {
+        await this.claim(this.payments.manager, payment.id, ['pending'], 'failed', 'Cancelled by customer.');
+        this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
+      }
+      return false;
+    }
+    if (payment.status !== 'succeeded' || order.paymentMethod === 'cod') return false;
+    const won = await this.payments.manager.transaction(async (m) => {
+      if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
+      await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, `Refund for cancelled order ${order.reference}`, m);
+      return true;
+    });
+    if (won) this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
+    return won;
   }
 
   /** Refund an order, to the wallet (instant store credit) or original method. */
@@ -367,15 +418,22 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (payment.status !== 'succeeded') {
       throw new BadRequestException('Only a completed payment can be refunded.');
     }
-    payment.status = 'refunded';
-    const saved = await this.payments.save(payment);
-
-    if (toWallet) {
-      await this.wallet.refund(saved.userId, saved.amountUsd, `Refund for ${saved.orderReference}`);
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (order?.status === 'cancelled') {
+      throw new BadRequestException('This order was cancelled and has already been settled.');
     }
+    // Atomic: of two concurrent refunds exactly one wins.
+    const won = await this.payments.manager.transaction(async (m) => {
+      if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
+      if (toWallet) {
+        await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, `Refund for ${payment.orderReference}`, m);
+      }
+      return true;
+    });
+    if (!won) throw new BadRequestException('Already refunded.');
+    const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
 
     // Reflect the refund on the order.
-    const order = await this.orders.findOne({ where: { id: orderId } });
     if (order) {
       order.status = 'returned';
       await this.orders.save(order);
@@ -394,17 +452,18 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async list(user: { id: string; role: string }): Promise<Payment[]> {
-    const rows =
-      user.role === 'customer' || user.role === 'rider'
-        ? await this.payments.find({ where: { userId: user.id }, order: { createdAt: 'DESC' } })
-        : await this.payments.find({ order: { createdAt: 'DESC' }, take: 200 });
+    // Only finance/admin see every payment; everyone else just their own.
+    const all = user.role === 'admin' || user.role === 'admin_finance';
+    const rows = all
+      ? await this.payments.find({ order: { createdAt: 'DESC' }, take: 200 })
+      : await this.payments.find({ where: { userId: user.id }, order: { createdAt: 'DESC' } });
     return rows.map((p) => this.view(p));
   }
 
   /** A payment by reference, visible to its owner and to finance/admin. */
   async status(user: { id: string; role: string }, reference: string): Promise<Payment> {
     const p = await this.payments.findOne({ where: { reference } });
-    const isStaff = (ADMIN_ROLES as readonly string[]).includes(user.role);
+    const isStaff = user.role === 'admin' || user.role === 'admin_finance';
     if (!p || (p.userId !== user.id && !isStaff)) throw new NotFoundException('Payment not found.');
     return this.view(p);
   }
@@ -416,7 +475,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   private publish(saved: Payment) {
     this.emitter.toUser(saved.userId, 'payment:updated', this.view(saved));
-    this.emitter.toRoles(ADMIN_ROLES, 'payment:updated', this.view(saved));
+    this.emitter.toRoles(FINANCE_ROLES, 'payment:updated', this.view(saved));
   }
 
   private static newReference(): string {

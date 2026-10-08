@@ -86,6 +86,7 @@ async function main() {
       items: [{ productId: products[0].id, qty: 1 }],
       paymentMethod: 'cod',
       deliveryFeeUsd: 0,
+    zoneId: 'zone-a',
     });
   } catch {
     codRefused = true;
@@ -99,6 +100,7 @@ async function main() {
     items: [{ productId: products[0].id, qty: 2 }],
     paymentMethod: 'cod',
     deliveryFeeUsd: 3,
+    zoneId: 'gombe',
     shippingAddress: JSON.stringify({ city: 'Kinshasa', line1: '12 Ave du Commerce' }),
   });
   check('order created + acked to customer', !!created.id && created.status === 'pending');
@@ -115,6 +117,10 @@ async function main() {
   const afterAccept = await custStatusUpdate;
   check('customer got order:updated when rider accepted', afterAccept.id === created.id);
 
+  const custShipped = waitFor<any>(cSock, 'order:updated');
+  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'picked_up' });
+  const shipped = await custShipped;
+  check('customer order → shipped live', shipped.status === 'shipped');
   const custOutForDelivery = waitFor<any>(cSock, 'order:updated');
   await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'in_transit' });
   const ofd = await custOutForDelivery;
@@ -134,6 +140,7 @@ async function main() {
     ],
     paymentMethod: 'stripe_card',
     deliveryFeeUsd: 0,
+    zoneId: 'zone-a',
   });
   check(
     'snapshot-line order created (no productId)',
@@ -157,6 +164,7 @@ async function main() {
     items: [{ name: 'Wallet Item', priceUsd: 40, qty: 1 }],
     paymentMethod: 'wallet',
     deliveryFeeUsd: 0,
+    zoneId: 'zone-a',
   });
   check('wallet order confirmed immediately', walletOrder.status === 'confirmed');
   const afterDebit = await walletDebited;
@@ -178,6 +186,7 @@ async function main() {
       items: [{ name: 'Too expensive', priceUsd: 999999, qty: 1 }],
       paymentMethod: 'wallet',
       deliveryFeeUsd: 0,
+    zoneId: 'zone-a',
     });
   } catch {
     rejected = true;
@@ -185,8 +194,14 @@ async function main() {
   check('wallet order rejected when funds insufficient', rejected);
 
   // ---- Payouts (seller ⇄ finance) ----
+  // A payout can only draw on DELIVERED sales, so complete the first delivery.
+  const sold = waitFor<any>(cSock, 'order:updated');
+  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
+  check('rider completes the delivery → order delivered', (await sold).status === 'delivered');
   const seller = await login('seller@somba.app');
   const sSock = await connect(seller.token);
+  const avail = await emit<{ available: number }>(sSock, 'payouts:available');
+  check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);
   const financeSawPayout = waitFor<any>(aSock, 'payout:created');
   const payout = await emit<any>(sSock, 'payouts:request', {
     amountUsd: 120,

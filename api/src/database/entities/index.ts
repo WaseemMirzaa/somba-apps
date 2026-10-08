@@ -2,6 +2,7 @@ export { User } from './user.entity';
 export type { UserRole } from './user.entity';
 export { Seller } from './seller.entity';
 export { Product } from './product.entity';
+export type { ProductStatus } from './product.entity';
 export { Order } from './order.entity';
 export type { OrderStatus, PaymentMethod } from './order.entity';
 export { OrderItem } from './order-item.entity';

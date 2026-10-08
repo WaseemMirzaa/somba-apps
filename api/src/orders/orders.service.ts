@@ -17,6 +17,7 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
+import { SettingsService } from '../content/settings.service';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -45,6 +46,7 @@ export interface CreateOrderInput {
 }
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
+const ORDER_STATUSES: readonly string[] = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'];
 
 @Injectable()
 export class OrdersService {
@@ -58,6 +60,7 @@ export class OrdersService {
     private readonly payments: PaymentsService,
     private readonly wallet: WalletService,
     private readonly promos: PromosService,
+    private readonly settings: SettingsService,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -86,7 +89,7 @@ export class OrdersService {
       process.env.NODE_ENV !== 'production';
 
     const items: OrderItem[] = [];
-    const stockToReserve: { productId: string; qty: number }[] = [];
+    const stockToReserve: { productId: string; qty: number; name: string }[] = [];
     let subtotal = 0;
     for (const line of input.items) {
       const rawQty = Number(line.qty ?? 1);
@@ -99,7 +102,7 @@ export class OrdersService {
       // name snapshots). The CLIENT'S PRICE IS NEVER TRUSTED for a real listing.
       let product = line.productId ? await this.products.get(line.productId) : null;
       if (!product && line.name) product = await this.products.findLiveByName(line.name);
-      if (product && product.status !== 'live') {
+      if (product && (product.status !== 'live' || !(product.price > 0))) {
         throw new BadRequestException(`"${product.name}" is not available.`);
       }
 
@@ -117,7 +120,7 @@ export class OrdersService {
         name = product.name;
         price = product.price;
         productId = product.id;
-        stockToReserve.push({ productId: product.id, qty });
+        stockToReserve.push({ productId: product.id, qty, name: product.name });
       } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
         const p = Number(line.priceUsd);
         if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
@@ -142,15 +145,12 @@ export class OrdersService {
       items.push(item);
     }
 
-    const deliveryFee = Number(input.deliveryFeeUsd ?? 0);
-    if (!Number.isFinite(deliveryFee) || deliveryFee < 0 || deliveryFee > MAX_DELIVERY_FEE) {
-      throw new BadRequestException('Invalid delivery fee.');
-    }
+    const deliveryFee = await this.resolveDeliveryFee(input.zoneId, input.deliveryFeeUsd, MAX_DELIVERY_FEE);
 
     let discount = 0;
     let promoCode: string | null = null;
     if (input.promoCode?.trim()) {
-      const res = await this.promos.validate(input.promoCode.trim(), subtotal);
+      const res = await this.promos.validate(input.promoCode.trim(), subtotal, customer.id);
       if (!res.ok) throw new BadRequestException(res.reason ?? 'Invalid promo code.');
       discount = Math.min(Number(res.discount.toFixed(2)), subtotal); // never below zero
       promoCode = res.code ?? null;
@@ -169,6 +169,24 @@ export class OrdersService {
       }
     }
 
+    // Take the stock ATOMICALLY (the UPDATE only succeeds while enough is left),
+    // so concurrent orders can never oversell. Released again on any failure.
+    const reserved: { productId: string; qty: number }[] = [];
+    const release = async () => {
+      for (const r of reserved) await this.products.restock(r.productId, r.qty);
+    };
+    try {
+      for (const r of stockToReserve) {
+        if (!(await this.products.reserve(r.productId, r.qty))) {
+          throw new BadRequestException(`"${r.name}" just sold out or has too little stock left.`);
+        }
+        reserved.push(r);
+      }
+    } catch (err) {
+      await release();
+      throw err;
+    }
+
     const order = this.orders.create({
       reference: OrdersService.newReference(),
       customerId: customer.id,
@@ -184,7 +202,13 @@ export class OrdersService {
       shippingAddress: input.shippingAddress ?? null,
       items,
     });
-    let saved = await this.orders.save(order);
+    let saved: Order;
+    try {
+      saved = await this.orders.save(order);
+    } catch (err) {
+      await release();
+      throw err;
+    }
 
     // Charge for the order. Wallet/card confirm immediately; COD stays pending
     // until the rider collects; mobile money stays pending until the subscriber
@@ -195,17 +219,13 @@ export class OrdersService {
     } catch (err) {
       saved.status = 'cancelled'; // never leave a dangling unpaid order behind
       await this.orders.save(saved);
+      await release();
       throw err;
     }
     const awaitingPayment = payment.status === 'pending' && payment.method !== 'cod';
     if (payment.status === 'succeeded') {
       saved.status = 'confirmed';
       saved = await this.orders.save(saved);
-    }
-
-    // Reserve stock only for lines that resolved to a real seeded product.
-    for (const reserve of stockToReserve) {
-      await this.products.decrementStock(reserve.productId, reserve.qty);
     }
 
     this.emitter.toUser(customer.id, 'order:created', saved);
@@ -284,13 +304,48 @@ export class OrdersService {
     });
   }
 
+  /**
+   * The delivery fee comes from the admin-configured zones (`deliveryZones`
+   * setting) — the client's number is ignored. Only when no zones are configured
+   * (dev/demo) is a capped client fee accepted.
+   */
+  private async resolveDeliveryFee(zoneId: string | undefined, clientFee: unknown, max: number): Promise<number> {
+    const raw = await this.settings.get('deliveryZones');
+    if (raw) {
+      let zones: { id: string; feeUsd: number }[] = [];
+      try {
+        zones = JSON.parse(raw);
+      } catch {
+        zones = [];
+      }
+      if (zones.length) {
+        const z = zones.find((x) => x.id === zoneId);
+        if (!z) throw new BadRequestException('Choose a valid delivery zone.');
+        return Number(Number(z.feeUsd).toFixed(2));
+      }
+    }
+    const fee = Number(clientFee ?? 0);
+    if (!Number.isFinite(fee) || fee < 0 || fee > max) throw new BadRequestException('Invalid delivery fee.');
+    return fee;
+  }
+
   async updateStatus(
     orderId: string,
     status: OrderStatus,
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
-    if (order.status === 'pending' && status !== 'cancelled' && order.paymentMethod !== 'cod') {
+    if (!ORDER_STATUSES.includes(status)) throw new BadRequestException('Unknown order status.');
+    if (status === 'cancelled') {
+      throw new BadRequestException('Use cancel so stock and refunds are handled.');
+    }
+    if ((order.status as string) === 'cancelled' || (order.status as string) === 'returned') {
+      throw new BadRequestException(`A ${order.status} order can no longer change.`);
+    }
+    if (order.status === 'delivered' && status !== 'returned') {
+      throw new BadRequestException('A delivered order can only be marked returned.');
+    }
+    if (order.status === 'pending' && order.paymentMethod !== 'cod') {
       const pay = await this.payments.forOrder(order.id);
       if (pay && pay.status === 'pending') {
         throw new BadRequestException('Awaiting payment — this order cannot be fulfilled yet.');
@@ -324,38 +379,32 @@ export class OrdersService {
     orderId: string,
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found.');
-    if (user.role === 'customer' && order.customerId !== user.id) {
-      throw new BadRequestException('You can only cancel your own orders.');
+    // Same answer for "missing" and "not yours" so ids can't be probed.
+    if (!order || (!user.role.startsWith('admin') && order.customerId !== user.id)) {
+      throw new NotFoundException('Order not found.');
     }
-    if (!['pending', 'confirmed'].includes(order.status)) {
-      throw new BadRequestException(
-        `Order can no longer be cancelled (status: ${order.status}).`,
-      );
+
+    // Atomic transition: of two concurrent cancels exactly one wins, so stock is
+    // restored and money refunded once.
+    const claim = await this.orders
+      .createQueryBuilder()
+      .update(Order)
+      .set({ status: 'cancelled' })
+      .where("id = :id AND status IN ('pending','confirmed')", { id: order.id })
+      .execute();
+    if (!claim.affected) {
+      throw new BadRequestException(`Order can no longer be cancelled (status: ${order.status}).`);
     }
+    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
 
     // Was the money actually received? (pending mobile money / COD: no refund due)
-    const payment = await this.payments.forOrder(order.id);
-    const wasPaid = payment?.status === 'succeeded' && order.paymentMethod !== 'cod';
-    if (!wasPaid) await this.payments.abandonPending(order.id);
-
-    order.status = 'cancelled';
-    const saved = await this.orders.save(order);
+    const wasPaid = await this.payments.refundCancelledOrder(saved);
 
     // Return reserved stock.
     for (const item of saved.items ?? []) {
       if (!item.productId.startsWith('ext:')) {
         await this.products.restock(item.productId, item.qty);
       }
-    }
-
-    // Refund only money we actually collected.
-    if (wasPaid) {
-      await this.wallet.refund(
-        saved.customerId,
-        saved.totalUsd,
-        `Refund for cancelled order ${saved.reference}`,
-      );
     }
 
     // Void the delivery task.
@@ -378,21 +427,51 @@ export class OrdersService {
     return saved;
   }
 
-  async list(user: { id: string; role: string }): Promise<Order[]> {
+  /**
+   * Who sees which orders: customers/riders their own, ops everything, a seller
+   * only the lines of THEIR products (no address, no customer id), everyone else
+   * nothing.
+   */
+  async list(user: { id: string; role: string }, sellerId?: string): Promise<unknown[]> {
     if (user.role === 'customer') {
-      return this.orders.find({
-        where: { customerId: user.id },
-        order: { createdAt: 'DESC' },
-      });
+      return this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
     }
     if (user.role === 'rider') {
-      return this.orders.find({
-        where: { riderId: user.id },
-        order: { createdAt: 'DESC' },
-      });
+      return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' } });
     }
-    // Admin / warehouse see everything.
-    return this.orders.find({ order: { createdAt: 'DESC' }, take: 200 });
+    if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
+      return this.orders.find({ order: { createdAt: 'DESC' }, take: 200 });
+    }
+    if (user.role === 'seller') return this.listForSeller(sellerId ?? user.id);
+    return [];
+  }
+
+  private async listForSeller(sellerId: string) {
+    const ids = await this.products.idsBySeller(sellerId);
+    if (!ids.length) return [];
+    const mine = new Set(ids);
+    const rows = await this.orders
+      .createQueryBuilder('o')
+      .innerJoinAndSelect('o.items', 'i')
+      .where('i.productId IN (:...ids)', { ids })
+      .orderBy('o.createdAt', 'DESC')
+      .take(200)
+      .getMany();
+    return rows.map((o) => {
+      const items = (o.items ?? []).filter((i) => mine.has(i.productId));
+      const subtotal = Number(items.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
+      return {
+        id: o.id,
+        reference: o.reference,
+        status: o.status,
+        paymentMethod: o.paymentMethod,
+        createdAt: o.createdAt,
+        customerName: (o.customerName ?? '').split(' ')[0],
+        items,
+        subtotalUsd: subtotal,
+        totalUsd: subtotal,
+      };
+    });
   }
 
   get(id: string): Promise<Order | null> {

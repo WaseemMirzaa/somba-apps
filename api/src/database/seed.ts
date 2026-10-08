@@ -198,6 +198,7 @@ async function run() {
     setRepo.create({ key: 'fxRate', value: '2850' }),
     setRepo.create({ key: 'codCapUsd', value: '500' }),
     setRepo.create({ key: 'codEnabled', value: 'false' }),
+    setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0 }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5 }]) }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
   ]);
 

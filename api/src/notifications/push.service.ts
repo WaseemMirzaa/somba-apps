@@ -82,6 +82,11 @@ export class PushService {
     const token = input.token?.trim();
     if (!token || token.length > 255) throw new Error('A valid device token is required.');
     const existing = await this.tokens.findOne({ where: { token } });
+    if (!existing) {
+      // Keep the registry bounded: a user keeps their 10 most recent devices.
+      const mine = await this.tokens.find({ where: { userId: user.id }, order: { updatedAt: 'ASC' } });
+      for (const old of mine.slice(0, Math.max(0, mine.length - 9))) await this.tokens.delete({ token: old.token });
+    }
     // The same physical device can change hands (logout → another login): the
     // token always follows the CURRENT user so pushes never leak to the old one.
     const row = existing ?? this.tokens.create({ token });
@@ -92,8 +97,9 @@ export class PushService {
     return this.tokens.save(row);
   }
 
-  async unregister(token: string): Promise<void> {
-    await this.tokens.delete({ token });
+  /** Scoped to the owner so one user can't unregister another's device. */
+  async unregister(token: string, userId: string): Promise<void> {
+    await this.tokens.delete({ token, userId });
   }
 
   /** Forget every device of a user (account deletion / sign-out everywhere). */

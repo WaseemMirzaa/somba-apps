@@ -10,6 +10,9 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { WsThrottleInterceptor } from './ws-throttle.interceptor';
+import { oneOf } from '../common/validate';
+import { cleanListing } from '../products/products.service';
+import type { ListingInput } from '../products/products.service';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
@@ -67,6 +70,18 @@ function fail(error: string) {
 }
 
 /** Validate a positive money amount (USD), rounded to cents. Throws otherwise. */
+/** Which admin sub-roles may use which feature (least privilege). */
+const GROUPS = {
+  config: ['admin', 'admin_finance', 'admin_operations'],
+  content: ['admin', 'admin_marketing'],
+  catalog: ['admin', 'admin_operations', 'admin_marketing'],
+  people: ['admin', 'admin_support', 'admin_operations', 'admin_finance'],
+  insight: ['admin', 'admin_operations', 'admin_finance'],
+  audit: ['admin', 'admin_operations'],
+  fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation'],
+} as const;
+const ALL_ROLES = ['customer', 'seller', 'admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'] as const;
+
 function assertAmount(x: unknown): number {
   const n = typeof x === 'number' ? x : Number(x);
   if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) {
@@ -135,6 +150,16 @@ export class RealtimeGateway
 
   private isAdmin(role: string) {
     return role.startsWith('admin');
+  }
+
+  /** Is the user's role in the given least-privilege group? */
+  private can(role: string, group: keyof typeof GROUPS) {
+    return (GROUPS[group] as readonly string[]).includes(role);
+  }
+
+  /** Drop every open socket of a user (after suspension / role change / password reset). */
+  private kick(userId: string) {
+    this.server?.in(RealtimeEmitter.userRoom(userId)).disconnectSockets(true);
   }
 
   afterInit(server: Server): void {
@@ -212,10 +237,17 @@ export class RealtimeGateway
     @ConnectedSocket() client: AuthedSocket,
     @MessageBody() body: { category?: string; status?: string },
   ) {
-    // Shoppers (and guests) only ever see live listings, whatever they ask for.
-    const role = client.data.user?.role ?? 'guest';
-    const filter = role === 'customer' || role === 'guest' ? { ...(body ?? {}), status: 'live' } : (body ?? {});
-    return ok(await this.products.list(filter));
+    // Admins may filter by any status; everyone else only ever sees LIVE listings
+    // (plus a seller's own drafts), whatever they ask for.
+    const user = client.data.user;
+    const role = user?.role ?? 'guest';
+    if (this.isAdmin(role)) return ok(await this.products.list(body ?? {}));
+    const rows = await this.products.list({ category: body?.category });
+    if (role === 'seller') {
+      const mine = await this.sellersSvc.byUser(user!.id);
+      return ok(rows.filter((p) => p.status === 'live' || p.sellerId === mine?.id || p.sellerId === user!.id));
+    }
+    return ok(rows.filter((p) => p.status === 'live'));
   }
 
   @SubscribeMessage('products:get')
@@ -223,10 +255,15 @@ export class RealtimeGateway
     @ConnectedSocket() client: AuthedSocket,
     @MessageBody() body: { id: string },
   ) {
-    const p = await this.products.get(body.id);
-    const role = client.data.user?.role ?? 'guest';
-    if (p && p.status !== 'live' && (role === 'customer' || role === 'guest')) {
-      return fail('Product not found.');
+    const p = await this.products.get(String(body?.id ?? ''));
+    const user = client.data.user;
+    const role = user?.role ?? 'guest';
+    if (p && p.status !== 'live' && !this.isAdmin(role)) {
+      // Non-live listings are visible only to their own seller (and admins).
+      const mine = role === 'seller' ? await this.sellersSvc.byUser(user!.id) : null;
+      if (!(role === 'seller' && (p.sellerId === mine?.id || p.sellerId === user!.id))) {
+        return fail('Product not found.');
+      }
     }
     return p ? ok(p) : fail('Product not found.');
   }
@@ -256,22 +293,20 @@ export class RealtimeGateway
       if (user.role !== 'seller' && !user.role.startsWith('admin')) {
         return fail('Only sellers or admins can publish products.');
       }
-      if (!body?.name || body.price == null || !body.category) {
-        return fail('name, price and category are required.');
-      }
       // Products are keyed to the Seller entity (not the user row) so seller
-      // dashboards, stats, and payouts all join on the same id. Sellers who
-      // haven't registered a storefront yet fall back to their user id.
+      // dashboards, stats, and payouts all join on the same id.
       const seller = await this.sellersSvc.byUser(user.id);
-      // Seller-published products go live immediately in this prototype.
+      if (user.role === 'seller' && seller?.status !== 'approved') {
+        return fail(
+          seller?.status === 'pending'
+            ? 'Your store is awaiting approval — you can list products once it is approved.'
+            : 'Your store is not active. Contact support.',
+        );
+      }
+      const data = cleanListing(body as ListingInput, { partial: false, allowStatus: false });
       const product = await this.products.create({
-        name: body.name,
-        nameFr: body.nameFr ?? null,
-        price: Number(body.price),
-        category: body.category,
-        stock: body.stock ?? 0,
-        image: body.image ?? null,
-        description: body.description ?? null,
+        ...data,
+        stock: data.stock ?? 0,
         status: 'live',
         sellerId: seller?.id ?? user.id,
         sellerName: seller?.name ?? user.name,
@@ -298,7 +333,16 @@ export class RealtimeGateway
       if (!isOwner && !user.role.startsWith('admin')) {
         return fail('You can only edit your own products.');
       }
-      return ok(await this.products.update(body.id, body.patch));
+      if (!user.role.startsWith('admin') && seller?.status !== 'approved' && existing.sellerId !== user.id) {
+        return fail('Your store is not active.');
+      }
+      // Whitelisted + range-checked; only admins may change moderation status.
+      const patch = cleanListing(body.patch as ListingInput, {
+        partial: true,
+        allowStatus: this.isAdmin(user.role),
+        currentPrice: existing.price,
+      });
+      return ok(await this.products.update(body.id, patch));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -309,7 +353,8 @@ export class RealtimeGateway
   async ordersList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.orders.list(user));
+      const sellerId = user.role === 'seller' ? (await this.sellersSvc.byUser(user.id))?.id : undefined;
+      return ok(await this.orders.list(user, sellerId));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -344,7 +389,9 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role === 'customer') return fail('Not allowed.');
+      if (!this.isOps(user.role)) return fail('Not allowed.');
+      // Cancelling must restock and refund — route it through the real flow.
+      if (body?.status === 'cancelled') return ok(await this.orders.cancel(user, body.orderId));
       return ok(await this.orders.updateStatus(body.orderId, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -359,6 +406,7 @@ export class RealtimeGateway
       if (user.role === 'rider') {
         return ok(await this.delivery.listForRider(user.id));
       }
+      if (!this.isOps(user.role)) return fail('Not allowed.');
       return ok(await this.delivery.listAll());
     } catch (e) {
       return fail((e as Error).message);
@@ -404,7 +452,10 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'rider') return fail('Riders only.');
-      return ok(await this.delivery.updateStatus(body.taskId, body.status));
+      if (!(['picked_up', 'in_transit', 'delivered', 'failed'] as string[]).includes(body?.status)) {
+        return fail('Invalid delivery status.');
+      }
+      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -515,6 +566,18 @@ export class RealtimeGateway
     }
   }
 
+  /** What the signed-in seller can withdraw right now (and how it is computed). */
+  @SubscribeMessage('payouts:available')
+  async payoutsAvailable(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Sellers only.');
+      return ok(await this.payouts.available(user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('payouts:request')
   async payoutsRequest(
     @ConnectedSocket() client: AuthedSocket,
@@ -523,6 +586,8 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'seller') return fail('Sellers only.');
+      const store = await this.sellersSvc.byUser(user.id);
+      if (store?.status !== 'approved') return fail('Your store must be approved before you can request payouts.');
       const amount = assertAmount(body?.amountUsd);
       return ok(
         await this.payouts.request(
@@ -607,10 +672,11 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
       return ok(
-        await this.disputes.resolve(body.disputeId, {
-          resolution: body.resolution,
-          refund: body.refund,
-        }),
+        await this.disputes.resolve(
+          body.disputeId,
+          { resolution: body.resolution, refund: body.refund },
+          user.role === 'admin' || user.role === 'admin_finance',
+        ),
       );
     } catch (e) {
       return fail((e as Error).message);
@@ -811,13 +877,21 @@ export class RealtimeGateway
 
   // ---- Promotions & flash sales ------------------------------------------
   @SubscribeMessage('promos:list')
-  async promosList() {
-    return ok(await this.promos.list());
+  async promosList(@ConnectedSocket() client: AuthedSocket) {
+    return ok(await this.promos.list(this.can(client.data.user?.role ?? 'guest', 'content')));
   }
 
   @SubscribeMessage('promos:validate')
-  async promosValidate(@MessageBody() body: { code: string; subtotalUsd: number }) {
-    return ok(await this.promos.validate(body.code, body.subtotalUsd));
+  async promosValidate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { code: string; subtotalUsd: number },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.promos.validate(String(body?.code ?? ''), Number(body?.subtotalUsd), user.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 
   @SubscribeMessage('promos:create')
@@ -827,8 +901,10 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(await this.promos.create(body));
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
+      const promo = await this.promos.create(body);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'promo.create', entity: 'promo', entityId: promo.id, detail: promo.code });
+      return ok(promo);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -846,7 +922,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
       return ok(await this.promos.createFlashSale(body));
     } catch (e) {
       return fail((e as Error).message);
@@ -855,8 +931,8 @@ export class RealtimeGateway
 
   // ---- CMS + settings + categories CRUD (admin) --------------------------
   @SubscribeMessage('cms:list')
-  async cmsList() {
-    return ok(await this.cms.list());
+  async cmsList(@ConnectedSocket() client: AuthedSocket) {
+    return ok(await this.cms.list(this.can(client.data.user?.role ?? 'guest', 'content')));
   }
 
   @SubscribeMessage('cms:upsert')
@@ -866,7 +942,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
       return ok(await this.cms.upsert(body));
     } catch (e) {
       return fail((e as Error).message);
@@ -874,8 +950,10 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('settings:get')
-  async settingsGet() {
-    return ok(await this.settings.all());
+  async settingsGet(@ConnectedSocket() client: AuthedSocket) {
+    // Everyone may read the public pricing/checkout settings; the rest is admin-only.
+    const role = client.data.user?.role ?? 'guest';
+    return ok(this.can(role, 'config') ? await this.settings.all() : await this.settings.publicView());
   }
 
   @SubscribeMessage('settings:set')
@@ -885,8 +963,10 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(await this.settings.set(body.key, body.value));
+      if (!this.can(user.role, 'config')) return fail('Not allowed.');
+      const all = await this.settings.set(String(body?.key ?? ''), body?.value);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'settings.set', entity: 'setting', entityId: body.key, detail: String(all[body.key]).slice(0, 200) });
+      return ok(all);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -899,7 +979,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
       return ok(await this.categories.create(body));
     } catch (e) {
       return fail((e as Error).message);
@@ -913,7 +993,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
       return ok(await this.categories.update(body.id, body.patch));
     } catch (e) {
       return fail((e as Error).message);
@@ -927,7 +1007,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
       await this.categories.remove(body.id);
       return ok({ id: body.id });
     } catch (e) {
@@ -963,6 +1043,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Only seller accounts can open a store.');
       return ok(
         await this.sellersSvc.register({ id: user.id, name: user.name }, body),
       );
@@ -978,7 +1059,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!['admin', 'admin_moderation', 'admin_operations'].includes(user.role)) return fail('Not allowed.');
+      oneOf(body?.status, ['approved', 'rejected', 'suspended', 'pending'] as const, 'Status');
       const seller = await this.sellersSvc.setStatus(body.id, body.status);
       await this.audit.record({
         actor: user.name,
@@ -1023,9 +1105,7 @@ export class RealtimeGateway
   async analyticsAdmin(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
-        return fail('Admins only.');
-      }
+      if (!this.can(user.role, 'insight')) return fail('Not allowed.');
       return ok(await this.analytics.adminStats());
     } catch (e) {
       return fail((e as Error).message);
@@ -1049,7 +1129,7 @@ export class RealtimeGateway
   async analyticsRevenue(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'insight')) return fail('Not allowed.');
       return ok(await this.analytics.revenueSeries());
     } catch (e) {
       return fail((e as Error).message);
@@ -1061,7 +1141,7 @@ export class RealtimeGateway
   async auditList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'audit')) return fail('Not allowed.');
       return ok(await this.audit.list());
     } catch (e) {
       return fail((e as Error).message);
@@ -1072,7 +1152,7 @@ export class RealtimeGateway
   async fraudList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'fraud')) return fail('Not allowed.');
       return ok(await this.fraud.list());
     } catch (e) {
       return fail((e as Error).message);
@@ -1086,7 +1166,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'fraud')) return fail('Not allowed.');
+      oneOf(body?.status, ['open', 'reviewed', 'blocked'] as const, 'Status');
       return ok(await this.fraud.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -1097,7 +1178,7 @@ export class RealtimeGateway
   async customersList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'people')) return fail('Not allowed.');
       return ok(await this.customers.list());
     } catch (e) {
       return fail((e as Error).message);
@@ -1111,9 +1192,12 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
-      await this.customers.setActive(body.id, body.active);
-      return ok({ id: body.id, active: body.active });
+      if (user.role !== 'admin' && user.role !== 'admin_support') return fail('Not allowed.');
+      const active = body?.active === true;
+      await this.customers.setActive(String(body?.id ?? ''), active, user.id);
+      await this.audit.record({ actor: user.name, role: user.role, action: active ? 'user.reactivate' : 'user.suspend', entity: 'user', entityId: body.id });
+      if (!active) this.kick(body.id); // suspended people lose their live sockets immediately
+      return ok({ id: body.id, active });
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1123,7 +1207,7 @@ export class RealtimeGateway
   async broadcastsList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
       return ok(await this.broadcasts.list());
     } catch (e) {
       return fail((e as Error).message);
@@ -1137,7 +1221,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
       return ok(await this.broadcasts.send(user.name, body));
     } catch (e) {
       return fail((e as Error).message);
@@ -1153,7 +1237,7 @@ export class RealtimeGateway
   async rolesStaff(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (user.role !== 'admin') return fail('Super admin only.');
       return ok(await this.roles.staff());
     } catch (e) {
       return fail((e as Error).message);
@@ -1168,8 +1252,13 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'admin') return fail('Super admin only.');
-      await this.roles.setRole(body.id, body.role as never);
-      return ok({ id: body.id, role: body.role });
+      const role = oneOf(body?.role, ALL_ROLES, 'Role');
+      const id = String(body?.id ?? '');
+      if (id === user.id) return fail('You cannot change your own role.');
+      await this.roles.setRole(id, role);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'role.set', entity: 'user', entityId: id, detail: role });
+      this.kick(id); // old privileges must not survive on an open socket
+      return ok({ id, role });
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1238,12 +1327,10 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Staff only.');
-      return ok(
-        await this.warehouse.buildBatch(body.hubId ?? null, body.taskIds ?? [], {
-          id: body.riderId,
-          name: body.riderName ?? 'Rider',
-        }),
-      );
+      const rider = await this.users.findById(String(body?.riderId ?? ''));
+      if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
+      if (!Array.isArray(body.taskIds) || body.taskIds.length === 0 || body.taskIds.length > 200) return fail('Select 1–200 parcels.');
+      return ok(await this.warehouse.buildBatch(body.hubId ?? null, body.taskIds, { id: rider.id, name: rider.name }));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1298,6 +1385,7 @@ export class RealtimeGateway
   async riderTasks(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
+      if (user.role !== 'rider') return fail('Riders only.');
       return ok(await this.rider.queue(user.id));
     } catch (e) {
       return fail((e as Error).message);
@@ -1334,7 +1422,9 @@ export class RealtimeGateway
       if (user.role !== 'seller' && !this.isAdmin(user.role)) {
         return fail('Only sellers or admins can create campaigns.');
       }
-      if (!body?.name) return fail('name is required.');
+      if (user.role === 'seller' && (await this.sellersSvc.byUser(user.id))?.status !== 'approved') {
+        return fail('Your store must be approved before you can run campaigns.');
+      }
       return ok(await this.campaigns.create(user, body));
     } catch (e) {
       return fail((e as Error).message);
@@ -1351,7 +1441,7 @@ export class RealtimeGateway
       if (user.role !== 'seller' && !this.isAdmin(user.role)) {
         return fail('Not allowed.');
       }
-      return ok(await this.campaigns.update(body.id, body.patch));
+      return ok(await this.campaigns.update(user, body.id, body.patch));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1369,6 +1459,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role)) return fail('Admins only.');
+      oneOf(body?.status, ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'] as const, 'Status');
       return ok(await this.campaigns.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -1418,6 +1509,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
+      oneOf(body?.status, ['requested', 'approved', 'received', 'allocated', 'dispatched', 'rejected'] as const, 'Status');
       return ok(await this.replacements.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -1469,6 +1561,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
+      oneOf(body?.status, ['requested', 'approved', 'received', 'ready', 'dispatched', 'rejected'] as const, 'Status');
       return ok(await this.exchanges.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -1635,12 +1728,10 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
-      return ok(
-        await this.delivery.assign(body.taskId, {
-          id: body.riderId,
-          name: body.riderName ?? 'Rider',
-        }),
-      );
+      // The assignee must be a real, active rider account.
+      const rider = await this.users.findById(String(body?.riderId ?? ''));
+      if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
+      return ok(await this.delivery.assign(body.taskId, { id: rider.id, name: rider.name }));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1787,8 +1878,8 @@ export class RealtimeGateway
     @MessageBody() body: { token: string },
   ) {
     try {
-      this.requireUser(client);
-      await this.push.unregister(body.token);
+      const user = this.requireUser(client);
+      await this.push.unregister(body.token, user.id);
       return ok({ unregistered: true });
     } catch (e) {
       return fail((e as Error).message);

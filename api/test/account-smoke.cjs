@@ -201,12 +201,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   a = await req(admin, 'support:reply', { id: tk.id, text: 'We are on it.' });
   ok(a.ok, 'admin can reply');
 
-  let products = (await req(s, 'products:list')).data;
-  if (!products.length) {
-    const p = await req(admin, 'products:create', { name: 'Smoke Item', price: 10, category: 'Electronics', stock: 50 });
-    products = [p.data];
-  }
-  const pid = products[0].id;
+  // Own listing with plenty of stock, so this suite doesn't depend on (or disturb) other data.
+  const own = await req(admin, 'products:create', { name: `Smoke Item ${tag}`, price: 100, category: 'Electronics', stock: 100 });
+  const pid = own.data.id;
   const PHONE = '+243 81 234 5678';
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const orderOf = async (id) => (await req(s, 'orders:list')).data.find((o) => o.id === id);
@@ -224,19 +221,19 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Cash on delivery is off by default');
   await req(admin, 'settings:set', { key: 'codEnabled', value: 'false' }); // (another suite may have enabled it)
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'cod', deliveryFeeUsd: 5 });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'cod', zoneId: 'gombe', deliveryFeeUsd: 5 });
   ok(!a.ok && /not available/i.test(a.error ?? ''), 'COD refused while codEnabled is false', a.error ?? '');
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'bitcoin', deliveryFeeUsd: 5 });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'bitcoin', zoneId: 'gombe', deliveryFeeUsd: 5 });
   ok(!a.ok, 'unknown payment method refused');
 
   console.log('\n— Mobile money (Airtel / Orange / M-Pesa): pending until the network confirms');
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5 });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', zoneId: 'gombe', deliveryFeeUsd: 5 });
   ok(!a.ok && /phone/i.test(a.error ?? ''), 'mobile money needs a phone number', a.error ?? '');
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, paymentPhone: 'abc' });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: 'abc' });
   ok(!a.ok, 'invalid phone number refused');
   const stockBefore = (await req(s, 'products:get', { id: pid })).data.stock;
 
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: PHONE });
   ok(a.ok && a.data.status === 'pending', 'mobile-money order starts PENDING (not paid yet)', a.error ?? '');
   const mm1 = a.data;
   let pay = await payOf(mm1.id);
@@ -255,7 +252,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   // declined by the subscriber (sandbox: number ending 0000) → cancelled + restocked
   const stock2 = (await req(s, 'products:get', { id: pid })).data.stock;
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'vodacom_mpesa', deliveryFeeUsd: 5, paymentPhone: '+243810000000' });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'vodacom_mpesa', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: '+243810000000' });
   ok(a.ok, 'M-Pesa order placed');
   const declined = await until(async () => { const o = await orderOf(a.data.id); return o?.status === 'cancelled' ? o : null; });
   ok(!!declined, 'declined payment → order CANCELLED');
@@ -289,7 +286,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Cancelling an UNPAID order gives no free refund; a late payment is not lost');
   const bal1 = await balance();
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: PHONE });
   const unpaid = a.data;
   const unpaidPay = await payOf(unpaid.id);
   a = await req(s, 'orders:cancel', { orderId: unpaid.id });
@@ -301,7 +298,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok((await orderOf(unpaid.id))?.status === 'cancelled', 'the cancelled order stays cancelled');
 
   console.log('\n— Cancelling a PAID order refunds exactly once');
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', deliveryFeeUsd: 5, paymentPhone: PHONE });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: PHONE });
   const paid = a.data;
   await until(async () => (await orderOf(paid.id))?.status === 'confirmed');
   const bal2 = await balance();
@@ -311,11 +308,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Order integrity (the server, not the client, decides the price)');
   const real = (await req(s, 'products:get', { id: pid })).data;
-  const mk = (over) => ({ items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 5, ...over });
+  const mk = (over) => ({ items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, zoneId: 'gombe', deliveryFeeUsd: 5, ...over });
   a = await req(s, 'orders:create', mk({ deliveryFeeUsd: -5 }));
-  ok(!a.ok, 'negative delivery fee rejected');
-  a = await req(s, 'orders:create', mk({ deliveryFeeUsd: 9999 }));
-  ok(!a.ok, 'absurd delivery fee rejected');
+  ok(a.ok && a.data.deliveryFeeUsd === 3, 'a negative client fee is ignored — the zone fee ($3) is charged', `got ${a.data?.deliveryFeeUsd}`);
+  a = await req(s, 'orders:create', mk({ deliveryFeeUsd: 0 }));
+  ok(a.ok && a.data.deliveryFeeUsd === 3, 'a $0 client fee does not give free delivery');
+  a = await req(s, 'orders:create', mk({ zoneId: 'atlantis' }));
+  ok(!a.ok && /zone/i.test(a.error ?? ''), 'an unknown delivery zone is rejected', a.error ?? '');
+  a = await req(s, 'orders:create', mk({ zoneId: undefined }));
+  ok(!a.ok, 'an order without a delivery zone is rejected');
   for (const q of [0, 1.5, -2, 101, 'abc']) {
     a = await req(s, 'orders:create', mk({ items: [{ productId: pid, qty: q }] }));
     ok(!a.ok, `quantity ${JSON.stringify(q)} rejected`);
@@ -339,19 +340,19 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const promoCode = `T${tag}`;
   a = await req(admin, 'promos:create', { code: promoCode, type: 'percent', value: 10, minOrder: 5, description: 'test' });
   ok(a.ok, 'admin creates a promo');
-  const lineA = { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 0 };
+  const lineA = { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, zoneId: 'gombe', deliveryFeeUsd: 0 };
   a = await req(s, 'orders:create', { ...lineA, promoCode });
-  ok(a.ok && a.data.promoCode === promoCode.toUpperCase() && a.data.discountUsd > 0 && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd)) < 0.011, `discount applied on the server (-$${a.data?.discountUsd})`, a.error ?? '');
+  ok(a.ok && a.data.promoCode === promoCode.toUpperCase() && a.data.discountUsd > 0 && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + 3)) < 0.011, `discount applied on the server (-$${a.data?.discountUsd})`, a.error ?? '');
   a = await req(s, 'orders:create', { ...lineA, promoCode: 'NOPE-NOT-REAL' });
   ok(!a.ok, 'unknown promo code is rejected (not silently ignored)');
   a = await req(s, 'orders:create', { ...lineA, promoCode, deliveryFeeUsd: 5 });
-  ok(a.ok && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + 5)) < 0.011, 'promo + delivery fee add up');
+  ok(a.ok && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + 3)) < 0.011, 'promo + zone fee add up');
 
   console.log('\n— Reviews need a delivered purchase (and only one each)');
   const other2 = (await req(admin, 'products:create', { name: `Never Bought ${tag}`, price: 9, category: 'Electronics', stock: 5 })).data;
   a = await req(s, 'reviews:create', { productId: other2.id, rating: 5, text: 'Great!' });
   ok(!a.ok && /delivered/i.test(a.error ?? ''), 'cannot review a product you never received', a.error ?? '');
-  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 0 });
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, zoneId: 'gombe', deliveryFeeUsd: 0 });
   const rv = a.data;
   await until(async () => (await orderOf(rv.id))?.status === 'confirmed');
   a = await req(s, 'reviews:create', { productId: pid, rating: 5, text: 'Great!' });

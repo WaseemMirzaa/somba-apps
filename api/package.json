@@ -26,7 +26,8 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "bootstrap:prod": "node dist/database/bootstrap-prod.js",
     "bootstrap:prod:dev": "ts-node -r tsconfig-paths/register src/database/bootstrap-prod.ts",
-    "smoke:account": "node test/account-smoke.cjs"
+    "smoke:account": "node test/account-smoke.cjs",
+    "smoke:authz": "node test/authz-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

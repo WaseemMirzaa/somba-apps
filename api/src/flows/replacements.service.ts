@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, Replacement } from '../database/entities';
@@ -23,13 +23,11 @@ export class ReplacementsService {
   ) {}
 
   list(user: { id: string; role: string }): Promise<Replacement[]> {
-    if (user.role === 'customer') {
-      return this.replacements.find({
-        where: { customerId: user.id },
-        order: { createdAt: 'DESC' },
-      });
+    // Ops (admin roles, warehouse) see all; everyone else only their own.
+    if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
+      return this.replacements.find({ order: { createdAt: 'DESC' }, take: 200 });
     }
-    return this.replacements.find({ order: { createdAt: 'DESC' }, take: 200 });
+    return this.replacements.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
   }
 
   async create(
@@ -42,8 +40,15 @@ export class ReplacementsService {
       condition?: string;
     },
   ): Promise<Replacement> {
-    const order = await this.orders.findOne({ where: { id: input.orderId } });
-    if (!order) throw new NotFoundException('Order not found.');
+    const order = await this.orders.findOne({ where: { id: String(input?.orderId ?? '') } });
+    const ops = actor.role.startsWith('admin') || actor.role === 'warehouse_staff';
+    // Customers may only file for their own DELIVERED orders; ops for any.
+    if (!order || (!ops && (order.customerId !== actor.id || order.status !== 'delivered'))) {
+      throw new NotFoundException('Order not found or not eligible for a replacement.');
+    }
+    if (!String(input.sku ?? '').trim() || !String(input.productName ?? '').trim()) {
+      throw new BadRequestException('Say which item needs replacing.');
+    }
     const rep = await this.replacements.save(
       this.replacements.create({
         reference: `REP-${Date.now().toString().slice(-8)}`,
@@ -51,10 +56,10 @@ export class ReplacementsService {
         orderReference: order.reference,
         customerId: order.customerId,
         customerName: order.customerName,
-        sku: input.sku,
-        productName: input.productName,
-        reason: input.reason ?? null,
-        condition: input.condition ?? null,
+        sku: String(input.sku).slice(0, 100),
+        productName: String(input.productName).slice(0, 200),
+        reason: input.reason ? String(input.reason).slice(0, 1000) : null,
+        condition: input.condition ? String(input.condition).slice(0, 100) : null,
         status: 'requested',
         dispatchStatus: 'pending',
       }),
