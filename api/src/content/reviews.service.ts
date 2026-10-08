@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Product, ProductQuestion, Review } from '../database/entities';
+import { Order, Product, ProductQuestion, Review } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
@@ -12,6 +12,7 @@ export class ReviewsService {
     @InjectRepository(ProductQuestion)
     private readonly questions: Repository<ProductQuestion>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(Order) private readonly orders: Repository<Order>,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -51,13 +52,34 @@ export class ReviewsService {
     user: { id: string; name: string },
     input: { productId: string; rating: number; text: string },
   ): Promise<Review> {
+    const text = String(input?.text ?? '').trim();
+    const rating = Number(input?.rating);
+    if (!input?.productId || !Number.isFinite(rating) || text.length < 3) {
+      throw new BadRequestException('Give a rating and write a short review.');
+    }
+    // Only people who actually received the product can review it — once.
+    const bought = await this.orders
+      .createQueryBuilder('o')
+      .innerJoin('o.items', 'i')
+      .where('o.customerId = :uid AND o.status = :st AND i.productId = :pid', {
+        uid: user.id,
+        st: 'delivered',
+        pid: input.productId,
+      })
+      .getCount();
+    if (!bought) {
+      throw new BadRequestException('You can review a product after it has been delivered to you.');
+    }
+    if (await this.reviews.count({ where: { productId: input.productId, userId: user.id } })) {
+      throw new BadRequestException('You have already reviewed this product.');
+    }
     const review = await this.reviews.save(
       this.reviews.create({
         productId: input.productId,
         userId: user.id,
         author: user.name,
-        rating: Math.min(5, Math.max(1, Math.round(input.rating))),
-        text: input.text,
+        rating: Math.min(5, Math.max(1, Math.round(rating))),
+        text: text.slice(0, 2000),
       }),
     );
     await this.recomputeRating(input.productId);
@@ -85,7 +107,7 @@ export class ReviewsService {
     });
   }
 
-  async ask(
+  private async askUnchecked(
     user: { id: string; name: string },
     input: { productId: string; question: string },
   ): Promise<ProductQuestion> {
@@ -98,6 +120,26 @@ export class ReviewsService {
     );
     this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'question:created', q);
     return q;
+  }
+
+  /** The product a question belongs to (for ownership checks). */
+  async productIdOfQuestion(id: string): Promise<string | null> {
+    return (await this.questions.findOne({ where: { id } }))?.productId ?? null;
+  }
+
+  async productSellerId(productId: string): Promise<string | null> {
+    return (await this.products.findOne({ where: { id: productId } }))?.sellerId ?? null;
+  }
+
+  async ask(
+    user: { id: string; name: string },
+    input: { productId: string; question: string },
+  ): Promise<ProductQuestion> {
+    const question = String(input?.question ?? '').trim();
+    if (!input?.productId || question.length < 3) {
+      throw new BadRequestException('Write your question first.');
+    }
+    return this.askUnchecked(user, { productId: input.productId, question: question.slice(0, 1000) });
   }
 
   async answer(

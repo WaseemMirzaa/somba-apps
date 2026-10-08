@@ -741,8 +741,16 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role === 'customer') return fail('Not allowed.');
-      return ok(await this.reviews.answer(body.id, body.answer, user.name));
+      if (!String(body?.answer ?? '').trim()) return fail('Write an answer first.');
+      if (!this.isAdmin(user.role)) {
+        // A seller may answer questions about THEIR OWN products only.
+        if (user.role !== 'seller') return fail('Not allowed.');
+        const seller = await this.sellersSvc.byUser(user.id);
+        const pid = await this.reviews.productIdOfQuestion(body.id);
+        const owner = pid ? await this.reviews.productSellerId(pid) : null;
+        if (!seller || !owner || owner !== seller.id) return fail('Not allowed.');
+      }
+      return ok(await this.reviews.answer(body.id, body.answer.trim().slice(0, 2000), user.name));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -780,7 +788,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       return ok(
-        await this.support.reply(body.id, { name: user.name, role: user.role }, body.text),
+        await this.support.reply(body.id, { id: user.id, name: user.name, role: user.role }, body.text),
       );
     } catch (e) {
       return fail((e as Error).message);
@@ -794,7 +802,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role === 'customer') return fail('Not allowed.');
+      if (!this.isAdmin(user.role)) return fail('Not allowed.');
       return ok(await this.support.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);

@@ -161,10 +161,46 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   a = await req(s, 'devices:unregister', { token: `fcm-${tag}` });
   ok(a.ok, 'devices:unregister');
 
+  console.log('\n— Address book (no mass assignment)');
+  a = await req(s, 'addresses:create', { label: 'Home', line1: '12 Ave du Commerce', city: 'Kinshasa', commune: 'Gombe', phone: '+243812345678' });
+  ok(a.ok && a.data.isDefault === true, 'first address becomes the default');
+  const addr1 = a.data;
+  a = await req(s, 'addresses:create', { label: 'x', city: 'Kinshasa' });
+  ok(!a.ok, 'an address without a street is rejected');
+  const other = await rest('POST', '/api/v1/auth/register', { email: `other${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Other' });
+  const so = await connect(other.json.accessToken);
+  a = await req(so, 'addresses:create', { id: addr1.id, userId: 'someone-else', label: 'Hijack', line1: 'Attacker St', city: 'Nowhere' });
+  ok(a.ok && a.data.id !== addr1.id && a.data.userId === other.json.user.id, 'client cannot choose the id or owner of an address');
+  const mine = (await req(s, 'addresses:list')).data;
+  ok(mine.length === 1 && mine[0].line1 === '12 Ave du Commerce', "another user's attempt left this address untouched");
+  a = await req(so, 'addresses:update', { id: addr1.id, patch: { line1: 'Pwned' } });
+  ok((await req(s, 'addresses:list')).data[0].line1 === '12 Ave du Commerce', "cannot edit someone else's address");
+  so.close();
+  a = await req(s, 'addresses:remove', { id: addr1.id });
+  ok(a.ok && (await req(s, 'addresses:list')).data.length === 0, 'owner can delete their address');
+
   console.log('\n— New payment methods (Orange Money, Vodacom M-Pesa)');
   const adminLogin = await rest('POST', '/api/v1/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
   ok(adminLogin.status === 200, 'admin can sign in');
   const admin = await connect(adminLogin.json.accessToken);
+
+  console.log('\n— Support tickets are private');
+  a = await req(s, 'support:open', { subject: 'Where is my refund?', message: 'Please help' });
+  ok(a.ok && a.data.reference, 'customer opens a ticket');
+  const tk = a.data;
+  const intruder = await rest('POST', '/api/v1/auth/register', { email: `intruder${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Intruder' });
+  const si = await connect(intruder.json.accessToken);
+  a = await req(si, 'support:reply', { id: tk.id, text: 'I can see your ticket' });
+  ok(!a.ok, "another customer cannot reply into someone else's ticket");
+  ok(!(await req(si, 'support:list')).data.some((t) => t.id === tk.id), "tickets list only shows the caller's own");
+  a = await req(si, 'support:setStatus', { id: tk.id, status: 'closed' });
+  ok(!a.ok, 'a customer cannot change ticket status');
+  si.close();
+  a = await req(s, 'support:reply', { id: tk.id, text: 'Any update?' });
+  ok(a.ok, 'the owner can reply');
+  a = await req(admin, 'support:reply', { id: tk.id, text: 'We are on it.' });
+  ok(a.ok, 'admin can reply');
+
   let products = (await req(s, 'products:list')).data;
   if (!products.length) {
     const p = await req(admin, 'products:create', { name: 'Smoke Item', price: 10, category: 'Electronics', stock: 50 });
@@ -310,6 +346,25 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(!a.ok, 'unknown promo code is rejected (not silently ignored)');
   a = await req(s, 'orders:create', { ...lineA, promoCode, deliveryFeeUsd: 5 });
   ok(a.ok && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + 5)) < 0.011, 'promo + delivery fee add up');
+
+  console.log('\n— Reviews need a delivered purchase (and only one each)');
+  const other2 = (await req(admin, 'products:create', { name: `Never Bought ${tag}`, price: 9, category: 'Electronics', stock: 5 })).data;
+  a = await req(s, 'reviews:create', { productId: other2.id, rating: 5, text: 'Great!' });
+  ok(!a.ok && /delivered/i.test(a.error ?? ''), 'cannot review a product you never received', a.error ?? '');
+  a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, deliveryFeeUsd: 0 });
+  const rv = a.data;
+  await until(async () => (await orderOf(rv.id))?.status === 'confirmed');
+  a = await req(s, 'reviews:create', { productId: pid, rating: 5, text: 'Great!' });
+  ok(!a.ok, 'cannot review before delivery');
+  await req(admin, 'orders:updateStatus', { orderId: rv.id, status: 'delivered' });
+  a = await req(s, 'reviews:create', { productId: pid, rating: 4, text: 'Works well, fast delivery.' });
+  ok(a.ok && a.data.rating === 4, 'can review after delivery', a.error ?? '');
+  a = await req(s, 'reviews:create', { productId: pid, rating: 1, text: 'Changed my mind' });
+  ok(!a.ok && /already/i.test(a.error ?? ''), 'only one review per product', a.error ?? '');
+  a = await req(s, 'reviews:create', { productId: pid, rating: 9, text: '' });
+  ok(!a.ok, 'empty reviews are rejected');
+  a = await req(s, 'questions:answer', { id: 'x', answer: 'hi' });
+  ok(!a.ok, 'a customer cannot answer product questions');
 
   console.log('\n— Suspended customers are locked out');
   a = await req(admin, 'customers:setActive', { id: userId, active: false });

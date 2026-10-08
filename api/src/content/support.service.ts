@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SupportTicket } from '../database/entities';
@@ -26,7 +26,8 @@ export class SupportService {
   ) {}
 
   list(user: { id: string; role: string }): Promise<SupportTicket[]> {
-    if (user.role === 'customer' || user.role === 'seller') {
+    // Only admins see everyone's tickets; every other role sees its own.
+    if (!user.role.startsWith('admin')) {
       return this.tickets.find({
         where: { userId: user.id },
         order: { updatedAt: 'DESC' },
@@ -43,6 +44,10 @@ export class SupportService {
     user: { id: string; name: string },
     input: { subject: string; category?: string; message: string; orderId?: string },
   ): Promise<SupportTicket> {
+    if (!input?.subject?.trim() || !input?.message?.trim()) {
+      throw new BadRequestException('Subject and message are required.');
+    }
+    input = { ...input, subject: input.subject.trim().slice(0, 200), message: input.message.trim().slice(0, 4000) };
     const msg: Msg = {
       from: user.name,
       role: 'customer',
@@ -74,11 +79,16 @@ export class SupportService {
 
   async reply(
     id: string,
-    from: { name: string; role: string },
+    from: { id: string; name: string; role: string },
     text: string,
   ): Promise<SupportTicket> {
     const ticket = await this.tickets.findOne({ where: { id } });
-    if (!ticket) throw new NotFoundException('Ticket not found.');
+    // Same answer for "missing" and "not yours" so ids can't be probed.
+    if (!ticket || (!from.role.startsWith('admin') && ticket.userId !== from.id)) {
+      throw new NotFoundException('Ticket not found.');
+    }
+    if (!text?.trim()) throw new BadRequestException('Write a message first.');
+    text = text.trim().slice(0, 4000);
     const msgs: Msg[] = JSON.parse(ticket.messages || '[]');
     msgs.push({ from: from.name, role: from.role, text, at: new Date().toISOString() });
     ticket.messages = JSON.stringify(msgs);

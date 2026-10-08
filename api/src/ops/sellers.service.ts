@@ -94,11 +94,14 @@ export class SellersService {
   /** Public storefront: the seller + their live products. */
   async storefront(id: string) {
     const seller = await this.get(id);
-    if (!seller) return null;
+    // Only approved stores are public; never expose the owner's user id.
+    if (!seller || seller.status !== 'approved') return null;
     const products = await this.products.find({
       where: { sellerId: id, status: 'live' },
     });
-    return { seller, products };
+    const { userId: _owner, ...publicSeller } = seller;
+    void _owner;
+    return { seller: publicSeller, products };
   }
 
   /** Seller dashboard KPIs for the signed-in seller. */

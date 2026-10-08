@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   CmsBlock,
+  Order,
   FlashSale,
   Product,
   ProductQuestion,
@@ -31,6 +32,7 @@ import { WishlistService } from './wishlist.service';
       CmsBlock,
       Setting,
       WishlistItem,
+      Order,
     ]),
     NotificationsModule,
   ],
