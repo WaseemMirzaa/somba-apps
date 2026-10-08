@@ -83,6 +83,19 @@ lib/
   widgets/                 # product card, product image, shared UI (badges, countdown…)
   screens/                 # home, categories, deals, product detail, cart, checkout,
                            # order success, orders, account
-  data/                    # mock catalogue, cart/shop state, market profiles
+  data/                    # live catalogue models, cart/shop state (server-priced), market profiles
   l10n/strings.dart        # EN/FR strings
+```
+
+## Live backend, tests
+
+Everything (catalogue, prices, stock, orders, wallet, addresses, wishlist, promos, notifications) comes
+from the API over one authenticated Socket.IO connection; there is no guest checkout and no demo
+login (seeded dev account: `customer@somba.app` / `Somba@2026`, dev only). Mobile-money orders stay
+**pending** until the provider confirms (push), and server rule errors are shown as readable messages.
+
+```bash
+flutter analyze && flutter test                      # widget tests
+flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
+  --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```

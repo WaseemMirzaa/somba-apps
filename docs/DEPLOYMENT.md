@@ -386,3 +386,27 @@ When you change an entity, generate a migration and commit it (see
 - [ ] Restrict `CORS_ORIGINS` to your real domain(s).
 - [ ] Enable automatic security updates (`unattended-upgrades`).
 - [ ] Take DigitalOcean backups / a managed MySQL if this goes real.
+
+## Mobile money, payouts and delivery zones (production)
+
+| Variable | Purpose |
+|---|---|
+| `MM_PROVIDER` | `none` (default; mobile money and top-ups are refused — only the wallet works) or the aggregator adapter name. `sandbox` is **rejected** when `NODE_ENV=production`. |
+| `MM_WEBHOOK_SECRET` | HMAC secret the aggregator signs webhooks with. Webhook URL to give the aggregator: `https://<domain>/api/v1/payments/webhook/mobile-money`. |
+| `MM_PENDING_TTL_MIN` | Minutes before an unpaid intent expires (default 15). |
+| `PAYOUT_CLEARANCE_HOURS` | Hours a delivered sale must age before a seller can be paid out (default 48 in production). |
+
+* Cash on delivery is **off** by default (`codEnabled=false`); an admin can enable it in Settings.
+* Delivery fees are server-side: set the `deliveryZones` setting (list of `{id,name,city,feeUsd}`); checkout requires a valid `zoneId`.
+* The nginx config rate-limits `/api/v1/auth/` (10 requests/min/IP, burst 8) on top of the API's own throttling.
+
+## Flutter apps
+
+Build against the deployed API (the apps default to a local dev URL):
+
+```bash
+cd mobile     && flutter build apk --release --dart-define=API_URL=https://api.example.com --dart-define=SOCKET_URL=https://api.example.com
+cd rider-app  && flutter build apk --release --dart-define=API_URL=https://api.example.com --dart-define=SOCKET_URL=https://api.example.com
+```
+
+The rider app needs location permission (declared in its Android manifest) to stream the live position to the customer.

@@ -11,7 +11,12 @@ _Companion to `BACKEND-AUDIT.md` and `PRODUCTION-READINESS-AUDIT.md`. Database t
 | Account lifecycle | Register, email verification, phone OTP (lockout), forgot/reset, change password, profile + prefs, avatar upload, account deletion, device-token registry. |
 | Web (customer + seller + warehouse + rider + admin) | Live hooks on the core flows. Real email/password sign-in on `/login` (demo persona picker only when `NEXT_PUBLIC_DEMO_MODE` is not `false`). |
 | Deployment | `docker-compose.yml`, `deploy/nginx/somba.conf`, `deploy/droplet-deploy.sh` (one-command idempotent droplet deploy), GitHub Actions CI incl. MySQL job. |
-| Mobile | Flutter apps are **not** verified from this environment (no Flutter SDK). See section 6 for the exact test plan. |
+| Payments | Mobile-money lifecycle (Airtel / Orange / M-Pesa): order + payment stay `pending` until a signed webhook (HMAC over the raw body, `POST /api/v1/payments/webhook/mobile-money`) or the sandbox confirms; atomic idempotent settlement; late success credited to the wallet; stale intents expire (`MM_PENDING_TTL_MIN`). Wallet orders are atomic. **COD is disabled** (`codEnabled=false`, admin can enable). **Account is mandatory** (no guest checkout). |
+| Money/stock integrity | Atomic stock reservation, conditional `UPDATE` transitions for cancel / settle / refund / payout approve / delivery accept, server-authoritative prices, promo limits, zone-based delivery fee (`deliveryZones` setting), payouts only from delivered sales after `PAYOUT_CLEARANCE_HOURS`. |
+| Authorization | Every WebSocket handler is role-checked; least-privilege admin sub-roles (operations / finance / warehouse); suspension and role change kick live sockets and revoke tokens; self-registration limited to customer/seller; audit log. 114-assertion authz smoke test in CI. |
+| Flutter customer app (`mobile/`) | Rewritten onto the live backend (no mock catalogue/state, real auth incl. verify/forgot/reset, mobile-money checkout with pending screen, orders, wallet, addresses, wishlist, promos, notifications). `flutter analyze` clean; 3 widget tests + 15 live-API tests; web build loaded and signed in a real browser. |
+| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, available / active / done deliveries, claim -> picked up -> in transit -> delivered, real GPS stream (`delivery:location`), earnings + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
+| Not verified here | Android/iOS device or emulator builds (no Android SDK in the sandbox), the droplet itself, and any real aggregator / SMTP / SMS / FCM account. |
 
 ## 2. Remaining work (scope vs backend)
 
@@ -19,12 +24,12 @@ Priority: **P0** blocks real money / launch, **P1** scope feature missing server
 
 | # | Item | Pri | Today | Proposed API / work |
 |---|---|---|---|---|
-| 1 | **Payment gateway (PSP) + webhooks** | P0 | `PaymentsService` records wallet/COD/mobile-money methods and marks them succeeded internally; no real PSP charge | Pick PSP (Stripe / Flutterwave / mobile-money aggregator). `payments:createIntent {orderId}` -> returns provider session; `POST /api/v1/payments/webhook/:provider` (signature-verified, idempotent) flips payment + order to `confirmed`. Needs PSP credentials. |
-| 2 | **COD policy conflict** | P0 | `PAYMENT_INVENTORY.md` says `codEnabled:false`; backend still accepts `cod` | Decision needed. If disabled: reject `cod` in `OrdersService.create` when setting `codEnabled=false` (setting already seeded by bootstrap pattern). |
-| 3 | **Guest checkout** | P1 | Scope says enabled; backend requires an account | `orders:createGuest {contact, items, ...}` with OTP-verified phone, or auto-create a shadow customer. |
+| 1 | **Mobile-money aggregator adapter** | P0 | Lifecycle, webhook, idempotency, expiry, refunds are built and tested against the sandbox provider. In production `MM_PROVIDER` defaults to `none`, so mobile money and top-ups are **refused** (fail closed); only the wallet works. | Implement the adapter for the chosen aggregator (`api/src/payments/mobile-money.provider.ts` interface: `charge`, signature verify) and set `MM_PROVIDER`, `MM_WEBHOOK_SECRET`. Needs the aggregator contract + credentials. Fallback if none: manual confirmation by finance in the admin panel. |
+| 2 | ~~COD policy conflict~~ | done | `codEnabled=false` by default; `cod` is refused until an admin enables it in Settings. | — |
+| 3 | ~~Guest checkout~~ | decided | Client decision: account mandatory. | No work. |
 | 4 | **Proof of delivery** | P1 | `delivery:updateStatus` only | `delivery:complete {taskId, otp, photoUrl}`; OTP generated at dispatch and sent to the customer; photo via `/uploads`. |
 | 5 | **Open-box / cross-city delivery flags** | P1 | Not modelled | Boolean columns on `order`/`delivery_task`; fee rules per zone. |
-| 6 | **Server-side zone pricing** | P1 | Client sends the fee (capped by `MAX_DELIVERY_FEE_USD`) | `zones` table + `orders.create` derives the fee from `zoneId`; remove client `deliveryFeeUsd`. |
+| 6 | ~~Server-side zone pricing~~ | done | `orders.create` requires `zoneId` and derives the fee from the `deliveryZones` setting. | Admin page to edit zones (currently via `settings:set`). |
 | 7 | **Seller subscription / billing (SF-23)** | P1 | Absent | `subscriptions` entity, `sellers:subscribe`, renewal job, commission tiers. |
 | 8 | **Referral (Refer & Earn)** | P1 | Absent | `referrals` entity, code on `users`, wallet credit on first delivered order. |
 | 9 | **Follow store, recently viewed, buy again** | P1 | Absent (local only) | `follows:toggle|list`, `recent:track|list`, derive buy-again from orders. |
@@ -34,7 +39,7 @@ Priority: **P0** blocks real money / launch, **P1** scope feature missing server
 | 13 | **Uploads storage** | P2 | Local disk volume (`UPLOAD_DIR`) | Move to DigitalOcean Spaces (S3 API) for durability and CDN. |
 | 14 | **Backups + monitoring** | P2 | None | Managed MySQL daily backups (or `mysqldump` cron), Sentry DSN, uptime check on `/api/v1/health`. |
 | 15 | **Web pages still on mock data** | P1 | batch-builder, dispatch, transfers, fraud mark-reviewed, role assignment, admin warehouses / support / broadcast contexts, exceptions / exchanges / replacements lists | Handlers already exist (`warehouse:*`, `roles:*`, `support:*`, `broadcasts:*`, `exceptions:*`, `exchanges:*`, `replacements:*`) — wiring only. |
-| 16 | **Flutter customer app on mock data** | P1 | 17 files still import `mock_data` (home, product_detail, shop_extra, catalog_extra, browse, order_screens, account_more, returns_extra, search_screen, categories, deals, product_image, product_card, gallery, shop_state, catalog_meta, catalog_live). Forgot/OTP/verify screens not wired to the new auth endpoints. | Wire to `products:list`, `orders:*`, `auth/*`. Requires a Flutter SDK to verify. |
+| 16 | ~~Flutter apps on mock data~~ | done | Both apps run on the live backend (see section 1). | Flash-sale price on the product detail is still local; add Firebase client files if push is wanted; device/emulator run. |
 
 ## 3. Firebase — is anything connected, and how is it managed?
 
@@ -156,11 +161,18 @@ Set the apps to the droplet: API `https://api.example.com/api/v1`, socket `https
 * Kill and restart the API container: clients reconnect, state intact.
 * `docker compose logs api` shows no stack traces during the above.
 
-**Known not-yet-testable (see section 2):** real card/mobile-money charges, guest checkout, proof-of-delivery OTP, subscriptions, referral.
+**E. Flutter apps (device or emulator — not possible in the build sandbox)**
+Build with the droplet: `flutter build apk --dart-define=API_URL=https://api.example.com --dart-define=SOCKET_URL=https://api.example.com`.
+Automated checks that already pass locally: `flutter analyze`, `flutter test` (widget), and `flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true --dart-define=API_URL=... --dart-define=SOCKET_URL=...` against a running API (customer: 15 flows; rider: full delivery with GPS). Manual on a phone: location permission prompt when a delivery is picked up; customer sees the rider move; mobile-money order stays pending until the webhook/sandbox confirms.
 
-## 7. Decisions needed from the client
+**Known not-yet-testable (see section 2):** real mobile-money charges (adapter pending), proof-of-delivery OTP, subscriptions, referral.
 
-1. **PSP** (Stripe / Flutterwave / aggregator) and sandbox credentials.
-2. **COD** enabled or disabled at launch.
-3. **Guest checkout** in v1, or account required.
-4. Whether the Flutter wiring (section 2, #16) happens now — it needs someone with the Flutter SDK to build and verify.
+## 7. Decisions
+
+Decided by the client: **payment = mobile money** (Airtel / Orange / M-Pesa), **COD disabled**, **account mandatory (no guest checkout)**, **MySQL**, **Firebase optional**.
+
+Still needed:
+1. **Which aggregator** (and sandbox credentials + webhook signing secret) so the adapter can be written, or approval of the manual-confirmation fallback.
+2. **SMTP and SMS** provider credentials for real verification / reset messages.
+3. **Firebase project files** (`google-services.json` / `GoogleService-Info.plist` + service account) only if push notifications are wanted.
+4. **Delivery zones and fees** to load into the `deliveryZones` setting for production.

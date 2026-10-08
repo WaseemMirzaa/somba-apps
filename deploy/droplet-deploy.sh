@@ -211,6 +211,10 @@ cat <<EOF
     SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS MAIL_FROM      → reset/verify emails
     TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM        → SMS OTP
     FIREBASE_SERVICE_ACCOUNT_JSON                           → push notifications
+    MM_PROVIDER MM_WEBHOOK_SECRET                           → mobile money (without it, mobile
+                                                              money is refused; only wallet works)
+    Aggregator webhook URL: $BASE_URL/api/v1/payments/webhook/mobile-money
+    Then set the delivery zones/fees: admin Settings → deliveryZones
  Logs:   sudo -u $APP_USER pm2 logs
  Update: re-run this same command (idempotent; backs nothing up — run mysqldump first).
 ══════════════════════════════════════════════════════════════════════════════

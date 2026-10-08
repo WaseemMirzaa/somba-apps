@@ -159,3 +159,10 @@ Optional integrations (all no-ops when unset): `FIREBASE_SERVICE_ACCOUNT_JSON` /
 `GOOGLE_APPLICATION_CREDENTIALS` (push), `SMTP_HOST/PORT/USER/PASS` + `MAIL_FROM` (email),
 `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM` (SMS), `WEB_URL`, `PUBLIC_API_URL`, `UPLOAD_DIR`,
 `UPLOAD_MAX_BYTES`, `WS_RATE_*`, `MAX_DELIVERY_FEE_USD`, `ALLOW_CLIENT_PRICED_ITEMS`.
+
+## Payments, money and security notes
+
+* **Mobile money** (`airtel_money`, `orange_money`, `mpesa`): orders/payments stay `pending` until the signed webhook `POST /api/v1/payments/webhook/mobile-money` (HMAC over the raw body, `MM_WEBHOOK_SECRET`) — or the sandbox provider in development (`MM_PROVIDER=sandbox`). Production default is `MM_PROVIDER=none`: mobile money is refused (fails closed) until an aggregator adapter is configured.
+* **COD** is off unless an admin sets `codEnabled=true`. **Account is mandatory** (no guest checkout).
+* Prices, promo discounts and delivery fees (`deliveryZones` setting) are computed server-side; stock and wallet moves are atomic.
+* Tests: `npm test` (unit), `npm run smoke`, `npm run smoke:account`, `npm run smoke:authz` against a seeded running server (`npm run seed`; the seed switches COD back off after creating demo orders).

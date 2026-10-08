@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: ['**']
-    paths: ['api/**', 'web/**', '.github/workflows/ci.yml']
+    paths: ['api/**', 'web/**', 'mobile/**', 'rider-app/**', '.github/workflows/ci.yml']
   pull_request:
-    paths: ['api/**', 'web/**']
+    paths: ['api/**', 'web/**', 'mobile/**', 'rider-app/**']
 
 jobs:
   api:
@@ -124,3 +124,24 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  # Static analysis + widget tests for both Flutter apps (the live-API tests run
+  # locally against a seeded server: see docs/BACKEND-REMAINING.md section 6E).
+  flutter:
+    name: Flutter (analyze + widget tests)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [mobile, rider-app]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
