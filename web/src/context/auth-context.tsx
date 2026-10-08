@@ -189,7 +189,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   authReady: boolean;
   login: (personaId: string) => void;
-  signInReal: (role: Persona["role"]) => void;
+  signInReal: (backendRole: string, user?: { name: string; email: string }) => Persona;
   logout: () => void;
   switchPersona: (personaId: string) => void;
 };
@@ -206,6 +206,28 @@ const REAL_SESSION_KEY = "somba-real-session";
  * All seeded demo accounts share one password (see api/src/database/seed.ts).
  */
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "Somba@2026";
+
+/** Which portal persona (permissions + home) a real backend role maps to. */
+function personaForBackendRole(role: string, all: Persona[]): Persona {
+  const byId = (id: string) => all.find((x) => x.id === id);
+  const adminIds: Record<string, string> = {
+    admin: "admin-1",
+    admin_operations: "admin-ops",
+    admin_finance: "admin-fin",
+    admin_support: "admin-sup",
+    admin_marketing: "admin-mkt",
+    admin_moderation: "admin-mod",
+  };
+  if (adminIds[role]) return byId(adminIds[role]) ?? STATIC_PERSONAS[0];
+  const portal: Record<string, Persona["role"]> = {
+    customer: "customer",
+    seller: "seller",
+    warehouse_staff: "warehouse",
+    rider: "rider",
+  };
+  const target = portal[role];
+  return all.find((x) => x.role === target) ?? STATIC_PERSONAS[0];
+}
 
 function backendEmailFor(persona: Persona): string | null {
   if (persona.role === "guest") return null;
@@ -233,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rt = useRealtime();
   const [persona, setPersona] = useState<Persona>(STATIC_PERSONAS[0]);
   const [authReady, setAuthReady] = useState(false);
+  const [realSession, setRealSession] = useState(false);
 
   const personas = useMemo(() => {
     const staffPersonas: Persona[] = staff
@@ -257,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const p = personas.find((x) => x.id === stored);
       if (p) setPersona(p);
     }
+    setRealSession(!!localStorage.getItem(REAL_SESSION_KEY));
     setAuthReady(true);
   }, [personas]);
 
@@ -267,6 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const p = personas.find((x) => x.id === personaId);
       if (p) {
         localStorage.removeItem(REAL_SESSION_KEY);
+        setRealSession(false);
         setPersona(p);
         localStorage.setItem(STORAGE_KEY, personaId);
       }
@@ -281,13 +306,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * never overwrites it with a seeded account.
    */
   const signInReal = useCallback(
-    (role: Persona["role"]) => {
+    (backendRole: string, user?: { name: string; email: string }): Persona => {
       localStorage.setItem(REAL_SESSION_KEY, "1");
-      const p =
-        personas.find((x) => x.role === role && x.id !== "guest") ??
-        STATIC_PERSONAS[0];
+      setRealSession(true);
+      const base = personaForBackendRole(backendRole, personas);
+      // Show the REAL person's identity on the portal, keep the role's permissions.
+      const p: Persona = user ? { ...base, name: user.name, nameFr: user.name, email: user.email } : base;
       setPersona(p);
-      localStorage.setItem(STORAGE_KEY, p.id);
+      localStorage.setItem(STORAGE_KEY, base.id);
+      return p;
     },
     [personas]
   );
@@ -296,6 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPersona(STATIC_PERSONAS[0]);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(REAL_SESSION_KEY);
+    setRealSession(false);
     rt.logout();
   }, [rt]);
 
@@ -322,12 +350,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [authReady, persona, rt]);
 
+  // Permissions come from the role's persona; identity comes from the real
+  // signed-in user — including after a full reload (persona is restored by id).
+  const shownPersona = useMemo<Persona>(
+    () =>
+      realSession && rt.user
+        ? { ...persona, name: rt.user.name, nameFr: rt.user.name, email: rt.user.email }
+        : persona,
+    [persona, realSession, rt.user],
+  );
+
   const switchPersona = login;
 
   return (
     <AuthContext.Provider
       value={{
-        persona,
+        persona: shownPersona,
         personas,
         isAuthenticated: persona.role !== "guest",
         authReady,

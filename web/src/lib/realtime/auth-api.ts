@@ -6,15 +6,24 @@ const API_URL =
 const ACCESS_KEY = "somba.accessToken";
 const REFRESH_KEY = "somba.refreshToken";
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(
+  path: string,
+  body: unknown,
+  accessToken?: string | null,
+): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "content-type": "application/json",
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body ?? {}),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(json?.message ?? `Request failed (${res.status})`);
+    // Nest validation errors arrive as an array of messages.
+    const msg = Array.isArray(json?.message) ? json.message.join(" ") : json?.message;
+    throw new Error(msg ?? `Request failed (${res.status})`);
   }
   return json as T;
 }
@@ -39,6 +48,27 @@ export const authApi = {
 
   refresh(refreshToken: string): Promise<AuthResult> {
     return post<AuthResult>("/api/v1/auth/refresh", { refreshToken });
+  },
+
+  // ---- account recovery + verification (one-shot REST) ----
+  /** Always succeeds — never reveals whether the email has an account. */
+  forgotPassword(email: string) {
+    return post<{ sent: boolean }>("/api/v1/auth/forgot", { email });
+  },
+  resetPassword(token: string, password: string) {
+    return post<{ reset: boolean }>("/api/v1/auth/reset", { token, password });
+  },
+  verifyEmail(token: string) {
+    return post<{ verified: boolean }>("/api/v1/auth/email/verify", { token });
+  },
+  sendEmailVerification() {
+    return post<{ sent: boolean }>("/api/v1/auth/email/send", {}, authApi.getAccess());
+  },
+  sendPhoneOtp() {
+    return post<{ sent: boolean }>("/api/v1/auth/phone/send", {}, authApi.getAccess());
+  },
+  verifyPhoneOtp(code: string) {
+    return post<{ verified: boolean }>("/api/v1/auth/phone/verify", { code }, authApi.getAccess());
   },
 
   async me(accessToken: string): Promise<BackendUser | null> {

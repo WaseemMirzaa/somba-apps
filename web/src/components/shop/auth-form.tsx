@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { useRealtime } from "@/context/realtime-context";
+import { authApi } from "@/lib/realtime/auth-api";
 
 type AuthMode = "register" | "login" | "otp" | "verify-email" | "forgot" | "reset";
 
@@ -21,7 +22,34 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const fr = locale === "fr";
+  const verifyRan = useRef(false);
+
+  // The emailed link carries ?token=… Read it AFTER mount: reading it during
+  // render makes the server HTML differ from the client's (hydration error).
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [tokenChecked, setTokenChecked] = useState(false);
+  useEffect(() => {
+    // Intentional: must run post-mount to stay hydration-safe.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLinkToken(new URLSearchParams(window.location.search).get("token"));
+    setTokenChecked(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  // Opening the verification link confirms the email automatically.
+  useEffect(() => {
+    if (mode !== "verify-email" || verifyRan.current || !linkToken) return;
+    const token = linkToken;
+    verifyRan.current = true;
+    setBusy(true);
+    authApi
+      .verifyEmail(token)
+      .then(() => setNotice(fr ? "E-mail vérifié ✓" : "Email verified ✓"))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setBusy(false));
+  }, [mode, fr, linkToken]);
 
   async function submit() {
     setError(null);
@@ -33,12 +61,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       }
       setBusy(true);
       try {
-        if (mode === "register") {
-          await realRegister({ email, password, name, role: "customer" });
-        } else {
-          await realLogin(email, password);
-        }
-        signInReal("customer");
+        const user =
+          mode === "register"
+            ? await realRegister({ email, password, name, role: "customer" })
+            : await realLogin(email, password);
+        signInReal(user.role, { name: user.name, email: user.email });
         router.push("/shop/account");
       } catch (e) {
         setError(
@@ -50,17 +77,39 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       }
       return;
     }
-    // Password-reset / email-verification steps (backend has no OTP step).
-    if (mode === "otp") {
-      router.push("/shop/verify-email");
-      return;
+    setBusy(true);
+    try {
+      if (mode === "forgot") {
+        if (!email) { setError(fr ? "Saisissez votre e-mail." : "Enter your email."); return; }
+        await authApi.forgotPassword(email);
+        // Same message whether or not the account exists (no enumeration).
+        setNotice(fr ? "Si un compte existe, un lien de réinitialisation vient d'être envoyé." : "If an account exists for that email, a reset link is on its way.");
+      } else if (mode === "reset") {
+        const token = linkToken;
+        if (!token) { setError(fr ? "Lien invalide : ouvrez le lien reçu par e-mail." : "Invalid link — open the link from your email."); return; }
+        await authApi.resetPassword(token, password);
+        router.push("/shop/login");
+      } else if (mode === "otp") {
+        await authApi.verifyPhoneOtp(otp);
+        router.push("/shop/verify-email");
+      } else if (mode === "verify-email") {
+        if (linkToken) router.push("/shop/account");
+        else { await authApi.sendEmailVerification(); setNotice(fr ? "E-mail de vérification renvoyé." : "Verification email sent."); }
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
-    if (mode === "forgot") {
-      router.push("/shop/reset");
-      return;
-    }
-    if (mode === "reset" || mode === "verify-email") {
-      router.push("/shop/login");
+  }
+
+  async function resendOtp() {
+    setError(null);
+    try {
+      await authApi.sendPhoneOtp();
+      setNotice(fr ? "Nouveau code envoyé." : "A new code was sent.");
+    } catch (e) {
+      setError((e as Error).message);
     }
   }
 
@@ -92,9 +141,15 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {mode === "verify-email" && (
           <p className="text-sm text-slate-600">{fr ? "Cliquez sur le lien envoyé à votre email." : "Click the link sent to your email."}</p>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+        {mode === "otp" && (
+          <button type="button" onClick={resendOtp} className="text-sm text-[var(--primary)]">
+            {fr ? "Renvoyer le code" : "Resend code"}
+          </button>
+        )}
         <Button onClick={submit} disabled={busy} className="w-full">
-          {busy ? (fr ? "Veuillez patienter…" : "Please wait…") : mode === "otp" ? (fr ? "Vérifier" : "Verify") : mode === "forgot" ? (fr ? "Envoyer lien" : "Send link") : mode === "login" ? (fr ? "Se connecter" : "Sign in") : mode === "register" ? (fr ? "Créer le compte" : "Create account") : (fr ? "Continuer" : "Continue")}
+          {busy ? (fr ? "Veuillez patienter…" : "Please wait…") : mode === "verify-email" ? (!tokenChecked || linkToken ? (fr ? "Continuer" : "Continue") : (fr ? "Renvoyer l'e-mail" : "Resend email")) : mode === "reset" ? (fr ? "Réinitialiser" : "Reset password") : mode === "otp" ? (fr ? "Vérifier" : "Verify") : mode === "forgot" ? (fr ? "Envoyer lien" : "Send link") : mode === "login" ? (fr ? "Se connecter" : "Sign in") : mode === "register" ? (fr ? "Créer le compte" : "Create account") : (fr ? "Continuer" : "Continue")}
         </Button>
       </div>
       <div className="text-center text-sm text-slate-500">

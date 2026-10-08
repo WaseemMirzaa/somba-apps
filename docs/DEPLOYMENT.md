@@ -21,6 +21,27 @@ Architecture on one domain (no CORS headaches):
 
 ---
 
+## Quick start (recommended): one command
+
+On a fresh Ubuntu droplet, with the DNS A record already pointing at it:
+
+```bash
+git clone https://github.com/WaseemMirzaa/somba-apps.git && cd somba-apps
+DOMAIN=api.example.com ADMIN_EMAIL=admin@example.com bash deploy/droplet-deploy.sh
+```
+
+`deploy/droplet-deploy.sh` is idempotent: it installs Docker/nginx/certbot, writes
+secrets to `/etc/somba/secrets.env` (**back it up** — losing `DATA_ENCRYPTION_KEY`
+makes encrypted data unreadable), builds the stack, applies migrations, runs
+`bootstrap:prod`, configures nginx (WebSocket upgrade, `/uploads/`, 6 MB body limit,
+`trust proxy`) and requests the TLS certificate. Optional integrations (SMTP, Twilio,
+Firebase, `WEB_URL`, `PUBLIC_API_URL`) go in `/etc/somba/api.extra.env`. Set
+`NEXT_PUBLIC_DEMO_MODE=false` for the web build so `/login` shows the real
+email/password form instead of the demo persona picker. See `docs/BACKEND-REMAINING.md`
+for the mobile/web test plan. The manual walkthrough below is the same thing step by step.
+
+---
+
 ## 0. Login / portal credentials (seeded demo accounts)
 
 After you run the seed (Step 7), these accounts exist. **All share the password
@@ -37,10 +58,10 @@ After you run the seed (Step 7), these accounts exist. **All share the password
 | `/shop` · Customer | customer | `customer@somba.app` | `Somba@2026` |
 | `/live` · Realtime console | any of the above | — | `Somba@2026` |
 
-The **real backend login** (JWT) is on the `/live` console and the mobile apps.
-The other portal pages (`/admin`, `/seller`, …) currently use the prototype
-persona switcher; the backend session established on `/live` (or in the mobile
-apps) is what drives real-time data.
+Portals sign in against the real backend on `/login` (email + password, JWT).
+With `NEXT_PUBLIC_DEMO_MODE=false` (production) the demo persona picker is hidden.
+These seeded accounts exist only on demo boxes where `npm run seed` was run; on
+production the only account is the admin created by `bootstrap:prod`.
 
 > **Security:** change these before any public launch. Either edit
 > `api/src/database/seed.ts` (the `DEMO_PASSWORD` constant + `DEMO_USERS`) and

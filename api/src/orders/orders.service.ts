@@ -62,32 +62,58 @@ export class OrdersService {
       throw new BadRequestException('An order needs at least one item.');
     }
 
+    const MAX_QTY = 100;
+    const MAX_DELIVERY_FEE = Number(process.env.MAX_DELIVERY_FEE_USD ?? 50);
+    // Only dev/demo may accept prices the client invents. In production every
+    // line must resolve to a live listing and is priced from OUR database.
+    const allowClientPriced =
+      process.env.ALLOW_CLIENT_PRICED_ITEMS === 'true' ||
+      process.env.NODE_ENV !== 'production';
+
     const items: OrderItem[] = [];
     const stockToReserve: { productId: string; qty: number }[] = [];
     let subtotal = 0;
     for (const line of input.items) {
-      const qty = Math.max(1, line.qty ?? 1);
-      // Prefer a seeded product (authoritative name/price + stock control);
-      // fall back to a client-supplied snapshot line.
-      const product = line.productId
-        ? await this.products.get(line.productId)
-        : null;
+      const rawQty = Number(line.qty ?? 1);
+      if (!Number.isInteger(rawQty) || rawQty < 1 || rawQty > MAX_QTY) {
+        throw new BadRequestException(`Quantity must be a whole number from 1 to ${MAX_QTY}.`);
+      }
+      const qty = rawQty;
+
+      // Resolve to a live listing: by id, else by exact name (mobile carts send
+      // name snapshots). The CLIENT'S PRICE IS NEVER TRUSTED for a real listing.
+      let product = line.productId ? await this.products.get(line.productId) : null;
+      if (!product && line.name) product = await this.products.findLiveByName(line.name);
+      if (product && product.status !== 'live') {
+        throw new BadRequestException(`"${product.name}" is not available.`);
+      }
 
       let name: string;
       let price: number;
       let productId: string;
       if (product) {
+        if (product.stock < qty) {
+          throw new BadRequestException(
+            product.stock > 0
+              ? `Only ${product.stock} of "${product.name}" left in stock.`
+              : `"${product.name}" is out of stock.`,
+          );
+        }
         name = product.name;
         price = product.price;
         productId = product.id;
         stockToReserve.push({ productId: product.id, qty });
-      } else if (line.name != null && line.priceUsd != null) {
-        name = line.name;
-        price = line.priceUsd;
-        productId = line.productId ?? `ext:${line.name}`;
+      } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
+        const p = Number(line.priceUsd);
+        if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
+          throw new BadRequestException('Invalid item price.');
+        }
+        name = String(line.name).slice(0, 200);
+        price = Number(p.toFixed(2));
+        productId = `ext:${name}`;
       } else {
         throw new BadRequestException(
-          'Each line needs a known productId or a {name, priceUsd} snapshot.',
+          'Unknown product. Refresh the catalogue and try again.',
         );
       }
 
@@ -101,7 +127,10 @@ export class OrdersService {
       items.push(item);
     }
 
-    const deliveryFee = input.deliveryFeeUsd ?? 0;
+    const deliveryFee = Number(input.deliveryFeeUsd ?? 0);
+    if (!Number.isFinite(deliveryFee) || deliveryFee < 0 || deliveryFee > MAX_DELIVERY_FEE) {
+      throw new BadRequestException('Invalid delivery fee.');
+    }
     const total = Number((subtotal + deliveryFee).toFixed(2));
 
     // Fail fast on wallet payments with insufficient funds — before creating

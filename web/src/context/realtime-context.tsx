@@ -48,14 +48,14 @@ interface RealtimeValue {
   payouts: Payout[];
   disputes: Dispute[];
 
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<BackendUser>;
   register: (input: {
     email: string;
     password: string;
     name: string;
     role?: string;
     phone?: string;
-  }) => Promise<void>;
+  }) => Promise<BackendUser>;
   logout: () => void;
 
   placeOrder: (input: {
@@ -309,6 +309,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const result = await authApi.login(email, password);
       authApi.saveTokens(result);
       await connectWith(result.accessToken, result.user);
+      return result.user;
     },
     [connectWith],
   );
@@ -325,6 +326,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       const result = await authApi.register(input);
       authApi.saveTokens(result);
       await connectWith(result.accessToken, result.user);
+      return result.user;
     },
     [connectWith],
   );

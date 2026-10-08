@@ -35,7 +35,7 @@ export default function ShopStoreDetailPage() {
         <p className="text-sm text-slate-500">
           {fr ? "Cette boutique n'est pas disponible pour le moment." : "This store is currently not available."}
         </p>
-        <Link href="/shop" className="inline-block text-sm font-medium text-[var(--primary)] hover:underline">
+        <Link href="/" className="inline-block text-sm font-medium text-[var(--primary)] hover:underline">
           {fr ? "← Retour à la boutique" : "← Back to shop"}
         </Link>
       </div>

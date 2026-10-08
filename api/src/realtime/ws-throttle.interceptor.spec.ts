@@ -26,7 +26,7 @@ describe('WsThrottleInterceptor', () => {
 
   it('throttles a flood per socket, but not other sockets', async () => {
     const i = new WsThrottleInterceptor();
-    const results = [];
+    const results: unknown[] = [];
     for (let n = 0; n < 60; n++) results.push(await run(i, {}, 'flooder'));
     expect(results.filter((r) => r !== 'HANDLED').length).toBeGreaterThan(0);
     expect(await run(i, {}, 'someone-else')).toBe('HANDLED');

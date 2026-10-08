@@ -15,6 +15,10 @@ async function bootstrap() {
   // Refuse to boot in production with insecure defaults.
   assertProductionConfig(config);
 
+  // Behind nginx: trust X-Forwarded-Proto/Host so generated URLs (uploaded image
+  // links) use https and the real domain instead of http://127.0.0.1.
+  app.set('trust proxy', 1);
+
   // Security headers on the REST surface (P2 hardening).
   // Cross-origin resource policy relaxed so the web/mobile apps can render /uploads images.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));

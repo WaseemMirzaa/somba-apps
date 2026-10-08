@@ -46,7 +46,7 @@ npm run smoke                 # end-to-end realtime test (server must be running
 | warehouse_staff | warehouse@somba.app |
 | rider | rider@somba.app |
 
-## REST endpoints (auth only)
+## REST endpoints (auth + uploads)
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -55,9 +55,13 @@ npm run smoke                 # end-to-end realtime test (server must be running
 | POST | `/api/v1/auth/refresh` | Rotate access token (rejected if the session was revoked) |
 | POST | `/api/v1/auth/logout-all` | Revoke every token for the user (Bearer token) |
 | GET | `/api/v1/auth/me` | Current user (Bearer token) |
+| POST | `/api/v1/auth/email/send` · `/email/verify` | Email verification link (token) |
+| POST | `/api/v1/auth/phone/send` · `/phone/verify` | Phone OTP (attempt lockout) |
+| POST | `/api/v1/auth/forgot` · `/reset` | Password recovery (never reveals whether an account exists) |
+| POST | `/api/v1/uploads` | Authenticated image upload (magic-byte checked, size-limited) → public URL under `/uploads/` |
 | GET | `/api/v1/health` | Liveness + db type |
 
-Auth endpoints are rate-limited (30 requests / minute / IP).
+Auth and upload endpoints are rate-limited per IP.
 
 ## WebSocket protocol
 
@@ -114,7 +118,10 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `delivery:assign` | `{taskId, riderId}` — dispatch to a rider | ops |
 | `notifications:list` / `notifications:markRead` / `notifications:markAllRead` | `{id?}` | all |
 
-**105 realtime handlers across 17 domain modules and 31 entities** cover every
+Account handlers: `me:get|update|prefs|setPrefs|changePassword|delete`,
+`devices:register|unregister` (optional FCM push token registry).
+
+**113 realtime handlers across 33 domains and 34 entities** cover every
 portal (customer, seller, admin, warehouse, rider) — including marketing
 campaigns, replacements, exchanges, and warehouse exceptions.
 
@@ -135,8 +142,20 @@ campaigns, replacements, exchanges, and warehouse exceptions.
 | `campaign:updated` | campaign created/approved → seller + marketing |
 | `replacement:updated` / `exchange:updated` | RMA lifecycle → customer + ops |
 | `exception:updated` | parcel incident raised/resolved → ops |
+| `me:updated` | profile/prefs changed → that user's other sessions |
+
+The complete generated list of REST endpoints, WebSocket events and pushed events is in
+[`docs/BACKEND-REMAINING.md`](../docs/BACKEND-REMAINING.md#5-api-reference-generated-from-source).
 
 ## Environment
 
 See [`.env.example`](.env.example). Key vars: `JWT_SECRET`,
 `JWT_REFRESH_SECRET`, `DATA_ENCRYPTION_KEY` (64 hex chars), `DB_TYPE`.
+In production the API refuses to boot on dev secrets, SQLite or `DB_SYNCHRONIZE=true`;
+the schema comes from migrations (`npm run migration:run`) and the first admin from
+`npm run bootstrap:prod` (never run `seed` there).
+
+Optional integrations (all no-ops when unset): `FIREBASE_SERVICE_ACCOUNT_JSON` /
+`GOOGLE_APPLICATION_CREDENTIALS` (push), `SMTP_HOST/PORT/USER/PASS` + `MAIL_FROM` (email),
+`TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM` (SMS), `WEB_URL`, `PUBLIC_API_URL`, `UPLOAD_DIR`,
+`UPLOAD_MAX_BYTES`, `WS_RATE_*`, `MAX_DELIVERY_FEE_USD`, `ALLOW_CLIENT_PRICED_ITEMS`.

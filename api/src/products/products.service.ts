@@ -24,6 +24,13 @@ export class ProductsService {
     return filter?.status ? rows : rows.filter((p) => p.status !== 'removed');
   }
 
+  /** A live listing by exact (case-insensitive) name — used to re-price snapshot order lines. */
+  async findLiveByName(name: string): Promise<Product | null> {
+    const rows = await this.repo.find({ where: { status: 'live' } });
+    const n = name.trim().toLowerCase();
+    return rows.find((p) => p.name.trim().toLowerCase() === n) ?? null;
+  }
+
   get(id: string): Promise<Product | null> {
     return this.repo.findOne({ where: { id } });
   }

@@ -8,6 +8,7 @@ import { BRAND } from "@/lib/config";
 import { LOGIN_HERO_IMAGE } from "@/lib/product-landing";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth, getPersonaDisplayName, getPersonaDisplaySubRole } from "@/context/auth-context";
+import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { FullPageLoader } from "@/components/ui/loader";
@@ -20,8 +21,16 @@ const ROLE_GROUPS = [
   { label: "Warehouse", labelFr: "Entrepôt", roles: ["warehouse"] as UserRole[] },
 ];
 
+// The one-click role picker is a demo convenience; production sets this to "false".
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+
 export default function LoginPage() {
-  const { login, isAuthenticated, authReady, persona, personas } = useAuth();
+  const { login, signInReal, isAuthenticated, authReady, persona, personas } = useAuth();
+  const { login: realLogin } = useRealtime();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const router = useRouter();
@@ -38,6 +47,25 @@ export default function LoginPage() {
     const persona = personas.find((p) => p.id === personaId);
     login(personaId);
     router.push(persona?.portal || getHomeForRole((persona?.role ?? "guest") as UserRole));
+  }
+
+  async function signInWithAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setSignInError(null);
+    if (!email || !password) {
+      setSignInError(fr ? "Saisissez votre e-mail et votre mot de passe." : "Enter your email and password.");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const user = await realLogin(email, password);
+      const p = signInReal(user.role, { name: user.name, email: user.email });
+      router.push(p.portal || getHomeForRole(p.role as UserRole));
+    } catch (err) {
+      setSignInError((err as Error).message);
+    } finally {
+      setSigningIn(false);
+    }
   }
 
   const activeRoles = ROLE_GROUPS.find((g) => g.label === group)?.roles ?? [];
@@ -108,7 +136,11 @@ export default function LoginPage() {
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
               {mode === "login" ? (fr ? "Se connecter" : "Sign in") : (fr ? "Continuer en tant qu'invité" : "Continue as Guest")}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">{fr ? "Sélectionnez votre rôle — vous n'accéderez qu'à votre portail" : "Select your role — you will only access your portal"}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {DEMO_MODE
+                ? (fr ? "Sélectionnez votre rôle — vous n'accéderez qu'à votre portail" : "Select your role — you will only access your portal")
+                : (fr ? "Connectez-vous avec votre compte — vous n'accéderez qu'à votre portail" : "Sign in with your account — you will only access your portal")}
+            </p>
           </div>
 
           <div className="flex gap-2 rounded-xl bg-slate-100 p-1">
@@ -124,6 +156,17 @@ export default function LoginPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              <form onSubmit={signInWithAccount} className="space-y-3">
+                <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input className="input-premium w-full px-4 py-3 text-sm" type="password" autoComplete="current-password" placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+                {signInError && <p role="alert" className="text-sm text-red-600">{signInError}</p>}
+                <Button type="submit" disabled={signingIn} className="w-full">
+                  {signingIn ? (fr ? "Veuillez patienter…" : "Please wait…") : (fr ? "Se connecter" : "Sign in")}
+                </Button>
+              </form>
+              {DEMO_MODE && (
+              <>
+              <p className="pt-2 text-center text-xs uppercase tracking-wide text-slate-400">{fr ? "ou essayer un rôle de démonstration" : "or try a demo role"}</p>
               <div className="flex flex-wrap gap-2">
                 {ROLE_GROUPS.map((g) => (
                   <button
@@ -162,6 +205,8 @@ export default function LoginPage() {
               )}
               {group === "Warehouse" && (
                 <p className="text-xs text-slate-500">{fr ? "Les identifiants d'entrepôt sont émis par l'Admin lors de la création d'un entrepôt." : "Warehouse credentials are issued by Admin when creating a warehouse."}</p>
+              )}
+              </>
               )}
             </div>
           )}

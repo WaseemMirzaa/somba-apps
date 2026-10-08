@@ -166,6 +166,32 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     ok(a.ok && a.data.paymentMethod === method, `order paid with ${method}`, a.error ?? '');
   }
 
+  console.log('\n— Order integrity (the server, not the client, decides the price)');
+  const real = (await req(s, 'products:get', { id: pid })).data;
+  const mk = (over) => ({ items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', deliveryFeeUsd: 5, ...over });
+  a = await req(s, 'orders:create', mk({ deliveryFeeUsd: -5 }));
+  ok(!a.ok, 'negative delivery fee rejected');
+  a = await req(s, 'orders:create', mk({ deliveryFeeUsd: 9999 }));
+  ok(!a.ok, 'absurd delivery fee rejected');
+  for (const q of [0, 1.5, -2, 101, 'abc']) {
+    a = await req(s, 'orders:create', mk({ items: [{ productId: pid, qty: q }] }));
+    ok(!a.ok, `quantity ${JSON.stringify(q)} rejected`);
+  }
+  a = await req(s, 'orders:create', mk({ items: [{ name: 'Not A Real Product', priceUsd: -10, qty: 1 }] }));
+  ok(!a.ok, 'negative client-supplied price rejected');
+  a = await req(s, 'orders:create', mk({ items: [{ name: 'Not A Real Product', priceUsd: 0, qty: 1 }] }));
+  ok(!a.ok, 'zero client-supplied price rejected');
+  a = await req(s, 'orders:create', mk({ items: [{ name: real.name, priceUsd: 0.01, qty: 1 }] }));
+  ok(a.ok && a.data.items[0].priceUsd === real.price, `underpaying a real product is impossible (charged ${a.data?.items?.[0]?.priceUsd}, listed ${real.price})`);
+  await req(admin, 'products:update', { id: pid, patch: { stock: 2 } });
+  a = await req(s, 'orders:create', mk({ items: [{ productId: pid, qty: 3 }] }));
+  ok(!a.ok && /Only 2/.test(a.error ?? ''), 'cannot order more than is in stock', a.error ?? '');
+  a = await req(s, 'orders:create', mk({ items: [{ productId: pid, qty: 2 }] }));
+  ok(a.ok, 'ordering exactly the remaining stock works');
+  a = await req(s, 'orders:create', mk({ items: [{ productId: pid, qty: 1 }] }));
+  ok(!a.ok && /out of stock/i.test(a.error ?? ''), 'sold-out product cannot be ordered', a.error ?? '');
+  await req(admin, 'products:update', { id: pid, patch: { stock: 50 } });
+
   console.log('\n— Suspended customers are locked out');
   a = await req(admin, 'customers:setActive', { id: userId, active: false });
   ok(a.ok, 'admin suspends the customer');
