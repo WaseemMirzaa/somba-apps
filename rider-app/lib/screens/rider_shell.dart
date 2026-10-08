@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'tasks_screen.dart';
-import 'map_screen.dart';
+import 'deliveries_screen.dart';
+import 'earnings_screen.dart';
 import 'profile_screen.dart';
-import 'live_tasks_screen.dart';
 
 class RiderShell extends StatefulWidget {
   final Locale locale;
@@ -22,15 +21,13 @@ class _RiderShellState extends State<RiderShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      TasksScreen(locale: widget.locale),
-      const LiveTasksScreen(),
-      MapScreen(locale: widget.locale),
+      const DeliveriesScreen(),
+      const EarningsScreen(),
       ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
     final items = <_NavItem>[
-      _NavItem(Icons.assignment_rounded, 'Tasks'),
-      _NavItem(Icons.bolt_rounded, 'Live'),
-      _NavItem(Icons.navigation_rounded, 'Navigate'),
+      _NavItem(Icons.two_wheeler_rounded, 'Deliveries'),
+      _NavItem(Icons.account_balance_wallet_rounded, 'Earnings'),
       _NavItem(Icons.person_rounded, 'Profile'),
     ];
 

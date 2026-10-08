@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/rider_store.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
 
@@ -17,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _t = Timer(const Duration(milliseconds: 1600), widget.onDone);
+    _t = Timer(const Duration(milliseconds: 1200), widget.onDone);
   }
 
   @override
@@ -57,9 +58,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// ---------------- Login / First password ----------------
+// ---------------- Login ----------------
 class RiderLoginScreen extends StatefulWidget {
-  /// When null the screen is preview-only (gallery); otherwise fires on sign-in.
   final VoidCallback? onSignedIn;
   const RiderLoginScreen({super.key, this.onSignedIn});
   @override
@@ -67,11 +67,10 @@ class RiderLoginScreen extends StatefulWidget {
 }
 
 class _RiderLoginScreenState extends State<RiderLoginScreen> {
-  // Pre-filled with the demo rider so the backend session connects out of the
-  // box; type your own credentials to override.
-  final _id = TextEditingController(text: 'rider@somba.app');
-  final _pass = TextEditingController(text: 'Somba@2026');
+  final _id = TextEditingController();
+  final _pass = TextEditingController();
   bool _loading = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -80,20 +79,21 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
     super.dispose();
   }
 
-  /// Authenticate against the backend; the whole rider app is then gated
-  /// behind a real session. On failure the rider can still enter (offline).
   Future<void> _submit() async {
-    setState(() => _loading = true);
+    if (_id.text.trim().isEmpty || _pass.text.isEmpty) {
+      setState(() => _error = 'Enter your email and password');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       await RiderStore.instance.login(_id.text.trim(), _pass.text);
       if (!mounted) return;
       widget.onSignedIn?.call();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign-in failed: $e')),
-      );
-      widget.onSignedIn?.call(); // allow offline entry
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -123,14 +123,19 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
         Padding(
           padding: const EdgeInsets.all(20),
           child: Column(children: [
-            RiderField(label: 'Email', hint: 'rider@somba.app', icon: Icons.mail_outline_rounded, controller: _id),
+            RiderField(fieldKey: const ValueKey('rider-email'), label: 'Email', hint: 'you@somba.app', icon: Icons.mail_outline_rounded, controller: _id, keyboard: TextInputType.emailAddress),
             const SizedBox(height: 16),
-            RiderField(label: 'Password', hint: 'Enter your password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
-            const SizedBox(height: 10),
+            RiderField(fieldKey: const ValueKey('rider-password'), label: 'Password', hint: 'Enter your password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Align(alignment: Alignment.centerLeft, child: Text(_error!, key: const ValueKey('login-error'), style: const TextStyle(color: AppColors.danger, fontSize: 12.5, fontWeight: FontWeight.w600))),
+              ),
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ForgotPasswordScreen(initialEmail: _id.text.trim()))),
                 style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                 child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               ),
@@ -139,6 +144,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
+                key: const ValueKey('rider-signin'),
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
@@ -150,12 +156,10 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            Row(children: [
-              const Icon(Icons.shield_outlined, size: 16, color: AppColors.muted),
-              const SizedBox(width: 6),
-              Expanded(
-                  child: Text('Your account is created by the Somba&Teka fleet team.',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
+            const Row(children: [
+              Icon(Icons.shield_outlined, size: 16, color: AppColors.muted),
+              SizedBox(width: 6),
+              Expanded(child: Text('Rider accounts are created by the Somba&Teka fleet team.', style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
             ]),
           ]),
         ),
@@ -164,9 +168,75 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
   }
 }
 
-// ---------------- Forgot password ----------------
-class ForgotPasswordScreen extends StatelessWidget {
-  const ForgotPasswordScreen({super.key});
+// ---------------- Forgot / reset password (email link) ----------------
+class ForgotPasswordScreen extends StatefulWidget {
+  final String initialEmail;
+  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  late final _email = TextEditingController(text: widget.initialEmail);
+  final _token = TextEditingController();
+  final _pass = TextEditingController();
+  bool _sent = false;
+  bool _busy = false;
+  String? _msg;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _token.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim())) {
+      setState(() => _msg = 'Enter a valid email');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _msg = null;
+    });
+    try {
+      final dev = await RiderStore.instance.forgotPassword(_email.text.trim());
+      if (!mounted) return;
+      setState(() {
+        _sent = true;
+        _msg = 'If that email has an account, a reset link is on its way.';
+        if (kDebugMode && dev != null) _token.text = dev;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _msg = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _reset() async {
+    if (_pass.text.length < 8) {
+      setState(() => _msg = 'Use at least 8 characters');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _msg = null;
+    });
+    try {
+      await RiderStore.instance.resetPassword(_token.text, _pass.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _msg = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,64 +251,19 @@ class ForgotPasswordScreen extends StatelessWidget {
         const SizedBox(height: 16),
         const Text('Forgot your password?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
         const SizedBox(height: 6),
-        const Text('Enter your Rider ID and we will send a reset code to your registered phone.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.4)),
+        Text(_sent ? 'Paste the code from the email and choose a new password.' : "Enter your email and we'll send you a reset link.",
+            style: const TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.4)),
         const SizedBox(height: 22),
-        const RiderField(label: 'Rider ID', hint: 'RDR-001', icon: Icons.badge_outlined),
+        RiderField(fieldKey: const ValueKey('forgot-email'), label: 'Email', hint: 'you@somba.app', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress),
+        if (_sent) ...[
+          const SizedBox(height: 14),
+          RiderField(fieldKey: const ValueKey('reset-token'), label: 'Reset code', hint: 'From the email', icon: Icons.key_rounded, controller: _token),
+          const SizedBox(height: 14),
+          RiderField(fieldKey: const ValueKey('reset-password'), label: 'New password', hint: 'At least 8 characters', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
+        ],
+        if (_msg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_msg!, key: const ValueKey('forgot-msg'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         const SizedBox(height: 22),
-        PrimaryButton('Send reset code',
-            icon: Icons.send_rounded,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OtpScreen()))),
-      ]),
-    );
-  }
-}
-
-// ---------------- OTP verification ----------------
-class OtpScreen extends StatefulWidget {
-  const OtpScreen({super.key});
-  @override
-  State<OtpScreen> createState() => _OtpScreenState();
-}
-
-class _OtpScreenState extends State<OtpScreen> {
-  int _filled = 4;
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: backAppBar(context, 'Verify code'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
-        const Text('Enter the 4-digit code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
-        const SizedBox(height: 6),
-        const Text('We sent a code to your phone ending •• 82.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
-        const SizedBox(height: 28),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: List.generate(4, (i) {
-          final active = i < _filled;
-          return Container(
-            height: 64,
-            width: 60,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: active ? AppColors.primary : AppColors.line, width: active ? 1.6 : 1),
-              boxShadow: AppShadow.card,
-            ),
-            child: Text(active ? '•' : '', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.primary)),
-          );
-        })),
-        const SizedBox(height: 24),
-        Center(
-          child: TextButton.icon(
-            onPressed: () => setState(() => _filled = 4),
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            label: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        PrimaryButton('Verify & continue',
-            icon: Icons.check_rounded, onPressed: () => Navigator.popUntil(context, (r) => r.isFirst)),
+        PrimaryButton(_busy ? '…' : (_sent ? 'Save new password' : 'Send reset link'), icon: _sent ? Icons.check_rounded : Icons.send_rounded, onPressed: _busy ? null : (_sent ? _reset : _send)),
       ]),
     );
   }
@@ -250,15 +275,19 @@ class RiderField extends StatelessWidget {
   final IconData icon;
   final bool obscure;
   final TextEditingController? controller;
-  const RiderField({super.key, required this.label, required this.hint, required this.icon, this.obscure = false, this.controller});
+  final TextInputType? keyboard;
+  final Key? fieldKey;
+  const RiderField({super.key, this.fieldKey, required this.label, required this.hint, required this.icon, this.obscure = false, this.controller, this.keyboard});
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.inkSoft)),
       const SizedBox(height: 6),
       TextField(
+        key: fieldKey,
         controller: controller,
         obscureText: obscure,
+        keyboardType: keyboard,
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, size: 20),

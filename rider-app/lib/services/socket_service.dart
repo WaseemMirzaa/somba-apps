@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'auth_service.dart' show ApiException;
 import 'env.dart';
 
 /// Single authenticated Socket.IO connection. All reads/writes go through
@@ -7,13 +8,25 @@ import 'env.dart';
 class SocketService {
   io.Socket? _socket;
 
-  io.Socket connect(String token) {
+  /// [tokenProvider] is asked for a valid access token on EVERY (re)connect, so
+  /// a reconnect after the 15-minute access token expired silently refreshes it.
+  io.Socket connect(Future<String> Function() tokenProvider) {
     disconnect();
     final socket = io.io(
       Env.socketUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setAuth({'token': token})
+          // A brand-new connection per sign-in. Without this socket_io_client
+          // CACHES sockets per URL, so a second sign-in (or another user in tests)
+          // would silently reuse the previous user's connection and identity.
+          .enableForceNew()
+          .setAuthFn((cb) async {
+            try {
+              cb({'token': await tokenProvider()});
+            } catch (e) {
+              cb({'token': ''}); // server rejects → connect_error → app signs out
+            }
+          })
           .enableReconnection()
           .setReconnectionDelay(1000)
           .build(),
@@ -45,7 +58,7 @@ class SocketService {
       ack: (dynamic res) {
         if (completer.isCompleted) return;
         if (res is Map && res['ok'] == false) {
-          completer.completeError(Exception(res['error']?.toString() ?? 'Request failed.'));
+          completer.completeError(ApiException(res['error']?.toString() ?? 'Request failed.'));
         } else if (res is Map && res.containsKey('data')) {
           completer.complete(res['data']);
         } else {
@@ -55,7 +68,7 @@ class SocketService {
     );
     return completer.future.timeout(
       const Duration(seconds: 8),
-      onTimeout: () => throw TimeoutException('No ack for $event'),
+      onTimeout: () => throw ApiException('The server did not respond. Please try again.'),
     );
   }
 

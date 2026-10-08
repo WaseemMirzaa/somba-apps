@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,8 +8,6 @@ import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Best-effort: restore a backend session so the Live tab reconnects.
-  unawaited(RiderStore.instance.tryRestore());
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -26,12 +23,32 @@ class SombaRiderApp extends StatefulWidget {
 }
 
 class _SombaRiderAppState extends State<SombaRiderApp> {
-  Locale _locale = const Locale('en');
+  Locale _locale = const Locale('fr');
   bool _splashDone = false;
+  bool _restored = false;
   bool _authed = false;
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
+  @override
+  void initState() {
+    super.initState();
+    RiderStore.instance.onSessionEnded = () {
+      if (!mounted) return;
+      setState(() => _authed = false);
+      _messenger.currentState?.showSnackBar(const SnackBar(content: Text('You were signed out. Please sign in again.')));
+    };
+    // Silently resume the previous shift (stored refresh token).
+    RiderStore.instance.tryRestore().timeout(const Duration(seconds: 8), onTimeout: () => false).then((ok) {
+      if (!mounted) return;
+      setState(() {
+        _restored = true;
+        _authed = ok;
+      });
+    });
+  }
 
   Widget _home() {
-    if (!_splashDone) {
+    if (!_splashDone || !_restored) {
       return SplashScreen(onDone: () => setState(() => _splashDone = true));
     }
     if (!_authed) {
@@ -48,6 +65,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Somba&Teka Rider',
+      scaffoldMessengerKey: _messenger,
       debugShowCheckedModeBanner: false,
       locale: _locale,
       supportedLocales: const [Locale('en'), Locale('fr')],

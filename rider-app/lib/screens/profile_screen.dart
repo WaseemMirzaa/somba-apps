@@ -1,263 +1,104 @@
 import 'package:flutter/material.dart';
+import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
-import 'more/rider_more.dart';
-import 'more/rider_more2.dart';
-import 'more/rider_more3.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
   final VoidCallback? onLogout;
-
   const ProfileScreen({super.key, required this.locale, required this.onLocaleChanged, this.onLogout});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _online = true;
+  static String _initials(String name) {
+    final p = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (p.isEmpty) return '?';
+    return (p.length == 1 ? p[0].substring(0, p[0].length >= 2 ? 2 : 1) : '${p[0][0]}${p[1][0]}').toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final store = RiderStore.instance;
     final top = MediaQuery.of(context).padding.top;
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        Container(
-          padding: EdgeInsets.fromLTRB(20, top + 24, 20, 24),
-          decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-          child: Column(
-            children: [
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2)),
-                  child: const CircleAvatar(radius: 32, backgroundColor: Colors.white, child: Text('JM', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22))),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Jean Mukendi', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 2),
-                    Text('RDR-001 · Paris 2e', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(100)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.star_rounded, color: Colors.amber.shade300, size: 15),
-                        const SizedBox(width: 4),
-                        const Text('4.9 · Top rider', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
-                  ]),
-                ),
-                Column(children: [
-                  _headerBtn(Icons.settings_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSettingsScreen()))),
-                  const SizedBox(height: 8),
-                  _headerBtn(Icons.edit_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderEditProfileScreen()))),
-                ]),
-              ]),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(18)),
-                child: Row(children: [
-                  _stat('1,284', 'Deliveries'),
-                  _divider(),
-                  _stat('98%', 'On-time'),
-                  _divider(),
-                  _stat('14 mo', 'With us'),
-                ]),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        // Duty status card
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SurfaceCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppColors.primary,
-              value: _online,
-              onChanged: (v) => setState(() => _online = v),
-              secondary: Container(
-                height: 40,
-                width: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.bolt_rounded, color: AppColors.primary),
-              ),
-              title: const Text('On duty', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-              subtitle: Text(_online ? 'Receiving new tasks' : 'Paused — no new tasks', style: const TextStyle(fontSize: 12.5)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _menuCard([
-          _Item(Icons.layers_rounded, 'Current batch', 'BAT-204 · 4 stops',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchOverviewScreen()))),
-          _Item(Icons.map_rounded, 'Zones & demand', 'Live demand heatmap',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZoneScreen()))),
-          _Item(Icons.schedule_rounded, 'Shift & attendance', 'Hours & clock-in log',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderShiftScreen()))),
-          _Item(Icons.history_rounded, 'Task history', 'Past deliveries & pickups',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderHistoryScreen()))),
-          _Item(Icons.notifications_rounded, 'Notifications', 'Tasks & route updates',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderNotificationsScreen()))),
-        ]),
-        const SizedBox(height: 14),
-        _menuCard([
-          _Item(Icons.two_wheeler_rounded, 'My vehicle', 'Details & maintenance',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderVehicleScreen()))),
-          _Item(Icons.folder_shared_rounded, 'Documents', 'Licence, ID & insurance',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderDocumentsScreen()))),
-          _Item(Icons.settings_rounded, 'Settings', 'Alerts & preferences',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSettingsScreen()))),
-          _Item(Icons.headset_mic_rounded, 'Support', '24/7 rider help',
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiderSupportScreen()))),
-        ]),
-        const SizedBox(height: 14),
-        // Language card
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SurfaceCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final u = store.user;
+        return ListView(padding: EdgeInsets.zero, children: [
+          Container(
+            padding: EdgeInsets.fromLTRB(20, top + 24, 20, 26),
+            decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
             child: Row(children: [
-              Container(
-                height: 40, width: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.translate_rounded, color: AppColors.primary, size: 21),
+              CircleAvatar(radius: 32, backgroundColor: Colors.white, child: Text(_initials(u?.name ?? ''), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22))),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(u?.name ?? '', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(u?.email ?? '', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                  if ((u?.phone ?? '').isNotEmpty) Text(u!.phone!, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                ]),
               ),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('Language', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5))),
-              _langChip('EN', 'en'),
-              const SizedBox(width: 8),
-              _langChip('FR', 'fr'),
             ]),
           ),
-        ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SurfaceCard(
-            padding: EdgeInsets.zero,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              leading: Container(
-                height: 40, width: 40,
-                decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SurfaceCard(
+                child: Row(children: [
+                  const Icon(Icons.translate_rounded, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Language', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5))),
+                  SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact, selectedBackgroundColor: AppColors.primary, selectedForegroundColor: Colors.white),
+                    segments: const [ButtonSegment(value: 'en', label: Text('EN')), ButtonSegment(value: 'fr', label: Text('FR'))],
+                    selected: {locale.languageCode},
+                    onSelectionChanged: (v) => onLocaleChanged(Locale(v.first)),
+                  ),
+                ]),
               ),
-              title: const Text('Log out', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
-              onTap: _confirmLogout,
-            ),
-          ),
-        ),
-        const SizedBox(height: 90),
-      ],
-    );
-  }
-
-  void _confirmLogout() {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Container(height: 56, width: 56, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 28)),
-            const SizedBox(height: 16),
-            const Text('Log out?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
-            const SizedBox(height: 6),
-            const Text('You will need to sign in again to receive tasks.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
-            const SizedBox(height: 20),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-              onPressed: () {
-                Navigator.pop(context);
-                widget.onLogout?.call();
-              },
-              child: const Text('Log out'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _headerBtn(IconData icon, VoidCallback onTap) => Material(
-        color: Colors.white.withValues(alpha: 0.2),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Padding(padding: const EdgeInsets.all(8), child: Icon(icon, color: Colors.white, size: 20)),
-        ),
-      );
-
-  Widget _langChip(String label, String code) {
-    final sel = widget.locale.languageCode == code;
-    return GestureDetector(
-      onTap: () => widget.onLocaleChanged(Locale(code)),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: sel ? AppColors.brandGradient : null,
-          color: sel ? null : AppColors.background,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: sel ? Colors.transparent : AppColors.line),
-        ),
-        child: Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: sel ? Colors.white : AppColors.muted)),
-      ),
-    );
-  }
-
-  Widget _menuCard(List<_Item> items) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (int i = 0; i < items.length; i++) ...[
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                leading: Container(
-                  height: 40, width: 40,
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(items[i].icon, color: AppColors.primary, size: 21),
+              const SizedBox(height: 18),
+              Text(store.unreadCount > 0 ? 'Notifications (${store.unreadCount} new)' : 'Notifications', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              const SizedBox(height: 10),
+              if (store.notifications.isEmpty)
+                const SurfaceCard(child: Text('Nothing yet. New deliveries and updates show up here.', style: TextStyle(color: AppColors.muted)))
+              else
+                for (final n in store.notifications.take(15))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: SurfaceCard(
+                      onTap: n.read ? null : () => store.markRead(n.id),
+                      padding: const EdgeInsets.all(14),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(n.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                            const SizedBox(height: 2),
+                            Text(n.body, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                          ]),
+                        ),
+                        if (!n.read) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                      ]),
+                    ),
+                  ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('sign-out'),
+                  onPressed: () async {
+                    await store.logout();
+                    onLogout?.call();
+                  },
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger)),
+                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  label: const Text('Sign out'),
                 ),
-                title: Text(items[i].title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                subtitle: Text(items[i].subtitle, style: const TextStyle(fontSize: 12.5)),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
-                onTap: items[i].onTap,
               ),
-              if (i != items.length - 1) const Divider(height: 1, indent: 68, endIndent: 14),
-            ],
-          ]),
-        ),
-      );
-
-  Widget _stat(String v, String l) => Expanded(
-        child: Column(children: [
-          Text(v, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(l, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5)),
-        ]),
-      );
-
-  Widget _divider() => Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.25));
-}
-
-class _Item {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-  _Item(this.icon, this.title, this.subtitle, [this.onTap]);
+            ]),
+          ),
+        ]);
+      },
+    );
+  }
 }

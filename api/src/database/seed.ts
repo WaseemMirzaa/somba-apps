@@ -197,7 +197,8 @@ async function run() {
   await setRepo.save([
     setRepo.create({ key: 'fxRate', value: '2850' }),
     setRepo.create({ key: 'codCapUsd', value: '500' }),
-    setRepo.create({ key: 'codEnabled', value: 'false' }),
+    // Demo cash orders below need COD on; it is switched back to the client scope (off) right after.
+    setRepo.create({ key: 'codEnabled', value: 'true' }),
     setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0 }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5 }]) }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
   ]);
@@ -249,7 +250,8 @@ async function run() {
         {
           items: spec.items,
           paymentMethod: spec.paymentMethod,
-          deliveryFeeUsd: 5,
+          deliveryFeeUsd: 3,
+          zoneId: 'gombe',
           shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
         },
       );
@@ -274,6 +276,9 @@ async function run() {
       }
     }
   }
+
+  // Client scope: cash on delivery is disabled by default (admins can enable it in Settings).
+  await setRepo.update({ key: 'codEnabled' }, { value: 'false' });
 
   // ── Marketing campaigns, replacements, exchanges, exceptions ────────────────
   console.log('Seeding campaigns / replacements / exchanges / exceptions…');

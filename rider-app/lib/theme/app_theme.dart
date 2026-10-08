@@ -13,6 +13,7 @@ class AppColors {
   static const Color cyan = Color(0xFF3B82F6);
   static const Color accent = Color(0xFFF59E0B); // COD / cash amber
   static const Color info = Color(0xFF0EA5E9); // navigate (sky)
+  static const Color success = Color(0xFF16A34A); // delivered
   static const Color danger = Color(0xFFEF4444); // failed / return
   static const Color violet = Color(0xFF7C3AED); // pickup
 
