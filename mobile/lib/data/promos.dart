@@ -1,39 +1,35 @@
-/// Promo / coupon codes, mirroring the admin promotions module and
-/// `shared/mock/entities.ts` MOCK_PROMOS.
+/// A promo code as defined by the admin (`promos:list`). The app only PREVIEWS
+/// discounts; the server validates and applies the code when the order is placed.
 class Promo {
   final String code;
   final String description;
   final double minOrderUsd;
-  final double? percentOff; // e.g. 0.10 for 10%
-  final double? amountOffUsd; // fixed USD discount
+  final String type; // percent | fixed
+  final double value;
+
   const Promo({
     required this.code,
     required this.description,
     required this.minOrderUsd,
-    this.percentOff,
-    this.amountOffUsd,
+    required this.type,
+    required this.value,
   });
 
-  /// Discount in USD for a given subtotal (0 if the minimum is not met).
-  double discountFor(double subtotalUsd) {
-    if (subtotalUsd < minOrderUsd) return 0;
-    if (percentOff != null) return subtotalUsd * percentOff!;
-    if (amountOffUsd != null) return amountOffUsd!;
-    return 0;
-  }
+  factory Promo.fromJson(Map<String, dynamic> j) => Promo(
+        code: j['code'] as String? ?? '',
+        description: (j['description'] as String?)?.isNotEmpty == true
+            ? j['description'] as String
+            : ((j['type'] == 'percent') ? '${(j['value'] as num).toInt()}% off' : '\$${(j['value'] as num).toInt()} off'),
+        minOrderUsd: (j['minOrder'] as num?)?.toDouble() ?? 0,
+        type: j['type'] as String? ?? 'percent',
+        value: (j['value'] as num?)?.toDouble() ?? 0,
+      );
 }
 
-const promos = [
-  Promo(code: 'SOMBA10', description: '10% off orders over \$50', minOrderUsd: 50, percentOff: 0.10),
-  Promo(code: 'SAVE20', description: '\$20 off orders over \$100', minOrderUsd: 100, amountOffUsd: 20),
-  Promo(code: 'WELCOME5', description: '\$5 off your first order', minOrderUsd: 0, amountOffUsd: 5),
-];
-
-/// Case-insensitive lookup; null if the code does not exist.
-Promo? findPromo(String code) {
-  final c = code.trim().toUpperCase();
-  for (final p in promos) {
-    if (p.code == c) return p;
-  }
-  return null;
+/// A code the server accepted for a given subtotal.
+class AppliedPromo {
+  final String code;
+  final double discountUsd;
+  final double forSubtotal;
+  const AppliedPromo({required this.code, required this.discountUsd, required this.forSubtotal});
 }

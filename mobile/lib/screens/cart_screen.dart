@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
-import '../data/promos.dart';
+import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -27,25 +27,36 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
-  void _applyPromo() {
+  /// The SERVER validates the code (and applies it again when the order is placed).
+  Future<void> _applyPromo() async {
     final code = _promoCtrl.text.trim();
     if (code.isEmpty) return;
-    final promo = findPromo(code);
-    String msg;
-    if (promo == null) {
-      msg = 'Invalid promo code';
-    } else if (shop.subtotal < promo.minOrderUsd) {
-      msg = 'Spend ${money(promo.minOrderUsd)} to use ${promo.code}';
-    } else {
-      shop.appliedPromo = promo;
-      msg = '${promo.code} applied';
-    }
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await shop.applyPromo(code);
+    if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    messenger.showSnackBar(SnackBar(content: Text(error ?? '${shop.appliedPromo!.code} applied')));
+  }
+
+  /// A cart change invalidates a previewed discount: re-check it.
+  void _cartChanged() {
+    shop.save();
+    setState(() {});
+    shop.revalidatePromo().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Prices/stock follow the live catalogue pushed by the server.
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) {
+      shop.syncWithCatalog();
+      return _scaffold(context);
+    });
+  }
+
+  Widget _scaffold(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
     final empty = shop.cart.isEmpty;
@@ -104,7 +115,10 @@ class _CartScreenState extends State<CartScreen> {
         return Dismissible(
           key: ValueKey('${item.product.id}-${item.variant}'),
           direction: DismissDirection.endToStart,
-          onDismissed: (_) => setState(() => shop.cart.removeAt(i)),
+          onDismissed: (_) {
+            shop.removeAt(i);
+            _cartChanged();
+          },
           background: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 24),
@@ -152,7 +166,10 @@ class _CartScreenState extends State<CartScreen> {
                           const Spacer(),
                           QuantityStepper(
                             value: item.qty,
-                            onChanged: (v) => setState(() => item.qty = v),
+                            onChanged: (v) {
+                              item.qty = v.clamp(1, item.product.stock < 1 ? 1 : item.product.stock);
+                              _cartChanged();
+                            },
                           ),
                         ],
                       ),

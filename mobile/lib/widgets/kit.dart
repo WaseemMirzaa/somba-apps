@@ -39,6 +39,10 @@ class AppField extends StatelessWidget {
   final TextInputType? keyboard;
   final Widget? trailing;
   final String? initial;
+  final TextEditingController? controller;
+  final String? error;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
   const AppField({
     super.key,
     required this.label,
@@ -48,6 +52,10 @@ class AppField extends StatelessWidget {
     this.keyboard,
     this.trailing,
     this.initial,
+    this.controller,
+    this.error,
+    this.maxLines = 1,
+    this.onChanged,
   });
 
   @override
@@ -58,11 +66,14 @@ class AppField extends StatelessWidget {
         Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.inkSoft)),
         const SizedBox(height: 6),
         TextField(
-          controller: initial != null ? TextEditingController(text: initial) : null,
+          controller: controller ?? (initial != null ? TextEditingController(text: initial) : null),
           obscureText: obscure,
           keyboardType: keyboard,
+          maxLines: obscure ? 1 : maxLines,
+          onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hint,
+            errorText: error,
             prefixIcon: icon != null ? Icon(icon, size: 20) : null,
             suffixIcon: trailing,
           ),

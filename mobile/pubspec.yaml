@@ -34,7 +34,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/products/
     - assets/brand/
 
   fonts:

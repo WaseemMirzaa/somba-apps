@@ -1,5 +1,6 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../data/catalog_models.dart';
 import '../theme/app_theme.dart';
 
 IconData categoryIcon(String category) {
@@ -60,13 +61,18 @@ class ProductImage extends StatelessWidget {
             // Real product photo (white-background studio shot).
             Padding(
               padding: EdgeInsets.all(pad),
-              child: Image.asset(
-                'assets/products/${product.id}.jpg',
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Center(
-                  child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
-                ),
-              ),
+              child: product.image.isEmpty
+                  ? Center(child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)))
+                  : CachedNetworkImage(
+                      imageUrl: product.image,
+                      fit: BoxFit.contain,
+                      placeholder: (_, __) => Center(
+                        child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.2)),
+                      ),
+                      errorWidget: (_, __, ___) => Center(
+                        child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)),
+                      ),
+                    ),
             ),
           ],
         );

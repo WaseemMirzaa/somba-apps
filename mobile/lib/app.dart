@@ -3,7 +3,7 @@ import 'screens/home_screen.dart';
 import 'screens/categories_screen.dart';
 import 'screens/deals_screen.dart';
 import 'screens/account_screen.dart';
-import 'screens/live_console_screen.dart';
+import 'screens/orders_screen.dart';
 import 'theme/app_theme.dart';
 import 'l10n/strings.dart';
 
@@ -28,7 +28,7 @@ class _AppShellState extends State<AppShell> {
       HomeScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
       CategoriesScreen(locale: widget.locale),
       DealsScreen(locale: widget.locale),
-      const LiveConsoleScreen(),
+      OrdersScreen(locale: widget.locale),
       AccountScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
 
@@ -36,7 +36,7 @@ class _AppShellState extends State<AppShell> {
       _NavItem(Icons.home_rounded, s.home),
       _NavItem(Icons.grid_view_rounded, s.categories),
       _NavItem(Icons.local_fire_department_rounded, s.deals),
-      _NavItem(Icons.bolt_rounded, 'Live'),
+      _NavItem(Icons.receipt_long_rounded, s.orders),
       _NavItem(Icons.person_rounded, s.account),
     ];
 

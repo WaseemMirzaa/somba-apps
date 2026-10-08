@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
+import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import 'more/order_screens.dart';
 
 class OrderSuccessScreen extends StatefulWidget {
   final Locale locale;
+  /// Backend order id (the reference is looked up from the live order list).
   final String orderId;
 
   const OrderSuccessScreen({super.key, required this.locale, required this.orderId});
@@ -27,6 +29,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
   @override
   Widget build(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
+    final order = RealtimeStore.instance.orderById(widget.orderId);
 
     return Scaffold(
       body: SafeArea(
@@ -75,7 +78,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                   children: [
                     const Icon(Icons.receipt_long_rounded, size: 18, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    Text(widget.orderId,
+                    Text(order?.reference ?? '',
                         style: const TextStyle(
                             fontWeight: FontWeight.w800, color: AppColors.primary, fontSize: 14)),
                   ],
@@ -85,7 +88,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale))),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, orderId: widget.orderId))),
                   icon: const Icon(Icons.local_shipping_rounded, size: 20),
                   label: Text(s.trackOrder),
                 ),

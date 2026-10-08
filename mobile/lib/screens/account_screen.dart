@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
+import '../services/realtime_store.dart';
+import '../util/format.dart';
+import 'wallet_screen.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
@@ -7,6 +10,7 @@ import 'more/account_more.dart';
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
 import 'more/catalog_extra.dart';
+import 'more/returns_extra.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -18,9 +22,8 @@ class AccountScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Strings(locale.languageCode);
-    final lang = locale.languageCode;
 
-    return Scaffold(
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (context, _) => Scaffold(
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -33,6 +36,10 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => WishlistScreen(locale: locale)))),
             _MenuItem(Icons.location_on_outlined, s.addresses, AppColors.mint,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: locale)))),
+            _MenuItem(Icons.account_balance_wallet_outlined, s.wallet, AppColors.royalBlue,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => WalletScreen(locale: locale)))),
+            _MenuItem(Icons.assignment_return_outlined, 'Returns & refunds', AppColors.accent,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnsListScreen(locale: locale)))),
             _MenuItem(Icons.local_offer_outlined, 'Coupons', AppColors.amber,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CouponsScreen(locale: locale)))),
           ]),
@@ -44,8 +51,6 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerEditProfileScreen(locale: locale)))),
             _MenuItem(Icons.notifications_none_rounded, 'Notifications', AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
-            _MenuItem(Icons.card_giftcard_rounded, 'Refer & Earn', AppColors.accent,
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReferScreen(locale: locale)))),
             _MenuItem(Icons.confirmation_number_outlined, 'Support', AppColors.royalBlue,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
             _MenuItem(Icons.settings_outlined, 'Settings', AppColors.inkSoft,
@@ -75,33 +80,10 @@ class AccountScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.amber.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: AppColors.amber, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      lang == 'fr' ? 'Mode prototype — données simulées.' : 'Prototype mode — mock data, no backend.',
-                      style: const TextStyle(color: Color(0xFF92610A), fontSize: 12.5, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 120),
         ],
       ),
-    );
+    ));
   }
 
   Widget _profileHeader(BuildContext context, Strings s) {
@@ -122,11 +104,11 @@ class AccountScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2),
                 ),
-                child: const CircleAvatar(
+                child: CircleAvatar(
                   radius: 32,
                   backgroundColor: Colors.white,
-                  child: Text('MD',
-                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22)),
+                  child: Text(_initials(RealtimeStore.instance.user?.name ?? ''),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22)),
                 ),
               ),
               const SizedBox(width: 16),
@@ -134,28 +116,34 @@ class AccountScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Marie Dubois',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text(RealtimeStore.instance.user?.name ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 2),
-                    Text('marie@email.com',
+                    Text(RealtimeStore.instance.user?.email ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(100),
+                    if (RealtimeStore.instance.user != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(RealtimeStore.instance.user!.emailVerified ? Icons.verified_rounded : Icons.mail_outline_rounded,
+                                color: Colors.white, size: 14),
+                            const SizedBox(width: 4),
+                            Text(RealtimeStore.instance.user!.emailVerified ? 'Email verified' : 'Email not verified',
+                                style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          ],
+                        ),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text('Gold member',
-                              style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -170,17 +158,23 @@ class AccountScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _stat('12', s.orders),
+                _stat('${RealtimeStore.instance.orders.length}', s.orders),
                 _divider(),
-                _stat('${ShopState.instance.wishlist.length}', s.wishlist),
+                _stat('${RealtimeStore.instance.wishlistIds.length}', s.wishlist),
                 _divider(),
-                _stat('3', 'Coupons'),
+                _stat(money(RealtimeStore.instance.walletBalance), s.wallet),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  static String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    return (parts.length == 1 ? parts[0].substring(0, parts[0].length >= 2 ? 2 : 1) : '${parts[0][0]}${parts[1][0]}').toUpperCase();
   }
 
   Widget _stat(String value, String label) => Expanded(
@@ -299,8 +293,10 @@ class AccountScreen extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
+                await RealtimeStore.instance.logout();
+                ShopState.instance.clearSession();
                 onLogout?.call();
               },
               child: const Text('Log out'),

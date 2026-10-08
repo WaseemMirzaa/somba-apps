@@ -34,7 +34,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   email: true,
   sms: false,
   personalize: true,
-  market: 'FR',
+  market: 'DRC',
 };
 
 const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;

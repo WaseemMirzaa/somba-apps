@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/brand_logo.dart';
@@ -20,8 +21,7 @@ class _CustomerSplashScreenState extends State<CustomerSplashScreen> with Single
   @override
   void initState() {
     super.initState();
-    // Longer, clearly visible splash.
-    _t = Timer(const Duration(milliseconds: 2800), widget.onDone);
+    _t = Timer(const Duration(milliseconds: 1600), widget.onDone);
   }
 
   @override
@@ -142,6 +142,7 @@ class _GlassField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: prefix ?? Icon(icon, size: 20),
+          prefixIconConstraints: prefix != null ? const BoxConstraints(minWidth: 96, minHeight: 48) : null,
           filled: true,
           fillColor: AppColors.background,
           enabledBorder: b(error != null ? AppColors.danger : AppColors.line),
@@ -167,10 +168,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Pre-filled with the demo customer so the backend session connects out of
-  // the box; users can type their own credentials over these.
-  final _email = TextEditingController(text: 'customer@somba.app');
-  final _pass = TextEditingController(text: 'Somba@2026');
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
   String? _emailErr, _passErr;
   bool _loading = false;
 
@@ -183,13 +182,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
 
-  /// Authenticate against the backend (JWT). On success the whole app is
-  /// gated behind a real session; on failure the user can still "Continue as
-  /// guest" (offline/mock) via the button below.
   Future<void> _signIn() async {
     setState(() {
       _emailErr = _email.text.trim().isEmpty ? 'Enter your email' : (!_validEmail(_email.text.trim()) ? 'Enter a valid email' : null);
-      _passErr = _pass.text.isEmpty ? 'Enter your password' : (_pass.text.length < 4 ? 'Password is too short' : null);
+      _passErr = _pass.text.isEmpty ? 'Enter your password' : null;
     });
     if (_emailErr != null || _passErr != null) return;
     setState(() => _loading = true);
@@ -199,16 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
       widget.onAuthed?.call();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _passErr = 'Sign-in failed — check the server or continue as guest');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      setState(() => _passErr = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  void _social(String name) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Signing in with $name…')));
-    Future.delayed(const Duration(milliseconds: 600), () => widget.onAuthed?.call());
   }
 
   @override
@@ -217,40 +207,26 @@ class _LoginScreenState extends State<LoginScreen> {
       title: 'Welcome back',
       subtitle: 'Sign in to continue shopping on Somba&Teka',
       form: Column(children: [
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        KeyedSubtree(key: const ValueKey('login-email'), child: _GlassField(label: 'Email', hint: 'you@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr)),
         const SizedBox(height: 14),
-        _GlassField(label: 'Password', hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        KeyedSubtree(key: const ValueKey('login-password'), child: _GlassField(label: 'Password', hint: '••••••••', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr)),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotScreen())),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ForgotScreen(initialEmail: _email.text.trim()))),
             style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
           ),
         ),
         const SizedBox(height: 4),
         AuthButton('Sign in', icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
-        const SizedBox(height: 18),
-        Row(children: [
-          const Expanded(child: Divider(color: AppColors.line)),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or continue with', style: TextStyle(color: AppColors.muted, fontSize: 12))),
-          const Expanded(child: Divider(color: AppColors.line)),
-        ]),
-        const SizedBox(height: 16),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          _socialBtn(bg: Colors.white, border: AppColors.line, child: const GoogleGMark(size: 22), onTap: () => _social('Google')),
-          const SizedBox(width: 16),
-          _socialBtn(bg: Colors.black, child: const Icon(Icons.apple, color: Colors.white, size: 26), onTap: () => _social('Apple')),
-          const SizedBox(width: 16),
-          _socialBtn(bg: const Color(0xFF1877F2), child: const Icon(Icons.facebook, color: Colors.white, size: 26), onTap: () => _social('Facebook')),
-        ]),
-        const SizedBox(height: 16),
-        TextButton(onPressed: () => widget.onAuthed?.call(), child: const Text('Continue as guest', style: TextStyle(fontWeight: FontWeight.w700))),
+        const SizedBox(height: 22),
         Center(
           child: GestureDetector(
+            key: const ValueKey('go-register'),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen(onAuthed: widget.onAuthed))),
             child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 13.5), children: [
-              TextSpan(text: "New here?  "),
+              TextSpan(text: 'New here?  '),
               TextSpan(text: 'Create an account', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
             ])),
           ),
@@ -258,21 +234,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ]),
     );
   }
-
-  Widget _socialBtn({required Color bg, Color? border, required Widget child, required VoidCallback onTap}) => Material(
-        color: bg,
-        shape: CircleBorder(side: border != null ? BorderSide(color: border) : BorderSide.none),
-        elevation: 3,
-        shadowColor: Colors.black.withValues(alpha: 0.2),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(height: 52, width: 52, child: Center(child: child)),
-        ),
-      );
 }
 
-// ============ Register ============
+// ============ Create account ============
 class RegisterScreen extends StatefulWidget {
   final VoidCallback? onAuthed;
   const RegisterScreen({super.key, this.onAuthed});
@@ -288,15 +252,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirm = TextEditingController();
   String _dial = '+243';
   bool _agree = true;
-  bool _hasPhoto = false;
+  bool _loading = false;
   String? _nameErr, _phoneErr, _emailErr, _passErr, _confirmErr;
 
   static const _codes = [
     ('🇨🇩', '+243', 'DR Congo'),
+    ('🇨🇬', '+242', 'Congo'),
     ('🇫🇷', '+33', 'France'),
-    ('🇺🇸', '+1', 'USA'),
-    ('🇬🇧', '+44', 'UK'),
-    ('🇳🇬', '+234', 'Nigeria'),
+    ('🇧🇪', '+32', 'Belgium'),
     ('🇰🇪', '+254', 'Kenya'),
     ('🇿🇦', '+27', 'South Africa'),
   ];
@@ -311,12 +274,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _validEmail(String s) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(s);
 
-  void _submit() {
+  Future<void> _submit() async {
     setState(() {
-      _nameErr = _name.text.trim().isEmpty ? 'Enter your full name' : null;
+      _nameErr = _name.text.trim().length < 2 ? 'Enter your full name' : null;
       _phoneErr = _phone.text.trim().length < 6 ? 'Enter a valid phone number' : null;
       _emailErr = !_validEmail(_email.text.trim()) ? 'Enter a valid email' : null;
-      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
+      _passErr = _pass.text.length < 8 ? 'Use at least 8 characters' : null;
       _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
     });
     if ([_nameErr, _phoneErr, _emailErr, _passErr, _confirmErr].any((e) => e != null)) return;
@@ -324,34 +287,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please accept the Terms & Privacy Policy')));
       return;
     }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(
-      phone: '$_dial ${_phone.text.trim()}',
-      onAuthed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(onVerified: () {
-        Navigator.of(context).popUntil((r) => r.isFirst);
-        widget.onAuthed?.call();
-      }))),
-    )));
+    setState(() => _loading = true);
+    try {
+      final phone = '$_dial${_phone.text.trim().replaceFirst(RegExp(r'^0+'), '')}';
+      await RealtimeStore.instance.register(
+        email: _email.text.trim(),
+        password: _pass.text,
+        name: _name.text.trim(),
+        phone: phone,
+      );
+      if (!mounted) return;
+      // The account exists and is signed in. Verifying the phone and email is
+      // encouraged but never blocks shopping.
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OtpScreen(phone: phone, onAuthed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyEmailScreen(onVerified: _finish))))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final m = e.toString();
+      setState(() {
+        if (m.toLowerCase().contains('email')) {
+          _emailErr = m;
+        } else if (m.toLowerCase().contains('password')) {
+          _passErr = m;
+        } else {
+          _confirmErr = m;
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  void _pickPhoto() {
-    setState(() => _hasPhoto = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo added (optional)')));
+  void _finish() {
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    widget.onAuthed?.call();
   }
 
   void _pickCode() {
     showModalBottomSheet(
       context: context,
-      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      builder: (_) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Padding(padding: EdgeInsets.all(16), child: Text('Select country code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
         ..._codes.map((c) => ListTile(
-          leading: Text(c.$1, style: const TextStyle(fontSize: 22)),
-          title: Text(c.$3),
-          trailing: Text(c.$2, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
-          onTap: () {
-            setState(() => _dial = c.$2);
-            Navigator.pop(context);
-          },
-        )),
+              leading: Text(c.$1, style: const TextStyle(fontSize: 22)),
+              title: Text(c.$3),
+              trailing: Text(c.$2, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+              onTap: () {
+                setState(() => _dial = c.$2);
+                Navigator.pop(context);
+              },
+            )),
         const SizedBox(height: 8),
       ])),
     );
@@ -364,74 +352,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
       subtitle: 'Join Somba&Teka in under a minute',
       showBack: true,
       form: Column(children: [
-        // Optional profile picture.
-        Center(
-          child: GestureDetector(
-            onTap: _pickPhoto,
-            child: Stack(children: [
-              CircleAvatar(
-                radius: 38,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                child: _hasPhoto
-                    ? const Icon(Icons.person_rounded, color: AppColors.primary, size: 40)
-                    : const Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 26),
-              ),
-              Positioned(right: 0, bottom: 0, child: Container(
-                height: 26, width: 26,
-                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
-                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
-              )),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Center(child: Text('Add a photo (optional)', style: TextStyle(color: AppColors.muted, fontSize: 11.5))),
-        const SizedBox(height: 16),
-        _GlassField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, controller: _name, error: _nameErr),
+        KeyedSubtree(key: const ValueKey('reg-name'), child: _GlassField(label: 'Full name', hint: 'Your full name', icon: Icons.person_outline_rounded, controller: _name, error: _nameErr)),
         const SizedBox(height: 14),
-        _GlassField(
-          label: 'Phone number', hint: '970 000 000', icon: Icons.phone_outlined,
-          controller: _phone, keyboard: TextInputType.phone, error: _phoneErr,
-          formatters: [FilteringTextInputFormatter.digitsOnly],
-          prefix: GestureDetector(
-            onTap: _pickCode,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              alignment: Alignment.center,
-              width: 78,
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(_dial, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                const Icon(Icons.arrow_drop_down_rounded, size: 20, color: AppColors.muted),
-              ]),
+        KeyedSubtree(
+          key: const ValueKey('reg-phone'),
+          child: _GlassField(
+            label: 'Mobile number (for delivery & payments)',
+            hint: '81 234 5678',
+            icon: Icons.phone_outlined,
+            controller: _phone,
+            keyboard: TextInputType.phone,
+            error: _phoneErr,
+            formatters: [FilteringTextInputFormatter.digitsOnly],
+            prefix: GestureDetector(
+              onTap: _pickCode,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.center,
+                width: 96,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(_dial, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppColors.muted),
+                ]),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 14),
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr),
+        KeyedSubtree(key: const ValueKey('reg-email'), child: _GlassField(label: 'Email', hint: 'you@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _emailErr)),
         const SizedBox(height: 14),
-        _GlassField(label: 'Password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        KeyedSubtree(key: const ValueKey('reg-password'), child: _GlassField(label: 'Password', hint: 'At least 8 characters', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr)),
         const SizedBox(height: 14),
-        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        KeyedSubtree(key: const ValueKey('reg-confirm'), child: _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr)),
         const SizedBox(height: 14),
         GestureDetector(
           onTap: () => setState(() => _agree = !_agree),
           child: Row(children: [
             Icon(_agree ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary, size: 22),
             const SizedBox(width: 8),
-            Expanded(child: RichText(text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
+            Expanded(
+                child: RichText(
+                    text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
               TextSpan(text: 'I agree to the '),
               TextSpan(text: 'Terms & Privacy Policy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
             ]))),
           ]),
         ),
         const SizedBox(height: 18),
-        AuthButton('Create account', icon: Icons.arrow_forward_rounded, onPressed: _submit),
+        AuthButton('Create account', icon: Icons.arrow_forward_rounded, loading: _loading, onPressed: _submit),
       ]),
     );
   }
 }
 
-// ============ OTP ============
+// ============ Phone verification (SMS code) ============
 class OtpScreen extends StatefulWidget {
   final VoidCallback? onAuthed;
   final String? phone;
@@ -446,11 +420,23 @@ class _OtpScreenState extends State<OtpScreen> {
   Timer? _timer;
   int _seconds = 30;
   String? _error;
+  String? _devCode;
+  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
+    _send();
+  }
+
+  Future<void> _send() async {
     _startTimer();
+    try {
+      final dev = await RealtimeStore.instance.sendPhoneOtp();
+      if (mounted && kDebugMode) setState(() => _devCode = dev);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
   }
 
   void _startTimer() {
@@ -479,69 +465,94 @@ class _OtpScreenState extends State<OtpScreen> {
 
   String get _code => _c.map((c) => c.text).join();
 
-  void _verify() {
-    if (_code.length < 6 || _c.any((c) => c.text.isEmpty)) {
+  Future<void> _verify() async {
+    if (_code.length < 6) {
       setState(() => _error = 'Enter the full 6-digit code');
       return;
     }
-    setState(() => _error = null);
-    widget.onAuthed?.call();
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
+    try {
+      await RealtimeStore.instance.verifyPhoneOtp(_code);
+      if (!mounted) return;
+      widget.onAuthed?.call();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = e.toString();
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
       title: 'Verify your number',
-      subtitle: 'Enter the 6-digit code sent to ${widget.phone ?? '+243 970 000 000'}',
+      subtitle: 'Enter the 6-digit code sent by SMS to ${widget.phone ?? 'your phone'}',
       showBack: true,
       form: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(6, (i) {
-          return SizedBox(
-            width: 46,
-            child: TextField(
-              controller: _c[i],
-              focusNode: _f[i],
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              maxLength: 1,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                counterText: '',
-                filled: true,
-                fillColor: AppColors.background,
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: _error != null ? AppColors.danger : AppColors.line)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onChanged: (v) {
-                if (v.isNotEmpty && i < 5) _f[i + 1].requestFocus();
-                if (v.isEmpty && i > 0) _f[i - 1].requestFocus();
-                setState(() {});
-              },
-            ),
-          );
-        })),
-        if (_error != null) Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600)),
-        ),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(6, (i) {
+              return SizedBox(
+                width: 46,
+                child: TextField(
+                  key: ValueKey('otp-$i'),
+                  controller: _c[i],
+                  focusNode: _f[i],
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    counterText: '',
+                    filled: true,
+                    fillColor: AppColors.background,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: _error != null ? AppColors.danger : AppColors.line)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.7)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onChanged: (v) {
+                    if (v.isNotEmpty && i < 5) _f[i + 1].requestFocus();
+                    if (v.isEmpty && i > 0) _f[i - 1].requestFocus();
+                    setState(() {});
+                  },
+                ),
+              );
+            })),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_error!, key: const ValueKey('otp-error'), style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+        if (_devCode != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('Dev build — code: $_devCode', key: const ValueKey('otp-dev'), style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+          ),
         const SizedBox(height: 18),
-        AuthButton('Verify', icon: Icons.verified_rounded, onPressed: _verify),
-        const SizedBox(height: 14),
+        AuthButton('Verify', icon: Icons.verified_rounded, loading: _busy, onPressed: _verify),
+        const SizedBox(height: 10),
         Center(
           child: _seconds > 0
               ? Text('Resend code in 0:${_seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))
               : TextButton.icon(
-                  onPressed: () {
-                    _startTimer();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('New code sent')));
-                  },
+                  onPressed: _send,
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                   label: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
+        ),
+        TextButton(
+          key: const ValueKey('otp-skip'),
+          onPressed: () => widget.onAuthed?.call(),
+          child: const Text('Skip for now', style: TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
     );
@@ -549,37 +560,86 @@ class _OtpScreenState extends State<OtpScreen> {
 }
 
 // ============ Email verification ============
-class VerifyEmailScreen extends StatelessWidget {
+class VerifyEmailScreen extends StatefulWidget {
   final VoidCallback? onVerified;
   const VerifyEmailScreen({super.key, this.onVerified});
   @override
+  State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+}
+
+class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
+  String? _msg;
+  String? _devToken;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _send();
+  }
+
+  Future<void> _send() async {
+    try {
+      final dev = await RealtimeStore.instance.sendEmailVerification();
+      if (mounted) {
+        setState(() {
+          _msg = 'Verification email sent.';
+          if (kDebugMode) _devToken = dev;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _msg = e.toString());
+    }
+  }
+
+  Future<void> _check() async {
+    setState(() => _busy = true);
+    final verified = await RealtimeStore.instance.refreshEmailVerified();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _msg = verified ? null : 'Not verified yet — tap the link in the email first.';
+    });
+    if (verified) widget.onVerified?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final email = RealtimeStore.instance.user?.email ?? 'your email';
     return _AuthPage(
       title: 'Verify your email',
-      subtitle: 'We sent a confirmation link to marie@email.com',
+      subtitle: 'We sent a confirmation link to $email',
       showBack: true,
       form: Column(children: [
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(18)),
-          child: Column(children: const [
+          child: const Column(children: [
             Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 46),
             SizedBox(height: 12),
             Text('Check your inbox', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
             SizedBox(height: 6),
-            Text('Tap the link in the email to activate your account, then continue to start shopping.',
+            Text('Tap the link in the email to confirm your address. You can keep shopping meanwhile.',
                 textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4)),
           ]),
         ),
+        if (_msg != null)
+          Padding(padding: const EdgeInsets.only(top: 10), child: Text(_msg!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
+        if (_devToken != null)
+          Padding(padding: const EdgeInsets.only(top: 6), child: SelectableText('Dev build — token: $_devToken', key: const ValueKey('email-dev'), style: const TextStyle(color: AppColors.muted, fontSize: 10.5))),
         const SizedBox(height: 18),
-        AuthButton("I've verified — continue", icon: Icons.check_circle_rounded,
-            onPressed: () => onVerified != null ? onVerified!() : Navigator.maybePop(context)),
-        const SizedBox(height: 10),
+        AuthButton("I've verified — continue", icon: Icons.check_circle_rounded, loading: _busy, onPressed: _check),
+        const SizedBox(height: 6),
         TextButton.icon(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification email resent'))),
+          onPressed: _send,
           icon: const Icon(Icons.refresh_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
           label: const Text('Resend email', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        TextButton(
+          key: const ValueKey('email-skip'),
+          onPressed: () => widget.onVerified?.call(),
+          child: const Text('Skip for now', style: TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
     );
@@ -588,38 +648,51 @@ class VerifyEmailScreen extends StatelessWidget {
 
 // ============ Forgot password ============
 class ForgotScreen extends StatefulWidget {
-  const ForgotScreen({super.key});
+  final String initialEmail;
+  const ForgotScreen({super.key, this.initialEmail = ''});
   @override
   State<ForgotScreen> createState() => _ForgotScreenState();
 }
 
 class _ForgotScreenState extends State<ForgotScreen> {
-  final _email = TextEditingController();
+  late final _email = TextEditingController(text: widget.initialEmail);
   String? _err;
+  bool _busy = false;
+
   @override
   void dispose() {
     _email.dispose();
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
     setState(() => _err = ok ? null : 'Enter a valid email');
     if (!ok) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reset link sent to your email')));
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+    setState(() => _busy = true);
+    try {
+      final dev = await RealtimeStore.instance.forgotPassword(_email.text.trim());
+      if (!mounted) return;
+      // Same message whether or not the address has an account.
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('If that email has an account, a reset link is on its way.')));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ResetPasswordScreen(devToken: kDebugMode ? dev : null)));
+    } catch (e) {
+      if (mounted) setState(() => _err = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
       title: 'Reset password',
-      subtitle: "We'll send a reset link to your email",
+      subtitle: "We'll email you a reset link",
       showBack: true,
       form: Column(children: [
-        _GlassField(label: 'Email', hint: 'marie@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err),
+        KeyedSubtree(key: const ValueKey('forgot-email'), child: _GlassField(label: 'Email', hint: 'you@email.com', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress, error: _err)),
         const SizedBox(height: 20),
-        AuthButton('Send reset link', icon: Icons.send_rounded, onPressed: _send),
+        AuthButton('Send reset link', icon: Icons.send_rounded, loading: _busy, onPressed: _send),
       ]),
     );
   }
@@ -627,44 +700,61 @@ class _ForgotScreenState extends State<ForgotScreen> {
 
 // ============ Reset password ============
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({super.key});
+  final String? devToken;
+  const ResetPasswordScreen({super.key, this.devToken});
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  late final _token = TextEditingController(text: widget.devToken ?? '');
   final _pass = TextEditingController();
   final _confirm = TextEditingController();
-  String? _passErr, _confirmErr;
+  String? _tokenErr, _passErr, _confirmErr;
+  bool _busy = false;
+
   @override
   void dispose() {
+    _token.dispose();
     _pass.dispose();
     _confirm.dispose();
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     setState(() {
-      _passErr = _pass.text.length < 6 ? 'Use at least 6 characters' : null;
+      _tokenErr = _token.text.trim().length < 20 ? 'Paste the code from the email' : null;
+      _passErr = _pass.text.length < 8 ? 'Use at least 8 characters' : null;
       _confirmErr = _confirm.text != _pass.text ? 'Passwords do not match' : null;
     });
-    if (_passErr != null || _confirmErr != null) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
-    Navigator.popUntil(context, (r) => r.isFirst);
+    if (_tokenErr != null || _passErr != null || _confirmErr != null) return;
+    setState(() => _busy = true);
+    try {
+      await RealtimeStore.instance.resetPassword(_token.text.trim(), _pass.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+      Navigator.popUntil(context, (r) => r.isFirst);
+    } catch (e) {
+      if (mounted) setState(() => _tokenErr = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return _AuthPage(
       title: 'Set a new password',
-      subtitle: 'Choose a strong password you have not used before',
+      subtitle: 'Paste the code from the email, then choose a new password',
       showBack: true,
       form: Column(children: [
-        _GlassField(label: 'New password', hint: 'Create a password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr),
+        KeyedSubtree(key: const ValueKey('reset-token'), child: _GlassField(label: 'Reset code', hint: 'From the link in your email', icon: Icons.key_rounded, controller: _token, error: _tokenErr)),
         const SizedBox(height: 14),
-        _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr),
+        KeyedSubtree(key: const ValueKey('reset-password'), child: _GlassField(label: 'New password', hint: 'At least 8 characters', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass, error: _passErr)),
+        const SizedBox(height: 14),
+        KeyedSubtree(key: const ValueKey('reset-confirm'), child: _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr)),
         const SizedBox(height: 20),
-        AuthButton('Save new password', icon: Icons.check_rounded, onPressed: _save),
+        AuthButton('Save new password', icon: Icons.check_rounded, loading: _busy, onPressed: _save),
       ]),
     );
   }

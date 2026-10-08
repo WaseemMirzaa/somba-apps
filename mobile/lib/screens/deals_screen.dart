@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common.dart';
 import '../widgets/product_card.dart';
+import '../services/realtime_store.dart';
 import 'product_detail_screen.dart';
 
 class DealsScreen extends StatefulWidget {
@@ -19,6 +18,10 @@ class DealsScreen extends StatefulWidget {
 class _DealsScreenState extends State<DealsScreen> {
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) => _scaffold(context));
+  }
+
+  Widget _scaffold(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
     final deals = [...liveCatalog().where((p) => p.discount >= 15)]
@@ -34,7 +37,7 @@ class _DealsScreenState extends State<DealsScreen> {
             automaticallyImplyLeading: false,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              title: Text(s.flashSale,
+              title: Text(s.deals,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
               background: Container(
                 decoration: const BoxDecoration(gradient: AppColors.dealGradient),
@@ -45,25 +48,6 @@ class _DealsScreenState extends State<DealsScreen> {
                       top: -10,
                       child: Icon(Icons.local_fire_department_rounded,
                           size: 180, color: Colors.white.withValues(alpha: 0.15)),
-                    ),
-                    Positioned(
-                      left: 20,
-                      bottom: 52,
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text('${s.endsIn} ',
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                          ),
-                          const SizedBox(width: 8),
-                          const Countdown(boxColor: Colors.white),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -83,7 +67,6 @@ class _DealsScreenState extends State<DealsScreen> {
                 (_, i) => ProductCard(
                   product: deals[i],
                   lang: lang,
-                  soldPercent: 60 + (deals[i].id * 13) % 38,
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => ProductDetailScreen(product: deals[i], locale: widget.locale))),
                   onAdd: () {

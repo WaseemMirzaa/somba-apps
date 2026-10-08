@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
-import '../data/shop_state.dart';
+import '../data/catalog_models.dart';
+import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import 'common.dart';
@@ -34,8 +34,6 @@ class _ProductCardState extends State<ProductCard> {
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    final shop = ShopState.instance;
-    final wished = shop.wishlist.contains(p.id);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -71,18 +69,17 @@ class _ProductCardState extends State<ProductCard> {
                     Positioned(
                       top: 6,
                       right: 6,
-                      child: CircleIconButton(
-                        icon: wished
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: wished ? AppColors.accent : AppColors.muted,
-                        background: Colors.white.withValues(alpha: 0.9),
-                        onTap: () {
-                          setState(() {
-                            wished
-                                ? shop.wishlist.remove(p.id)
-                                : shop.wishlist.add(p.id);
-                          });
+                      // The wishlist lives on the server and is pushed live.
+                      child: ListenableBuilder(
+                        listenable: RealtimeStore.instance,
+                        builder: (_, __) {
+                          final wished = RealtimeStore.instance.wishlistIds.contains(p.uuid);
+                          return CircleIconButton(
+                            icon: wished ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: wished ? AppColors.accent : AppColors.muted,
+                            background: Colors.white.withValues(alpha: 0.9),
+                            onTap: () => RealtimeStore.instance.toggleWishlist(p.uuid),
+                          );
                         },
                       ),
                     ),

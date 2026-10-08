@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
+import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
-import '../../data/catalog_meta.dart';
+import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_card.dart';
 import 'browse.dart';
@@ -33,11 +33,15 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) => _scaffold(context));
+  }
+
+  Widget _scaffold(BuildContext context) {
     final lang = widget.locale.languageCode;
     _q.text = _ctrl.text;
     final results = runQuery(liveCatalog(), _q);
     final t = _ctrl.text.trim().toLowerCase();
-    final stores = allSellers.where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
+    final stores = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -173,21 +177,17 @@ class _SearchScreenState extends State<SearchScreen> {
       itemBuilder: (_, i) {
         final s = stores[i];
         return GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, seller: s))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name))),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18), boxShadow: AppShadow.card),
             child: Row(children: [
-              CircleAvatar(radius: 24, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(s.name[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 18))),
+              CircleAvatar(radius: 24, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(s.name[0].toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 18))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                 const SizedBox(height: 2),
-                Row(children: [
-                  const Icon(Icons.star_rounded, size: 14, color: AppColors.amber),
-                  const SizedBox(width: 3),
-                  Text('${s.rating} · ${s.badge.label}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                ]),
+                Text('${s.productCount} product${s.productCount == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
               ])),
               const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
             ]),

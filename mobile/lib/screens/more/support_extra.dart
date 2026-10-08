@@ -1,154 +1,221 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 
-class AddressFormScreen extends StatelessWidget {
+/// Add a delivery address (saved on the server, encrypted at rest).
+class AddressFormScreen extends StatefulWidget {
   final Locale locale;
-  final String? label;
-  final String? name;
-  final String? phone;
-  final String? address;
-  final String? city;
-  final String? zone;
-  const AddressFormScreen({
-    super.key,
-    this.locale = const Locale('en'),
-    this.label,
-    this.name,
-    this.phone,
-    this.address,
-    this.city,
-    this.zone,
-  });
+  const AddressFormScreen({super.key, this.locale = const Locale('en')});
+  @override
+  State<AddressFormScreen> createState() => _AddressFormScreenState();
+}
+
+class _AddressFormScreenState extends State<AddressFormScreen> {
+  final _label = TextEditingController(text: 'Home');
+  final _phone = TextEditingController();
+  final _line1 = TextEditingController();
+  final _commune = TextEditingController();
+  final _city = TextEditingController(text: 'Kinshasa');
+  bool _default = false;
+  bool _busy = false;
+  String? _lineErr, _cityErr;
+
+  @override
+  void dispose() {
+    for (final c in [_label, _phone, _line1, _commune, _city]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _lineErr = _line1.text.trim().isEmpty ? 'Enter the street address' : null;
+      _cityErr = _city.text.trim().isEmpty ? 'Enter the city' : null;
+    });
+    if (_lineErr != null || _cityErr != null) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await RealtimeStore.instance.addAddress({
+        'label': _label.text.trim().isEmpty ? 'Home' : _label.text.trim(),
+        'line1': _line1.text.trim(),
+        if (_commune.text.trim().isNotEmpty) 'commune': _commune.text.trim(),
+        'city': _city.text.trim(),
+        if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
+        if (_default) 'isDefault': true,
+      });
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Address saved')));
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final editing = label != null;
     return Scaffold(
-      appBar: backAppBar(context, editing ? 'Edit address' : 'Add address'),
+      appBar: backAppBar(context, 'Add address'),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
-        AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded, initial: label),
+        AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded, controller: _label),
         const SizedBox(height: 16),
-        AppField(label: 'Full name', hint: 'Marie Dubois', icon: Icons.person_outline_rounded, initial: name),
+        AppField(label: 'Phone (for the rider)', hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone),
         const SizedBox(height: 16),
-        AppField(label: 'Phone', hint: '+243 970 000 000', icon: Icons.phone_outlined, keyboard: TextInputType.phone, initial: phone),
-        const SizedBox(height: 16),
-        AppField(label: 'Address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined, initial: address),
+        AppField(label: 'Street address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined, controller: _line1, error: _lineErr),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: AppField(label: 'City', hint: 'Kinshasa', initial: city)),
+          Expanded(child: AppField(label: 'Commune', hint: 'Gombe', controller: _commune)),
           const SizedBox(width: 12),
-          Expanded(child: AppField(label: 'Zone', hint: 'Gombe', initial: zone)),
+          Expanded(child: AppField(label: 'City', hint: 'Kinshasa', controller: _city, error: _cityErr)),
         ]),
         const SizedBox(height: 16),
-        const Row(children: [
-          Icon(Icons.check_box_rounded, color: AppColors.primary, size: 22),
-          SizedBox(width: 8),
-          Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-        ]),
-        const SizedBox(height: 20),
-        PrimaryButton(editing ? 'Update address' : 'Save address',
-            icon: Icons.save_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(editing ? 'Address updated' : 'Address saved')));
-              Navigator.maybePop(context);
-            }),
-      ]),
-    );
-  }
-}
-
-class ReferScreen extends StatelessWidget {
-  final Locale locale;
-  const ReferScreen({super.key, this.locale = const Locale('en')});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: backAppBar(context, 'Refer & Earn'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(24), boxShadow: AppShadow.soft),
-          child: Column(children: [
-            const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 44),
-            const SizedBox(height: 12),
-            const Text('Give \$5, get \$5', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans')),
-            const SizedBox(height: 6),
-            Text('Invite friends — you both earn \$5 in store credit on their first order.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
-          ]),
-        ),
-        const SizedBox(height: 18),
-        const Text('Your referral code', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.primary, width: 1.4)),
-          child: Row(children: [
-            const Icon(Icons.confirmation_number_rounded, color: AppColors.primary),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('MARIE-5X9K', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: 1))),
-            TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(const ClipboardData(text: 'MARIE-5X9K'));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied')));
-              },
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy'),
-            ),
-          ]),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _default,
+          onChanged: (v) => setState(() => _default = v ?? false),
+          title: const Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
         ),
         const SizedBox(height: 12),
-        PrimaryButton('Share invite link',
-            icon: Icons.share_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sharing your invite link…')))),
-        const SectionHeader('Your rewards', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
-        Panel(child: Row(children: [
-          _stat('7', 'Friends joined'), _div(), _stat('\$35', 'Earned'), _div(), _stat('3', 'Pending'),
-        ])),
+        FilledButton(
+          key: const ValueKey('save-address'),
+          onPressed: _busy ? null : _save,
+          child: Text(_busy ? '…' : 'Save address'),
+        ),
       ]),
     );
   }
-
-  Widget _stat(String v, String l) => Expanded(child: Column(children: [
-        Text(v, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary)),
-        const SizedBox(height: 2),
-        Text(l, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-      ]));
-  Widget _div() => Container(width: 1, height: 30, color: AppColors.line);
 }
 
-class SupportListScreen extends StatelessWidget {
+/// A support ticket as returned by `support:list` (messages is a JSON array).
+class TicketView {
+  final String id;
+  final String reference;
+  final String subject;
+  final String status;
+  final List<({String from, String role, String text})> messages;
+
+  TicketView({required this.id, required this.reference, required this.subject, required this.status, required this.messages});
+
+  factory TicketView.fromJson(Map<String, dynamic> j) {
+    List<dynamic> raw = const [];
+    try {
+      raw = jsonDecode((j['messages'] as String?) ?? '[]') as List;
+    } catch (_) {}
+    return TicketView(
+      id: j['id'] as String,
+      reference: j['reference'] as String? ?? '',
+      subject: j['subject'] as String? ?? '',
+      status: j['status'] as String? ?? 'open',
+      messages: raw
+          .map((m) => (from: (m['from'] ?? '').toString(), role: (m['role'] ?? '').toString(), text: (m['text'] ?? '').toString()))
+          .toList(),
+    );
+  }
+
+  Color get color => switch (status) {
+        'resolved' || 'closed' => AppColors.success,
+        'pending' => AppColors.primary,
+        _ => AppColors.amber,
+      };
+  String get label => switch (status) { 'pending' => 'In progress', 'resolved' => 'Resolved', 'closed' => 'Closed', _ => 'Open' };
+}
+
+class SupportListScreen extends StatefulWidget {
   final Locale locale;
   const SupportListScreen({super.key, this.locale = const Locale('en')});
   @override
+  State<SupportListScreen> createState() => _SupportListScreenState();
+}
+
+class _SupportListScreenState extends State<SupportListScreen> {
+  late Future<List<TicketView>> _future = _load();
+
+  Future<List<TicketView>> _load() async => ((await RealtimeStore.instance.call('support:list')) as List)
+      .map((e) => TicketView.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))
+      .toList();
+
+  Future<void> _newTicket() async {
+    final subject = TextEditingController();
+    final message = TextEditingController();
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('New support ticket', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          const SizedBox(height: 12),
+          TextField(key: const ValueKey('ticket-subject'), controller: subject, decoration: const InputDecoration(labelText: 'Subject')),
+          const SizedBox(height: 10),
+          TextField(key: const ValueKey('ticket-message'), controller: message, maxLines: 4, decoration: const InputDecoration(labelText: 'How can we help?')),
+          const SizedBox(height: 14),
+          FilledButton(
+            key: const ValueKey('ticket-submit'),
+            onPressed: () async {
+              final nav = Navigator.of(ctx);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await RealtimeStore.instance.call('support:open', {'subject': subject.text, 'message': message.text});
+                nav.pop(true);
+              } catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ]),
+      ),
+    );
+    if (created == true && mounted) setState(() => _future = _load());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const tickets = [
-      ('TKT-3391', 'Refund not received', 'Open', AppColors.amber),
-      ('TKT-3382', 'Wrong item delivered', 'In progress', AppColors.primary),
-      ('TKT-3360', 'Change delivery address', 'Resolved', AppColors.success),
-    ];
     return Scaffold(
       appBar: backAppBar(context, 'Support'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        ...tickets.map((t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(id: t.$1, subject: t.$2, status: t.$3, statusColor: t.$4))),
-          child: Panel(
-          child: Row(children: [
-            Container(height: 44, width: 44, decoration: BoxDecoration(color: t.$4.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.confirmation_number_outlined, color: t.$4)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(t.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              Text(t.$1, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            ])),
-            Pill(t.$3, color: t.$4.withValues(alpha: 0.14), textColor: t.$4, fontSize: 10.5),
-          ]),
-        )))),
-        const SizedBox(height: 4),
-        PrimaryButton('New ticket',
-            icon: Icons.add_rounded,
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening a new support ticket…')))),
-      ]),
+      body: FutureBuilder<List<TicketView>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError) return Center(child: Text('${snap.error}', style: const TextStyle(color: AppColors.muted)));
+          final tickets = snap.data ?? const <TicketView>[];
+          return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+            if (tickets.isEmpty) const Panel(child: Text('No tickets yet. Need help? Open one below.', style: TextStyle(color: AppColors.muted))),
+            ...tickets.map((t) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticket: t)));
+                    if (mounted) setState(() => _future = _load());
+                  },
+                  child: Panel(
+                    child: Row(children: [
+                      Container(
+                          height: 44,
+                          width: 44,
+                          decoration: BoxDecoration(color: t.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                          child: Icon(Icons.confirmation_number_outlined, color: t.color)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(t.subject, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Text(t.reference, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                      ])),
+                      Pill(t.label, color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
+                    ]),
+                  ),
+                ))),
+            const SizedBox(height: 4),
+            PrimaryButton('New ticket', icon: Icons.add_rounded, onPressed: _newTicket),
+          ]);
+        },
+      ),
     );
   }
 }
@@ -159,33 +226,35 @@ class HelpScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const faqs = [
-      'How do I track my order?',
-      'What are the delivery fees?',
-      'How do returns and refunds work?',
-      'Which payment methods are accepted?',
-      'How do I contact a seller?',
+      ('How do I track my order?', 'Open Account → My Orders and tap the order. Its status updates live, and once a rider is on the way you can see the live position.'),
+      ('Which payment methods are accepted?', 'Airtel Money, Orange Money and Vodacom M-Pesa, or your Somba&Teka wallet. You approve mobile-money payments on your phone.'),
+      ('What are the delivery fees?', 'The fee depends on your delivery zone and is shown at checkout before you pay.'),
+      ('What if my payment is not approved?', 'The order is cancelled automatically and the items are released. Nothing is charged; you can simply try again.'),
+      ('How do I contact support?', 'Open Account → Support and create a ticket. Replies appear there and as notifications.'),
     ];
     return Scaffold(
       appBar: backAppBar(context, 'Help & support'),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        Row(children: [
-          Expanded(child: _contact(Icons.chat_bubble_rounded, 'Live chat', AppColors.primary)),
-          const SizedBox(width: 12),
-          Expanded(child: _contact(Icons.call_rounded, 'Call us', AppColors.success)),
-          const SizedBox(width: 12),
-          Expanded(child: _contact(Icons.mail_rounded, 'Email', AppColors.royalBlue)),
-        ]),
+        PrimaryButton('Contact support',
+            icon: Icons.support_agent_rounded,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
         const SectionHeader('FAQs', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
-        Panel(padding: EdgeInsets.zero, child: Column(children: [
-          for (int i = 0; i < faqs.length; i++) ...[
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              title: Text(faqs[i], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-              trailing: const Icon(Icons.expand_more_rounded, color: AppColors.faint),
-            ),
-            if (i != faqs.length - 1) const Divider(height: 1),
-          ],
-        ])),
+        Panel(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              for (int i = 0; i < faqs.length; i++) ...[
+                ExpansionTile(
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(faqs[i].$1, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  children: [Text(faqs[i].$2, style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.4))],
+                ),
+                if (i != faqs.length - 1) const Divider(height: 1),
+              ],
+            ])),
         const SizedBox(height: 16),
         TextButton.icon(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen())),
@@ -196,20 +265,52 @@ class HelpScreen extends StatelessWidget {
       ]),
     );
   }
-
-  Widget _contact(IconData icon, String label, Color c) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18), boxShadow: AppShadow.card),
-        child: Column(children: [
-          Container(height: 44, width: 44, decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: c)),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
-        ]),
-      );
 }
 
-class AccountDeleteScreen extends StatelessWidget {
-  const AccountDeleteScreen({super.key});
+/// Permanently erases the account (the server checks the password).
+class AccountDeleteScreen extends StatefulWidget {
+  /// Called after the account is deleted (returns the app to sign-in).
+  final VoidCallback? onDeleted;
+  const AccountDeleteScreen({super.key, this.onDeleted});
+  @override
+  State<AccountDeleteScreen> createState() => _AccountDeleteScreenState();
+}
+
+class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
+  final _pw = TextEditingController();
+  bool _busy = false;
+  String? _err;
+
+  @override
+  void dispose() {
+    _pw.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    if (_pw.text.isEmpty) {
+      setState(() => _err = 'Enter your password to confirm');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _err = null;
+    });
+    try {
+      await RealtimeStore.instance.deleteAccount(_pw.text);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      widget.onDeleted?.call();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _err = e.toString();
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -218,31 +319,35 @@ class AccountDeleteScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-          child: Column(children: const [
+          child: const Column(children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.accentDark, size: 40),
             SizedBox(height: 10),
             Text('This action is permanent', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
             SizedBox(height: 6),
-            Text('Deleting your account removes your orders, coupons, wishlist and addresses. This cannot be undone.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
+            Text('Your personal data, addresses and wishlist are erased and you are signed out everywhere. Past orders are kept for accounting without your details.',
+                textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
           ]),
         ),
         const SizedBox(height: 16),
-        Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-          Text("Before you go", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        const Panel(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Before you go', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           SizedBox(height: 10),
-          _Bullet('Any unused coupons will be forfeited'),
-          _Bullet('Active orders must be completed or cancelled'),
+          _Bullet('Any wallet balance is forfeited — spend it first'),
+          _Bullet('Active orders should be completed or cancelled'),
           _Bullet('You can create a new account anytime'),
         ])),
+        const SizedBox(height: 16),
+        AppField(label: 'Confirm with your password', obscure: true, icon: Icons.lock_outline_rounded, controller: _pw, error: _err),
         const SizedBox(height: 20),
-        SizedBox(width: double.infinity, child: FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deletion requested')));
-            Navigator.maybePop(context);
-          },
-          child: const Text('Permanently delete account'),
-        )),
+        SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: const ValueKey('delete-account'),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
+              onPressed: _busy ? null : _delete,
+              child: Text(_busy ? '…' : 'Permanently delete account'),
+            )),
         const SizedBox(height: 10),
         SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: const Text('Keep my account'))),
       ]),
@@ -250,31 +355,18 @@ class AccountDeleteScreen extends StatelessWidget {
   }
 }
 
-// CF-35 — Support ticket detail (conversation thread + reply).
+// Support ticket conversation (loaded from the server; replies are sent live).
 class SupportTicketDetailScreen extends StatefulWidget {
-  final String id;
-  final String subject;
-  final String status;
-  final Color statusColor;
-  const SupportTicketDetailScreen({super.key, required this.id, required this.subject, required this.status, required this.statusColor});
+  final TicketView ticket;
+  const SupportTicketDetailScreen({super.key, required this.ticket});
   @override
   State<SupportTicketDetailScreen> createState() => _SupportTicketDetailScreenState();
 }
 
 class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   final _ctrl = TextEditingController();
-  final List<(String, bool)> _msgs = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _msgs.addAll([
-      ('Hi, I need help with this order.', true),
-      ('Thanks for reaching out! Could you share the order number so we can look into it?', false),
-      ('It is order SMB-2026-4821.', true),
-      ('Got it — our team is reviewing it now and will update you shortly.', false),
-    ]);
-  }
+  late TicketView _t = widget.ticket;
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -282,37 +374,43 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
     super.dispose();
   }
 
-  void _send() {
-    final t = _ctrl.text.trim();
-    if (t.isEmpty) return;
-    setState(() {
-      _msgs.add((t, true));
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      final res = await RealtimeStore.instance.call('support:reply', {'id': _t.id, 'text': text});
+      _t = TicketView.fromJson((res as Map).map((k, v) => MapEntry(k.toString(), v)));
       _ctrl.clear();
-    });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: backAppBar(context, widget.id),
+      appBar: backAppBar(context, _t.reference),
       body: Column(children: [
         Container(
           width: double.infinity,
           color: AppColors.surface,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
           child: Row(children: [
-            Expanded(child: Text(widget.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-            Pill(widget.status, color: widget.statusColor.withValues(alpha: 0.14), textColor: widget.statusColor, fontSize: 10.5),
+            Expanded(child: Text(_t.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+            Pill(_t.label, color: _t.color.withValues(alpha: 0.14), textColor: _t.color, fontSize: 10.5),
           ]),
         ),
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            itemCount: _msgs.length,
+            itemCount: _t.messages.length,
             itemBuilder: (_, i) {
-              final m = _msgs[i];
-              final mine = m.$2;
+              final m = _t.messages[i];
+              final mine = !m.role.startsWith('admin');
               return Align(
                 alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
@@ -329,8 +427,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                     ),
                     boxShadow: mine ? null : AppShadow.card,
                   ),
-                  child: Text(m.$1,
-                      style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+                  child: Text(m.text, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
                 ),
               );
             },
@@ -350,8 +447,6 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                     filled: true,
                     fillColor: AppColors.surface,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
                   ),
                 ),
@@ -362,7 +457,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                 shape: const CircleBorder(),
                 child: InkWell(
                   customBorder: const CircleBorder(),
-                  onTap: _send,
+                  onTap: _sending ? null : _send,
                   child: const Padding(padding: EdgeInsets.all(13), child: Icon(Icons.send_rounded, color: Colors.white, size: 22)),
                 ),
               ),

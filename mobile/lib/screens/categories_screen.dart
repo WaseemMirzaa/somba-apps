@@ -1,7 +1,7 @@
 import '../data/catalog_live.dart';
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
-import '../data/catalog_meta.dart';
+import '../data/catalog_models.dart';
+import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_image.dart';
@@ -27,16 +27,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   void _openCategory(String name) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: name)));
-  void _openStore(Seller s) => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, seller: s)));
+  void _openStore(Seller s) => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name)));
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) => _scaffold(context));
+  }
+
+  Widget _scaffold(BuildContext context) {
     final s = Strings(widget.locale.languageCode);
     final lang = widget.locale.languageCode;
     final t = _ctrl.text.trim().toLowerCase();
     final searching = t.isNotEmpty;
-    final cats = categories.where((c) => !searching || c.name.toLowerCase().contains(t) || c.nameFr.toLowerCase().contains(t)).toList();
-    final stores = allSellers.where((x) => !searching || x.name.toLowerCase().contains(t)).toList();
+    final cats = liveCategories().where((c) => !searching || c.name.toLowerCase().contains(t) || c.nameFr.toLowerCase().contains(t)).toList();
+    final stores = liveSellers().where((x) => !searching || x.name.toLowerCase().contains(t)).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(s.categories)),
@@ -147,11 +151,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), boxShadow: AppShadow.card),
             child: Row(children: [
-              CircleAvatar(radius: 22, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(x.name[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800))),
+              CircleAvatar(radius: 22, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(x.name[0].toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800))),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(x.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                Text('${x.rating}★ · ${x.badge.label}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                Text('${x.productCount} product${x.productCount == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
               ])),
               const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
             ]),

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
+import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
-import '../../data/catalog_meta.dart';
-import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
+import '../../services/realtime_store.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import 'shop_extra.dart';
@@ -13,7 +12,10 @@ class ProductQuery {
   String text;
   int sort; // 0 relevance · 1 price↑ · 2 price↓ · 3 rating · 4 discount
   String? category; // null = all
-  double minPrice, maxPrice;
+  double minPrice;
+
+  /// Upper price bound; null = no cap (the slider ends at the dearest live listing).
+  double? maxPrice;
   double minRating; // 0 = any
   bool dealsOnly;
   ProductQuery({
@@ -21,7 +23,7 @@ class ProductQuery {
     this.sort = 0,
     this.category,
     this.minPrice = 0,
-    this.maxPrice = 800,
+    this.maxPrice,
     this.minRating = 0,
     this.dealsOnly = false,
   });
@@ -32,7 +34,7 @@ class ProductQuery {
   int get activeCount {
     var n = 0;
     if (category != null) n++;
-    if (minPrice > 0 || maxPrice < 800) n++;
+    if (minPrice > 0 || maxPrice != null) n++;
     if (minRating > 0) n++;
     if (dealsOnly) n++;
     if (sort != 0) n++;
@@ -51,7 +53,7 @@ List<Product> runQuery(List<Product> src, ProductQuery q) {
     return matchesText &&
         (q.category == null || p.category == q.category) &&
         p.price >= q.minPrice &&
-        p.price <= q.maxPrice &&
+        (q.maxPrice == null || p.price <= q.maxPrice!) &&
         p.rating >= q.minRating &&
         (!q.dealsOnly || p.discount >= 15);
   }).toList();
@@ -121,22 +123,22 @@ class _FilterSheetState extends State<_FilterSheet> {
               _label('Category'),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 _chip('All', q.category == null, () => setState(() => q.category = null)),
-                ...categories.map((c) => _chip(c.name, q.category == c.name, () => setState(() => q.category = c.name))),
+                ...liveCategories().map((c) => _chip(c.name, q.category == c.name, () => setState(() => q.category = c.name))),
               ]),
               const SizedBox(height: 20),
               Row(children: [
                 _label('Price range'),
                 const Spacer(),
-                Text('${money(q.minPrice)} – ${money(q.maxPrice)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
+                Text('${money(q.minPrice)} – ${money(q.maxPrice ?? liveMaxPrice())}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
               ]),
               RangeSlider(
-                values: RangeValues(q.minPrice, q.maxPrice),
-                min: 0, max: 800, divisions: 32,
+                values: RangeValues(q.minPrice, q.maxPrice ?? liveMaxPrice()),
+                min: 0, max: liveMaxPrice(), divisions: 32,
                 activeColor: AppColors.primary,
-                labels: RangeLabels(money(q.minPrice), money(q.maxPrice)),
+                labels: RangeLabels(money(q.minPrice), money(q.maxPrice ?? liveMaxPrice())),
                 onChanged: (v) => setState(() {
                   q.minPrice = v.start;
-                  q.maxPrice = v.end;
+                  q.maxPrice = v.end >= liveMaxPrice() ? null : v.end;
                 }),
               ),
               const SizedBox(height: 12),
@@ -191,7 +193,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       );
 }
 
-/// Searchable directory of sellers / businesses.
+/// Searchable directory of the stores that currently have live products.
 class SellersDirectoryScreen extends StatefulWidget {
   final Locale locale;
   final String? initialQuery;
@@ -211,119 +213,55 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = _ctrl.text.trim().toLowerCase();
-    final list = allSellers.where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
-    return Scaffold(
-      appBar: backAppBar(context, 'Stores & sellers'),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: _SearchField(controller: _ctrl, hint: 'Search stores or businesses…', onChanged: (_) => setState(() {})),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-          child: Align(alignment: Alignment.centerLeft, child: Text('${list.length} stores', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
-        ),
-        Expanded(
-          child: list.isEmpty
-              ? const Center(child: Text('No stores match your search', style: TextStyle(color: AppColors.muted)))
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _sellerTile(list[i]),
-                ),
-        ),
-      ]),
+    return ListenableBuilder(
+      listenable: RealtimeStore.instance,
+      builder: (context, _) {
+        final t = _ctrl.text.trim().toLowerCase();
+        final list = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
+        return Scaffold(
+          appBar: backAppBar(context, 'Stores & sellers'),
+          body: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: _SearchField(controller: _ctrl, hint: 'Search stores or businesses…', onChanged: (_) => setState(() {})),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: Align(alignment: Alignment.centerLeft, child: Text('${list.length} stores', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+            ),
+            Expanded(
+              child: list.isEmpty
+                  ? const Center(child: Text('No stores match your search', style: TextStyle(color: AppColors.muted)))
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => _sellerTile(list[i]),
+                    ),
+            ),
+          ]),
+        );
+      },
     );
   }
 
   Widget _sellerTile(Seller s) {
-    final gold = s.badge == SellerBadge.gold || s.badge == SellerBadge.sombaAssured;
-    final c = s.badge == SellerBadge.sombaAssured
-        ? AppColors.primary
-        : gold
-            ? AppColors.amber
-            : s.badge == SellerBadge.silver
-                ? AppColors.muted
-                : const Color(0xFFB45309);
     return Panel(
       padding: const EdgeInsets.all(12),
       child: Row(children: [
-        CircleAvatar(radius: 24, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(s.name[0], style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 18))),
+        CircleAvatar(radius: 24, backgroundColor: AppColors.primary.withValues(alpha: 0.12), child: Text(s.name[0].toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 18))),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const SizedBox(height: 2),
-          Row(children: [
-            const Icon(Icons.star_rounded, size: 14, color: AppColors.amber),
-            const SizedBox(width: 3),
-            Text('${s.rating} · ${(s.followers / 1000).toStringAsFixed(1)}k followers', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-          ]),
-          const SizedBox(height: 5),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
-            child: Text(s.badge.label, style: TextStyle(color: c, fontWeight: FontWeight.w700, fontSize: 10)),
-          ),
+          Text('${s.productCount} product${s.productCount == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
         ])),
         FilledButton(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, seller: s))),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name))),
           style: FilledButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 16)),
           child: const Text('Visit'),
         ),
-      ]),
-    );
-  }
-}
-
-/// Lets the customer change their delivery address / zone (mock).
-class AddressSelectScreen extends StatefulWidget {
-  final Locale locale;
-  const AddressSelectScreen({super.key, this.locale = const Locale('en')});
-  @override
-  State<AddressSelectScreen> createState() => _AddressSelectScreenState();
-}
-
-class _AddressSelectScreenState extends State<AddressSelectScreen> {
-  static const _addrs = [
-    ('Kinshasa, Gombe', '12 Commerce Ave, Gombe, Kinshasa', Icons.home_rounded),
-    ('Kinshasa, Limete', 'Tower B, Limete Industrial, Kinshasa', Icons.work_rounded),
-    ('Kinshasa, Ngaliema', '8 Av. des Écoles, Ngaliema, Kinshasa', Icons.location_city_rounded),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = ShopState.instance.selectedAddressLabel ?? _addrs.first.$1;
-    return Scaffold(
-      appBar: backAppBar(context, 'Deliver to'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        ..._addrs.map((a) {
-          final sel = a.$1 == selected;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: GestureDetector(
-              onTap: () {
-                ShopState.instance.selectedAddressLabel = a.$1;
-                Navigator.pop(context, true);
-              },
-              child: Panel(
-                child: Row(children: [
-                  Container(height: 44, width: 44, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(a.$3, color: AppColors.primary)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(a.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-                    const SizedBox(height: 2),
-                    Text(a.$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                  ])),
-                  Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel ? AppColors.primary : AppColors.faint),
-                ]),
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 4),
-        OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.add_location_alt_rounded, size: 20), label: const Text('Use current location')),
       ]),
     );
   }

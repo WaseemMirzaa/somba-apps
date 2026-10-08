@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../data/mock_data.dart';
+import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
+import '../../services/realtime_store.dart';
 import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -9,53 +10,70 @@ import '../../widgets/kit.dart';
 import '../../widgets/product_card.dart';
 import 'browse.dart';
 
-/// Coupons / promo codes available to the customer (mirrors admin promotions).
-class CouponsScreen extends StatelessWidget {
+/// Coupons / promo codes the admin has published (`promos:list`). The code is
+/// validated by the server in the cart and again when the order is placed.
+class CouponsScreen extends StatefulWidget {
   final Locale locale;
   const CouponsScreen({super.key, this.locale = const Locale('en')});
+  @override
+  State<CouponsScreen> createState() => _CouponsScreenState();
+}
+
+class _CouponsScreenState extends State<CouponsScreen> {
+  late final Future<List<Promo>> _future =
+      RealtimeStore.instance.listPromos().then((rows) => rows.where((r) => r['active'] != false).map(Promo.fromJson).toList());
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: backAppBar(context, 'Coupons'),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        ...promos.map((p) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Panel(
-                child: Row(children: [
-                  Container(
-                    height: 48, width: 48,
-                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
-                    child: const Icon(Icons.local_offer_rounded, color: AppColors.primary),
+      body: FutureBuilder<List<Promo>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          final promos = snap.data ?? const <Promo>[];
+          return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+            if (promos.isEmpty) const Panel(child: Text('No coupons available right now.', style: TextStyle(color: AppColors.muted))),
+            ...promos.map((p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Panel(
+                    child: Row(children: [
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
+                        child: const Icon(Icons.local_offer_rounded, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(p.code, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5)),
+                        const SizedBox(height: 2),
+                        Text(p.description, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        if (p.minOrderUsd > 0) Text('Min. order ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                      ])),
+                      TextButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: p.code));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p.code} copied')));
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 15),
+                        label: const Text('Copy'),
+                      ),
+                    ]),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(p.code, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5)),
-                    const SizedBox(height: 2),
-                    Text(p.description, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                    if (p.minOrderUsd > 0)
-                      Text('Min. order ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
-                  ])),
-                  TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: p.code));
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p.code} copied')));
-                    },
-                    icon: const Icon(Icons.copy_rounded, size: 15),
-                    label: const Text('Copy'),
-                  ),
-                ]),
-              ),
-            )),
-        const SizedBox(height: 4),
-        const Panel(
-          child: Row(children: [
-            Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
-            SizedBox(width: 10),
-            Expanded(child: Text('Apply a coupon code in your cart before checkout.',
-                style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
-          ]),
-        ),
-      ]),
+                )),
+            const SizedBox(height: 4),
+            const Panel(
+              child: Row(children: [
+                Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text('Apply a coupon code in your cart before checkout.', style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
+              ]),
+            ),
+          ]);
+        },
+      ),
     );
   }
 }
@@ -84,6 +102,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) => _scaffold(context));
+  }
+
+  Widget _scaffold(BuildContext context) {
     final lang = widget.locale.languageCode;
     _q.text = _ctrl.text;
     final items = runQuery(liveCatalog(), _q);
@@ -185,11 +207,28 @@ class ReviewComposeScreen extends StatefulWidget {
 class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
   int _rating = 5;
   final _ctrl = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final p = widget.product;
+    if (p == null) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await RealtimeStore.instance.addReview(p.uuid, _rating, _ctrl.text);
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Thanks for your review!')));
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
@@ -203,8 +242,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
             child: Row(children: [
               const Icon(Icons.inventory_2_rounded, color: AppColors.primary),
               const SizedBox(width: 12),
-              Expanded(child: Text(p.displayName(widget.locale.languageCode),
-                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+              Expanded(child: Text(p.displayName(widget.locale.languageCode), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
             ]),
           ),
         const SizedBox(height: 18),
@@ -221,47 +259,24 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           );
         })),
         const SizedBox(height: 20),
-        const Text('Add photos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-        const SizedBox(height: 10),
-        Row(children: [
-          _photoBox(),
-          const SizedBox(width: 10),
-          _photoBox(),
-        ]),
-        const SizedBox(height: 20),
         const Text('Your review', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         TextField(
+          key: const ValueKey('review-text'),
           controller: _ctrl,
           maxLines: 5,
           decoration: InputDecoration(
             hintText: 'Share what you liked or what could be better…',
             filled: true,
             fillColor: AppColors.surface,
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
           ),
         ),
+        const SizedBox(height: 8),
+        const Text('You can review a product once it has been delivered to you.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(height: 20),
-        PrimaryButton('Submit review',
-            icon: Icons.send_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted — pending moderation')));
-              Navigator.maybePop(context);
-            }),
+        PrimaryButton(_busy ? '…' : 'Submit review', icon: Icons.send_rounded, onPressed: _busy ? null : _submit),
       ]),
     );
   }
-
-  Widget _photoBox() => Container(
-        height: 72,
-        width: 72,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: const Icon(Icons.add_a_photo_rounded, color: AppColors.primary),
-      );
 }

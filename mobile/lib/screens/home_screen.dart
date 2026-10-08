@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../data/catalog_models.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../services/realtime_store.dart';
@@ -15,6 +15,7 @@ import 'categories_screen.dart';
 import 'more/search_screen.dart';
 import 'more/browse.dart';
 import 'more/catalog_extra.dart';
+import 'more/account_more.dart';
 
 class HomeScreen extends StatefulWidget {
   final Locale locale;
@@ -32,18 +33,22 @@ class _HomeScreenState extends State<HomeScreen> {
   int _feedTab = 0;
   Timer? _autoplay;
 
-  late final List<_Banner> _banners = [
-    _Banner(AppColors.brandGradient, Icons.auto_awesome_rounded),
-    _Banner(AppColors.dealGradient, Icons.local_fire_department_rounded),
-    _Banner(
-      const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)],
-      ),
-      Icons.local_shipping_rounded,
-    ),
+  static const _gradients = [
+    AppColors.brandGradient,
+    AppColors.dealGradient,
+    LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)]),
   ];
+  static const _icons = [Icons.auto_awesome_rounded, Icons.local_fire_department_rounded, Icons.local_shipping_rounded];
+
+  /// The admin's banners (CMS), or a single neutral welcome banner when none exist.
+  List<_Banner> _banners(Strings s) {
+    final cms = RealtimeStore.instance.banners;
+    if (cms.isEmpty) return [_Banner(_gradients[0], _icons[0], '', s.heroTitle, s.heroSubtitle)];
+    return [
+      for (var i = 0; i < cms.length; i++)
+        _Banner(_gradients[i % _gradients.length], _icons[i % _icons.length], '', cms[i].title, cms[i].body),
+    ];
+  }
 
   @override
   void initState() {
@@ -52,7 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
     RealtimeStore.instance.addListener(_onStore);
     _autoplay = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_pageController.hasClients) return;
-      final next = (_page + 1) % _banners.length;
+      final count = RealtimeStore.instance.banners.isEmpty ? 1 : RealtimeStore.instance.banners.length;
+      if (count < 2) return;
+      final next = (_page + 1) % count;
       _pageController.animateToPage(next,
           duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
     });
@@ -90,8 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1: // Trending — most reviewed
         list.sort((a, b) => b.reviews.compareTo(a.reviews));
         break;
-      case 2: // New — newest ids first
-        list.sort((a, b) => b.id.compareTo(a.id));
+      case 2: // New — most recently listed
+        list.sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
         break;
       case 3: // Popular — highest rated
         list.sort((a, b) => b.rating.compareTo(a.rating));
@@ -117,8 +124,12 @@ class _HomeScreenState extends State<HomeScreen> {
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoriesScreen(locale: widget.locale)))),
         ),
         SliverToBoxAdapter(child: _categories(lang)),
-        SliverToBoxAdapter(child: _flashSaleStrip(s)),
-        SliverToBoxAdapter(child: _dealsRow(deals, lang)),
+        if (deals.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: SectionHeader(s.deals, actionLabel: s.seeAll, onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true)))),
+          ),
+          SliverToBoxAdapter(child: _dealsRow(deals, lang)),
+        ],
         SliverToBoxAdapter(
           child: SectionHeader(s.recommended, actionLabel: s.seeAll,
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, title: s.recommended)))),
@@ -148,6 +159,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// The delivery address chip: the chosen saved address, else the default one.
+  String _addressLabel() {
+    final list = RealtimeStore.instance.addresses;
+    if (list.isEmpty) return widget.locale.languageCode == 'fr' ? 'Ajouter une adresse' : 'Add an address';
+    final a = list.firstWhere((x) => x.id == ShopState.instance.selectedAddressId, orElse: () => list.firstWhere((x) => x.isDefault, orElse: () => list.first));
+    return [if ((a.commune ?? '').isNotEmpty) a.commune, a.city].join(', ');
+  }
+
   // ---- Header (gradient app bar with location + search) ----
   Widget _header(Strings s, String lang) {
     return SliverAppBar(
@@ -174,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () async {
-                      await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressSelectScreen(locale: widget.locale)));
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale, pickMode: true)));
                       if (mounted) setState(() {});
                     },
                     child: Column(
@@ -185,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
                       Row(
                         children: [
-                          Text(ShopState.instance.selectedAddressLabel ?? 'Kinshasa, Gombe',
+                          Text(_addressLabel(),
                               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
                           const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
                         ],
@@ -272,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---- Hero carousel ----
   Widget _heroCarousel(Strings s) {
+    final banners = _banners(s);
     return Column(
       children: [
         const SizedBox(height: 18),
@@ -279,10 +299,10 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 168,
           child: PageView.builder(
             controller: _pageController,
-            itemCount: _banners.length,
+            itemCount: banners.length,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (_, i) {
-              final b = _banners[i];
+              final b = banners[i];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Container(
@@ -304,25 +324,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.22),
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Text(
-                                i == 1 ? '${s.flashSale} · -30%' : (i == 2 ? s.freeDelivery : s.prototype),
-                                style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
                             Text(
-                              s.heroTitle,
+                              b.title,
                               style: const TextStyle(
                                   color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: -0.5),
                             ),
                             const SizedBox(height: 6),
-                            Text(s.heroSubtitle,
+                            Text(b.body,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
                           ],
                         ),
@@ -338,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
-            _banners.length,
+            banners.length,
             (i) => AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -360,8 +370,8 @@ class _HomeScreenState extends State<HomeScreen> {
     void go(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     final items = [
       (Icons.bolt_rounded, s.deals, AppColors.accent, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
-      (Icons.local_shipping_rounded, s.freeDelivery, AppColors.mint, () => go(ProductListScreen(locale: widget.locale, title: s.freeDelivery))),
-      (Icons.verified_rounded, s.inStock, AppColors.primary, () => go(ProductListScreen(locale: widget.locale, title: s.inStock))),
+      (Icons.storefront_rounded, s.isFr ? 'Boutiques' : 'Stores', AppColors.mint, () => go(SellersDirectoryScreen(locale: widget.locale))),
+      (Icons.favorite_rounded, s.wishlist, AppColors.primary, () => go(WishlistScreen(locale: widget.locale))),
       (Icons.percent_rounded, 'Coupons', AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
     ];
     return Padding(
@@ -442,15 +452,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---- Categories row ----
   Widget _categories(String lang) {
+    final cats = liveCategories();
     return SizedBox(
       height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length,
+        itemCount: cats.length,
         separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (_, i) {
-          final cat = categories[i];
+          final cat = cats[i];
           final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -475,31 +486,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  // ---- Flash sale strip ----
-  Widget _flashSaleStrip(Strings s) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 24, 16, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        gradient: AppColors.dealGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadow.card,
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.bolt_rounded, color: Colors.white, size: 24),
-          const SizedBox(width: 8),
-          Text(s.flashSale,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16.5)),
-          const Spacer(),
-          Text('${s.endsIn}  ',
-              style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w500)),
-          const Countdown(),
-        ],
       ),
     );
   }
@@ -529,5 +515,8 @@ class _HomeScreenState extends State<HomeScreen> {
 class _Banner {
   final Gradient gradient;
   final IconData icon;
-  _Banner(this.gradient, this.icon);
+  final String tag;
+  final String title;
+  final String body;
+  _Banner(this.gradient, this.icon, this.tag, this.title, this.body);
 }
