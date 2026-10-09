@@ -1,0 +1,2896 @@
+<title>Somba&amp;Teka User Flows</title>
+<meta name="description" content="Every user, app, screen, option and flow of the Somba&amp;Teka marketplace, with flowcharts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+/* Layout: technical reference — sticky contents rail on the left, one reading column on the right;
+   wide tables and diagrams scroll inside their own frames. Palette follows the brand's royal blue. */
+:root {
+  --paper: #f6f7fb;
+  --sheet: #ffffff;
+  --ink: #111a33;
+  --muted: #59637d;
+  --line: #dde2ee;
+  --accent: #1a3aa8;
+  --accent-soft: #e7ecfb;
+  --code-bg: #eef1f8;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --step--1: 0.84rem;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.55rem;
+  --step-3: 2.1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0b1020; --sheet: #10172c; --ink: #e3e8f5; --muted: #9aa5c2; --line: #243052;
+    --accent: #93a9ff; --accent-soft: #1a2552; --code-bg: #151d38; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0b1020; --sheet: #10172c; --ink: #e3e8f5; --muted: #9aa5c2; --line: #243052;
+  --accent: #93a9ff; --accent-soft: #1a2552; --code-bg: #151d38; color-scheme: dark;
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: var(--step-0); line-height: 1.6;
+  padding-inline: 16px; padding-block: 0;
+}
+.shell { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 2.5rem; max-width: 84rem; margin: 0 auto; }
+.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); align-self: start;
+  max-height: 100vh; overflow-y: auto; padding-block: 2rem; font-size: 0.9rem;
+}
+.rail .brand { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; margin-bottom: 0.25rem; }
+.rail .sub { color: var(--muted); font-size: var(--step--1); margin-bottom: 1.25rem; }
+.rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+.rail ol ol { padding-left: 0.85rem; margin-block: 0.2rem 0.4rem; border-left: 1px solid var(--line); }
+.rail a { color: var(--muted); text-decoration: none; display: block; padding: 0.18rem 0.5rem; border-radius: 4px; }
+.rail > nav > ol > li > a { color: var(--ink); font-weight: 600; }
+.rail a:hover { color: var(--accent); }
+.rail a.active { background: var(--accent-soft); color: var(--accent); }
+.rail details summary { display: none; }
+main { min-width: 0; padding-block: 2.5rem 5rem; }
+main > * { max-width: 62rem; }
+p, li { max-width: 72ch; }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; letter-spacing: -0.01em; position: relative; }
+h1 { font-size: var(--step-3); font-weight: 700; margin: 0 0 1.25rem; }
+h1 + .table-wrap { margin-bottom: 0; }
+h2 { font-size: var(--step-2); font-weight: 700; margin: 3.5rem 0 1rem; padding-top: 1.25rem; border-top: 2px solid var(--ink); }
+h3 { font-size: var(--step-1); font-weight: 600; margin: 2.25rem 0 0.75rem; }
+h4 { font-size: 1.02rem; font-weight: 600; margin: 1.75rem 0 0.5rem; }
+h4 + p em, h4 + p { color: var(--muted); font-size: var(--step--1); }
+.anchor { position: absolute; left: -1.1em; color: var(--line); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+hr { border: 0; height: 0; margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.84em; background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; overflow-wrap: anywhere; }
+pre.code { background: var(--code-bg); padding: 1rem; overflow-x: auto; border-radius: 6px; }
+pre.code code { background: none; padding: 0; }
+strong { font-weight: 700; }
+.table-wrap { overflow-x: auto; margin: 1rem 0 1.5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--sheet); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--line); }
+th { font-family: var(--font-display); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--code-bg); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td code { white-space: normal; }
+td:first-child code { white-space: nowrap; }
+.st { display: inline-block; min-width: 1.4em; }
+.diagram { overflow-x: auto; margin: 1rem 0 1.75rem; padding: 1rem; background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; }
+.diagram pre.mermaid { margin: 0; background: none; font-family: var(--font-mono); font-size: 0.8rem; }
+blockquote { margin: 1rem 0; padding: 0.5rem 1rem; border-left: 3px solid var(--accent); background: var(--accent-soft); }
+ul, ol { padding-left: 1.4rem; }
+main li { margin-block: 0.2rem; }
+@media (max-width: 960px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .rail { position: static; max-height: none; padding-block: 1rem 0; }
+  .rail details { border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 0.75rem; background: var(--sheet); }
+  .rail details summary { display: block; cursor: pointer; font-weight: 600; }
+  .rail details[open] summary { margin-bottom: 0.75rem; }
+  main { padding-block: 1.5rem 4rem; }
+  .anchor { display: none; }
+}
+@media (min-width: 961px) { .rail details > nav { display: block; } }
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">Somba&amp;Teka</div>
+    <div class="sub">Users, apps &amp; flows · Oct 2026</div>
+    <details id="toc" open>
+      <summary>Contents</summary>
+      <nav aria-label="Contents"><ol><li><a href="#1-users-and-the-apps-they-use">1. Users and the apps they use</a></li><li><a href="#2-how-the-apps-talk-to-the-backend">2. How the apps talk to the backend</a><ol><li><a href="#21-one-connection-request--answer-live-pushes">2.1 One connection, request → answer, live pushes</a></li><li><a href="#22-session-lifecycle-in-the-mobile-apps">2.2 Session lifecycle in the mobile apps</a></li><li><a href="#23-how-a-notification-reaches-a-user">2.3 How a notification reaches a user</a></li></ol></li><li><a href="#3-one-order-every-user--the-end-to-end-lifecycle">3. One order, every user — the end-to-end lifecycle</a></li><li><a href="#4-customer--mobile-app-flutter">4. Customer — mobile app (Flutter)</a><ol><li><a href="#41-navigation-map">4.1 Navigation map</a></li><li><a href="#42-every-screen-and-its-options">4.2 Every screen and its options</a></li><li><a href="#43-flowcharts">4.3 Flowcharts</a></li><li><a href="#44-gaps-found-in-the-customer-app">4.4 Gaps found in the customer app</a></li></ol></li><li><a href="#5-customer-and-visitor--web-shop-shop-and-public-pages">5. Customer and visitor — web shop (/shop) and public pages</a><ol><li><a href="#51-navigation">5.1 Navigation</a></li><li><a href="#52-sign-in-and-where-each-role-lands">5.2 Sign-in and where each role lands</a></li><li><a href="#53-every-page-and-its-options">5.3 Every page and its options</a></li><li><a href="#54-flowcharts">5.4 Flowcharts</a></li><li><a href="#55-gaps-in-the-web-shop">5.5 Gaps in the web shop</a></li></ol></li><li><a href="#6-seller--web-portal-seller">6. Seller — web portal (/seller)</a><ol><li><a href="#61-navigation-and-access">6.1 Navigation and access</a></li><li><a href="#62-every-page-and-its-options">6.2 Every page and its options</a></li><li><a href="#63-flowcharts">6.3 Flowcharts</a></li><li><a href="#64-gaps-in-the-seller-portal">6.4 Gaps in the seller portal</a></li></ol></li><li><a href="#7-admin--web-portal-admin-and-its-sub-roles">7. Admin — web portal (/admin) and its sub-roles</a><ol><li><a href="#71-who-sees-which-menu">7.1 Who sees which menu</a></li><li><a href="#72-every-page-and-its-options">7.2 Every page and its options</a></li><li><a href="#73-flowcharts">7.3 Flowcharts</a></li><li><a href="#74-gaps-in-the-admin-portal">7.4 Gaps in the admin portal</a></li></ol></li><li><a href="#8-warehouse-staff--web-portal-warehouse">8. Warehouse staff — web portal (/warehouse)</a><ol><li><a href="#81-navigation-and-staff-tiers">8.1 Navigation and staff tiers</a></li><li><a href="#82-how-parcels-map-to-live-delivery-tasks">8.2 How parcels map to live delivery tasks</a></li><li><a href="#83-every-page-and-its-options">8.3 Every page and its options</a></li><li><a href="#84-flowcharts">8.4 Flowcharts</a></li><li><a href="#85-gaps-in-the-warehouse-portal">8.5 Gaps in the warehouse portal</a></li></ol></li><li><a href="#9-rider--mobile-app-flutter-and-web-portal-rider">9. Rider — mobile app (Flutter) and web portal (/rider)</a><ol><li><a href="#91-rider-mobile-app--navigation">9.1 Rider mobile app — navigation</a></li><li><a href="#92-rider-mobile-flowcharts">9.2 Rider mobile flowcharts</a></li><li><a href="#93-rider-web-portal-rider">9.3 Rider web portal (/rider)</a></li><li><a href="#94-gaps-for-riders">9.4 Gaps for riders</a></li></ol></li><li><a href="#10-which-app-does-what--side-by-side">10. Which app does what — side by side</a><ol><li><a href="#101-readiness-by-user">10.1 Readiness by user</a></li><li><a href="#102-recommended-order-to-close-the-gaps">10.2 Recommended order to close the gaps</a></li></ol></li></ol></nav>
+    </details>
+  </aside>
+  <main>
+<h1 id="sombateka--users-apps-and-flows">Somba&amp;Teka — Users, Apps and Flows</h1>
+<div class="table-wrap"><table><tbody><tr>
+<td><strong>Document</strong></td>
+<td>Every user type, every app and portal, every screen and the options on it, and a flowchart for every major and minor flow</td>
+</tr>
+<tr>
+<td><strong>Covers</strong></td>
+<td>Customer mobile app (Flutter), customer web shop, seller web portal, admin web portal (with its sub-roles), warehouse web portal, rider mobile app (Flutter) and rider web portal, and how each one talks to the backend</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>Read from the code on branch <code>claude/somba-api-analysis-4rg0y7</code>, October 2026. Companion to <code>docs/ARCHITECTURE.md</code> (data model, API and gap analysis)</td>
+</tr>
+</tbody></table></div>
+<h3 id="how-to-read-the-flowcharts"><a class="anchor" href="#how-to-read-the-flowcharts" aria-hidden="true">#</a>How to read the flowcharts</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Shape / mark</th>
+<th>Meaning</th>
+</tr>
+</thead><tbody><tr>
+<td>Rounded box</td>
+<td>A screen or page the user sees</td>
+</tr>
+<tr>
+<td>Rectangle</td>
+<td>An action the user takes or the system performs</td>
+</tr>
+<tr>
+<td>Diamond</td>
+<td>A decision or a check (validation, server rule, user choice)</td>
+</tr>
+<tr>
+<td><code>event:name</code> on an arrow</td>
+<td>The real-time request the app sends to the server (WebSocket)</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/…</code></td>
+<td>A one-off REST call (login, register, password reset, upload)</td>
+</tr>
+<tr>
+<td>⚡</td>
+<td>A live update pushed by the server to the screen, with no refresh</td>
+</tr>
+<tr>
+<td><strong>LIVE</strong></td>
+<td>The option reads or writes real data on the server</td>
+</tr>
+<tr>
+<td><strong>LOCAL</strong></td>
+<td>The option works on the device only (for example the cart, filters, language)</td>
+</tr>
+<tr>
+<td><strong>MOCK</strong></td>
+<td>The page shows demo data and the option does not reach the server yet</td>
+</tr>
+<tr>
+<td><strong>STUB</strong></td>
+<td>The control is visible but only shows a message or does nothing yet</td>
+</tr>
+</tbody></table></div>
+<h2 id="1-users-and-the-apps-they-use"><a class="anchor" href="#1-users-and-the-apps-they-use" aria-hidden="true">#</a>1. Users and the apps they use</h2>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  subgraph People
+    G([Visitor - not signed in])
+    C([Customer])
+    S([Seller])
+    R([Rider])
+    W([Warehouse staff])
+    A([Admin and admin sub-roles])
+  end
+  subgraph Apps
+    CM["📱 Customer app - Flutter"]
+    WS["🌐 Web shop - /shop"]
+    SP["🌐 Seller portal - /seller"]
+    RM["📱 Rider app - Flutter"]
+    RW["🌐 Rider web - /rider"]
+    WP["🌐 Warehouse portal - /warehouse"]
+    AP["🌐 Admin portal - /admin"]
+  end
+  API[("Somba&amp;Teka API&lt;br/&gt;one live connection per signed-in user")]
+  G --&gt; CM &amp; WS
+  C --&gt; CM &amp; WS
+  S --&gt; SP &amp; WS
+  R --&gt; RM &amp; RW
+  W --&gt; WP
+  A --&gt; AP
+  CM &amp; WS &amp; SP &amp; RM &amp; RW &amp; WP &amp; AP &lt;--&gt; API</pre></div>
+<div class="table-wrap"><table><thead><tr>
+<th>User</th>
+<th>How the account is created</th>
+<th>Apps</th>
+<th>Main jobs</th>
+</tr>
+</thead><tbody><tr>
+<td>Visitor</td>
+<td>—</td>
+<td>Customer app, web shop</td>
+<td>Browse products, categories, deals, stores, reviews; must sign in to buy</td>
+</tr>
+<tr>
+<td>Customer</td>
+<td>Self sign-up (email + password)</td>
+<td>Customer app, web shop</td>
+<td>Buy, pay (wallet or mobile money), track deliveries live, cancel, return/dispute, review, support, wallet, addresses, wishlist</td>
+</tr>
+<tr>
+<td>Seller</td>
+<td>Self sign-up as seller, then store approval by an admin</td>
+<td>Seller portal (and the shop)</td>
+<td>Store profile, products and stock, orders containing their products, promotions/campaigns, reviews and questions, payouts, analytics</td>
+</tr>
+<tr>
+<td>Rider</td>
+<td>Created by the admin (role <code>rider</code>)</td>
+<td>Rider app, rider web</td>
+<td>Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see earnings</td>
+</tr>
+<tr>
+<td>Warehouse staff</td>
+<td>Created by the admin (role <code>warehouse_staff</code>)</td>
+<td>Warehouse portal</td>
+<td>Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns, cash reconciliation</td>
+</tr>
+<tr>
+<td>Admin (super admin)</td>
+<td>Bootstrap account</td>
+<td>Admin portal</td>
+<td>Everything, including staff roles</td>
+</tr>
+<tr>
+<td>Admin — operations</td>
+<td>Admin assigns the role</td>
+<td>Admin portal</td>
+<td>Orders, sellers, catalogue, customers, fulfilment, settings, audit, fraud</td>
+</tr>
+<tr>
+<td>Admin — finance</td>
+<td>Admin assigns the role</td>
+<td>Admin portal</td>
+<td>Payments, refunds, payouts, disputes with refunds, settings, analytics, fraud</td>
+</tr>
+<tr>
+<td>Admin — support</td>
+<td>Admin assigns the role</td>
+<td>Admin portal</td>
+<td>Customers (suspend/reactivate), support tickets</td>
+</tr>
+<tr>
+<td>Admin — marketing</td>
+<td>Admin assigns the role</td>
+<td>Admin portal</td>
+<td>Promo codes, flash sales, CMS banners, broadcasts, categories</td>
+</tr>
+<tr>
+<td>Admin — moderation</td>
+<td>Admin assigns the role</td>
+<td>Admin portal</td>
+<td>Seller approval/suspension, fraud review</td>
+</tr>
+</tbody></table></div>
+<p><strong>Where each user lands after signing in on the web</strong> (<code>/login</code> or <code>/shop/login</code>): customer → <code>/shop/account</code>, seller → <code>/seller</code>, any admin role → <code>/admin</code>, warehouse staff → <code>/warehouse</code>, rider → <code>/rider</code>. Each portal refuses users of other roles (portal isolation in <code>web/src/lib/portal-access.ts</code>); the server checks the role again on every request.</p>
+<h2 id="2-how-the-apps-talk-to-the-backend"><a class="anchor" href="#2-how-the-apps-talk-to-the-backend" aria-hidden="true">#</a>2. How the apps talk to the backend</h2>
+<h3 id="21-one-connection-request--answer-live-pushes"><a class="anchor" href="#21-one-connection-request--answer-live-pushes" aria-hidden="true">#</a>2.1 One connection, request → answer, live pushes</h3>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  autonumber
+  participant U as User
+  participant App as Mobile app or web page
+  participant REST as REST /api/v1/auth
+  participant WS as Live connection (Socket.IO)
+  participant DB as Database
+  U-&gt;&gt;App: email + password
+  App-&gt;&gt;REST: POST /auth/login
+  REST--&gt;&gt;App: access token (15 min) + refresh token (30 days) + user
+  App-&gt;&gt;WS: connect with the access token
+  WS-&gt;&gt;WS: check token, session version, account not suspended
+  WS--&gt;&gt;App: ready (user profile)
+  App-&gt;&gt;WS: load my data (products, orders, wallet, addresses, notifications…)
+  WS-&gt;&gt;DB: read only what this user may see
+  WS--&gt;&gt;App: answers {ok, data}
+  U-&gt;&gt;App: taps an action (place order, accept delivery, approve payout…)
+  App-&gt;&gt;WS: request e.g. orders:create
+  WS-&gt;&gt;DB: check the rules, write
+  WS--&gt;&gt;App: answer {ok, data} or {ok:false, error:"readable message"}
+  WS--&gt;&gt;App: ⚡ pushes to every screen that cares (customer, ops, rider, seller)</pre></div>
+<ul>
+<li>The apps <strong>never poll</strong>: lists change on screen because the server pushes the change (<code>order:updated</code>, <code>delivery:location</code>, <code>wallet:updated</code>, …).</li>
+<li>REST is only used before the live connection exists: sign-up, sign-in, refresh, forgot/reset password, email and phone verification, photo upload, and the mobile-money provider&#39;s callback.</li>
+<li>Every error comes back as a readable sentence that the apps show as-is (for example &quot;Only 2 of &quot;Nike Air Max&quot; left in stock.&quot;).</li>
+</ul>
+<h3 id="22-session-lifecycle-in-the-mobile-apps"><a class="anchor" href="#22-session-lifecycle-in-the-mobile-apps" aria-hidden="true">#</a>2.2 Session lifecycle in the mobile apps</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  Start([App opens]) --&gt; Splash([Splash screen])
+  Splash --&gt; Stored{Refresh token saved on the phone?}
+  Stored -- No --&gt; Login([Sign-in screen])
+  Stored -- Yes --&gt; Refresh["POST /auth/refresh"]
+  Refresh --&gt; RefreshOK{Accepted?}
+  RefreshOK -- "401 / 403&lt;br/&gt;revoked, suspended, deleted" --&gt; Clear[Forget the tokens] --&gt; Login
+  RefreshOK -- "timeout / offline" --&gt; Login
+  RefreshOK -- Yes --&gt; Connect[Open the live connection]
+  Login -- "POST /auth/login" --&gt; Connect
+  Connect --&gt; Ready{ready received?}
+  Ready -- No --&gt; Retry[Reconnect with a fresh token] --&gt; Connect
+  Ready -- Yes --&gt; Hydrate[Load all my data in parallel] --&gt; Home([Home / Deliveries])
+  Home --&gt; Live{{Server disconnects me&lt;br/&gt;suspension, role change, password change}}
+  Live --&gt; Verify["POST /auth/refresh"]
+  Verify -- accepted --&gt; Connect
+  Verify -- refused --&gt; Ended[Session ended message] --&gt; Login
+  Home -- "Sign out" --&gt; Out["devices:unregister, close connection, forget tokens"] --&gt; Login</pre></div>
+<h3 id="23-how-a-notification-reaches-a-user"><a class="anchor" href="#23-how-a-notification-reaches-a-user" aria-hidden="true">#</a>2.3 How a notification reaches a user</h3>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  Event[Something happens&lt;br/&gt;order update, payout, dispute, broadcast] --&gt; Svc[Server creates a notification row]
+  Svc --&gt; Live[⚡ notification:new on the live connection]
+  Svc --&gt; Push{Firebase configured and&lt;br/&gt;device registered?}
+  Push -- Yes --&gt; FCM[Push to the phone]
+  Push -- No --&gt; Skip[In-app only]
+  Live --&gt; Bell[Bell / notifications list updates]
+  Bell --&gt; Read["notifications:markRead / markAllRead"]</pre></div>
+<h2 id="3-one-order-every-user--the-end-to-end-lifecycle"><a class="anchor" href="#3-one-order-every-user--the-end-to-end-lifecycle" aria-hidden="true">#</a>3. One order, every user — the end-to-end lifecycle</h2>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  subgraph Customer
+    C1([Browse and add to cart]) --&gt; C2[Checkout: address, zone, promo, payment]
+    C2 --&gt; C3["orders:create"]
+    C9([Sees ⚡ status changes and the rider on the map])
+    C10([Delivered: can review, return or dispute])
+  end
+  subgraph Server
+    S1{Prices, stock, promo,&lt;br/&gt;zone fee checked} --&gt;|fails| SX[Readable error, nothing saved]
+    S1 --&gt;|ok| S2[Stock reserved, order saved as pending]
+    S2 --&gt; S3{Payment method}
+    S3 -- Wallet --&gt; S4[Wallet debited, order confirmed]
+    S3 -- Mobile money --&gt; S5[Approval request sent to the phone]
+    S5 --&gt; S6{Approved within 15 min?}
+    S6 -- Yes --&gt; S4
+    S6 -- "No / declined" --&gt; S7[Order cancelled, stock released]
+    S4 --&gt; S8[Delivery task opened]
+  end
+  subgraph Warehouse_and_Admin["Warehouse and admin"]
+    W1([⚡ New order alert]) --&gt; W2{Assign or let riders claim?}
+    W2 -- Assign --&gt; W3["delivery:assign / warehouse:buildBatch"]
+  end
+  subgraph Rider
+    R1([⚡ Task appears in Available]) --&gt; R2["delivery:accept"]
+    R2 --&gt; R3[Picked up] --&gt; R4[On the way, GPS shared] --&gt; R5{Delivered?}
+    R5 -- Yes --&gt; R6["delivered (cash confirmed if COD)"]
+    R5 -- No --&gt; R7[Could not deliver]
+  end
+  subgraph Seller
+    SL1([Sees the order lines of their own products])
+    SL2([Delivered sales become payable after 48 h])
+  end
+  C3 --&gt; S1
+  S8 --&gt; W1 &amp; R1 &amp; SL1
+  W3 --&gt; R3
+  R3 &amp; R4 &amp; R6 --&gt; C9
+  R6 --&gt; C10 &amp; SL2</pre></div>
+<h2 id="4-customer--mobile-app-flutter"><a class="anchor" href="#4-customer--mobile-app-flutter" aria-hidden="true">#</a>4. Customer — mobile app (Flutter)</h2>
+<h3 id="41-navigation-map"><a class="anchor" href="#41-navigation-map" aria-hidden="true">#</a>4.1 Navigation map</h3>
+<p>Five tabs in a floating bar: <strong>Home · Categories · Deals · Orders · Account</strong>. Everything else opens on top of a tab.</p>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  Splash([Splash]) --&gt; Restore{Saved session?}
+  Restore -- no --&gt; Login([Sign in])
+  Restore -- yes --&gt; Shell
+  Login --&gt; Register([Create account]) --&gt; OTP([Phone code]) --&gt; VerifyEmail([Verify email]) --&gt; Shell
+  Login --&gt; Forgot([Forgot password]) --&gt; Reset([Reset password]) --&gt; Login
+  Login --&gt; Shell
+  subgraph Shell["App shell - bottom tabs"]
+    Home([Home])
+    Cats([Categories])
+    Deals([Deals])
+    Orders([Orders])
+    Account([Account])
+  end
+  Home --&gt; Search([Search]) &amp; PList([Product list]) &amp; Stores([Stores directory]) &amp; Wish([Wishlist]) &amp; Coupons([Coupons]) &amp; Cart([Cart]) &amp; AddrPick([Choose address]) &amp; PD([Product detail])
+  Cats --&gt; PList &amp; Store([Store page]) &amp; Stores &amp; Search
+  Deals --&gt; PD
+  PD --&gt; Store &amp; Reviews([Reviews]) --&gt; Compose([Write review])
+  PD --&gt; Cart --&gt; Checkout([Checkout])
+  PD -- Buy now --&gt; Checkout
+  Checkout --&gt; AddrPick --&gt; AddrForm([New address])
+  Checkout --&gt; Pending([Payment pending]) --&gt; Success([Order confirmed])
+  Checkout --&gt; Success --&gt; Track([Order tracking])
+  Orders --&gt; OD([Order detail])
+  OD --&gt; Pending &amp; Track &amp; Return([Return request]) &amp; Help([Help])
+  Return --&gt; RStatus([Return status])
+  Account --&gt; Orders &amp; Wish &amp; Addr([Addresses]) &amp; Wallet([Wallet]) &amp; Returns([Returns list]) &amp; Coupons &amp; Edit([Edit profile]) &amp; Notif([Notifications]) &amp; Support([Support tickets]) &amp; Settings([Settings]) &amp; Help
+  Addr --&gt; AddrForm
+  Returns --&gt; RStatus
+  Notif --&gt; OD
+  Support --&gt; Ticket([Ticket thread])
+  Help --&gt; Support &amp; Delete([Delete account])
+  Settings --&gt; Delete</pre></div>
+<h3 id="42-every-screen-and-its-options"><a class="anchor" href="#42-every-screen-and-its-options" aria-hidden="true">#</a>4.2 Every screen and its options</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Screen</th>
+<th>Reached from</th>
+<th>Shows</th>
+<th>Options</th>
+</tr>
+</thead><tbody><tr>
+<td>Splash</td>
+<td>App start</td>
+<td>Logo, spinner</td>
+<td>Automatic: restore session (<code>POST /auth/refresh</code>) → Home or Sign in</td>
+</tr>
+<tr>
+<td>Sign in</td>
+<td>Not signed in, after sign-out or session end</td>
+<td>Email, password</td>
+<td><strong>Sign in</strong> (LIVE <code>POST /auth/login</code>) · Forgot password? · Create an account</td>
+</tr>
+<tr>
+<td>Create account</td>
+<td>Sign in</td>
+<td>Name, mobile (country code +243 default, +242, +33, +32, +254, +27), email, password, confirm, terms checkbox</td>
+<td><strong>Create account</strong> (LIVE <code>POST /auth/register</code>, role customer) — errors placed under the matching field</td>
+</tr>
+<tr>
+<td>Phone code</td>
+<td>After sign-up</td>
+<td>6 code boxes, 30 s resend timer</td>
+<td>Sends code on open (LIVE <code>POST /auth/phone/send</code>) · <strong>Verify</strong> (LIVE <code>POST /auth/phone/verify</code>) · Resend · Skip for now</td>
+</tr>
+<tr>
+<td>Verify email</td>
+<td>After phone code</td>
+<td>Instructions</td>
+<td>Sends email on open (LIVE <code>POST /auth/email/send</code>) · <strong>I&#39;ve verified — continue</strong> (LIVE <code>me:get</code>) · Resend · Skip for now</td>
+</tr>
+<tr>
+<td>Forgot password</td>
+<td>Sign in</td>
+<td>Email</td>
+<td><strong>Send reset link</strong> (LIVE <code>POST /auth/forgot</code>, same answer for unknown emails)</td>
+</tr>
+<tr>
+<td>Reset password</td>
+<td>Forgot password</td>
+<td>Code, new password, confirm</td>
+<td><strong>Save new password</strong> (LIVE <code>POST /auth/reset</code>) → Sign in</td>
+</tr>
+<tr>
+<td>Home</td>
+<td>Tab 1</td>
+<td>Deliver-to chip, banners (admin CMS), quick actions, top categories, deals row (≥ 15 % off), recommended feed</td>
+<td>Deliver to (choose address, LOCAL) · EN/FR (LIVE <code>me:update</code>) · Cart icon with count · Search bar · Quick actions Deals / Stores / Wishlist / Coupons · Category → product list · See all · Feed chips For you / Trending / New / Popular (LOCAL sort) · Product card: open, <strong>+</strong> add to cart (LOCAL), ♥ (LIVE <code>wishlist:toggle</code>)</td>
+</tr>
+<tr>
+<td>Categories</td>
+<td>Tab 2</td>
+<td>Category grid with counts, popular stores</td>
+<td>Search categories and stores (LOCAL) · Category → product list · Store → store page · See all stores · Search all products for &quot;…&quot;</td>
+</tr>
+<tr>
+<td>Deals</td>
+<td>Tab 3</td>
+<td>Products ≥ 15 % off, biggest first</td>
+<td>Open product · + add to cart · ♥</td>
+</tr>
+<tr>
+<td>Orders</td>
+<td>Tab 4 / Account</td>
+<td>Live order list (⚡ <code>order:created/updated</code>)</td>
+<td>Filter All / Active / Delivered / Cancelled (LOCAL) · Open order</td>
+</tr>
+<tr>
+<td>Account</td>
+<td>Tab 5</td>
+<td>Initials, name, email, verified badge, order / wishlist / wallet counts</td>
+<td>My orders · Wishlist · Addresses · Wallet · Returns &amp; refunds · Coupons · Language EN/FR (LIVE <code>me:update</code>) · Edit profile · Notifications · Support · Settings · Help · <strong>Log out</strong> (confirm sheet)</td>
+</tr>
+<tr>
+<td>Product detail</td>
+<td>Home, Deals, related products</td>
+<td>Image, stock badge, price (FC + USD), discount, delivery note, description, seller, 2 reviews, questions &amp; answers, related items</td>
+<td>♥ · Quantity 1–min(stock, 20) · Visit store · See all / write reviews · <strong>Ask a question</strong> (LIVE <code>questions:ask</code>) · Add to cart (LOCAL) · <strong>Buy now</strong> → checkout · disabled when out of stock or unlisted</td>
+</tr>
+<tr>
+<td>Reviews</td>
+<td>Product detail</td>
+<td>Average, 5→1 distribution, list (LIVE <code>reviews:list</code>)</td>
+<td>Write a review</td>
+</tr>
+<tr>
+<td>Write review</td>
+<td>Reviews</td>
+<td>1–5 stars, text</td>
+<td><strong>Submit</strong> (LIVE <code>reviews:create</code>; server allows it only after delivery)</td>
+</tr>
+<tr>
+<td>Store page</td>
+<td>Product detail, categories, stores, search</td>
+<td>Store name, rating, badge (LIVE <code>sellers:storefront</code>), its products</td>
+<td>♥ on products</td>
+</tr>
+<tr>
+<td>Stores directory</td>
+<td>Home, categories</td>
+<td>Stores derived from live products</td>
+<td>Search (LOCAL) · Visit</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>Home, categories</td>
+<td>Results over the live catalogue</td>
+<td>Text · Products / Stores · <strong>Filters</strong>: sort (relevance, price ↑, price ↓, top rated, biggest discount), category, price range, minimum rating, deals only, reset, show N results · quick sorts (all LOCAL)</td>
+</tr>
+<tr>
+<td>Product list</td>
+<td>Home, categories</td>
+<td>Products of a category / deals / all</td>
+<td>Search in list · Filters · quick sorts (LOCAL)</td>
+</tr>
+<tr>
+<td>Wishlist</td>
+<td>Home, Account</td>
+<td>Saved products (LIVE <code>wishlist:list</code>, ⚡ <code>wishlist:updated</code>)</td>
+<td>♥ removes</td>
+</tr>
+<tr>
+<td>Coupons</td>
+<td>Home, Account</td>
+<td>Public promo codes (LIVE <code>promos:list</code>)</td>
+<td>Copy code (LOCAL)</td>
+</tr>
+<tr>
+<td>Cart</td>
+<td>Home cart icon, &quot;Added to cart&quot; message</td>
+<td>Lines, subtotal, delivery, promo, total</td>
+<td>Swipe to remove · Quantity 1–stock · <strong>Promo code → Apply</strong> (LIVE <code>promos:validate</code>) · <strong>Checkout</strong></td>
+</tr>
+<tr>
+<td>Checkout</td>
+<td>Cart, Buy now</td>
+<td>Address, delivery zones with fees (from server settings), payment methods, wallet balance, totals</td>
+<td>Change / add address · Zone (LOCAL) · Pay with <strong>Wallet / Airtel Money / Orange Money / Vodacom M-Pesa</strong> · mobile-money number (9–15 digits) · <strong>Place order</strong> (LIVE <code>orders:create</code>)</td>
+</tr>
+<tr>
+<td>Payment pending</td>
+<td>Checkout (mobile money), Order detail &quot;Pay&quot;</td>
+<td>&quot;Approve on your phone&quot;, amount, reference (⚡ <code>order:updated</code>, <code>payment:updated</code>)</td>
+<td><strong>Cancel order</strong> (LIVE <code>orders:cancel</code>) · Continue shopping · after failure <strong>Try again</strong> (refills the cart, LOCAL)</td>
+</tr>
+<tr>
+<td>Order confirmed</td>
+<td>Checkout (wallet), Payment pending (approved)</td>
+<td>Reference</td>
+<td>Track order · Continue shopping</td>
+</tr>
+<tr>
+<td>Order detail</td>
+<td>Orders, notification, links</td>
+<td>Status, items, totals, payment state</td>
+<td><strong>Pay</strong> (pending mobile money) · <strong>Track</strong> (processing / shipped / out for delivery) · <strong>Cancel order</strong> (pending / confirmed, LIVE <code>orders:cancel</code>) · <strong>Return</strong> (delivered) · Help</td>
+</tr>
+<tr>
+<td>Order tracking</td>
+<td>Order detail, Order confirmed</td>
+<td>Rider status and live position (⚡ <code>delivery:location</code>), timeline Placed → Confirmed → Processing → Shipped → Out for delivery → Delivered</td>
+<td>Back</td>
+</tr>
+<tr>
+<td>Return request</td>
+<td>Order detail (delivered)</td>
+<td>Items</td>
+<td>Reason: damaged, wrong item, not as described, no longer needed, other · details · <strong>Submit</strong> (LIVE <code>disputes:open</code> type return)</td>
+</tr>
+<tr>
+<td>Returns list / status</td>
+<td>Account</td>
+<td>Requests and their state (LIVE <code>disputes:list</code>)</td>
+<td>Open a request</td>
+</tr>
+<tr>
+<td>Wallet</td>
+<td>Account</td>
+<td>Balance (FC + USD), pending top-ups, history (⚡ <code>wallet:updated</code>, <code>wallet:transaction</code>)</td>
+<td><strong>Top up with mobile money</strong>: amount (≥ $1), network, number → LIVE <code>wallet:topup</code></td>
+</tr>
+<tr>
+<td>Addresses</td>
+<td>Account; picker from Home / Checkout</td>
+<td>Saved addresses (LIVE <code>addresses:list</code>)</td>
+<td>Add new · Delete (LIVE <code>addresses:remove</code>) · in picker: tap to choose (LOCAL)</td>
+</tr>
+<tr>
+<td>New address</td>
+<td>Addresses</td>
+<td>Label, rider phone, street (required), commune, city (required), default</td>
+<td><strong>Save</strong> (LIVE <code>addresses:create</code>)</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>Account</td>
+<td>List with unread count (⚡ <code>notification:new</code>)</td>
+<td>Tap: mark read (LIVE <code>notifications:markRead</code>), order → order detail · <strong>Mark all</strong> (LIVE <code>notifications:markAllRead</code>)</td>
+</tr>
+<tr>
+<td>Edit profile</td>
+<td>Account</td>
+<td>Name, phone, email (read-only in practice)</td>
+<td><strong>Save</strong> (LIVE <code>me:update</code>)</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>Account</td>
+<td>Toggles and account actions</td>
+<td>Push / Email / SMS / Personalised (LIVE <code>me:setPrefs</code>) · Prices in FC or USD (LOCAL + LIVE <code>me:setPrefs market</code>) · <strong>Change password</strong> (LIVE <code>me:changePassword</code>) · About · Delete account</td>
+</tr>
+<tr>
+<td>Delete account</td>
+<td>Settings, Help</td>
+<td>Warning, password</td>
+<td><strong>Permanently delete</strong> (LIVE <code>me:delete</code>) · Keep my account</td>
+</tr>
+<tr>
+<td>Help</td>
+<td>Account, Order detail</td>
+<td>5 FAQs</td>
+<td>Contact support · Delete my account</td>
+</tr>
+<tr>
+<td>Support tickets</td>
+<td>Account, Help</td>
+<td>Tickets (LIVE <code>support:list</code>)</td>
+<td><strong>New ticket</strong> (LIVE <code>support:open</code>) · open a ticket</td>
+</tr>
+<tr>
+<td>Ticket thread</td>
+<td>Support tickets</td>
+<td>Messages</td>
+<td><strong>Reply</strong> (LIVE <code>support:reply</code>)</td>
+</tr>
+</tbody></table></div>
+<h3 id="43-flowcharts"><a class="anchor" href="#43-flowcharts" aria-hidden="true">#</a>4.3 Flowcharts</h3>
+<h4 id="c-1-sign-up-with-phone-and-email-verification"><a class="anchor" href="#c-1-sign-up-with-phone-and-email-verification" aria-hidden="true">#</a>C-1 Sign up with phone and email verification</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  A([Sign in screen]) --&gt;|Create an account| B([Create account form])
+  B --&gt; V{Name ≥ 2, phone ≥ 6 digits,&lt;br/&gt;valid email, password ≥ 8,&lt;br/&gt;passwords match, terms ticked?}
+  V -- no --&gt; B
+  V -- yes --&gt; R["POST /auth/register&lt;br/&gt;role = customer"]
+  R --&gt; RO{Server answer}
+  RO -- "email already used / weak password / too many attempts / offline" --&gt; B
+  RO -- ok --&gt; S[Signed in, live connection opens, data loads]
+  S --&gt; O([Phone code screen])
+  O --&gt; OS["POST /auth/phone/send (auto)"]
+  OS --&gt; OC{User action}
+  OC -- "enters 6 digits" --&gt; OV["POST /auth/phone/verify"]
+  OV --&gt; OVR{Correct and not expired?&lt;br/&gt;max 5 attempts, 10 min}
+  OVR -- no --&gt; O
+  OVR -- yes --&gt; E
+  OC -- "Resend after 30 s" --&gt; OS
+  OC -- "Skip for now" --&gt; E([Verify email screen])
+  E --&gt; ES["POST /auth/email/send (auto)"]
+  ES --&gt; EC{User action}
+  EC -- "taps link in email, then I've verified" --&gt; EM["me:get"]
+  EM --&gt; EMV{emailVerified?}
+  EMV -- no --&gt; E
+  EMV -- yes --&gt; H([Home])
+  EC -- Resend --&gt; ES
+  EC -- "Skip for now" --&gt; H</pre></div>
+<h4 id="c-2-sign-in-forgot-and-reset-password"><a class="anchor" href="#c-2-sign-in-forgot-and-reset-password" aria-hidden="true">#</a>C-2 Sign in, forgot and reset password</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  L([Sign in]) --&gt; LV{Valid email and password entered?}
+  LV -- no --&gt; L
+  LV -- yes --&gt; LP["POST /auth/login"]
+  LP --&gt; LR{Answer}
+  LR -- "wrong password / suspended / 429 / offline" --&gt; LE[Message under the password field] --&gt; L
+  LR -- ok --&gt; H([Home - data loads live])
+  L --&gt;|Forgot password?| F([Forgot password])
+  F --&gt; FP["POST /auth/forgot"]
+  FP --&gt; FM[Same message whether or not the email exists] --&gt; RS([Reset password])
+  RS --&gt; RV{Code ≥ 20 chars, password ≥ 8, match?}
+  RV -- no --&gt; RS
+  RV -- yes --&gt; RP["POST /auth/reset"]
+  RP --&gt; RR{Valid and not expired - 60 min?}
+  RR -- no --&gt; RS
+  RR -- yes --&gt; RO[All other sessions signed out] --&gt; L</pre></div>
+<h4 id="c-3-browse-search-and-filter"><a class="anchor" href="#c-3-browse-search-and-filter" aria-hidden="true">#</a>C-3 Browse, search and filter</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  H([Home]) --&gt; Q{What does the shopper do?}
+  Q -- "taps a category" --&gt; PL([Product list - category])
+  Q -- "Deals / See all" --&gt; PL2([Product list - deals or all])
+  Q -- "search bar" --&gt; SR([Search])
+  Q -- "feed chip" --&gt; Sort[Re-sort feed locally] --&gt; H
+  Q -- "product card" --&gt; PD([Product detail])
+  Q -- "Stores" --&gt; SD([Stores directory]) --&gt; ST([Store page])
+  C([Categories tab]) --&gt; CS{Typed text?}
+  CS -- no --&gt; PL
+  CS -- yes --&gt; CM[Matching categories and stores] --&gt; PL &amp; ST
+  CM --&gt;|Search all products| SR
+  SR --&gt; T[Type text - results update instantly]
+  T --&gt; FT{Filters?}
+  FT -- yes --&gt; FS[Sort, category, price range,&lt;br/&gt;minimum rating, deals only] --&gt; Res
+  FT -- no --&gt; Res[Results grid]
+  SR --&gt;|Stores tab| ST
+  D([Deals tab]) --&gt; PD
+  Live{{⚡ product:created / product:updated}} -.-&gt; H &amp; PL &amp; SR &amp; PD</pre></div>
+<p>The catalogue is downloaded once (<code>products:list</code>) and kept current by live pushes; search, sort and filters run on the phone.</p>
+<h4 id="c-4-product-detail-wishlist-reviews-and-questions"><a class="anchor" href="#c-4-product-detail-wishlist-reviews-and-questions" aria-hidden="true">#</a>C-4 Product detail, wishlist, reviews and questions</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  PD([Product detail]) --&gt; L["reviews:list + questions:list"]
+  PD --&gt; A{Action}
+  A -- "♥" --&gt; W["wishlist:toggle"] --&gt; WR{ok?}
+  WR -- no --&gt; WL["wishlist:list (undo)"]
+  WR -- yes --&gt; WS[⚡ wishlist:updated on other devices]
+  A -- "Ask" --&gt; AQ[Question sheet] --&gt; AQS["questions:ask"] --&gt; AQR[Shown as awaiting seller response]
+  A -- "See all / write" --&gt; RV([Reviews]) --&gt; RW([Write review]) --&gt; RC["reviews:create"]
+  RC --&gt; RCR{Delivered to this customer&lt;br/&gt;and not reviewed before?}
+  RCR -- no --&gt; RE[Server message shown]
+  RCR -- yes --&gt; RT[Thanks message, list reloads]
+  A -- "Visit store" --&gt; ST([Store page - sellers:storefront])
+  A -- "quantity +/-" --&gt; QT[1 to stock, max 20]
+  A -- "Add to cart" --&gt; AC[Saved in the cart on the phone]
+  A -- "Buy now" --&gt; CO([Checkout])
+  Stock{In stock and listed?} -. "no: buttons disabled" .-&gt; A</pre></div>
+<h4 id="c-5-cart-and-promo-code"><a class="anchor" href="#c-5-cart-and-promo-code" aria-hidden="true">#</a>C-5 Cart and promo code</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  CT([Cart]) --&gt; E{Empty?}
+  E -- yes --&gt; ES[Start shopping] --&gt; H([Home])
+  E -- no --&gt; A{Action}
+  A -- "change quantity / swipe to remove" --&gt; U[Update cart on the phone] --&gt; PR{Promo applied?}
+  PR -- yes --&gt; PV
+  PR -- no --&gt; CT
+  A -- "enter code → Apply" --&gt; PV["promos:validate {code, subtotal}"]
+  PV --&gt; PVR{Valid?&lt;br/&gt;active, not expired, minimum order,&lt;br/&gt;usage limits}
+  PVR -- no --&gt; PE[Reason shown] --&gt; CT
+  PVR -- yes --&gt; PA[Discount line shown] --&gt; CT
+  A -- Checkout --&gt; CO([Checkout])
+  Live{{⚡ product price or stock changes}} -.-&gt; RP[Line prices refresh, delisted lines removed] -.-&gt; CT</pre></div>
+<h4 id="c-6-checkout-and-payment"><a class="anchor" href="#c-6-checkout-and-payment" aria-hidden="true">#</a>C-6 Checkout and payment</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  CO([Checkout]) --&gt; AD{Delivery address?}
+  AD -- none --&gt; AP([Choose address]) --&gt; AN([New address]) --&gt; AC["addresses:create"] --&gt; AP --&gt; CO
+  AD -- yes --&gt; Z[Choose delivery zone - fee from server settings]
+  Z --&gt; PM{Payment method}
+  PM -- Wallet --&gt; WB{Balance ≥ total?}
+  WB -- no --&gt; WE[Wallet balance is not enough] --&gt; CO
+  WB -- yes --&gt; PO
+  PM -- "Airtel / Orange / M-Pesa" --&gt; PN{Number 9–15 digits?}
+  PN -- no --&gt; PNE[Error under the number] --&gt; CO
+  PN -- yes --&gt; PO["Place order → orders:create&lt;br/&gt;items, zone, address, method, number, promo"]
+  PO --&gt; SV{Server checks&lt;br/&gt;prices, stock, zone, promo, balance}
+  SV -- fails --&gt; SE["Readable error e.g. only 2 left / invalid promo"] --&gt; CO
+  SV -- ok --&gt; CC[Cart cleared]
+  CC --&gt; ST{Order status}
+  ST -- confirmed --&gt; OK([Order confirmed])
+  ST -- pending --&gt; PP([Payment pending - see C-7])
+  OK --&gt; TR([Track order])</pre></div>
+<h4 id="c-7-mobile-money-approval"><a class="anchor" href="#c-7-mobile-money-approval" aria-hidden="true">#</a>C-7 Mobile-money approval</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  PP([Payment pending: approve on your phone]) --&gt; W{What happens next?}
+  W -- "customer approves with PIN" --&gt; AP[Provider confirms to the server]
+  AP --&gt; AU[⚡ payment:updated succeeded + order:updated confirmed] --&gt; OK([Order confirmed])
+  W -- "declines / ignores 15 min" --&gt; FL[Server cancels the order and frees the stock]
+  FL --&gt; FU[⚡ order:updated cancelled] --&gt; FX([Payment did not go through + reason])
+  FX --&gt;|Try again| RC[Items put back in the cart] --&gt; H([Home])
+  W -- "taps Cancel order" --&gt; CX["orders:cancel"] --&gt; FX
+  W -- "Continue shopping" --&gt; H
+  H -.-&gt;|later: Orders → order → Pay| PP
+  Late{{Approved after cancellation?}} -.-&gt; WC[Amount credited to the wallet]</pre></div>
+<h4 id="c-8-orders-tracking-and-cancellation"><a class="anchor" href="#c-8-orders-tracking-and-cancellation" aria-hidden="true">#</a>C-8 Orders, tracking and cancellation</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  O([Orders tab]) --&gt; F[Filter: All / Active / Delivered / Cancelled] --&gt; OD([Order detail])
+  N([Notification of type order]) --&gt; OD
+  OD --&gt; S{Order status}
+  S -- "pending + payment pending" --&gt; P[Pay → Payment pending]
+  S -- "pending or confirmed" --&gt; C[Cancel order]
+  C --&gt; CD{Confirm?&lt;br/&gt;pending: nothing charged&lt;br/&gt;confirmed: refund to wallet}
+  CD -- Keep order --&gt; OD
+  CD -- Cancel --&gt; CE["orders:cancel"] --&gt; CR{Still pending or confirmed&lt;br/&gt;on the server?}
+  CR -- no --&gt; CRE[Order can no longer be cancelled] --&gt; OD
+  CR -- yes --&gt; CU[⚡ order:updated cancelled, ⚡ wallet:updated if refunded]
+  S -- "processing / shipped / out for delivery" --&gt; T([Order tracking])
+  T --&gt; TL[Timeline + rider position ⚡ delivery:location]
+  S -- delivered --&gt; R([Return request - see C-9])
+  S -- any --&gt; HP([Help])</pre></div>
+<h4 id="c-9-return-request"><a class="anchor" href="#c-9-return-request" aria-hidden="true">#</a>C-9 Return request</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  OD([Delivered order]) --&gt;|Return| RQ([Return request])
+  RQ --&gt; RR[Choose reason + optional details]
+  RR --&gt; RS["disputes:open {type: return}"]
+  RS --&gt; RV{Paid, not cancelled,&lt;br/&gt;no open request already?}
+  RV -- no --&gt; RE[Error under the form] --&gt; RQ
+  RV -- yes --&gt; ST([Return status: under review])
+  ST -.-&gt; AD{Admin decision}
+  AD -- "resolve with refund" --&gt; RF[⚡ wallet credited, status resolved]
+  AD -- "resolve without refund" --&gt; RS2[Status resolved + resolution]
+  AD -- reject --&gt; RJ[Status declined]
+  AC([Account → Returns &amp; refunds]) --&gt; RL["disputes:list"] --&gt; ST</pre></div>
+<h4 id="c-10-wallet-top-up"><a class="anchor" href="#c-10-wallet-top-up" aria-hidden="true">#</a>C-10 Wallet top-up</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  W([Wallet]) --&gt; T[Top up with mobile money]
+  T --&gt; F[Amount ≥ $1, network, number]
+  F --&gt; V{Valid?}
+  V -- no --&gt; F
+  V -- yes --&gt; R["wallet:topup"]
+  R --&gt; RV{Fewer than 3 pending top-ups&lt;br/&gt;and provider available?}
+  RV -- no --&gt; E[Server message] --&gt; W
+  RV -- yes --&gt; PC[Pending card: approve on your phone]
+  PC --&gt; O{Outcome}
+  O -- approved --&gt; OK[⚡ wallet:updated + wallet:transaction&lt;br/&gt;balance and history update]
+  O -- "declined / expired" --&gt; X[Pending card disappears]</pre></div>
+<h4 id="c-11-addresses"><a class="anchor" href="#c-11-addresses" aria-hidden="true">#</a>C-11 Addresses</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  A([Addresses]) --&gt; L["addresses:list"]
+  A --&gt;|Add new address| N([New address form])
+  N --&gt; V{Street and city filled?}
+  V -- no --&gt; N
+  V -- yes --&gt; C["addresses:create (encrypted on the server)"] --&gt; A
+  A --&gt;|Delete icon| D["addresses:remove"] --&gt; A
+  P([Picker from Home or Checkout]) --&gt;|tap an address| S[Selected for delivery on this phone] --&gt; Back([Back to Home / Checkout])
+  U{{⚡ addresses:updated from another device}} -.-&gt; L</pre></div>
+<h4 id="c-12-account-settings-notifications-and-support"><a class="anchor" href="#c-12-account-settings-notifications-and-support" aria-hidden="true">#</a>C-12 Account, settings, notifications and support</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  AC([Account]) --&gt; EP([Edit profile]) --&gt; EPS["me:update {name, phone}"]
+  AC --&gt; LG[EN / FR] --&gt; LGS["me:update {locale}"]
+  AC --&gt; ST([Settings])
+  ST --&gt; TG[Push / Email / SMS / Personalised] --&gt; TGS["me:setPrefs"]
+  ST --&gt; CUR[Prices in FC or USD] --&gt; CURS["me:setPrefs {market}"]
+  ST --&gt; CP[Change password] --&gt; CPS["me:changePassword"] --&gt; CPR{Current password right&lt;br/&gt;and new ≥ 8?}
+  CPR -- no --&gt; CPE[Error in the dialog]
+  CPR -- yes --&gt; CPO[New tokens kept, other devices signed out]
+  ST --&gt; DEL([Delete account])
+  AC --&gt; NT([Notifications]) --&gt; NTT{Tap}
+  NTT -- row --&gt; MR["notifications:markRead"] --&gt; ORD{Order notification?}
+  ORD -- yes --&gt; OD([Order detail])
+  NTT -- "Mark all" --&gt; MA["notifications:markAllRead"]
+  AC --&gt; SP([Support tickets]) --&gt; SPL["support:list"]
+  SP --&gt; NEW[New ticket: subject + message] --&gt; NEWS["support:open"] --&gt; SP
+  SP --&gt; TK([Ticket thread]) --&gt; RP["support:reply"] --&gt; TK
+  AC --&gt; HL([Help]) --&gt; FAQ[5 FAQs] &amp; SP &amp; DEL</pre></div>
+<h4 id="c-13-delete-account-and-sign-out"><a class="anchor" href="#c-13-delete-account-and-sign-out" aria-hidden="true">#</a>C-13 Delete account and sign out</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  D([Delete account]) --&gt; P[Enter password]
+  P --&gt; DS["me:delete {password}"]
+  DS --&gt; DR{Password correct?}
+  DR -- no --&gt; DE[Error under the field] --&gt; D
+  DR -- yes --&gt; AN[Server anonymises personal data,&lt;br/&gt;ends every session, closes connections]
+  AN --&gt; LO[App clears its data]
+  LO --&gt; GAP["⚠ today the app stays on an empty shell&lt;br/&gt;instead of returning to Sign in"]
+  A([Account]) --&gt;|Log out| CF{Confirm?}
+  CF -- Cancel --&gt; A
+  CF -- "Log out" --&gt; LOS["devices:unregister, close connection, forget tokens,&lt;br/&gt;clear cart and selections"] --&gt; SI([Sign in])</pre></div>
+<h3 id="44-gaps-found-in-the-customer-app"><a class="anchor" href="#44-gaps-found-in-the-customer-app" aria-hidden="true">#</a>4.4 Gaps found in the customer app</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>What the user sees</th>
+<th>Effect</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Product cards in <strong>Search, Product list, Store page and Wishlist</strong> cannot be opened and their <strong>+</strong> does nothing (only ♥ works)</td>
+<td>Product detail is reachable only from Home, Deals and &quot;You may also like&quot;</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Delete account</strong> succeeds but the app stays on an empty shell instead of returning to Sign in</td>
+<td>Confusing end state</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Push notifications are not wired (no Firebase in the app); the Push toggle only saves a preference</td>
+<td>Alerts arrive only while the app is open</td>
+</tr>
+<tr>
+<td>4</td>
+<td>The &quot;Prices shown in&quot; choice is not restored at the next launch</td>
+<td>Always starts in FC</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Phone and email cannot be verified later if skipped at sign-up</td>
+<td>Verified badge stays &quot;not verified&quot;</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Tracking shows the rider position as coordinates, not a map; Track is hidden for confirmed orders</td>
+<td>Weak tracking experience</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Support replies, return status, coupons and the success screen do not refresh live</td>
+<td>Customer must reopen the screen</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Failed top-ups disappear without a message; no manual &quot;check payment&quot; on the pending screen</td>
+<td>Unclear outcome</td>
+</tr>
+<tr>
+<td>9</td>
+<td>No promo field on checkout (cart only); &quot;Buy now&quot; merges into the whole cart</td>
+<td>Surprising totals</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Addresses: no edit, no &quot;set default&quot;, no delete confirmation</td>
+<td></td>
+</tr>
+<tr>
+<td>11</td>
+<td>No exchange or dispute (non-return) request from the app; no photos on returns or reviews</td>
+<td></td>
+</tr>
+<tr>
+<td>12</td>
+<td>No share, variants or image gallery on product detail</td>
+<td></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Cart is reachable only from Home and the product message; many screens are English-only; sign-up always saves English</td>
+<td></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Terms link is plain text and the box is pre-ticked; avatar upload missing</td>
+<td></td>
+</tr>
+</tbody></table></div>
+<h2 id="5-customer-and-visitor--web-shop-shop-and-public-pages"><a class="anchor" href="#5-customer-and-visitor--web-shop-shop-and-public-pages" aria-hidden="true">#</a>5. Customer and visitor — web shop (<code>/shop</code>) and public pages</h2>
+<p>Important context for the client: the web shop is a <strong>companion</strong> to the mobile app today. It has no &quot;Add to cart&quot; button on product pages (the product page sends shoppers to the App Store / Google Play), and several pages still show demo data. The table marks each page.</p>
+<h3 id="51-navigation"><a class="anchor" href="#51-navigation" aria-hidden="true">#</a>5.1 Navigation</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  Landing(["/ — marketing home"]) --&gt; Shop(["/shop/products"])
+  Landing --&gt; GetApp(["/get-app → app stores"])
+  Landing --&gt; Sell(["/sell-online"]) --&gt; Plans(["/sell-online/subscribe"])
+  Landing --&gt; Login(["/login"])
+  subgraph Header["Shop header (every /shop page)"]
+    H1[Search box] --&gt; SearchP(["/shop/search?q="])
+    H2[Bell] --&gt; Notif(["/shop/notifications"])
+    H3[Account icon] --&gt; Acc(["/shop/account"])
+    H4[Heart] --&gt; Wish(["/shop/wishlist"])
+    H5[Cart] --&gt; Cart(["/shop/cart"])
+    H6[Categories] --&gt; Cats(["/shop/categories"])
+    H7[Flash sale] --&gt; Deals(["/shop/deals"])
+    H8["EN/FR, market FR/DRC"]
+  end
+  Shop --&gt; PDP(["/shop/products/:id"])
+  SearchP --&gt; PDP
+  Cats --&gt; SearchP
+  Deals --&gt; PDP
+  PDP --&gt; Reviews(["/shop/products/:id/reviews"]) &amp; Store(["/shop/stores/:id"]) &amp; Apps["App Store / Google Play"]
+  Cart --&gt; Checkout(["/shop/checkout"]) --&gt; Pay(["/shop/checkout/payment"]) --&gt; Conf(["/shop/orders/:id/confirmed"])
+  Acc --&gt; Orders(["/shop/orders"]) --&gt; OD(["/shop/orders/:id"])
+  OD --&gt; Track(["/shop/orders/:id/tracking"]) &amp; Ret(["/shop/orders/:id/return"]) &amp; Supp(["/shop/support"])
+  Acc --&gt; Addr(["/shop/account/addresses"]) &amp; Refer(["/shop/refer"]) &amp; Supp &amp; Notif &amp; Help(["/shop/help"])
+  Help --&gt; Del(["/shop/account/delete"])
+  Supp --&gt; Ticket(["/shop/support/:id"])
+  Login --&gt; Auth(["/shop/login · register · otp · verify-email · forgot · reset"])</pre></div>
+<h3 id="52-sign-in-and-where-each-role-lands"><a class="anchor" href="#52-sign-in-and-where-each-role-lands" aria-hidden="true">#</a>5.2 Sign-in and where each role lands</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  L(["/login"]) --&gt; Already{Already signed in?}
+  Already -- yes --&gt; Home[Go to my portal]
+  Already -- no --&gt; T{Tab / choice}
+  T -- "Email + password" --&gt; P["POST /auth/login"] --&gt; R{Role}
+  T -- "Continue as guest" --&gt; G(["/ (shop as visitor)"])
+  T -- "Demo role picker&lt;br/&gt;(only when NEXT_PUBLIC_DEMO_MODE ≠ false)" --&gt; D[Pick Seller / Admin / Warehouse persona] --&gt; B["Bridge signs into the matching seeded account"] --&gt; R
+  R -- customer --&gt; C(["/shop/account"])
+  R -- seller --&gt; S(["/seller"])
+  R -- admin --&gt; A(["/admin"])
+  R -- admin_operations --&gt; AO(["/admin/orders"])
+  R -- admin_finance --&gt; AF(["/admin/finance"])
+  R -- admin_support --&gt; AS(["/admin/support"])
+  R -- admin_marketing --&gt; AM(["/admin/flash-sales"])
+  R -- admin_moderation --&gt; AMo(["/admin/moderation"])
+  R -- warehouse_staff --&gt; W(["/warehouse"])
+  R -- rider --&gt; RI(["/rider"])
+  P -- error --&gt; E[Server message shown] --&gt; L</pre></div>
+<p><code>/shop/login</code>, <code>/shop/register</code>, <code>/shop/otp</code>, <code>/shop/verify-email</code>, <code>/shop/forgot</code>, <code>/shop/reset</code> use the same REST calls as the app (<code>POST /auth/login</code>, <code>/register</code> with role customer, <code>/phone/verify</code>, <code>/email/verify</code>, <code>/forgot</code>, <code>/reset</code>). Sign-up on the web does not chain to the phone code and email screens.</p>
+<h3 id="53-every-page-and-its-options"><a class="anchor" href="#53-every-page-and-its-options" aria-hidden="true">#</a>5.3 Every page and its options</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Page</th>
+<th>Data</th>
+<th>Options</th>
+<th>Status</th>
+</tr>
+</thead><tbody><tr>
+<td><code>/</code> home</td>
+<td>Demo products and categories</td>
+<td>Search, Browse products, Sell on Somba&amp;Teka, Shop now (→ app stores), FAQ, seller plans</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/products</code></td>
+<td>Live catalogue (<code>products:list</code>, ⚡ <code>product:*</code>)</td>
+<td>Sort (popularity, price ↑↓, rating, discount), filters (category, brand, rating, discount, max price), ♥, open product, &quot;Buy again&quot; (recently viewed)</td>
+<td>LIVE data, LOCAL filters</td>
+</tr>
+<tr>
+<td><code>/shop/search?q=</code></td>
+<td>Live catalogue</td>
+<td>Text match on name, category, seller</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/categories</code></td>
+<td><code>categories:list</code></td>
+<td>Category → search</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/deals</code></td>
+<td>Live products ≥ 13 % off</td>
+<td>Open product</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/products/:id</code></td>
+<td>Live product; variants, specs and seller stats are placeholders</td>
+<td>Variant chips, zone fee check, follow store, share / copy link, ask question, similar products, <strong>App Store / Google Play</strong> (no add-to-cart)</td>
+<td>LIVE + LOCAL/STUB</td>
+</tr>
+<tr>
+<td><code>/shop/products/:id/reviews</code></td>
+<td>Demo reviews</td>
+<td>Write review (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/stores/:id</code></td>
+<td>Demo store lookup</td>
+<td>—</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/wishlist</code></td>
+<td>Hearted products (this browser only)</td>
+<td>Remove</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td><code>/shop/cart</code></td>
+<td>Cart in this browser (filled only by <strong>Reorder</strong>)</td>
+<td>Quantity 1–5, remove, save for later, promo (demo codes SOMBA10, SAVE20), checkout</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td><code>/shop/checkout</code></td>
+<td>3 fixed demo addresses, zone fees</td>
+<td>Address, cross-city (blocked), open box, note, continue</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/checkout/payment</code></td>
+<td>Card (placeholder) or Airtel Money</td>
+<td><strong>Pay</strong> → <code>orders:create</code> when signed in with a non-empty cart; otherwise or on error goes to a demo confirmation</td>
+<td>LIVE (partly)</td>
+</tr>
+<tr>
+<td><code>/shop/orders/:id/confirmed</code>, <code>/shop/orders/success</code></td>
+<td>Demo order</td>
+<td>View order, track</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/orders</code></td>
+<td><code>orders:list</code>, ⚡ <code>order:*</code></td>
+<td>View, Return (delivered)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/orders/:id</code></td>
+<td>Live order</td>
+<td><strong>Cancel</strong> (<code>orders:cancel</code>), Reorder (local cart), Return, Review, Open support ticket</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/orders/:id/tracking</code></td>
+<td>Live status; map and ETA are placeholders</td>
+<td>—</td>
+<td>LIVE + MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/orders/:id/return</code></td>
+<td>Live order</td>
+<td>3 steps: items, reason, confirm → local reference only (no <code>disputes:open</code>)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/shop/returns/:id</code>, <code>/shop/disputes/:id</code>, <code>/shop/exchange</code></td>
+<td>Demo records</td>
+<td>Read-only / local submit</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/support</code>, <code>/shop/support/:id</code></td>
+<td>Tickets stored in this browser</td>
+<td>New ticket, chat with attachments</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td><code>/shop/notifications</code></td>
+<td><code>notifications:list</code>, ⚡ <code>notification:new</code></td>
+<td>Filters, mark all read (<code>notifications:markAllRead</code>), open (<code>notifications:markRead</code>)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/account</code></td>
+<td>Demo profile</td>
+<td>Menu: orders, wishlist, refer, addresses, support, notifications, help, deals</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/shop/account/addresses</code></td>
+<td><code>addresses:list</code>, ⚡ <code>addresses:updated</code></td>
+<td>Add (<code>addresses:create</code>), edit (<code>addresses:update</code>), set default, delete (<code>addresses:remove</code>)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/shop/account/delete</code></td>
+<td>—</td>
+<td>Request deletion (message only)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/shop/help</code></td>
+<td>FAQ</td>
+<td>Request deletion, open ticket</td>
+<td>static</td>
+</tr>
+<tr>
+<td><code>/shop/refer</code></td>
+<td>Demo code and stats</td>
+<td>Copy code</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/sell-online</code>, <code>/sell-online/subscribe</code></td>
+<td>Plans Starter $49, Pro $99, Enterprise</td>
+<td>Plan checkout form (no charge) → sign in / seller register</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/get-app</code></td>
+<td>—</td>
+<td>Redirects phones to the store</td>
+<td>static</td>
+</tr>
+<tr>
+<td><code>/live</code></td>
+<td>Developer console</td>
+<td>Exercises real customer, seller, admin and rider events</td>
+<td>LIVE (internal)</td>
+</tr>
+</tbody></table></div>
+<h3 id="54-flowcharts"><a class="anchor" href="#54-flowcharts" aria-hidden="true">#</a>5.4 Flowcharts</h3>
+<h4 id="w-1-browse-to-product-web"><a class="anchor" href="#w-1-browse-to-product-web" aria-hidden="true">#</a>W-1 Browse to product (web)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  H(["/ home"]) --&gt;|Browse products| P(["/shop/products"])
+  H --&gt;|search| S(["/shop/search?q="])
+  P --&gt; F[Sort and filters - in the browser] --&gt; P
+  P --&gt; PD(["Product page"])
+  S --&gt; PD
+  C(["/shop/categories"]) --&gt; S
+  D(["/shop/deals"]) --&gt; PD
+  PD --&gt; A{Shopper action}
+  A -- "Buy" --&gt; AS[App Store / Google Play link]
+  A -- "Share" --&gt; SH[Native share or copy link]
+  A -- "Follow store / ask question / variant" --&gt; LC[Saved in the browser only]
+  A -- "Reviews" --&gt; RV([Reviews page - demo])</pre></div>
+<h4 id="w-2-web-checkout-as-it-works-today"><a class="anchor" href="#w-2-web-checkout-as-it-works-today" aria-hidden="true">#</a>W-2 Web checkout as it works today</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  OD(["Delivered order"]) --&gt;|Reorder| CT(["/shop/cart"])
+  CT --&gt; PR[Promo: demo codes only] --&gt; CO(["/shop/checkout"])
+  CO --&gt; AD[Pick one of 3 demo addresses, options, note] --&gt; PY(["/shop/checkout/payment"])
+  PY --&gt; M{Card or Airtel}
+  M --&gt; Pay[Pay]
+  Pay --&gt; C{Signed in, connected,&lt;br/&gt;cart not empty?}
+  C -- no --&gt; Demo(["Demo confirmation ORD-2024-001"])
+  C -- yes --&gt; OC["orders:create (items by name, zone fee)"]
+  OC --&gt; OR{Server accepts?}
+  OR -- yes --&gt; Real(["/shop/orders/REF/confirmed"])
+  OR -- "no: error toast" --&gt; Demo</pre></div>
+<h4 id="w-3-orders-cancel-and-support-web"><a class="anchor" href="#w-3-orders-cancel-and-support-web" aria-hidden="true">#</a>W-3 Orders, cancel and support (web)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  O(["/shop/orders"]) --&gt; OD(["/shop/orders/:id"])
+  OD --&gt; S{Status}
+  S -- "pending / confirmed" --&gt; CX["Cancel → orders:cancel"] --&gt; CR{Allowed?}
+  CR -- yes --&gt; CU[⚡ order:updated cancelled, refund to wallet if paid]
+  CR -- no --&gt; CE[Toast: can no longer be cancelled]
+  S -- "processing → out for delivery" --&gt; TR(["Tracking page - status live, map placeholder"])
+  S -- delivered --&gt; DL{Option}
+  DL -- Reorder --&gt; CT(["Cart"])
+  DL -- Return --&gt; RW([Return wizard - local only])
+  DL -- Review --&gt; RV([Reviews - demo])
+  OD --&gt;|Open support ticket| SP(["/shop/support - stored in browser"])</pre></div>
+<h4 id="w-4-addresses-and-notifications-web"><a class="anchor" href="#w-4-addresses-and-notifications-web" aria-hidden="true">#</a>W-4 Addresses and notifications (web)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  A(["/shop/account/addresses"]) --&gt; L["addresses:list"]
+  A --&gt; N[Add address form] --&gt; V{Street and city?}
+  V -- no --&gt; N
+  V -- yes --&gt; C["addresses:create"] --&gt; U[⚡ addresses:updated]
+  A --&gt; E[Edit] --&gt; EU["addresses:update"]
+  A --&gt; D[Set default] --&gt; DU["addresses:update isDefault"]
+  A --&gt; R[Delete] --&gt; RU["addresses:remove"]
+  NT(["/shop/notifications"]) --&gt; NL["notifications:list + ⚡ notification:new"]
+  NT --&gt; MA["Mark all read → notifications:markAllRead"]
+  NT --&gt; MO["Open → notifications:markRead → linked page"]</pre></div>
+<h3 id="55-gaps-in-the-web-shop"><a class="anchor" href="#55-gaps-in-the-web-shop" aria-hidden="true">#</a>5.5 Gaps in the web shop</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Gap</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>No add-to-cart on product pages; the cart fills only through Reorder; cart and wishlist live in the browser only</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Checkout uses 3 fixed demo addresses (not the customer&#39;s saved addresses); promo codes are demo codes; card is a placeholder; the Airtel number and promo are not sent; failures fall through to a demo confirmation</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Returns, return status, disputes, exchange, support tickets, refer, account profile and delete account are demo or browser-only</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Home page, header search suggestions, store pages and product reviews use demo ids, so their links show &quot;not found&quot; for real products</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Header bell count is demo data; there is no sign-out in the shop header</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Legal pages for returns, seller and shipping are linked but missing</td>
+</tr>
+<tr>
+<td>7</td>
+<td>The demo role picker is on unless <code>NEXT_PUBLIC_DEMO_MODE=false</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="6-seller--web-portal-seller"><a class="anchor" href="#6-seller--web-portal-seller" aria-hidden="true">#</a>6. Seller — web portal (<code>/seller</code>)</h2>
+<h3 id="61-navigation-and-access"><a class="anchor" href="#61-navigation-and-access" aria-hidden="true">#</a>6.1 Navigation and access</h3>
+<p>Sidebar (one list): <strong>Dashboard · Storefront · Products · Inventory · Orders · Disputes · Notifications · Shipping · Returns · Replacements · Promotions · Reviews · Finance · Analytics · Support · Settings</strong>. Header: language, persona name, logout.</p>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  In([Open any /seller page]) --&gt; G1{Signed in?}
+  G1 -- no --&gt; L(["/login"])
+  G1 -- yes --&gt; G2{Role = seller?}
+  G2 -- no --&gt; Own[Sent to own portal]
+  G2 -- yes --&gt; G3{Store blocked by moderation?}
+  G3 -- yes --&gt; Blk(["Account blocked → email support"])
+  G3 -- no --&gt; G4{Active subscription?&lt;br/&gt;stored in the browser}
+  G4 -- no --&gt; Sub(["/seller/subscribe"]) --&gt; Plan{Plan}
+  Plan -- "Starter / Pro" --&gt; Act[Activate - demo, no charge] --&gt; Dash
+  Plan -- Enterprise --&gt; Mail[Email sales]
+  G4 -- yes --&gt; Dash(["/seller dashboard"])
+  Dash --&gt; M{Menu}
+  M --&gt; Store(["Storefront / Settings"])
+  M --&gt; Prod(["Products / Inventory"])
+  M --&gt; Ord(["Orders / Shipping"])
+  M --&gt; AS(["Returns / Replacements / Disputes"])
+  M --&gt; Mkt(["Promotions / Reviews"])
+  M --&gt; Fin(["Finance / Payouts"])
+  M --&gt; An(["Analytics"])
+  M --&gt; Sup(["Notifications / Support"])</pre></div>
+<p>The store approval state (pending / approved / rejected / suspended) is <strong>enforced by the server</strong> (a store that is not approved cannot publish products, request payouts or create campaigns), but the portal does not yet show a &quot;pending approval&quot; screen automatically — <code>/seller/register</code>, <code>/seller/pending</code> and <code>/seller/resubmit</code> are static pages.</p>
+<h3 id="62-every-page-and-its-options"><a class="anchor" href="#62-every-page-and-its-options" aria-hidden="true">#</a>6.2 Every page and its options</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Page</th>
+<th>Data</th>
+<th>Options</th>
+<th>Status</th>
+</tr>
+</thead><tbody><tr>
+<td><code>/seller</code> dashboard</td>
+<td>Store name, rating, badge (<code>sellers:mine</code>, <code>sellers:stats</code>); revenue and orders from live orders; low-stock list; recent orders; finance snapshot</td>
+<td>Analytics, Create product, quick actions (orders, create product, request payout, request promotion); charts, funnel, segments and activity are demo</td>
+<td>LIVE + MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/register</code> · <code>/pending</code> · <code>/resubmit</code></td>
+<td>Registration form, waiting and resubmission screens</td>
+<td>Submit / resubmit (no server call)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/seller/subscribe</code></td>
+<td>Plans</td>
+<td>Activate (browser only), contact sales</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td><code>/seller/storefront</code> (+ preview)</td>
+<td>Store names and descriptions</td>
+<td>Save, preview, publish (messages only)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/seller/settings</code></td>
+<td>Store name (live), monthly goals</td>
+<td>Edit goals (browser), <strong>Save settings</strong> (<code>sellers:update</code>), permissions and logo (demo)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td><code>/seller/products</code></td>
+<td>Own products from the live catalogue</td>
+<td>Search, status filter, view, create, Unavailable / Mark live (<code>products:update</code> — the server ignores status changes from sellers)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/seller/products/create</code></td>
+<td>7-step wizard: basic info, media, variants, inventory, pricing, shipping, review</td>
+<td><strong>Submit</strong> → <code>products:create {name, nameFr, price, category, stock}</code>; media, variants, SKU, brand, description, weight are not sent yet; Save draft (message)</td>
+<td>LIVE (partial)</td>
+</tr>
+<tr>
+<td><code>/seller/products/:id</code></td>
+<td>Live product + derived stock/pricing, orders with this product, reviews (<code>reviews:seller</code>)</td>
+<td>Edit (opens empty wizard), mark unavailable / live</td>
+<td>LIVE + DERIVED</td>
+</tr>
+<tr>
+<td><code>/seller/inventory</code> (+ <code>:sku</code>)</td>
+<td>Derived from live products</td>
+<td>Search, export CSV (browser), import CSV and adjust stock (messages)</td>
+<td>DERIVED / STUB</td>
+</tr>
+<tr>
+<td><code>/seller/orders</code></td>
+<td>Orders containing own products (<code>orders:list</code>, ⚡ <code>order:*</code>) — customer first name only, no address</td>
+<td>Search, dates, status; Accept / Mark ready (local only)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td><code>/seller/orders/:id</code></td>
+<td>Order lines, payment, commission 12 %, net, timeline</td>
+<td>Package ready, flag unavailable (local only), open support</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td><code>/seller/shipping</code> (+ <code>:id</code>)</td>
+<td>Derived shipments from live orders</td>
+<td>Search, filters, view</td>
+<td>DERIVED</td>
+</tr>
+<tr>
+<td><code>/seller/returns</code> (+ <code>:id</code>)</td>
+<td>Customer returns (<code>disputes:list</code> type return)</td>
+<td>View only — the admin decides</td>
+<td>LIVE (read-only)</td>
+</tr>
+<tr>
+<td><code>/seller/replacements</code> (+ <code>:id</code>)</td>
+<td>Empty list; detail from browser data</td>
+<td>View</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/disputes</code> (+ <code>:id</code>)</td>
+<td>Demo disputes</td>
+<td>Respond (browser only)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/reviews</code></td>
+<td><code>reviews:seller</code></td>
+<td>Reply, report (browser only, visible to admin moderation locally)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td><code>/seller/promotions</code> (+ <code>:id</code>)</td>
+<td>Empty list</td>
+<td>Create campaign</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/promotions/create</code></td>
+<td>Name, discount %, start, end</td>
+<td><strong>Submit for approval</strong> → <code>campaigns:create</code> (store must be approved; created as pending)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/seller/finance</code></td>
+<td>Revenue (live), pending and available (derived), payouts (<code>payouts:list</code>), charts (demo)</td>
+<td>Request payout, transactions, payouts, statements, tax</td>
+<td>LIVE + MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/finance/transactions</code></td>
+<td>Derived from live orders</td>
+<td>Search, dates, status</td>
+<td>DERIVED</td>
+</tr>
+<tr>
+<td><code>/seller/finance/payouts</code> (+ <code>:id</code>, <code>pending</code>)</td>
+<td><code>payouts:list</code>, ⚡ <code>payout:created/updated</code></td>
+<td>View, breakdown</td>
+<td>LIVE + DERIVED</td>
+</tr>
+<tr>
+<td><code>/seller/finance/payouts/request</code></td>
+<td>Available shown as a fixed demo figure</td>
+<td><strong>Request</strong> → <code>payouts:request {amountUsd}</code> (≥ $10, ≤ server-computed available, store approved); bank fields not sent</td>
+<td>LIVE (partial)</td>
+</tr>
+<tr>
+<td><code>/seller/finance/statements</code>, <code>/tax</code></td>
+<td>Demo months / static text</td>
+<td>Download (demo file)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/seller/analytics</code> (+ products, revenue, customers, inventory)</td>
+<td>Demo charts; &quot;Best sellers&quot; live</td>
+<td>Period and date controls</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/notifications</code></td>
+<td>Demo notifications</td>
+<td>Mark read (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/seller/support</code> (+ <code>:id</code>)</td>
+<td>Tickets stored in the browser</td>
+<td>New ticket (auto-filled), chat with attachments</td>
+<td>LOCAL</td>
+</tr>
+</tbody></table></div>
+<h3 id="63-flowcharts"><a class="anchor" href="#63-flowcharts" aria-hidden="true">#</a>6.3 Flowcharts</h3>
+<h4 id="s-1-seller-onboarding-and-approval"><a class="anchor" href="#s-1-seller-onboarding-and-approval" aria-hidden="true">#</a>S-1 Seller onboarding and approval</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  V([Visitor]) --&gt; SO(["/sell-online"]) --&gt; SU["Sign up as seller&lt;br/&gt;POST /auth/register role=seller"]
+  SU --&gt; SR["sellers:register {name}"] --&gt; PD[Store status: pending]
+  PD --&gt; AD{{⚡ seller:updated to admins}}
+  AD --&gt; DEC{Admin / moderation / operations decision&lt;br/&gt;sellers:setStatus}
+  DEC -- approved --&gt; OK[Store can publish products,&lt;br/&gt;request payouts and create campaigns]
+  DEC -- rejected --&gt; RJ[Seller informed - resubmission screen is static today]
+  DEC -- "suspended (later)" --&gt; SP[Sessions ended, listings blocked]
+  OK --&gt; NT[⚡ seller:updated to the seller + notification]</pre></div>
+<h4 id="s-2-product-listing"><a class="anchor" href="#s-2-product-listing" aria-hidden="true">#</a>S-2 Product listing</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  C(["/seller/products/create"]) --&gt; W1[1 Basic info] --&gt; W2[2 Media] --&gt; W3[3 Variants] --&gt; W4[4 Inventory] --&gt; W5[5 Pricing] --&gt; W6[6 Shipping] --&gt; W7[7 Review]
+  W7 --&gt; SB["Submit → products:create&lt;br/&gt;name, nameFr, price, category, stock"]
+  SB --&gt; V{Server checks&lt;br/&gt;name 1–200 chars, price 0.01–1,000,000,&lt;br/&gt;category, store approved}
+  V -- fails --&gt; X[Nothing happens on screen today - error not shown]
+  V -- ok --&gt; LV[Product created as LIVE]
+  LV --&gt; PU[⚡ product:created to shoppers and admins]
+  PU --&gt; L(["/seller/products"])
+  L --&gt; T{Row action}
+  T -- View --&gt; D(["Product detail: stock, pricing, orders, reviews"])
+  T -- "Unavailable / Mark live" --&gt; U["products:update status - ignored for sellers"]
+  T -- Edit --&gt; C</pre></div>
+<h4 id="s-3-orders-and-fulfilment-seller-view"><a class="anchor" href="#s-3-orders-and-fulfilment-seller-view" aria-hidden="true">#</a>S-3 Orders and fulfilment (seller view)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  NO{{⚡ order:created / order:updated}} --&gt; OL(["/seller/orders&lt;br/&gt;only lines of my products,&lt;br/&gt;first name, no address"])
+  OL --&gt; F[Search, dates, shipping status]
+  OL --&gt; OD(["Order detail"])
+  OD --&gt; A{Seller action}
+  A -- "Accept / Mark ready / Package ready" --&gt; LC[Shown locally - not sent to the server yet]
+  A -- "Flag unavailable" --&gt; FU[Choose item + reason → local message]
+  A -- "Open support" --&gt; SP(["/seller/support"])
+  OD --&gt; TL[Timeline follows the real order status set by riders and ops]
+  TL --&gt; SH(["/seller/shipping - derived shipment view"])</pre></div>
+<h4 id="s-4-payout-request"><a class="anchor" href="#s-4-payout-request" aria-hidden="true">#</a>S-4 Payout request</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  F(["/seller/finance"]) --&gt; RQ(["/seller/finance/payouts/request"])
+  RQ --&gt; AM[Enter amount]
+  AM --&gt; PR["payouts:request {amountUsd}"]
+  PR --&gt; V{Server rules&lt;br/&gt;seller role, store approved, ≥ $10,&lt;br/&gt;≤ available = delivered sales older than 48 h&lt;br/&gt;minus 12 % commission minus earlier payouts}
+  V -- fails --&gt; X[No message today]
+  V -- ok --&gt; RC[Payout requested]
+  RC --&gt; FN{{⚡ payout:created to finance}}
+  FN --&gt; D{Finance decision}
+  D -- approve --&gt; PD["payouts:approve → status paid,&lt;br/&gt;seller's in-app wallet credited"]
+  D -- reject --&gt; RJ["payouts:reject → status rejected"]
+  PD &amp; RJ --&gt; U{{⚡ payout:updated → /seller/finance/payouts}}</pre></div>
+<h4 id="s-5-campaigns-reviews-returns"><a class="anchor" href="#s-5-campaigns-reviews-returns" aria-hidden="true">#</a>S-5 Campaigns, reviews, returns</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  P(["/seller/promotions/create"]) --&gt; N{Name entered?}
+  N -- no --&gt; NE[Enter a campaign name]
+  N -- yes --&gt; CC["campaigns:create {name, discount, start, end}"]
+  CC --&gt; CS{Store approved?}
+  CS -- no --&gt; X[No message today]
+  CS -- yes --&gt; PEN[Campaign pending → marketing admins notified]
+  PEN --&gt; AD["Admin campaigns:setStatus (approve / schedule / reject)"]
+  R(["/seller/reviews"]) --&gt; RL["reviews:seller"]
+  R --&gt; RP[Reply / report → saved in the browser]
+  RT(["/seller/returns"]) --&gt; RTL["disputes:list (returns of my products)"] --&gt; RD[Read-only; admin resolves]</pre></div>
+<h3 id="64-gaps-in-the-seller-portal"><a class="anchor" href="#64-gaps-in-the-seller-portal" aria-hidden="true">#</a>6.4 Gaps in the seller portal</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Gap</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Server errors (product create, payout request, campaign create) are not shown to the seller</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Registration, pending approval and resubmission screens are not connected to <code>sellers:register</code> / store status</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Subscription is browser-only (no billing on the server)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Product wizard sends only name, price, category and stock; no edit, delete, images, variants or stock adjustment</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Order &quot;accept / ready / unavailable&quot; actions are local only (the server has no seller fulfilment step yet)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Campaign list, disputes, replacements, notifications, support, statements, tax and most analytics are demo or browser-only</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Payout request shows a fixed available amount (the server&#39;s <code>payouts:available</code> exists but is not called); bank details are not sent</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Several status filters offer values that live data never produces</td>
+</tr>
+</tbody></table></div>
+<h2 id="7-admin--web-portal-admin-and-its-sub-roles"><a class="anchor" href="#7-admin--web-portal-admin-and-its-sub-roles" aria-hidden="true">#</a>7. Admin — web portal (<code>/admin</code>) and its sub-roles</h2>
+<h3 id="71-who-sees-which-menu"><a class="anchor" href="#71-who-sees-which-menu" aria-hidden="true">#</a>7.1 Who sees which menu</h3>
+<p>The super admin sees every group. Every other admin sees <strong>only its own group</strong> and lands on its first page.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Group</th>
+<th>Menu items → route</th>
+<th align="center">Super admin</th>
+<th align="center">Operations</th>
+<th align="center">Finance</th>
+<th align="center">Support</th>
+<th align="center">Marketing</th>
+<th align="center">Moderation</th>
+<th align="center">Warehouse admin*</th>
+</tr>
+</thead><tbody><tr>
+<td>Administration</td>
+<td>Dashboard <code>/admin</code> · Roles <code>/admin/roles</code> · Audit log <code>/admin/audit</code> · Settings <code>/admin/settings</code></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>Finance</td>
+<td>Finance <code>/admin/finance</code> · Payouts <code>/admin/payouts</code> · Refunds <code>/admin/refunds</code> · Fraud &amp; payments <code>/admin/fraud</code> · Analytics <code>/admin/analytics</code></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>Operations</td>
+<td>Orders <code>/admin/orders</code> · Fulfilment ops <code>/admin/fulfillment</code> (+ every fulfilment page) · Disputes <code>/admin/disputes</code> · Returns <code>/admin/returns</code> · Zones <code>/admin/zones</code></td>
+<td align="center">✔</td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>Warehouse admin</td>
+<td>Warehouses <code>/admin/warehouses</code> · Warehouse staff <code>/admin/warehouses/staff</code> · Inventory · Dispatch</td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✔</td>
+</tr>
+<tr>
+<td>Moderation</td>
+<td>Moderation <code>/admin/moderation</code> · Products <code>/admin/products</code> · Sellers <code>/admin/sellers</code> · Reviews <code>/admin/reviews</code> · Categories <code>/admin/categories</code></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✔</td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>Marketing</td>
+<td>Flash sales <code>/admin/flash-sales</code> · Promotions <code>/admin/promotions</code> · CMS <code>/admin/cms</code> · Broadcasts <code>/admin/broadcasts</code> · Marketing <code>/admin/marketing</code></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td>Support</td>
+<td>Support <code>/admin/support</code> · Customers <code>/admin/customers</code></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✔</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+<tr>
+<td><strong>Lands on</strong></td>
+<td></td>
+<td align="center"><code>/admin</code></td>
+<td align="center"><code>/admin/orders</code></td>
+<td align="center"><code>/admin/finance</code></td>
+<td align="center"><code>/admin/support</code></td>
+<td align="center"><code>/admin/flash-sales</code></td>
+<td align="center"><code>/admin/moderation</code></td>
+<td align="center"><code>/admin/warehouses</code></td>
+</tr>
+</tbody></table></div>
+<p>* Warehouse admin is a web department without its own server role yet. The server checks each request again with the real role (see the permission table in <code>ARCHITECTURE.md</code>, section 7.2).</p>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  L(["/login"]) --&gt; R{Admin role}
+  R -- admin --&gt; SA(["Super admin: all groups"])
+  R -- admin_operations --&gt; OP(["Orders · Fulfilment · Disputes · Returns · Zones"])
+  R -- admin_finance --&gt; FI(["Finance · Payouts · Refunds · Fraud · Analytics"])
+  R -- admin_support --&gt; SU(["Support · Customers"])
+  R -- admin_marketing --&gt; MK(["Flash sales · Promotions · CMS · Broadcasts · Marketing"])
+  R -- admin_moderation --&gt; MO(["Moderation · Products · Sellers · Reviews · Categories"])
+  SA &amp; OP &amp; FI &amp; SU &amp; MK &amp; MO --&gt; G{Opens a page outside the group?}
+  G -- yes --&gt; Home[Sent back to the group's first page]
+  G -- no --&gt; P[Page opens]</pre></div>
+<h3 id="72-every-page-and-its-options"><a class="anchor" href="#72-every-page-and-its-options" aria-hidden="true">#</a>7.2 Every page and its options</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Page</th>
+<th>Data</th>
+<th>Options</th>
+<th>Status</th>
+</tr>
+</thead><tbody><tr>
+<td>Dashboard <code>/admin</code></td>
+<td>KPIs, charts, alerts (demo); recent orders and seller queue (live)</td>
+<td>Period, alerts, quick links, approve sellers (link); queue approve/reject (message only)</td>
+<td>LIVE + MOCK</td>
+</tr>
+<tr>
+<td>Roles <code>/admin/roles</code></td>
+<td>Role catalogue (<code>roles:defs</code>)</td>
+<td>Edit permissions, save (message only); no staff list or role assignment on screen</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Audit log <code>/admin/audit</code></td>
+<td><code>audit:list</code></td>
+<td>Read-only</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Settings <code>/admin/settings</code></td>
+<td>Market profile, commission, FX, minimum payout, clearance hours, zone fees</td>
+<td>Save (message only — <code>settings:set</code> not wired)</td>
+<td>LOCAL / STUB</td>
+</tr>
+<tr>
+<td>Finance <code>/admin/finance</code></td>
+<td>Revenue, payouts, commission, cash flow</td>
+<td>—</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Payouts <code>/admin/payouts</code></td>
+<td><code>payouts:list</code>, ⚡ <code>payout:*</code></td>
+<td>Filters; approve / reject (screen only — <code>payouts:approve/reject</code> not wired)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Refunds <code>/admin/refunds</code></td>
+<td>2 demo refunds</td>
+<td>Authorise (screen only)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Fraud <code>/admin/fraud</code></td>
+<td><code>fraud:list</code></td>
+<td>Filters, open order; no status change</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Analytics <code>/admin/analytics</code></td>
+<td>Charts</td>
+<td>Period</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Orders <code>/admin/orders</code> (+ <code>:id</code>)</td>
+<td><code>orders:list</code>, ⚡ <code>order:*</code>; detail with customer, seller, payment, logistics, commission</td>
+<td>Filters, view; <strong>no status change, refund or cancel on screen</strong></td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Disputes <code>/admin/disputes</code> (+ <code>:id</code>)</td>
+<td>Demo disputes</td>
+<td>Chat (local); <strong>Resolve for buyer / for seller</strong> → <code>disputes:resolve</code></td>
+<td>MOCK + LIVE</td>
+</tr>
+<tr>
+<td>Returns <code>/admin/returns</code> (+ <code>:id</code>)</td>
+<td>Demo returns</td>
+<td>Read-only</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Zones <code>/admin/zones</code></td>
+<td>Demo zones</td>
+<td>Add zone, assign rider, pause / activate (local)</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td>Warehouses (+ <code>:id</code>, staff)</td>
+<td>Demo hubs and staff</td>
+<td>Create hub with credentials, reset password, activate / deactivate, add / edit / disable staff (local)</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td>Moderation <code>/admin/moderation</code></td>
+<td>Live products</td>
+<td><strong>Approve / Reject</strong> → <code>products:update status</code></td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Products <code>/admin/products</code> (+ <code>:id</code>)</td>
+<td>Live products</td>
+<td>Review → <strong>Approve / Reject</strong> (<code>products:update</code>), request changes, notes, block (local)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Sellers <code>/admin/sellers</code> (+ <code>:id</code>)</td>
+<td><code>sellers:list</code></td>
+<td><strong>Approve / Reject</strong> pending store → <code>sellers:setStatus</code>; block / unblock (local)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Reviews <code>/admin/reviews</code></td>
+<td>Demo reviews + seller reports</td>
+<td>Publish / remove, resolve / dismiss reports (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Categories <code>/admin/categories</code></td>
+<td>Categories stored in the browser</td>
+<td>Add / edit with image (local)</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td>Flash sales <code>/admin/flash-sales</code></td>
+<td><code>flashsales:list</code></td>
+<td>Create (screen only — <code>flashsales:create</code> not wired)</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Promotions <code>/admin/promotions</code></td>
+<td>Demo seller promotion requests</td>
+<td>Approve / reject (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>CMS <code>/admin/cms</code></td>
+<td><code>cms:list</code></td>
+<td>Show / hide block (local), preview</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Broadcasts <code>/admin/broadcasts</code></td>
+<td>Demo broadcasts</td>
+<td>Compose: channel, audience, title, message → send / schedule (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Marketing <code>/admin/marketing</code></td>
+<td>Demo campaigns, banners</td>
+<td>Create campaign (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Support <code>/admin/support</code> (+ <code>:id</code>)</td>
+<td>Tickets stored in the browser</td>
+<td>Reply with attachments, set status (local)</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td>Customers <code>/admin/customers</code> (+ <code>:id</code>)</td>
+<td><code>customers:list</code></td>
+<td>Filters; <strong>Suspend / Reactivate</strong> → <code>customers:setActive</code></td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Fulfilment <code>/admin/fulfillment/*</code></td>
+<td>Same pages as the warehouse portal (section 8)</td>
+<td>Same options</td>
+<td>LIVE + MOCK</td>
+</tr>
+</tbody></table></div>
+<h3 id="73-flowcharts"><a class="anchor" href="#73-flowcharts" aria-hidden="true">#</a>7.3 Flowcharts</h3>
+<h4 id="a-1-seller-moderation"><a class="anchor" href="#a-1-seller-moderation" aria-hidden="true">#</a>A-1 Seller moderation</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  NS{{⚡ seller:updated - new store pending}} --&gt; SL(["/admin/sellers"])
+  SL --&gt; SD(["Seller detail"])
+  SD --&gt; S{Store status}
+  S -- pending --&gt; D{Decision}
+  D -- Approve --&gt; AP["sellers:setStatus approved"] --&gt; OK[Seller can publish, request payouts, run campaigns]
+  D -- Reject --&gt; RJ["sellers:setStatus rejected"]
+  S -- "approved / other" --&gt; BL{Block storefront?}
+  BL -- yes --&gt; LB[Blocked in this browser only today]
+  AP &amp; RJ --&gt; PUSH{{⚡ seller:updated to the seller + notification + audit entry}}</pre></div>
+<h4 id="a-2-product-moderation"><a class="anchor" href="#a-2-product-moderation" aria-hidden="true">#</a>A-2 Product moderation</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  Q(["/admin/moderation or /admin/products"]) --&gt; P(["Product"])
+  P --&gt; ST{Status pending?}
+  ST -- no --&gt; VIEW[View only]
+  ST -- yes --&gt; D{Decision}
+  D -- Approve --&gt; A["products:update status = live"] --&gt; V[⚡ product:updated - visible to shoppers]
+  D -- Reject --&gt; R["products:update status = rejected"] --&gt; H[⚡ product:updated - hidden]
+  D -- "Request changes / notes" --&gt; LC[Kept on screen only today]
+  Note["Today new seller listings go straight to live,&lt;br/&gt;so the pending queue fills only when a listing is set back to pending"] -.-&gt; ST</pre></div>
+<h4 id="a-3-customer-suspension"><a class="anchor" href="#a-3-customer-suspension" aria-hidden="true">#</a>A-3 Customer suspension</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  C(["/admin/customers"]) --&gt; CD(["Customer detail: info, orders, spend"])
+  CD --&gt; S{Active?}
+  S -- yes --&gt; SU["Suspend → customers:setActive false"]
+  SU --&gt; K[Server ends every session and disconnects the customer's devices]
+  K --&gt; APP[Customer app returns to Sign in with a message]
+  S -- no --&gt; RE["Reactivate → customers:setActive true"] --&gt; CAN[Customer can sign in again]
+  SU &amp; RE --&gt; AU[Audit entry + ⚡ customer:updated]</pre></div>
+<h4 id="a-4-disputes-and-returns"><a class="anchor" href="#a-4-disputes-and-returns" aria-hidden="true">#</a>A-4 Disputes and returns</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  NEW{{⚡ dispute:created from the customer app}} --&gt; DL(["/admin/disputes"])
+  DL --&gt; DD(["Dispute detail: reason, order, buyer, seller, payment, chat"])
+  DD --&gt; D{Decision}
+  D -- "Favour buyer" --&gt; FB["disputes:resolve refund = true"]
+  FB --&gt; FR{Admin or finance?}
+  FR -- yes --&gt; RF[Payment refunded to the customer's wallet, order returned]
+  FR -- no --&gt; NR[Resolved without refund]
+  D -- "Favour seller" --&gt; FS["disputes:resolve refund = false"]
+  D -- "Reject (server supports disputes:reject, no button yet)" --&gt; RJ[Rejected]
+  RF &amp; NR &amp; FS &amp; RJ --&gt; PU{{⚡ dispute:updated → customer's Returns screen}}</pre></div>
+<h4 id="a-5-finance-payouts-refunds-fraud"><a class="anchor" href="#a-5-finance-payouts-refunds-fraud" aria-hidden="true">#</a>A-5 Finance: payouts, refunds, fraud</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  PR{{⚡ payout:created from a seller}} --&gt; PL(["/admin/payouts"])
+  PL --&gt; PD{Requested?}
+  PD -- yes --&gt; DEC{Approve or reject}
+  DEC --&gt; SRV["Server-side: payouts:approve credits the seller wallet,&lt;br/&gt;payouts:reject records the note"]
+  SRV -.-&gt; GAP["⚠ buttons on this page change the screen only today"]
+  RF(["/admin/refunds"]) --&gt; RFA[Authorise - demo]
+  OR(["Order"]) -.-&gt; ORF["Server supports orders:refund (to wallet or original method) - no button yet"]
+  FR(["/admin/fraud"]) --&gt; FRL["fraud:list - COD orders above the cap are flagged"] --&gt; FRO[Open the order]</pre></div>
+<h4 id="a-6-marketing-and-content"><a class="anchor" href="#a-6-marketing-and-content" aria-hidden="true">#</a>A-6 Marketing and content</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  FS(["Flash sales"]) --&gt; FSL["flashsales:list"] --&gt; FSC[Create: name, dates, discount] --&gt; FSX[Screen only today]
+  PM(["Promotions"]) --&gt; PMA[Approve / reject seller requests - demo]
+  CMS(["CMS"]) --&gt; CML["cms:list"] --&gt; CMT[Show / hide block - screen only]
+  BR(["Broadcasts"]) --&gt; BRC[Channel push / SMS / email, audience, title, message]
+  BRC --&gt; BRV{Title entered?}
+  BRV -- no --&gt; BRE[Error message]
+  BRV -- yes --&gt; BRS[Send now / schedule - screen only today;&lt;br/&gt;server supports broadcasts:send]
+  MK(["Marketing"]) --&gt; MKC[Create campaign - demo]</pre></div>
+<h4 id="a-7-platform-administration"><a class="anchor" href="#a-7-platform-administration" aria-hidden="true">#</a>A-7 Platform administration</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  RO(["Roles"]) --&gt; RD["roles:defs - 7 staff roles and their scopes"]
+  RO -.-&gt; RS["Server supports roles:staff and roles:setRole&lt;br/&gt;(change a user's role, ends their sessions) - no screen yet"]
+  AU(["Audit log"]) --&gt; AL["audit:list - who did what, when"]
+  SE(["Settings"]) --&gt; SF[Commission, FX rate, minimum payout, clearance hours]
+  SF -.-&gt; SS["Server supports settings:set (codEnabled, codCapUsd,&lt;br/&gt;deliveryZones, fxRate, commissionPct) - Save not wired"]
+  ZN(["Zones"]) --&gt; ZA[Add zone, assign riders, pause - local today]
+  WH(["Warehouses"]) --&gt; WC[Create hub + portal credentials, staff - local today]</pre></div>
+<h3 id="74-gaps-in-the-admin-portal"><a class="anchor" href="#74-gaps-in-the-admin-portal" aria-hidden="true">#</a>7.4 Gaps in the admin portal</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Gap</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Only five admin actions reach the server today: seller approve/reject, product approve/reject, dispute resolve, customer suspend/reactivate (and the warehouse &quot;Receive&quot;, which the server refuses)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>No screen yet for: order status change, order refund or cancel, payout approve/reject, dispute reject, fraud status, role assignment and staff list, settings save (COD on/off, zones, FX, commission), promo codes, flash-sale create, CMS edit, broadcasts, categories (server CRUD), campaigns, support tickets</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Finance, refunds, analytics, disputes list, returns, reviews, promotions, marketing, broadcasts, zones, warehouses and staff show demo or browser-only data</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Links from admin pages to <code>/warehouse</code>, <code>/shop</code> or other groups bounce back; <code>/admin/fulfillment/aged</code> does not exist</td>
+</tr>
+<tr>
+<td>5</td>
+<td>In demo mode several admin personas sign into the super-admin server account</td>
+</tr>
+<tr>
+<td>6</td>
+<td>No exports, bulk actions or pagination on any list</td>
+</tr>
+</tbody></table></div>
+<h2 id="8-warehouse-staff--web-portal-warehouse"><a class="anchor" href="#8-warehouse-staff--web-portal-warehouse" aria-hidden="true">#</a>8. Warehouse staff — web portal (<code>/warehouse</code>)</h2>
+<h3 id="81-navigation-and-staff-tiers"><a class="anchor" href="#81-navigation-and-staff-tiers" aria-hidden="true">#</a>8.1 Navigation and staff tiers</h3>
+<p>Staff have three tiers: <strong>operator (1) · supervisor (2) · manager (3)</strong>. The sidebar only shows what the tier allows.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Menu item</th>
+<th>Route</th>
+<th>Minimum tier</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Dashboard</td>
+<td><code>/warehouse</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Inbound</td>
+<td><code>/warehouse/inbound</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Receiving</td>
+<td><code>/warehouse/receiving</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Sorting</td>
+<td><code>/warehouse/sorting</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Batch builder</td>
+<td><code>/warehouse/batch-builder</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Dispatch</td>
+<td><code>/warehouse/dispatch</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>–</td>
+<td>Inventory, Parcels (no menu entry)</td>
+<td><code>/warehouse/inventory</code>, <code>/warehouse/parcels/:id</code></td>
+<td>operator</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Riders</td>
+<td><code>/warehouse/riders</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Deliveries</td>
+<td><code>/warehouse/deliveries</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Transfers</td>
+<td><code>/warehouse/transfers</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Returns</td>
+<td><code>/warehouse/returns</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Replacements</td>
+<td><code>/warehouse/replacements</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Exchanges</td>
+<td><code>/warehouse/exchanges</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Aged parcels</td>
+<td><code>/warehouse/aged</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Exceptions</td>
+<td><code>/warehouse/exceptions</code></td>
+<td>supervisor</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Analytics</td>
+<td><code>/warehouse/analytics</code></td>
+<td>manager</td>
+</tr>
+<tr>
+<td>–</td>
+<td>Hubs (no menu entry)</td>
+<td><code>/warehouse/hubs</code></td>
+<td>manager</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Settings</td>
+<td><code>/warehouse/settings</code></td>
+<td>manager</td>
+</tr>
+</tbody></table></div>
+<p>The hub is fixed by the signed-in staff persona (Paris, Lyon, Kinshasa, Abidjan); there is no in-portal hub switcher.</p>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  subgraph Op["Operator"]
+    D(["Dashboard"]) --- IN(["Inbound"]) --- RC(["Receiving"]) --- SO(["Sorting"]) --- BB(["Batch builder"]) --- DS(["Dispatch"])
+  end
+  subgraph Sup["Supervisor adds"]
+    RI(["Riders"]) --- DL(["Deliveries"]) --- TR(["Transfers"]) --- RT(["Returns"]) --- RP(["Replacements"]) --- EX(["Exchanges"]) --- AG(["Aged"]) --- EC(["Exceptions"])
+  end
+  subgraph Man["Manager adds"]
+    AN(["Analytics"]) --- ST(["Settings"]) --- HB(["Hubs"])
+  end
+  Op --&gt; Sup --&gt; Man</pre></div>
+<h3 id="82-how-parcels-map-to-live-delivery-tasks"><a class="anchor" href="#82-how-parcels-map-to-live-delivery-tasks" aria-hidden="true">#</a>8.2 How parcels map to live delivery tasks</h3>
+<p>The warehouse pages derive a parcel &quot;stage&quot; from the live delivery task (<code>delivery:list</code>, ⚡ <code>delivery:updated</code>):</p>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  U["Task unassigned"] --&gt; I(["Stage: inbound"])
+  A["Task assigned to a rider"] --&gt; S(["Stage: sorting"])
+  P["picked_up"] --&gt; R(["Stage: ready"])
+  T["in_transit"] --&gt; DS(["Stage: dispatched"])
+  D["delivered"] --&gt; DV(["Stage: delivered"])
+  F["failed"] --&gt; E(["Stage: exception"])</pre></div>
+<h3 id="83-every-page-and-its-options"><a class="anchor" href="#83-every-page-and-its-options" aria-hidden="true">#</a>8.3 Every page and its options</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Page</th>
+<th>Data</th>
+<th>Options</th>
+<th>Status</th>
+</tr>
+</thead><tbody><tr>
+<td>Dashboard</td>
+<td>Demo KPIs, alerts, dispatch queue, leaderboard (hub name is real)</td>
+<td>Quick links, open dispatch, alerts</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Inbound</td>
+<td>All live tasks as parcels</td>
+<td>Search, status, <strong>Scan barcode</strong> (simulated), View, <strong>Receive</strong> (sends <code>delivery:updateStatus</code>, which the server refuses for staff), Inspect</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Receiving</td>
+<td>First 5 live parcels</td>
+<td>Scan (simulated), Receive (same as above)</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Parcel detail</td>
+<td>Live parcel, seller, customer, items, timeline</td>
+<td>Receive, accept, reject (messages), create incident (opens list)</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Sorting</td>
+<td>Live parcels in stage sorting</td>
+<td>Assign zone (2-step confirm), hold — both local</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Batch builder</td>
+<td>Demo parcels</td>
+<td>Add / remove, optimise route (reverses), create batch &amp; assign rider (demo riders)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Dispatch (+ batch detail)</td>
+<td>Demo batches; rider panel live</td>
+<td>Assign / change / auto-assign rider, dispatch — local</td>
+<td>MOCK + LOCAL</td>
+</tr>
+<tr>
+<td>Inventory (+ SKU)</td>
+<td><code>warehouse:inventory</code></td>
+<td>Search; adjust / move / reserve (messages)</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Riders (+ detail)</td>
+<td>Riders who have live tasks; earnings derived</td>
+<td>Zone A–D per rider (browser), assign (message), call</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td>Deliveries</td>
+<td>Demo parcels by type (local, cross-zone, inter-warehouse, return)</td>
+<td>Tabs, expand journey</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Delivery detail (no link)</td>
+<td>Live task</td>
+<td>Call rider, escalate (message)</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td>Transfers</td>
+<td>Demo transfer runs</td>
+<td>Mark arrived, receive at hub (messages)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Returns (+ detail)</td>
+<td>Demo returns</td>
+<td>Approve / reject (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Replacements (+ detail)</td>
+<td>Demo replacements kept in the browser</td>
+<td>Full workflow: start inspection → approve / reject → allocate → assign rider → dispatch → delivered → close (local)</td>
+<td>LOCAL</td>
+</tr>
+<tr>
+<td>Exchanges (+ detail)</td>
+<td>Demo exchanges</td>
+<td>Approve, allocate variant (messages), create dispatch</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Aged parcels (+ detail)</td>
+<td>All open live parcels</td>
+<td>Mark received, accept (messages), create incident</td>
+<td>LIVE + STUB</td>
+</tr>
+<tr>
+<td>Exceptions (+ detail)</td>
+<td>Demo incidents</td>
+<td>Investigation notes → update resolution (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>Demo charts</td>
+<td>Period controls</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Hubs</td>
+<td>Hub profile</td>
+<td>Read-only</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>Working hours, zones, batch size</td>
+<td>Save / reset (messages)</td>
+<td>STUB</td>
+</tr>
+</tbody></table></div>
+<h3 id="84-flowcharts"><a class="anchor" href="#84-flowcharts" aria-hidden="true">#</a>8.4 Flowcharts</h3>
+<h4 id="h-1-parcel-journey-through-the-hub-intended-with-what-is-live-today"><a class="anchor" href="#h-1-parcel-journey-through-the-hub-intended-with-what-is-live-today" aria-hidden="true">#</a>H-1 Parcel journey through the hub (intended, with what is live today)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  NO{{⚡ order paid → delivery task unassigned}} --&gt; IN(["Inbound list - LIVE"])
+  IN --&gt; SC{Scan or pick parcel}
+  SC -- "Scan barcode" --&gt; SIM[Simulated today - opens a demo parcel]
+  SC -- Inspect --&gt; PD(["Parcel detail"])
+  PD --&gt; IQ{Inspection}
+  IQ -- Accept --&gt; OKM[Message only today]
+  IQ -- Reject --&gt; RJ[Message only today]
+  IQ -- "Create incident" --&gt; EXL(["Exceptions list"])
+  IN --&gt; RC["Receive → delivery:updateStatus 'assigned'"]
+  RC --&gt; RCX[Refused by the server today: riders only]
+  IN --&gt; ASG{How is a rider attached?}
+  ASG -- "rider claims in the app" --&gt; ACC["delivery:accept (rider)"] --&gt; SORT(["Stage: sorting"])
+  ASG -- "dispatcher assigns (server supports delivery:assign,&lt;br/&gt;web screens not wired yet)" --&gt; SORT
+  SORT --&gt; ZN[Assign zone / hold - local] --&gt; RDY(["Stage: ready when rider picks up"])
+  RDY --&gt; DSP(["Stage: dispatched when rider is on the way"])
+  DSP --&gt; DLV(["delivered"])
+  DSP --&gt; FLD(["exception when delivery fails"])</pre></div>
+<h4 id="h-2-batching-and-dispatch"><a class="anchor" href="#h-2-batching-and-dispatch" aria-hidden="true">#</a>H-2 Batching and dispatch</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  BB(["Batch builder"]) --&gt; ADD[Add parcels to the batch] --&gt; OPT[Optimise route]
+  OPT --&gt; CB[Create batch &amp; assign rider]
+  CB --&gt; M1[Search and pick a rider] --&gt; M2{Confirm?}
+  M2 -- Back --&gt; M1
+  M2 -- Confirm --&gt; BD(["Batch detail"])
+  BD --&gt; R{Rider}
+  R -- "assign / change" --&gt; M1
+  R -- "auto-assign nearest" --&gt; AU[Nearest rider chosen]
+  BD --&gt; DIS{Batch ready?}
+  DIS -- yes --&gt; DP[Dispatch → deliveries]
+  Note1["Today these steps are local;&lt;br/&gt;the server already offers&lt;br/&gt;warehouse:buildBatch and delivery:assign"] -.-&gt; BD</pre></div>
+<h4 id="h-3-replacement-workflow-as-built-in-the-portal"><a class="anchor" href="#h-3-replacement-workflow-as-built-in-the-portal" aria-hidden="true">#</a>H-3 Replacement workflow (as built in the portal)</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  RQ([requested]) --&gt;|Start inspection| IS([inspecting])
+  IS --&gt;|Approve replacement| AP([approved])
+  IS --&gt;|Reject| RJ([rejected])
+  AP --&gt;|Allocate new unit| AL([allocated])
+  AL --&gt; HR{Rider assigned?}
+  HR -- no --&gt; AR[Pick a rider → Assign] --&gt; AL
+  HR -- yes --&gt; DS([dispatched])
+  DS --&gt;|Mark delivered| DL([delivered])
+  DL --&gt;|Close case| CL([closed])</pre></div>
+<p>(Stored in the browser today; the server&#39;s <code>replacements:setStatus</code> is ready to be wired.)</p>
+<h4 id="h-4-exceptions-returns-exchanges-aged-parcels"><a class="anchor" href="#h-4-exceptions-returns-exchanges-aged-parcels" aria-hidden="true">#</a>H-4 Exceptions, returns, exchanges, aged parcels</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  EX(["Exceptions"]) --&gt; ED(["Exception detail"]) --&gt; NT[Investigation notes] --&gt; UR[Update resolution - local]
+  RT(["Returns"]) --&gt; RS{Pending?}
+  RS -- yes --&gt; RA[Approve / reject - local]
+  RS -- no --&gt; RV[View]
+  XC(["Exchanges"]) --&gt; XD(["Exchange detail"]) --&gt; XA{Pending?}
+  XA -- yes --&gt; XB[Approve / allocate variant - messages] --&gt; XDP[Create dispatch]
+  AG(["Aged parcels - LIVE open parcels"]) --&gt; AD(["Aged detail"]) --&gt; AA[Mark received / accept / create incident]
+  TR(["Transfers"]) --&gt; TA[Mark arrived / receive at destination - messages]</pre></div>
+<h3 id="85-gaps-in-the-warehouse-portal"><a class="anchor" href="#85-gaps-in-the-warehouse-portal" aria-hidden="true">#</a>8.5 Gaps in the warehouse portal</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Gap</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>&quot;Receive&quot; sends a status the server refuses (only riders may move a delivery); receiving needs its own server action</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Batches, dispatch, rider assignment, transfers, exceptions, exchanges, replacements and returns are local or demo; the server already has <code>warehouse:buildBatch</code>, <code>delivery:assign</code>, <code>warehouse:createTransfer</code>, <code>exceptions:*</code>, <code>exchanges:setStatus</code>, <code>replacements:setStatus</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>COD cash reconciliation (<code>warehouse:reconcile</code>) has no screen</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Barcode scanning is simulated (no camera)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Dashboard, analytics, deliveries-by-type and settings are demo</td>
+</tr>
+<tr>
+<td>6</td>
+<td>All warehouse staff share one server account in demo mode, so data is not scoped per hub</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Links to admin and shop pages bounce warehouse users back to their dashboard</td>
+</tr>
+</tbody></table></div>
+<h2 id="9-rider--mobile-app-flutter-and-web-portal-rider"><a class="anchor" href="#9-rider--mobile-app-flutter-and-web-portal-rider" aria-hidden="true">#</a>9. Rider — mobile app (Flutter) and web portal (<code>/rider</code>)</h2>
+<p>The <strong>mobile app is the complete rider tool</strong> (claim, status updates, live GPS, cash confirmation, earnings). The web rider portal is mostly read-only today.</p>
+<h3 id="91-rider-mobile-app--navigation"><a class="anchor" href="#91-rider-mobile-app--navigation" aria-hidden="true">#</a>9.1 Rider mobile app — navigation</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  SP([Splash]) --&gt; RS{Saved session and role = rider?}
+  RS -- no --&gt; LG([Sign in])
+  RS -- yes --&gt; SH
+  LG --&gt;|Forgot password?| FP([Reset password: email → code + new password]) --&gt; LG
+  LG -- "POST /auth/login (role must be rider)" --&gt; SH
+  subgraph SH["Rider shell - bottom tabs"]
+    DV(["Deliveries: Active · Available · Done"])
+    EA(["Earnings"])
+    PR(["Profile"])
+  end
+  PR --&gt;|Sign out| LG</pre></div>
+<div class="table-wrap"><table><thead><tr>
+<th>Screen</th>
+<th>Shows</th>
+<th>Options</th>
+</tr>
+</thead><tbody><tr>
+<td>Sign in</td>
+<td>Email, password, &quot;accounts are created by the fleet team&quot;</td>
+<td><strong>Sign in</strong> (<code>POST /auth/login</code>; non-rider accounts refused) · Forgot password?</td>
+</tr>
+<tr>
+<td>Reset password</td>
+<td>Email, then code + new password</td>
+<td>Send link (<code>POST /auth/forgot</code>) · Save (<code>POST /auth/reset</code>)</td>
+</tr>
+<tr>
+<td>Deliveries</td>
+<td>Greeting, connection pill (Online / Connecting / Error / Offline), tabs with counts</td>
+<td>Pull to refresh (<code>rider:tasks</code>, <code>rider:earnings</code>, <code>notifications:list</code>)</td>
+</tr>
+<tr>
+<td>— Available tab</td>
+<td>Unclaimed deliveries: reference, COD amount, address, items</td>
+<td><strong>Accept this delivery</strong> (<code>delivery:accept</code>)</td>
+</tr>
+<tr>
+<td>— Active tab</td>
+<td>My deliveries: status, customer, address, phone, items, cash banner, GPS status</td>
+<td><strong>Picked up the parcel</strong> → <strong>On my way</strong> → <strong>Delivered</strong> (<code>delivery:updateStatus</code>), cash confirmation for COD, <strong>Could not deliver</strong> (confirm)</td>
+</tr>
+<tr>
+<td>— Done tab</td>
+<td>Delivered and failed</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Earnings</td>
+<td>Total ($2.50 per delivery), delivered, in progress, cash collected</td>
+<td>Pull to refresh</td>
+</tr>
+<tr>
+<td>Profile</td>
+<td>Name, email, phone, language, notifications (15 latest)</td>
+<td>EN/FR · tap notification (<code>notifications:markRead</code>) · <strong>Sign out</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="92-rider-mobile-flowcharts"><a class="anchor" href="#92-rider-mobile-flowcharts" aria-hidden="true">#</a>9.2 Rider mobile flowcharts</h3>
+<h4 id="r-1-sign-in-and-session"><a class="anchor" href="#r-1-sign-in-and-session" aria-hidden="true">#</a>R-1 Sign in and session</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  A([Open app]) --&gt; T{Refresh token saved?}
+  T -- no --&gt; L([Sign in])
+  T -- yes --&gt; RF["POST /auth/refresh"] --&gt; RR{Accepted and role = rider?}
+  RR -- yes --&gt; CN[Live connection → ready → load tasks, earnings, notifications] --&gt; D([Deliveries])
+  RR -- "401/403 or other role" --&gt; L
+  L --&gt; LP["POST /auth/login"] --&gt; LR{Result}
+  LR -- "not a rider" --&gt; LE[This app is for Somba&amp;Teka riders] --&gt; L
+  LR -- "wrong password / 429 / offline" --&gt; LE2[Message under the form] --&gt; L
+  LR -- ok --&gt; CN
+  D -.-&gt; SE{{Suspended or role changed by admin}} -.-&gt; L</pre></div>
+<h4 id="r-2-claim-and-deliver-an-order"><a class="anchor" href="#r-2-claim-and-deliver-an-order" aria-hidden="true">#</a>R-2 Claim and deliver an order</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  P{{⚡ new paid order → task in Available}} --&gt; AV([Available tab])
+  AV --&gt; AC["Accept this delivery → delivery:accept"]
+  AC --&gt; W{First rider to accept?}
+  W -- no --&gt; NA[This delivery is no longer available]
+  W -- yes --&gt; AS([Active: assigned])
+  AS --&gt; C1[⚡ customer sees processing]
+  AS --&gt;|Picked up the parcel| PU["delivery:updateStatus picked_up"]
+  PU --&gt; C2[⚡ customer: shipped] --&gt; GPS[GPS sharing starts - see R-3]
+  PU --&gt;|On my way to the customer| IT["delivery:updateStatus in_transit"]
+  IT --&gt; C3[⚡ customer: out for delivery]
+  IT --&gt;|Delivered| COD{Cash on delivery order?}
+  COD -- no --&gt; DL["delivery:updateStatus delivered"]
+  COD -- yes --&gt; CQ{Cash collected?}
+  CQ -- "Not yet" --&gt; IT
+  CQ -- "Yes, collected" --&gt; DL
+  DL --&gt; C4[⚡ customer: delivered, cash marked collected, seller sale counts toward payout]
+  DL --&gt; DN([Done tab])
+  PU &amp; IT --&gt;|Could not deliver| FC{Confirm mark as failed?}
+  FC -- Cancel --&gt; IT
+  FC -- "Mark failed" --&gt; FL["delivery:updateStatus failed"] --&gt; DN</pre></div>
+<h4 id="r-3-live-location-sharing"><a class="anchor" href="#r-3-live-location-sharing" aria-hidden="true">#</a>R-3 Live location sharing</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  S{A delivery is picked up or in transit?} -- no --&gt; STOP[Stop sharing]
+  S -- yes --&gt; SV{Phone location service on?}
+  SV -- no --&gt; M1[Turn on GPS to share your position]
+  SV -- yes --&gt; PM{Permission}
+  PM -- "not asked" --&gt; AQ[Ask permission] --&gt; PM
+  PM -- denied --&gt; M2[Location permission is off]
+  PM -- "denied forever" --&gt; M3[Location is blocked, enable it in settings]
+  PM -- granted --&gt; FX[Send first position now]
+  FX --&gt; LOOP[Every move ≥ 10 m, at most every 4 s]
+  LOOP --&gt; EV["delivery:location {taskId, lat, lng}"]
+  EV --&gt; CU[⚡ customer and ops see the rider move]
+  LOOP --&gt; S</pre></div>
+<h4 id="r-4-earnings-notifications-sign-out"><a class="anchor" href="#r-4-earnings-notifications-sign-out" aria-hidden="true">#</a>R-4 Earnings, notifications, sign out</h4>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  E([Earnings]) --&gt; ER["rider:earnings"] --&gt; EV[Total $2.50 × delivered, in progress, cash collected to hand over]
+  P([Profile]) --&gt; N[Notifications list ⚡ notification:new] --&gt; NR["tap → notifications:markRead"]
+  P --&gt; LG[EN / FR]
+  P --&gt; SO[Sign out] --&gt; X[Stop GPS, forget tokens, close connection] --&gt; L([Sign in])</pre></div>
+<h3 id="93-rider-web-portal-rider"><a class="anchor" href="#93-rider-web-portal-rider" aria-hidden="true">#</a>9.3 Rider web portal (<code>/rider</code>)</h3>
+<p>Bottom tabs: <strong>Dashboard · Active tasks · My zone · Earnings · My account</strong>. Bell → notifications.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Page</th>
+<th>Data</th>
+<th>Options</th>
+<th>Status</th>
+</tr>
+</thead><tbody><tr>
+<td><code>/rider</code> dashboard</td>
+<td>Name, active and completed counts, current deliveries; KPIs and charts demo</td>
+<td>All tasks</td>
+<td>LIVE + MOCK</td>
+</tr>
+<tr>
+<td><code>/rider/tasks</code></td>
+<td><code>rider:tasks</code> (open pool shown as &quot;assigned&quot;)</td>
+<td>Search, status, open task</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/rider/tasks/:id</code></td>
+<td>Order, customer, items, timeline</td>
+<td>Call customer, Navigate (Google Maps), Proof of delivery, Failed delivery</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/rider/tasks/:id/pod</code></td>
+<td>OTP, recipient, notes, photo placeholder</td>
+<td>Confirm delivered (message only)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/rider/tasks/:id/fail</code></td>
+<td>Reason, notes</td>
+<td>Report failed (message only)</td>
+<td>STUB</td>
+</tr>
+<tr>
+<td><code>/rider/zone</code></td>
+<td>Zone (set by warehouse, stored in browser), zone fee (demo), tasks in / outside zone</td>
+<td>Open task</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td><code>/rider/earnings</code></td>
+<td>—</td>
+<td>Tab link exists but the page does not</td>
+<td>missing</td>
+</tr>
+<tr>
+<td><code>/rider/profile</code></td>
+<td>Name, id, phone, current deliveries; rating and vehicle demo</td>
+<td>Availability toggle (local), history, notifications</td>
+<td>LIVE + LOCAL</td>
+</tr>
+<tr>
+<td><code>/rider/history</code></td>
+<td>Delivered tasks</td>
+<td>Open task</td>
+<td>LIVE</td>
+</tr>
+<tr>
+<td><code>/rider/notifications</code></td>
+<td>Demo notifications</td>
+<td>Mark read (local)</td>
+<td>MOCK</td>
+</tr>
+<tr>
+<td><code>/rider/batches/:id</code>, <code>/rider/first-password</code></td>
+<td>Not linked</td>
+<td>—</td>
+<td>STUB</td>
+</tr>
+</tbody></table></div>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  L(["/login - email + password"]) --&gt; D(["/rider dashboard"])
+  D --&gt; T(["/rider/tasks"]) --&gt; TD(["Task detail"])
+  TD --&gt; CALL[Call customer] 
+  TD --&gt; NAV[Navigate in Google Maps]
+  TD --&gt; POD(["Proof of delivery: OTP, name, notes → message only"])
+  TD --&gt; FAIL(["Failed delivery: reason, notes → message only"])
+  D --&gt; Z(["My zone"]) &amp; PRF(["My account"]) --&gt; H(["History"])
+  Note["Accepting, status changes and GPS&lt;br/&gt;are done in the mobile app"] -.-&gt; TD</pre></div>
+<h3 id="94-gaps-for-riders"><a class="anchor" href="#94-gaps-for-riders" aria-hidden="true">#</a>9.4 Gaps for riders</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Gap</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>No proof of delivery (customer OTP / photo / signature) in the app; the web POD page is not connected</td>
+</tr>
+<tr>
+<td>2</td>
+<td>No reason captured when a delivery fails; &quot;could not deliver&quot; is not offered before pickup</td>
+</tr>
+<tr>
+<td>3</td>
+<td>No background location (tracking pauses when the app is closed); no button to open phone settings when permission is blocked</td>
+</tr>
+<tr>
+<td>4</td>
+<td>No batches, zone, shift / availability or cash hand-over in the app</td>
+</tr>
+<tr>
+<td>5</td>
+<td>App text is English even when French is selected (only system widgets change)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Web rider portal cannot accept or update deliveries; Earnings tab has no page; notifications are demo</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Rider staff onboarding (first password) is not connected</td>
+</tr>
+</tbody></table></div>
+<h2 id="10-which-app-does-what--side-by-side"><a class="anchor" href="#10-which-app-does-what--side-by-side" aria-hidden="true">#</a>10. Which app does what — side by side</h2>
+<p>✅ works against the server · 🟡 partly (screen exists, part of it local or demo) · 🧪 demo / local only · — not offered</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Action</th>
+<th>Customer app</th>
+<th>Web shop</th>
+<th>Seller portal</th>
+<th>Admin portal</th>
+<th>Warehouse portal</th>
+<th>Rider app</th>
+<th>Rider web</th>
+<th>Server event</th>
+</tr>
+</thead><tbody><tr>
+<td>Sign up</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td>— (register page static)</td>
+<td>—</td>
+<td>—</td>
+<td>— (accounts by admin)</td>
+<td>—</td>
+<td><code>POST /auth/register</code></td>
+</tr>
+<tr>
+<td>Sign in / restore session</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><code>POST /auth/login</code>, <code>/auth/refresh</code></td>
+</tr>
+<tr>
+<td>Phone code / email verification</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🟡</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>POST /auth/phone/*</code>, <code>/auth/email/*</code></td>
+</tr>
+<tr>
+<td>Forgot / reset password</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td>via <code>/login</code></td>
+<td>via <code>/login</code></td>
+<td>via <code>/login</code></td>
+<td><span class="st">✅</span></td>
+<td>via <code>/login</code></td>
+<td><code>POST /auth/forgot</code>, <code>/auth/reset</code></td>
+</tr>
+<tr>
+<td>Browse, search, filter</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>products:list</code>, <code>categories:list</code></td>
+</tr>
+<tr>
+<td>Wishlist</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>wishlist:toggle</code></td>
+</tr>
+<tr>
+<td>Reviews / questions</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><span class="st">🟡</span> read reviews</td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>reviews:*</code>, <code>questions:*</code></td>
+</tr>
+<tr>
+<td>Cart and promo code</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>promos:validate</code></td>
+</tr>
+<tr>
+<td>Place order (wallet / mobile money)</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🟡</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>orders:create</code></td>
+</tr>
+<tr>
+<td>Approve mobile-money payment</td>
+<td><span class="st">✅</span> (pending screen)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>webhook → ⚡ <code>payment:updated</code></td>
+</tr>
+<tr>
+<td>Track order live</td>
+<td><span class="st">✅</span> (status + rider coordinates)</td>
+<td><span class="st">🟡</span> (status, map placeholder)</td>
+<td><span class="st">🟡</span> derived</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>⚡ <code>order:updated</code>, <code>delivery:location</code></td>
+</tr>
+<tr>
+<td>Cancel order</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>— (server ready)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>orders:cancel</code></td>
+</tr>
+<tr>
+<td>Return / dispute</td>
+<td><span class="st">✅</span> return</td>
+<td><span class="st">🧪</span></td>
+<td><span class="st">🟡</span> read-only</td>
+<td><span class="st">🟡</span> resolve</td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td><code>disputes:open</code>, <code>disputes:resolve</code></td>
+</tr>
+<tr>
+<td>Wallet top-up</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>wallet:topup</code></td>
+</tr>
+<tr>
+<td>Addresses</td>
+<td><span class="st">✅</span> (add, delete)</td>
+<td><span class="st">✅</span> (add, edit, default, delete)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>addresses:*</code></td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><code>notifications:*</code></td>
+</tr>
+<tr>
+<td>Support tickets</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><span class="st">🧪</span></td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>support:*</code></td>
+</tr>
+<tr>
+<td>Profile, preferences, password, delete account</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><span class="st">🟡</span> store name</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">🟡</span> (language, sign out)</td>
+<td>—</td>
+<td><code>me:*</code></td>
+</tr>
+<tr>
+<td>Publish product</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span> (basic fields)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>products:create</code></td>
+</tr>
+<tr>
+<td>Approve / reject product</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>products:update</code></td>
+</tr>
+<tr>
+<td>Approve / reject store</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>sellers:setStatus</code></td>
+</tr>
+<tr>
+<td>Campaign</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span> create</td>
+<td><span class="st">🧪</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>campaigns:*</code></td>
+</tr>
+<tr>
+<td>Request / approve payout</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span> request</td>
+<td><span class="st">🧪</span> approve (server ready)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>payouts:request</code>, <code>payouts:approve</code></td>
+</tr>
+<tr>
+<td>Suspend customer</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><code>customers:setActive</code></td>
+</tr>
+<tr>
+<td>Assign rider / batch</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">🧪</span> (server ready)</td>
+<td><span class="st">🧪</span> (server ready)</td>
+<td>—</td>
+<td>—</td>
+<td><code>delivery:assign</code>, <code>warehouse:buildBatch</code></td>
+</tr>
+<tr>
+<td>Claim delivery</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td><code>delivery:accept</code></td>
+</tr>
+<tr>
+<td>Picked up → on the way → delivered / failed</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><code>delivery:updateStatus</code></td>
+</tr>
+<tr>
+<td>Share live location</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">✅</span></td>
+<td>—</td>
+<td><code>delivery:location</code></td>
+</tr>
+<tr>
+<td>Cash collected (COD, when enabled)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">🧪</span> reconcile (server ready)</td>
+<td><span class="st">✅</span></td>
+<td><span class="st">🧪</span></td>
+<td><code>delivery:updateStatus delivered</code>, <code>warehouse:reconcile</code></td>
+</tr>
+<tr>
+<td>Earnings</td>
+<td>—</td>
+<td>—</td>
+<td><span class="st">🟡</span> finance</td>
+<td>—</td>
+<td><span class="st">🟡</span> per rider</td>
+<td><span class="st">✅</span></td>
+<td>— (tab missing)</td>
+<td><code>rider:earnings</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="101-readiness-by-user"><a class="anchor" href="#101-readiness-by-user" aria-hidden="true">#</a>10.1 Readiness by user</h3>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  C["Customer mobile app&lt;br/&gt;✅ end-to-end on the server"]:::ok
+  R["Rider mobile app&lt;br/&gt;✅ end-to-end on the server"]:::ok
+  W["Web shop&lt;br/&gt;🟡 browse, orders, addresses live;&lt;br/&gt;checkout, returns, support partly demo"]:::part
+  S["Seller portal&lt;br/&gt;🟡 products, campaigns, payouts live;&lt;br/&gt;fulfilment, analytics, support demo"]:::part
+  A["Admin portal&lt;br/&gt;🟡 moderation, sellers, customers, disputes live;&lt;br/&gt;finance actions, settings, marketing demo"]:::part
+  H["Warehouse portal&lt;br/&gt;🟡 parcel lists live;&lt;br/&gt;batches, dispatch, exceptions demo"]:::part
+  RW["Rider web&lt;br/&gt;🟡 read-only task view"]:::part
+  classDef ok fill:#e3f6ea,stroke:#1f8a4c,color:#0b3d22
+  classDef part fill:#fff4dc,stroke:#b7791f,color:#4a3208</pre></div>
+<h3 id="102-recommended-order-to-close-the-gaps"><a class="anchor" href="#102-recommended-order-to-close-the-gaps" aria-hidden="true">#</a>10.2 Recommended order to close the gaps</h3>
+<ol>
+<li><strong>Admin finance and operations actions</strong> — wire payout approve/reject, order refund/cancel/status, dispute reject, fraud status, settings save (COD, zones, FX, commission), role assignment. The server already supports all of them.</li>
+<li><strong>Warehouse and dispatch</strong> — wire rider assignment and batches (<code>delivery:assign</code>, <code>warehouse:buildBatch</code>), exceptions, exchanges, replacements, transfers and the COD reconciliation screen; give hub &quot;receiving&quot; its own server action.</li>
+<li><strong>Customer app fixes</strong> — open product cards from search, lists, store and wishlist; return to Sign in after account deletion; push notifications; remember the price-currency choice; verify phone/email later.</li>
+<li><strong>Rider</strong> — proof of delivery (customer code and photo), failure reasons, background location, cash hand-over.</li>
+<li><strong>Seller</strong> — show server errors, real approval gating, full product editing (images, variants, stock), seller fulfilment step, payouts with the server&#39;s available amount.</li>
+<li><strong>Web shop</strong> — add to cart and real checkout with saved addresses and mobile-money number, returns through <code>disputes:open</code>, support tickets on the server.</li>
+</ol>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var toc = document.getElementById('toc');
+  if (window.matchMedia('(max-width: 960px)').matches && toc) toc.open = false;
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  if (!('IntersectionObserver' in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      var a = byId[e.target.id];
+      if (!a) return;
+      links.forEach(function (l) { l.classList.remove('active'); });
+      a.classList.add('active');
+    });
+  }, { rootMargin: '0px 0px -75% 0px' });
+  document.querySelectorAll('main h2[id], main h3[id]').forEach(function (h) { io.observe(h); });
+})();
+</script>
