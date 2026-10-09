@@ -4,6 +4,7 @@
 |---|---|
 | **Document** | Every user type, every app and portal, every screen and the options on it, and a flowchart for every major and minor flow |
 | **Covers** | Customer mobile app (Flutter), customer web shop, seller web portal, admin web portal (with its sub-roles), warehouse web portal, rider mobile app (Flutter) and rider web portal, and how each one talks to the backend |
+| **Also covers** | Every broken or illogical flow found, with severity, a flowchart of where it breaks and the fix (section 11) |
 | **Source** | Read from the code on branch `claude/somba-api-analysis-4rg0y7`, October 2026. Companion to `docs/ARCHITECTURE.md` (data model, API and gap analysis) |
 
 ### How to read the flowcharts
@@ -33,6 +34,7 @@
 8. Warehouse staff — web portal
 9. Rider — mobile app and web portal
 10. Which app does what — side by side
+11. Broken flows and flows that do not make sense
 
 ---
 
@@ -1470,4 +1472,326 @@ flowchart LR
 4. **Rider** — proof of delivery (customer code and photo), failure reasons, background location, cash hand-over.
 5. **Seller** — show server errors, real approval gating, full product editing (images, variants, stock), seller fulfilment step, payouts with the server's available amount.
 6. **Web shop** — add to cart and real checkout with saved addresses and mobile-money number, returns through `disputes:open`, support tickets on the server.
+
+
+---
+
+## 11. Broken flows and flows that do not make sense
+
+This chapter lists every flow found to be **broken** (it cannot be completed, or it ends somewhere wrong) or **illogical** (it completes, but the result contradicts what the user was told, or the business rule makes no sense). Each item was read from the code; the most serious ones were re-checked by hand.
+
+### 11.1 Severity scale
+
+| Severity | Meaning |
+|---|---|
+| 🔴 **Critical** | Money, stock or trust is wrong: the user is told something happened that did not, or a core business process cannot run in production |
+| 🟠 **High** | The flow cannot be completed, or ends on a dead end |
+| 🟡 **Medium** | The flow works but is confusing, inconsistent or misleading |
+| ⚪ **Low** | Cosmetic, labels, filters that never match |
+
+In the flowcharts below, red boxes mark where the flow breaks.
+
+### 11.2 Count by app
+
+| App | 🔴 Critical | 🟠 High | 🟡 Medium | ⚪ Low |
+|---|---|---|---|---|
+| Whole system (business logic) | 4 | 3 | 1 | — |
+| Customer mobile app | — | 2 | 8 | 3 |
+| Web shop | 3 | 4 | 5 | 2 |
+| Seller portal | 2 | 4 | 5 | 2 |
+| Admin portal | 4 | 4 | 3 | 2 |
+| Warehouse portal | 1 | 3 | 3 | 2 |
+| Rider app | — | 2 | 3 | 1 |
+| Rider web | 1 | 3 | 1 | 1 |
+
+---
+
+### 11.3 System-wide flows that do not make sense
+
+#### X-1 🔴 In production nobody can pay for an order
+
+Mobile money is the chosen payment method, but no aggregator is connected, so production refuses it. The wallet is the only other method, and the wallet can only be topped up with mobile money. COD is switched off and card is refused in production. A new customer therefore has no way to pay.
+
+```mermaid
+flowchart TD
+  C([Customer at checkout - production]) --> M{Payment method}
+  M -- "Airtel / Orange / M-Pesa" --> MM[No aggregator configured]:::bad --> R1[Mobile money is not available yet]:::bad
+  M -- Wallet --> W{Balance ≥ total?}
+  W -- "no - every new account starts at $0" --> TU[Top up wallet]
+  TU --> TM[Top-up needs mobile money]:::bad --> R1
+  M -- "Cash on delivery" --> COD[Disabled by policy]:::bad
+  M -- Card --> CARD[Refused in production]:::bad
+  R1 --> DEAD([No order can be placed]):::bad
+  COD --> DEAD
+  CARD --> DEAD
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+**Fix:** connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets or temporarily enable COD.
+
+#### X-2 🔴 A failed delivery leaves the order in limbo
+
+When a rider taps **Could not deliver**, the delivery task becomes `failed`, but the order keeps its last status (`shipped` or `out for delivery`). Nothing re-attempts, returns the parcel, refunds or tells the customer. The customer can no longer cancel (only pending/confirmed can be cancelled) and cannot open a return (only delivered orders can).
+
+```mermaid
+flowchart TD
+  R([Rider: could not deliver]) --> F["delivery task → failed"]
+  F --> O[Order status unchanged: out for delivery]:::bad
+  O --> C1{Customer options}
+  C1 -- Cancel --> X1[Refused: only pending or confirmed]:::bad
+  C1 -- Return --> X2[Not offered: order not delivered]:::bad
+  C1 -- Track --> X3[Shows out for delivery forever]:::bad
+  F --> N[No re-attempt, no return to hub, no refund, no notification]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+**Fix:** a failed-delivery workflow: reason code → order `delivery_failed` → re-attempt or return to hub → automatic refund after N attempts, with customer notification.
+
+#### X-3 🔴 Nobody knows where to pick the parcel up
+
+The delivery task only carries the **customer's** address. There is no seller pickup address, no "ready for pickup" signal from the seller (the seller's Accept / Package ready buttons are screen-only), and the warehouse "Receive" step is refused by the server. The rider is told "Picked up the parcel" without any record of where from.
+
+```mermaid
+flowchart TD
+  P([Order paid]) --> T[Delivery task: customer address only]
+  T --> S{Seller prepares the parcel?}
+  S -- "Accept / Package ready" --> SL[Screen only - server never told]:::bad
+  T --> H{Hub receives it?}
+  H -- Receive --> HR[Refused by the server: riders only]:::bad
+  T --> R[Rider accepts]
+  R --> PU{Pick up from where?}
+  PU --> NA[No seller or hub address on the task]:::bad
+  NA --> PK[Rider taps Picked up anyway]
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+**Fix:** add a seller fulfilment step (accept → packed → ready for pickup, with the seller's pickup address), a server action for hub receiving, and show the pickup location on the rider's task.
+
+#### X-4 🔴 Seller payouts end in a wallet the seller cannot withdraw
+
+Approving a payout sets it to `paid` and credits the seller's **in-app wallet**. There is no withdrawal from the wallet to bank or mobile money, so the seller's money never leaves the platform.
+
+```mermaid
+flowchart LR
+  RQ([Seller requests payout]) --> AP[Finance approves] --> PD["Status 'paid'"] --> WL[Seller's in-app wallet credited]
+  WL --> WD{Withdraw to bank / mobile money?}
+  WD --> NO[Not available]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+**Fix:** payout accounts and real disbursement; mark `paid` only after the provider confirms.
+
+#### X-5 🟠 Refunds happen without the goods coming back
+
+A return request is resolved by an admin with a refund, and the order is marked `returned`, but there is no pickup task, inspection or restock. The money is returned while the item stays with the customer.
+
+```mermaid
+flowchart LR
+  RQ([Customer: return request]) --> AD[Admin resolves with refund] --> MN[Wallet credited, order 'returned']
+  MN --> GD{Item collected and inspected?}
+  GD --> NO[No pickup, no inspection, no restock]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+#### X-6 🟠 Product moderation is bypassed
+
+The seller sees "Submitted for moderation", but the server publishes the product **immediately as live**. The admin moderation queue therefore stays empty, and unreviewed listings reach shoppers.
+
+```mermaid
+flowchart LR
+  S([Seller: Submit for moderation]) --> SV["products:create → status live"] --> SH[Visible to shoppers at once]:::bad
+  SV --> Q[Admin moderation queue: nothing pending]:::bad
+  S --> TT[Toast: Submitted for moderation]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+#### X-7 🟠 Flash-sale and campaign prices are never charged
+
+Flash sales and campaign discounts are created and displayed, but checkout always charges the normal product price.
+
+#### X-8 🟡 Verification is never required
+
+Phone and email verification can be skipped at sign-up and cannot be done later, yet nothing (ordering, mobile money, payouts) requires a verified account.
+
+---
+
+### 11.4 Customer mobile app
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| CM-1 | Search → product, Category list → product, Store → product, Wishlist → product | Product cards cannot be opened and **+** does nothing; only ♥ works. Product detail is reachable only from Home, Deals and related items | 🟠 | Pass `onTap` / `onAdd` to `ProductCard` on those screens |
+| CM-2 | Delete account | Account is deleted but the app stays on an empty shell instead of returning to Sign in (the success callback is never passed) | 🟠 | End the session through the normal "session ended" path |
+| CM-3 | Prices in FC / USD | The saved choice is read before preferences load, so the app always starts in FC | 🟡 | Re-apply the preference after `me:prefs` loads |
+| CM-4 | Verify phone / email later | Skipped verification cannot be resumed; the "not verified" badge is not tappable | 🟡 | Make the badge open the verification screens |
+| CM-5 | Wallet top-up declined | The pending card just disappears with no message | 🟡 | Show the failure reason from `payment:updated` |
+| CM-6 | Payment pending | No manual "check payment" and no client timeout; "Pay" from order detail only reopens the waiting screen, it does not send a new prompt | 🟡 | Call `payments:status`; offer "send the request again" |
+| CM-7 | Buy now | Adds the product to the existing cart and checks out the **whole** cart | 🟡 | Buy-now checkout of that item only |
+| CM-8 | Promo at checkout | No promo field on checkout; must go back to the cart | 🟡 | Add the field on checkout |
+| CM-9 | Track order | Track is hidden for confirmed orders; rider position is shown as coordinates, not a map | 🟡 | Show Track from confirmed; add a map |
+| CM-10 | Support / returns / coupons | Staff replies, return decisions and coupons do not refresh live | 🟡 | Listen to `support:updated`, `dispute:updated`, `promo:updated` |
+| CM-11 | Language | App starts in French, but sign-up always saves English, so the app switches to English after sign-up; many screens are English-only | ⚪ | Send the current locale on register; translate screens |
+| CM-12 | Push toggle | Saves a preference, but the app never registers for push | ⚪ | Add Firebase messaging and `devices:register` |
+| CM-13 | Terms | Terms checkbox is pre-ticked and the text is not a link | ⚪ | Untick by default, link the legal pages |
+
+```mermaid
+flowchart TD
+  S([Search / Product list / Store / Wishlist]) --> PC[Tap a product card]
+  PC --> N1[Nothing happens]:::bad
+  S --> PL[Tap +]
+  PL --> N2[Nothing happens]:::bad
+  D([Delete account]) --> OK[me:delete succeeds] --> EM[Empty app shell, no sign-in screen]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.5 Web shop
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| WS-1 | Pay | If `orders:create` fails (guest, unknown product, out of stock), the error toast is followed by a **demo "order confirmed" page** (ORD-2024-001). With an empty cart or no connection it goes straight to that page | 🔴 | Stay on payment and show the error |
+| WS-2 | Return request | The 3-step return wizard shows "Pickup scheduled" with a reference, but never calls the server (`disputes:open`) | 🔴 | Call `disputes:open` |
+| WS-3 | Delete account | Shows "Deletion request submitted" but nothing is sent | 🔴 | Call `me:delete` with password |
+| WS-4 | Buy on the web | No add-to-cart on product pages; the cart can only be filled with **Reorder** on a delivered order | 🟠 | Add to cart from product pages |
+| WS-5 | Checkout addresses | Shows 3 fixed demo addresses instead of the customer's saved addresses; the chosen address is sent only as an id | 🟠 | Use `addresses:list` and send the full address |
+| WS-6 | Product links from home and search suggestions, store pages, product reviews | Use demo ids, so real products show "Product not found" / "Store not found" | 🟠 | Use live ids |
+| WS-7 | Mobile money | The Airtel number and the promo code are not sent with the order; the "payment failed, retry" banner can never appear | 🟠 | Send `paymentPhone` and `promoCode`; follow the pending flow like the app |
+| WS-8 | Checkout says "Guest checkout enabled" | Contradicts the decision that an account is mandatory; the guest email field is unused | 🟡 | Remove guest checkout text |
+| WS-9 | Cancel order | The Cancel button is shown for processing / shipped / out-for-delivery orders, which the server refuses | 🟡 | Show only for pending / confirmed |
+| WS-10 | Promo codes | Validated against two demo codes, not the server | 🟡 | Use `promos:validate` |
+| WS-11 | Support tickets | Stored in the browser and visible to every customer on that browser | 🟡 | Use `support:*` |
+| WS-12 | Bell and account | Bell count and account profile are demo; there is no sign-out in the shop | 🟡 | Use live notifications and user; add sign-out |
+| WS-13 | Legal links | Returns, seller and shipping policy pages are linked but missing (404) | ⚪ | Add the pages |
+| WS-14 | Header search | Empty search jumps to `q=phone` | ⚪ | Go to all products |
+
+```mermaid
+flowchart TD
+  P([Payment page]) --> PAY[Pay]
+  PAY --> C{Signed in, connected, cart not empty?}
+  C -- no --> FAKE([Order confirmed ORD-2024-001]):::bad
+  C -- yes --> OC["orders:create"] --> R{Server accepts?}
+  R -- yes --> REAL([Real confirmation])
+  R -- no --> ERR[Error toast] --> FAKE
+  RT([Return wizard]) --> SUB[Submit] --> MSG[Pickup scheduled, reference RET-…]:::bad --> NOTHING[Nothing sent to the server]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.6 Seller portal
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| SP-1 | Create product | Toast says "Submitted for moderation" but the product goes live (X-6); only name, price, category and stock are sent — images, variants, SKU, description, weight are dropped | 🔴 | Send all fields; create as pending |
+| SP-2 | Any failed request (product, payout, campaign) | Errors are never shown; the page simply does nothing | 🔴 | Catch and display server errors |
+| SP-3 | Registration → pending → resubmit | Static pages that never call the server and never follow the real store status; a pending seller can use the whole portal | 🟠 | Use `sellers:register` and `sellers:mine` status for gating |
+| SP-4 | Subscription | Required by the portal but stored only in the browser; demo seller 2 is always blocked; the server has no subscription | 🟠 | Server-side subscription, or remove the gate |
+| SP-5 | Edit / remove product, mark unavailable | Edit opens an empty new-product wizard; Unavailable / Mark live are ignored by the server; no delete | 🟠 | Edit form with `products:update`; allow sellers to pause; wire `products:delete` |
+| SP-6 | Payout request | "Available" is a fixed $12,450; bank details typed by the seller are not sent; confirmation reference is fixed | 🟠 | Use `payouts:available`; payout accounts |
+| SP-7 | Order Accept / Mark ready / Flag unavailable | Screen only; "partial refund triggered" is shown but nothing is refunded | 🟡 | Seller fulfilment events |
+| SP-8 | Campaigns | Created on the server but the list is always empty and detail says "not found" | 🟡 | Use `campaigns:list` |
+| SP-9 | Notifications, disputes, support, statements, tax | Demo or browser-only | 🟡 | Wire the server events |
+| SP-10 | Reviews reply / report | Saved in the browser; reply keyed by row position, so replies can attach to the wrong review | 🟡 | Server-side replies keyed by review id |
+| SP-11 | Inventory adjust / import | Toast only; stock never changes | 🟡 | `products:update {stock}` |
+| SP-12 | Status filters | Orders, returns, payouts and transactions filters offer values the data never has | ⚪ | Align filter values |
+| SP-13 | Storefront | Defaults to "TechZone Store" and saves nothing | ⚪ | Wire `sellers:update` |
+
+```mermaid
+flowchart TD
+  W([Product wizard: 7 steps]) --> SB[Submit for moderation]
+  SB --> SENT[Only name, price, category, stock sent]:::bad
+  SENT --> LIVE[Product live immediately]:::bad
+  SB --> E{Server error?}
+  E -- yes --> SIL[Nothing shown, page stays]:::bad
+  PR([Request payout]) --> AV[Available: fixed $12,450]:::bad --> PRQ["payouts:request"] --> E
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.7 Admin portal
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| AD-1 | Approve / reject payout | Badge changes and a toast confirms, but nothing is sent; the next live update reverts the row. Finance believes the seller was paid | 🔴 | Call `payouts:approve` / `payouts:reject` |
+| AD-2 | Settings → Save | Toast "Settings saved (audit logged)" but nothing is saved or audited (COD, zones, FX, commission cannot be changed from the portal) | 🔴 | Call `settings:set` |
+| AD-3 | Broadcast → Send now | Appears as "sent" but no one receives it | 🔴 | Call `broadcasts:send` |
+| AD-4 | Refunds → Authorise | Screen only, on demo refunds; orders cannot be refunded from the portal at all | 🔴 | Use `orders:refund` from order detail |
+| AD-5 | Order management | Orders can be viewed but not moved, cancelled or refunded | 🟠 | Add `orders:updateStatus`, `orders:cancel`, `orders:refund` |
+| AD-6 | Disputes | The list shows demo disputes, not the customers' real return requests; resolving sends a demo id to the server | 🟠 | Show `disputes:list`; resolve real ids; add reject |
+| AD-7 | Roles | "Save permissions" is a toast; there is no way to give a user a staff role | 🟠 | Use `roles:staff`, `roles:setRole` |
+| AD-8 | Warehouses and warehouse staff | Created in the browser with generated passwords that cannot actually sign in | 🟠 | Create real accounts on the server |
+| AD-9 | Flash sale, promo codes, CMS, categories, promotions | Screen or browser only; promo codes cannot be created at all | 🟡 | Wire `flashsales:create`, `promos:create`, `cms:upsert`, `categories:*`, `campaigns:setStatus` |
+| AD-10 | Block seller / product | Hidden only in this browser | 🟡 | Use `sellers:setStatus suspended` / product status |
+| AD-11 | Demo personas | Support, marketing, moderation and warehouse personas act with **super-admin** rights on the server | 🟡 | Seed one account per sub-role |
+| AD-12 | Links | Links to warehouse, shop or other groups bounce back; `/admin/fulfillment/aged` is a 404 | ⚪ | Use admin routes |
+| AD-13 | Customer filter "Inactive" | Never matches (data says "suspended") | ⚪ | Align values |
+
+```mermaid
+flowchart TD
+  P([Payouts: requested row]) --> A[Approve]
+  A --> T[Badge Approved + toast]:::bad
+  T --> N[No server call]:::bad --> RV[Next live update reverts the row]:::bad
+  S([Settings]) --> SV[Save] --> ST[Toast: saved, audit logged]:::bad --> NS[Nothing saved]:::bad
+  B([Broadcast]) --> BS[Send now] --> BT[Listed as sent]:::bad --> NR[No customer receives it]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.8 Warehouse portal
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| WH-1 | Receive parcel | Sends a rider-only status change that the server refuses; no message is shown, the parcel never moves | 🔴 | Hub receiving server action |
+| WH-2 | Parcel stages | Stages are derived from the **rider's** progress (a parcel is "sorting" only after a rider accepts it), so hub work cannot drive the flow | 🟠 | Separate hub states from delivery states |
+| WH-3 | Batch builder, dispatch, assign rider | Demo parcels and riders, screen-only; nothing is assigned on the server | 🟠 | `warehouse:buildBatch`, `delivery:assign` |
+| WH-4 | Scan barcode | Simulated; always opens a demo parcel that is "not found" | 🟠 | Camera / scanner input matched to real parcels |
+| WH-5 | Exceptions, exchanges, replacements, returns, transfers | Demo or browser-only; replacement workflow can be completed entirely without the server | 🟡 | Wire the `*:setStatus`, `exceptions:create`, `warehouse:createTransfer` events |
+| WH-6 | COD reconciliation | No screen, although the server computes it | 🟡 | Add a reconciliation page |
+| WH-7 | Demo hubs share one account | All hubs see the same parcels | 🟡 | Hub-scoped accounts |
+| WH-8 | Status filters | "pending" / "received" never match live stages | ⚪ | Align values |
+| WH-9 | Links | Links into admin and shop bounce back to the warehouse dashboard | ⚪ | Warehouse routes |
+
+```mermaid
+flowchart TD
+  IN([Inbound parcel]) --> RC[Receive]
+  RC --> EV["delivery:updateStatus assigned"] --> SV{Server}
+  SV --> RF[Refused: riders only, invalid status]:::bad --> NM[No message, parcel stays inbound]:::bad
+  IN --> ST{When does it reach Sorting?}
+  ST --> RA[Only when a rider accepts it in the app]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.9 Rider mobile app
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| RA-1 | Could not deliver | No reason is captured, and the order is left in limbo (X-2); not offered before pickup | 🟠 | Reason codes; allow fail from assigned |
+| RA-2 | Delivered | No proof of delivery (customer code, photo, signature) | 🟠 | Customer OTP + photo |
+| RA-3 | GPS when the app is closed | Tracking stops in the background; when permission is blocked there is no button to open settings | 🟡 | Foreground service; "open settings" button |
+| RA-4 | Cash collected | Shown as "hand it over at the warehouse" but there is no hand-over or reconciliation step | 🟡 | Cash hand-over flow with warehouse sign-off |
+| RA-5 | Earnings | Flat $2.50 per delivery regardless of distance, zone or failed attempts | 🟡 | Configurable rider pay rules |
+| RA-6 | Language | Choosing French only changes system widgets; app text stays English | ⚪ | Translate strings |
+
+### 11.10 Rider web portal
+
+| ID | Flow | What happens | Severity | Fix |
+|---|---|---|---|---|
+| RW-1 | Proof of delivery | "Confirm delivered" shows success but nothing is sent; the order is not delivered | 🔴 | `delivery:updateStatus delivered` with proof |
+| RW-2 | Open pool tasks | Unclaimed tasks are labelled "assigned" with no Accept button | 🟠 | Show the pool separately with Accept |
+| RW-3 | Status changes and GPS | Cannot accept, pick up, start or share location on the web | 🟠 | Same actions as the app, or point riders to the app |
+| RW-4 | Earnings tab | The tab links to a page that does not exist | 🟠 | Add the page using `rider:earnings` |
+| RW-5 | Failed delivery | Reason form shows success but sends nothing | 🟡 | Wire to the server |
+| RW-6 | Batches, first password | Unlinked pages; batches render empty | ⚪ | Wire or remove |
+
+```mermaid
+flowchart TD
+  T([Rider web: task]) --> POD[Proof of delivery: code, name, notes]
+  POD --> CF[Confirm delivered] --> OKT[Toast: delivery confirmed]:::bad --> NS[Order still out for delivery]:::bad
+  T --> FL[Failed delivery: reason] --> FT[Toast: logged]:::bad --> NS2[Nothing recorded]:::bad
+  NAV([Earnings tab]) --> F404[Page does not exist]:::bad
+  classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
+```
+
+### 11.11 Fix order for broken flows
+
+1. **Stop false success messages** (WS-1, WS-2, WS-3, AD-1, AD-2, AD-3, AD-4, RW-1, SP-1, SP-2): every one of these tells a user something happened when it did not. They are the fastest and most important fixes.
+2. **Production payment path** (X-1) and **failed-delivery workflow** (X-2).
+3. **Pickup and hub flow** (X-3, WH-1, WH-2, SP-7) and **proof of delivery** (RA-2, RW-1).
+4. **Money out** (X-4 payouts, refunds to the original payment method) and **returns logistics** (X-5).
+5. **Moderation and pricing rules** (X-6, X-7).
+6. Customer app dead ends (CM-1, CM-2) and the remaining medium and low items.
 
