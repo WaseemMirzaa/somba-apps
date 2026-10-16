@@ -31,8 +31,17 @@ const NEXT: Record<DeliveryStatus, DeliveryStatus[]> = {
   failed: [],
 };
 
+/** Called when a rider reports a failed attempt (OrdersService re-opens or cancels the order). */
+export type DeliveryFailedHandler = (task: DeliveryTask, reason: string) => Promise<void>;
+
 @Injectable()
 export class DeliveryService {
+  private failedHandler: DeliveryFailedHandler | null = null;
+
+  registerFailedHandler(fn: DeliveryFailedHandler) {
+    this.failedHandler = fn;
+  }
+
   constructor(
     @InjectRepository(DeliveryTask)
     private readonly tasks: Repository<DeliveryTask>,
@@ -119,6 +128,7 @@ export class DeliveryService {
     taskId: string,
     status: DeliveryStatus,
     riderId: string,
+    reason?: string,
   ): Promise<DeliveryTask> {
     const task = await this.tasks.findOne({ where: { id: taskId } });
     // Same answer for "missing" and "someone else's" so ids can't be probed.
@@ -126,11 +136,12 @@ export class DeliveryService {
     if (!NEXT[task.status]?.includes(status)) {
       throw new BadRequestException(`A ${task.status.replace('_', ' ')} delivery cannot become ${String(status).replace('_', ' ')}.`);
     }
+    const failure = status === 'failed' ? String(reason ?? '').trim().slice(0, 200) || 'Customer not reachable' : null;
     // Conditional on the status we just read: a double-tap can't apply it twice.
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
-      .set({ status })
+      .set({ status, ...(failure ? { failureReason: failure } : {}) })
       .where('id = :id AND status = :cur', { id: taskId, cur: task.status })
       .execute();
     if (!claim.affected) throw new BadRequestException('This delivery was just updated. Refresh and try again.');
@@ -139,6 +150,15 @@ export class DeliveryService {
     // Collect COD when the parcel is delivered.
     if (status === 'delivered') {
       await this.payments.markCollected(task.orderId);
+    }
+
+    // A failed attempt is not a dead end: the order is re-opened for another
+    // attempt (or cancelled and refunded once the limit is reached).
+    if (status === 'failed') {
+      this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', saved);
+      if (saved.riderId) this.emitter.toUser(saved.riderId, 'delivery:updated', saved);
+      if (this.failedHandler) await this.failedHandler(saved, failure ?? '');
+      return saved;
     }
 
     const order = await this.orders.findOne({ where: { id: task.orderId } });
@@ -180,5 +200,35 @@ export class DeliveryService {
     const order = await this.orders.findOne({ where: { id: task.orderId } });
     if (order) this.emitter.toUser(order.customerId, 'delivery:location', payload);
     this.emitter.toRoles(OPS_ROOMS, 'delivery:location', payload);
+  }
+
+  /** The seller says the parcel is packed and ready for pickup. */
+  async markReady(orderId: string): Promise<DeliveryTask | null> {
+    const task = await this.tasks.findOne({ where: { orderId, status: 'unassigned' } })
+      ?? (await this.tasks.findOne({ where: { orderId, status: 'assigned' } }));
+    if (!task) return null;
+    if (!task.readyAt) {
+      task.readyAt = new Date();
+      await this.tasks.save(task);
+    }
+    this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+    if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+    return task;
+  }
+
+  /** Hub staff scan the parcel in. Independent of the rider's progress. */
+  async markReceived(taskId: string): Promise<DeliveryTask> {
+    const task = await this.tasks.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Delivery task not found.');
+    if (task.status === 'delivered' || task.status === 'failed') {
+      throw new BadRequestException(`A ${task.status} parcel cannot be received.`);
+    }
+    if (!task.receivedAt) {
+      task.receivedAt = new Date();
+      await this.tasks.save(task);
+    }
+    this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+    if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+    return task;
   }
 }

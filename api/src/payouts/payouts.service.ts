@@ -36,7 +36,7 @@ export class PayoutsService {
     const sellerIds = [userId, ...(seller ? [seller.id] : [])];
     const mine = new Set((await this.products.find({ where: { sellerId: In(sellerIds) }, select: { id: true } })).map((p) => p.id));
     const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12)));
-    const holdHours = Number(process.env.PAYOUT_CLEARANCE_HOURS ?? (process.env.NODE_ENV === 'production' ? 48 : 0));
+    const holdHours = Number((await this.settings.get('payoutClearanceHours')) ?? process.env.PAYOUT_CLEARANCE_HOURS ?? (process.env.NODE_ENV === 'production' ? 48 : 0));
     const cutoff = new Date(Date.now() - holdHours * 3_600_000);
     let gross = 0;
     if (mine.size) {
@@ -59,8 +59,16 @@ export class PayoutsService {
     seller: { id: string; name: string },
     amountUsd: number,
     method = 'bank',
+    account?: string,
   ): Promise<Payout> {
-    if (!(amountUsd >= 10)) throw new BadRequestException('The minimum payout is $10.');
+    const min = Number((await this.settings.get('minPayoutUsd')) ?? 10);
+    if (!(amountUsd >= min)) throw new BadRequestException(`The minimum payout is $${min}.`);
+    const kind = ['bank', 'mobile_money', 'wallet'].includes(method) ? method : 'bank';
+    // Money that leaves the platform needs a destination.
+    const dest = String(account ?? '').trim().slice(0, 250);
+    if (kind !== 'wallet' && dest.length < 5) {
+      throw new BadRequestException(kind === 'bank' ? 'Enter your bank account (holder and IBAN / account number).' : 'Enter the mobile-money number to pay.');
+    }
     const { available } = await this.available(seller.id);
     if (amountUsd > available + 0.001) {
       throw new BadRequestException(`You can withdraw up to $${available.toFixed(2)} right now.`);
@@ -71,7 +79,8 @@ export class PayoutsService {
         sellerId: seller.id,
         sellerName: seller.name,
         amountUsd,
-        method: ['bank', 'mobile_money', 'wallet'].includes(method) ? method : 'bank',
+        method: kind,
+        account: kind === 'wallet' ? null : dest,
         status: 'requested',
       }),
     );
@@ -86,20 +95,31 @@ export class PayoutsService {
     return payout;
   }
 
-  async approve(payoutId: string): Promise<Payout> {
+  /**
+   * Finance marks a payout paid. For bank / mobile-money payouts the money is
+   * sent outside the platform, so finance must enter the transfer reference;
+   * only "wallet" payouts are credited to the seller's in-app wallet.
+   */
+  async approve(payoutId: string, providerRef?: string): Promise<Payout> {
     const payout = await this.payouts.findOne({ where: { id: payoutId } });
     if (!payout) throw new NotFoundException('Payout not found.');
+    const ref = String(providerRef ?? '').trim().slice(0, 100);
+    if (payout.method !== 'wallet' && ref.length < 3) {
+      throw new BadRequestException('Enter the reference of the transfer you made (bank or mobile-money receipt).');
+    }
     // Atomic: two finance users clicking at once pay it out exactly once, and the
     // wallet credit commits together with the status change.
     const won = await this.payouts.manager.transaction(async (m) => {
       const res = await m
         .createQueryBuilder()
         .update(Payout)
-        .set({ status: 'paid' })
+        .set({ status: 'paid', providerRef: ref || null })
         .where("id = :id AND status = 'requested'", { id: payoutId })
         .execute();
       if (!res.affected) return false;
-      await this.wallet.apply(payout.sellerId, 'credit', payout.amountUsd, `Payout ${payout.reference}`, m);
+      if (payout.method === 'wallet') {
+        await this.wallet.apply(payout.sellerId, 'credit', payout.amountUsd, `Payout ${payout.reference}`, m);
+      }
       return true;
     });
     if (!won) throw new BadRequestException('This payout is no longer awaiting approval.');
@@ -108,7 +128,7 @@ export class PayoutsService {
     this.emitter.toRoles(FINANCE_ROOMS, 'payout:updated', saved);
     await this.notifications.toUser(saved.sellerId, {
       title: 'Payout paid',
-      body: `${saved.reference} · $${saved.amountUsd.toFixed(2)} settled to your wallet.`,
+      body: `${saved.reference} · $${saved.amountUsd.toFixed(2)} ${saved.method === 'wallet' ? 'credited to your wallet' : `sent to your ${saved.method === 'bank' ? 'bank account' : 'mobile-money number'} (ref ${saved.providerRef})`}.`,
       type: 'payout',
       entityId: saved.id,
     });

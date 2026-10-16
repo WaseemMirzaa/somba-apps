@@ -7,6 +7,7 @@ import {
   OrderItem,
   OrderStatus,
   PaymentMethod,
+  Seller,
 } from '../database/entities';
 import { ProductsService } from '../products/products.service';
 import {
@@ -18,6 +19,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { SettingsService } from '../content/settings.service';
+import { DeliveryService } from '../delivery/delivery.service';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -54,6 +56,8 @@ export class OrdersService {
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     @InjectRepository(DeliveryTask)
     private readonly deliveries: Repository<DeliveryTask>,
+    @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
+    private readonly delivery: DeliveryService,
     private readonly products: ProductsService,
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
@@ -67,6 +71,9 @@ export class OrdersService {
     this.payments.registerOrderSettledHandler((payment, outcome) =>
       this.onPaymentSettled(payment, outcome),
     );
+    // A rider could not deliver: re-open the order for another attempt, or
+    // cancel + refund it once the limit is reached.
+    this.delivery.registerFailedHandler((task, reason) => this.onDeliveryFailed(task, reason));
   }
 
   async create(
@@ -260,6 +267,7 @@ export class OrdersService {
         address: order.shippingAddress,
         zoneId: order.zoneId,
         codAmountUsd: order.paymentMethod === 'cod' ? order.totalUsd : 0,
+        pickupAddress: await this.pickupFor(order),
       }),
     );
     this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
@@ -268,6 +276,104 @@ export class OrdersService {
       body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
       type: 'order',
       entityId: order.id,
+    });
+  }
+
+  /** Where the rider collects the parcel: the seller(s)' pickup address, else the hub. */
+  private async pickupFor(order: Order): Promise<string> {
+    const lines: string[] = [];
+    const seen = new Set<string>();
+    for (const item of order.items ?? []) {
+      if (item.productId.startsWith('ext:')) continue;
+      const p = await this.products.get(item.productId);
+      if (!p?.sellerId || seen.has(p.sellerId)) continue;
+      seen.add(p.sellerId);
+      const seller = await this.sellers.findOne({ where: { id: p.sellerId } });
+      lines.push(`${seller?.name ?? p.sellerName ?? 'Seller'} — ${seller?.pickupAddress || 'address not provided, contact the seller'}`);
+    }
+    if (lines.length) return lines.join(' | ');
+    return (await this.settings.get('hubAddress')) || 'Somba&Teka hub';
+  }
+
+  /** The seller confirms the parcel is packed and ready for the rider. */
+  async sellerReady(user: { id: string }, orderId: string): Promise<DeliveryTask> {
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    const sellerRow = await this.sellers.findOne({ where: { userId: user.id } });
+    const mine = new Set(await this.products.idsBySeller(sellerRow?.id ?? user.id));
+    if (sellerRow?.id && sellerRow.id !== user.id) for (const id of await this.products.idsBySeller(user.id)) mine.add(id);
+    if (!(order.items ?? []).some((i) => mine.has(i.productId))) throw new NotFoundException('Order not found.');
+    if (!['confirmed', 'processing'].includes(order.status)) {
+      throw new BadRequestException(`An order that is ${order.status.replace(/_/g, ' ')} cannot be marked ready.`);
+    }
+    const task = await this.delivery.markReady(orderId);
+    if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+    await this.notifications.toAdmins({
+      title: 'Parcel ready for pickup',
+      body: `${order.reference} is packed and ready.`,
+      type: 'delivery',
+      entityId: order.id,
+    });
+    return task;
+  }
+
+  /**
+   * A delivery attempt failed. The order goes back to "confirmed" and a fresh
+   * task is queued for another attempt; after DELIVERY_MAX_ATTEMPTS the order is
+   * cancelled, the stock released and any prepaid money refunded.
+   */
+  private async onDeliveryFailed(task: DeliveryTask, reason: string): Promise<void> {
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    if (!order || order.status === 'cancelled' || order.status === 'returned' || order.status === 'delivered') return;
+    const max = Number(process.env.DELIVERY_MAX_ATTEMPTS ?? 3);
+    if (task.attempts >= max) {
+      const claim = await this.orders
+        .createQueryBuilder()
+        .update(Order)
+        .set({ status: 'cancelled' })
+        .where("id = :id AND status NOT IN ('cancelled','returned','delivered')", { id: order.id })
+        .execute();
+      if (!claim.affected) return;
+      const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+      const refunded = await this.payments.refundCancelledOrder(saved);
+      for (const item of saved.items ?? []) {
+        if (!item.productId.startsWith('ext:')) await this.products.restock(item.productId, item.qty);
+      }
+      this.emitter.toUser(saved.customerId, 'order:updated', saved);
+      this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+      await this.notifications.toUser(saved.customerId, {
+        title: 'Order cancelled',
+        body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded ? ' Your payment was refunded to your wallet.' : ''}`,
+        type: 'order',
+        entityId: saved.id,
+      });
+      return;
+    }
+    order.status = 'confirmed';
+    order.riderId = null;
+    const saved = await this.orders.save(order);
+    const next = await this.deliveries.save(
+      this.deliveries.create({
+        orderId: order.id,
+        orderReference: order.reference,
+        status: 'unassigned',
+        address: task.address,
+        zoneId: task.zoneId,
+        codAmountUsd: task.codAmountUsd,
+        pickupAddress: task.pickupAddress,
+        readyAt: task.readyAt,
+        receivedAt: task.receivedAt,
+        attempts: task.attempts + 1,
+      }),
+    );
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    this.emitter.toRoles([...OPS_ROOMS, 'rider'], 'delivery:updated', next);
+    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    await this.notifications.toUser(saved.customerId, {
+      title: 'Delivery attempt failed',
+      body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}). You can also cancel the order.`,
+      type: 'order',
+      entityId: saved.id,
     });
   }
 
@@ -408,9 +514,11 @@ export class OrdersService {
     }
 
     // Void the delivery task.
-    const task = await this.deliveries.findOne({ where: { orderId: saved.id } });
-    if (task && task.status !== 'delivered') {
+    const open = await this.deliveries.find({ where: { orderId: saved.id } });
+    for (const task of open) {
+      if (!['unassigned', 'assigned', 'picked_up', 'in_transit'].includes(task.status)) continue;
       task.status = 'failed';
+      task.failureReason = 'Order cancelled';
       await this.deliveries.save(task);
       this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
       if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);

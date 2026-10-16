@@ -203,9 +203,16 @@ async function main() {
   const avail = await emit<{ available: number }>(sSock, 'payouts:available');
   check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);
   const financeSawPayout = waitFor<any>(aSock, 'payout:created');
+  let noAccount = false;
+  try {
+    await emit(sSock, 'payouts:request', { amountUsd: 120, method: 'bank' });
+  } catch {
+    noAccount = true;
+  }
+  check('bank payout refused without a destination account', noAccount);
   const payout = await emit<any>(sSock, 'payouts:request', {
     amountUsd: 120,
-    method: 'bank',
+    method: 'wallet',
   });
   check('seller requested a payout', payout.status === 'requested');
   const payoutSeen = await financeSawPayout;
@@ -215,7 +222,21 @@ async function main() {
   const sellerCredited = waitFor<{ balance: number }>(sSock, 'wallet:updated');
   await emit(aSock, 'payouts:approve', { payoutId: payout.id });
   const sellerAfter = await sellerCredited;
-  check('approved payout credited seller wallet live', sellerAfter.balance === sellerBalBefore + 120);
+  check('approved wallet payout credited seller wallet live', sellerAfter.balance === sellerBalBefore + 120);
+
+  // Bank payout: finance must enter the real transfer reference; the in-app wallet is NOT credited.
+  const bankPayout = await emit<any>(sSock, 'payouts:request', { amountUsd: 20, method: 'bank', account: 'Kinshasa Traders — IBAN CD00 1234 5678' });
+  let noRef = false;
+  try {
+    await emit(aSock, 'payouts:approve', { payoutId: bankPayout.id });
+  } catch {
+    noRef = true;
+  }
+  check('bank payout cannot be marked paid without a transfer reference', noRef);
+  const walletBeforeBank = (await emit<{ balance: number }>(sSock, 'wallet:get')).balance;
+  const paidBank = await emit<any>(aSock, 'payouts:approve', { payoutId: bankPayout.id, providerRef: 'BANK-TRX-0001' });
+  const walletAfterBank = (await emit<{ balance: number }>(sSock, 'wallet:get')).balance;
+  check('bank payout paid with a reference, wallet untouched', paidBank.status === 'paid' && paidBank.providerRef === 'BANK-TRX-0001' && walletAfterBank === walletBeforeBank);
 
   // ---- Disputes / returns (customer ⇄ admin) ----
   const adminSawDispute = waitFor<any>(aSock, 'dispute:created');

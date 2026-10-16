@@ -245,6 +245,27 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     this.timers.add(t);
   }
 
+  /**
+   * Finance confirms (or declines) a pending mobile-money payment by hand —
+   * the fallback when no aggregator is connected (`MM_PROVIDER=manual`) and a
+   * convenient test hook with the sandbox. Uses the same atomic settle path.
+   */
+  async decideManually(reference: string, outcome: 'succeeded' | 'failed', reason?: string): Promise<Payment> {
+    if (!['manual', 'sandbox'].includes(this.mobileMoney?.name ?? '')) {
+      throw new BadRequestException('Manual confirmation is only available with MM_PROVIDER=manual.');
+    }
+    const payment = await this.payments.findOne({ where: { reference } });
+    if (!payment) throw new NotFoundException('Payment not found.');
+    if (payment.status !== 'pending') throw new BadRequestException(`This payment is already ${payment.status}.`);
+    const done = await this.settle({
+      reference,
+      outcome,
+      providerRef: payment.providerRef ?? undefined,
+      reason: outcome === 'failed' ? (reason?.trim() || 'Declined by finance.') : undefined,
+    });
+    return this.view(done ?? payment) as Payment;
+  }
+
   /** Entry point for the aggregator webhook (signature already verified by the provider). */
   verifyWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): MobileMoneyEvent {
     if (!this.mobileMoney) throw new Error('Mobile money is not configured.');
@@ -358,7 +379,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   /** Fail mobile-money charges nobody approved within the window (default 15 min). */
   async expireStale(): Promise<number> {
-    const ttlMin = Number(process.env.MM_PENDING_TTL_MIN ?? 15);
+    const ttlMin = Number(process.env.MM_PENDING_TTL_MIN ?? (this.mobileMoney?.name === 'manual' ? 1440 : 15));
     const cutoff = new Date(Date.now() - ttlMin * 60_000);
     const stale = await this.payments.find({
       where: { status: 'pending', method: In([...MOBILE_MONEY_METHODS]), createdAt: LessThan(cutoff) },

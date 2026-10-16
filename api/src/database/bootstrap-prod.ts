@@ -82,6 +82,8 @@ async function run() {
       { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 },
     ]),
     commissionPct: '12',
+    productModeration: 'true', // new seller listings wait for a moderator
+    minPayoutUsd: '10',
   };
   for (const [key, value] of Object.entries(defaults)) {
     if (!(await settings.findOne({ where: { key } }))) {

@@ -58,6 +58,11 @@ export class RiderService {
         address: t.address,
         lat: t.lat,
         lng: t.lng,
+        pickupAddress: t.pickupAddress,
+        attempts: t.attempts,
+        failureReason: t.failureReason,
+        readyAt: t.readyAt,
+        receivedAt: t.receivedAt,
         createdAt: t.createdAt,
         order: o
           ? {

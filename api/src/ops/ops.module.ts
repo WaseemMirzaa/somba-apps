@@ -20,6 +20,7 @@ import { AuditService } from './audit.service';
 import { FraudService } from './fraud.service';
 import { CustomersService } from './customers.service';
 import { BroadcastsService } from './broadcasts.service';
+import { UsersModule } from '../users/users.module';
 import { RolesService } from './roles.service';
 
 @Module({
@@ -38,6 +39,7 @@ import { RolesService } from './roles.service';
       Broadcast,
     ]),
     NotificationsModule,
+    UsersModule,
   ],
   providers: [
     SellersService,

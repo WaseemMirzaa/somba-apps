@@ -84,7 +84,25 @@ export class SandboxMobileMoneyProvider implements MobileMoneyProvider {
   }
 }
 
-/** `MM_PROVIDER`: `sandbox` (dev default) | `none` (production default → refuse mobile money). */
+/**
+ * Manual provider (`MM_PROVIDER=manual`): the customer pays the platform's
+ * merchant mobile-money number by hand and finance confirms the payment in the
+ * admin portal (`payments:confirm`). No aggregator or webhook is involved, so it
+ * is the safe way to take real payments before an aggregator contract exists.
+ */
+export class ManualMobileMoneyProvider implements MobileMoneyProvider {
+  readonly name = 'manual';
+
+  async initiate(charge: MobileMoneyCharge) {
+    return { providerRef: `manual_${charge.reference}` };
+  }
+
+  parseWebhook(): MobileMoneyEvent {
+    throw new Error('Manual mobile money has no webhook; finance confirms payments in the admin portal.');
+  }
+}
+
+/** `MM_PROVIDER`: `sandbox` (dev default) | `manual` (finance confirms by hand) | `none` (production default → refuse mobile money). */
 export function createMobileMoneyProvider(): MobileMoneyProvider | null {
   const prod = process.env.NODE_ENV === 'production';
   const which = (process.env.MM_PROVIDER ?? (prod ? 'none' : 'sandbox')).toLowerCase();
@@ -94,5 +112,6 @@ export function createMobileMoneyProvider(): MobileMoneyProvider | null {
     }
     return new SandboxMobileMoneyProvider(process.env.MM_WEBHOOK_SECRET ?? 'dev-only-mm-webhook-secret');
   }
+  if (which === 'manual') return new ManualMobileMoneyProvider();
   return null; // no aggregator configured → mobile money is refused (fail closed)
 }

@@ -13,6 +13,7 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class DisputesService {
@@ -21,6 +22,7 @@ export class DisputesService {
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     private readonly notifications: NotificationsService,
     private readonly payments: PaymentsService,
+    private readonly products: ProductsService,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -67,9 +69,44 @@ export class DisputesService {
    * wallet. Refunding moves money, so it needs finance/admin (`canRefund`) — and
    * if the refund cannot be made the dispute is NOT marked resolved.
    */
+  /**
+   * The warehouse confirms the returned goods arrived. A refund on a return
+   * needs this first, so money never goes back while the goods are still with
+   * the customer. Resellable goods go back into stock.
+   */
+  async markReceived(disputeId: string, restock = true): Promise<Dispute> {
+    const dispute = await this.disputes.findOne({ where: { id: disputeId } });
+    if (!dispute) throw new NotFoundException('Dispute not found.');
+    if (dispute.type !== 'return') throw new BadRequestException('Only returns have goods to receive.');
+    if (dispute.status !== 'open') throw new BadRequestException('This request was already handled.');
+    const claim = await this.disputes
+      .createQueryBuilder()
+      .update(Dispute)
+      .set({ receivedAt: new Date() })
+      .where('id = :id AND receivedAt IS NULL', { id: disputeId })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('These goods were already marked as received.');
+    if (restock) {
+      const order = await this.orders.findOne({ where: { id: dispute.orderId } });
+      for (const item of order?.items ?? []) {
+        if (!item.productId.startsWith('ext:')) await this.products.restock(item.productId, item.qty);
+      }
+    }
+    const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
+    this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
+    this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
+    await this.notifications.toUser(saved.customerId, {
+      title: 'Return received',
+      body: `${saved.reference}: we received your goods. Your request is being reviewed.`,
+      type: 'dispute',
+      entityId: saved.id,
+    });
+    return saved;
+  }
+
   async resolve(
     disputeId: string,
-    opts: { resolution?: string; refund?: boolean },
+    opts: { resolution?: string; refund?: boolean; force?: boolean },
     canRefund: boolean,
   ): Promise<Dispute> {
     const dispute = await this.disputes.findOne({ where: { id: disputeId } });
@@ -77,6 +114,9 @@ export class DisputesService {
     if (dispute.status !== 'open') throw new BadRequestException('This request was already handled.');
     if (opts.refund && !canRefund) {
       throw new BadRequestException('Only admin or finance can issue a refund.');
+    }
+    if (opts.refund && dispute.type === 'return' && !dispute.receivedAt && !opts.force) {
+      throw new BadRequestException('Mark the returned goods as received at the warehouse before refunding.');
     }
     if (opts.refund) {
       await this.payments.refund(dispute.orderId, true); // throws if it can't be refunded

@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { encryptedColumn } from '../../common/crypto/field-crypto';
 
 export type PayoutStatus = 'requested' | 'approved' | 'rejected' | 'paid';
 
@@ -37,6 +38,14 @@ export class Payout {
 
   @Column({ type: 'varchar', nullable: true })
   note: string | null;
+
+  /** Where to send the money (method, number/IBAN, holder) — encrypted at rest. */
+  @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
+  account: string | null;
+
+  /** Reference of the real transfer, entered by finance when marking it paid. */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  providerRef: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

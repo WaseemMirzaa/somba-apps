@@ -138,7 +138,7 @@ export class WarehouseService {
   ): Promise<WarehouseBatch> {
     for (const id of taskIds) {
       const task = await this.tasks.findOne({ where: { id } });
-      if (!task) continue;
+      if (!task || !['unassigned', 'assigned'].includes(task.status)) continue;
       task.riderId = rider.id;
       task.status = 'assigned';
       await this.tasks.save(task);

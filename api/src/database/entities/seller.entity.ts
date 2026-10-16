@@ -4,6 +4,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { encryptedColumn } from '../../common/crypto/field-crypto';
 
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
@@ -30,6 +31,10 @@ export class Seller {
 
   @Column({ type: 'int', default: 0 })
   productCount: number;
+
+  /** Where riders collect this seller's parcels (encrypted at rest). */
+  @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
+  pickupAddress: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

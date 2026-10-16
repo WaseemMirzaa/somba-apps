@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DeliveryTask, Order, OrderItem } from '../database/entities';
+import { DeliveryTask, Order, OrderItem, Seller } from '../database/entities';
+import { DeliveryModule } from '../delivery/delivery.module';
 import { ContentModule } from '../content/content.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProductsModule } from '../products/products.module';
@@ -10,7 +11,8 @@ import { OrdersService } from './orders.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, DeliveryTask]),
+    TypeOrmModule.forFeature([Order, OrderItem, DeliveryTask, Seller]),
+    DeliveryModule,
     ProductsModule,
     NotificationsModule,
     PaymentsModule,

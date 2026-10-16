@@ -53,6 +53,26 @@ export class DeliveryTask {
   @Column({ type: 'float', nullable: true })
   lng: number | null;
 
+  /** Which attempt this is (1 = first); a failed task is followed by a new one until the limit. */
+  @Column({ type: 'int', default: 1 })
+  attempts: number;
+
+  /** Why the rider could not deliver (set when status = failed). */
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  failureReason: string | null;
+
+  /** Where the rider collects the parcel (seller / hub), encrypted at rest. */
+  @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
+  pickupAddress: string | null;
+
+  /** The seller marked the parcel ready for pickup. */
+  @Column({ type: 'datetime', nullable: true })
+  readyAt: Date | null;
+
+  /** The hub scanned the parcel in. */
+  @Column({ type: 'datetime', nullable: true })
+  receivedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

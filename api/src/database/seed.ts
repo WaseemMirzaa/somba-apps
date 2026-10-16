@@ -144,6 +144,7 @@ async function run() {
       badge: 'somba_assured',
       rating: 4.6,
       productCount: CATALOG.length,
+      pickupAddress: '14 Avenue du Commerce, Gombe, Kinshasa',
     }),
   );
 
@@ -201,6 +202,9 @@ async function run() {
     setRepo.create({ key: 'codEnabled', value: 'true' }),
     setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0 }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5 }]) }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
+    // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
+    setRepo.create({ key: 'productModeration', value: 'false' }),
+    setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
   ]);
 
   // A couple of seed reviews on the first product.

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Product } from '../database/entities';
+import { FlashSale, Product } from '../database/entities';
 import type { ProductStatus } from '../database/entities';
 import { num, oneOf, optStr, price as priceOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -61,8 +61,42 @@ export function cleanListing(
 export class ProductsService {
   constructor(
     @InjectRepository(Product) private readonly repo: Repository<Product>,
+    @InjectRepository(FlashSale) private readonly flash: Repository<FlashSale>,
     private readonly emitter: RealtimeEmitter,
   ) {}
+
+  /**
+   * Show (and charge) the flash-sale price while a sale is running: the listing
+   * price becomes the flash price and the normal price is kept as the
+   * "was" price. Only the returned copy changes, never the stored row.
+   */
+  private async withFlash(products: Product[]): Promise<Product[]> {
+    if (!products.length) return products;
+    const sales = (await this.flash.find({ where: { active: true } })).filter((f) => {
+      const now = Date.now();
+      const from = f.startsAt ? Date.parse(f.startsAt) : NaN;
+      const to = f.endsAt ? Date.parse(f.endsAt) : NaN;
+      return !(Number.isFinite(from) && now < from) && !(Number.isFinite(to) && now > to);
+    });
+    if (!sales.length) return products;
+    const best = new Map<string, number>();
+    for (const f of sales) best.set(f.productId, Math.min(best.get(f.productId) ?? Infinity, f.flashPrice));
+    return products.map((p) => {
+      const fp = best.get(p.id);
+      if (fp === undefined || !(fp > 0) || fp >= p.price) return p;
+      const was = Math.max(p.originalPrice ?? 0, p.price);
+      return Object.assign(Object.create(Object.getPrototypeOf(p)), p, {
+        price: fp,
+        originalPrice: was,
+        discount: Math.min(90, Math.round(((was - fp) / was) * 100)),
+      }) as Product;
+    });
+  }
+
+  /** The stored row, without flash pricing — use this whenever the row will be saved back. */
+  getRaw(id: string): Promise<Product | null> {
+    return this.repo.findOne({ where: { id } });
+  }
 
   async list(filter?: { category?: string; status?: string }): Promise<Product[]> {
     const where: Record<string, string> = {};
@@ -73,14 +107,15 @@ export class ProductsService {
       order: { createdAt: 'DESC' },
     });
     // Soft-removed listings never appear unless explicitly requested.
-    return filter?.status ? rows : rows.filter((p) => p.status !== 'removed');
+    return this.withFlash(filter?.status ? rows : rows.filter((p) => p.status !== 'removed'));
   }
 
   /** A live listing by exact (case-insensitive) name — used to re-price snapshot order lines. */
   async findLiveByName(name: string): Promise<Product | null> {
     const rows = await this.repo.find({ where: { status: 'live' } });
     const n = name.trim().toLowerCase();
-    return rows.find((p) => p.name.trim().toLowerCase() === n) ?? null;
+    const hit = rows.find((p) => p.name.trim().toLowerCase() === n);
+    return hit ? (await this.withFlash([hit]))[0] : null;
   }
 
   /** Ids of every product a seller owns (for scoping their order view). */
@@ -88,15 +123,17 @@ export class ProductsService {
     return (await this.repo.find({ where: { sellerId }, select: { id: true } })).map((p) => p.id);
   }
 
-  get(id: string): Promise<Product | null> {
-    return this.repo.findOne({ where: { id } });
+  async get(id: string): Promise<Product | null> {
+    const p = await this.repo.findOne({ where: { id } });
+    return p ? (await this.withFlash([p]))[0] : null;
   }
 
   async create(data: Partial<Product>): Promise<Product> {
     const product = await this.repo.save(this.repo.create(data));
-    // Live-update every open storefront/dashboard.
+    // Shoppers only hear about listings that are live; staff see every new one
+    // (a pending listing lands in the moderation queue).
     this.emitter.toRoles(
-      ['customer', ...ADMIN_ROLES],
+      product.status === 'live' ? ['customer', ...ADMIN_ROLES] : ADMIN_ROLES,
       'product:created',
       product,
     );
@@ -104,14 +141,14 @@ export class ProductsService {
   }
 
   async update(id: string, patch: Partial<Product>): Promise<Product | null> {
+    const before = await this.getRaw(id);
     await this.repo.update({ id }, patch);
     const product = await this.get(id);
     if (product) {
-      this.emitter.toRoles(
-        ['customer', ...ADMIN_ROLES],
-        'product:updated',
-        product,
-      );
+      // Shoppers get the update while it is live or when it just stopped being live
+      // (so their screens drop it); a never-live listing stays staff-only.
+      const shoppers = product.status === 'live' || before?.status === 'live';
+      this.emitter.toRoles(shoppers ? ['customer', ...ADMIN_ROLES] : ADMIN_ROLES, 'product:updated', product);
     }
     return product;
   }
@@ -152,7 +189,7 @@ export class ProductsService {
 
   /** Soft-remove a listing: hidden from storefront, kept for order history. */
   async remove(id: string): Promise<Product | null> {
-    const product = await this.get(id);
+    const product = await this.getRaw(id);
     if (!product) return null;
     product.status = 'removed';
     const saved = await this.repo.save(product);

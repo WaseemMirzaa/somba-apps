@@ -46,6 +46,10 @@ export class Dispute {
   @Column({ type: 'text', nullable: true })
   resolution: string | null;
 
+  /** The warehouse confirmed the returned goods arrived (required before a refund on a return). */
+  @Column({ type: 'datetime', nullable: true })
+  receivedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

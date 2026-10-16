@@ -85,8 +85,14 @@ const register = async (label, role = 'customer') => {
   const prodA = a.data;
   a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { price: -1 } });
   ok(!a.ok, 'cannot update to a negative price');
-  a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { sellerId: sellerB.store.id, rating: 5, status: 'removed', stock: 50 } });
-  ok(a.ok && a.data.sellerId === sellerA.store.id && a.data.rating === 0 && a.data.status === 'live' && a.data.stock === 50, 'update ignores sellerId / rating / status, applies stock');
+  a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { sellerId: sellerB.store.id, rating: 5, stock: 50 } });
+  ok(a.ok && a.data.sellerId === sellerA.store.id && a.data.rating === 0 && a.data.status === 'live' && a.data.stock === 50, 'update ignores sellerId / rating, applies stock');
+  a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { status: 'removed' } });
+  ok(!a.ok, 'a seller cannot change moderation status (only pause / resume)');
+  a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { status: 'draft' } });
+  ok(a.ok && a.data.status === 'draft', 'a seller can pause a live listing');
+  a = await req(sellerA.sock, 'products:update', { id: prodA.id, patch: { status: 'live' } });
+  ok(a.ok && a.data.status === 'live', 'a seller can resume a paused listing');
   a = await req(sellerB.sock, 'products:update', { id: prodA.id, patch: { price: 1 } });
   ok(!a.ok, "a seller cannot edit another seller's product");
   a = await req(admin.sock, 'products:update', { id: prodA.id, patch: { status: 'live', stock: 3 } });
@@ -293,7 +299,7 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(cust.sock, 'replacements:create', { orderId: pend.id, sku: 'x', productName: 'y' })).ok, "a customer cannot file a replacement on someone else's order");
   ok(!(await req(cust2.sock, 'exchanges:create', { orderId: o1.id, fromSku: 'a', fromName: 'a', toSku: 'b', toName: 'b' })).ok, 'cannot file an exchange on an order that is not yours');
 
-  a = await req(sellerA.sock, 'payouts:request', { amountUsd: 500 });
+  a = await req(sellerA.sock, 'payouts:request', { amountUsd: 500, method: 'wallet' });
   ok(!a.ok && /withdraw up to/i.test(a.error ?? ''), 'a payout above the available balance is refused', a.error ?? '');
   ok(!(await req(sellerA.sock, 'payouts:request', { amountUsd: 5 })).ok, 'below the $10 minimum is refused');
   const av = await req(sellerA.sock, 'payouts:available');

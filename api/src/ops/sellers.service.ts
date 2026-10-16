@@ -63,11 +63,14 @@ export class SellersService {
   /** A seller edits their own store profile (name). */
   async updateProfile(
     userId: string,
-    patch: { name?: string },
+    patch: { name?: string; pickupAddress?: string | null },
   ): Promise<Seller> {
     const seller = await this.byUser(userId);
     if (!seller) throw new NotFoundException('Store not found.');
     if (patch.name != null) seller.name = str(patch.name, 'Store name', { min: 2, max: 100 });
+    if (patch.pickupAddress !== undefined) {
+      seller.pickupAddress = patch.pickupAddress === null || patch.pickupAddress === '' ? null : str(patch.pickupAddress, 'Pickup address', { min: 5, max: 300 });
+    }
     const saved = await this.sellers.save(seller);
     this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', saved);
     if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', saved);

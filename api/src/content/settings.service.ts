@@ -9,7 +9,7 @@ import { num, oneOf, str } from '../common/validate';
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
 export const PUBLIC_SETTINGS = ['fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones'] as const;
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryZones'] as const;
+const WRITABLE = ['fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryZones', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress'] as const;
 
 /**
  * Key/value platform config: FX rate, COD cap, delivery zones (JSON),
@@ -50,6 +50,14 @@ export class SettingsService {
         return String(num(value, 'Commission', { min: 0, max: 60 }));
       case 'codEnabled':
         return oneOf(String(value), ['true', 'false'] as const, 'COD flag');
+      case 'productModeration':
+        return oneOf(String(value), ['true', 'false'] as const, 'Moderation flag');
+      case 'minPayoutUsd':
+        return String(num(value, 'Minimum payout', { min: 1, max: 100000 }));
+      case 'payoutClearanceHours':
+        return String(num(value, 'Clearance hours', { min: 0, max: 720, int: true }));
+      case 'hubAddress':
+        return str(value, 'Hub address', { max: 200 });
       case 'deliveryZones': {
         let zones: unknown;
         try {

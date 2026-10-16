@@ -10,7 +10,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { WsThrottleInterceptor } from './ws-throttle.interceptor';
-import { oneOf } from '../common/validate';
+import { oneOf, str } from '../common/validate';
 import { cleanListing } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
 import { Server, Socket } from 'socket.io';
@@ -307,10 +307,19 @@ export class RealtimeGateway
       const product = await this.products.create({
         ...data,
         stock: data.stock ?? 0,
-        status: 'live',
+        // New listings from sellers wait for a moderator unless moderation is switched off.
+        status: user.role === 'seller' && (await this.settings.get('productModeration')) !== 'false' ? 'pending' : 'live',
         sellerId: seller?.id ?? user.id,
         sellerName: seller?.name ?? user.name,
       });
+      if (product.status === 'pending') {
+        await this.notifications.toAdmins({
+          title: 'Product awaiting review',
+          body: `${product.name} from ${product.sellerName ?? 'a seller'} needs moderation.`,
+          type: 'moderation',
+          entityId: product.id,
+        });
+      }
       return ok(product);
     } catch (e) {
       return fail((e as Error).message);
@@ -342,7 +351,28 @@ export class RealtimeGateway
         allowStatus: this.isAdmin(user.role),
         currentPrice: existing.price,
       });
-      return ok(await this.products.update(body.id, patch));
+      // A seller may pause a live listing or resume a paused one; everything else
+      // (approving, rejecting, un-removing) is a moderator's decision.
+      const wanted = (body.patch as Record<string, unknown> | undefined)?.status;
+      if (!this.isAdmin(user.role) && wanted !== undefined) {
+        const pause = wanted === 'draft' && existing.status === 'live';
+        const resume = wanted === 'live' && existing.status === 'draft';
+        if (!pause && !resume) return fail('Only a moderator can change this listing\'s status.');
+        patch.status = wanted as typeof existing.status;
+      }
+      const updated = await this.products.update(body.id, patch);
+      if (this.isAdmin(user.role) && patch.status && patch.status !== existing.status && existing.sellerId) {
+        const owner = await this.sellersSvc.get(existing.sellerId);
+        if (owner?.userId) {
+          await this.notifications.toUser(owner.userId, {
+            title: patch.status === 'live' ? 'Product approved' : patch.status === 'rejected' ? 'Product rejected' : 'Product updated',
+            body: `${existing.name} is now ${patch.status}.`,
+            type: 'moderation',
+            entityId: existing.id,
+          });
+        }
+      }
+      return ok(updated);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -447,7 +477,7 @@ export class RealtimeGateway
   @SubscribeMessage('delivery:updateStatus')
   async deliveryUpdateStatus(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { taskId: string; status: DeliveryStatus },
+    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string },
   ) {
     try {
       const user = this.requireUser(client);
@@ -455,7 +485,7 @@ export class RealtimeGateway
       if (!(['picked_up', 'in_transit', 'delivered', 'failed'] as string[]).includes(body?.status)) {
         return fail('Invalid delivery status.');
       }
-      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id));
+      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -471,6 +501,38 @@ export class RealtimeGateway
       if (user.role !== 'rider') return fail('Riders only.');
       await this.delivery.updateLocation(body.taskId, user.id, body.lat, body.lng);
       return ok({ received: true });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Hub staff scan a parcel in (independent of the rider's progress). */
+  @SubscribeMessage('warehouse:receive')
+  async warehouseReceive(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { taskId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      const task = await this.delivery.markReceived(String(body?.taskId ?? ''));
+      await this.audit.record({ actor: user.name, role: user.role, action: 'parcel.received', entity: 'delivery', entityId: task.id, detail: task.orderReference });
+      return ok(task);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** A seller confirms an order containing their products is packed and ready for the rider. */
+  @SubscribeMessage('orders:sellerReady')
+  async ordersSellerReady(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Sellers only.');
+      return ok(await this.orders.sellerReady(user, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -539,6 +601,39 @@ export class RealtimeGateway
     }
   }
 
+  /** Finance confirms a pending mobile-money payment by hand (manual provider / fallback). */
+  @SubscribeMessage('payments:confirm')
+  async paymentsConfirm(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { reference: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin' && user.role !== 'admin_finance') return fail('Only admin/finance can confirm payments.');
+      const paid = await this.payments.decideManually(String(body?.reference ?? ''), 'succeeded');
+      await this.audit.record({ actor: user.name, role: user.role, action: 'payment.confirmed', entity: 'payment', entityId: paid.id, detail: paid.reference });
+      return ok(paid);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('payments:decline')
+  async paymentsDecline(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { reference: string; reason?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin' && user.role !== 'admin_finance') return fail('Only admin/finance can decline payments.');
+      const res = await this.payments.decideManually(String(body?.reference ?? ''), 'failed', body?.reason);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'payment.declined', entity: 'payment', entityId: res.id, detail: res.reference });
+      return ok(res);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('orders:refund')
   async ordersRefund(
     @ConnectedSocket() client: AuthedSocket,
@@ -581,7 +676,7 @@ export class RealtimeGateway
   @SubscribeMessage('payouts:request')
   async payoutsRequest(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { amountUsd: number; method?: string },
+    @MessageBody() body: { amountUsd: number; method?: string; account?: string },
   ) {
     try {
       const user = this.requireUser(client);
@@ -594,6 +689,7 @@ export class RealtimeGateway
           { id: user.id, name: user.name },
           amount,
           body.method,
+          body.account,
         ),
       );
     } catch (e) {
@@ -604,14 +700,16 @@ export class RealtimeGateway
   @SubscribeMessage('payouts:approve')
   async payoutsApprove(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { payoutId: string },
+    @MessageBody() body: { payoutId: string; providerRef?: string },
   ) {
     try {
       const user = this.requireUser(client);
       if (user.role !== 'admin' && user.role !== 'admin_finance') {
         return fail('Only admin/finance can approve payouts.');
       }
-      return ok(await this.payouts.approve(body.payoutId));
+      const paid = await this.payouts.approve(body.payoutId, body.providerRef);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'payout.paid', entity: 'payout', entityId: paid.id, detail: `${paid.reference} $${paid.amountUsd} ref ${paid.providerRef ?? 'wallet'}` });
+      return ok(paid);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -666,7 +764,7 @@ export class RealtimeGateway
   @SubscribeMessage('disputes:resolve')
   async disputesResolve(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { disputeId: string; resolution?: string; refund?: boolean },
+    @MessageBody() body: { disputeId: string; resolution?: string; refund?: boolean; force?: boolean },
   ) {
     try {
       const user = this.requireUser(client);
@@ -674,10 +772,27 @@ export class RealtimeGateway
       return ok(
         await this.disputes.resolve(
           body.disputeId,
-          { resolution: body.resolution, refund: body.refund },
+          { resolution: body.resolution, refund: body.refund, force: body.force === true && user.role === 'admin' },
           user.role === 'admin' || user.role === 'admin_finance',
         ),
       );
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The warehouse confirms returned goods arrived (needed before a refund on a return). */
+  @SubscribeMessage('disputes:markReceived')
+  async disputesMarkReceived(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { disputeId: string; restock?: boolean },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      const d = await this.disputes.markReceived(String(body?.disputeId ?? ''), body?.restock !== false);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'return.received', entity: 'dispute', entityId: d.id, detail: d.reference });
+      return ok(d);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1264,6 +1379,26 @@ export class RealtimeGateway
     }
   }
 
+  /** Super admin creates a rider / warehouse / admin sub-role account (temporary password returned once). */
+  @SubscribeMessage('roles:createStaff')
+  async rolesCreateStaff(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { email: string; name: string; role: string; phone?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin') return fail('Super admin only.');
+      const role = oneOf(body?.role, ['rider', 'warehouse_staff', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation'] as const, 'Role');
+      const email = str(body?.email, 'Email', { max: 200 }).toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email.');
+      const created = await this.roles.createStaff({ email, name: str(body?.name, 'Name', { min: 2, max: 100 }), role, phone: body?.phone ? str(body.phone, 'Phone', { max: 30 }) : null });
+      await this.audit.record({ actor: user.name, role: user.role, action: 'staff.created', entity: 'user', entityId: created.id, detail: `${role} ${email}` });
+      return ok(created);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   // ---- Warehouse (staff/admin) -------------------------------------------
   @SubscribeMessage('warehouse:hubs')
   async whHubs(@ConnectedSocket() client: AuthedSocket) {
@@ -1669,12 +1804,12 @@ export class RealtimeGateway
   @SubscribeMessage('sellers:update')
   async sellersUpdate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { name?: string },
+    @MessageBody() body: { name?: string; pickupAddress?: string | null },
   ) {
     try {
       const user = this.requireUser(client);
       if (user.role !== 'seller') return fail('Sellers only.');
-      return ok(await this.sellersSvc.updateProfile(user.id, body));
+      return ok(await this.sellersSvc.updateProfile(user.id, { name: body?.name, pickupAddress: body?.pickupAddress }));
     } catch (e) {
       return fail((e as Error).message);
     }
