@@ -5,32 +5,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
+import { CASE_STATUS_OPTIONS, caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
-  { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
-  { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
-];
-
-const RETURN_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  pending: { en: "Pending", fr: "En attente" },
-  pending_inspection: { en: "Pending inspection", fr: "En attente d'inspection" },
-  inspecting: { en: "Inspecting", fr: "Inspection" },
-  approved: { en: "Approved", fr: "Approuvé" },
-  rejected: { en: "Rejected", fr: "Rejeté" },
-  refunded: { en: "Refunded", fr: "Remboursé" },
-};
-
-function returnStatusLabel(status: string, fr: boolean) {
-  const entry = RETURN_STATUS_LABELS[status];
-  if (entry) return fr ? entry.fr : entry.en;
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export default function SellerReturnsPage() {
   const { t, locale } = useLocale();
@@ -42,7 +21,7 @@ export default function SellerReturnsPage() {
     () =>
       applyListFilters(sellerReturnList, filters, {
         searchFields: ["id", "orderId", "customer", "reason"],
-        dateField: timelineRequestDate,
+        dateField: "date",
         statusField: "status",
       }),
     [sellerReturnList, filters]
@@ -53,15 +32,15 @@ export default function SellerReturnsPage() {
       title={t("returns")}
       subtitle={
         fr
-          ? "Vue liste — N° retour, commande, client, motif, montant, statut"
-          : "List View — Return ID, Order, Customer, Reason, Amount, Status"
+          ? "Retours demandés par les clients sur vos commandes. La décision revient à l'administration."
+          : "Returns customers requested on your orders. The administration makes the decision."
       }
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("returns") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={CASE_STATUS_OPTIONS}
           searchPlaceholder={fr ? "N° retour, commande, client…" : "Return ID, order, customer…"}
         />
       }
@@ -71,9 +50,9 @@ export default function SellerReturnsPage() {
         )},
         { key: "orderId", label: fr ? "Commande" : "Order" },
         { key: "customer", label: t("customer") },
-        { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (fr ? String(row.reasonFr ?? row.reason) : String(row.reason)) },
-        { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{returnStatusLabel(String(row.status), fr)}</Badge> },
+        { key: "reason", label: fr ? "Motif" : "Reason", },
+        { key: "amount", label: t("amount"), render: (row) => (Number(row.amount) > 0 ? formatCurrency(row.amount as number, locale) : "—") },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={caseStatusVariant(String(row.status))}>{caseStatusLabel(String(row.status), fr)}</Badge> },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/returns/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

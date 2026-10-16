@@ -5,18 +5,14 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
-import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Requested", labelFr: "Demandé" },
-  { value: "processing", label: "Inspecting", labelFr: "Inspection" },
-  { value: "allocated", label: "Allocated", labelFr: "Alloué" },
-  { value: "shipped", label: "Dispatched", labelFr: "Expédié" },
-  { value: "completed", label: "Closed", labelFr: "Clôturé" },
-];
+import {
+  REPLACEMENT_STATUS_OPTIONS,
+  replacementStatusLabelReal,
+  replacementStatusVariantReal,
+} from "@/lib/seller-labels";
 
 export default function SellerReplacementsPage() {
   const { t, locale } = useLocale();
@@ -27,8 +23,8 @@ export default function SellerReplacementsPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(sellerReplacementList, filters, {
-        searchFields: ["id", "orderId", "customer", "sku"],
-        dateField: timelineRequestDate,
+        searchFields: ["id", "orderId", "customer", "sku", "productName"],
+        dateField: "date",
         statusField: "status",
       }),
     [sellerReplacementList, filters]
@@ -39,15 +35,15 @@ export default function SellerReplacementsPage() {
       title={t("replacements")}
       subtitle={
         fr
-          ? "Vue liste — N° dossier, commande, client, SKU, statut"
-          : "List View — Replacement ID, Order, Customer, SKU, Status"
+          ? "Remplacements en direct (lecture seule) : l'entrepôt les traite"
+          : "Live replacements (read-only): the warehouse processes them"
       }
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("replacements") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={REPLACEMENT_STATUS_OPTIONS}
           searchPlaceholder={fr ? "N° dossier, commande, client, SKU…" : "Case ID, order, customer, SKU…"}
         />
       }
@@ -57,8 +53,10 @@ export default function SellerReplacementsPage() {
         )},
         { key: "orderId", label: fr ? "Commande" : "Order" },
         { key: "customer", label: t("customer") },
+        { key: "productName", label: fr ? "Produit" : "Product" },
         { key: "sku", label: "SKU" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant={replacementStatusVariant(String(row.status))}>{replacementStatusLabel(String(row.status), fr)}</Badge> },
+        { key: "status", label: t("status"), render: (row) => <Badge variant={replacementStatusVariantReal(String(row.status))}>{replacementStatusLabelReal(String(row.status), fr)}</Badge> },
+        { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},

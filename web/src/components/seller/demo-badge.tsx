@@ -24,14 +24,18 @@ export function DemoBadge({ className }: { className?: string }) {
 }
 
 /** A full-width notice for pages that are entirely sample data. */
-export function DemoNotice({ className }: { className?: string }) {
+export function DemoNotice({ className, all = false }: { className?: string; all?: boolean }) {
   const { locale } = useLocale();
   return (
     <div className={cn("flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600", className)}>
       <DemoBadge />
-      {locale === "fr"
-        ? "Les graphiques ci-dessous sont des exemples. Seul « Meilleures ventes » reflète vos vraies commandes."
-        : "The charts below are samples. Only “Best sellers” reflects your real orders."}
+      {all
+        ? locale === "fr"
+          ? "Toutes les valeurs de cette page sont des exemples : le serveur ne fournit pas encore ces statistiques."
+          : "Every figure on this page is sample data: the server does not provide these statistics yet."
+        : locale === "fr"
+          ? "Les graphiques ci-dessous sont des exemples. Seul « Meilleures ventes » reflète vos vraies commandes."
+          : "The charts below are samples. Only “Best sellers” reflects your real orders."}
     </div>
   );
 }

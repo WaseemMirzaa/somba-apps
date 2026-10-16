@@ -31,6 +31,7 @@ export default function SellerRegisterPage() {
   // then sends it to the right page for its approval state).
   useEffect(() => {
     if (!ready) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- nothing to check until a seller socket is up
       setChecking(false);
       return;
     }
@@ -49,6 +50,7 @@ export default function SellerRegisterPage() {
   }, [ready, router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill once the account is known
     if (isSeller && !name && rt.user?.name) setName(rt.user.name);
   }, [isSeller, rt.user?.name, name]);
 

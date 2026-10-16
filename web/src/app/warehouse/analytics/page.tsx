@@ -32,6 +32,8 @@ import {
   RevenueAreaChart,
 } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
+import { useWarehouseData } from "@/lib/warehouse";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import {
   warehouseExtendedKpis,
   warehouseThroughputTrend,
@@ -56,6 +58,9 @@ export default function WarehouseAnalyticsPage() {
   const [period, setPeriod] = useState<AnalyticsPeriod>("30D");
   const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
   const k = warehouseExtendedKpis;
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { stats } = useWarehouseData();
 
   const inboundSpark = warehouseInboundDispatchTrend.map((d) => d.inbound);
   const dispatchSpark = warehouseInboundDispatchTrend.map((d) => d.dispatch);
@@ -75,7 +80,7 @@ export default function WarehouseAnalyticsPage() {
             ? "Réception · Expédition · Débit · Lanes · Livreurs · Retours · Exceptions · SLA"
             : "Inbound · Dispatch · Throughput · Lanes · Riders · Returns · Exceptions · SLAs"
         }
-        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("analytics") }]}
+        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: base }, { label: t("analytics") }]}
         actions={
           <AnalyticsPeriodControls
             period={period}
@@ -85,6 +90,38 @@ export default function WarehouseAnalyticsPage() {
           />
         }
       />
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">{fr ? "En direct maintenant" : "Live right now"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Calculé à partir des livraisons en direct" : "Computed from the live delivery list"}</p>
+          </div>
+          <Badge variant="success">{fr ? "Données réelles" : "Live data"}</Badge>
+        </CardHeader>
+        <CardContent>
+          <InfoGrid
+            columns={4}
+            items={[
+              { label: fr ? "Entrants" : "Inbound", value: stats.inbound },
+              { label: fr ? "Reçus" : "Received", value: stats.received },
+              { label: fr ? "Tri" : "Sorting", value: stats.sorting },
+              { label: fr ? "Prêts" : "Ready", value: stats.ready },
+              { label: fr ? "Expédiés" : "Dispatched", value: stats.dispatched },
+              { label: fr ? "Livrés" : "Delivered", value: stats.delivered },
+              { label: fr ? "Exceptions" : "Exceptions", value: stats.exception },
+              { label: fr ? "Ouverts > 24 h" : "Open > 24 h", value: stats.aged24h },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Badge variant="warning">{fr ? "Données démo" : "Demo data"}</Badge>
+        {fr
+          ? "Tous les graphiques et indicateurs ci-dessous sont des exemples : le serveur ne fournit pas encore ces mesures."
+          : "Every chart and indicator below is sample data: the server does not provide these measures yet."}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsKpiCard
@@ -205,7 +242,7 @@ export default function WarehouseAnalyticsPage() {
             <h2 className="font-semibold text-slate-900">{fr ? "Performance livreurs" : "Rider performance"}</h2>
             <p className="text-xs text-slate-500">{fr ? "Classement par livraisons" : "Ranked by deliveries"}</p>
           </div>
-          <NavLinkButton href="/warehouse/riders">
+          <NavLinkButton href={ops("/riders")}>
             {t("viewAll")}
           </NavLinkButton>
         </CardHeader>
@@ -216,9 +253,7 @@ export default function WarehouseAnalyticsPage() {
                 key: "name",
                 label: fr ? "Livreur" : "Rider",
                 render: (row) => (
-                  <Link href={`/warehouse/riders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
-                    {String(row.name)}
-                  </Link>
+                  <span className="font-medium text-slate-900">{String(row.name)}</span>
                 ),
               },
               { key: "deliveries", label: fr ? "Livraisons" : "Deliveries" },
@@ -243,9 +278,6 @@ export default function WarehouseAnalyticsPage() {
               },
             ]}
             data={warehouseRiderLeaderboard as unknown as Record<string, unknown>[]}
-            rowAction={(row) => (
-              <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-            )}
           />
         </CardContent>
       </Card>
@@ -262,9 +294,7 @@ export default function WarehouseAnalyticsPage() {
                   key: "id",
                   label: fr ? "Lot" : "Batch",
                   render: (row) => (
-                    <Link href={`/warehouse/dispatch/${String(row.id).replace("BAT-", "")}`} className="font-medium text-[var(--primary)] hover:underline">
-                      {String(row.id)}
-                    </Link>
+                    <span className="font-medium text-slate-900">{String(row.id)}</span>
                   ),
                 },
                 { key: "parcels", label: fr ? "Colis" : "Parcels" },
@@ -281,9 +311,6 @@ export default function WarehouseAnalyticsPage() {
                 },
               ]}
               data={warehouseTopBatches as unknown as Record<string, unknown>[]}
-              rowAction={(row) => (
-                <Link href={`/warehouse/dispatch/${String(row.id).replace("BAT-", "")}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-              )}
             />
           </CardContent>
         </Card>
@@ -451,7 +478,7 @@ export default function WarehouseAnalyticsPage() {
         ].map((link) => (
           <Link
             key={link.href}
-            href={link.href}
+            href={ops(link.href.replace("/warehouse", ""))}
             className="group flex items-center gap-3 rounded-xl border border-[var(--primary-tint)] p-4 transition-all hover:border-[var(--primary)] hover:bg-[var(--primary-light)]"
           >
             <div className="rounded-xl bg-red-50 p-2">

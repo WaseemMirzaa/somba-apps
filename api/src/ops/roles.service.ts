@@ -40,7 +40,7 @@ export class RolesService {
       .filter(
         (u) => u.role.startsWith('admin') || u.role === 'warehouse_staff' || u.role === 'rider',
       )
-      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, active: u.active }));
   }
 
   async setRole(id: string, role: UserRole): Promise<void> {

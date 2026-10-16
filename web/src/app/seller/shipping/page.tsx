@@ -8,18 +8,8 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
+import { SHIPPING_STATUS_OPTIONS, shippingStatusLabel, shippingStatusVariant } from "@/lib/seller-labels";
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "ready", label: "Ready", labelFr: "Prêt" },
-  { value: "picked_up", label: "Picked up", labelFr: "Collecté" },
-  { value: "in_transit", label: "In transit", labelFr: "En transit" },
-  { value: "delivered", label: "Delivered", labelFr: "Livré" },
-];
-
-function formatStatus(status: string) {
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export default function SellerShippingPage() {
   const { t, locale } = useLocale();
@@ -32,17 +22,16 @@ export default function SellerShippingPage() {
       applyListFilters(
         shipmentList.map((s) => ({
           ...s,
-          rider: s.rider.name,
-          warehouse: s.warehouse.name,
+          rider: s.riderAssigned ? (fr ? "Assigné" : "Assigned") : "—",
         })),
         filters,
         {
-          searchFields: ["id", "orderId", "rider", "warehouse", "trackingNumber"],
-          dateField: (item) => String(item.pickupTime).slice(0, 10),
+          searchFields: ["id", "orderId", "trackingNumber"],
+          dateField: (item) => String(item.createdDate),
           statusField: "status",
         }
       ),
-    [shipmentList, filters]
+    [shipmentList, filters, fr]
   );
 
   return (
@@ -50,16 +39,16 @@ export default function SellerShippingPage() {
       title={t("shipping")}
       subtitle={
         fr
-          ? "Expéditions — ID, commande, livreur, entrepôt, statut, collecte"
-          : "Shipments — ID, order, rider, warehouse, status, pickup time"
+          ? "Expéditions suivies d'après le statut réel de chaque commande"
+          : "Shipments tracked from each order's real status"
       }
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("shipping") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "N° expédition, commande, livreur…" : "Shipment ID, order, rider…"}
+          statusOptions={SHIPPING_STATUS_OPTIONS}
+          searchPlaceholder={fr ? "N° expédition, commande…" : "Shipment ID, order…"}
         />
       }
       columns={[
@@ -82,7 +71,6 @@ export default function SellerShippingPage() {
           ),
         },
         { key: "rider", label: fr ? "Livreur" : "Rider" },
-        { key: "warehouse", label: fr ? "Entrepôt" : "Warehouse" },
         {
           key: "trackingNumber",
           label: fr ? "N° suivi" : "Tracking #",
@@ -92,12 +80,12 @@ export default function SellerShippingPage() {
           key: "status",
           label: t("status"),
           render: (row) => (
-            <Badge variant={row.status === "delivered" ? "success" : "info"}>
-              {fr ? String(row.statusFr) : formatStatus(String(row.status))}
+            <Badge variant={shippingStatusVariant(String(row.status))}>
+              {shippingStatusLabel(String(row.status), fr)}
             </Badge>
           ),
         },
-        { key: "pickupTime", label: fr ? "Collecte" : "Pickup Time" },
+        { key: "createdDate", label: t("date") },
         {
           key: "actions",
           label: t("action"),

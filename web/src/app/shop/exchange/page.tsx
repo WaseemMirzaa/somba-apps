@@ -1,79 +1,56 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { useMyOrders } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 
-const reasons = [
-  { en: "Wrong size", fr: "Mauvaise taille" },
-  { en: "Wrong color", fr: "Mauvaise couleur" },
-  { en: "Defective — exchange", fr: "Défectueux — échange" },
-  { en: "Prefer different variant", fr: "Je préfère une autre variante" },
-];
-
-export default function ShopExchangePage() {
+function ExchangeInfo() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const [step, setStep] = useState(1);
-  const [done, setDone] = useState(false);
-
-  if (done) {
-    return (
-      <div className="mx-auto max-w-lg py-12 text-center">
-        <div className="card-premium p-8">
-          <h2 className="text-xl font-bold text-emerald-700">{fr ? "Échange demandé" : "Exchange Requested"}</h2>
-          <p className="mt-2 text-sm text-slate-500">{fr ? "EXC-2024-001 — Enlèvement et remplacement planifiés" : "EXC-2024-001 — Pickup & replacement scheduled"}</p>
-          <Link href="/shop/orders" className="mt-4 inline-block text-[var(--primary)]">{fr ? "Voir les commandes" : "View orders"}</Link>
-        </div>
-      </div>
-    );
-  }
+  const delivered = useMyOrders().filter((o) => o.status === "delivered");
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <PageHeader title={fr ? "Demander un échange" : "Request Exchange"} subtitle="ORD-2024-001" backHref="/shop/orders/ORD-2024-001" />
-
-      {step === 1 && (
-        <div className="card-premium space-y-4 p-6">
-          <h3 className="font-semibold">{fr ? "Sélectionner l'article" : "Select item"}</h3>
-          <label className="flex gap-3 rounded-xl border p-4">
-            <input type="radio" defaultChecked />
-            <span>Nike Air Max 270 — {fr ? "Taille 42" : "Size 42"}</span>
-          </label>
-          <Button onClick={() => setStep(2)} className="w-full">{fr ? "Continuer" : "Continue"}</Button>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="card-premium space-y-4 p-6">
-          <h3 className="font-semibold">{fr ? "Motif de l'échange" : "Exchange reason"}</h3>
-          {reasons.map((r) => (
-            <label key={r.en} className="flex gap-3 rounded-xl border p-4">
-              <input type="radio" name="reason" />
-              <span>{fr ? r.fr : r.en}</span>
-            </label>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader title={fr ? "Demander un échange" : "Request an exchange"} backHref="/shop/orders" />
+      <div className="card-premium space-y-3 p-6 text-sm text-slate-600">
+        <p>
+          {fr
+            ? "Les échanges sont traités par notre équipe support. Choisissez une commande livrée ci-dessous et ouvrez un ticket en précisant l'article et la variante souhaitée, ou demandez un retour avec remboursement."
+            : "Exchanges are handled by our support team. Pick a delivered order below and open a ticket naming the item and the variant you want, or request a return for a refund."}
+        </p>
+      </div>
+      {delivered.length === 0 ? (
+        <p className="text-center text-sm text-slate-500">{fr ? "Aucune commande livrée pour le moment." : "You have no delivered orders yet."}</p>
+      ) : (
+        <div className="space-y-3">
+          {delivered.map((o) => (
+            <div key={o.id} className="card-premium flex flex-wrap items-center justify-between gap-3 p-4">
+              <div>
+                <p className="font-medium text-slate-900">{o.reference}</p>
+                <p className="text-xs text-slate-500">{o.date} · {o.itemsCount} {fr ? "articles" : "items"}</p>
+              </div>
+              <div className="flex gap-3 text-sm">
+                <Link href={`/shop/support?order=${o.id}&subject=${encodeURIComponent(fr ? "Demande d'échange" : "Exchange request")}`} className="btn-primary px-4 py-2 text-xs">
+                  {fr ? "Ouvrir un ticket d'échange" : "Open exchange ticket"}
+                </Link>
+                <Link href={`/shop/orders/${o.id}/return`} className="rounded-xl border px-4 py-2 text-xs font-medium">
+                  {fr ? "Demander un retour" : "Request a return"}
+                </Link>
+              </div>
+            </div>
           ))}
-          <h3 className="font-semibold pt-2">{fr ? "Remplacement souhaité" : "Preferred replacement"}</h3>
-          <select className="input-premium w-full px-4 py-2.5 text-sm">
-            <option>{fr ? "Taille 43 — Même couleur" : "Size 43 — Same color"}</option>
-            <option>{fr ? "Taille 42 — Noir" : "Size 42 — Black"}</option>
-          </select>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setStep(1)} className="flex-1">{fr ? "Retour" : "Back"}</Button>
-            <Button onClick={() => setStep(3)} className="flex-1">{fr ? "Continuer" : "Continue"}</Button>
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="card-premium space-y-4 p-6">
-          <h3 className="font-semibold">{fr ? "Confirmer l'échange" : "Confirm exchange"}</h3>
-          <p className="text-sm text-slate-600">{fr ? "Inspection à l'ouverture du colis disponible à la livraison. Aucun frais supplémentaire pour un échange de taille." : "Open box inspection available at delivery. No extra charge for size exchange."}</p>
-          <Button onClick={() => setDone(true)} className="w-full">{fr ? "Soumettre l'échange" : "Submit Exchange"}</Button>
         </div>
       )}
     </div>
+  );
+}
+
+export default function ShopExchangePage() {
+  return (
+    <RequireSignIn next="/shop/exchange">
+      <ExchangeInfo />
+    </RequireSignIn>
   );
 }

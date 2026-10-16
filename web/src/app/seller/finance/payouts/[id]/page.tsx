@@ -1,59 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { Card, CardContent } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Badge } from "@/components/ui/badge";
-import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { applyListFilters } from "@/lib/list-filter-utils";
 import { useSellerData } from "@/lib/seller";
-import type { SellerPayoutItemStatus } from "@/lib/seller";
+import { payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const STATUS_LABELS: Record<SellerPayoutItemStatus, { en: string; fr: string }> = {
-  awaiting_delivery: { en: "Awaiting delivery", fr: "En attente de livraison" },
-  pending_clearance: { en: "Pending clearance", fr: "Délai de sécurisation" },
-  ready_for_payout: { en: "Ready for payout", fr: "Prêt pour versement" },
-  paid_out: { en: "Paid out", fr: "Versé" },
-};
-
-function statusBadgeVariant(status: SellerPayoutItemStatus) {
-  switch (status) {
-    case "paid_out":
-      return "success" as const;
-    case "ready_for_payout":
-      return "primary" as const;
-    case "pending_clearance":
-      return "info" as const;
-    default:
-      return "warning" as const;
-  }
-}
 
 export default function SellerPayoutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getPayout, getPayoutItemsByPayoutId } = useSellerData();
+  const { getPayout } = useSellerData();
   const payout = getPayout(id);
-  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-
-  const items = useMemo(() => getPayoutItemsByPayoutId(id), [id]);
-
-  const filtered = useMemo(
-    () =>
-      applyListFilters(items, filters, {
-        searchFields: ["orderId", "listingName"],
-        dateField: "deliveryDate",
-      }),
-    [items, filters]
-  );
 
   if (!payout) {
     return (
@@ -63,13 +25,13 @@ export default function SellerPayoutDetailPage() {
     );
   }
 
-  const itemTotal = items.reduce((sum, i) => sum + i.netEarnings, 0);
+  const label = payoutStatusLabel(payout.status, fr);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={payout.id}
-        subtitle={`${formatCurrency(payout.amount, locale)} · ${fr ? (payout.statusFr ?? payout.status) : payout.status}`}
+        subtitle={`${formatCurrency(payout.amount, locale)} · ${label}`}
         backHref="/seller/finance/payouts"
         breadcrumbs={[
           { label: fr ? "Vendeur" : "Seller", href: "/seller" },
@@ -80,9 +42,9 @@ export default function SellerPayoutDetailPage() {
         actions={
           <div className="flex items-center gap-3">
             <NavLinkButton href="/seller/finance/payouts/pending">
-              {fr ? "Voir tous les éléments en attente" : "See all pending items"}
+              {fr ? "Gains par commande" : "Earnings per order"}
             </NavLinkButton>
-            <Badge variant={payout.status === "paid" ? "success" : "warning"}>{fr ? (payout.statusFr ?? payout.status) : payout.status}</Badge>
+            <Badge variant={payoutStatusVariant(payout.status)}>{label}</Badge>
           </div>
         }
       />
@@ -90,110 +52,31 @@ export default function SellerPayoutDetailPage() {
       <DetailSection title={fr ? "Détails du versement" : "Payout Details"}>
         <InfoGrid
           items={[
-            { label: fr ? "N° demande" : "Request ID", value: payout.id },
+            { label: fr ? "Référence" : "Reference", value: payout.id },
             { label: t("amount"), value: formatCurrency(payout.amount, locale) },
-            { label: fr ? "Compte bancaire" : "Bank Account", value: payout.bankAccount },
-            { label: fr ? "Méthode" : "Method", value: fr ? (payout.methodFr ?? payout.method) : payout.method },
-            { label: fr ? "Approuvé par" : "Approved By", value: payout.approvedBy },
-            { label: t("status"), value: fr ? (payout.statusFr ?? payout.status) : payout.status },
+            { label: fr ? "Méthode" : "Method", value: payoutMethodLabel(payout.methodKey, fr) },
+            { label: fr ? "Compte de destination" : "Destination account", value: payout.account || (payout.methodKey === "wallet" ? (fr ? "Portefeuille Somba" : "Somba wallet") : "—") },
+            { label: t("status"), value: label },
             { label: t("date"), value: payout.date },
             {
-              label: fr ? "Articles inclus" : "Items included",
-              value: `${payout.itemCount ?? items.length} · ${formatCurrency(itemTotal, locale)} net`,
+              label: fr ? "Réf. du virement" : "Transfer reference",
+              value: payout.status === "paid" ? payout.providerRef || (payout.methodKey === "wallet" ? (fr ? "Crédit portefeuille" : "Wallet credit") : "—") : fr ? "Renseignée au paiement" : "Shown once paid",
             },
+            ...(payout.note ? [{ label: fr ? "Note de la finance" : "Finance note", value: payout.note, full: true }] : []),
           ]}
         />
+        {payout.status === "rejected" && (
+          <p className="mt-4 text-sm text-red-700">
+            {fr ? "Cette demande a été rejetée : les fonds restent disponibles. Consultez la note ci-dessus ou contactez le support." : "This request was rejected: the funds are available again. See the note above or contact support."}
+          </p>
+        )}
       </DetailSection>
 
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {fr ? "Répartition par commande" : "Order breakdown"}
-          </h2>
-          <NavLinkButton href="/seller/finance/payouts/pending">
-            {fr ? "Voir le détail complet →" : "View full breakdown →"}
-          </NavLinkButton>
-        </div>
-
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={[]}
-          showStatusFilter={false}
-          searchPlaceholder={fr ? "N° commande, annonce…" : "Order ID, listing name…"}
-        />
-
-        <Card>
-          <CardContent className="p-0">
-            {filtered.length === 0 ? (
-              <p className="p-8 text-center text-sm text-slate-500">
-                {fr
-                  ? "Aucune commande associée à ce versement."
-                  : "No orders linked to this payout yet."}
-              </p>
-            ) : (
-              <DataTable
-                columns={[
-                  {
-                    key: "orderId",
-                    label: fr ? "Commande" : "Order ID",
-                    render: (row) => (
-                      <Link
-                        href={`/seller/orders/${row.orderId}`}
-                        className="font-medium text-[var(--primary)] hover:underline"
-                      >
-                        {String(row.orderId)}
-                      </Link>
-                    ),
-                  },
-                  {
-                    key: "listingName",
-                    label: fr ? "Annonce / produit" : "Listing",
-                    render: (row) => (
-                      <Link
-                        href={`/seller/products/${row.productId}`}
-                        className="text-[var(--primary)] hover:underline"
-                      >
-                        {String(row.listingName)}
-                      </Link>
-                    ),
-                  },
-                  {
-                    key: "deliveryDate",
-                    label: fr ? "Date de livraison" : "Delivery date",
-                    render: (row) => (row.deliveryDate ? String(row.deliveryDate) : "—"),
-                  },
-                  {
-                    key: "orderAmount",
-                    label: fr ? "Montant commande" : "Order amount",
-                    render: (row) => formatCurrency(row.orderAmount as number, locale),
-                  },
-                  {
-                    key: "commission",
-                    label: fr ? "Commission" : "Commission",
-                    render: (row) => formatCurrency(row.commission as number, locale),
-                  },
-                  {
-                    key: "netEarnings",
-                    label: fr ? "Gains nets" : "Net earnings",
-                    render: (row) => formatCurrency(row.netEarnings as number, locale),
-                  },
-                  {
-                    key: "status",
-                    label: t("status"),
-                    render: (row) => {
-                      const status = row.status as SellerPayoutItemStatus;
-                      const label = fr ? STATUS_LABELS[status].fr : STATUS_LABELS[status].en;
-                      return <Badge variant={statusBadgeVariant(status)}>{label}</Badge>;
-                    },
-                  },
-                ]}
-                data={filtered as unknown as Record<string, unknown>[]}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <p className="text-xs text-slate-500">
+        {fr
+          ? "Les versements sont prélevés sur votre solde global ; ils ne sont pas rattachés à des commandes précises."
+          : "Payouts draw on your overall balance; they are not tied to individual orders."}
+      </p>
     </div>
   );
 }

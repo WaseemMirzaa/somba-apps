@@ -7,22 +7,9 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useSellerData } from "@/lib/seller";
+import { TXN_STATUS_OPTIONS, txnStatusLabel, txnStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const STATUS_OPTIONS = [
-  { value: "completed", label: "Completed", labelFr: "Terminé" },
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
-];
-
-const STATUS_FR: Record<string, string> = {
-  paid: "Payé",
-  completed: "Terminé",
-  pending: "En attente",
-  refunded: "Remboursé",
-  failed: "Échoué",
-};
 
 export default function SellerTransactionsPage() {
   const { t, locale } = useLocale();
@@ -53,7 +40,7 @@ export default function SellerTransactionsPage() {
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={TXN_STATUS_OPTIONS}
           searchPlaceholder={fr ? "Commande, client…" : "Order, customer…"}
         />
       }
@@ -65,7 +52,7 @@ export default function SellerTransactionsPage() {
         { key: "grossAmount", label: fr ? "Brut" : "Gross", render: (row) => formatCurrency(row.grossAmount as number, locale) },
         { key: "commission", label: fr ? "Commission" : "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
         { key: "netAmount", label: fr ? "Net" : "Net", render: (row) => formatCurrency(row.netAmount as number, locale) },
-        { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+        { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={txnStatusVariant(String(row.status))}>{txnStatusLabel(String(row.status), fr)}</Badge> },
         { key: "date", label: fr ? "Date" : "Date" },
       ]}
       rowAction={(row) => (

@@ -5,60 +5,57 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { applyListFilters, timelineRequestDate } from "@/lib/list-filter-utils";
+import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useReplacements } from "@/context/replacement-context";
-import { replacementStatusLabel, replacementStatusVariant } from "@/lib/replacement-workflow";
-
-const STATUS_OPTIONS = [
-  { value: "requested", label: "Requested", labelFr: "Demandé" },
-  { value: "inspecting", label: "Inspecting", labelFr: "Inspection" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
-  { value: "allocated", label: "Allocated", labelFr: "Alloué" },
-  { value: "dispatched", label: "Dispatched", labelFr: "Expédié" },
-  { value: "delivered", label: "Delivered", labelFr: "Livré" },
-  { value: "closed", label: "Closed", labelFr: "Clôturé" },
-];
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
+import { REPLACEMENT_STATUS, pick, shortDate, statusOptions, useOpsQuery, type ReplacementRow } from "@/lib/warehouse-live";
 
 export default function WarehouseReplacementsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { replacements } = useReplacements();
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const q = useOpsQuery<ReplacementRow[]>("replacements:list", { initial: [] as ReplacementRow[], push: ["replacement:updated"] });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
-    () =>
-      applyListFilters(replacements, filters, {
-        searchFields: ["id", "orderId", "sku", "customer"],
-        dateField: timelineRequestDate,
-        statusField: "status",
-      }),
-    [replacements, filters]
+    () => applyListFilters(q.data, filters, { searchFields: ["reference", "orderReference", "sku", "productName", "customerName"], statusField: "status" }),
+    [q.data, filters],
   );
 
   return (
     <WarehouseListPage
       title={t("replacements")}
-      subtitle={fr ? "Vue liste — ID dossier, ID commande, SKU, Client, Statut" : "List View — Case ID, Order ID, SKU, Customer, Status"}
-      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("replacements") }]}
+      subtitle={fr ? "Remplacements en direct — inspection, allocation d'une nouvelle unité, expédition" : "Live replacements — inspect, allocate a new unit, dispatch"}
+      breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("replacements") }]}
       filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "ID dossier, commande, SKU, client…" : "Case ID, order, SKU, customer…"}
-        />
+        <div className="space-y-3">
+          {q.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{q.error}</p>}
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            statusOptions={statusOptions(REPLACEMENT_STATUS)}
+            searchPlaceholder={fr ? "Référence, commande, SKU, client…" : "Reference, order, SKU, customer…"}
+            showDateFilters={false}
+          />
+        </div>
       }
       columns={[
-        { key: "id", label: fr ? "ID dossier" : "Case ID", render: (row) => (
-          <Link href={`/warehouse/replacements/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+        { key: "reference", label: fr ? "ID dossier" : "Case ID", render: (row) => (
+          <Link href={ops(`/replacements/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
         )},
-        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+        { key: "orderReference", label: fr ? "ID commande" : "Order ID" },
         { key: "sku", label: "SKU" },
-        { key: "customer", label: t("customer") },
-        { key: "status", label: t("status"), render: (row) => <Badge variant={replacementStatusVariant(String(row.status))}>{replacementStatusLabel(String(row.status), fr)}</Badge> },
+        { key: "productName", label: fr ? "Produit" : "Product" },
+        { key: "customerName", label: t("customer") },
+        { key: "status", label: t("status"), render: (row) => (
+          <Badge variant={row.status === "dispatched" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
+            {pick(REPLACEMENT_STATUS[String(row.status)], fr, String(row.status))}
+          </Badge>
+        )},
+        { key: "createdAt", label: fr ? "Demandé le" : "Requested", render: (row) => shortDate(String(row.createdAt), locale) },
         { key: "actions", label: t("action"), render: (row) => (
-          <Link href={`/warehouse/replacements/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
+          <Link href={ops(`/replacements/${row.id}`)} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

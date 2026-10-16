@@ -23,6 +23,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
+import { StatCard } from "@/components/ui/stat-card";
+import { DemoBadge } from "@/components/admin/demo-badge";
+import { SellerStatusActions } from "@/components/admin/status-actions";
+import { useRealtime } from "@/context/realtime-context";
+import { ORDER_STATUS_BADGE, orderStatusLabel } from "@/lib/admin-live";
 import {
   DualMetricChart,
   HorizontalBarChart,
@@ -36,30 +41,18 @@ import {
 } from "@/components/seller/analytics-kpi";
 import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 import { useAdminData } from "@/lib/admin";
 import {
   adminRevenueTrend,
   adminExtendedKpis,
   adminSellerGrowth,
   adminCategoryGmv,
-  adminTopSellers,
-  adminPendingActions,
-  adminRecentActivity,
   adminGoals,
   adminDashboardAlerts,
   adminReturnMetrics,
   adminMarketplaceHealth,
 } from "@/lib/admin-analytics";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
-
-const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  delivered: "success",
-  processing: "info",
-  pending: "warning",
-  cancelled: "danger",
-  approved: "success",
-};
 
 const alertPriorityVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
   Critical: "danger",
@@ -77,25 +70,32 @@ const alertIcon = {
 
 export default function AdminDashboard() {
   const { t, locale } = useLocale();
-  const { toast } = useToast();
   const fr = locale === "fr";
   const [period, setPeriod] = useState<AnalyticsPeriod>("30D");
   const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
-  const { orderEntities, sellerEntities } = useAdminData();
+  const { orderEntities, sellerEntities, stats, fraudAlerts, moderationQueue, auditLogs } = useAdminData();
+  const rt = useRealtime();
   const k = adminExtendedKpis;
+  const openDisputes = rt.disputes.filter((d) => d.status === "open").length;
+  const requestedPayouts = rt.payouts.filter((p) => p.status === "requested");
+  const openFraud = fraudAlerts.filter((f) => f.status === "open").length;
+  const pendingProducts = moderationQueue.filter((p) => p.status === "pending").length;
+  const pendingSellers = sellerEntities.filter((s) => s.status === "pending").length;
+  const topSellers = [...sellerEntities].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const queue = [...sellerEntities].sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending")).slice(0, 8);
 
   const revenueSpark = adminRevenueTrend.map((d) => d.revenue);
   const ordersSpark = adminRevenueTrend.map((d) => d.orders);
 
   const quickLinks = [
-    { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(k.ordersMtd, locale)} MTD`, icon: ShoppingCart },
-    { href: "/admin/sellers", label: t("activeSellers"), sub: `${k.pendingApprovals} ${fr ? "en attente" : "pending"}`, icon: Users },
-    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: formatCurrency(84200, locale), icon: Wallet },
-    { href: "/admin/fraud", label: fr ? "Fraude" : "Fraud", sub: `${k.fraudFlags} ${fr ? "alertes" : "flags"}`, icon: Shield },
-    { href: "/admin/returns", label: fr ? "Retours" : "Returns", sub: `${adminReturnMetrics.returnRate}% ${fr ? "taux" : "rate"}`, icon: RotateCcw },
-    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: fr ? "5 escaladés" : "5 escalated", icon: Scale },
-    { href: "/admin/products", label: fr ? "Produits" : "Products", sub: fr ? "8 en modération" : "8 moderation", icon: Package },
-    { href: "/admin/analytics", label: t("analytics"), sub: fr ? "Analyse détaillée" : "Deep dive", icon: BarChart3 },
+    { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(stats?.orders ?? orderEntities.length, locale)} ${fr ? "au total" : "total"}`, icon: ShoppingCart },
+    { href: "/admin/sellers", label: t("sellers"), sub: `${pendingSellers} ${fr ? "en attente" : "pending"}`, icon: Users },
+    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: `${requestedPayouts.length} ${fr ? "à traiter" : "to process"}`, icon: Wallet },
+    { href: "/admin/fraud", label: fr ? "Fraude" : "Fraud", sub: `${openFraud} ${fr ? "alertes ouvertes" : "open flags"}`, icon: Shield },
+    { href: "/admin/returns", label: fr ? "Retours" : "Returns", sub: `${rt.disputes.filter((d) => d.type === "return" && d.status === "open").length} ${fr ? "ouverts" : "open"}`, icon: RotateCcw },
+    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: `${openDisputes} ${fr ? "ouverts" : "open"}`, icon: Scale },
+    { href: "/admin/moderation", label: fr ? "Modération" : "Moderation", sub: `${pendingProducts} ${fr ? "produits en attente" : "products pending"}`, icon: Package },
+    { href: "/admin/analytics", label: t("analytics"), sub: fr ? "Analyse détaillée (démo)" : "Deep dive (demo)", icon: BarChart3 },
   ];
 
   return (
@@ -103,9 +103,11 @@ export default function AdminDashboard() {
       <PageHeader
         title={fr ? "Tableau de bord marketplace" : "Marketplace dashboard"}
         subtitle={
-          fr
-            ? `GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} clients · Score santé ${adminMarketplaceHealth.overallScore}/100`
-            : `GMV ${formatCurrency(k.gmvMtd, locale)} MTD · ${formatNumber(k.activeCustomers, locale)} customers · Health score ${adminMarketplaceHealth.overallScore}/100`
+          stats
+            ? fr
+              ? `GMV ${formatCurrency(stats.gmv, locale)} · ${formatNumber(stats.orders, locale)} commandes · ${formatNumber(stats.customers, locale)} clients (en direct)`
+              : `GMV ${formatCurrency(stats.gmv, locale)} · ${formatNumber(stats.orders, locale)} orders · ${formatNumber(stats.customers, locale)} customers (live)`
+            : fr ? "Chargement des indicateurs en direct…" : "Loading live figures…"
         }
         actions={
           <div className="flex flex-wrap items-center gap-3">
@@ -123,6 +125,17 @@ export default function AdminDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title={fr ? "GMV (en direct)" : "GMV (live)"} value={formatCurrency(stats?.gmv ?? 0, locale)} icon={DollarSign} />
+        <StatCard title={fr ? "Commandes (en direct)" : "Orders (live)"} value={formatNumber(stats?.orders ?? 0, locale)} icon={ShoppingCart} />
+        <StatCard title={fr ? "Commission plateforme (en direct)" : "Platform commission (live)"} value={formatCurrency(stats?.commissionUsd ?? 0, locale)} icon={Wallet} />
+        <StatCard title={fr ? "Produits en ligne (en direct)" : "Live products (live)"} value={formatNumber(stats?.liveProducts ?? 0, locale)} icon={Package} />
+      </div>
+
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {fr ? "Indicateurs illustratifs" : "Illustrative indicators"}
+        <DemoBadge fr={fr} />
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsKpiCard title={fr ? "GMV (MTD)" : "GMV (MTD)"} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} />
         <AnalyticsKpiCard title={fr ? "Commandes (MTD)" : "Orders (MTD)"} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} />
         <AnalyticsKpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} />
@@ -139,6 +152,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
                 {fr ? "GMV & commandes" : "GMV & orders"}
+                <DemoBadge fr={fr} />
               </h2>
               <p className="text-xs text-slate-500">
                 {fr ? "Tendance revenu marketplace" : "Marketplace revenue trend"} · {period}
@@ -153,7 +167,7 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs juin" : "June goals"}</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs juin" : "June goals"}<DemoBadge fr={fr} /></h2>
             <p className="text-xs text-slate-500">{fr ? "Progression mensuelle" : "Monthly progress"}</p>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -167,7 +181,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "GMV par catégorie" : "GMV by category"}</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "GMV par catégorie" : "GMV by category"}<DemoBadge fr={fr} /></h2>
             <p className="text-xs text-slate-500">MTD</p>
           </CardHeader>
           <CardContent>
@@ -184,7 +198,7 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Alertes opérationnelles" : "Operational alerts"}</h2>
+              <h2 className="font-semibold text-slate-900">{fr ? "Alertes opérationnelles" : "Operational alerts"}<DemoBadge fr={fr} /></h2>
               <p className="text-xs text-slate-500">{fr ? "Fraude · Retours · Litiges · Versements" : "Fraud · Returns · Disputes · Payouts"}</p>
             </div>
           </CardHeader>
@@ -223,7 +237,7 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <h2 className="font-semibold text-slate-900">{fr ? "Top vendeurs" : "Top sellers"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Classement GMV MTD" : "Ranked by GMV MTD"}</p>
+              <p className="text-xs text-slate-500">{fr ? "Classés par chiffre d'affaires (en direct)" : "Ranked by revenue (live)"}</p>
             </div>
             <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
           </CardHeader>
@@ -231,21 +245,21 @@ export default function AdminDashboard() {
             <DataTable
               columns={[
                 {
-                  key: "name",
+                  key: "storeName",
                   label: fr ? "Vendeur" : "Seller",
                   render: (row) => (
                     <Link href={`/admin/sellers/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
-                      {String(row.name)}
+                      {String(row.storeName)}
                     </Link>
                   ),
                 },
-                { key: "gmv", label: "GMV", render: (row) => formatCurrency(row.gmv as number, locale) },
+                { key: "revenue", label: fr ? "Chiffre d'affaires" : "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
                 { key: "orders", label: t("orders") },
-                { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `★ ${row.rating}` },
-                { key: "fulfillment", label: fr ? "Expédition" : "Fulfillment", render: (row) => `${row.fulfillment}%` },
-                { key: "returns", label: fr ? "Retours" : "Returns", render: (row) => `${row.returns}%` },
+                { key: "rating", label: fr ? "Note" : "Rating", render: (row) => (Number(row.rating) > 0 ? `★ ${row.rating}` : "—") },
+                { key: "returns", label: fr ? "Retours" : "Returns" },
               ]}
-              data={adminTopSellers.slice(0, 5) as unknown as Record<string, unknown>[]}
+              data={topSellers as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucun vendeur" : "No sellers yet"}
               rowAction={(row) => (
                 <Link href={`/admin/sellers/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
@@ -256,19 +270,20 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader>
             <h2 className="font-semibold text-slate-900">{fr ? "Actions en attente" : "Pending actions"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "Priorité et volume" : "Priority and volume"}</p>
+            <p className="text-xs text-slate-500">{fr ? "Volumes en direct" : "Live counts"}</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {adminPendingActions.map((action) => (
-              <div key={action.type} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                <span className="text-sm text-slate-700">{fr ? action.typeFr : action.type}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant={action.priority === "Critical" ? "danger" : action.priority === "High" ? "warning" : "default"}>
-                    {fr ? action.priorityFr : action.priority}
-                  </Badge>
-                  <span className="font-bold text-slate-900">{action.count}</span>
-                </div>
-              </div>
+            {[
+              { href: "/admin/sellers", label: fr ? "Vendeurs à approuver" : "Sellers to approve", count: pendingSellers },
+              { href: "/admin/moderation", label: fr ? "Produits à modérer" : "Products to moderate", count: pendingProducts },
+              { href: "/admin/payouts", label: fr ? "Versements demandés" : "Payouts requested", count: requestedPayouts.length },
+              { href: "/admin/disputes", label: fr ? "Litiges ouverts" : "Open disputes", count: openDisputes },
+              { href: "/admin/fraud", label: fr ? "Alertes fraude ouvertes" : "Open fraud alerts", count: openFraud },
+            ].map((action) => (
+              <Link key={action.href} href={action.href} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 hover:border-[var(--primary-tint)]">
+                <span className="text-sm text-slate-700">{action.label}</span>
+                <span className="font-bold text-slate-900">{action.count}</span>
+              </Link>
             ))}
           </CardContent>
         </Card>
@@ -317,8 +332,8 @@ export default function AdminDashboard() {
                   key: "status",
                   label: t("status"),
                   render: (row) => (
-                    <Badge variant={statusVariant[row.status as string] ?? "default"}>
-                      {t(row.status as Parameters<typeof t>[0]) || String(row.status)}
+                    <Badge variant={ORDER_STATUS_BADGE[row.status as string] ?? "default"}>
+                      {orderStatusLabel(String(row.status), fr)}
                     </Badge>
                   ),
                 },
@@ -334,13 +349,14 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-[var(--primary)]" />
-            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente (journal d'audit)" : "Recent activity (audit log)"}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
-            {adminRecentActivity.map((item) => (
-              <div key={item.text} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                <p className="text-xs text-slate-400">{fr ? item.timeFr : item.time}</p>
-                <p className="mt-1 text-sm text-slate-700">{fr ? item.textFr : item.text}</p>
+            {auditLogs.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucune activité" : "No activity yet"}</p>}
+            {auditLogs.slice(0, 6).map((item) => (
+              <div key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                <p className="text-xs text-slate-400">{item.timestamp}</p>
+                <p className="mt-1 text-sm text-slate-700">{item.actor} · {item.action} · {item.entity}</p>
               </div>
             ))}
           </CardContent>
@@ -369,8 +385,8 @@ export default function AdminDashboard() {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={statusVariant[row.status as string] ?? "default"}>
-                    {t(row.status as Parameters<typeof t>[0]) || String(row.status)}
+                  <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
+                    {String(row.status)}
                   </Badge>
                 ),
               },
@@ -379,16 +395,13 @@ export default function AdminDashboard() {
                 label: t("action"),
                 render: (row) =>
                   row.status === "pending" ? (
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => toast(fr ? `Vendeur ${row.storeName} approuvé` : `Seller ${row.storeName} approved`)} className="text-xs font-medium text-emerald-600 hover:underline">{t("approve")}</button>
-                      <button type="button" onClick={() => toast(fr ? `Vendeur ${row.storeName} rejeté` : `Seller ${row.storeName} rejected`)} className="text-xs font-medium text-red-600 hover:underline">{t("reject")}</button>
-                    </div>
+                    <SellerStatusActions sellerId={String(row.id)} status="pending" name={String(row.storeName)} />
                   ) : (
                     <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
                   ),
               },
             ]}
-            data={sellerEntities as unknown as Record<string, unknown>[]}
+            data={queue as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>

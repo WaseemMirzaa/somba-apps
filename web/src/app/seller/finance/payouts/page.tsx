@@ -8,15 +8,9 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useSellerData } from "@/lib/seller";
+import { PAYOUT_STATUS_OPTIONS, payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const STATUS_OPTIONS = [
-  { value: "requested", label: "Requested", labelFr: "Demandé" },
-  { value: "processing", label: "Processing", labelFr: "En cours" },
-  { value: "paid", label: "Paid", labelFr: "Payé" },
-  { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
-];
 
 export default function SellerPayoutsPage() {
   const { t, locale } = useLocale();
@@ -27,7 +21,7 @@ export default function SellerPayoutsPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(payoutList, filters, {
-        searchFields: ["id", "method"],
+        searchFields: ["id", "methodKey", "providerRef"],
         dateField: "date",
         statusField: "status",
       }),
@@ -37,7 +31,7 @@ export default function SellerPayoutsPage() {
   return (
     <SellerListPage
       title={t("payouts")}
-      subtitle={fr ? "Référence, Montant, Méthode, Statut, Date" : "Request ID, Amount, Method, Status, Date"}
+      subtitle={fr ? "Vos demandes de versement en direct : référence, montant, méthode, statut" : "Your payout requests, live: reference, amount, method, status"}
       breadcrumbs={[
         { label: fr ? "Vendeur" : "Seller", href: "/seller" },
         { label: t("finance"), href: "/seller/finance" },
@@ -46,7 +40,7 @@ export default function SellerPayoutsPage() {
       actions={
         <div className="flex flex-wrap items-center gap-3">
           <NavLinkButton href="/seller/finance/payouts/pending">
-            {fr ? "Voir les éléments en attente" : "View breakdown"}
+            {fr ? "Gains par commande" : "Earnings per order"}
           </NavLinkButton>
           <Link href="/seller/finance/payouts/request" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{t("requestPayout")}</Link>
         </div>
@@ -55,7 +49,7 @@ export default function SellerPayoutsPage() {
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={PAYOUT_STATUS_OPTIONS}
           searchPlaceholder={fr ? "Référence, méthode…" : "Request ID, method…"}
         />
       }
@@ -64,12 +58,12 @@ export default function SellerPayoutsPage() {
           <Link href={`/seller/finance/payouts/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "method", label: fr ? "Méthode" : "Method", render: (row) => (fr ? String(row.methodFr ?? row.method) : String(row.method)) },
+        { key: "methodKey", label: fr ? "Méthode" : "Method", render: (row) => payoutMethodLabel(String(row.methodKey), fr) },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "paid" ? "success" : "warning"}>{fr ? String(row.statusFr ?? row.status) : String(row.status)}</Badge>
+          <Badge variant={payoutStatusVariant(String(row.status))}>{payoutStatusLabel(String(row.status), fr)}</Badge>
         )},
         { key: "date", label: t("date") },
-        { key: "items", label: fr ? "Articles" : "Items", render: (row) => String(row.itemCount ?? "—") },
+        { key: "providerRef", label: fr ? "Réf. de virement" : "Transfer ref.", render: (row) => String(row.providerRef ?? "—") },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex flex-col gap-1">
             <Link href={`/seller/finance/payouts/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">

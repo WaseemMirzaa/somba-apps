@@ -1,81 +1,158 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useAdminData } from "@/lib/admin";
+import { ErrorNote } from "@/components/admin/modal";
+import { NoticeBar } from "@/components/admin/demo-badge";
+import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { errMsg, useServerList, type FlashSaleServerRow } from "@/lib/admin-live";
+import { socketClient } from "@/lib/realtime/socket-client";
+import { formatCurrency } from "@/lib/utils";
 
-const SALE_STATUS_FR: Record<string, string> = { active: "Actif", scheduled: "Planifiée", ended: "Terminée" };
+const SALE_STATUS_FR: Record<string, string> = { active: "En cours", scheduled: "Planifiée", ended: "Terminée" };
+
+function saleState(fs: FlashSaleServerRow): "active" | "scheduled" | "ended" {
+  const now = Date.now();
+  const start = fs.startsAt ? new Date(fs.startsAt).getTime() : null;
+  const end = fs.endsAt ? new Date(fs.endsAt).getTime() : null;
+  if (end !== null && !Number.isNaN(end) && end < now) return "ended";
+  if (start !== null && !Number.isNaN(start) && start > now) return "scheduled";
+  return "active";
+}
+
+function fmt(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 16).replace("T", " ");
+}
 
 export default function AdminFlashSalesPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { flashSales } = useAdminData();
-  const [sales, setSales] = useState(flashSales);
-  useEffect(() => setSales(flashSales), [flashSales]);
+  const rt = useRealtime();
+  const { items: sales, reload, error: loadError } = useServerList<FlashSaleServerRow>("flashsales:list", {
+    pushEvents: ["flashsale:updated"],
+  });
+  const liveProducts = useMemo(() => rt.products.filter((p) => p.status === "live"), [rt.products]);
   const [showCreate, setShowCreate] = useState(false);
-  const [name, setName] = useState("");
-  const [discount, setDiscount] = useState("");
+  const [form, setForm] = useState({ title: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function saveCampaign() {
-    if (!name.trim()) return;
-    setSales((s) => [...s, {
-      id: `FS-${s.length + 1}`,
-      name,
-      nameFr: name,
-      start: new Date().toISOString().slice(0, 10),
-      end: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-      discount: Number(discount) || 20,
-      products: 0,
-      status: "scheduled" as const,
-    }]);
-    setShowCreate(false);
-    setName("");
-    setDiscount("");
-    toast(fr ? "Campagne de vente flash créée" : "Flash sale campaign created");
+  const product = liveProducts.find((p) => p.id === form.productId);
+  // Normal price (the server reports `originalPrice` while a sale already runs).
+  const basePrice = product ? (product.originalPrice ?? product.price) : null;
+  const flash = Number(form.flashPrice);
+  const discount = basePrice && flash > 0 && flash < basePrice ? Math.round((1 - flash / basePrice) * 100) : 0;
+
+  async function save() {
+    if (!form.title.trim() || !product) {
+      setError(fr ? "Titre et produit requis." : "Title and product are required.");
+      return;
+    }
+    if (!(flash > 0)) {
+      setError(fr ? "Saisissez un prix flash valide." : "Enter a valid flash price.");
+      return;
+    }
+    if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
+      setError(fr ? "La fin doit être après le début." : "The end must be after the start.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await socketClient.request("flashsales:create", {
+        title: form.title.trim(),
+        productId: product.id,
+        productName: product.name,
+        flashPrice: flash,
+        discount,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
+        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
+      });
+      await reload();
+      setShowCreate(false);
+      setForm({ title: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
+      toast(fr ? "Vente flash créée" : "Flash sale created", "success");
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Ventes flash" : "Flash Sales"}
-        subtitle={fr ? "Programmez des campagnes avec un sélecteur de date" : "Schedule campaigns with date picker"}
-        breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Ventes flash" : "Flash Sales" }]}
-        actions={<Button size="sm" onClick={() => setShowCreate(true)}>{fr ? "Créer une vente flash" : "Create Flash Sale"}</Button>}
+        subtitle={fr ? "Le prix flash est appliqué par le serveur pendant la fenêtre choisie" : "The server applies the flash price during the chosen window"}
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Ventes flash" : "Flash Sales" }]}
+        actions={<Button size="sm" onClick={() => { setShowCreate((s) => !s); setError(null); }}>{fr ? "Créer une vente flash" : "Create flash sale"}</Button>}
       />
+
+      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
 
       {showCreate && (
         <Card>
           <CardContent className="space-y-4 p-6">
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Nom de la campagne" : "Campaign name"} value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Titre de la vente" : "Sale title"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="text-xs font-medium">{fr ? "Date de début" : "Start date"}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
-              <div><label className="text-xs font-medium">{fr ? "Date de fin" : "End date"}</label><input type="date" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" /></div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">{fr ? "Produit" : "Product"}</label>
+                <select className="input-premium mt-1 w-full px-4 py-2.5 text-sm" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
+                  <option value="">{fr ? "Choisir un produit…" : "Choose a product…"}</option>
+                  {liveProducts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.originalPrice ?? p.price, locale)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">
+                  {fr ? "Prix flash (USD)" : "Flash price (USD)"}
+                  {basePrice ? ` — ${fr ? "remise" : "discount"} ${discount}%` : ""}
+                </label>
+                <input className="input-premium mt-1 w-full px-4 py-2.5 text-sm" inputMode="decimal" value={form.flashPrice} onChange={(e) => setForm({ ...form, flashPrice: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">{fr ? "Début" : "Starts"}</label>
+                <input type="datetime-local" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">{fr ? "Fin" : "Ends"}</label>
+                <input type="datetime-local" className="input-premium mt-1 w-full px-4 py-2.5 text-sm" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} />
+              </div>
             </div>
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Remise %" : "Discount %"} value={discount} onChange={(e) => setDiscount(e.target.value)} />
-            <Button onClick={saveCampaign}>{fr ? "Enregistrer la campagne" : "Save Campaign"}</Button>
+            <ErrorNote message={error} />
+            <Button onClick={save} disabled={saving}>{saving ? "…" : fr ? "Enregistrer la vente flash" : "Save flash sale"}</Button>
           </CardContent>
         </Card>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {sales.map((fs) => (
-          <Card key={fs.id}>
-            <CardContent className="p-6">
-              <div className="flex justify-between">
-                <h3 className="font-semibold">{fr ? (fs.nameFr ?? fs.name) : fs.name}</h3>
-                <Badge variant={fs.status === "active" ? "success" : "warning"}>{fr ? (SALE_STATUS_FR[fs.status] ?? fs.status) : fs.status}</Badge>
-              </div>
-              <p className="mt-2 text-sm text-slate-500">{fs.start} → {fs.end}</p>
-              <p className="mt-1 text-sm">{fr ? `${fs.discount} % de remise · ${fs.products} produits` : `${fs.discount}% off · ${fs.products} products`}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {sales.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucune vente flash." : "No flash sales yet."}</p>}
+        {sales.map((fs) => {
+          const st = saleState(fs);
+          return (
+            <Card key={fs.id}>
+              <CardContent className="p-6">
+                <div className="flex justify-between gap-3">
+                  <h3 className="font-semibold">{fs.title}</h3>
+                  <Badge variant={st === "active" ? "success" : st === "scheduled" ? "warning" : "default"}>{fr ? SALE_STATUS_FR[st] : st}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-slate-700">{fs.productName}</p>
+                <p className="mt-1 text-sm text-slate-500">{fmt(fs.startsAt)} → {fmt(fs.endsAt)}</p>
+                <p className="mt-1 text-sm">{formatCurrency(fs.flashPrice, locale)} · {fr ? `${fs.discount} % de remise` : `${fs.discount}% off`}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

@@ -13,6 +13,9 @@ import { Shield, AlertTriangle, Ban } from "lucide-react";
 import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/context/toast-context";
+import { errMsg } from "@/lib/admin-live";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
@@ -43,8 +46,23 @@ const STATUS_OPTIONS = [
 export default function AdminFraudPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { fraudAlerts } = useAdminData();
+  const { fraudAlerts, setFraudStatus } = useAdminData();
+  const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const avgScore = fraudAlerts.length ? Math.round(fraudAlerts.reduce((s, a) => s + a.score, 0) / fraudAlerts.length) : 0;
+
+  async function setStatus(id: string, status: "open" | "reviewed" | "blocked") {
+    setBusyId(id);
+    try {
+      await setFraudStatus(id, status);
+      toast(fr ? "Statut de l'alerte mis à jour" : "Alert status updated", "success");
+    } catch (e) {
+      toast(errMsg(e), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const filtered = useMemo(
     () =>
@@ -58,12 +76,12 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Scoring fictif statique — échecs OTP, vélocité, blocages d'adresse" : "Static mock scoring — OTP failures, velocity, address blocks"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — vous les examinez ou les bloquez" : "Alerts raised by the server (e.g. COD orders above the cap) — review or block them"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />
         <StatCard title={fr ? "Bloquées" : "Blocked"} value={fraudAlerts.filter((a) => a.status === "blocked").length} icon={Ban} />
-        <StatCard title={fr ? "Score de risque moyen" : "Avg Risk Score"} value="71" icon={Shield} trend={fr ? "Vérification OTP activée" : "OTP verification enabled"} />
+        <StatCard title={fr ? "Score de risque moyen" : "Avg Risk Score"} value={fraudAlerts.length ? avgScore : "—"} icon={Shield} />
       </div>
 
       <ListFilters
@@ -85,11 +103,24 @@ export default function AdminFraudPage() {
               { key: "severity", label: fr ? "Gravité" : "Severity", render: (r) => <Badge variant={severityVariant[r.severity as keyof typeof severityVariant]}>{fr ? (SEVERITY_FR[String(r.severity)] ?? String(r.severity)) : String(r.severity)}</Badge> },
               { key: "status", label: fr ? "Statut" : "Status", render: (r) => <Badge variant={r.status === "blocked" ? "danger" : "info"}>{fr ? (STATUS_FR[String(r.status)] ?? String(r.status)) : String(r.status)}</Badge> },
               { key: "date", label: t("date") },
+              {
+                key: "actions",
+                label: t("action"),
+                render: (r) => {
+                  const id = String(r.id);
+                  const st = String(r.status);
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {st !== "reviewed" && <Button size="sm" variant="approve" disabled={busyId === id} onClick={() => setStatus(id, "reviewed")}>{fr ? "Marquer examiné" : "Mark reviewed"}</Button>}
+                      {st !== "blocked" && <Button size="sm" variant="reject" disabled={busyId === id} onClick={() => setStatus(id, "blocked")}>{fr ? "Bloquer" : "Block"}</Button>}
+                      {st !== "open" && <Button size="sm" variant="secondary" disabled={busyId === id} onClick={() => setStatus(id, "open")}>{fr ? "Rouvrir" : "Reopen"}</Button>}
+                    </div>
+                  );
+                },
+              },
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
-            rowAction={(row) => row.orderId ? (
-              <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-            ) : null}
+            emptyMessage={fr ? "Aucune alerte" : "No alerts"}
           />
         </CardContent>
       </Card>

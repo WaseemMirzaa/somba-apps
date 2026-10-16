@@ -3,110 +3,219 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
+import { ErrorNote } from "@/components/admin/modal";
+import { NoticeBar } from "@/components/admin/demo-badge";
 import { Tag, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { PROMOTION_REQUESTS, type PromotionRequest } from "@/lib/promotions-entities";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { errMsg, useServerList, type CampaignRow, type PromoRow } from "@/lib/admin-live";
+import { socketClient } from "@/lib/realtime/socket-client";
+import { formatCurrency } from "@/lib/utils";
 
-const statusVariant = { pending: "warning", approved: "success", rejected: "danger" } as const;
-
+const statusVariant: Record<string, "warning" | "success" | "danger" | "info" | "default"> = {
+  pending: "warning",
+  active: "success",
+  scheduled: "info",
+  rejected: "danger",
+  ended: "default",
+  draft: "default",
+};
 const STATUS_FR: Record<string, string> = {
   pending: "En attente",
-  approved: "Approuvé",
-  rejected: "Rejeté",
+  active: "Active",
+  scheduled: "Planifiée",
+  rejected: "Rejetée",
+  ended: "Terminée",
+  draft: "Brouillon",
 };
 
-const TYPE_FR: Record<string, string> = {
-  discount: "Remise",
-  coupon: "Coupon",
-};
+const EMPTY_PROMO = { code: "", type: "percent", value: "", minOrder: "", maxUses: "", perUserLimit: "", expiresAt: "", isPublic: true, description: "" };
 
 export default function AdminPromotionsPage() {
-  const { t, locale } = useLocale();
+  const { locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
-  const [requests, setRequests] = useState<PromotionRequest[]>(PROMOTION_REQUESTS);
-  const [tab, setTab] = useState("pending");
+  const { items: campaigns, setItems: setCampaigns, error: campErr } = useServerList<CampaignRow>("campaigns:list", { pushEvents: ["campaign:updated"] });
+  const { items: promos, reload: reloadPromos, error: promoErr } = useServerList<PromoRow>("promos:list", { pushEvents: ["promo:updated"] });
+  const [tab, setTab] = useState("campaigns");
+  const [filter, setFilter] = useState("pending");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_PROMO);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const pending = requests.filter((r) => r.status === "pending").length;
-  const approved = requests.filter((r) => r.status === "approved").length;
-  const rejected = requests.filter((r) => r.status === "rejected").length;
+  const pending = campaigns.filter((c) => c.status === "pending").length;
+  const approved = campaigns.filter((c) => c.status === "active" || c.status === "scheduled").length;
+  const rejected = campaigns.filter((c) => c.status === "rejected").length;
+  const shown = filter === "all" ? campaigns : campaigns.filter((c) => c.status === filter);
 
-  const filtered = tab === "all" ? requests : requests.filter((r) => r.status === tab);
+  async function decide(c: CampaignRow, status: "active" | "rejected") {
+    setBusyId(c.id);
+    try {
+      const updated = await socketClient.request<CampaignRow>("campaigns:setStatus", { id: c.id, status });
+      setCampaigns((cur) => cur.map((x) => (x.id === c.id ? { ...x, ...updated } : x)));
+      toast(status === "active" ? (fr ? "Campagne approuvée" : "Campaign approved") : fr ? "Campagne rejetée" : "Campaign rejected", "success");
+    } catch (e) {
+      toast(errMsg(e), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
-  function decide(id: string, status: PromotionRequest["status"]) {
-    setRequests((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
-    toast(status === "approved" ? (fr ? "Promotion approuvée et publiée" : "Promotion approved & published") : fr ? "Demande rejetée" : "Request rejected", "success");
+  async function createPromo() {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await socketClient.request("promos:create", {
+        code: form.code.trim(),
+        type: form.type,
+        value: form.value === "" ? undefined : Number(form.value),
+        ...(form.minOrder !== "" ? { minOrder: Number(form.minOrder) } : {}),
+        ...(form.maxUses !== "" ? { maxUses: Number(form.maxUses) } : {}),
+        ...(form.perUserLimit !== "" ? { perUserLimit: Number(form.perUserLimit) } : {}),
+        ...(form.expiresAt ? { expiresAt: new Date(form.expiresAt).toISOString() } : {}),
+        isPublic: form.isPublic,
+        ...(form.description.trim() ? { description: form.description.trim() } : {}),
+      });
+      setForm(EMPTY_PROMO);
+      await reloadPromos();
+      toast(fr ? "Code promo créé" : "Promo code created", "success");
+    } catch (e) {
+      setFormError(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Demandes de promotion" : "Promotion Requests"}
-        subtitle={fr ? "Les vendeurs demandent des promotions — la plateforme les approuve et les publie" : "Sellers request promotions — the platform approves and publishes them"}
+        title={fr ? "Promotions" : "Promotions"}
+        subtitle={fr ? "Codes promo de la plateforme et demandes de campagne des vendeurs" : "Platform promo codes and seller campaign requests"}
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Promotions" : "Promotions" }]}
       />
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard title={fr ? "En attente" : "Pending"} value={pending} icon={Clock} />
-        <StatCard title={fr ? "Approuvées" : "Approved"} value={approved} icon={CheckCircle2} />
-        <StatCard title={fr ? "Rejetées" : "Rejected"} value={rejected} icon={XCircle} />
-      </div>
 
       <Tabs
         active={tab}
         onChange={setTab}
         tabs={[
-          { id: "pending", label: `${fr ? "En attente" : "Pending"} (${pending})` },
-          { id: "approved", label: fr ? "Approuvées" : "Approved" },
-          { id: "rejected", label: fr ? "Rejetées" : "Rejected" },
-          { id: "all", label: fr ? "Toutes" : "All" },
+          { id: "campaigns", label: `${fr ? "Demandes de campagne" : "Campaign requests"} (${pending})` },
+          { id: "codes", label: `${fr ? "Codes promo" : "Promo codes"} (${promos.length})` },
         ]}
       />
 
-      <div className="card-premium overflow-hidden">
-        <DataTable
-          data={filtered as unknown as Record<string, unknown>[]}
-          columns={[
-            {
-              key: "campaign",
-              label: fr ? "Campagne" : "Campaign",
-              render: (row) => {
-                const r = row as unknown as PromotionRequest;
-                return (
-                  <div>
-                    <p className="font-semibold text-slate-900">{r.campaign}</p>
-                    <p className="text-xs text-slate-400">{r.seller}</p>
-                  </div>
-                );
-              },
-            },
-            { key: "type", label: t("type"), render: (row) => <Badge variant="info"><Tag className="mr-1 h-3 w-3" />{fr ? (TYPE_FR[String(row.type)] ?? String(row.type)) : String(row.type)}</Badge> },
-            { key: "value", label: fr ? "Valeur" : "Value", render: (row) => <span className="font-semibold text-slate-900">{String(row.value)}</span> },
-            { key: "scope", label: fr ? "Portée" : "Scope", render: (row) => <span className="text-slate-500">{String(row.scope)}</span> },
-            { key: "end", label: fr ? "Période" : "Window", render: (row) => { const r = row as unknown as PromotionRequest; return <span className="text-xs text-slate-500">{r.start} → {r.end}</span>; } },
-            { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[row.status as PromotionRequest["status"]]}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
-            {
-              key: "actions",
-              label: "",
-              render: (row) => {
-                const r = row as unknown as PromotionRequest;
-                if (r.status !== "pending") return <span className="text-xs text-slate-400">—</span>;
-                return (
-                  <div className="flex gap-2">
-                    <button onClick={() => decide(r.id, "approved")} className="text-sm font-medium text-emerald-600 hover:underline">{fr ? "Approuver" : "Approve"}</button>
-                    <button onClick={() => decide(r.id, "rejected")} className="text-sm font-medium text-red-600 hover:underline">{fr ? "Rejeter" : "Reject"}</button>
-                  </div>
-                );
-              },
-            },
-          ]}
-        />
-      </div>
+      {tab === "campaigns" && (
+        <>
+          {campErr && <NoticeBar tone="warn">{campErr}</NoticeBar>}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard title={fr ? "En attente" : "Pending"} value={pending} icon={Clock} />
+            <StatCard title={fr ? "Approuvées" : "Approved"} value={approved} icon={CheckCircle2} />
+            <StatCard title={fr ? "Rejetées" : "Rejected"} value={rejected} icon={XCircle} />
+          </div>
+          <Tabs
+            active={filter}
+            onChange={setFilter}
+            tabs={[
+              { id: "pending", label: fr ? "En attente" : "Pending" },
+              { id: "active", label: fr ? "Actives" : "Active" },
+              { id: "rejected", label: fr ? "Rejetées" : "Rejected" },
+              { id: "all", label: fr ? "Toutes" : "All" },
+            ]}
+          />
+          <div className="card-premium overflow-hidden">
+            <DataTable
+              data={shown as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucune campagne" : "No campaigns"}
+              columns={[
+                {
+                  key: "name",
+                  label: fr ? "Campagne" : "Campaign",
+                  render: (row) => {
+                    const c = row as unknown as CampaignRow;
+                    return (
+                      <div>
+                        <p className="font-semibold text-slate-900">{fr ? c.nameFr || c.name : c.name}</p>
+                        <p className="text-xs text-slate-400">{c.sellerName ?? "—"} · {c.reference}</p>
+                      </div>
+                    );
+                  },
+                },
+                { key: "discount", label: fr ? "Remise" : "Discount", render: (row) => <span className="font-semibold">{Number(row.discount)}%</span> },
+                { key: "productCount", label: fr ? "Produits" : "Products" },
+                { key: "budgetUsd", label: "Budget", render: (row) => formatCurrency(Number(row.budgetUsd), locale) },
+                { key: "startDate", label: fr ? "Période" : "Window", render: (row) => <span className="text-xs text-slate-500">{String(row.startDate ?? "—")} → {String(row.endDate ?? "—")}</span> },
+                { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[String(row.status)] ?? "default"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+                {
+                  key: "actions",
+                  label: "",
+                  render: (row) => {
+                    const c = row as unknown as CampaignRow;
+                    if (c.status !== "pending") return <span className="text-xs text-slate-400">—</span>;
+                    return (
+                      <div className="flex gap-2">
+                        <button disabled={busyId === c.id} onClick={() => decide(c, "active")} className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50">{fr ? "Approuver" : "Approve"}</button>
+                        <button disabled={busyId === c.id} onClick={() => decide(c, "rejected")} className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50">{fr ? "Rejeter" : "Reject"}</button>
+                      </div>
+                    );
+                  },
+                },
+              ]}
+            />
+          </div>
+        </>
+      )}
+
+      {tab === "codes" && (
+        <>
+          {promoErr && <NoticeBar tone="warn">{promoErr}</NoticeBar>}
+          <div className="card-premium space-y-4 p-6">
+            <h3 className="flex items-center gap-2 font-semibold"><Tag className="h-4 w-4 text-[var(--primary)]" />{fr ? "Nouveau code promo" : "New promo code"}</h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <input className="input-premium px-4 py-2 text-sm uppercase" placeholder={fr ? "Code (ex. BIENVENUE10)" : "Code (e.g. WELCOME10)"} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+              <select className="input-premium px-4 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="percent">{fr ? "Pourcentage (%)" : "Percent (%)"}</option>
+                <option value="fixed">{fr ? "Montant fixe ($)" : "Fixed amount ($)"}</option>
+              </select>
+              <input className="input-premium px-4 py-2 text-sm" inputMode="decimal" placeholder={form.type === "percent" ? (fr ? "Valeur (1 à 90)" : "Value (1 to 90)") : fr ? "Valeur ($)" : "Value ($)"} value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
+              <input className="input-premium px-4 py-2 text-sm" inputMode="decimal" placeholder={fr ? "Commande min. ($, optionnel)" : "Min order ($, optional)"} value={form.minOrder} onChange={(e) => setForm({ ...form, minOrder: e.target.value })} />
+              <input className="input-premium px-4 py-2 text-sm" inputMode="numeric" placeholder={fr ? "Utilisations max. (optionnel)" : "Max uses (optional)"} value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} />
+              <input className="input-premium px-4 py-2 text-sm" inputMode="numeric" placeholder={fr ? "Limite par client (optionnel)" : "Per-customer limit (optional)"} value={form.perUserLimit} onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })} />
+              <div>
+                <input type="datetime-local" className="input-premium w-full px-4 py-2 text-sm" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} aria-label={fr ? "Expire le" : "Expires"} />
+                <p className="mt-1 text-xs text-slate-400">{fr ? "Expiration (optionnel)" : "Expiry (optional)"}</p>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.isPublic} onChange={(e) => setForm({ ...form, isPublic: e.target.checked })} />
+                {fr ? "Visible dans l'écran Coupons" : "Listed in the Coupons screen"}
+              </label>
+              <input className="input-premium px-4 py-2 text-sm sm:col-span-2 lg:col-span-4" placeholder={fr ? "Description (optionnel)" : "Description (optional)"} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <ErrorNote message={formError} />
+            <Button onClick={createPromo} disabled={saving}>{saving ? "…" : fr ? "Créer le code" : "Create code"}</Button>
+          </div>
+
+          <div className="card-premium overflow-hidden">
+            <DataTable
+              data={promos as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucun code promo" : "No promo codes yet"}
+              columns={[
+                { key: "code", label: "Code", render: (row) => <span className="font-mono font-semibold text-slate-900">{String(row.code)}</span> },
+                { key: "value", label: fr ? "Remise" : "Discount", render: (row) => <span>{row.type === "percent" ? `${row.value}%` : formatCurrency(Number(row.value), locale)}</span> },
+                { key: "minOrder", label: fr ? "Min." : "Min order", render: (row) => (Number(row.minOrder) > 0 ? formatCurrency(Number(row.minOrder), locale) : "—") },
+                { key: "maxUses", label: fr ? "Limites" : "Limits", render: (row) => <span className="text-xs text-slate-500">{row.maxUses != null ? `${row.maxUses} ${fr ? "total" : "total"}` : fr ? "illimité" : "unlimited"}{row.perUserLimit != null ? ` · ${row.perUserLimit}/${fr ? "client" : "customer"}` : ""}</span> },
+                { key: "expiresAt", label: fr ? "Expire" : "Expires", render: (row) => <span className="text-xs text-slate-500">{row.expiresAt ? String(row.expiresAt).slice(0, 16).replace("T", " ") : "—"}</span> },
+                { key: "isPublic", label: fr ? "Visibilité" : "Visibility", render: (row) => <Badge variant={row.isPublic ? "info" : "default"}>{row.isPublic ? (fr ? "Public" : "Public") : fr ? "Privé" : "Private"}</Badge> },
+                { key: "active", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.active ? "success" : "default"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge> },
+              ]}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

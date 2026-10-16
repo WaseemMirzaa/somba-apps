@@ -157,7 +157,9 @@ export function useServerList<T extends { id: string }>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef(opts.body);
-  bodyRef.current = opts.body;
+  useEffect(() => {
+    bodyRef.current = opts.body;
+  });
   const enabled = opts.enabled ?? true;
   const pushKey = (opts.pushEvents ?? []).join("|");
 
@@ -275,4 +277,17 @@ export const DISPUTE_STATUS_BADGE: Record<string, "success" | "warning" | "dange
 export const DISPUTE_TYPE_LABEL: Record<string, { en: string; fr: string }> = {
   dispute: { en: "Dispute", fr: "Litige" },
   return: { en: "Return", fr: "Retour" },
+};
+
+export const SUPPORT_STATUS_LABEL: Record<string, { en: string; fr: string }> = {
+  open: { en: "Open", fr: "Ouvert" },
+  pending: { en: "Awaiting customer", fr: "En attente du client" },
+  resolved: { en: "Resolved", fr: "Résolu" },
+  closed: { en: "Closed", fr: "Fermé" },
+};
+export const SUPPORT_STATUS_BADGE: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
+  open: "warning",
+  pending: "info",
+  resolved: "success",
+  closed: "default",
 };

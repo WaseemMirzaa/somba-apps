@@ -33,8 +33,8 @@ export default function GetAppPage() {
 
   const features = [
     { icon: Truck, en: "1–3 day delivery with live tracking", fr: "Livraison 1–3 jours avec suivi en direct" },
-    { icon: ShieldCheck, en: "Card & mobile money", fr: "Carte et mobile money" },
-    { icon: RotateCcw, en: "Easy 30-day returns", fr: "Retours faciles sous 30 jours" },
+    { icon: ShieldCheck, en: "Mobile money & wallet", fr: "Mobile money et portefeuille" },
+    { icon: RotateCcw, en: "Easy 7-day returns", fr: "Retours faciles sous 7 jours" },
   ];
 
   return (
@@ -52,7 +52,7 @@ export default function GetAppPage() {
           </span>
 
           <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.05] tracking-tight text-balance sm:text-5xl">
-            {fr ? "Achetez sur l'app Somba&Teka" : "Shopping happens on the Somba&Teka app"}
+            {fr ? "Téléchargez l'app Somba&Teka" : "Get the Somba&Teka app"}
           </h1>
 
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/80">
@@ -61,8 +61,8 @@ export default function GetAppPage() {
                 ? "Redirection vers la boutique d'applications…"
                 : "Taking you to the app store…"
               : fr
-                ? "Parcourez, achetez, suivez et retournez vos commandes — directement depuis l'application mobile Somba&Teka."
-                : "Browse, buy, track and return your orders — right from the Somba&Teka mobile app."}
+                ? "Parcourez, achetez, suivez et retournez vos commandes depuis l'application mobile — ou commandez directement sur le site."
+                : "Browse, buy, track and return your orders from the mobile app — or order right here on the website."}
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
@@ -85,6 +85,10 @@ export default function GetAppPage() {
               {fr ? "Google Play" : "Get it — Google Play"}
             </a>
           </div>
+
+          <Link href="/shop/products" className="mt-6 inline-block text-sm font-semibold text-white underline underline-offset-4">
+            {fr ? "Ou acheter sur le site →" : "Or shop on the website →"}
+          </Link>
 
           <ul className="mt-10 grid w-full gap-3 text-left sm:grid-cols-3">
             {features.map((f) => (

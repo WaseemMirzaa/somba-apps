@@ -43,13 +43,13 @@ export function riderTaskToDeliveryDetail(task: RiderTask): DeliveryDetailData {
     paymentType: task.paymentType,
     customer: {
       name: task.customer,
-      phone: task.phone,
+      phone: task.phone ?? "",
       address: task.address,
     },
     seller: {
       name: task.sellerName,
       store: task.sellerStore,
-      phone: task.sellerPhone,
+      phone: task.sellerPhone ?? "",
     },
     products: task.products,
     timeline: task.timeline,

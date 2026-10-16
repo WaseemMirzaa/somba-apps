@@ -33,6 +33,14 @@ class RealtimeStore extends ChangeNotifier {
   final List<WalletTransactionDto> walletTransactions = [];
   final List<PaymentDto> payments = [];
 
+  /// Bumped when the server pushes a support-ticket / return change, so open
+  /// list screens reload themselves (their data is fetched on demand).
+  final ValueNotifier<int> supportRevision = ValueNotifier(0);
+  final ValueNotifier<int> disputeRevision = ValueNotifier(0);
+
+  /// The ticket carried by the latest `support:updated` push (open conversations follow it).
+  Map<String, dynamic>? lastSupportTicket;
+
   /// Wallet top-ups that failed while the app was live, kept until the customer
   /// dismisses them on the wallet screen (instead of silently vanishing).
   final List<PaymentDto> failedTopups = [];
@@ -275,6 +283,11 @@ class RealtimeStore extends ChangeNotifier {
       walletTransactions.insert(0, WalletTransactionDto.fromJson(_map(d)));
       notifyListeners();
     });
+    _socket.on('support:updated', (d) {
+      lastSupportTicket = d is Map ? _map(d) : null;
+      supportRevision.value++;
+    });
+    _socket.on('dispute:updated', (_) => disputeRevision.value++);
     _socket.on('payment:created', _upsertPayment);
     _socket.on('payment:updated', _upsertPayment);
     _socket.on('product:created', (d) => _upsertProduct(d));

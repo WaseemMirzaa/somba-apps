@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
+import { errMsg } from "@/lib/admin-live";
 
 const ORDER_STATUS_FR: Record<string, string> = {
   delivered: "Livrée",
@@ -56,7 +57,12 @@ export default function AdminCustomerDetailPage() {
             <button
               onClick={async () => {
                 const next = status === "active" ? "suspended" : "active";
-                await setCustomerActive(customer.id, next === "active");
+                try {
+                  await setCustomerActive(customer.id, next === "active");
+                } catch (e) {
+                  toast(errMsg(e), "error");
+                  return;
+                }
                 setStatus(next);
                 toast(
                   fr

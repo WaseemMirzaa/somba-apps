@@ -12,6 +12,7 @@ import { useToast } from "@/context/toast-context";
 import { REVIEWS, REPORTS, type ReviewItem, type ReportItem } from "@/lib/moderation-entities";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useReviews } from "@/context/reviews-context";
+import { NoticeBar } from "@/components/admin/demo-badge";
 
 const reviewVariant = { pending: "warning", published: "success", removed: "danger" } as const;
 const reportVariant = { open: "warning", resolved: "success", dismissed: "default" } as const;
@@ -60,11 +61,11 @@ export default function AdminReviewsPage() {
 
   function setReviewStatus(id: string, status: ReviewItem["status"]) {
     setReviews((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
-    toast(status === "published" ? (fr ? "Avis publié" : "Review published") : fr ? "Avis retiré" : "Review removed", "success");
+    toast(status === "published" ? (fr ? "Avis publié (local, non enregistré)" : "Review published (local, not saved)") : fr ? "Avis retiré (local, non enregistré)" : "Review removed (local, not saved)", "info");
   }
   function setReportStatus(id: string, status: ReportItem["status"]) {
     setReports((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
-    toast(status === "resolved" ? (fr ? "Signalement résolu" : "Report resolved") : fr ? "Signalement rejeté" : "Report dismissed", "success");
+    toast(status === "resolved" ? (fr ? "Signalement résolu (local, non enregistré)" : "Report resolved (local, not saved)") : fr ? "Signalement rejeté (local, non enregistré)" : "Report dismissed (local, not saved)", "info");
   }
 
   return (
@@ -74,6 +75,12 @@ export default function AdminReviewsPage() {
         subtitle={fr ? "Modérez les avis clients et le contenu signalé" : "Moderate customer reviews and reported content"}
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Avis" : "Reviews" }]}
       />
+
+      <NoticeBar tone="warn">
+        {fr
+          ? "Données de démonstration : les notes de modération ne sont pas encore enregistrées sur le serveur. Les décisions ci-dessous restent dans ce navigateur."
+          : "Demo data: moderation notes are not saved to the server yet. Decisions below stay in this browser only."}
+      </NoticeBar>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Avis en attente" : "Pending reviews"} value={pending} icon={MessageSquare} />

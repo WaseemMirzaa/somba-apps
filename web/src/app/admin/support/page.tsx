@@ -7,51 +7,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { NoticeBar } from "@/components/admin/demo-badge";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { useSupport } from "@/context/support-context";
-import { SUPPORT_PRIORITY_LABELS, SUPPORT_STATUS_LABELS } from "@/lib/support-tickets";
+import { SUPPORT_STATUS_BADGE, SUPPORT_STATUS_LABEL, useServerList, type SupportTicketRow } from "@/lib/admin-live";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
-  { value: "in_progress", label: "In progress", labelFr: "En cours" },
+  { value: "pending", label: "Awaiting customer", labelFr: "En attente du client" },
   { value: "resolved", label: "Resolved", labelFr: "Résolu" },
+  { value: "closed", label: "Closed", labelFr: "Fermé" },
 ];
 
 export default function AdminSupportPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { tickets } = useSupport();
+  const { items: tickets, error } = useServerList<SupportTicketRow>("support:list", { pushEvents: ["support:updated"] });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const rows = useMemo(
-    () =>
-      tickets.map((tk) => ({
-        id: tk.id,
-        subject: tk.subject,
-        subjectFr: tk.subjectFr,
-        party: tk.party,
-        audience: tk.audience,
-        priority: tk.priority,
-        status: tk.status,
-        date: tk.date,
-      })),
-    [tickets]
-  );
+  const rows = useMemo(() => tickets.map((tk) => ({ ...tk, date: tk.createdAt.slice(0, 10) })), [tickets]);
 
   const filtered = useMemo(
-    () => applyListFilters(rows, filters, { searchFields: ["id", "subject", "party"], dateField: "date", statusField: "status" }),
-    [rows, filters]
+    () => applyListFilters(rows, filters, { searchFields: ["reference", "subject", "userName", "category"], dateField: "date", statusField: "status" }),
+    [rows, filters],
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("support")}
-        subtitle={fr ? "Tickets de support clients et vendeurs" : "Customer & seller support tickets"}
+        subtitle={fr ? "Tickets de support (en direct)" : "Support tickets (live)"}
         breadcrumbs={[adminBreadcrumb(locale), { label: t("support") }]}
       />
+      {error && <NoticeBar tone="warn">{error}</NoticeBar>}
 
       <ListFilters
         values={filters}
@@ -63,21 +52,17 @@ export default function AdminSupportPage() {
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucun ticket" : "No tickets"}
             columns={[
-              { key: "id", label: t("ticket"), render: (row) => (
-                <Link href={`/admin/support/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+              { key: "reference", label: t("ticket"), render: (row) => (
+                <Link href={`/admin/support/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
               )},
-              { key: "subject", label: fr ? "Sujet" : "Subject", render: (row) => <span>{fr ? String(row.subjectFr ?? row.subject) : String(row.subject)}</span> },
-              { key: "party", label: fr ? "Demandeur" : "Requester" },
-              { key: "audience", label: fr ? "Portail" : "Portal", render: (row) => <span className="capitalize">{String(row.audience)}</span> },
-              { key: "priority", label: fr ? "Priorité" : "Priority", render: (row) => (
-                <Badge variant={row.priority === "high" ? "danger" : row.priority === "medium" ? "warning" : "default"}>
-                  {fr ? SUPPORT_PRIORITY_LABELS[String(row.priority)].fr : SUPPORT_PRIORITY_LABELS[String(row.priority)].en}
-                </Badge>
-              )},
+              { key: "subject", label: fr ? "Sujet" : "Subject" },
+              { key: "userName", label: fr ? "Demandeur" : "Requester" },
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => <span className="capitalize">{String(row.category)}</span> },
               { key: "status", label: t("status"), render: (row) => (
-                <Badge variant={row.status === "resolved" ? "success" : row.status === "in_progress" ? "info" : "warning"}>
-                  {fr ? SUPPORT_STATUS_LABELS[row.status as "open"].fr : SUPPORT_STATUS_LABELS[row.status as "open"].en}
+                <Badge variant={SUPPORT_STATUS_BADGE[String(row.status)] ?? "default"}>
+                  {SUPPORT_STATUS_LABEL[String(row.status)]?.[fr ? "fr" : "en"] ?? String(row.status)}
                 </Badge>
               )},
               { key: "date", label: t("date") },

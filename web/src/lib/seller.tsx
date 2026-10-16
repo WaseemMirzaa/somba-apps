@@ -6,7 +6,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useRealtime } from "@/context/realtime-context";
@@ -559,6 +558,32 @@ function buildSellerData(input: BuildInput) {
     }))
     .sort((a, b) => b.month.localeCompare(a.month));
 
+  // Real revenue by category (sales that count: not pending / cancelled / returned).
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const catMap = new Map<string, { category: string; categoryFr: string; gross: number; orders: Set<string> }>();
+  for (const o of sellerOrders) {
+    if (!countsAsSale(o)) continue;
+    for (const it of o.items ?? []) {
+      const prod = productById.get(it.productId);
+      const key = prod?.category ?? "—";
+      const cur = catMap.get(key) ?? { category: key, categoryFr: prod?.categoryFr ?? key, gross: 0, orders: new Set<string>() };
+      cur.gross += it.priceUsd * it.qty;
+      cur.orders.add(o.id);
+      catMap.set(key, cur);
+    }
+  }
+  const categoryRevenue = [...catMap.values()]
+    .map((c) => ({
+      category: c.category,
+      categoryFr: c.categoryFr,
+      gross: money(c.gross),
+      commission: money(c.gross * rate),
+      net: money(c.gross * (1 - rate)),
+      orders: c.orders.size,
+      rate: commissionPct,
+    }))
+    .sort((a, b) => b.gross - a.gross);
+
   // Reviews (read-only: the server has no reply / report event).
   const sellerReviewList = reviews.map((r, i) => ({
     id: i + 1,
@@ -702,6 +727,7 @@ function buildSellerData(input: BuildInput) {
     sellerPayoutSummary,
     transactionList,
     statements,
+    categoryRevenue,
     sellerReviewList,
     sellerReturnList,
     sellerDisputeList,
@@ -795,14 +821,13 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [replacements, setReplacements] = useState<Replacement[]>([]);
   const [readyAt, setReadyAt] = useState<Record<string, string>>({});
-  const sellerRef = useRef<SellerStore | null>(null);
-  sellerRef.current = seller;
 
   // Remembered "ready" flags (only ever written after the server accepted).
   useEffect(() => {
     if (!userId) return;
     try {
       const raw = localStorage.getItem(`somba-seller-ready:${userId}`);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a browser-stored flag map once the user is known
       if (raw) setReadyAt(JSON.parse(raw) as Record<string, string>);
     } catch {
       /* storage unavailable */
@@ -817,7 +842,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       return mine;
     } catch {
       /* keep what we have */
-      return sellerRef.current;
     }
   }, []);
   const refreshProducts = useCallback(async () => {
@@ -854,6 +878,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   // product pushes from the server, so we re-read instead).
   useEffect(() => {
     if (!isSeller) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial server fetch
     void refresh();
     const tick = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -870,6 +895,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const notifCount = rt.notifications.length;
   useEffect(() => {
     if (!isSeller || notifCount === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-read after a server notification
     void refresh();
   }, [isSeller, notifCount, refresh]);
 
@@ -904,6 +930,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   // A sign-out / account switch clears everything.
   useEffect(() => {
     if (rt.user?.role === "seller") return;
+    /* eslint-disable react-hooks/set-state-in-effect -- sign-out / account switch resets the cache */
     setSeller(null);
     setSellerLoaded(false);
     setStats(null);
@@ -914,6 +941,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     setCampaigns([]);
     setTickets([]);
     setReplacements([]);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [rt.user?.role, userId]);
 
   const actions = useMemo<Actions>(() => {

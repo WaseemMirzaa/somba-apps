@@ -64,9 +64,7 @@ export default function ShopProductDetailPage() {
 
   useEffect(() => {
     if (!productId || rt.status !== "connected") return;
-    /* eslint-disable react-hooks/set-state-in-effect */
     loadQuestions();
-    /* eslint-enable react-hooks/set-state-in-effect */
     socketClient
       .request<Review[]>("reviews:list", { productId })
       .then(setReviews)

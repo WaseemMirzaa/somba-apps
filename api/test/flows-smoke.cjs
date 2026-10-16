@@ -242,7 +242,7 @@ const register = async (label, role = 'customer') => {
   ok(signin.status === 200 && signin.json.user.role === 'rider', 'the new rider can sign in');
   ok(!(await req(admin.sock, 'roles:createStaff', { email, name: 'Dup', role: 'rider' })).ok, 'a duplicate email is refused');
   const staff = (await req(admin.sock, 'roles:staff')).data;
-  ok(staff.some((s) => s.email === email && s.role === 'rider'), 'riders show up in the staff list');
+  ok(staff.some((s) => s.email === email && s.role === 'rider' && s.active === true && s.phone === '+243800000001'), 'riders show up in the staff list with phone and active flag');
 
   // cleanup the flash sale so reruns are clean
   void flashId;

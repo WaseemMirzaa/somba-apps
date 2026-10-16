@@ -82,6 +82,8 @@ class RiderStore extends ChangeNotifier {
   Future<void> logout() async {
     _poolTimer?.cancel();
     _poolTimer = null;
+    _pushTimer?.cancel();
+    _pushTimer = null;
     await location.stop();
     await _auth.clear();
     _socket.disconnect();
@@ -196,28 +198,42 @@ class RiderStore extends ChangeNotifier {
     });
 
     // Server pushes (a change event triggers one targeted re-read — no timers).
-    _socket.on('delivery:updated', (_) => unawaited(refresh()));
-    _socket.on('order:created', (_) => unawaited(refresh())); // a new paid order = a new pool item
-    _socket.on('order:updated', (_) => unawaited(refresh()));
+    _socket.on('delivery:updated', (_) => _pushRefresh());
+    _socket.on('order:created', (_) => _pushRefresh()); // a new paid order = a new pool item
+    _socket.on('order:updated', (_) => _pushRefresh());
     _socket.on('notification:new', (d) {
       notifications.insert(0, NotificationDto.fromJson(_map(d)));
       notifyListeners();
     });
   }
 
+  Timer? _pushTimer;
+
+  /// Pushes often arrive in bursts: re-read once, shortly after the last one.
+  void _pushRefresh() {
+    _pushTimer?.cancel();
+    _pushTimer = Timer(const Duration(milliseconds: 300), () => unawaited(refresh(light: true)));
+  }
+
   /// Re-read the rider's queue (own + open pool), earnings and notifications.
-  Future<void> refresh() async {
+  Future<void> refresh({bool light = false}) async {
     // Coalesce bursts of pushes: one read in flight, one more queued at most.
     if (_refreshing) {
       _refreshAgain = true;
+      if (!light) _refreshFull = true;
       return _refreshDone?.future;
     }
+    _refreshFull = !light;
     _refreshing = true;
     final done = _refreshDone = Completer<void>();
     try {
       do {
         _refreshAgain = false;
-        await _refreshOnce();
+        final full = _refreshFull;
+        _refreshFull = false;
+        await _refreshOnce(full: full);
+        // Space repeated reads out: the server limits requests per second.
+        if (_refreshAgain) await Future.delayed(const Duration(milliseconds: 600));
       } while (_refreshAgain);
     } finally {
       _refreshing = false;
@@ -227,9 +243,12 @@ class RiderStore extends ChangeNotifier {
 
   bool _refreshing = false;
   bool _refreshAgain = false;
+  bool _refreshFull = false;
   Completer<void>? _refreshDone;
 
-  Future<void> _refreshOnce() async {
+  /// [full] also re-reads notifications and the public settings; a light read
+  /// (after an action or a push) only needs the queue and the earnings.
+  Future<void> _refreshOnce({required bool full}) async {
     try {
       final rows = ((await _socket.request('rider:tasks')) as List).map((e) => DeliveryTaskDto.fromJson(_map(e))).toList();
       myTasks
@@ -239,10 +258,12 @@ class RiderStore extends ChangeNotifier {
         ..clear()
         ..addAll(rows.where((t) => t.isOpen));
       earnings = EarningsDto.fromJson(_map(await _socket.request('rider:earnings')));
-      notifications
-        ..clear()
-        ..addAll(((await _socket.request('notifications:list')) as List).map((e) => NotificationDto.fromJson(_map(e))));
-      await _readSettings();
+      if (full) {
+        notifications
+          ..clear()
+          ..addAll(((await _socket.request('notifications:list')) as List).map((e) => NotificationDto.fromJson(_map(e))));
+        await _readSettings();
+      }
       loaded = true;
       status = ConnStatus.connected;
       notifyListeners();
@@ -261,7 +282,7 @@ class RiderStore extends ChangeNotifier {
 
   Future<void> accept(String taskId) async {
     await _socket.request('delivery:accept', {'taskId': taskId});
-    await refresh();
+    await refresh(light: true);
   }
 
   /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.
@@ -272,7 +293,7 @@ class RiderStore extends ChangeNotifier {
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
     });
-    await refresh();
+    await refresh(light: true);
   }
 
   Future<void> sendLocation(String taskId, double lat, double lng) async {

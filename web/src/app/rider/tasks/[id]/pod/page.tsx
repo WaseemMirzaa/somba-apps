@@ -1,57 +1,59 @@
 "use client";
 
-import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { Button } from "@/components/ui/button";
+import { DeliveredForm } from "@/components/warehouse/rider-task-actions";
 import { useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 
+/** Proof of delivery = the delivered step: the customer's 4-digit code (and cash for COD), sent to the server. */
 export default function RiderPodPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const router = useRouter();
-  const { getRiderTask } = useRiderData();
+  const { getRiderTask, refresh, loading } = useRiderData();
   const task = getRiderTask(id);
-  const [otp, setOtp] = useState("");
-  const [recipient, setRecipient] = useState("");
-  const [notes, setNotes] = useState("");
 
-  if (!task) return <div className="text-center text-slate-500">{fr ? "Tâche introuvable" : "Task not found"}</div>;
-
-  function confirmDelivery() {
-    toast(fr ? "Livraison confirmée" : "Delivery confirmed");
-    router.push("/rider/tasks");
+  if (!task) {
+    return <div className="text-center text-slate-500">{loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Tâche introuvable" : "Task not found")}</div>;
   }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <PageHeader title={fr ? "Preuve de livraison" : "Proof of Delivery"} subtitle={task.id} backHref={`/rider/tasks/${id}`} />
+      <PageHeader title={fr ? "Preuve de livraison" : "Proof of Delivery"} subtitle={task.orderId} backHref={`/rider/tasks/${id}`} />
 
       <DetailSection title={fr ? "Détails" : "Details"}>
         <InfoGrid items={[
           { label: t("customer"), value: task.customer },
           { label: fr ? "Commande" : "Order", value: task.orderId },
-          { label: fr ? "Destinataire" : "Recipient", value: recipient || "—" },
+          { label: fr ? "Adresse" : "Address", value: task.address, full: true },
         ]} />
       </DetailSection>
 
       <DetailSection title={fr ? "Vérification" : "Verification"}>
-        <div className="space-y-3">
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder="OTP" value={otp} onChange={(e) => setOtp(e.target.value)} />
-          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Nom du destinataire" : "Recipient name"} value={recipient} onChange={(e) => setRecipient(e.target.value)} />
-          <textarea className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Notes" : "Notes"} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            {fr ? "Photo / Signature (mock)" : "Photo / Signature (mock upload)"}
-          </div>
-        </div>
-        <Button onClick={confirmDelivery} className="mt-4 w-full bg-emerald-600">
-          {fr ? "Confirmer livraison" : "Confirm Delivered"}
-        </Button>
+        {task.status === "in_transit" ? (
+          <DeliveredForm
+            task={task}
+            onDone={() => {
+              void refresh();
+              router.push(`/rider/tasks/${id}`);
+            }}
+          />
+        ) : task.status === "delivered" ? (
+          <p className="text-sm text-emerald-700">{fr ? "Cette livraison est déjà confirmée." : "This delivery is already confirmed."}</p>
+        ) : (
+          <p className="text-sm text-slate-600">
+            {fr
+              ? "Vous pouvez confirmer la livraison une fois en route vers le client."
+              : "You can confirm delivery once you are on the way to the customer."}{" "}
+            <Link href={`/rider/tasks/${id}`} className="text-emerald-700 underline">
+              {fr ? "Retour à la tâche" : "Back to the task"}
+            </Link>
+          </p>
+        )}
       </DetailSection>
     </div>
   );

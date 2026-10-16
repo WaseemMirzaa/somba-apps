@@ -224,7 +224,7 @@ export function buildParcels(
       rawStatus: t.status,
       seller,
       customer: o?.customerName ?? "—",
-      customerPhone: phoneOf(o?.shippingAddress),
+      customerPhone: phoneOf(t.address) ?? phoneOf(o?.shippingAddress),
       customerAddress: addressText(t.address ?? o?.shippingAddress),
       pickupAddress: addressText(t.pickupAddress),
       zone: t.zoneId ?? "—",

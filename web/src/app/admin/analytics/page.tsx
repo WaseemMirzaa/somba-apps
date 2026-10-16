@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { NoticeBar } from "@/components/admin/demo-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
@@ -87,6 +88,12 @@ export default function AdminAnalyticsPage() {
           />
         }
       />
+
+      <NoticeBar tone="warn">
+        {fr
+          ? "Données de démonstration : les chiffres et graphiques de cette page sont illustratifs, pas ceux de la plateforme. Les chiffres en direct sont sur le tableau de bord, Finance et Commandes."
+          : "Demo data: the figures and charts on this page are illustrative, not the platform's real numbers. Live figures are on the Dashboard, Finance and Orders pages."}
+      </NoticeBar>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsKpiCard

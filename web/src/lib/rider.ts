@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 
 /**
- * Live rider data layer — backend-backed replacement for the mock
- * @/lib/rider-entities. Derives the rider's delivery queue and shift summary
- * from their real delivery tasks (enriched with order snapshots) over the one
- * authenticated socket, refreshing on live delivery:updated pushes.
+ * Live rider data layer. `rider:tasks` returns the rider's own tasks PLUS the
+ * open pool (status `unassigned`), each with an order snapshot. The pool is
+ * exposed separately as "available" so it is never mistaken for assigned work.
+ * Refreshes on every `delivery:updated` push and after each action.
  */
 
 interface RiderQueueRow {
@@ -21,6 +21,11 @@ interface RiderQueueRow {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  pickupAddress?: string | null;
+  attempts?: number;
+  failureReason?: string | null;
+  readyAt?: string | null;
+  receivedAt?: string | null;
   createdAt: string;
   order: {
     reference: string;
@@ -32,13 +37,15 @@ interface RiderQueueRow {
   } | null;
 }
 
-interface RiderEarnings {
+export interface RiderEarnings {
   totalTasks: number;
   delivered: number;
   active: number;
   codCollectedUsd: number;
   earningsUsd: number;
 }
+
+export type RiderTaskStatus = "available" | "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
 
 const PAYMENT_LABEL: Record<string, string> = {
   cod: "Cash on Delivery",
@@ -57,12 +64,23 @@ const STATUS_STEP: Record<string, number> = {
 };
 
 function addressText(raw: string | null): string {
-  if (!raw) return "Kinshasa";
+  if (!raw) return "—";
   try {
     const a = JSON.parse(raw) as { line1?: string; commune?: string; city?: string };
-    return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "Kinshasa";
+    if (a && typeof a === "object") return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "—";
   } catch {
-    return raw;
+    /* plain text */
+  }
+  return raw;
+}
+
+function phoneFrom(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const a = JSON.parse(raw) as { phone?: string };
+    return a?.phone ? String(a.phone) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -70,28 +88,31 @@ function toRiderTask(row: RiderQueueRow) {
   const o = row.order;
   const step = STATUS_STEP[row.status] ?? 1;
   const items = o?.items ?? [];
+  const status: RiderTaskStatus = row.status === "unassigned" ? "available" : (row.status as RiderTaskStatus);
   return {
     id: row.id,
     type: "delivery" as const,
-    status: (row.status === "unassigned" ? "assigned" : row.status) as
-      | "assigned"
-      | "picked_up"
-      | "in_transit"
-      | "delivered"
-      | "failed",
+    status,
+    isPool: row.status === "unassigned",
     customer: o?.customerName ?? "Customer",
     address: addressText(row.address ?? o?.shippingAddress ?? null),
-    phone: "+243 800 000 000",
-    zone: row.zoneId ?? "Kinshasa — Gombe",
+    pickupAddress: addressText(row.pickupAddress ?? null),
+    phone: phoneFrom(row.address) ?? phoneFrom(o?.shippingAddress),
+    zone: row.zoneId ?? "—",
     orderId: row.orderReference,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
     paymentType: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? o?.paymentMethod ?? "—",
     eta: step >= 4 ? "En route" : "Scheduled",
     distance: "—",
     items: items.reduce((s, it) => s + it.qty, 0),
-    sellerName: "Kinshasa Traders",
-    sellerStore: "Kinshasa Traders",
-    sellerPhone: "+243 820 100 200",
+    attempts: row.attempts ?? 1,
+    failureReason: row.failureReason ?? null,
+    readyAt: row.readyAt ?? null,
+    receivedAt: row.receivedAt ?? null,
+    createdAt: row.createdAt,
+    sellerName: "—",
+    sellerStore: "—",
+    sellerPhone: null as string | null,
     products: items.map((it) => ({
       productId: it.productId,
       name: it.productName,
@@ -102,14 +123,14 @@ function toRiderTask(row: RiderQueueRow) {
     })),
     timeline: [
       { time: new Date(row.createdAt).toLocaleString(), label: "Order placed", done: step >= 1 },
+      { time: row.readyAt ? new Date(row.readyAt).toLocaleString() : "—", label: "Seller ready", done: !!row.readyAt },
       { time: "—", label: "Picked from seller", done: step >= 3 },
-      { time: "—", label: "At warehouse", done: step >= 3 },
-      { time: "—", label: "Out for delivery", done: step >= 4 },
-      { time: "—", label: "Delivered", done: step >= 5 },
+      { time: "—", label: "Out for delivery", done: step >= 4 && row.status !== "failed" },
+      row.status === "failed"
+        ? { time: "—", label: `Failed${row.failureReason ? `: ${row.failureReason}` : ""}`, done: true }
+        : { time: "—", label: "Delivered", done: step >= 5 },
     ],
     codAmount: row.codAmountUsd,
-    notes: "" as string,
-    notesFr: "" as string,
   };
 }
 
@@ -119,53 +140,71 @@ export function useRiderData() {
   const rt = useRealtime();
   const [queue, setQueue] = useState<RiderQueueRow[]>([]);
   const [earnings, setEarnings] = useState<RiderEarnings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const isRider = rt.user?.role === "rider";
+  const connected = rt.status === "connected";
 
-  useEffect(() => {
-    if (rt.status !== "connected" || !isRider) return;
-    let alive = true;
-    const load = async () => {
+  const refresh = useCallback(async () => {
+    try {
       const [q, e] = await Promise.all([
-        socketClient.request<RiderQueueRow[]>("rider:tasks").catch(() => []),
-        socketClient.request<RiderEarnings>("rider:earnings").catch(() => null),
+        socketClient.request<RiderQueueRow[]>("rider:tasks"),
+        socketClient.request<RiderEarnings>("rider:earnings"),
       ]);
-      if (!alive) return;
       setQueue(q ?? []);
       setEarnings(e);
-    };
-    void load();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load your tasks.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!connected || !isRider) return;
+    void refresh();
+    const s = socketClient.current;
+    const onPush = () => void refresh();
+    s?.on("delivery:updated", onPush);
     return () => {
-      alive = false;
+      s?.off("delivery:updated", onPush);
     };
-    // rt.deliveries changes when a delivery:updated event lands — refetch then.
-  }, [rt.status, isRider, rt.deliveries]);
+  }, [connected, isRider, refresh]);
 
   return useMemo(() => {
     const riderTasks = queue.map(toRiderTask);
-    const active = riderTasks.filter((t) => t.status !== "delivered" && t.status !== "failed");
+    const available = riderTasks.filter((t) => t.isPool);
+    const mine = riderTasks.filter((t) => !t.isPool);
+    const active = mine.filter((t) => t.status !== "delivered" && t.status !== "failed");
     const riderProfile = {
       id: rt.user?.id ? `RDR-${rt.user.id.slice(0, 4).toUpperCase()}` : "RDR-001",
+      userId: rt.user?.id ?? "",
       name: rt.user?.name ?? "Rider",
-      phone: rt.user?.phone ?? "+243 800 000 000",
-      vehicle: "Motorcycle — Honda CB150",
-      vehicleFr: "Moto — Honda CB150",
-      zone: "Kinshasa — Gombe",
-      rating: 4.9,
+      email: rt.user?.email ?? "",
+      phone: rt.user?.phone ?? null,
       deliveriesToday: earnings?.delivered ?? 0,
       earningsToday: earnings?.earningsUsd ?? 0,
       codCollected: earnings?.codCollectedUsd ?? 0,
       activeTasks: earnings?.active ?? active.length,
-      status: "on_duty" as const,
     };
     return {
       riderProfile,
+      /** Every row the server sent: own tasks + open pool. */
       riderTasks,
+      /** Open pool: unclaimed, can be accepted. */
+      available,
+      /** The rider's own tasks (any status). */
+      mine,
       earnings,
+      loading,
+      error,
+      refresh,
       getRiderTask: (id: string) => riderTasks.find((t) => t.id === id || t.orderId === id),
       getActiveRiderTasks: () => active,
     };
-  }, [queue, earnings, rt.user]);
+  }, [queue, earnings, rt.user, loading, error, refresh]);
 }
 
 export type RiderData = ReturnType<typeof useRiderData>;

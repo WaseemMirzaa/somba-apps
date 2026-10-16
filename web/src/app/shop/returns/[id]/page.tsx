@@ -4,41 +4,56 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { DualCurrency } from "@/components/ui/dual-currency";
-import { getReturn } from "@/lib/shared-entities";
+import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { useMyDisputes, disputeStageLabel } from "@/lib/orders";
+import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 
-const STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  requested: { en: "Requested", fr: "Demandé" },
-  approved: { en: "Approved — pickup scheduled", fr: "Approuvé — enlèvement planifié" },
-  in_transit: { en: "In transit", fr: "En transit" },
-  received: { en: "Received at warehouse", fr: "Reçu à l'entrepôt" },
-  refunded: { en: "Refunded", fr: "Remboursé" },
-  rejected: { en: "Rejected", fr: "Rejeté" },
-};
-
-export default function ReturnStatusPage() {
+function ReturnStatus() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
-  const ret = getReturn(id);
   const fr = locale === "fr";
+  const rt = useRealtime();
+  const rows = useMyDisputes();
+  const ret = rows.find((d) => d.id === id || d.reference === id);
 
-  if (!ret) return <div className="text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
+  if (!ret) {
+    return (
+      <div className="space-y-3 py-12 text-center text-slate-500">
+        <p>{rt.status === "connected" ? (fr ? "Retour introuvable" : "Return not found") : (fr ? "Chargement…" : "Loading…")}</p>
+        <Link href="/shop/returns" className="text-[var(--primary)] hover:underline">{fr ? "Tous mes retours" : "All my returns"}</Link>
+      </div>
+    );
+  }
+
+  const order = rt.orders.find((o) => o.id === ret.orderId);
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ret.id} subtitle={ret.orderId} backHref="/shop/orders" />
-      <DetailSection title={fr ? "Statut du retour" : "Return Status"}>
+      <PageHeader title={ret.reference} subtitle={`${fr ? "Commande" : "Order"} ${ret.orderReference}`} backHref="/shop/returns" />
+      <DetailSection title={ret.type === "return" ? (fr ? "Statut du retour" : "Return status") : (fr ? "Statut du litige" : "Dispute status")}>
         <InfoGrid items={[
-          { label: fr ? "Statut" : "Status", value: fr ? STATUS_LABELS[ret.status]?.fr : STATUS_LABELS[ret.status]?.en },
-          { label: fr ? "Raison" : "Reason", value: fr ? (ret.reasonFr ?? ret.reason) : ret.reason },
-          { label: fr ? "Articles" : "Items", value: ret.items.join(", "), full: true },
-          ...(ret.refundAmount ? [{ label: fr ? "Remboursement" : "Refund", value: <DualCurrency amount={ret.refundAmount} /> }] : []),
+          { label: fr ? "Statut" : "Status", value: disputeStageLabel(ret, fr) },
+          { label: fr ? "Type" : "Type", value: ret.type === "return" ? (fr ? "Retour" : "Return") : (fr ? "Litige" : "Dispute") },
+          { label: fr ? "Demandé le" : "Requested", value: new Date(ret.createdAt).toLocaleString() },
+          ...(ret.receivedAt ? [{ label: fr ? "Colis reçu le" : "Goods received", value: new Date(ret.receivedAt).toLocaleString() }] : []),
+          { label: fr ? "Raison" : "Reason", value: ret.reason, full: true },
+          ...(ret.resolution ? [{ label: fr ? "Décision" : "Decision", value: ret.resolution, full: true }] : []),
+          ...(order ? [{ label: fr ? "Montant de la commande" : "Order total", value: `$${order.totalUsd.toFixed(2)}` }] : []),
         ]} />
         <Link href={`/shop/orders/${ret.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">
-          {fr ? "Voir commande →" : "View order →"}
+          {fr ? "Voir la commande →" : "View order →"}
         </Link>
       </DetailSection>
     </div>
+  );
+}
+
+export default function ReturnStatusPage() {
+  const { id } = useParams<{ id: string }>();
+  return (
+    <RequireSignIn next={`/shop/returns/${id}`}>
+      <ReturnStatus />
+    </RequireSignIn>
   );
 }

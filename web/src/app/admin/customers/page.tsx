@@ -15,7 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
-  { value: "inactive", label: "Inactive", labelFr: "Inactif" },
+  { value: "suspended", label: "Suspended", labelFr: "Suspendu" },
 ];
 
 const STATUS_FR: Record<string, string> = {
@@ -88,7 +88,7 @@ export default function AdminCustomersPage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
+                render: (row) => <Badge variant={row.status === "active" ? "success" : "danger"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
               {
                 key: "actions",

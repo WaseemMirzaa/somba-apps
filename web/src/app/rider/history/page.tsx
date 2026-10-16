@@ -1,25 +1,30 @@
 "use client";
 
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
+import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { useLocale } from "@/context/locale-context";
 import { useRiderData } from "@/lib/rider";
 
 export default function RiderHistoryPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { riderTasks } = useRiderData();
-  const completed = riderTasks.filter((t) => t.status === "delivered");
+  const { mine, loading } = useRiderData();
+  const finished = mine.filter((t) => t.status === "delivered" || t.status === "failed");
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Historique des tâches" : "Task History"} subtitle={`${completed.length} ${fr ? "terminées" : "completed"}`} />
-      {completed.map((t) => (
-        <Link key={t.id} href={`/rider/tasks/${t.id}`} className="block rounded-xl border p-4">
-          <div className="flex justify-between font-medium">{t.id} <span className="text-emerald-600">{fr ? "livré" : "delivered"}</span></div>
-          <p className="text-sm text-slate-500">{t.customer} · {t.orderId}</p>
-        </Link>
-      ))}
+      <PageHeader title={fr ? "Historique des tâches" : "Task History"} subtitle={`${finished.length} ${fr ? "terminées" : "finished"}`} />
+      {finished.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+          {loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Aucune livraison terminée." : "Nothing finished yet.")}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {finished.map((task) => (
+            <RiderTaskCard key={task.id} task={task} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

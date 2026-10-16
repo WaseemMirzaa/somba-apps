@@ -1,48 +1,87 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageLoader } from "@/components/ui/loader";
+import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { useAuth } from "@/context/auth-context";
-import { useSupport } from "@/context/support-context";
-import { SUPPORT_STATUS_LABELS } from "@/lib/support-tickets";
+import { useRealtime } from "@/context/realtime-context";
+import { socketClient } from "@/lib/realtime/socket-client";
+import { useSupportTickets, ticketStatusLabel, type SupportTicketRow } from "@/lib/shop-live";
 import { MessageSquare } from "lucide-react";
 
-export default function ShopSupportPage() {
+const CATEGORIES = [
+  { id: "general", en: "General", fr: "Général" },
+  { id: "orders", en: "Orders", fr: "Commandes" },
+  { id: "payment", en: "Payment", fr: "Paiement" },
+  { id: "delivery", en: "Delivery", fr: "Livraison" },
+  { id: "returns", en: "Returns & refunds", fr: "Retours et remboursements" },
+  { id: "account", en: "Account", fr: "Compte" },
+];
+
+function SupportContent() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const router = useRouter();
+  const params = useSearchParams();
   const { toast } = useToast();
-  const { persona } = useAuth();
-  const { tickets, addTicket } = useSupport();
+  const rt = useRealtime();
+  const { tickets, loaded, error: listError, put } = useSupportTickets();
 
-  const [subject, setSubject] = useState("");
-  const [orderId, setOrderId] = useState("");
+  const [subject, setSubject] = useState(params.get("subject") ?? "");
+  const [category, setCategory] = useState(params.get("order") ? "orders" : "general");
   const [message, setMessage] = useState("");
+  // Prefill the order from ?order= (an order id or reference) once the orders are loaded.
+  const orderParam = params.get("order");
+  const [orderId, setOrderId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const myTickets = tickets.filter((tk) => tk.audience === "customer");
+  const orders = rt.orders;
+  const prefilled = useMemo(
+    () => (orderParam ? orders.find((o) => o.id === orderParam || o.reference === orderParam) : undefined),
+    [orderParam, orders],
+  );
+  useEffect(() => {
+    // Intentional: one-time prefill when the linked order becomes known.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (prefilled) {
+      setOrderId((cur) => cur || prefilled.id);
+      setSubject((cur) => cur || (fr ? `Question sur la commande ${prefilled.reference}` : `Question about order ${prefilled.reference}`));
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [prefilled, fr]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     if (!subject.trim() || !message.trim()) {
-      toast(fr ? "Sujet et message requis" : "Subject and message are required", "info");
+      setError(fr ? "Sujet et message requis" : "Subject and message are required");
       return;
     }
-    const id = addTicket({
-      subject: subject.trim(),
-      category: orderId.trim() ? "Orders" : "General",
-      categoryFr: orderId.trim() ? "Commandes" : "Général",
-      audience: "customer",
-      party: persona.name && persona.role !== "guest" ? persona.name : "Customer",
-      message: orderId.trim() ? `${message.trim()}\n\n${fr ? "Commande" : "Order"}: ${orderId.trim()}` : message.trim(),
-    });
-    toast(fr ? "Ticket soumis" : "Ticket submitted");
-    router.push(`/shop/support/${id}`);
+    setBusy(true);
+    try {
+      const ticket = await socketClient.request<SupportTicketRow>("support:open", {
+        subject: subject.trim(),
+        category,
+        message: message.trim(),
+        ...(orderId ? { orderId } : {}),
+      });
+      put(ticket);
+      toast(fr ? "Ticket envoyé" : "Ticket submitted");
+      router.push(`/shop/support/${ticket.id}`);
+    } catch (err) {
+      const msg = (err as Error).message;
+      setError(msg);
+      toast(msg, "error");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -56,10 +95,12 @@ export default function ShopSupportPage() {
         ]}
       />
 
-      {myTickets.length > 0 && (
+      {listError && <p role="alert" className="text-sm text-red-600">{listError}</p>}
+
+      {tickets.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-semibold text-slate-900">{fr ? "Mes tickets" : "My tickets"}</p>
-          {myTickets.map((tk) => (
+          {tickets.map((tk) => (
             <Link
               key={tk.id}
               href={`/shop/support/${tk.id}`}
@@ -68,16 +109,19 @@ export default function ShopSupportPage() {
               <div className="flex items-center gap-3">
                 <span className="rounded-lg bg-blue-50 p-2"><MessageSquare className="h-4 w-4 text-[var(--primary)]" /></span>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{fr ? tk.subjectFr : tk.subject}</p>
-                  <p className="text-xs text-slate-500">{tk.id} · {tk.date}</p>
+                  <p className="text-sm font-medium text-slate-900">{tk.subject}</p>
+                  <p className="text-xs text-slate-500">{tk.reference} · {new Date(tk.updatedAt).toLocaleDateString()}</p>
                 </div>
               </div>
-              <Badge variant={tk.status === "resolved" ? "success" : tk.status === "in_progress" ? "info" : "warning"}>
-                {fr ? SUPPORT_STATUS_LABELS[tk.status].fr : SUPPORT_STATUS_LABELS[tk.status].en}
+              <Badge variant={tk.status === "resolved" || tk.status === "closed" ? "success" : tk.status === "pending" ? "info" : "warning"}>
+                {ticketStatusLabel(tk.status, fr)}
               </Badge>
             </Link>
           ))}
         </div>
+      )}
+      {loaded && tickets.length === 0 && !listError && (
+        <p className="text-sm text-slate-500">{fr ? "Vous n'avez pas encore de ticket." : "You have no tickets yet."}</p>
       )}
 
       <form onSubmit={submit} className="card-premium space-y-5 p-6">
@@ -86,16 +130,38 @@ export default function ShopSupportPage() {
           <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "Sujet" : "Subject"}</label>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Problème de commande, retour, paiement..." : "Order issue, return, payment..."} />
         </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "ID de commande (facultatif)" : "Order ID (optional)"}</label>
-          <input value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm" placeholder="ORD-2024-XXXX" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "Catégorie" : "Category"}</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm">
+              {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{fr ? c.fr : c.en}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "Commande concernée (facultatif)" : "Related order (optional)"}</label>
+            <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm">
+              <option value="">{fr ? "Aucune" : "None"}</option>
+              {orders.map((o) => <option key={o.id} value={o.id}>{o.reference}</option>)}
+            </select>
+          </div>
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "Message" : "Message"}</label>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Message</label>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm" rows={4} placeholder={fr ? "Décrivez votre problème..." : "Describe your issue..."} />
         </div>
-        <Button type="submit">{fr ? "Soumettre le ticket" : "Submit Ticket"}</Button>
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        <Button type="submit" disabled={busy}>{busy ? "…" : fr ? "Soumettre le ticket" : "Submit Ticket"}</Button>
       </form>
     </div>
+  );
+}
+
+export default function ShopSupportPage() {
+  return (
+    <RequireSignIn next="/shop/support">
+      <Suspense fallback={<PageLoader className="py-12" />}>
+        <SupportContent />
+      </Suspense>
+    </RequireSignIn>
   );
 }

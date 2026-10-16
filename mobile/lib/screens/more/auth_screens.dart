@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/realtime_store.dart';
@@ -251,7 +252,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _pass = TextEditingController();
   final _confirm = TextEditingController();
   String _dial = '+243';
-  bool _agree = true;
+  bool _agree = false;
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()..onTap = () => showTermsDialog(context);
   bool _loading = false;
   String? _nameErr, _phoneErr, _emailErr, _passErr, _confirmErr;
 
@@ -269,6 +271,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     for (final c in [_name, _phone, _email, _pass, _confirm]) {
       c.dispose();
     }
+    _termsTap.dispose();
     super.dispose();
   }
 
@@ -387,15 +390,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         KeyedSubtree(key: const ValueKey('reg-confirm'), child: _GlassField(label: 'Confirm password', hint: 'Re-enter password', icon: Icons.lock_reset_rounded, obscure: true, controller: _confirm, error: _confirmErr)),
         const SizedBox(height: 14),
         GestureDetector(
+          key: const ValueKey('reg-terms'),
+          behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _agree = !_agree),
           child: Row(children: [
             Icon(_agree ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, color: AppColors.primary, size: 22),
             const SizedBox(width: 8),
             Expanded(
                 child: RichText(
-                    text: const TextSpan(style: TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
-              TextSpan(text: 'I agree to the '),
-              TextSpan(text: 'Terms & Privacy Policy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                    text: TextSpan(style: const TextStyle(color: AppColors.muted, fontSize: 12.5), children: [
+              const TextSpan(text: 'I agree to the '),
+              TextSpan(
+                  text: 'Terms & Privacy Policy',
+                  recognizer: _termsTap,
+                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
             ]))),
           ]),
         ),
@@ -764,3 +772,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 }
+
+/// A short, plain summary of the terms and privacy policy.
+Future<void> showTermsDialog(BuildContext context) => showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Terms & Privacy Policy'),
+        content: const SingleChildScrollView(
+          key: ValueKey('terms-body'),
+          child: Text(
+            'Terms of use\n'
+            '- Somba&Teka is a marketplace: sellers list products, we take the order, collect the payment and deliver it.\n'
+            '- Prices, stock and delivery fees are set by the platform and shown before you pay.\n'
+            '- You can cancel an order before it is delivered; paid orders are refunded to your Somba&Teka wallet.\n'
+            '- Delivered goods can be returned within the return window shown on the order.\n\n'
+            'Privacy\n'
+            '- We keep your name, email, phone number and delivery addresses to run your orders.\n'
+            '- Your data is never sold. Sellers see only what they need to prepare your parcel; riders see your name, phone and address while delivering.\n'
+            '- You can edit your details in Edit profile and delete your account at any time in Settings.',
+            style: TextStyle(height: 1.4, fontSize: 13.5),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+      ),
+    );

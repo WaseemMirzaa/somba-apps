@@ -10,7 +10,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lipcart/data/catalog_live.dart';
+import 'package:lipcart/data/market_profiles.dart';
 import 'package:lipcart/data/shop_state.dart';
+import 'package:lipcart/util/format.dart' show marketNotifier;
 import 'package:lipcart/services/auth_service.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/services/socket_service.dart';
@@ -41,11 +43,13 @@ Future<void> until(bool Function() cond, {String what = 'condition', Duration ti
 
 /// A second, independent connection used to act as the admin.
 class Admin {
+  final String email;
+  Admin([this.email = 'admin@somba.app']);
   final SocketService socket = SocketService();
   late final String token;
   Future<void> connect() async {
     final auth = AuthService();
-    final r = await auth.login('admin@somba.app', 'Somba@2026');
+    final r = await auth.login(email, 'Somba@2026');
     token = r.accessToken;
     final s = socket.connect(() async => token);
     final ready = Completer<void>();
@@ -127,6 +131,16 @@ void main() {
       await until(() => store.walletBalance == 60, what: 'wallet:updated after confirmation');
       await until(() => store.payments.firstWhere((p) => p.id == pay.id).status == 'succeeded', what: 'payment:updated');
       expect(store.walletTransactions.first.type, 'topup');
+    });
+
+    test('a declined top-up stays visible with its reason until dismissed', () async {
+      final pay = await store.topUpWallet(5, method: 'airtel_money', phone: '+243810000000'); // sandbox: ...0000 is declined
+      expect(pay.status, 'pending');
+      await until(() => store.failedTopups.any((p) => p.id == pay.id), what: 'failed top-up kept for the wallet screen');
+      expect(store.failedTopups.firstWhere((p) => p.id == pay.id).failureReason, isNotNull);
+      expect(store.walletBalance, 60, reason: 'nothing was credited');
+      store.dismissTopupFailure(pay.id);
+      expect(store.failedTopups.any((p) => p.id == pay.id), isFalse);
     });
 
     test('place an order paid from the wallet; the SERVER prices it', () async {
@@ -228,6 +242,50 @@ void main() {
       shop.clearCart();
     });
 
+    test('proof of delivery: the customer sees the 4-digit code while the parcel is on its way', () async {
+      final rider = Admin('rider@somba.app');
+      await rider.connect();
+      await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'true'});
+      try {
+        final order = await store.placeOrder(
+          items: [
+            {'productId': productId, 'qty': 1},
+          ],
+          paymentMethod: 'stripe_card',
+          zoneId: 'gombe',
+        );
+        expect(order.status, 'confirmed');
+
+        var info = await store.call('orders:deliveryCode', {'orderId': order.id}) as Map;
+        expect(info['required'], isTrue);
+
+        final tasks = await rider.call('rider:tasks') as List;
+        final task = tasks.cast<Map>().firstWhere((t) => t['orderId'] == order.id);
+        await rider.call('delivery:accept', {'taskId': task['id']});
+        await rider.call('delivery:updateStatus', {'taskId': task['id'], 'status': 'picked_up'});
+        await rider.call('delivery:updateStatus', {'taskId': task['id'], 'status': 'in_transit'});
+
+        info = await store.call('orders:deliveryCode', {'orderId': order.id}) as Map;
+        expect(info['required'], isTrue);
+        final code = info['code'] as String;
+        expect(code, matches(RegExp(r'^\d{4}$')), reason: 'the card shows this code');
+
+        // The rider needs exactly that code.
+        await expectLater(rider.call('delivery:updateStatus', {'taskId': task['id'], 'status': 'delivered'}), throwsA(isA<ApiException>()));
+        await rider.call('delivery:updateStatus', {'taskId': task['id'], 'status': 'delivered', 'code': code});
+        await until(() => store.orderById(order.id)!.status == 'delivered', what: 'order delivered');
+
+        // Rule off: nothing required, no code.
+        await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'false'});
+        final off = await store.call('orders:deliveryCode', {'orderId': order.id}) as Map;
+        expect(off['required'], isFalse);
+        expect(off['code'], isNull);
+      } finally {
+        await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'false'});
+        rider.close();
+      }
+    });
+
     test('profile, preferences and password', () async {
       await store.updateProfile(name: 'Flutter Renamed');
       expect(store.user!.name, 'Flutter Renamed');
@@ -254,6 +312,8 @@ void main() {
     });
 
     test('forgot / reset password through the REST endpoints', () async {
+      await store.setPref('market', 'FR');
+      marketNotifier.value = MarketProfileId.drc; // as at a fresh launch
       await store.logout();
       final dev = await store.forgotPassword(email);
       expect(dev, isNotNull);
@@ -262,6 +322,7 @@ void main() {
       await store.login(email, 'Flutter-Reset-2026');
       expect(store.isSignedIn, isTrue);
       await until(() => store.hydrated, what: 'download after login');
+      expect(marketNotifier.value, MarketProfileId.france, reason: 'the saved "Prices shown in" choice is re-applied after preferences load');
     });
 
     test('push device registration', () async {

@@ -23,6 +23,7 @@ import {
   Settings,
   Boxes,
   Truck,
+  Banknote,
 } from "lucide-react";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 
@@ -35,8 +36,10 @@ const ROLE_LEVEL: Record<WarehouseStaffRole, number> = {
 
 export type WarehouseNavItem = {
   href: string;
-  /** i18n key (rendered via t()). */
+  /** i18n key (rendered via t()) or, when `plainLabel`, the text itself. */
   label: string;
+  /** Render `label` as-is instead of translating it. */
+  plainLabel?: boolean;
   icon: LucideIcon;
   /** Minimum role tier required to see / reach this page. */
   tier: number;
@@ -67,12 +70,13 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, tier: T.supervisor, nav: true },
   { href: "/warehouse/aged", label: "agedParcels", icon: AlertTriangle, tier: T.supervisor, nav: true },
   { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle, tier: T.supervisor, nav: true },
+  { href: "/warehouse/reconcile", label: "COD cash", plainLabel: true, icon: Banknote, tier: T.supervisor, nav: true },
   { href: "/warehouse/analytics", label: "analytics", icon: BarChart3, tier: T.manager, nav: true },
   { href: "/warehouse/hubs", label: "hubs", icon: Boxes, tier: T.manager, nav: false },
   { href: "/warehouse/settings", label: "settings", icon: Settings, tier: T.manager, nav: true },
 ];
 
-export type WarehouseNavLink = { href: string; label: string; icon: LucideIcon; i18n: true };
+export type WarehouseNavLink = { href: string; label: string; icon: LucideIcon; i18n: boolean };
 
 /** Sidebar items visible to a warehouse role (tier at or below the role). */
 export function getWarehouseNav(role: WarehouseStaffRole): WarehouseNavLink[] {
@@ -81,7 +85,7 @@ export function getWarehouseNav(role: WarehouseStaffRole): WarehouseNavLink[] {
     href: r.href,
     label: r.label,
     icon: r.icon,
-    i18n: true,
+    i18n: !r.plainLabel,
   }));
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/catalog_live.dart';
 import '../../l10n/strings.dart';
 import '../../services/models.dart';
@@ -62,7 +63,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
         final payment = store.paymentForOrder(o.id);
         final cancellable = o.status == 'pending' || o.status == 'confirmed';
-        final trackable = const {'processing', 'shipped', 'out_for_delivery'}.contains(o.status);
+        final trackable = const {'confirmed', 'processing', 'shipped', 'out_for_delivery'}.contains(o.status);
         final c = switch (o.status) {
           'delivered' => AppColors.success,
           'cancelled' || 'returned' => AppColors.danger,
@@ -106,6 +107,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                 ]),
               ),
+              DeliveryCodeCard(orderId: o.id, status: o.status),
               const SizedBox(height: 14),
               Panel(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -282,11 +284,116 @@ class OrderTrackingScreen extends StatelessWidget {
                 ),
               ]),
             ),
+            DeliveryCodeCard(orderId: o.id, status: o.status),
+            if (loc != null) ...[
+              const SizedBox(height: 14),
+              Panel(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Rider position: ${loc.lat.toStringAsFixed(5)}, ${loc.lng.toStringAsFixed(5)}',
+                      key: const ValueKey('rider-coords'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const ValueKey('open-maps'),
+                    onPressed: () => openInMaps(context, loc.lat, loc.lng),
+                    icon: const Icon(Icons.map_rounded, size: 18),
+                    label: const Text('Open in maps'),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 14),
             Panel(child: cancelled ? Text(s.orderStatus(o.status), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w800)) : StatusTimeline(steps)),
           ]),
         );
       },
+    );
+  }
+}
+
+/// Opens the rider's position in the phone's maps app (or the browser).
+Future<void> openInMaps(BuildContext context, double lat, double lng) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final ok = await launchUrl(Uri.parse('https://www.google.com/maps?q=$lat,$lng'), mode: LaunchMode.externalApplication);
+    if (!ok) messenger.showSnackBar(const SnackBar(content: Text('Could not open the maps app.')));
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(content: Text('Could not open the maps app.')));
+  }
+}
+
+/// Proof of delivery: while the parcel is on its way the customer sees a 4-digit
+/// code to give to the rider. Asks the server (`orders:deliveryCode`) and only
+/// renders when a code is required and available.
+class DeliveryCodeCard extends StatefulWidget {
+  final String orderId;
+  final String status;
+  const DeliveryCodeCard({super.key, required this.orderId, required this.status});
+
+  @override
+  State<DeliveryCodeCard> createState() => _DeliveryCodeCardState();
+}
+
+class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
+  String? _code;
+
+  static const _statuses = {'processing', 'shipped', 'out_for_delivery'};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant DeliveryCodeCard old) {
+    super.didUpdateWidget(old);
+    if (old.status != widget.status || old.orderId != widget.orderId) _load();
+  }
+
+  Future<void> _load() async {
+    if (!_statuses.contains(widget.status)) {
+      if (_code != null) setState(() => _code = null);
+      return;
+    }
+    try {
+      final r = await RealtimeStore.instance.call('orders:deliveryCode', {'orderId': widget.orderId});
+      final m = r is Map ? r : const {};
+      final code = m['required'] == true && m['code'] != null ? '${m['code']}' : null;
+      if (mounted) setState(() => _code = code);
+    } catch (_) {
+      if (mounted) setState(() => _code = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final code = _code;
+    if (code == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        key: const ValueKey('delivery-code-card'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: AppColors.brandGradient,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(children: [
+          const Icon(Icons.lock_rounded, color: Colors.white, size: 30),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Text('Delivery code  ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                Text(code, key: const ValueKey('delivery-code'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 6)),
+              ]),
+              const SizedBox(height: 4),
+              Text('Give this code to the rider when you receive your parcel.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 12.5, height: 1.3)),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 }

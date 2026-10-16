@@ -65,8 +65,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           mode === "register"
             ? await realRegister({ email, password, name, role: "customer" })
             : await realLogin(email, password);
-        signInReal(user.role, { name: user.name, email: user.email });
-        router.push("/shop/account");
+        const persona = signInReal(user.role, { name: user.name, email: user.email });
+        // Come back to the page that asked for an account (cart, checkout...), else the account page.
+        const next = new URLSearchParams(window.location.search).get("next");
+        const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
+        router.push(user.role === "customer" ? safeNext ?? "/shop/account" : persona.portal || "/shop/account");
       } catch (e) {
         setError(
           (e as Error).message ||

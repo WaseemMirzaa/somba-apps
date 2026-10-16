@@ -40,9 +40,9 @@ export const PORTAL_QUICK_ACCESS = [
 
 /** Marketplace deal highlight cards */
 export const DEAL_HIGHLIGHTS = [
-  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/get-app" },
-  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/get-app" },
-  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/get-app" },
+  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/shop/deals" },
+  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/shop/products" },
+  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/shop/products" },
   { title: "Fast Delivery", titleFr: "Livraison rapide", subtitle: "1–3 days", subtitleFr: "1–3 jours", tag: "Nationwide", tagFr: "National", href: "#modules" },
   { title: "Become a Seller", titleFr: "Devenir vendeur", subtitle: "From $49/mo", subtitleFr: "À partir de 49 $/mois", tag: "Open now", tagFr: "Ouvert", href: "/sell-online" },
   { title: "Mobile App", titleFr: "App mobile", subtitle: "iOS & Android", subtitleFr: "iOS et Android", tag: "Download", tagFr: "Télécharger", href: "#apps" },
@@ -90,10 +90,10 @@ export const PORTALS = [
     descFr: "Votre marketplace du quotidien — milliers de produits, offres par catégorie et livraison à domicile.",
     icon: "ShoppingBag",
     image: PORTAL_IMAGES.shop,
-    loginHref: "/get-app",
+    loginHref: "/shop/products",
     appHref: APP_LINKS.customerApp,
-    features: ["Categories, search & flash deals", "Guest checkout & secure payments", "Order tracking & easy returns"],
-    featuresFr: ["Catégories, recherche et ventes flash", "Achat invité et paiement sécurisé", "Suivi de commande et retours faciles"],
+    features: ["Categories, search & flash deals", "Secure checkout with mobile money & wallet", "Order tracking & easy returns"],
+    featuresFr: ["Catégories, recherche et ventes flash", "Paiement sécurisé par mobile money et portefeuille", "Suivi de commande et retours faciles"],
     trust: [
       { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
       { icon: "Globe", label: "Web + mobile app", labelFr: "Web + app mobile" },
@@ -110,8 +110,8 @@ export const PORTALS = [
         name: "Cart & Checkout",
         nameFr: "Panier et paiement",
         icon: "CreditCard",
-        items: ["Cart & wishlist", "Guest checkout", "Coupons & offers", "Order confirmation"],
-        itemsFr: ["Panier et liste d'envies", "Achat invité", "Coupons et offres", "Confirmation de commande"],
+        items: ["Cart & wishlist", "Mobile money & wallet", "Coupons & offers", "Order confirmation"],
+        itemsFr: ["Panier et liste d'envies", "Mobile money et portefeuille", "Coupons et offres", "Confirmation de commande"],
       },
       {
         name: "After Purchase",
@@ -352,7 +352,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Livraison 1–3 jours",
     cta: "Shop with fast delivery",
     ctaFr: "Acheter avec livraison rapide",
-    href: "/get-app",
+    href: "/shop/products",
     tag: "Nationwide",
     tagFr: "National",
     icon: "Truck",
@@ -373,7 +373,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Carte + mobile money",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
-    href: "/get-app",
+    href: "/shop/products",
     tag: "Buyer safe",
     tagFr: "Acheteur protégé",
     icon: "ShieldCheck",
@@ -393,7 +393,7 @@ export const PLATFORM_MODULES = [
     highlightFr: "Retours 7 jours",
     cta: "How returns work",
     ctaFr: "Comment retourner",
-    href: "/get-app",
+    href: "/shop/products",
     tag: "Hassle-free",
     tagFr: "Sans tracas",
     icon: "RotateCcw",
@@ -428,7 +428,7 @@ export const PLATFORM_MODULES = [
 ] as const;
 
 export const PAYMENT_OPTIONS = [
-  { title: "Card & Mobile Money", titleFr: "Carte et mobile money", desc: "Pay securely at checkout with saved cards or mobile money (Airtel, Orange, M-Pesa).", descFr: "Payez en toute sécurité par carte ou mobile money (Airtel, Orange, M-Pesa)." },
+  { title: "Card & Mobile Money", titleFr: "Mobile money et portefeuille", desc: "Pay securely at checkout with saved cards or mobile money (Airtel, Orange, M-Pesa).", descFr: "Payez en toute sécurité par carte ou mobile money (Airtel, Orange, M-Pesa)." },
   { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba&Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba&Teka." },
   { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
 ] as const;
@@ -497,10 +497,10 @@ export const PRODUCT_HERO = {
   bulletsFr: [
     "Des milliers de produits de vendeurs vérifiés",
     "Livraison en 1–3 jours avec suivi en temps réel",
-    "Carte et mobile money",
+    "Mobile money et portefeuille",
   ],
-  guarantee: "Free to browse · Guest checkout · Easy returns within 7 days",
-  guaranteeFr: "Navigation gratuite · Paiement invité · Retours faciles sous 7 jours",
+  guarantee: "Free to browse · Mobile money & wallet · Easy returns within 7 days",
+  guaranteeFr: "Navigation gratuite · Mobile money et portefeuille · Retours faciles sous 7 jours",
 };
 
 export const TRUST_SIGNALS = [
@@ -517,11 +517,11 @@ export const CONVERSION_PATHS = [
     badgeFr: "Le plus populaire",
     title: "I want to shop",
     titleFr: "Je veux acheter",
-    desc: "Browse categories, compare deals, and checkout — guest or account, card, or mobile money.",
-    descFr: "Parcourez les catégories, comparez les offres et payez — invité ou compte, carte ou mobile money.",
+    desc: "Browse categories, compare deals, and checkout with your account — mobile money or wallet.",
+    descFr: "Parcourez les catégories, comparez les offres et payez avec votre compte — mobile money ou portefeuille.",
     cta: "Shop now",
     ctaFr: "Acheter maintenant",
-    href: "/get-app",
+    href: "/shop/products",
     highlight: true,
   },
   {
@@ -554,7 +554,7 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with card or mobile money — guest checkout available on every order.", descFr: "Payez par carte ou mobile money — paiement invité disponible." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with mobile money or your Somba wallet — an account is needed to order.", descFr: "Payez par mobile money ou avec votre portefeuille Somba — un compte est nécessaire pour commander." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
@@ -602,8 +602,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept credit/debit cards and mobile money (Airtel, Orange, M-Pesa). Guest checkout is available without creating an account.",
-    aFr: "Cartes bancaires et mobile money (Airtel, Orange, M-Pesa). Paiement invité sans compte.",
+    a: "We accept mobile money (Airtel, Orange, M-Pesa) and your Somba wallet, and cash on delivery where enabled. An account is required to place an order.",
+    aFr: "Mobile money (Airtel, Orange, M-Pesa) et portefeuille Somba, et paiement à la livraison lorsqu'il est activé. Un compte est nécessaire pour commander.",
   },
   {
     q: "How long does delivery take?",

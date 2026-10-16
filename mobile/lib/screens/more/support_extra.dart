@@ -136,6 +136,23 @@ class SupportListScreen extends StatefulWidget {
 class _SupportListScreenState extends State<SupportListScreen> {
   late Future<List<TicketView>> _future = _load();
 
+  @override
+  void initState() {
+    super.initState();
+    RealtimeStore.instance.supportRevision.addListener(_onPush);
+  }
+
+  @override
+  void dispose() {
+    RealtimeStore.instance.supportRevision.removeListener(_onPush);
+    super.dispose();
+  }
+
+  /// Staff replied or changed a ticket: reload the list.
+  void _onPush() {
+    if (mounted) setState(() => _future = _load());
+  }
+
   Future<List<TicketView>> _load() async => ((await RealtimeStore.instance.call('support:list')) as List)
       .map((e) => TicketView.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))
       .toList();
@@ -369,7 +386,21 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   bool _sending = false;
 
   @override
+  void initState() {
+    super.initState();
+    RealtimeStore.instance.supportRevision.addListener(_onPush);
+  }
+
+  /// A staff reply to THIS ticket appears without reopening the screen.
+  void _onPush() {
+    final j = RealtimeStore.instance.lastSupportTicket;
+    if (j == null || j['id'] != _t.id || !mounted) return;
+    setState(() => _t = TicketView.fromJson(j));
+  }
+
+  @override
   void dispose() {
+    RealtimeStore.instance.supportRevision.removeListener(_onPush);
     _ctrl.dispose();
     super.dispose();
   }

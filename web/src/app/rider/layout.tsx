@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { List, User, Wallet, Home, LogOut, Bell, MapPin } from "lucide-react";
-import { NotificationBell } from "@/components/ui/notification-bell";
+import { useRealtime } from "@/context/realtime-context";
+import { RiderGpsProvider } from "@/lib/rider-gps";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,25 @@ const nav = [
   { href: "/rider/earnings", icon: Wallet, label: "earnings" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
+
+/** Notification bell with the live unread count from the server. */
+function RiderBell() {
+  const { unreadCount } = useRealtime();
+  return (
+    <Link
+      href="/rider/notifications"
+      className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
+      aria-label="Notifications"
+    >
+      <Bell className="h-5 w-5" />
+      {unreadCount > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {unreadCount}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function RiderLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,8 +58,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
               <button onClick={() => setLocale("en")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "en" ? "bg-emerald-600 text-white" : "text-slate-500")}>EN</button>
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>
-            <NotificationBell portal="rider" href="/rider/notifications" />
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{t("prototype")}</span>
+            <RiderBell />
             <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label="Logout">
               <LogOut className="h-4 w-4" />
             </button>
@@ -47,7 +66,9 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 py-6 pb-24">{children}</main>
+      <RiderGpsProvider>
+        <main className="mx-auto max-w-lg px-4 py-6 pb-24">{children}</main>
+      </RiderGpsProvider>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--border)] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg justify-around py-2">

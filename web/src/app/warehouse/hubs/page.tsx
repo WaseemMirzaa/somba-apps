@@ -1,47 +1,44 @@
 "use client";
 
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/context/auth-context";
-import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
+import { Card, CardContent } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
 import { useLocale } from "@/context/locale-context";
+import { useOpsBase } from "@/lib/ops-path";
+import { useOpsQuery, type HubRow } from "@/lib/warehouse-live";
 
-/** Warehouse staff see their assigned hub only — creation is admin-only at /admin/warehouses */
+/** Hub records are read-only here; hubs are set up by the platform admin. */
 export default function WarehouseHubPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { persona } = useAuth();
-  const { getWarehouse } = useWarehouseAdmin();
-  const warehouse = persona.warehouseId ? getWarehouse(persona.warehouseId) : undefined;
-
-  if (!warehouse) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Aucun entrepôt assigné à votre compte" : "No warehouse assigned to your account"}</div>;
-  }
+  const base = useOpsBase();
+  const hubsQ = useOpsQuery<HubRow[]>("warehouse:hubs", { initial: [] as HubRow[] });
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Mon entrepôt" : "My Warehouse"} subtitle={warehouse.name} breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: "Hub" }]} />
-
-      <div className="card-premium p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="font-semibold text-slate-900">{warehouse.name}</h3>
-            <p className="text-sm text-slate-500">{warehouse.city}, {warehouse.country}</p>
-          </div>
-          <Badge variant="primary">{warehouse.id}</Badge>
-        </div>
-        <DetailSection title={fr ? "Détails" : "Details"} className="mt-6 border-0 p-0 shadow-none">
-          <InfoGrid items={[
-            { label: fr ? "Adresse" : "Address", value: warehouse.address, full: true },
-            { label: fr ? "Capacité" : "Capacity", value: warehouse.capacity.toLocaleString() },
-            { label: fr ? "Personnel" : "Staff", value: warehouse.staff },
-            { label: "Zones", value: warehouse.zones.join(" · "), full: true },
-            { label: fr ? "Responsable" : "Manager", value: warehouse.managerName },
-          ]} />
-        </DetailSection>
-        <p className="mt-4 text-xs text-slate-500">{fr ? "La configuration et les identifiants de l'entrepôt sont gérés par l'Admin de la plateforme." : "Warehouse setup and credentials are managed by platform Admin."}</p>
-      </div>
+      <PageHeader
+        title={fr ? "Hubs" : "Hubs"}
+        subtitle={fr ? "Hubs enregistrés (lecture seule)" : "Registered hubs (read-only)"}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: "Hubs" }]}
+      />
+      {hubsQ.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{hubsQ.error}</p>}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable
+            emptyMessage={hubsQ.loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Aucun hub enregistré." : "No hubs registered.")}
+            columns={[
+              { key: "name", label: fr ? "Nom" : "Name" },
+              { key: "city", label: fr ? "Ville" : "City" },
+              { key: "country", label: fr ? "Pays" : "Country", render: (row) => String(row.country ?? "—") },
+              { key: "capacity", label: fr ? "Capacité (colis)" : "Capacity (parcels)", render: (row) => Number(row.capacity).toLocaleString() },
+            ]}
+            data={hubsQ.data as unknown as Record<string, unknown>[]}
+          />
+        </CardContent>
+      </Card>
+      <p className="text-xs text-slate-500">
+        {fr ? "La configuration des hubs est gérée par l'Admin de la plateforme." : "Hub setup is managed by the platform admin."}
+      </p>
     </div>
   );
 }

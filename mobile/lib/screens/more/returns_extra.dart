@@ -204,9 +204,28 @@ class ReturnsListScreen extends StatefulWidget {
 }
 
 class _ReturnsListScreenState extends State<ReturnsListScreen> {
-  late final Future<List<ReturnView>> _future = RealtimeStore.instance
+  late Future<List<ReturnView>> _future = _load();
+
+  Future<List<ReturnView>> _load() => RealtimeStore.instance
       .call('disputes:list')
       .then((rows) => (rows as List).map((e) => ReturnView.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v)))).toList());
+
+  @override
+  void initState() {
+    super.initState();
+    RealtimeStore.instance.disputeRevision.addListener(_onPush);
+  }
+
+  @override
+  void dispose() {
+    RealtimeStore.instance.disputeRevision.removeListener(_onPush);
+    super.dispose();
+  }
+
+  /// Ops decided on a return: reload the list.
+  void _onPush() {
+    if (mounted) setState(() => _future = _load());
+  }
 
   @override
   Widget build(BuildContext context) {

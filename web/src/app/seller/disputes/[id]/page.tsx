@@ -1,38 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { DetailSection } from "@/components/ui/info-grid";
-import { Button } from "@/components/ui/button";
-import { useDisputes } from "@/context/dispute-context";
+import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
+import { Badge } from "@/components/ui/badge";
+import { useSellerData } from "@/lib/seller";
+import { caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
 import { useLocale } from "@/context/locale-context";
-
-const FROM_FR: Record<string, string> = {
-  buyer: "Client",
-  seller: "Vendeur",
-  admin: "Admin",
-};
 
 export default function SellerDisputeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { getDispute, addMessage } = useDisputes();
+  const { sellerDisputeList } = useSellerData();
   const { locale } = useLocale();
-  const [reply, setReply] = useState("");
-  const dispute = getDispute(id);
   const fr = locale === "fr";
+  const dispute = sellerDisputeList.find((d) => d.id === id || d.disputeId === id);
 
-  if (!dispute) return <div className="text-center text-slate-500">{fr ? "Introuvable" : "Not found"}</div>;
+  if (!dispute) return <div className="p-8 text-center text-slate-500">{fr ? "Introuvable" : "Not found"}</div>;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={dispute.id} subtitle={dispute.orderId} backHref="/seller/disputes" />
-      <DetailSection title={fr ? "Messages" : "Messages"}>
-        {dispute.messages.map((m, i) => (
-          <div key={i} className="mb-2 rounded-lg bg-slate-50 p-3 text-sm"><strong>{fr ? (FROM_FR[m.from] ?? m.from) : m.from}:</strong> {m.text}</div>
-        ))}
-        <textarea className="input-premium mt-4 w-full px-3 py-2 text-sm" rows={3} value={reply} onChange={(e) => setReply(e.target.value)} placeholder={fr ? "Votre réponse" : "Your response"} />
-        <Button onClick={() => { addMessage(id, "seller", reply); setReply(""); }} className="mt-2">{fr ? "Répondre" : "Respond"}</Button>
+      <PageHeader
+        title={dispute.id}
+        subtitle={dispute.orderId}
+        backHref="/seller/disputes"
+        actions={<Badge variant={caseStatusVariant(dispute.status)}>{caseStatusLabel(dispute.status, fr)}</Badge>}
+      />
+      <DetailSection title={fr ? "Détails" : "Details"}>
+        <InfoGrid items={[
+          { label: fr ? "Commande" : "Order", value: <Link href={`/seller/orders/${dispute.orderId}`} className="text-[var(--primary)] hover:underline">{dispute.orderId}</Link> },
+          { label: fr ? "Client" : "Customer", value: dispute.customer },
+          { label: "Date", value: dispute.date },
+          { label: fr ? "Motif" : "Reason", value: dispute.reason, full: true },
+          ...(dispute.resolution ? [{ label: fr ? "Décision" : "Resolution", value: dispute.resolution, full: true }] : []),
+        ]} />
+        <p className="mt-4 text-xs text-slate-500">
+          {fr ? "Le serveur ne permet pas encore au vendeur de répondre à un litige : écrivez au support." : "The server does not let sellers reply to a dispute yet: write to support."}
+        </p>
+        <Link href="/seller/support" className="mt-2 inline-block text-sm text-[var(--primary)] hover:underline">
+          {fr ? "Contacter le support" : "Contact support"}
+        </Link>
       </DetailSection>
     </div>
   );

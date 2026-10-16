@@ -74,14 +74,12 @@ interface FraudRow {
 }
 interface FlashSaleRow {
   id: string;
-  name: string;
-  nameFr?: string;
-  discountPct?: number;
+  title: string;
+  productName?: string;
   discount?: number;
-  productCount?: number;
-  status: string;
-  startsAt?: string;
-  endsAt?: string;
+  active?: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 interface CmsRow {
   id?: string;
@@ -207,7 +205,7 @@ function buildAdminData(
       city: "Kinshasa",
       country: "DRC",
       address: "—",
-      status: (s.status === "rejected" ? "suspended" : s.status) as "pending" | "approved" | "suspended",
+      status: s.status as "pending" | "approved" | "rejected" | "suspended",
       category: "General",
       date: dateOf(s.createdAt),
       orders: sellerOrders.length,
@@ -261,10 +259,16 @@ function buildAdminData(
     price: p.price,
     discount: p.discount ?? 0,
     description: p.description ?? "",
-    status: (p.status === "live" ? "approved" : p.status === "pending" ? "pending" : "rejected") as
-      | "pending"
-      | "approved"
-      | "rejected",
+    status: (p.status === "live" || p.status === "approved"
+      ? "approved"
+      : p.status === "pending"
+        ? "pending"
+        : p.status === "removed"
+          ? "removed"
+          : p.status === "draft"
+            ? "draft"
+            : "rejected") as "pending" | "approved" | "rejected" | "removed" | "draft",
+    rawStatus: p.status,
     submittedDate: "—",
     image: p.image ?? "/brand/logo-stack.png",
     images: [p.image ?? "/brand/logo-stack.png"],
@@ -317,13 +321,13 @@ function buildAdminData(
   }));
   const flashSales = flash.map((f) => ({
     id: f.id,
-    name: f.name,
-    nameFr: f.nameFr ?? f.name,
+    name: f.title,
+    nameFr: f.title,
     start: f.startsAt ? dateOf(f.startsAt) : "—",
     end: f.endsAt ? dateOf(f.endsAt) : "—",
-    discount: f.discountPct ?? f.discount ?? 0,
-    products: f.productCount ?? 0,
-    status: f.status,
+    discount: f.discount ?? 0,
+    products: 1,
+    status: f.active === false ? "ended" : "active",
   }));
   const adminRoles = roles.map((r) => ({
     id: r.key,
@@ -399,6 +403,24 @@ export function useAdminData() {
     void refresh();
   }, [refresh]);
 
+  // Keep the one-shot lists fresh when the server pushes a change.
+  useEffect(() => {
+    if (rt.status !== "connected" || !isAdmin) return;
+    const sock = socketClient.current;
+    if (!sock) return;
+    const events = ["seller:updated", "customer:updated", "fraud:created", "fraud:updated", "audit:created", "campaign:updated"];
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const handler = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refresh(), 400);
+    };
+    events.forEach((ev) => sock.on(ev, handler));
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach((ev) => sock.off(ev, handler));
+    };
+  }, [rt.status, isAdmin, refresh]);
+
   const data = useMemo(
     () =>
       buildAdminData(
@@ -430,13 +452,15 @@ export function useAdminData() {
       refresh,
       setSellerStatus: (id: string, status: "approved" | "rejected" | "suspended" | "pending") =>
         run("sellers:setStatus", { id, status }),
+      setProductStatus: (id: string, status: "live" | "rejected" | "removed") =>
+        run("products:update", { id, patch: { status } }),
       moderateProduct: (id: string, approve: boolean) =>
         run("products:update", { id, patch: { status: approve ? "live" : "rejected" } }),
       deleteProduct: (id: string) => run("products:delete", { id }),
       resolveDispute: (disputeId: string, refund = false) =>
         run("disputes:resolve", { disputeId, refund }),
-      rejectDispute: (disputeId: string, note?: string) =>
-        run("disputes:reject", { disputeId, note }),
+      rejectDispute: (disputeId: string, resolution?: string) =>
+        run("disputes:reject", { disputeId, resolution }),
       setCustomerActive: (id: string, active: boolean) =>
         run("customers:setActive", { id, active }),
       setFraudStatus: (id: string, status: string) =>

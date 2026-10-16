@@ -1,43 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/context/toast-context";
+import { FailedForm } from "@/components/warehouse/rider-task-actions";
 import { useLocale } from "@/context/locale-context";
 import { useRiderData } from "@/lib/rider";
-
-const REASONS = [
-  { value: "Customer unavailable", labelFr: "Client indisponible" },
-  { value: "Wrong address", labelFr: "Mauvaise adresse" },
-  { value: "Refused delivery", labelFr: "Livraison refusée" },
-  { value: "Payment issue", labelFr: "Problème de paiement" },
-];
 
 export default function RiderFailedDeliveryPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const router = useRouter();
-  const { getRiderTask } = useRiderData();
+  const { getRiderTask, refresh, loading } = useRiderData();
   const task = getRiderTask(id);
-  const [reason, setReason] = useState(REASONS[0].value);
 
-  if (!task) return <div>{fr ? "Introuvable" : "Not found"}</div>;
+  if (!task) return <div className="text-center text-slate-500">{loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Introuvable" : "Not found")}</div>;
+
+  const canFail = task.status === "assigned" || task.status === "picked_up" || task.status === "in_transit";
 
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <PageHeader title={fr ? "Livraison échouée" : "Failed Delivery"} subtitle={task.id} backHref={`/rider/tasks/${id}`} />
+      <PageHeader title={fr ? "Livraison échouée" : "Could not deliver"} subtitle={task.orderId} backHref={`/rider/tasks/${id}`} />
       <div className="card-premium space-y-4 p-6">
-        <select className="input-premium w-full px-4 py-2 text-sm" value={reason} onChange={(e) => setReason(e.target.value)}>
-          {REASONS.map((r) => <option key={r.value} value={r.value}>{fr ? r.labelFr : r.value}</option>)}
-        </select>
-        <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder={fr ? "Notes" : "Notes"} />
-        <Button onClick={() => { toast(fr ? "Échec enregistré — retour à l'entrepôt" : "Failed delivery logged — return to warehouse"); router.push("/rider/tasks"); }} className="w-full bg-red-600">
-          {fr ? "Signaler l'échec" : "Report Failed Delivery"}
-        </Button>
+        {canFail ? (
+          <FailedForm
+            task={task}
+            onDone={() => {
+              void refresh();
+              router.push("/rider/tasks");
+            }}
+          />
+        ) : (
+          <p className="text-sm text-slate-600">
+            {task.status === "available"
+              ? (fr ? "Acceptez d'abord cette livraison." : "Accept this delivery first.")
+              : (fr ? "Cette livraison est déjà terminée." : "This delivery is already finished.")}{" "}
+            <Link href={`/rider/tasks/${id}`} className="text-emerald-700 underline">
+              {fr ? "Retour à la tâche" : "Back to the task"}
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

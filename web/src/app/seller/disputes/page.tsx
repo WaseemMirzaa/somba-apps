@@ -6,143 +6,64 @@ import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import { useDisputes } from "@/context/dispute-context";
+import { useSellerData } from "@/lib/seller";
+import { CASE_STATUS_OPTIONS, caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
 import { useLocale } from "@/context/locale-context";
 
-const STATUS_OPTIONS = [
-  { value: "open", label: "Open", labelFr: "Ouvert" },
-  { value: "seller_responded", label: "Seller responded", labelFr: "Réponse vendeur" },
-  { value: "resolved", label: "Resolved", labelFr: "Résolu" },
-  { value: "closed", label: "Closed", labelFr: "Fermé" },
-];
-
-const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  open: "warning",
-  seller_responded: "info",
-  resolved: "success",
-  closed: "default",
-};
-
-const STATUS_LABELS_FR: Record<string, string> = {
-  open: "Ouvert",
-  seller_responded: "Réponse vendeur",
-  resolved: "Résolu",
-  closed: "Fermé",
-};
-
-const REASON_LABELS_FR: Record<string, string> = {
-  not_as_described: "Non conforme à la description",
-  defective: "Défectueux",
-  wrong_item: "Mauvais article",
-  damaged: "Endommagé",
-  late_delivery: "Livraison en retard",
-  not_received: "Non reçu",
-};
-
-function localizeDisputeReason(reason: string, fr: boolean) {
-  if (fr && REASON_LABELS_FR[reason]) return REASON_LABELS_FR[reason];
-  return reason.replace(/_/g, " ");
-}
-
 export default function SellerDisputesPage() {
-  const { disputes } = useDisputes();
+  const { sellerDisputeList } = useSellerData();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
     () =>
-      applyListFilters(disputes, filters, {
-        searchFields: ["id", "orderId", "buyerName", "productName", "reason"],
-        dateField: "createdAt",
+      applyListFilters(sellerDisputeList, filters, {
+        searchFields: ["id", "orderId", "customer", "reason"],
+        dateField: "date",
         statusField: "status",
       }),
-    [disputes, filters]
+    [sellerDisputeList, filters]
   );
 
   return (
-    <SellerListPage
-      title={locale === "fr" ? "Litiges" : "Disputes"}
-      subtitle={
-        locale === "fr"
-          ? "Gérer les litiges clients liés à vos commandes"
-          : "Manage customer disputes on your orders"
-      }
-      breadcrumbs={[
-        { label: locale === "fr" ? "Vendeur" : "Seller", href: "/seller" },
-        { label: locale === "fr" ? "Litiges" : "Disputes" },
-      ]}
-      filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={
-            locale === "fr" ? "ID litige, commande, client…" : "Dispute ID, order, buyer…"
-          }
-        />
-      }
-      columns={[
-        {
-          key: "id",
-          label: locale === "fr" ? "ID litige" : "Dispute ID",
-          render: (row) => (
-            <Link
-              href={`/seller/disputes/${row.id}`}
-              className="font-medium text-[var(--primary)] hover:underline"
-            >
-              {String(row.id)}
-            </Link>
-          ),
-        },
-        {
-          key: "orderId",
-          label: locale === "fr" ? "Commande" : "Order",
-          render: (row) => (
-            <Link
-              href={`/seller/orders/${row.orderId}`}
-              className="text-[var(--primary)] hover:underline"
-            >
-              {String(row.orderId)}
-            </Link>
-          ),
-        },
-        { key: "buyerName", label: locale === "fr" ? "Client" : "Buyer" },
-        { key: "productName", label: locale === "fr" ? "Produit" : "Product" },
-        {
-          key: "reason",
-          label: locale === "fr" ? "Motif" : "Reason",
-          render: (row) => (
-            <span className="max-w-[10rem] text-slate-600">
-              {localizeDisputeReason(String(row.reason), locale === "fr")}
-            </span>
-          ),
-        },
-        {
-          key: "status",
-          label: t("status"),
-          render: (row) => (
-            <Badge variant={statusVariant[row.status as string] ?? "default"}>
-              {locale === "fr"
-                ? STATUS_LABELS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")
-                : String(row.status).replace(/_/g, " ")}
-            </Badge>
-          ),
-        },
-        { key: "createdAt", label: t("date") },
-        {
-          key: "actions",
-          label: t("action"),
-          render: (row) => (
-            <Link
-              href={`/seller/disputes/${row.id}`}
-              className="text-sm text-[var(--primary)] hover:underline"
-            >
-              {t("view")}
-            </Link>
-          ),
-        },
-      ]}
-      data={filtered as unknown as Record<string, unknown>[]}
-    />
+    <div className="space-y-4">
+      <SellerListPage
+        title={fr ? "Litiges" : "Disputes"}
+        subtitle={fr ? "Litiges clients visibles par votre compte (lecture seule)" : "Customer disputes visible to your account (read-only)"}
+        breadcrumbs={[
+          { label: fr ? "Vendeur" : "Seller", href: "/seller" },
+          { label: fr ? "Litiges" : "Disputes" },
+        ]}
+        filters={
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            statusOptions={CASE_STATUS_OPTIONS}
+            searchPlaceholder={fr ? "ID litige, commande, client…" : "Dispute ID, order, customer…"}
+          />
+        }
+        columns={[
+          { key: "id", label: fr ? "ID litige" : "Dispute ID", render: (row) => (
+            <Link href={`/seller/disputes/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+          )},
+          { key: "orderId", label: fr ? "Commande" : "Order", render: (row) => (
+            <Link href={`/seller/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
+          )},
+          { key: "customer", label: fr ? "Client" : "Customer" },
+          { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="max-w-[16rem] text-slate-600">{String(row.reason)}</span> },
+          { key: "status", label: t("status"), render: (row) => (
+            <Badge variant={caseStatusVariant(String(row.status))}>{caseStatusLabel(String(row.status), fr)}</Badge>
+          )},
+          { key: "date", label: t("date") },
+        ]}
+        data={filtered as unknown as Record<string, unknown>[]}
+      />
+      <p className="text-xs text-slate-500">
+        {fr
+          ? "Il n'y a aucun litige à afficher tant que le serveur ne vous en expose pas. Les litiges sont tranchés par l'administration ; pour une commande précise, contactez le support."
+          : "Nothing is shown here until the server exposes a dispute to your account. Disputes are decided by the administration; for a specific order, contact support."}
+      </p>
+    </div>
   );
 }

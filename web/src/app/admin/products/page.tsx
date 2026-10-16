@@ -18,12 +18,16 @@ const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
   { value: "approved", label: "Approved", labelFr: "Approuvé" },
   { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
+  { value: "removed", label: "Blocked", labelFr: "Bloqué" },
+  { value: "draft", label: "Draft (paused)", labelFr: "Brouillon (en pause)" },
 ];
 
 const STATUS_FR: Record<string, string> = {
   pending: "En attente",
   approved: "Approuvé",
   rejected: "Rejeté",
+  removed: "Bloqué",
+  draft: "Brouillon",
 };
 
 const CATEGORY_FR: Record<string, string> = {
@@ -44,7 +48,6 @@ export default function AdminProductsPage() {
     () =>
       applyListFilters(moderationQueue, filters, {
         searchFields: ["id", "name", "seller", "category"],
-        dateField: "submittedDate",
         statusField: "status",
       }),
     [moderationQueue, filters]
@@ -54,7 +57,7 @@ export default function AdminProductsPage() {
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Modération des produits" : "Product Moderation"}
-        subtitle={fr ? "Vue liste — ID produit, image, nom, vendeur, catégorie, prix, statut, date de soumission" : "List View — Product ID, Image, Name, Seller, Category, Price, Status, Submitted Date"}
+        subtitle={fr ? "Produits en direct — approuver, rejeter, bloquer" : "Live products — approve, reject, block"}
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Modération des produits" : "Product Moderation" }]}
       />
 
@@ -69,7 +72,7 @@ export default function AdminProductsPage() {
         <CardContent className="p-0">
           <DataTable
             columns={[
-              { key: "id", label: fr ? "ID produit" : "Product ID" },
+              { key: "id", label: fr ? "ID produit" : "Product ID", render: (row) => <span className="font-mono text-xs">{String(row.id).slice(0, 8)}</span> },
               {
                 key: "image",
                 label: fr ? "Image" : "Image",
@@ -92,11 +95,14 @@ export default function AdminProductsPage() {
               {
                 key: "seller",
                 label: fr ? "Vendeur" : "Seller",
-                render: (row) => (
-                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
-                    {String(row.seller)}
-                  </Link>
-                ),
+                render: (row) =>
+                  row.sellerId ? (
+                    <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
+                      {String(row.seller)}
+                    </Link>
+                  ) : (
+                    <span>{String(row.seller)}</span>
+                  ),
               },
               {
                 key: "category",
@@ -111,9 +117,8 @@ export default function AdminProductsPage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
+                render: (row) => <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : row.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
-              { key: "submittedDate", label: fr ? "Soumis le" : "Submitted" },
               {
                 key: "actions",
                 label: t("action"),

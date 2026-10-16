@@ -11,19 +11,15 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { RevenueAreaChart, HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
-import {
-  sellerFinanceRevenueByCategory,
-  sellerCommissionByTier,
-  sellerFinanceNetCommissionTrend,
-} from "@/lib/seller-entities";
 import { useSellerData } from "@/lib/seller";
 import type { SellerPayoutItemStatus } from "@/lib/seller";
+import { payoutMethodLabel, payoutStatusLabel, payoutStatusVariant, txnStatusLabel, txnStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_LABELS: Record<SellerPayoutItemStatus, { en: string; fr: string }> = {
-  awaiting_delivery: { en: "Awaiting delivery", fr: "En attente de livraison" },
-  pending_clearance: { en: "Pending clearance", fr: "Délai de sécurisation" },
-  ready_for_payout: { en: "Ready for payout", fr: "Prêt pour versement" },
+  awaiting_delivery: { en: "Awaiting confirmation", fr: "En attente de confirmation" },
+  pending_clearance: { en: "In delivery", fr: "En cours de livraison" },
+  ready_for_payout: { en: "Delivered (earned)", fr: "Livrée (gagnée)" },
   paid_out: { en: "Paid out", fr: "Versé" },
 };
 
@@ -40,13 +36,6 @@ function statusBadgeVariant(status: SellerPayoutItemStatus) {
   }
 }
 
-const PAYMENT_STATUS_FR: Record<string, string> = {
-  paid: "Payé",
-  pending: "En attente",
-  refunded: "Remboursé",
-  failed: "Échoué",
-};
-
 export default function SellerFinancePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -56,6 +45,8 @@ export default function SellerFinancePage() {
     transactionList,
     payoutList,
     getPendingPayoutItems,
+    statements,
+    categoryRevenue,
   } = useSellerData();
   const f = sellerFinanceStats;
   const summary = sellerPayoutSummary;
@@ -63,13 +54,11 @@ export default function SellerFinancePage() {
   const pendingItems = getPendingPayoutItems().slice(0, 6);
   const recentPayouts = payoutList.slice(0, 5);
 
-  const revenueTrendData = sellerFinanceNetCommissionTrend.map((d) => ({
-    label: d.label,
-    revenue: d.net + d.commission,
-    net: d.net,
-  }));
+  const revenueTrendData = [...statements]
+    .reverse()
+    .map((d) => ({ label: d.month, revenue: d.gross, net: d.net }));
 
-  const categoryChartData = sellerFinanceRevenueByCategory.map((c) => ({
+  const categoryChartData = categoryRevenue.map((c) => ({
     label: fr ? c.categoryFr : c.category,
     value: c.net,
   }));
@@ -100,13 +89,13 @@ export default function SellerFinancePage() {
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         {fr
-          ? `Les gains sont versés après confirmation de livraison, puis un délai de sécurisation de ${summary.clearanceHours}h.`
-          : `Earnings accrue after delivery confirmation, then a ${summary.clearanceHours}h clearance period.`}
+          ? `Les gains sont acquis à la livraison de la commande, après commission de ${summary.commissionPct} % ; le solde disponible vient du serveur et déduit les versements déjà demandés.`
+          : `Earnings accrue once an order is delivered, minus the ${summary.commissionPct}% commission; the available balance comes from the server and already subtracts payouts you requested.`}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard title={fr ? "Revenus" : "Revenue"} value={formatCurrency(f.revenue, locale)} icon={TrendingUp} />
-        <StatCard title={fr ? "Revenus en attente" : "Pending Revenue"} value={formatCurrency(f.pendingRevenue, locale)} icon={DollarSign} />
+        <StatCard title={fr ? "En cours de livraison (net)" : "In delivery (net)"} value={formatCurrency(f.pendingRevenue, locale)} icon={DollarSign} />
         <StatCard title={t("availableBalance")} value={formatCurrency(f.availableBalance, locale)} icon={Wallet} />
         <StatCard title={fr ? "Commissions payées" : "Commission Paid"} value={formatCurrency(f.commissionPaid, locale)} icon={DollarSign} />
         <StatCard title={fr ? "Montant remboursé" : "Refund Amount"} value={formatCurrency(f.refundAmount, locale)} icon={RotateCcw} />
@@ -178,7 +167,7 @@ export default function SellerFinancePage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant="success">{fr ? (PAYMENT_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
+                render: (row) => <Badge variant={txnStatusVariant(String(row.status))}>{txnStatusLabel(String(row.status), fr)}</Badge>,
               },
               { key: "date", label: t("date") },
             ]}
@@ -191,11 +180,11 @@ export default function SellerFinancePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <h3 className="font-semibold text-slate-900">{fr ? "Versements en attente" : "Pending Clearance & Payout"}</h3>
+              <h3 className="font-semibold text-slate-900">{fr ? "Gains par commande" : "Earnings per order"}</h3>
               <p className="mt-0.5 text-xs text-slate-500">
                 {fr
-                  ? `${formatCurrency(summary.totalPending, locale)} en attente · ${formatCurrency(summary.availableForPayout, locale)} disponible`
-                  : `${formatCurrency(summary.totalPending, locale)} pending · ${formatCurrency(summary.availableForPayout, locale)} available`}
+                  ? `${formatCurrency(summary.totalPending, locale)} en cours · ${formatCurrency(summary.availableForPayout, locale)} disponible`
+                  : `${formatCurrency(summary.totalPending, locale)} in progress · ${formatCurrency(summary.availableForPayout, locale)} available`}
               </p>
             </div>
             <NavLinkButton href="/seller/finance/payouts/pending">
@@ -259,12 +248,12 @@ export default function SellerFinancePage() {
                   label: t("amount"),
                   render: (row) => formatCurrency(row.amount as number, locale),
                 },
-                { key: "method", label: fr ? "Méthode" : "Method", render: (row) => (fr ? String(row.methodFr ?? row.method) : String(row.method)) },
+                { key: "methodKey", label: fr ? "Méthode" : "Method", render: (row) => payoutMethodLabel(String(row.methodKey), fr) },
                 {
                   key: "status",
                   label: t("status"),
                   render: (row) => (
-                    <Badge variant={row.status === "paid" ? "success" : "warning"}>{fr ? String(row.statusFr ?? row.status) : String(row.status)}</Badge>
+                    <Badge variant={payoutStatusVariant(String(row.status))}>{payoutStatusLabel(String(row.status), fr)}</Badge>
                   ),
                 },
                 { key: "date", label: t("date") },
@@ -277,38 +266,14 @@ export default function SellerFinancePage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <h3 className="font-semibold text-slate-900">{fr ? "Répartition des commissions" : "Commission Breakdown"}</h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {fr ? "Taux par catégorie et palier vendeur" : "Rates by category and seller tier"}
-          </p>
+          <h3 className="font-semibold text-slate-900">{fr ? "Commission" : "Commission"}</h3>
         </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            columns={[
-              {
-                key: "tier",
-                label: fr ? "Palier" : "Tier",
-                render: (row) => (fr ? String(row.tierFr) : String(row.tier)),
-              },
-              {
-                key: "rate",
-                label: fr ? "Taux" : "Rate",
-                render: (row) => `${row.rate}%`,
-              },
-              {
-                key: "gross",
-                label: fr ? "Revenu brut" : "Gross",
-                render: (row) => formatCurrency(row.gross as number, locale),
-              },
-              {
-                key: "commission",
-                label: fr ? "Commission" : "Commission",
-                render: (row) => formatCurrency(row.commission as number, locale),
-              },
-              { key: "orders", label: fr ? "Commandes" : "Orders" },
-            ]}
-            data={sellerCommissionByTier as unknown as Record<string, unknown>[]}
-          />
+        <CardContent>
+          <p className="text-sm text-slate-600">
+            {fr
+              ? `La plateforme prélève ${summary.commissionPct} % sur chaque vente livrée (taux unique, fixé par la plateforme). Commission sur vos ventes à ce jour : ${formatCurrency(f.commissionPaid, locale)}.`
+              : `The platform keeps ${summary.commissionPct}% of every delivered sale (one flat rate set by the platform). Commission on your sales so far: ${formatCurrency(f.commissionPaid, locale)}.`}
+          </p>
         </CardContent>
       </Card>
 
@@ -346,7 +311,7 @@ export default function SellerFinancePage() {
                 render: (row) => `${row.rate}%`,
               },
             ]}
-            data={sellerFinanceRevenueByCategory as unknown as Record<string, unknown>[]}
+            data={categoryRevenue as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>

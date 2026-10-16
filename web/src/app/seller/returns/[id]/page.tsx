@@ -5,36 +5,11 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
-import { ActivityTimeline } from "@/components/ui/timeline";
-import { NavLinkButton } from "@/components/ui/nav-link-button";
+import { Badge } from "@/components/ui/badge";
 import { useSellerData } from "@/lib/seller";
+import { caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const RETURN_STATUS_LABELS: Record<string, { en: string; fr: string }> = {
-  pending: { en: "Pending", fr: "En attente" },
-  pending_inspection: { en: "Pending inspection", fr: "En attente d'inspection" },
-  inspecting: { en: "Inspecting", fr: "Inspection" },
-  approved: { en: "Approved", fr: "Approuvé" },
-  rejected: { en: "Rejected", fr: "Rejeté" },
-  refunded: { en: "Refunded", fr: "Remboursé" },
-};
-
-const TIMELINE_LABELS: Record<string, string> = {
-  "Order Delivered": "Commande livrée",
-  "Return Requested": "Retour demandé",
-  "Return Approved": "Retour approuvé",
-  "Pickup Scheduled": "Ramassage planifié",
-  "Refund Processed": "Remboursement traité",
-  "Received at Warehouse": "Reçu à l'entrepôt",
-  "Inspecting": "Inspection",
-};
-
-function localizeStatus(status: string, fr: boolean) {
-  const entry = RETURN_STATUS_LABELS[status];
-  if (entry) return fr ? entry.fr : entry.en;
-  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,51 +24,32 @@ export default function SellerReturnDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={ret.id} subtitle={`${fr ? "Commande" : "Order"} ${ret.orderId} · ${fr ? ret.reasonFr : ret.reason}`} backHref="/seller/returns" />
+      <PageHeader
+        title={ret.id}
+        subtitle={`${fr ? "Commande" : "Order"} ${ret.orderId} · ${ret.reason}`}
+        backHref="/seller/returns"
+        actions={<Badge variant={caseStatusVariant(ret.status)}>{caseStatusLabel(ret.status, fr)}</Badge>}
+      />
 
       <DetailGrid>
-        <DetailGridSection title={fr ? "Aperçu" : "Overview"}>
+        <DetailGridSection title={fr ? "Aperçu" : "Overview"} span={2}>
           <InfoGrid items={[
             { label: fr ? "N° retour" : "Return ID", value: ret.id },
             { label: fr ? "Commande" : "Order", value: <Link href={`/seller/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
             { label: t("customer"), value: ret.customer },
-            { label: fr ? "Motif" : "Reason", value: fr ? ret.reasonFr : ret.reason },
-            { label: fr ? "Statut" : "Status", value: localizeStatus(ret.status, fr) },
+            { label: fr ? "Date" : "Date", value: ret.date },
+            { label: fr ? "Statut" : "Status", value: caseStatusLabel(ret.status, fr) },
+            { label: fr ? "Montant de la commande" : "Order amount", value: ret.amount > 0 ? formatCurrency(ret.amount, locale) : "—" },
+            { label: fr ? "Motif" : "Reason", value: ret.reason, full: true },
+            ...(ret.resolution ? [{ label: fr ? "Décision" : "Resolution", value: ret.resolution, full: true }] : []),
           ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Produit" : "Product"}>
-          <InfoGrid items={[
-            { label: fr ? "Produit" : "Product", value: <Link href={`/seller/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-            { label: fr ? "Variante" : "Variant", value: fr ? (ret.variantFr ?? ret.variant) : ret.variant },
-            { label: fr ? "Quantité" : "Quantity", value: ret.qty },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Remboursement" : "Refund"}>
-          <InfoGrid items={[
-            { label: fr ? "Montant" : "Amount", value: formatCurrency(ret.refund.amount, locale) },
-            { label: fr ? "Méthode" : "Method", value: fr ? ret.refund.methodFr : ret.refund.method },
-            { label: fr ? "Statut" : "Status", value: localizeStatus(ret.refund.status, fr) },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Inspection" : "Inspection"} span={2}>
-          <InfoGrid items={[
-            { label: fr ? "Notes entrepôt" : "Warehouse Notes", value: fr ? ret.inspection.warehouseNotesFr : ret.inspection.warehouseNotes },
-            { label: fr ? "Photos" : "Photos", value: `${ret.inspection.photos} ${fr ? "jointe(s)" : "attached"}` },
-            { label: fr ? "Condition" : "Condition", value: fr ? ret.inspection.conditionFr : ret.inspection.condition },
-          ]} />
-          <NavLinkButton href="/warehouse/returns" className="mt-4">{fr ? "File de retours entrepôt →" : "Warehouse Return Queue →"}</NavLinkButton>
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
-          <ActivityTimeline events={ret.timeline.map((event) => ({
-            ...event,
-            label: fr ? (TIMELINE_LABELS[event.label] ?? event.label) : event.label,
-          }))} />
         </DetailGridSection>
       </DetailGrid>
+      <p className="text-xs text-slate-500">
+        {fr
+          ? "L'inspection et le remboursement sont gérés par l'entrepôt et l'administration ; vous êtes informé par notification."
+          : "Inspection and refund are handled by the warehouse and the administration; you are notified when it is decided."}
+      </p>
     </div>
   );
 }

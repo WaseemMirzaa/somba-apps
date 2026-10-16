@@ -1,25 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
-import { Check, Lock, ArrowRight } from "lucide-react";
-import { useAuth } from "@/context/auth-context";
-import { useSellerSubscription } from "@/context/seller-subscription-context";
-import { useToast } from "@/context/toast-context";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { Check, Info, ArrowRight } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { SELLER_PLANS } from "@/lib/product-landing";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { cn } from "@/lib/utils";
 
 function SellerSubscribeContent() {
-  const { persona } = useAuth();
-  const { purchasePlan, getSubscription } = useSellerSubscription();
-  const { toast } = useToast();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const searchParams = useSearchParams();
 
   const planContent: Record<string, { name: string; desc: string; features: string[] }> = {
     starter: {
@@ -39,30 +32,8 @@ function SellerSubscribeContent() {
     },
   };
 
-  const initialPlan = (() => {
-    const raw = searchParams.get("plan");
-    if (raw === "professional" || raw === "pro") return "pro" as const;
-    if (raw === "starter") return "starter" as const;
-    if (raw === "enterprise") return "enterprise" as const;
-    return "pro" as const;
-  })();
-
-  const [planId, setPlanId] = useState<"starter" | "pro" | "enterprise">(initialPlan);
-
-  const existing = getSubscription(persona.id);
-
-  function handleSubscribe() {
-    if (planId === "enterprise") {
-      window.location.href = "mailto:sales@somba.com?subject=Seller%20Enterprise%20Plan";
-      return;
-    }
-    purchasePlan(persona.id, planId);
-    toast(
-      fr ? "Abonnement activé — bienvenue sur le portail vendeur !" : "Subscription activated — welcome to the seller portal!",
-      "success"
-    );
-    router.push("/seller");
-  }
+  const raw = searchParams.get("plan");
+  const highlighted = raw === "starter" ? "starter" : raw === "enterprise" ? "enterprise" : "pro";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -78,32 +49,23 @@ function SellerSubscribeContent() {
 
         <div className="mx-auto max-w-2xl text-center">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-            <Lock className="h-8 w-8" />
+            <Info className="h-8 w-8" />
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-slate-900">
-            {fr ? "Abonnement vendeur requis" : "Seller subscription required"}
+            {fr ? "Offres vendeur — facturation bientôt disponible" : "Seller plans — billing coming soon"}
           </h1>
           <p className="mt-3 text-slate-600">
-            {fr
-              ? `Bonjour ${persona.name} — vous devez souscrire un abonnement pour accéder au portail vendeur.`
-              : `Hi ${persona.name} — you need an active subscription to access the seller portal.`}
+            {fr ? "Aperçu des offres prévues. Rien n'est facturé ni requis aujourd'hui." : "A preview of the planned plans. Nothing is charged or required today."}
           </p>
-          {existing && !existing.active && (
-            <p className="mt-2 text-sm text-amber-700">
-              {fr ? "Votre abonnement précédent a expiré." : "Your previous subscription has expired."}
-            </p>
-          )}
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
           {SELLER_PLANS.map((plan) => (
-            <button
+            <div
               key={plan.id}
-              type="button"
-              onClick={() => setPlanId(plan.id)}
               className={cn(
                 "card-premium relative flex flex-col p-6 text-left transition-all",
-                planId === plan.id && "ring-2 ring-blue-500 shadow-lg"
+                highlighted === plan.id && "ring-2 ring-blue-500 shadow-lg"
               )}
             >
               {plan.popular && (
@@ -130,22 +92,23 @@ function SellerSubscribeContent() {
                   </li>
                 ))}
               </ul>
-            </button>
+            </div>
           ))}
         </div>
 
-        <div className="mx-auto mt-10 max-w-md">
-          <button type="button" onClick={handleSubscribe} className="btn-primary flex w-full items-center justify-center gap-2 py-3.5">
-            {planId === "enterprise"
-              ? fr ? "Contacter les ventes" : "Contact sales"
-              : fr ? "Activer l'abonnement" : "Activate subscription"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-          <p className="mt-4 text-center text-xs text-slate-500">
+        <div className="mx-auto mt-10 max-w-md space-y-3 text-center">
+          <p className="text-sm text-slate-600">
             {fr
-              ? "Paiement simulé pour la démo. En production, redirection vers l'app ou Stripe."
-              : "Mock payment for demo. In production, redirects to app or Stripe."}
+              ? "La facturation n'est pas encore disponible : aucun abonnement n'est nécessaire ni activable pour le moment. Votre boutique est utilisable dès que la modération l'a approuvée."
+              : "Billing is not available yet: no subscription is needed or can be activated right now. Your store is usable as soon as moderation approves it."}
           </p>
+          <Link href="/seller" className="btn-primary inline-flex w-full items-center justify-center gap-2 py-3.5">
+            {fr ? "Retour au portail vendeur" : "Back to the seller portal"}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <a href="mailto:sales@somba.com?subject=Seller%20plans" className="block text-sm text-[var(--primary)] hover:underline">
+            {fr ? "Contacter les ventes à propos des offres" : "Contact sales about plans"}
+          </a>
         </div>
       </div>
     </div>

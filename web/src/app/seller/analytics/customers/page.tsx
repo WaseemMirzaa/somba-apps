@@ -12,6 +12,7 @@ import {
   UserX,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { DemoNotice } from "@/components/seller/demo-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +74,7 @@ export default function SellerCustomerAnalyticsPage() {
         ]}
         actions={<AnalyticsPeriodControls period={period} onPeriodChange={setPeriod} dateRange={dateRange} onDateRangeChange={setDateRange} />}
       />
+      <DemoNotice all />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsKpiCard

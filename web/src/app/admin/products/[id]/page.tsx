@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
@@ -11,15 +10,15 @@ import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { useToast } from "@/context/toast-context";
-import { useModeration } from "@/context/moderation-context";
-import { Ban, ShieldCheck } from "lucide-react";
+import { ProductStatusActions } from "@/components/admin/status-actions";
+import { Ban } from "lucide-react";
 
 const STATUS_FR: Record<string, string> = {
   pending: "En attente",
   approved: "Approuvé",
   rejected: "Rejeté",
-  changes_requested: "Modifications demandées",
+  removed: "Bloqué",
+  draft: "Brouillon",
 };
 
 const CATEGORY_FR: Record<string, string> = {
@@ -41,50 +40,22 @@ export default function AdminProductModerationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
-  const { isProductBlocked, blockProduct, unblockProduct } = useModeration();
-  const { getModerationProduct, moderateProduct } = useAdminData();
-  const router = useRouter();
+  const { getModerationProduct } = useAdminData();
+  // Live product: its status follows the server's `product:updated` push.
   const product = getModerationProduct(id);
-  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "changes_requested">(product?.status ?? "pending");
-  const [notes, setNotes] = useState("");
 
   if (!product) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
   }
 
-  const blocked = isProductBlocked(product.id);
-
-  function toggleBlock() {
-    if (!product) return;
-    if (blocked) {
-      unblockProduct(product.id);
-      toast(fr ? "Produit débloqué" : "Product unblocked");
-    } else {
-      blockProduct(product.id);
-      toast(fr ? "Produit bloqué — masqué de la boutique" : "Product blocked — hidden from storefront", "info");
-    }
-  }
-
-  async function updateStatus(newStatus: "approved" | "rejected" | "changes_requested") {
-    if (!product) return;
-    if (newStatus === "approved" || newStatus === "rejected") {
-      await moderateProduct(product.id, newStatus === "approved");
-    }
-    setStatus(newStatus);
-    toast(
-      fr
-        ? `Produit ${newStatus === "changes_requested" ? "renvoyé pour modifications" : newStatus === "approved" ? "approuvé" : "rejeté"}`
-        : `Product ${newStatus === "changes_requested" ? "sent back for changes" : newStatus}`
-    );
-    if (newStatus === "approved") router.push("/admin/moderation");
-  }
+  const status = product.status;
+  const blocked = status === "removed";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={product.name}
-        subtitle={fr ? `Soumis le ${product.submittedDate} · Statut : ${STATUS_FR[status] ?? status}` : `Submitted ${product.submittedDate} · Status: ${status}`}
+        subtitle={fr ? `Statut : ${STATUS_FR[status] ?? status}` : `Status: ${status}`}
         backHref="/admin/products"
         breadcrumbs={[
           adminBreadcrumb(locale),
@@ -93,27 +64,10 @@ export default function AdminProductModerationDetailPage() {
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {status === "pending" ? (
-              <>
-                <button onClick={() => updateStatus("approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
-                <button onClick={() => updateStatus("rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
-              </>
-            ) : (
-              <Badge variant={blocked ? "danger" : status === "approved" ? "success" : status === "rejected" ? "danger" : "warning"}>
-                {blocked ? (fr ? "Bloqué" : "Blocked") : fr ? (STATUS_FR[status] ?? status) : status}
-              </Badge>
-            )}
-            <button
-              onClick={toggleBlock}
-              className={
-                blocked
-                  ? "flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                  : "flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-              }
-            >
-              {blocked ? <ShieldCheck className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-              {blocked ? (fr ? "Débloquer le produit" : "Unblock product") : (fr ? "Bloquer le produit" : "Block product")}
-            </button>
+            <Badge variant={status === "approved" ? "success" : status === "pending" ? "warning" : status === "draft" ? "default" : "danger"}>
+              {fr ? (STATUS_FR[status] ?? status) : status}
+            </Badge>
+            <ProductStatusActions productId={product.id} status={product.rawStatus} name={product.name} size="md" />
           </div>
         }
       />
@@ -121,7 +75,7 @@ export default function AdminProductModerationDetailPage() {
       {blocked && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <Ban className="h-5 w-5 shrink-0" />
-          <p>{fr ? "Ce produit est bloqué et masqué de la boutique." : "This product is blocked and hidden from the storefront."}</p>
+          <p>{fr ? "Ce produit est bloqué et retiré de la boutique pour tous les clients." : "This product is blocked and removed from the storefront for every shopper."}</p>
         </div>
       )}
 
@@ -129,7 +83,7 @@ export default function AdminProductModerationDetailPage() {
         <div className="lg:col-span-1">
           <DetailSection title={fr ? "Médias" : "Media"}>
             <div className="relative aspect-square overflow-hidden rounded-lg">
-              <Image src={product.image} alt={product.name} fill className="object-cover" />
+              <Image src={product.image} alt={product.name} fill className="object-cover" sizes="400px" />
             </div>
           </DetailSection>
         </div>
@@ -137,7 +91,7 @@ export default function AdminProductModerationDetailPage() {
         <div className="space-y-6 lg:col-span-2">
           <DetailSection title={fr ? "Informations vendeur" : "Seller Information"}>
             <InfoGrid items={[
-              { label: fr ? "Vendeur" : "Seller", value: <Link href={`/admin/sellers/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link> },
+              { label: fr ? "Vendeur" : "Seller", value: product.sellerId ? <Link href={`/admin/sellers/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link> : product.seller },
               { label: fr ? "Note de la boutique" : "Store Rating", value: product.sellerRating > 0 ? `⭐ ${product.sellerRating}` : (fr ? "Nouveau vendeur" : "New seller") },
             ]} />
           </DetailSection>
@@ -158,24 +112,6 @@ export default function AdminProductModerationDetailPage() {
             ]} />
           </DetailSection>
 
-          <DetailSection title={fr ? "Modération" : "Moderation"}>
-            <div className="space-y-4">
-              <textarea
-                className="w-full rounded-lg border border-blue-200 p-3 text-sm"
-                placeholder={fr ? "Ajouter des notes de modération..." : "Add moderation notes..."}
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-              {status === "pending" && (
-                <div className="flex gap-2">
-                  <button onClick={() => updateStatus("approved")} className="rounded-lg border border-[var(--border-strong)] bg-white px-6 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
-                  <button onClick={() => updateStatus("rejected")} className="rounded-lg border border-[var(--border-strong)] bg-white px-6 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
-                  <button onClick={() => updateStatus("changes_requested")} className="rounded-lg border border-blue-200 px-6 py-2 text-sm font-medium text-slate-600">{fr ? "Demander des modifications" : "Request Changes"}</button>
-                </div>
-              )}
-            </div>
-          </DetailSection>
         </div>
       </div>
     </div>

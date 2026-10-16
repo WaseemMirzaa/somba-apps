@@ -2,40 +2,71 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection } from "@/components/ui/info-grid";
+import { DataTable } from "@/components/ui/data-table";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-
-const STATEMENT_MONTHS: { en: string; fr: string }[] = [
-  { en: "May 2024", fr: "Mai 2024" },
-  { en: "April 2024", fr: "Avril 2024" },
-  { en: "March 2024", fr: "Mars 2024" },
-];
+import { useSellerData } from "@/lib/seller";
+import { downloadCsv } from "@/lib/seller-labels";
+import { formatCurrency } from "@/lib/utils";
 
 export default function SellerStatementsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { statements, sellerStore, commissionPct } = useSellerData();
 
-  function downloadPdf(month: string) {
-    const blob = new Blob([`Somba&Teka Statement — ${month}\nRevenue, fees, payouts (mock PDF)`], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `statement-${month.replace(" ", "-").toLowerCase()}.pdf`;
-    a.click();
-    toast(fr ? `Relevé de ${month} téléchargé` : `${month} statement downloaded`);
+  function monthLabel(month: string) {
+    const [y, m] = month.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: "UTC" });
   }
+
+  function csvFor(rows: typeof statements, filename: string) {
+    downloadCsv(filename, [
+      ["Month", "Delivered orders", "Gross (USD)", `Commission ${commissionPct}% (USD)`, "Net (USD)", "Paid out (USD)"],
+      ...rows.map((r) => [r.month, r.orders, r.gross.toFixed(2), r.commission.toFixed(2), r.net.toFixed(2), r.paidOut.toFixed(2)]),
+    ]);
+    toast(fr ? "Relevé CSV téléchargé" : "Statement CSV downloaded");
+  }
+
+  const slug = sellerStore.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "store";
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Relevés" : "Statements"} subtitle={fr ? "Relevés financiers mensuels" : "Monthly financial statements"} backHref="/seller/finance" />
+      <PageHeader
+        title={fr ? "Relevés" : "Statements"}
+        subtitle={fr ? "Relevé mensuel calculé à partir de vos commandes livrées et versements payés" : "Monthly statement computed from your delivered orders and paid payouts"}
+        backHref="/seller/finance"
+        actions={
+          statements.length > 0 ? (
+            <button type="button" onClick={() => csvFor(statements, `somba-statements-${slug}.csv`)} className="rounded-lg border border-sky-200 px-4 py-2 text-sm hover:bg-sky-50">
+              {fr ? "Tout télécharger (CSV)" : "Download all (CSV)"}
+            </button>
+          ) : undefined
+        }
+      />
       <DetailSection title={fr ? "Relevés disponibles" : "Available Statements"}>
-        {STATEMENT_MONTHS.map((m) => (
-          <div key={m.en} className="flex justify-between border-b border-sky-50 py-3 last:border-0">
-            <span className="font-medium">{fr ? m.fr : m.en}</span>
-            <button onClick={() => downloadPdf(fr ? m.fr : m.en)} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Télécharger le PDF" : "Download PDF"}</button>
-          </div>
-        ))}
+        {statements.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            {fr ? "Aucune commande livrée ni versement pour le moment." : "No delivered orders or payouts yet."}
+          </p>
+        ) : (
+          <DataTable
+            columns={[
+              { key: "month", label: fr ? "Mois" : "Month", render: (row) => monthLabel(String(row.month)) },
+              { key: "orders", label: fr ? "Commandes livrées" : "Delivered orders" },
+              { key: "gross", label: fr ? "Brut" : "Gross", render: (row) => formatCurrency(row.gross as number, locale) },
+              { key: "commission", label: "Commission", render: (row) => formatCurrency(row.commission as number, locale) },
+              { key: "net", label: "Net", render: (row) => formatCurrency(row.net as number, locale) },
+              { key: "paidOut", label: fr ? "Versé" : "Paid out", render: (row) => formatCurrency(row.paidOut as number, locale) },
+              { key: "actions", label: fr ? "Action" : "Action", render: (row) => (
+                <button type="button" onClick={() => csvFor(statements.filter((s) => s.month === row.month), `somba-statement-${slug}-${String(row.month)}.csv`)} className="text-sm text-[var(--primary)] hover:underline">
+                  {fr ? "Télécharger CSV" : "Download CSV"}
+                </button>
+              )},
+            ]}
+            data={statements as unknown as Record<string, unknown>[]}
+          />
+        )}
       </DetailSection>
     </div>
   );

@@ -9,9 +9,13 @@ export default function SellerTaxPage() {
   const fr = locale === "fr";
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Rapports fiscaux" : "Tax Reports"} subtitle={fr ? "N° fiscal : CD-123456789" : "Tax ID: CD-123456789"} backHref="/seller/finance" />
+      <PageHeader title={fr ? "Rapports fiscaux" : "Tax Reports"} backHref="/seller/finance" />
       <DetailSection title={fr ? "Rapports fiscaux" : "Tax Reports"}>
-        <p className="text-sm text-slate-500">{fr ? "Les rapports fiscaux trimestriels apparaîtront ici." : "Quarterly tax reports will appear here."}</p>
+        <p className="text-sm text-slate-500">
+          {fr
+            ? "Les rapports fiscaux ne sont pas encore générés par la plateforme. Utilisez les relevés mensuels (CSV) comme base de votre déclaration."
+            : "The platform does not generate tax reports yet. Use the monthly statements (CSV) as the basis for your own filing."}
+        </p>
       </DetailSection>
     </div>
   );

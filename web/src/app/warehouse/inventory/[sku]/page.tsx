@@ -1,88 +1,64 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
-import { ActivityTimeline } from "@/components/ui/timeline";
-import { NavLinkButton } from "@/components/ui/nav-link-button";
+import { Badge } from "@/components/ui/badge";
 import { useWarehouseData } from "@/lib/warehouse";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 
 export default function WarehouseInventoryDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
-  const { getInventory } = useWarehouseData();
-  const item = getInventory(decodeURIComponent(sku));
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { inventory, inventoryLoading } = useWarehouseData();
+  const decoded = decodeURIComponent(sku);
+  const item = inventory.find((i) => i.sku === decoded);
 
   if (!item) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Article d'inventaire introuvable" : "Inventory item not found"}</div>;
+    return (
+      <div className="p-8 text-center text-slate-500">
+        {inventoryLoading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Article d'inventaire introuvable" : "Inventory item not found")}
+      </div>
+    );
   }
 
+  const listHref = ops("/inventory");
   return (
     <div className="space-y-6">
       <PageHeader
-        title={item.product}
-        subtitle={`SKU: ${item.sku} · ${fr ? "Emplacement" : "Location"}: ${item.location}`}
-        backHref="/warehouse/inventory"
+        title={item.name}
+        subtitle={`SKU: ${item.sku}`}
+        backHref={listHref}
         breadcrumbs={[
-          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
-          { label: fr ? "Inventaire" : "Inventory", href: "/warehouse/inventory" },
+          { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+          { label: fr ? "Inventaire" : "Inventory", href: listHref },
           { label: item.sku },
         ]}
+        actions={<Badge variant={item.status === "ok" ? "success" : item.status === "low" ? "warning" : "danger"}>{item.status}</Badge>}
       />
 
-      <div className="grid gap-4 lg:grid-cols-4">
-        <div className="relative aspect-square overflow-hidden rounded-xl lg:col-span-1">
-          <Image src={item.image} alt={item.product} fill className="object-cover" />
-        </div>
-
-        <DetailGrid className="lg:col-span-3">
-          <DetailGridSection title={fr ? "Aperçu" : "Overview"} span={2}>
-            <InfoGrid items={[
-              { label: "SKU", value: item.sku },
-              { label: fr ? "Produit" : "Product", value: <Link href={`/shop/products/${item.productId}`} className="text-[var(--primary)] hover:underline">{item.product}</Link> },
-              { label: fr ? "Catégorie" : "Category", value: fr ? item.categoryFr : item.category },
-              { label: fr ? "Emplacement entrepôt" : "Warehouse Location", value: item.location },
-            ]} />
-          </DetailGridSection>
-
-          <DetailGridSection title={fr ? "Navigation liée" : "Related Navigation"}>
-            <div className="flex flex-wrap gap-3">
-              <NavLinkButton href={`/shop/products/${item.productId}`}>{fr ? "→ Détail du produit" : "→ Product Detail"}</NavLinkButton>
-              <NavLinkButton href="/warehouse/replacements">{fr ? "→ Cas de remplacement" : "→ Replacement Cases"}</NavLinkButton>
-              <NavLinkButton href="/warehouse/dispatch">{fr ? "→ Expéditions" : "→ Dispatches"}</NavLinkButton>
-            </div>
-          </DetailGridSection>
-
-          <DetailGridSection title={fr ? "Quantités" : "Quantities"} span={3}>
-            <InfoGrid columns={4} items={[
-              { label: fr ? "Disponible" : "Available", value: item.available },
-              { label: fr ? "Réservé" : "Reserved", value: item.reserved },
-              { label: fr ? "Alloué" : "Allocated", value: item.allocated },
-              { label: fr ? "Endommagé" : "Damaged", value: item.damaged },
-            ]} />
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => toast(fr ? `Stock ajusté pour ${item.sku}` : `Stock adjusted for ${item.sku}`)} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Ajuster le stock" : "Adjust Stock"}</button>
-              <button onClick={() => toast(fr ? `Stock déplacé pour ${item.sku}` : `Stock moved for ${item.sku}`, "info")} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Déplacer le stock" : "Move Stock"}</button>
-              <button onClick={() => toast(fr ? `Stock réservé pour ${item.sku}` : `Stock reserved for ${item.sku}`, "info")} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50">{fr ? "Réserver le stock" : "Reserve Stock"}</button>
-            </div>
-          </DetailGridSection>
-
-          <DetailGridSection title={fr ? "Historique des mouvements" : "Movement History"} span={3}>
-            <ActivityTimeline events={item.movements.map((m) => ({
-              time: m.time,
-              label: `${fr ? m.labelFr : m.label} (${m.qty > 0 ? "+" : ""}${m.qty})`,
-              done: true,
-            }))} />
-          </DetailGridSection>
-        </DetailGrid>
-      </div>
+      <DetailGrid>
+        <DetailGridSection title={fr ? "Aperçu" : "Overview"} span={2}>
+          <InfoGrid items={[
+            { label: "SKU", value: item.sku },
+            { label: fr ? "Produit" : "Product", value: item.name },
+            { label: fr ? "Catégorie" : "Category", value: item.category },
+            { label: fr ? "Stock disponible" : "Available stock", value: item.stock },
+          ]} />
+        </DetailGridSection>
+        <DetailGridSection title={fr ? "Remarque" : "Note"}>
+          <p className="text-sm text-slate-600">
+            {fr
+              ? "Le stock est géré par les vendeurs (création et modification des annonces). Il n'y a pas d'ajustement, de déplacement ni de réservation depuis l'entrepôt."
+              : "Stock is managed by sellers through their listings. The warehouse cannot adjust, move or reserve stock from here."}
+          </p>
+        </DetailGridSection>
+      </DetailGrid>
     </div>
   );
 }

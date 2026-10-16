@@ -174,3 +174,85 @@ export function paymentMethodName(m: string, fr: boolean): string {
   };
   return map[m] ?? m;
 }
+
+// ---------------------------------------------------------------------------
+// Support tickets (`support:list/open/reply`, live via `support:updated`)
+// ---------------------------------------------------------------------------
+
+export interface SupportMessage {
+  from: string;
+  role: string;
+  text: string;
+  at: string;
+}
+
+export interface SupportTicketRow {
+  id: string;
+  reference: string;
+  subject: string;
+  category: string;
+  orderId: string | null;
+  status: "open" | "pending" | "resolved" | "closed";
+  /** JSON array as stored by the server. */
+  messages: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function ticketMessages(t: Pick<SupportTicketRow, "messages">): SupportMessage[] {
+  try {
+    const list = JSON.parse(t.messages || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function ticketStatusLabel(status: string, fr: boolean): string {
+  const map: Record<string, { en: string; fr: string }> = {
+    open: { en: "Open", fr: "Ouvert" },
+    pending: { en: "Answered", fr: "Répondu" },
+    resolved: { en: "Resolved", fr: "Résolu" },
+    closed: { en: "Closed", fr: "Fermé" },
+  };
+  const m = map[status];
+  return m ? (fr ? m.fr : m.en) : status;
+}
+
+function upsertTicket(list: SupportTicketRow[], t: SupportTicketRow): SupportTicketRow[] {
+  const next = list.filter((x) => x.id !== t.id);
+  next.unshift(t);
+  return next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+}
+
+/** The signed-in customer's tickets, kept live by `support:updated`. */
+export function useSupportTickets() {
+  const rt = useRealtime();
+  const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (rt.status !== "connected" || !rt.user) return;
+    let alive = true;
+    socketClient
+      .request<SupportTicketRow[]>("support:list")
+      .then((list) => {
+        if (!alive) return;
+        setTickets(list);
+        setError(null);
+      })
+      .catch((e: Error) => alive && setError(e.message))
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, [rt.status, rt.user]);
+
+  useSocketEvent<SupportTicketRow>("support:updated", (t) => {
+    setTickets((cur) => upsertTicket(cur, t));
+  });
+
+  const put = useCallback((t: SupportTicketRow) => setTickets((cur) => upsertTicket(cur, t)), []);
+  return { tickets, loaded, error, put };
+}

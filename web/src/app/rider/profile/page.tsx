@@ -1,25 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Phone } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, Phone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
-import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
+import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { useRiderData } from "@/lib/rider";
-import { riderTaskToDeliveryDetail } from "@/lib/delivery-detail";
 import { useLocale } from "@/context/locale-context";
-import { useRiderZones } from "@/context/rider-zone-context";
+import { useAuth } from "@/context/auth-context";
 
 export default function RiderProfilePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getRiderZone } = useRiderZones();
+  const router = useRouter();
+  const { logout } = useAuth();
   const { riderProfile, getActiveRiderTasks } = useRiderData();
-  const [onDuty, setOnDuty] = useState(true);
   const activeTasks = getActiveRiderTasks();
-  const assignedZone = getRiderZone(riderProfile.id) || riderProfile.zone;
+  const initials = riderProfile.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="space-y-6">
@@ -27,75 +26,62 @@ export default function RiderProfilePage() {
 
       <div className="card-premium p-6 text-center">
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-2xl font-bold text-white">
-          {riderProfile.name.split(" ").map((n) => n[0]).join("")}
+          {initials}
         </div>
         <h2 className="font-[family-name:var(--font-display)] text-xl font-bold">{riderProfile.name}</h2>
-        <p className="text-sm text-slate-500">{riderProfile.id}</p>
+        <p className="text-sm text-slate-500">{riderProfile.email}</p>
         <div className="mt-3 flex justify-center gap-2">
-          <Badge variant={onDuty ? "success" : "warning"}>{onDuty ? (fr ? "En ligne" : "Online") : (fr ? "Hors ligne" : "Offline")}</Badge>
-          <Badge variant="primary">⭐ {riderProfile.rating}</Badge>
+          <Badge variant="primary">{riderProfile.id}</Badge>
         </div>
-        <label className="mt-4 flex items-center justify-center gap-2 text-sm">
-          <input type="checkbox" checked={onDuty} onChange={(e) => setOnDuty(e.target.checked)} />
-          {fr ? "Disponibilité (RF-04)" : "Availability toggle (RF-04)"}
-        </label>
       </div>
 
-      <DetailSection title={fr ? "Livraisons actives" : "Current Deliveries"}>
+      <DetailSection title={fr ? "Profil" : "Profile"}>
+        <InfoGrid items={[
+          { label: fr ? "Nom" : "Name", value: riderProfile.name },
+          { label: "Email", value: riderProfile.email || "—" },
+          {
+            label: fr ? "Téléphone" : "Phone",
+            value: riderProfile.phone ? (
+              <a href={`tel:${riderProfile.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1 text-emerald-600 hover:underline">
+                <Phone className="h-3.5 w-3.5" />
+                {riderProfile.phone}
+              </a>
+            ) : "—",
+          },
+          { label: fr ? "Livraisons en cours" : "Active deliveries", value: riderProfile.activeTasks },
+        ]} />
+      </DetailSection>
+
+      <DetailSection title={fr ? "Livraisons en cours" : "Current Deliveries"}>
         {activeTasks.length === 0 ? (
           <p className="text-sm text-slate-500">{fr ? "Aucune livraison active." : "No active deliveries."}</p>
         ) : (
           <div className="space-y-3">
             {activeTasks.map((task) => (
-              <ActiveDeliveryCard
-                key={task.id}
-                delivery={riderTaskToDeliveryDetail(task)}
-                locale={locale}
-                alwaysExpanded
-                linkClass="text-emerald-600"
-              />
+              <RiderTaskCard key={task.id} task={task} />
             ))}
           </div>
         )}
       </DetailSection>
 
       <DetailSection title={fr ? "Liens rapides" : "Quick Links"}>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/rider/history" className="text-sm text-emerald-600 hover:underline">
-            {fr ? "Historique" : "Task History"}
-          </Link>
-          <Link href="/rider/notifications" className="text-sm text-emerald-600 hover:underline">
-            {fr ? "Notifications" : "Notifications"}
-          </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link href="/rider/history" className="text-sm text-emerald-600 hover:underline">{fr ? "Historique" : "Task History"}</Link>
+          <Link href="/rider/earnings" className="text-sm text-emerald-600 hover:underline">{t("earnings")}</Link>
+          <Link href="/rider/notifications" className="text-sm text-emerald-600 hover:underline">Notifications</Link>
         </div>
       </DetailSection>
 
-      <DetailSection title={fr ? "Profil" : "Profile"}>
-        <InfoGrid items={[
-          {
-            label: fr ? "Téléphone" : "Phone",
-            value: (
-              <a
-                href={`tel:${riderProfile.phone.replace(/\s/g, "")}`}
-                className="inline-flex items-center gap-1 text-emerald-600 hover:underline"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                {riderProfile.phone}
-              </a>
-            ),
-          },
-          { label: fr ? "Véhicule" : "Vehicle", value: fr ? riderProfile.vehicleFr : riderProfile.vehicle },
-          { label: t("zone"), value: assignedZone },
-          {
-            label: fr ? "Statut" : "Status",
-            value: fr
-              ? riderProfile.status === "on_duty"
-                ? "En service"
-                : "Hors service"
-              : riderProfile.status.replace(/_/g, " "),
-          },
-        ]} />
-      </DetailSection>
+      <button
+        onClick={() => {
+          logout();
+          router.push("/login");
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+      >
+        <LogOut className="h-4 w-4" />
+        {fr ? "Se déconnecter" : "Sign out"}
+      </button>
     </div>
   );
 }

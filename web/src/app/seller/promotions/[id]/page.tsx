@@ -2,9 +2,10 @@
 
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
+import { Badge } from "@/components/ui/badge";
 import { useSellerData } from "@/lib/seller";
+import { campaignStatusLabel, campaignStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -21,12 +22,18 @@ export default function SellerPromotionDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={promo.campaign} subtitle={fr ? `${promo.discount}% de remise · ${promo.statusFr}` : `${promo.discount}% off · ${promo.status}`} backHref="/seller/promotions" />
+      <PageHeader
+        title={promo.campaign}
+        subtitle={`${promo.reference} · ${promo.discount}% ${fr ? "de remise" : "off"}`}
+        backHref="/seller/promotions"
+        actions={<Badge variant={campaignStatusVariant(promo.status)}>{campaignStatusLabel(promo.status, fr)}</Badge>}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DetailSection title={fr ? "Aperçu" : "Overview"}>
           <InfoGrid items={[
             { label: fr ? "Nom de la campagne" : "Campaign Name", value: promo.campaign },
+            { label: fr ? "Statut" : "Status", value: campaignStatusLabel(promo.status, fr) },
             { label: fr ? "Budget" : "Budget", value: formatCurrency(promo.budget, locale) },
             { label: fr ? "Produits" : "Products", value: promo.products },
             { label: fr ? "Remise" : "Discount", value: `${promo.discount}%` },
@@ -40,9 +47,8 @@ export default function SellerPromotionDetailPage() {
             { label: fr ? "Clics" : "Clicks", value: promo.clicks },
             { label: fr ? "Commandes" : "Orders", value: promo.orders },
             { label: fr ? "Revenu" : "Revenue", value: formatCurrency(promo.revenue, locale) },
-            { label: fr ? "ROI" : "ROI", value: `${promo.roi}x` },
+            { label: fr ? "ROI" : "ROI", value: promo.budget > 0 ? `${promo.roi}x` : "—" },
           ]} />
-          <NavLinkButton href="/seller/analytics" className="mt-4">{fr ? "Analyses complètes →" : "Full Analytics →"}</NavLinkButton>
         </DetailSection>
       </div>
     </div>

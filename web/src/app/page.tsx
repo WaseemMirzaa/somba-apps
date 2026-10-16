@@ -50,7 +50,7 @@ import {
   PLATFORM_MODULES,
 } from "@/lib/product-landing";
 import { BRAND } from "@/lib/config";
-import { categories, products } from "@/lib/mock-data";
+import { useCatalog, useShopCategories } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/utils";
 import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
@@ -65,8 +65,8 @@ const MODULE_ICONS = {
 const MARQUEE_ITEMS = [
   { icon: Truck, en: "1–3 day delivery", fr: "Livraison 1–3 jours" },
   { icon: ShieldCheck, en: "Buyer protection", fr: "Protection acheteur" },
-  { icon: RotateCcw, en: "30-day returns", fr: "Retours 30 jours" },
-  { icon: Wallet, en: "Card · Mobile money", fr: "Carte · Mobile money" },
+  { icon: RotateCcw, en: "7-day returns", fr: "Retours 7 jours" },
+  { icon: Wallet, en: "Mobile money · Wallet", fr: "Mobile money · Portefeuille" },
   { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
   { icon: Headphones, en: "24/7 support", fr: "Assistance 24h/24, 7j/7" },
   { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },
@@ -97,6 +97,8 @@ export default function HomePage() {
   const { locale } = useLocale();
   const { persona, isAuthenticated, authReady } = useAuth();
   const router = useRouter();
+  const products = useCatalog();
+  const categories = useShopCategories();
   const fr = locale === "fr";
   const role = persona.role as UserRole;
   const [explorePortal, setExplorePortal] = useState<string | undefined>(undefined);
@@ -188,7 +190,7 @@ export default function HomePage() {
               {categories.slice(0, 5).map((c) => (
                 <Link
                   key={c.id}
-                  href="/shop/products"
+                  href={`/shop/search?q=${encodeURIComponent(c.name)}`}
                   className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-[var(--primary-tint)] hover:text-[var(--primary)]"
                 >
                   {fr ? c.nameFr : c.name}
@@ -213,27 +215,6 @@ export default function HomePage() {
 
             {/* Trust row */}
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {["AB", "MD", "SL"].map((i, idx) => (
-                    <span
-                      key={i}
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-white",
-                        idx === 0 ? "bg-[var(--primary)]" : idx === 1 ? "bg-[var(--brand-red)]" : "bg-slate-700"
-                      )}
-                    >
-                      {i}
-                    </span>
-                  ))}
-                </div>
-                <div className="text-sm">
-                  <span className="flex items-center gap-1 font-bold text-slate-900">
-                    4.8 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  </span>
-                  <span className="text-xs text-slate-500">{fr ? "48K+ acheteurs satisfaits" : "48K+ happy shoppers"}</span>
-                </div>
-              </div>
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
                 <BadgeCheck className="h-4 w-4 text-[var(--primary)]" />
                 {fr ? "Vendeurs vérifiés" : "Verified sellers"}
@@ -245,19 +226,22 @@ export default function HomePage() {
           <div className="relative hidden lg:block animate-rise delay-200">
             <div className="grid h-[540px] grid-cols-2 grid-rows-2 gap-4">
               {/* Featured large product */}
+              {heroProducts[1] && (
               <Link href={`/shop/products/${heroProducts[1].id}`} className="showcase-card group row-span-2 flex flex-col bg-white">
                 <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
-                    src={heroProducts[1].image}
+                    src={heroProducts[1].image || "/brand/logo-stack.png"}
                     alt={fr ? heroProducts[1].nameFr : heroProducts[1].name}
                     fill
                     preload
                     sizes="320px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
+                  {heroProducts[1].discount > 0 && (
                   <span className="absolute left-3 top-3 rounded-full bg-[var(--brand-red)] px-2.5 py-1 text-[10px] font-bold text-white shadow">
                     -{heroProducts[1].discount}%
                   </span>
+                  )}
                 </div>
                 <div className="p-4">
                   <p className="line-clamp-1 text-sm font-bold text-slate-900">{fr ? heroProducts[1].nameFr : heroProducts[1].name}</p>
@@ -266,12 +250,14 @@ export default function HomePage() {
                   </p>
                 </div>
               </Link>
+              )}
 
               {/* Secondary product */}
+              {heroProducts[0] && (
               <Link href={`/shop/products/${heroProducts[0].id}`} className="showcase-card group flex flex-col bg-white">
                 <div className="relative flex-1 overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
-                    src={heroProducts[0].image}
+                    src={heroProducts[0].image || "/brand/logo-stack.png"}
                     alt={fr ? heroProducts[0].nameFr : heroProducts[0].name}
                     fill
                     sizes="240px"
@@ -283,6 +269,7 @@ export default function HomePage() {
                   <p className="mt-0.5 text-sm font-extrabold text-[var(--primary)]">{formatCurrency(heroProducts[0].price, locale)}</p>
                 </div>
               </Link>
+              )}
 
               {/* Offer tile */}
               <Link
@@ -294,7 +281,7 @@ export default function HomePage() {
                   {fr ? "Offres flash" : "Flash deals"}
                 </span>
                 <div>
-                  <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold">{fr ? "−50%" : "−50%"}</p>
+                  <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold">{fr ? "Offres du moment" : "Today's deals"}</p>
                   <p className="text-sm text-white/80">{fr ? "sur une sélection" : "on selected items"}</p>
                   <span className="mt-2 inline-flex items-center gap-1 text-sm font-bold">
                     {fr ? "Voir" : "Shop"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -304,15 +291,6 @@ export default function HomePage() {
             </div>
 
             {/* Floating chips */}
-            <div className="showcase-chip float-a absolute -left-6 top-12 flex items-center gap-2 px-3.5 py-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50">
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              </span>
-              <div>
-                <p className="text-sm font-extrabold leading-none text-slate-900">4.8 / 5</p>
-                <p className="text-[11px] text-slate-500">{fr ? "12k+ avis" : "12k+ reviews"}</p>
-              </div>
-            </div>
             <div className="showcase-chip float-b absolute -bottom-5 right-6 flex items-center gap-2 px-3.5 py-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary-light)]">
                 <Truck className="h-4 w-4 text-[var(--primary)]" />
@@ -354,10 +332,10 @@ export default function HomePage() {
           </div>
           <div className="cat-rail mt-8">
             {categories.map((cat) => (
-              <Link key={cat.id} href="/shop/products" className="cat-tile group">
+              <Link key={cat.id} href={`/shop/search?q=${encodeURIComponent(cat.name)}`} className="cat-tile group">
                 <div className="relative aspect-[5/4] overflow-hidden">
                   <Image
-                    src={cat.image}
+                    src={cat.image || "/brand/logo-stack.png"}
                     alt={fr ? cat.nameFr : cat.name}
                     fill
                     sizes="160px"
@@ -395,7 +373,7 @@ export default function HomePage() {
               <Link key={p.id} href={`/shop/products/${p.id}`} className="pcard group block">
                 <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
-                    src={p.image}
+                    src={p.image || "/brand/logo-stack.png"}
                     alt={fr ? p.nameFr : p.name}
                     fill
                     sizes="(max-width: 1024px) 50vw, 280px"

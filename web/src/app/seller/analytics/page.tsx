@@ -16,6 +16,7 @@ import {
   Heart,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { DemoNotice } from "@/components/seller/demo-badge";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
@@ -94,6 +95,7 @@ export default function SellerAnalyticsPage() {
         breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("analytics") }]}
         actions={<AnalyticsPeriodControls period={period} onPeriodChange={setPeriod} dateRange={dateRange} onDateRangeChange={setDateRange} />}
       />
+      <DemoNotice />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AnalyticsKpiCard

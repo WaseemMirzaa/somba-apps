@@ -16,9 +16,11 @@ import { getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
 
 const ROLE_GROUPS = [
+  { label: "Customer", labelFr: "Client", roles: ["customer"] as UserRole[] },
   { label: "Seller", labelFr: "Vendeur", roles: ["seller"] as UserRole[] },
   { label: "Admin", labelFr: "Admin", roles: ["admin"] as UserRole[] },
   { label: "Warehouse", labelFr: "Entrepôt", roles: ["warehouse"] as UserRole[] },
+  { label: "Rider", labelFr: "Livreur", roles: ["rider"] as UserRole[] },
 ];
 
 // The one-click role picker is a demo convenience; production sets this to "false".
@@ -34,8 +36,7 @@ export default function LoginPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "guest">("login");
-  const [group, setGroup] = useState("Admin");
+  const [group, setGroup] = useState("Customer");
 
   useEffect(() => {
     if (authReady && isAuthenticated) {
@@ -60,7 +61,10 @@ export default function LoginPage() {
     try {
       const user = await realLogin(email, password);
       const p = signInReal(user.role, { name: user.name, email: user.email });
-      router.push(p.portal || getHomeForRole(p.role as UserRole));
+      // Customers coming from a shop page (cart, checkout...) go back where they were.
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
+      router.push(user.role === "customer" && safeNext ? safeNext : p.portal || getHomeForRole(p.role as UserRole));
     } catch (err) {
       setSignInError((err as Error).message);
     } finally {
@@ -119,6 +123,7 @@ export default function LoginPage() {
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold">{BRAND.fullName}</h1>
             <p className="mt-2 text-white/85">{BRAND.tagline}</p>
           </div>
+          {DEMO_MODE && (
           <div className="space-y-3 text-sm text-white/80">
             <p>{t("prototypeDesc")}</p>
             <p className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
@@ -127,6 +132,7 @@ export default function LoginPage() {
                 : "Each role is isolated: Admin manages warehouses and sees fulfillment inside Admin only. Sellers need an active subscription. Warehouse staff cannot cross into other portals."}
             </p>
           </div>
+          )}
         </div>
       </div>
 
@@ -134,27 +140,16 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md space-y-8">
           <div>
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">
-              {mode === "login" ? (fr ? "Se connecter" : "Sign in") : (fr ? "Continuer en tant qu'invité" : "Continue as Guest")}
+              {fr ? "Se connecter" : "Sign in"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               {DEMO_MODE
-                ? (fr ? "Sélectionnez votre rôle — vous n'accéderez qu'à votre portail" : "Select your role — you will only access your portal")
+                ? (fr ? "Connectez-vous ou choisissez un rôle de démonstration — vous n'accéderez qu'à votre portail" : "Sign in, or pick a demo role — you will only access your portal")
                 : (fr ? "Connectez-vous avec votre compte — vous n'accéderez qu'à votre portail" : "Sign in with your account — you will only access your portal")}
             </p>
           </div>
 
-          <div className="flex gap-2 rounded-xl bg-slate-100 p-1">
-            <button onClick={() => setMode("login")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "login" ? "bg-white shadow-sm" : ""}`}>{fr ? "Connexion" : "Login"}</button>
-            <button onClick={() => setMode("guest")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${mode === "guest" ? "bg-white shadow-sm" : ""}`}>{fr ? "Invité" : "Guest"}</button>
-          </div>
-
-          {mode === "guest" ? (
-            <div className="space-y-4">
-              <input className="input-premium w-full px-4 py-3 text-sm" placeholder={fr ? "E-mail (facultatif)" : "Email (optional)"} />
-              <input className="input-premium w-full px-4 py-3 text-sm" placeholder={fr ? "Téléphone (facultatif)" : "Phone (optional)"} />
-              <Button onClick={() => enterAs("guest")} className="w-full">{fr ? "Continuer en tant qu'invité → Boutique" : "Continue as Guest → Shop"}</Button>
-            </div>
-          ) : (
+          {(
             <div className="space-y-4">
               <form onSubmit={signInWithAccount} className="space-y-3">
                 <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -210,6 +205,11 @@ export default function LoginPage() {
               )}
             </div>
           )}
+
+          <p className="text-center text-sm text-slate-500">
+            {fr ? "Pas encore de compte ?" : "No account yet?"}{" "}
+            <Link href="/shop/register" className="font-medium text-[var(--primary)] hover:underline">{fr ? "Créer un compte client" : "Create a customer account"}</Link>
+          </p>
 
           <Link href="/" className="block text-center text-sm text-[var(--primary)] hover:underline">
             ← {fr ? `Retour à ${BRAND.name}` : `Back to ${BRAND.name}`}

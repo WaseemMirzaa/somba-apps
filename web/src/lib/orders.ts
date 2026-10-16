@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useCatalog } from "@/lib/catalog";
-import type { Order } from "@/lib/realtime/types";
+import type { Dispute, Order } from "@/lib/realtime/types";
 
 const STATUS_FLOW = [
   "pending",
@@ -142,4 +142,52 @@ export function useMyOrder(id: string | undefined): OrderDetail | undefined {
     if (!id) return undefined;
     return all.find((x) => x.id === id || x.reference === id);
   }, [all, id]);
+}
+
+/** Dispute row as the server sends it (adds fields the shared type does not list). */
+export type DisputeRow = Dispute & { receivedAt?: string | null; updatedAt?: string };
+
+/** The signed-in customer's returns and disputes (live: `disputes:list` + `dispute:*` pushes). */
+export function useMyDisputes(): DisputeRow[] {
+  const { disputes } = useRealtime();
+  return useMemo(
+    () => [...(disputes as DisputeRow[])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    [disputes],
+  );
+}
+
+/** Human status for a return / dispute row. */
+export function disputeStageLabel(d: DisputeRow, fr: boolean): string {
+  if (d.status === "resolved") return fr ? "Résolu" : "Resolved";
+  if (d.status === "rejected") return fr ? "Rejeté" : "Rejected";
+  if (d.type === "return" && d.receivedAt) return fr ? "Colis reçu — en cours d'examen" : "Goods received — under review";
+  return d.type === "return"
+    ? fr ? "Demande reçue — en attente du retour du colis" : "Request received — waiting for the goods"
+    : fr ? "Ouvert — en cours d'examen" : "Open — under review";
+}
+
+const STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmée",
+  processing: "En préparation",
+  shipped: "Expédiée",
+  out_for_delivery: "En cours de livraison",
+  delivered: "Livrée",
+  cancelled: "Annulée",
+  returned: "Retournée",
+};
+
+/** Customer-facing label for an order status (EN is the status with spaces). */
+export function orderStatusLabel(status: string, fr: boolean): string {
+  return fr ? (STATUS_FR[status] ?? status) : status.replace(/_/g, " ");
+}
+
+/** Statuses in which the customer may still cancel (the server refuses anything else). */
+export function canCancelOrder(status: string): boolean {
+  return status === "pending" || status === "confirmed";
+}
+
+/** Statuses in which a 4-digit handover code may exist for the rider. */
+export function hasDeliveryCodeStage(status: string): boolean {
+  return status === "processing" || status === "shipped" || status === "out_for_delivery";
 }
