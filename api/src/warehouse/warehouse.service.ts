@@ -15,6 +15,7 @@ import type {
   ExceptionStatus,
   ExceptionType,
 } from '../database/entities';
+import { num, oneOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
@@ -60,13 +61,13 @@ export class WarehouseService {
     const exc = await this.exceptions.save(
       this.exceptions.create({
         reference: `INC-${Date.now().toString().slice(-8)}`,
-        taskId: input.taskId ?? null,
-        orderReference: input.orderReference ?? null,
-        type: input.type ?? 'other',
-        severity: input.severity ?? 'medium',
+        taskId: input.taskId ? str(input.taskId, 'Task', { max: 64 }) : null,
+        orderReference: input.orderReference ? str(input.orderReference, 'Order', { max: 40 }) : null,
+        type: oneOf(input.type ?? 'other', ['damaged', 'missing_item', 'wrong_item', 'address_issue', 'lost', 'other'] as const, 'Type'),
+        severity: oneOf(input.severity ?? 'medium', ['low', 'medium', 'high'] as const, 'Severity'),
         status: 'open',
-        hub: input.hub ?? null,
-        notes: input.notes,
+        hub: input.hub ? str(input.hub, 'Hub', { max: 100 }) : null,
+        notes: str(input.notes, 'Notes', { min: 3, max: 2000 }),
         raisedBy,
       }),
     );
@@ -186,11 +187,19 @@ export class WarehouseService {
     return this.transfers.find({ order: { createdAt: 'DESC' }, take: 100 });
   }
 
-  async createTransfer(data: Partial<StockTransfer>): Promise<StockTransfer> {
+  async createTransfer(data: Record<string, unknown>): Promise<StockTransfer> {
+    const fromHub = str(data?.fromHub, 'From hub', { max: 100 });
+    const toHub = str(data?.toHub, 'To hub', { max: 100 });
+    if (fromHub.toLowerCase() === toHub.toLowerCase()) throw new Error('Choose two different hubs.');
+    // Only these fields are accepted; reference, status and ids are ours.
     const transfer = await this.transfers.save(
       this.transfers.create({
-        ...data,
-        reference: `TRF-${Date.now().toString().slice(-6)}`,
+        fromHub,
+        toHub,
+        sku: str(data?.sku, 'SKU', { max: 100 }),
+        productName: data?.productName ? str(data.productName, 'Product', { max: 200 }) : null,
+        qty: num(data?.qty, 'Quantity', { min: 1, max: 100000, int: true }),
+        reference: `TRF-${Date.now().toString().slice(-8)}`,
         status: 'requested',
       }),
     );

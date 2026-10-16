@@ -28,7 +28,9 @@
     "bootstrap:prod:dev": "ts-node -r tsconfig-paths/register src/database/bootstrap-prod.ts",
     "smoke:account": "node test/account-smoke.cjs",
     "smoke:authz": "node test/authz-smoke.cjs",
-    "smoke:flows": "node test/flows-smoke.cjs"
+    "smoke:flows": "node test/flows-smoke.cjs",
+    "smoke:race": "node test/race-smoke.cjs",
+    "smoke:coverage": "node test/coverage-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

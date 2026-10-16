@@ -42,6 +42,7 @@ const mask = (phone: string | null) =>
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentsService.name);
   private orderSettled: OrderPaymentSettledHandler | null = null;
+  private readonly manualInFlight = new Set<string>();
   private sweeper: NodeJS.Timeout | null = null;
   private readonly timers = new Set<NodeJS.Timeout>();
 
@@ -254,16 +255,23 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!['manual', 'sandbox'].includes(this.mobileMoney?.name ?? '')) {
       throw new BadRequestException('Manual confirmation is only available with MM_PROVIDER=manual.');
     }
-    const payment = await this.payments.findOne({ where: { reference } });
-    if (!payment) throw new NotFoundException('Payment not found.');
-    if (payment.status !== 'pending') throw new BadRequestException(`This payment is already ${payment.status}.`);
-    const done = await this.settle({
-      reference,
-      outcome,
-      providerRef: payment.providerRef ?? undefined,
-      reason: outcome === 'failed' ? (reason?.trim() || 'Declined by finance.') : undefined,
-    });
-    return this.view(done ?? payment) as Payment;
+    // Two finance users clicking at once: only one request is handled, the other is told so.
+    if (this.manualInFlight.has(reference)) throw new BadRequestException('This payment is being processed right now.');
+    this.manualInFlight.add(reference);
+    try {
+      const payment = await this.payments.findOne({ where: { reference } });
+      if (!payment) throw new NotFoundException('Payment not found.');
+      if (payment.status !== 'pending') throw new BadRequestException(`This payment is already ${payment.status}.`);
+      const done = await this.settle({
+        reference,
+        outcome,
+        providerRef: payment.providerRef ?? undefined,
+        reason: outcome === 'failed' ? (reason?.trim() || 'Declined by finance.') : undefined,
+      });
+      return this.view(done ?? payment) as Payment;
+    } finally {
+      this.manualInFlight.delete(reference);
+    }
   }
 
   /** Entry point for the aggregator webhook (signature already verified by the provider). */

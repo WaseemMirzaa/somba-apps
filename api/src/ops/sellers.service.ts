@@ -112,8 +112,9 @@ export class SellersService {
     const products = await this.products.find({
       where: { sellerId: id, status: 'live' },
     });
-    const { userId: _owner, ...publicSeller } = seller;
+    const { userId: _owner, pickupAddress: _pickup, ...publicSeller } = seller;
     void _owner;
+    void _pickup;
     return { seller: publicSeller, products };
   }
 
