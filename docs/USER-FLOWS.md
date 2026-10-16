@@ -1795,3 +1795,44 @@ flowchart TD
 5. **Moderation and pricing rules** (X-6, X-7).
 6. Customer app dead ends (CM-1, CM-2) and the remaining medium and low items.
 
+
+---
+
+## 12. Status after the fixes (October 2026)
+
+Every item in section 11 was worked on. This table says what is fixed, what is only partly fixed and what is still open. "Verified" means it was exercised in a real browser or by an automated test against the running API (details in `docs/LOCAL-RUN.md`).
+
+### 12.1 System-wide flows
+
+| ID | Was | Now | Verified |
+|---|---|---|---|
+| X-1 | Nobody could pay in production | `MM_PROVIDER=manual`: the customer pays the merchant number, finance confirms or declines in the admin portal (`payments:confirm` / `payments:decline`). A real aggregator adapter is still open | Browser (web checkout → pending → finance confirms → order confirmed); production-mode check |
+| X-2 | Failed delivery left the order in limbo | Rider gives a reason → order goes back to `confirmed`, a new attempt is queued, customer is told; after 3 attempts the order is cancelled, stock released, prepaid money refunded. The customer can cancel in between | API suites, browser (rider web), Flutter live test |
+| X-3 | No pickup information | Task carries the seller's pickup address; seller marks "ready"; hub staff scan "received" (`warehouse:receive`); riders are pushed new deliveries | API suites, browser (seller → warehouse → rider) |
+| X-4 | Payouts ended in an in-app wallet | Bank / mobile-money payouts need a destination and finance enters the transfer reference; only "wallet" payouts credit the wallet. Automatic disbursement through a provider is still open | API suites, browser (admin payouts) |
+| X-5 | Refund without the goods | A refund on a return is refused until the warehouse marks the goods received (goods go back into stock) | API suites, browser (customer → warehouse → admin) |
+| X-6 | Moderation bypassed | Seller listings are `pending` until a moderator approves (setting `productModeration`, on in production); sellers can only pause / resume | API suites, browser (seller wizard → admin approves) |
+| X-7 | Flash-sale / campaign price not charged | Flash-sale price is shown and charged. Campaign discounts are still not applied to prices (open) | API suites |
+| X-8 | Verification never required | Still not required (open) | — |
+| New | No proof of delivery | Customer sees a 4-digit code; the rider must enter it (`requireDeliveryCode`, on in production) | API suites, browser (rider web), Flutter live test |
+
+### 12.2 Per app
+
+| App | Fixed | Still open |
+|---|---|---|
+| Customer app (CM) | CM-1 product cards open from search, lists, stores, wishlist · CM-2 delete account returns to sign-in · CM-3 market and locale restored · CM-4 verify later · CM-5/6 failed top-up reason, check payment, countdown · CM-7 Buy now is its own checkout · CM-8 promo on checkout · CM-9 Track from confirmed + open in maps · CM-10 live support and returns · CM-11 terms unchecked and linked · delivery code card | CM-12 phone push (needs Firebase project files) · several screens English-only |
+| Web shop (WS) | WS-1 no fake confirmation, real mobile-money flow · WS-2 returns call the server and list live · WS-3 delete account calls the server · WS-4/5 real cart, saved addresses, zones · WS-6 live ids · WS-7…10 · WS-11 support on the server · WS-12 live bell, sign-out, real profile and wallet top-up · WS-13/14 legal pages, search | `/sell-online/subscribe` is still a demo checkout · tracking has coordinates and a map link, not an embedded map |
+| Seller (SP) | SP-1/2 errors shown, wizard sends every field with real photo upload · SP-3 registration and approval gating · SP-4 browser-only subscription removed · SP-5 edit, delete, pause/resume · SP-6 real available balance and payout destination · SP-7 "package ready" reaches the server · SP-8/9 campaigns, notifications, support, replacements live · SP-11 stock adjust · SP-12/13 | Reviews are read-only (no server reply event) · disputes/replacements lists are limited by the server · conversion/retention/segments widgets are labelled "demo data" |
+| Admin (AD) | AD-1 payouts · AD-2 settings and zones saved · AD-3 broadcasts · AD-4/5 order status, cancel, refund; live refunds and pending-payment queue · AD-6 live disputes and returns with "goods received" · AD-7 staff list, role change, staff creation · AD-8 warehouse staff accounts · AD-9 flash sales, promo codes, CMS, categories, campaign decisions · AD-10 suspend / reinstate · AD-12/13 | Hub directory is still local · finance KPIs, analytics charts and the reviews moderation are labelled "demo data" |
+| Warehouse (WH) | WH-1/2 receive and stages · WH-3 assign rider and batches · WH-4 returns received · WH-5 exceptions, exchanges, replacements, transfers live · WH-6 COD reconciliation page · scanner is a typed/scanned code input | Dashboard throughput/goals widgets are demo (labelled) · no cash hand-over sign-off |
+| Rider app (RA) | RA-1 reasons on failure, from `assigned` · RA-2 handover code · pickup address, seller-ready, attempts · RA-3 open phone settings · RA-4 cash note | RA-6 French text for app strings · background location |
+| Rider web (RW) | RW-1…5 accept, picked up, on the way, delivered with code, failed with reason, GPS from the browser, earnings page, live notifications | — |
+
+### 12.3 Bugs found and fixed while verifying
+
+* The web app requested its data before the server finished signing the socket in, so after a page reload several pages stayed on "Loading…" or silently showed empty lists. It now waits for the server's `ready`.
+* The public store page returned the seller's pickup address.
+* Warehouse staff and sellers could not see the returns they have to act on.
+* Stock-transfer and exception requests accepted unvalidated fields.
+* Two finance users confirming the same payment at once both received a success reply.
+* Several pages still showed "all data is simulated" wording; it now only appears in demo mode.

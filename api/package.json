@@ -30,7 +30,8 @@
     "smoke:authz": "node test/authz-smoke.cjs",
     "smoke:flows": "node test/flows-smoke.cjs",
     "smoke:race": "node test/race-smoke.cjs",
-    "smoke:coverage": "node test/coverage-smoke.cjs"
+    "smoke:coverage": "node test/coverage-smoke.cjs",
+    "check:prod": "node test/prod-check.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
