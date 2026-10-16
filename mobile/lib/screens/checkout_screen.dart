@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../services/models.dart';
@@ -13,7 +14,11 @@ import 'more/account_more.dart';
 class CheckoutScreen extends StatefulWidget {
   final Locale locale;
 
-  const CheckoutScreen({super.key, required this.locale});
+  /// "Buy now": check out only these lines. The saved cart is left untouched.
+  /// Null → check out the whole cart.
+  final List<CartItem>? lines;
+
+  const CheckoutScreen({super.key, required this.locale, this.lines});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -22,6 +27,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final shop = ShopState.instance;
   final _phone = TextEditingController();
+  final _promo = TextEditingController();
   String payment = 'airtel_money';
   String? _phoneError;
   bool _placing = false;
@@ -31,10 +37,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _phone.text = RealtimeStore.instance.user?.phone ?? '';
     shop.syncWithCatalog();
+    if (_buyNow) _refreshLines();
+    final applied = shop.appliedPromo;
+    if (applied != null && (applied.forSubtotal - _subtotal).abs() < 0.005) _promo.text = applied.code;
+  }
+
+  bool get _buyNow => widget.lines != null;
+
+  /// The lines being bought: the buy-now item(s) or the whole cart.
+  List<CartItem> get _lines => widget.lines ?? shop.cart;
+  double get _subtotal => _lines.fold(0.0, (s, i) => s + i.product.price * i.qty);
+
+  /// Prices/stock of a buy-now line follow the live catalogue like cart lines do.
+  void _refreshLines() {
+    for (final c in widget.lines!) {
+      final fresh = productByUuid(c.product.uuid);
+      if (fresh != null) c.product = fresh;
+    }
+  }
+
+  /// The SERVER validates the code (and applies it again when the order is placed).
+  Future<void> _applyPromo() async {
+    final code = _promo.text.trim();
+    if (code.isEmpty) return;
+    final error = await shop.applyPromo(code, subtotalUsd: _subtotal);
+    if (!mounted) return;
+    setState(() {});
+    _toast(error ?? '${shop.appliedPromo!.code} ${_lang == 'fr' ? 'appliqué' : 'applied'}');
   }
 
   @override
   void dispose() {
+    _promo.dispose();
     _phone.dispose();
     super.dispose();
   }
@@ -53,7 +87,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final store = RealtimeStore.instance;
     final fr = _lang == 'fr';
     final address = _address;
-    if (shop.cart.isEmpty) return;
+    if (_lines.isEmpty) return;
     if (address == null) {
       _toast(fr ? 'Ajoutez une adresse de livraison.' : 'Add a delivery address first.');
       return;
@@ -63,7 +97,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _phoneError = err);
       if (err != null) return;
     }
-    if (payment == 'wallet' && store.walletBalance + 0.001 < shop.subtotal + deliveryFee - shop.promoDiscount(shop.subtotal)) {
+    if (payment == 'wallet' && store.walletBalance + 0.001 < _subtotal + deliveryFee - shop.promoDiscount(_subtotal)) {
       _toast(fr ? 'Solde du portefeuille insuffisant.' : 'Your wallet balance is not enough for this order.');
       return;
     }
@@ -71,12 +105,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final order = await store.placeOrder(
         // Lines reference real listings; the SERVER prices them.
-        items: shop.cart.map((c) => {'productId': c.product.uuid, 'qty': c.qty, 'variant': c.variant}).toList(),
+        items: _lines.map((c) => {'productId': c.product.uuid, 'qty': c.qty, 'variant': c.variant}).toList(),
         paymentMethod: payment,
         paymentPhone: isMobileMoney(payment) ? _phone.text.trim() : null,
         deliveryFeeUsd: deliveryFee,
         zoneId: shop.selectedZoneId,
-        promoCode: shop.appliedPromo?.code,
+        promoCode: _buyNow ? (shop.promoDiscount(_subtotal) > 0 ? shop.appliedPromo?.code : null) : shop.appliedPromo?.code,
         address: {
           'label': address.label,
           'line1': address.line1,
@@ -87,8 +121,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'zone': shop.selectedZoneId,
         },
       );
-      // The order now owns these lines (and holds the stock).
-      shop.clearCart();
+      // The order now owns these lines (and holds the stock). A buy-now order leaves the saved cart alone.
+      if (_buyNow) {
+        shop.appliedPromo = null;
+      } else {
+        shop.clearCart();
+      }
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -118,8 +156,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final s = Strings(_lang);
     final store = RealtimeStore.instance;
     final deliveryFee = deliveryFeeUsd;
-    final discount = shop.promoDiscount(shop.subtotal);
-    final total = shop.subtotal + deliveryFee - discount;
+    if (_buyNow) _refreshLines();
+    final subtotal = _subtotal;
+    final discount = shop.promoDiscount(subtotal);
+    final total = subtotal + deliveryFee - discount;
     final address = _address;
 
     return Scaffold(
@@ -213,11 +253,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
           const SizedBox(height: 18),
+          _sectionTitle(_lang == 'fr' ? 'Code promo' : 'Promo code'),
+          const SizedBox(height: 10),
+          _card(
+            child: Row(children: [
+              const Icon(Icons.local_offer_rounded, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('checkout-promo'),
+                  controller: _promo,
+                  textCapitalization: TextCapitalization.characters,
+                  onSubmitted: (_) => _applyPromo(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: s.promoHint,
+                    border: InputBorder.none,
+                    hintStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+              TextButton(key: const ValueKey('checkout-promo-apply'), onPressed: _applyPromo, child: Text(s.apply)),
+            ]),
+          ),
+          const SizedBox(height: 18),
           _sectionTitle(s.orderSummary),
           const SizedBox(height: 10),
           _card(
             child: Column(children: [
-              _row(s.subtotal, money(shop.subtotal)),
+              _row(s.subtotal, money(subtotal)),
               const SizedBox(height: 8),
               _row('${s.delivery} · ${selectedZone.name}', deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
               if (discount > 0) ...[
@@ -245,7 +309,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         child: FilledButton(
           key: const ValueKey('place-order'),
-          onPressed: _placing || shop.cart.isEmpty ? null : () => _placeOrder(deliveryFee),
+          onPressed: _placing || _lines.isEmpty ? null : () => _placeOrder(deliveryFee),
           child: Text(_placing ? '…' : '${s.placeOrder}  ·  ${money(total)}'),
         ),
       ),

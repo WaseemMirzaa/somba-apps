@@ -180,9 +180,10 @@ function buildAdminData(
       sellerEarnings: o.totalUsd - commission,
       refunds: o.status === "returned" ? o.totalUsd : 0,
       timeline: [
-        { time: `${dateOf(o.createdAt)} 09:00`, label: "Placed", done: true },
-        { time: `${dateOf(o.createdAt)} 12:00`, label: "Processing", done: o.status !== "pending" },
-        { time: `${dateOf(o.createdAt)} 18:00`, label: "Delivered", done: o.status === "delivered" },
+        { time: o.createdAt.slice(0, 16).replace("T", " "), label: "Placed", done: true },
+        ...(o.updatedAt && o.updatedAt !== o.createdAt
+          ? [{ time: o.updatedAt.slice(0, 16).replace("T", " "), label: `Status: ${o.status.replace(/_/g, " ")}`, done: o.status === "delivered" }]
+          : []),
       ],
     };
   });

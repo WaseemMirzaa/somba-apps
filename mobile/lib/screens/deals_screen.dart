@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_live.dart';
-import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
+import '../widgets/product_actions.dart';
 import '../widgets/product_card.dart';
 import '../services/realtime_store.dart';
-import 'product_detail_screen.dart';
 
 class DealsScreen extends StatefulWidget {
   final Locale locale;
@@ -67,14 +66,8 @@ class _DealsScreenState extends State<DealsScreen> {
                 (_, i) => ProductCard(
                   product: deals[i],
                   lang: lang,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: deals[i], locale: widget.locale))),
-                  onAdd: () {
-                    setState(() => ShopState.instance.addToCart(deals[i]));
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(SnackBar(content: Text(s.addedToCart)));
-                  },
+                  onTap: () => openProduct(context, deals[i], widget.locale),
+                  onAdd: () => addProductToCart(context, deals[i], widget.locale, after: () => setState(() {})),
                 ),
                 childCount: deals.length,
               ),

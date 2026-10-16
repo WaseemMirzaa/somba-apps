@@ -6,7 +6,7 @@ import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
-import '../../widgets/product_card.dart';
+import '../../widgets/product_actions.dart';
 import '../product_detail_screen.dart' show reviewTile;
 import 'catalog_extra.dart';
 
@@ -53,7 +53,6 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = widget.locale.languageCode;
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
@@ -70,7 +69,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-                  delegate: SliverChildBuilderDelegate((_, i) => ProductCard(product: items[i], lang: lang), childCount: items.length),
+                  delegate: SliverChildBuilderDelegate((_, i) => productCard(context, items[i], widget.locale), childCount: items.length),
                 ),
               ),
           ]),

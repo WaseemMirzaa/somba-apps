@@ -7,9 +7,9 @@ import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/product_actions.dart';
 import '../widgets/product_card.dart';
 import '../widgets/product_image.dart';
-import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 import 'categories_screen.dart';
 import 'more/search_screen.dart';
@@ -77,18 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openProduct(Product p) {
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p, locale: widget.locale)));
-  }
+  void _openProduct(Product p) => openProduct(context, p, widget.locale);
 
-  void _add(Product p) {
-    setState(() => ShopState.instance.addToCart(p));
-    final s = Strings(widget.locale.languageCode);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('${p.displayName(widget.locale.languageCode)} — ${s.addedToCart}')));
-  }
+  void _add(Product p) => addProductToCart(context, p, widget.locale, after: () => setState(() {}));
 
   // Recommended feed, filtered by the selected chip in real time.
   List<Product> _feed() {

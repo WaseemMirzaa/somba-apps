@@ -1,76 +1,56 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 import { useSellerData } from "@/lib/seller";
+import {
+  ORDER_STATUS_OPTIONS,
+  orderStatusLabel,
+  orderStatusVariant,
+  shippingStatusLabel,
+  shippingStatusVariant,
+} from "@/lib/seller-labels";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "processing", label: "Processing", labelFr: "En cours" },
-  { value: "ready", label: "Ready", labelFr: "Prêt" },
-  { value: "picked", label: "Picked", labelFr: "Collecté" },
-  { value: "delivered", label: "Delivered", labelFr: "Livré" },
-];
-
-const ORDER_STATUS_FR: Record<string, string> = {
-  pending: "En attente",
-  processing: "En cours",
-  ready: "Prêt",
-  picked: "Collecté",
-  delivered: "Livré",
-  cancelled: "Annulé",
+const PAYMENT_LABEL: Record<string, string> = {
+  cod: "Cash on Delivery",
+  stripe_card: "Card",
+  airtel_money: "Mobile Money",
+  wallet: "Wallet",
 };
 
 export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const { sellerOrderList } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [orders, setOrders] = useState(() => sellerOrderList);
-
-  useEffect(() => {
-    setOrders(sellerOrderList);
-  }, [sellerOrderList]);
 
   const filtered = useMemo(
     () =>
-      applyListFilters(orders, filters, {
+      applyListFilters(sellerOrderList, filters, {
         // Privacy: search only on order ID and customer first name — no PII.
         searchFields: ["id", "customer"],
         dateField: "date",
-        statusField: "shippingStatus",
+        statusField: "orderStatus",
       }),
-    [orders, filters]
+    [sellerOrderList, filters]
   );
-
-  function acceptOrder(id: string) {
-    setOrders((o) => o.map((item) => item.id === id ? { ...item, shippingStatus: "processing" } : item));
-    toast(fr ? `Commande ${id} acceptée` : `Order ${id} accepted`);
-  }
-
-  function markReady(id: string) {
-    setOrders((o) => o.map((item) => item.id === id ? { ...item, shippingStatus: "ready" } : item));
-    toast(fr ? `Commande ${id} prête pour enlèvement` : `Order ${id} marked ready for pickup`);
-  }
 
   return (
     <SellerListPage
       title={t("orders")}
-      subtitle={fr ? "Vue liste — Numéro de commande, Client, Articles, Montant, Paiement, Statut de commande, Statut d'expédition, Date" : "List View — Order Number, Customer, Items, Amount, Payment, Order Status, Shipping Status, Date"}
+      subtitle={fr ? "Commandes contenant vos produits. Marquez « colis prêt » depuis le détail de la commande." : "Orders containing your products. Mark “package ready” from the order detail."}
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("orders") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={ORDER_STATUS_OPTIONS}
           searchPlaceholder={fr ? "ID commande, client…" : "Order ID, customer…"}
         />
       }
@@ -81,20 +61,12 @@ export default function SellerOrdersPage() {
         { key: "customer", label: t("customer") },
         { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethod), locale) },
-        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant="info">{fr ? (ORDER_STATUS_FR[String(row.orderStatus)] ?? String(row.orderStatus)) : String(row.orderStatus)}</Badge> },
-        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge>{fr ? (ORDER_STATUS_FR[String(row.shippingStatus)] ?? String(row.shippingStatus)) : String(row.shippingStatus)}</Badge> },
+        { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(PAYMENT_LABEL[String(row.paymentMethod)] ?? String(row.paymentMethod), locale) },
+        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant={orderStatusVariant(String(row.orderStatus))}>{orderStatusLabel(String(row.orderStatus), fr)}</Badge> },
+        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge variant={shippingStatusVariant(String(row.shippingStatus))}>{shippingStatusLabel(String(row.shippingStatus), fr)}</Badge> },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex gap-2 text-xs">
-            <Link href={`/seller/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            {row.shippingStatus === "pending" && (
-              <button onClick={() => acceptOrder(String(row.id))} className="text-emerald-600 hover:underline">{fr ? "Accepter" : "Accept"}</button>
-            )}
-            {row.shippingStatus === "processing" && (
-              <button onClick={() => markReady(String(row.id))} className="text-[var(--primary)] hover:underline">{fr ? "Marquer prêt" : "Mark Ready"}</button>
-            )}
-          </div>
+          <Link href={`/seller/orders/${row.id}`} className="text-xs text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

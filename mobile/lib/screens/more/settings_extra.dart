@@ -4,6 +4,7 @@ import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
+import 'auth_screens.dart' show OtpScreen, VerifyEmailScreen;
 import 'support_extra.dart';
 
 // Account settings — notification choices are saved on the account (me:setPrefs).
@@ -23,7 +24,7 @@ class CustomerSettingsScreen extends StatelessWidget {
           appBar: backAppBar(context, 'Settings'),
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
             _group('Notifications', [
-              _toggle(Icons.notifications_active_rounded, 'Push notifications', 'Order updates & offers', pref('push'), (v) => store.setPref('push', v)),
+              _toggle(Icons.notifications_active_rounded, 'Push notifications', 'Delivered in the app now; phone push needs the app build with Firebase', pref('push'), (v) => store.setPref('push', v)),
               _toggle(Icons.mail_outline_rounded, 'Email', 'Receipts & news', pref('email'), (v) => store.setPref('email', v)),
               _toggle(Icons.sms_outlined, 'SMS', 'Delivery alerts by text', pref('sms'), (v) => store.setPref('sms', v)),
             ]),
@@ -38,6 +39,10 @@ class CustomerSettingsScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 14),
             _group('Account', [
+              if (store.user != null && !store.user!.phoneVerified && (store.user!.phone ?? '').isNotEmpty)
+                _nav(Icons.sms_outlined, 'Verify phone', () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: store.user!.phone)))),
+              if (store.user != null && !store.user!.emailVerified)
+                _nav(Icons.mark_email_unread_outlined, 'Verify email', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen()))),
               _nav(Icons.lock_reset_rounded, 'Change password', () => _changePassword(context)),
               _nav(Icons.info_outline_rounded, 'About Somba&Teka', () => showAboutDialog(
                     context: context,
@@ -210,6 +215,16 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
         AppField(label: 'Full name', hint: 'Your name', icon: Icons.person_outline_rounded, controller: _name),
         const SizedBox(height: 16),
         AppField(label: 'Phone', hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone, error: _err),
+        if (u != null && !u.phoneVerified && (u.phone ?? '').isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('verify-phone'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: u.phone))),
+              icon: const Icon(Icons.sms_outlined, size: 18),
+              label: const Text('Verify this phone number'),
+            ),
+          ),
         const SizedBox(height: 16),
         AppField(label: 'Email (your login)', icon: Icons.mail_outline_rounded, initial: u?.email ?? ''),
         const SizedBox(height: 24),

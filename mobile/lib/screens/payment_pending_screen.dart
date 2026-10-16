@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
@@ -24,6 +25,7 @@ class PaymentPendingScreen extends StatefulWidget {
 class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
   bool _cancelling = false;
   bool _navigated = false;
+  bool _checking = false;
 
   String get _lang => widget.locale.languageCode;
 
@@ -42,6 +44,26 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  /// Ask the server for the payment's current state (in case a push was missed).
+  Future<void> _check(PaymentDto? payment) async {
+    final fr = _lang == 'fr';
+    if (payment == null) return;
+    setState(() => _checking = true);
+    try {
+      final p = await RealtimeStore.instance.refreshPayment(payment.reference);
+      if (!mounted) return;
+      if (p.isPending) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(fr ? 'Toujours en attente de votre approbation.' : 'Still waiting for your approval on the phone.')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -108,6 +130,10 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted, fontSize: 14.5, height: 1.4),
                 ),
+                if (!failed) ...[
+                  const SizedBox(height: 14),
+                  PaymentExpiryHint(createdAt: order.createdAt, fr: fr),
+                ],
                 const SizedBox(height: 18),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -138,6 +164,17 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      key: const ValueKey('check-payment'),
+                      onPressed: _checking || payment == null ? null : () => _check(payment),
+                      icon: _checking
+                          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.refresh_rounded, size: 20),
+                      label: Text(fr ? 'Vérifier le paiement' : 'Check payment status'),
+                    ),
+                  ),
                   TextButton(
                     onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
                     child: Text(fr ? 'Continuer — je confirmerai plus tard' : "Continue shopping — I'll confirm later"),
@@ -149,5 +186,55 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
         );
       },
     );
+  }
+}
+
+/// "Unapproved requests expire after 15 minutes", with the time left when known.
+class PaymentExpiryHint extends StatefulWidget {
+  final DateTime? createdAt;
+  final bool fr;
+  const PaymentExpiryHint({super.key, required this.createdAt, required this.fr});
+
+  @override
+  State<PaymentExpiryHint> createState() => _PaymentExpiryHintState();
+}
+
+class _PaymentExpiryHintState extends State<PaymentExpiryHint> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fr = widget.fr;
+    final created = widget.createdAt;
+    var text = fr ? 'Une demande non approuvée expire après 15 minutes.' : 'Unapproved requests expire after 15 minutes.';
+    if (created != null) {
+      final left = created.add(const Duration(minutes: 15)).difference(DateTime.now());
+      if (left.isNegative) {
+        text = fr ? 'La demande a peut-être expiré — vérifiez le paiement.' : 'The request may have expired — check the payment.';
+      } else {
+        final mm = left.inMinutes.toString().padLeft(2, '0');
+        final ss = (left.inSeconds % 60).toString().padLeft(2, '0');
+        text = fr ? 'Expire dans $mm:$ss si vous n\'approuvez pas.' : 'Expires in $mm:$ss if not approved.';
+      }
+    }
+    return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      const Icon(Icons.timer_outlined, size: 16, color: AppColors.muted),
+      const SizedBox(width: 6),
+      Flexible(child: Text(text, key: const ValueKey('expiry-hint'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+    ]);
   }
 }

@@ -6,10 +6,11 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection } from "@/components/ui/info-grid";
 import { DualCurrency } from "@/components/ui/dual-currency";
-import { useShop } from "@/context/shop-context";
+import { useShop, useCartLines } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-import { useMarket } from "@/context/market-context";
+import { useRealtime } from "@/context/realtime-context";
+import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
 
 // Variant strings come from the shop/cart data layer as free-form English tokens
 // (e.g. "256GB Black", "White", "Default"). Translate the known tokens locally.
@@ -32,38 +33,56 @@ function localizeVariant(variant: string, fr: boolean) {
     .join(" ");
 }
 
+function qtyOptions(qty: number, stock: number | null): number[] {
+  const max = Math.max(1, Math.min(10, stock ?? 10));
+  return Array.from({ length: Math.max(max, qty) }, (_, i) => i + 1);
+}
+
 export default function ShopCartPage() {
   const { locale } = useLocale();
-  const { profile } = useMarket();
-  const { cart, updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, applyPromo, removePromo } = useShop();
+  const fr = locale === "fr";
+  const rt = useRealtime();
+  const { updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, applyPromo, removePromo, zoneId, setZoneId } = useShop();
+  const { lines, subtotal, hasUnavailable } = useCartLines();
+  const settings = usePublicSettings();
   const { toast } = useToast();
   const [promoInput, setPromoInput] = useState("");
+  const [promoBusy, setPromoBusy] = useState(false);
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const discount = promoDiscount || (cart.length > 0 ? 0 : 0);
-  const delivery = profile.zones[0]?.deliveryFeeUsd ?? 0;
-  const total = subtotal - discount + delivery;
+  const zones = settings.deliveryZones;
+  const zone = zones.find((z) => z.id === zoneId) ?? null;
+  const discount = Math.min(promoDiscount, subtotal);
+  const delivery = zone?.feeUsd ?? 0;
+  const total = Math.max(0, subtotal - discount) + delivery;
 
-  const grouped = cart.reduce<Record<string, typeof cart>>((acc, item) => {
-    (acc[item.seller] ??= []).push(item);
+  const grouped = lines.reduce<Record<string, typeof lines>>((acc, item) => {
+    (acc[item.seller || "Somba&Teka"] ??= []).push(item);
     return acc;
   }, {});
 
-  function handleApplyPromo() {
-    if (applyPromo(promoInput)) {
-      toast(locale === "fr" ? "Code promo appliqué" : "Promo code applied");
+  async function handleApplyPromo() {
+    if (!rt.user) {
+      toast(fr ? "Connectez-vous pour utiliser un code promo" : "Sign in to use a promo code", "info");
+      return;
+    }
+    setPromoBusy(true);
+    const res = await applyPromo(promoInput);
+    setPromoBusy(false);
+    if (res.ok) {
+      toast(fr ? "Code promo appliqué" : "Promo code applied");
+      setPromoInput("");
     } else {
-      toast(locale === "fr" ? "Code invalide" : "Invalid promo code");
+      toast(res.reason ?? (fr ? "Code invalide" : "Invalid promo code"), "error");
     }
   }
 
-  if (cart.length === 0) {
+  if (lines.length === 0) {
     return (
       <div className="space-y-6 py-16 text-center">
-        <PageHeader title={locale === "fr" ? "Panier" : "Shopping Cart"} />
-        <p className="text-slate-500">{locale === "fr" ? "Votre panier est vide" : "Your cart is empty"}</p>
+        <PageHeader title={fr ? "Panier" : "Shopping Cart"} />
+        <p className="text-slate-500">{fr ? "Votre panier est vide" : "Your cart is empty"}</p>
         <Link href="/shop/products" className="text-[var(--primary)] hover:underline">
-          {locale === "fr" ? "Continuer vos achats" : "Continue shopping"}
+          {fr ? "Continuer vos achats" : "Continue shopping"}
         </Link>
       </div>
     );
@@ -71,38 +90,54 @@ export default function ShopCartPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={locale === "fr" ? "Panier" : "Shopping Cart"} subtitle={locale === "fr" ? "Groupé par vendeur" : "Grouped by seller"} />
+      <PageHeader title={fr ? "Panier" : "Shopping Cart"} subtitle={fr ? "Groupé par vendeur" : "Grouped by seller"} />
+
+      {hasUnavailable && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {fr
+            ? "Certains articles ne sont plus disponibles. Retirez-les avant de passer à la caisse."
+            : "Some items are no longer available. Remove them before checking out."}
+        </div>
+      )}
 
       {Object.entries(grouped).map(([seller, items]) => (
         <DetailSection key={seller} title={seller}>
           <div className="space-y-4">
             {items.map((item) => (
               <div key={`${item.id}-${item.variant}`} className="flex gap-4">
-                <Link href={`/shop/products/${item.id}`} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
-                  <Image src={item.image} alt={item.name} fill className="object-cover" sizes="80px" />
+                <Link href={`/shop/products/${item.id}`} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  {item.image && <Image src={item.image} alt={item.name} fill className="object-cover" sizes="80px" />}
                 </Link>
                 <div className="flex-1">
                   <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
-                    {locale === "fr" ? item.nameFr : item.name}
+                    {fr ? item.nameFr : item.name}
                   </Link>
-                  <p className="text-xs text-slate-500">{localizeVariant(item.variant, locale === "fr")}</p>
+                  <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)}</p>
+                  {item.unavailable && (
+                    <p className="text-xs font-medium text-red-600">{fr ? "Indisponible" : "Unavailable"}</p>
+                  )}
+                  {!item.unavailable && item.livePrice !== item.price && (
+                    <p className="text-xs text-amber-600">{fr ? "Le prix a changé" : "Price has changed"}</p>
+                  )}
                   <div className="mt-2 flex items-center gap-3">
                     <select
                       className="rounded border border-blue-200 px-2 py-1 text-sm"
                       value={item.qty}
                       onChange={(e) => updateQty(item.id, item.variant, Number(e.target.value))}
                     >
-                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                      {qtyOptions(item.qty, item.stock).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
                     </select>
-                    <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast(locale === "fr" ? "Retiré" : "Removed"); }}>
-                      {locale === "fr" ? "Supprimer" : "Remove"}
+                    <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast(fr ? "Retiré" : "Removed"); }}>
+                      {fr ? "Supprimer" : "Remove"}
                     </button>
-                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast(locale === "fr" ? "Enregistré" : "Saved"); }}>
-                      {locale === "fr" ? "Sauvegarder" : "Save for later"}
+                    <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast(fr ? "Enregistré" : "Saved"); }}>
+                      {fr ? "Sauvegarder" : "Save for later"}
                     </button>
                   </div>
                 </div>
-                <DualCurrency amount={item.price * item.qty} className="font-semibold text-blue-700" />
+                <DualCurrency amount={item.livePrice * item.qty} className="font-semibold text-blue-700" />
               </div>
             ))}
           </div>
@@ -110,48 +145,80 @@ export default function ShopCartPage() {
       ))}
 
       <div className="card-premium p-4">
-        <p className="mb-2 text-sm font-medium">{locale === "fr" ? "Code promo" : "Promo code"}</p>
+        <p className="mb-2 text-sm font-medium">{fr ? "Code promo" : "Promo code"}</p>
         <div className="flex gap-2">
           <input
             className="input-premium flex-1 px-3 py-2 text-sm"
-            placeholder="SOMBA10"
+            placeholder={fr ? "Entrez votre code" : "Enter your code"}
             value={promoInput}
             onChange={(e) => setPromoInput(e.target.value)}
             disabled={!!promoCode}
           />
           {promoCode ? (
             <button onClick={removePromo} className="rounded-xl border px-4 py-2 text-sm text-red-600">
-              {locale === "fr" ? "Retirer" : "Remove"}
+              {fr ? "Retirer" : "Remove"}
             </button>
           ) : (
-            <button onClick={handleApplyPromo} className="btn-primary px-4 py-2 text-sm">
-              {locale === "fr" ? "Appliquer" : "Apply"}
+            <button onClick={handleApplyPromo} disabled={promoBusy || !promoInput.trim()} className="btn-primary px-4 py-2 text-sm disabled:opacity-50">
+              {promoBusy ? "…" : fr ? "Appliquer" : "Apply"}
             </button>
           )}
         </div>
-        {promoCode && <p className="mt-1 text-xs text-emerald-600">{promoCode} {locale === "fr" ? "appliqué" : "applied"}</p>}
+        {promoCode && <p className="mt-1 text-xs text-emerald-600">{promoCode} {fr ? "appliqué" : "applied"}</p>}
+      </div>
+
+      <div className="card-premium p-4">
+        <p className="mb-2 text-sm font-medium">{fr ? "Zone de livraison" : "Delivery zone"}</p>
+        {zones.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            {settings.loaded
+              ? (fr ? "Les frais de livraison seront calculés par le serveur à la commande." : "Delivery fees are calculated by the server when you place the order.")
+              : (fr ? "Chargement des zones…" : "Loading zones…")}
+          </p>
+        ) : (
+          <select
+            className="input-premium w-full px-3 py-2 text-sm"
+            value={zoneId ?? ""}
+            onChange={(e) => setZoneId(e.target.value || null)}
+          >
+            <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : `$${z.feeUsd.toFixed(2)}`})
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="card-premium p-6">
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between"><span>{locale === "fr" ? "Sous-total" : "Subtotal"}</span><DualCurrency amount={subtotal} /></div>
+          <div className="flex justify-between"><span>{fr ? "Sous-total" : "Subtotal"}</span><DualCurrency amount={subtotal} /></div>
           {discount > 0 && (
             <div className="flex justify-between text-emerald-600">
-              <span>{locale === "fr" ? "Réduction" : "Discount"}</span><span>-<DualCurrency amount={discount} /></span>
+              <span>{fr ? "Réduction" : "Discount"}</span><span>-<DualCurrency amount={discount} /></span>
             </div>
           )}
           <div className="flex justify-between">
-            <span>{locale === "fr" ? "Livraison (zone)" : "Delivery (zone)"}</span>
-            {delivery === 0 ? (locale === "fr" ? "GRATUIT" : "FREE") : <DualCurrency amount={delivery} />}
+            <span>{fr ? "Livraison (zone)" : "Delivery (zone)"}</span>
+            {!zone ? (
+              <span className="text-slate-500">{fr ? "Choisissez une zone" : "Choose a zone"}</span>
+            ) : delivery === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={delivery} />}
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">
-            <span>{locale === "fr" ? "Total" : "Total"}</span>
+            <span>Total</span>
             <DualCurrency amount={total} className="text-blue-700" />
           </div>
         </div>
-        <Link href="/shop/checkout" className="btn-primary mt-4 block w-full py-3 text-center">
-          {locale === "fr" ? "Passer à la caisse" : "Continue to Checkout"}
-        </Link>
+        {hasUnavailable ? (
+          <button disabled className="btn-primary mt-4 block w-full py-3 text-center opacity-50">
+            {fr ? "Passer à la caisse" : "Continue to Checkout"}
+          </button>
+        ) : (
+          <Link href="/shop/checkout" className="btn-primary mt-4 block w-full py-3 text-center">
+            {fr ? "Passer à la caisse" : "Continue to Checkout"}
+          </Link>
+        )}
       </div>
     </div>
   );

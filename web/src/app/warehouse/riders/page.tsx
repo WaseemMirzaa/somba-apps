@@ -4,121 +4,94 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
-import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 import { useRiderZones } from "@/context/rider-zone-context";
-import { type RiderEntity } from "@/lib/warehouse-entities";
 import { useWarehouseData } from "@/lib/warehouse";
-
-const STATUS_OPTIONS = [
-  { value: "active", label: "Active", labelFr: "Actif" },
-  { value: "offline", label: "Offline", labelFr: "Hors ligne" },
-];
-
-const STATUS_FR: Record<string, string> = {
-  active: "Actif",
-  inactive: "Inactif",
-  offline: "Hors ligne",
-};
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
+import { formatCurrency } from "@/lib/utils";
 
 export default function WarehouseRidersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
+  const ops = useOpsPath();
+  const base = useOpsBase();
   const { zoneOptions, getRiderZone, setRiderZone } = useRiderZones();
-  const { riderEntities } = useWarehouseData();
+  const { riders, ridersError, parcels } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [assignRider, setAssignRider] = useState<RiderEntity | null>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
 
-  const filtered = useMemo(
+  const rows = useMemo(
     () =>
-      applyListFilters(riderEntities, filters, {
-        searchFields: ["name", "zone", "location", "phone"],
-        statusField: "status",
+      riders.map((r) => {
+        const mine = parcels.filter((p) => p.riderId === r.id);
+        const delivered = mine.filter((p) => p.status === "delivered");
+        return {
+          ...r,
+          delivered: delivered.length,
+          failed: mine.filter((p) => p.status === "exception").length,
+          cod: delivered.reduce((s, p) => s + p.codAmountUsd, 0),
+        };
       }),
-    [riderEntities, filters]
+    [riders, parcels],
+  );
+  const filtered = useMemo(
+    () => applyListFilters(rows, filters, { searchFields: ["name", "phone"] }),
+    [rows, filters],
   );
 
   return (
-    <>
     <WarehouseListPage
-      title={fr ? "Affectations des livreurs" : "Rider Assignments"}
-      subtitle={fr ? "Vue liste — Nom du livreur, Zone, Livraisons actives, Lieu, Score de performance" : "List View — Rider Name, Zone, Active Deliveries, Location, Performance Score"}
-      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("riders") }]}
+      title={fr ? "Livreurs" : "Riders"}
+      subtitle={
+        fr
+          ? "Comptes livreurs actifs avec leurs livraisons en cours. La zone est une note gardée sur cet appareil."
+          : "Active rider accounts with their live deliveries. Zone is a note kept on this device."
+      }
+      breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("riders") }]}
       filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "Nom du livreur, zone, lieu…" : "Rider name, zone, location…"}
-          showDateFilters={false}
-        />
+        <div className="space-y-3">
+          {ridersError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{ridersError}</p>}
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            searchPlaceholder={fr ? "Nom ou téléphone…" : "Name or phone…"}
+            showDateFilters={false}
+            showStatusFilter={false}
+          />
+        </div>
       }
       columns={[
         { key: "name", label: fr ? "Nom du livreur" : "Rider Name", render: (row) => (
-          <Link href={`/warehouse/riders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
+          <Link href={ops(`/riders/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
-        { key: "zone", label: t("zone"), render: (row) => (
+        { key: "phone", label: fr ? "Téléphone" : "Phone", render: (row) => row.phone ? (
+          <a href={`tel:${String(row.phone).replace(/\s/g, "")}`} className="text-[var(--primary)] hover:underline">{String(row.phone)}</a>
+        ) : "—" },
+        { key: "zone", label: fr ? "Zone (sur cet appareil)" : "Zone (this device)", render: (row) => (
           <select
-            value={getRiderZone(row.id as number)}
-            onChange={(e) => {
-              setRiderZone(row.id as number, e.target.value);
-              toast(fr ? `${row.name} → ${e.target.value}` : `${row.name} → ${e.target.value}`);
-            }}
+            value={getRiderZone(String(row.id))}
+            onChange={(e) => setRiderZone(String(row.id), e.target.value)}
             className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
-            onClick={(e) => e.stopPropagation()}
+            aria-label={fr ? "Zone, note locale" : "Zone, local note"}
           >
+            <option value="">—</option>
             {zoneOptions.map((z) => (
               <option key={z} value={z}>{z}</option>
             ))}
           </select>
         )},
-        { key: "activeDeliveries", label: fr ? "Livraisons actives" : "Active Deliveries" },
-        { key: "location", label: fr ? "Lieu actuel" : "Current Location" },
-        { key: "performanceScore", label: fr ? "Performance" : "Performance", render: (row) => (
-          <span className="font-medium text-emerald-600">{String(row.performanceScore)}%</span>
+        { key: "activeTasks", label: fr ? "Livraisons actives" : "Active Deliveries", render: (row) => (
+          <Badge variant={Number(row.activeTasks) > 0 ? "info" : "default"}>{String(row.activeTasks)}</Badge>
         )},
-        { key: "status", label: t("status"), render: (row) => <Badge variant="success">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+        { key: "delivered", label: fr ? "Livrées" : "Delivered" },
+        { key: "failed", label: fr ? "Échouées" : "Failed" },
+        { key: "cod", label: fr ? "COD encaissé" : "COD collected", render: (row) => formatCurrency(Number(row.cod), locale) },
         { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex gap-2 text-xs">
-            <Link href={`/warehouse/riders/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            <button
-              onClick={() => {
-                const rider = riderEntities.find((r) => r.id === row.id);
-                if (rider) {
-                  setAssignRider(rider);
-                  setShowAssignModal(true);
-                }
-              }}
-              className="text-[var(--primary)] hover:underline"
-            >
-              {t("assign")}
-            </button>
-          </div>
+          <Link href={ops(`/riders/${row.id}`)} className="text-xs text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
     />
-
-    <AssignRiderModal
-      open={showAssignModal}
-      title={fr ? "Assigner un livreur au lot" : "Assign rider to batch"}
-      subtitle={assignRider ? (fr ? `Sélectionné : ${assignRider.name}` : `Selected: ${assignRider.name}`) : undefined}
-      selectedRiderId={assignRider?.id ?? null}
-      onClose={() => {
-        setShowAssignModal(false);
-        setAssignRider(null);
-      }}
-      onConfirm={(rider) => {
-        toast(fr ? `${rider.name} assigné au prochain lot prêt` : `${rider.name} assigned to next ready batch`);
-        setShowAssignModal(false);
-        setAssignRider(null);
-      }}
-    />
-    </>
   );
 }

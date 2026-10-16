@@ -64,6 +64,16 @@ class LocationReporter {
     return access;
   }
 
+  /// Opens the system page where the rider can fix the problem. Returns false
+  /// when the platform has no such page (tests, desktop).
+  Future<bool> openSettings(LocationAccess access) async {
+    try {
+      return access == LocationAccess.serviceOff ? await Geolocator.openLocationSettings() : await Geolocator.openAppSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> stop() async {
     await _sub?.cancel();
     _sub = null;

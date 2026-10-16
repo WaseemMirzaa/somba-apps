@@ -57,7 +57,7 @@ void main() {
 
     // COD is off by default; enable for this run, then the customer orders cash-on-delivery.
     await admin.call('settings:set', {'key': 'codEnabled', 'value': 'true'});
-    final products = (await customer.call('products:list')) as List;
+    final products = ((await customer.call('products:list')) as List).where((p) => ((p['stock'] as num?) ?? 0) > 5).toList();
     final order = await customer.call('orders:create', {
       'items': [
         {'productId': products.first['id'], 'qty': 1}
@@ -101,6 +101,77 @@ void main() {
     expect(store.isSignedIn, isFalse);
     // Leave the platform as we found it (COD off per the client scope).
     await admin.call('settings:set', {'key': 'codEnabled', 'value': 'false'});
+    admin.close();
+    customer.close();
+  }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');
+
+  test('rider: fail with a reason (re-queued as attempt 2) and deliver with the customer code', () async {
+    final admin = Actor();
+    await admin.connect('admin@somba.app', 'Somba@2026');
+    final customer = Actor();
+    await customer.connect('customer@somba.app', 'Somba@2026');
+    final store = RiderStore.instance;
+    final products = ((await customer.call('products:list')) as List).where((p) => ((p['stock'] as num?) ?? 0) > 5).toList();
+
+    Future<Map> order() async => Map<String, dynamic>.from(await customer.call('orders:create', {
+          'items': [
+            {'productId': products.first['id'], 'qty': 1}
+          ],
+          'paymentMethod': 'stripe_card',
+          'zoneId': 'gombe',
+          'shippingAddress': '{"city":"Kinshasa","line1":"3 Ave Livre"}',
+        }));
+
+    await store.login('rider@somba.app', 'Somba@2026');
+    await until(() => store.isConnected && store.loaded, what: 'rider hydrated');
+
+    // ---- failed delivery from `assigned` with a reason -> new task, attempt 2
+    final o1 = await order();
+    // The server does not push new pool items to riders, so re-read like pull-to-refresh.
+    await store.refresh();
+    await until(() => store.pool.any((t) => t.orderId == o1['id']), what: 'task in pool');
+    final t1 = store.pool.firstWhere((t) => t.orderId == o1['id']);
+    expect(t1.attempts, 1);
+    await store.accept(t1.id);
+    await store.advance(t1.id, 'failed', reason: 'Customer unreachable');
+    await until(() => store.finished.any((t) => t.id == t1.id), what: 'failed task in Done');
+    final failed = store.finished.firstWhere((t) => t.id == t1.id);
+    expect(failed.status, 'failed');
+    expect(failed.failureReason, startsWith('Customer unreachable'));
+    await until(() => store.pool.any((t) => t.orderId == o1['id']), what: 're-queued task');
+    final again = store.pool.firstWhere((t) => t.orderId == o1['id']);
+    expect(again.id, isNot(t1.id));
+    expect(again.attempts, 2);
+
+    // ---- proof of delivery: wrong code refused, right code delivers
+    await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'true'});
+    try {
+      await store.refresh();
+      expect(store.requireDeliveryCode, isTrue);
+      final o2 = await order();
+      await store.refresh();
+      await until(() => store.pool.any((t) => t.orderId == o2['id']), what: 'second task in pool');
+      final t2 = store.pool.firstWhere((t) => t.orderId == o2['id']);
+      await store.accept(t2.id);
+      await store.advance(t2.id, 'picked_up');
+      await store.advance(t2.id, 'in_transit');
+      final info = await customer.call('orders:deliveryCode', {'orderId': o2['id']}) as Map;
+      expect(info['required'], isTrue);
+      final code = info['code'] as String;
+      expect(code, matches(RegExp(r'^\d{4}$')));
+
+      await expectLater(store.advance(t2.id, 'delivered'), throwsA(anything));
+      final wrong = code == '1234' ? '4321' : '1234';
+      await expectLater(store.advance(t2.id, 'delivered', code: wrong), throwsA(predicate((e) => e.toString().contains('Wrong delivery code'))));
+      await store.advance(t2.id, 'delivered', code: code);
+      await until(() => store.finished.any((t) => t.id == t2.id && t.status == 'delivered'), what: 'delivered with code');
+    } finally {
+      await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'false'});
+    }
+    await store.refresh();
+    expect(store.requireDeliveryCode, isFalse);
+
+    await store.logout();
     admin.close();
     customer.close();
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');

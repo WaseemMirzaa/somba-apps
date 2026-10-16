@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageLoader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
-import { useModeration } from "@/context/moderation-context";
 import { useCatalog } from "@/lib/catalog";
 
 function SearchResults() {
@@ -14,10 +13,9 @@ function SearchResults() {
   const query = (searchParams.get("q") || "").toLowerCase();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { isProductVisible } = useModeration();
   const products = useCatalog();
 
-  const visible = products.filter(isProductVisible);
+  const visible = products;
   const results = query
     ? visible.filter(
         (p) =>

@@ -12,20 +12,9 @@ import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
+import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL, orderStatusLabel } from "@/lib/admin-live";
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "processing", label: "Processing", labelFr: "En cours" },
-  { value: "delivered", label: "Delivered", labelFr: "Livré" },
-  { value: "cancelled", label: "Cancelled", labelFr: "Annulé" },
-];
-
-const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  delivered: "success",
-  processing: "info",
-  pending: "warning",
-  cancelled: "danger",
-};
+const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABEL).map(([value, l]) => ({ value, label: l.en, labelFr: l.fr }));
 
 const PAYMENT_METHOD_FR: Record<string, string> = {
   Card: "Carte",
@@ -90,11 +79,14 @@ export default function AdminOrdersPage() {
               {
                 key: "seller",
                 label: fr ? "Vendeur" : "Seller",
-                render: (row) => (
-                  <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
-                    {String(row.seller)}
-                  </Link>
-                ),
+                render: (row) =>
+                  row.sellerId ? (
+                    <Link href={`/admin/sellers/${row.sellerId}`} className="text-[var(--primary)] hover:underline">
+                      {String(row.seller)}
+                    </Link>
+                  ) : (
+                    <span>{String(row.seller)}</span>
+                  ),
               },
               {
                 key: "amount",
@@ -110,8 +102,8 @@ export default function AdminOrdersPage() {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={statusVariant[row.status as string] ?? "default"}>
-                    {t(row.status as Parameters<typeof t>[0])}
+                  <Badge variant={ORDER_STATUS_BADGE[row.status as string] ?? "default"}>
+                    {orderStatusLabel(String(row.status), fr)}
                   </Badge>
                 ),
               },

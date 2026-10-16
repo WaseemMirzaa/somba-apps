@@ -8,58 +8,51 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { ActiveDeliveryCard } from "@/components/delivery/active-delivery-card";
-import { useWarehouseData } from "@/lib/warehouse";
-import { deliveryEntityToDetail } from "@/lib/delivery-detail";
-import { batchEntities } from "@/lib/entities";
+import { STAGE_LABEL, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
+import { BATCH_STATUS, batchTaskIds, pick, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-
-const STATUS_FR: Record<string, string> = {
-  active: "Actif",
-  inactive: "Inactif",
-  offline: "Hors ligne",
-};
-
-// Batch status values originate from the shared (non-owned) entities layer.
-const BATCH_STATUS_FR: Record<string, string> = {
-  ready: "Prêt",
-  dispatched: "Expédié",
-  in_transit: "En transit",
-  delivered: "Livré",
-};
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getRider, getDeliveriesByRider } = useWarehouseData();
-  const rider = getRider(id);
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { riders, parcels, ridersLoading } = useWarehouseData();
+  const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
+  const rider = riders.find((r) => r.id === id);
 
   if (!rider) {
     return (
       <div className="p-8 text-center text-slate-500">
-        {fr ? "Livreur introuvable" : "Rider not found"}
+        {ridersLoading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Livreur introuvable" : "Rider not found")}
       </div>
     );
   }
 
-  const batches = batchEntities.filter((b) => b.riderId === rider.id);
-  const activeDeliveries = getDeliveriesByRider(rider.id);
+  const mine = parcels.filter((p) => p.riderId === rider.id);
+  const active = mine.filter((p) => p.status !== "delivered" && p.status !== "exception");
+  const delivered = mine.filter((p) => p.status === "delivered");
+  const failed = mine.filter((p) => p.status === "exception");
+  const cod = delivered.reduce((s, p) => s + p.codAmountUsd, 0);
+  const batches = batchesQ.data.filter((b) => b.riderId === rider.id);
+  const listHref = ops("/riders");
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={rider.name}
-        subtitle={`${rider.zone} · ${fr ? rider.vehicleFr : rider.vehicle} · ⭐ ${rider.rating}`}
-        backHref="/warehouse/riders"
+        subtitle={rider.phone ?? undefined}
+        backHref={listHref}
         breadcrumbs={[
-          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
-          { label: fr ? "Livreurs" : "Riders", href: "/warehouse/riders" },
+          { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+          { label: fr ? "Livreurs" : "Riders", href: listHref },
           { label: rider.name },
         ]}
         actions={
-          <>
+          rider.phone ? (
             <a
               href={`tel:${rider.phone.replace(/\s/g, "")}`}
               className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50"
@@ -67,106 +60,59 @@ export default function WarehouseRiderDetailPage() {
               <Phone className="h-3.5 w-3.5" />
               {fr ? "Appeler livreur" : "Call Rider"}
             </a>
-            <Badge variant="success">{fr ? STATUS_FR[rider.status] ?? rider.status : rider.status}</Badge>
-          </>
+          ) : undefined
         }
       />
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Aperçu" : "Overview"}>
-          <InfoGrid
-            items={[
-              { label: fr ? "Nom" : "Name", value: rider.name },
-              {
-                label: fr ? "Téléphone" : "Phone",
-                value: (
-                  <a
-                    href={`tel:${rider.phone.replace(/\s/g, "")}`}
-                    className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {rider.phone}
-                  </a>
-                ),
-              },
-              { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
-              { label: t("zone"), value: rider.zone },
-              { label: fr ? "Statut" : "Status", value: fr ? STATUS_FR[rider.status] ?? rider.status : rider.status },
-              { label: fr ? "Position" : "Location", value: rider.location },
-            ]}
-          />
+          <InfoGrid items={[
+            { label: fr ? "Nom" : "Name", value: rider.name },
+            { label: fr ? "Téléphone" : "Phone", value: rider.phone ?? "—" },
+            { label: fr ? "Livraisons actives" : "Active deliveries", value: active.length },
+          ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Performance" : "Performance"}>
-          <InfoGrid
-            columns={3}
-            items={[
-              { label: fr ? "Livraisons totales" : "Total Deliveries", value: rider.deliveries },
-              { label: fr ? "Échecs" : "Failed Deliveries", value: rider.failedDeliveries },
-              { label: fr ? "Note" : "Rating", value: `⭐ ${rider.rating}` },
-              { label: fr ? "Score performance" : "Performance Score", value: `${rider.performanceScore}%` },
-            ]}
-          />
+        <DetailGridSection title={fr ? "Performance (liste en direct)" : "Performance (live list)"}>
+          <InfoGrid columns={3} items={[
+            { label: fr ? "Livrées" : "Delivered", value: delivered.length },
+            { label: fr ? "Échouées" : "Failed", value: failed.length },
+            { label: fr ? "COD encaissé" : "COD collected", value: formatCurrency(cod, locale) },
+          ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Revenus" : "Earnings"}>
-          <InfoGrid
-            columns={3}
-            items={[
-              { label: fr ? "Journalier" : "Daily", value: formatCurrency(rider.earningsDaily, locale) },
-              { label: fr ? "Hebdomadaire" : "Weekly", value: formatCurrency(rider.earningsWeekly, locale) },
-              { label: fr ? "Mensuel" : "Monthly", value: formatCurrency(rider.earningsMonthly, locale) },
-            ]}
-          />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Lots assignés" : "Assigned Batches"} span={2}>
+        <DetailGridSection title={fr ? "Lots assignés" : "Assigned Batches"}>
           <DataTable
+            emptyMessage={fr ? "Aucun lot." : "No batches."}
             columns={[
-              {
-                key: "id",
-                label: fr ? "Lot" : "Batch",
-                render: (row) => (
-                  <Link href={`/warehouse/dispatch/${row.id}`} className="text-[var(--primary)] hover:underline">
-                    {String(row.id)}
-                  </Link>
-                ),
-              },
-              { key: "zone", label: t("zone") },
-              { key: "parcelCount", label: fr ? "Colis" : "Parcels" },
-              {
-                key: "status",
-                label: fr ? "Statut" : "Status",
-                render: (row) => <Badge>{fr ? (BATCH_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
-              },
+              { key: "reference", label: fr ? "Lot" : "Batch", render: (row) => (
+                <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
+              )},
+              { key: "count", label: fr ? "Colis" : "Parcels" },
+              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge>{pick(BATCH_STATUS[String(row.status)], fr, String(row.status))}</Badge> },
             ]}
-            data={batches as unknown as Record<string, unknown>[]}
-            rowAction={(row) => (
-              <Link href={`/warehouse/dispatch/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-            )}
+            data={batches.map((b) => ({ ...b, count: batchTaskIds(b).length })) as unknown as Record<string, unknown>[]}
           />
         </DetailGridSection>
 
-        <DetailGridSection
-          title={fr ? "Livraisons actives" : "Current Deliveries"}
-          span={3}
-        >
-          {activeDeliveries.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              {fr ? "Aucune livraison active." : "No active deliveries."}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {activeDeliveries.map((delivery) => (
-                <ActiveDeliveryCard
-                  key={delivery.id}
-                  delivery={deliveryEntityToDetail(delivery)}
-                  locale={locale}
-                  alwaysExpanded
-                />
-              ))}
-            </div>
-          )}
+        <DetailGridSection title={fr ? "Livraisons de ce livreur" : "This rider's deliveries"} span={3}>
+          <DataTable
+            emptyMessage={fr ? "Aucune livraison." : "No deliveries."}
+            columns={[
+              { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
+                <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+              )},
+              { key: "orderId", label: fr ? "ID commande" : "Order ID" },
+              { key: "customer", label: t("customer") },
+              { key: "customerAddress", label: fr ? "Adresse" : "Address" },
+              { key: "attempts", label: fr ? "Tentatives" : "Attempts" },
+              { key: "status", label: t("status"), render: (row) => {
+                const s = String(row.status) as ParcelStage;
+                return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
+              }},
+            ]}
+            data={mine as unknown as Record<string, unknown>[]}
+          />
         </DetailGridSection>
       </DetailGrid>
     </div>

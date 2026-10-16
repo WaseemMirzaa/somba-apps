@@ -1,45 +1,23 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { SellerListPage } from "@/components/seller/list-page";
+import { ProductImage } from "@/components/seller/product-image";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useSellerData } from "@/lib/seller";
+import {
+  PRODUCT_STATUS_OPTIONS,
+  errMessage,
+  productStatusExplain,
+  productStatusLabel,
+  productStatusVariant,
+} from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
-
-type SellerProductStatus = "live" | "draft" | "paused" | "out_of_stock" | "unavailable";
-
-const STATUS_OPTIONS = [
-  { value: "live", label: "Live", labelFr: "En ligne" },
-  { value: "draft", label: "Draft", labelFr: "Brouillon" },
-  { value: "paused", label: "Paused", labelFr: "En pause" },
-  { value: "unavailable", label: "Unavailable", labelFr: "Indisponible" },
-  { value: "out_of_stock", label: "Out of stock", labelFr: "En rupture de stock" },
-];
-
-const PRODUCT_STATUS_FR: Record<string, string> = {
-  live: "En ligne", draft: "Brouillon", paused: "En pause", unavailable: "Indisponible",
-  out_of_stock: "En rupture de stock", active: "Actif", disabled: "Désactivé",
-};
-
-function productStatusBadgeVariant(status: string) {
-  if (status === "live") return "success";
-  if (status === "unavailable" || status === "out_of_stock") return "danger";
-  return "warning";
-}
-
-function productStatusLabel(status: string, fr: boolean) {
-  return fr ? (PRODUCT_STATUS_FR[status] ?? status) : status;
-}
-
-const MODERATION_STATUS_FR: Record<string, string> = {
-  approved: "Approuvé", pending: "En attente", rejected: "Rejeté", flagged: "Signalé",
-};
 
 export default function SellerProductsPage() {
   const { t, locale } = useLocale();
@@ -47,39 +25,38 @@ export default function SellerProductsPage() {
   const { toast } = useToast();
   const { sellerProductList, pauseProduct, publishProduct } = useSellerData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [products, setProducts] = useState(sellerProductList);
-  // Resync when the live catalogue hydrates/changes over the socket.
-  useEffect(() => {
-    setProducts(sellerProductList);
-  }, [sellerProductList]);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
-      applyListFilters(products, filters, {
-        searchFields: ["id", "name", "brand", "sku", "category"],
+      applyListFilters(sellerProductList, filters, {
+        searchFields: ["id", "name", "sku", "category"],
         statusField: "status",
       }),
-    [products, filters]
+    [sellerProductList, filters]
   );
 
-  async function setProductStatus(id: string, status: SellerProductStatus) {
-    setProducts((items) => items.map((item) => (item.id === id ? { ...item, status } : item)));
-    if (status === "unavailable") {
-      await pauseProduct(id);
-    } else {
-      await publishProduct(id);
+  async function toggle(id: string, to: "draft" | "live") {
+    setBusyId(id);
+    try {
+      if (to === "draft") await pauseProduct(id);
+      else await publishProduct(id);
+      toast(
+        to === "draft"
+          ? fr ? "Produit mis en pause : masqué de la boutique" : "Product paused: hidden from the shop"
+          : fr ? "Produit remis en ligne" : "Product is live again"
+      );
+    } catch (e) {
+      toast(errMessage(e), "error");
+    } finally {
+      setBusyId(null);
     }
-    toast(
-      status === "unavailable"
-        ? (fr ? "Produit marqué indisponible" : "Product marked unavailable")
-        : (fr ? "Produit remis en ligne" : "Product marked live")
-    );
   }
 
   return (
     <SellerListPage
       title={t("products")}
-      subtitle={fr ? "Vue liste — Image, Nom, Marque, SKU, Prix, Stock, Vendus, Vues, Note, Statut, Modération" : "List View — Image, Name, Brand, SKU, Price, Stock, Sold, Views, Rating, Status, Moderation"}
+      subtitle={fr ? "Vos annonces et leur statut de modération réel" : "Your listings and their real moderation status"}
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("products") }]}
       actions={
         <Link href="/seller/products/create" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
@@ -90,47 +67,60 @@ export default function SellerProductsPage() {
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "Produit, SKU, marque…" : "Product, SKU, brand…"}
+          statusOptions={PRODUCT_STATUS_OPTIONS}
+          searchPlaceholder={fr ? "Produit, SKU, catégorie…" : "Product, SKU, category…"}
           showDateFilters={false}
         />
       }
       columns={[
-        { key: "image", label: fr ? "Image" : "Image", render: (row) => (
-          <div className="relative h-10 w-10 overflow-hidden rounded">
-            <Image src={String(row.image)} alt="" fill className="object-cover" sizes="40px" />
+        { key: "image", label: "Image", render: (row) => (
+          <div className="h-10 w-10 overflow-hidden rounded">
+            <ProductImage src={String(row.image)} />
           </div>
         )},
         { key: "name", label: fr ? "Produit" : "Product", primary: true, render: (row) => (
           <Link href={`/seller/products/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
         )},
-        { key: "brand", label: fr ? "Marque" : "Brand" },
         { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
         { key: "sku", label: "SKU" },
         { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
-        { key: "discountPrice", label: fr ? "Promo" : "Sale", render: (row) => formatCurrency(row.discountPrice as number, locale) },
         { key: "availableStock", label: "Stock" },
         { key: "soldCount", label: fr ? "Vendus" : "Sold" },
-        { key: "views", label: fr ? "Vues" : "Views" },
-        { key: "rating", label: fr ? "Note" : "Rating", render: (row) => `⭐ ${row.rating}` },
-        { key: "status", label: t("status"), render: (row) => <Badge variant={productStatusBadgeVariant(String(row.status))}>{productStatusLabel(String(row.status), fr)}</Badge> },
-        { key: "moderationStatus", label: fr ? "Modération" : "Moderation", render: (row) => <Badge>{fr ? (MODERATION_STATUS_FR[String(row.moderationStatus)] ?? String(row.moderationStatus)) : String(row.moderationStatus)}</Badge> },
-        { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex flex-wrap gap-2 text-xs">
-            <Link href={`/seller/products/${row.id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            <Link href="/seller/products/create" className="text-slate-500 hover:underline">{fr ? "Modifier" : "Edit"}</Link>
-            {row.status === "live" && (
-              <button type="button" onClick={() => setProductStatus(row.id as string, "unavailable")} className="text-amber-700 hover:underline">
-                {fr ? "Indisponible" : "Unavailable"}
-              </button>
-            )}
-            {row.status === "unavailable" && (
-              <button type="button" onClick={() => setProductStatus(row.id as string, "live")} className="text-emerald-700 hover:underline">
-                {fr ? "Remettre en ligne" : "Mark live"}
-              </button>
-            )}
-          </div>
-        )},
+        { key: "rating", label: fr ? "Note" : "Rating", render: (row) => (Number(row.rating) > 0 ? `⭐ ${Number(row.rating).toFixed(1)}` : "—") },
+        { key: "status", label: t("status"), render: (row) => {
+          const status = String(row.status);
+          return (
+            <div title={productStatusExplain(status, fr) ?? undefined}>
+              <Badge variant={productStatusVariant(status)}>{productStatusLabel(status, fr)}</Badge>
+            </div>
+          );
+        }},
+        { key: "actions", label: t("action"), render: (row) => {
+          const id = String(row.id);
+          const status = String(row.status);
+          const busy = busyId === id;
+          return (
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link href={`/seller/products/${id}`} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+              <Link href={`/seller/products/${id}/edit`} className="text-slate-500 hover:underline">{fr ? "Modifier" : "Edit"}</Link>
+              {status === "live" && (
+                <button type="button" disabled={busy} onClick={() => toggle(id, "draft")} className="text-amber-700 hover:underline disabled:opacity-50">
+                  {fr ? "Indisponible" : "Unavailable"}
+                </button>
+              )}
+              {status === "draft" && (
+                <button type="button" disabled={busy} onClick={() => toggle(id, "live")} className="text-emerald-700 hover:underline disabled:opacity-50">
+                  {fr ? "Remettre en ligne" : "Mark live"}
+                </button>
+              )}
+              {(status === "pending" || status === "rejected") && (
+                <span className="text-slate-500">
+                  {status === "pending" ? (fr ? "Validation en cours" : "Awaiting moderator") : fr ? "Refusé par la modération" : "Rejected by moderation"}
+                </span>
+              )}
+            </div>
+          );
+        }},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
     />

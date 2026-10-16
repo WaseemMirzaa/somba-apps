@@ -48,7 +48,7 @@ export function ProductCard({ product, flash }: ProductCardProps) {
 
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/50">
           <Image
-            src={product.image}
+            src={product.image || "/brand/logo-stack.png"}
             alt={name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"

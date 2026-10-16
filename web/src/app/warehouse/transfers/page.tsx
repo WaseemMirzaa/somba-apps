@@ -1,151 +1,145 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs } from "@/components/ui/tabs";
 import { StatCard } from "@/components/ui/stat-card";
-import { Truck, ArrowRight, ChevronDown, MapPin, User } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
+import { Truck, ArrowRight } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { ParcelJourney } from "@/components/warehouse/parcel-journey";
-import {
-  TRANSFER_RUNS,
-  TRANSFER_STATUS_LABELS,
-  parcelsForTransfer,
-  type TransferStatus,
-} from "@/lib/warehouse-transfers";
-import { cn } from "@/lib/utils";
-
-const STATUS_VARIANT: Record<TransferStatus, "success" | "info" | "warning" | "default"> = {
-  scheduled: "default",
-  loading: "warning",
-  in_transit: "info",
-  arrived: "warning",
-  received: "success",
-};
+import { socketClient } from "@/lib/realtime/socket-client";
+import { TRANSFER_STATUS, errorMessage, pick, shortDate, useOpsQuery, type TransferRow } from "@/lib/warehouse-live";
+import { useWarehouseData } from "@/lib/warehouse";
+import { useOpsBase } from "@/lib/ops-path";
 
 export default function WarehouseTransfersPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const [tab, setTab] = useState<"all" | "outbound" | "return">("all");
-  const [open, setOpen] = useState<string | null>("TR-9001");
+  const base = useOpsBase();
+  const { inventory } = useWarehouseData();
+  const transfersQ = useOpsQuery<TransferRow[]>("warehouse:transfers", { initial: [] as TransferRow[], push: ["transfer:updated"] });
+  const hubsQ = useOpsQuery<{ id: string; name: string }[]>("warehouse:hubs", { initial: [] });
+  const [form, setForm] = useState({ fromHub: "", toHub: "", sku: "", productName: "", qty: "1" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const runs = TRANSFER_RUNS.filter((r) => tab === "all" || r.direction === tab);
-  const inTransit = TRANSFER_RUNS.filter((r) => r.status === "in_transit").length;
-  const scheduled = TRANSFER_RUNS.filter((r) => r.status === "scheduled").length;
-  const parcelsMoving = TRANSFER_RUNS.reduce((n, r) => n + r.parcelIds.length, 0);
+  const requested = transfersQ.data.filter((r) => r.status === "requested").length;
+  const inTransit = transfersQ.data.filter((r) => r.status === "in_transit").length;
+  const units = transfersQ.data.reduce((n, r) => n + r.qty, 0);
+  const skuOptions = useMemo(() => inventory.map((i) => ({ sku: i.sku, name: i.name })), [inventory]);
 
-  const tabs = [
-    { id: "all", label: fr ? "Tous" : "All" },
-    { id: "outbound", label: fr ? "Sortants (vente)" : "Outbound (fulfilment)" },
-    { id: "return", label: fr ? "Retours" : "Returns" },
-  ];
+  function pickSku(sku: string) {
+    const hit = skuOptions.find((o) => o.sku === sku);
+    setForm((f) => ({ ...f, sku, productName: hit?.name ?? f.productName }));
+  }
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const qty = Number(form.qty);
+    if (!form.fromHub.trim() || !form.toHub.trim() || !form.sku.trim() || !Number.isFinite(qty) || qty < 1) {
+      setError(fr ? "Renseignez hub d'origine, hub de destination, SKU et quantité (≥ 1)." : "Enter from hub, to hub, SKU and a quantity of at least 1.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await socketClient.request<TransferRow>("warehouse:createTransfer", {
+        fromHub: form.fromHub.trim(),
+        toHub: form.toHub.trim(),
+        sku: form.sku.trim(),
+        productName: form.productName.trim() || undefined,
+        qty: Math.floor(qty),
+      });
+      toast(fr ? `Transfert ${created.reference} créé` : `Transfer ${created.reference} created`);
+      setForm({ fromHub: "", toHub: "", sku: "", productName: "", qty: "1" });
+      await transfersQ.reload();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Transferts inter-entrepôts" : "Inter-warehouse Transfers"}
-        subtitle={
-          fr
-            ? "Liaisons longue distance entre hubs — un colis voyage d'un entrepôt (zone A) vers un autre (zone B), puis livraison dernier km au client"
-            : "Line-haul legs between hubs — a parcel travels from one warehouse (zone A) to another (zone B), then last-mile to the customer"
-        }
-        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: fr ? "Transferts" : "Transfers" }]}
+        subtitle={fr ? "Demandes de transfert de stock entre hubs" : "Stock transfer requests between hubs"}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Transferts" : "Transfers" }]}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard title={fr ? "Demandés" : "Requested"} value={requested} icon={Truck} />
         <StatCard title={fr ? "En transit" : "In transit"} value={inTransit} icon={Truck} />
-        <StatCard title={fr ? "Planifiés" : "Scheduled"} value={scheduled} icon={Truck} />
-        <StatCard title={fr ? "Colis en mouvement" : "Parcels moving"} value={parcelsMoving} icon={ArrowRight} />
+        <StatCard title={fr ? "Unités concernées" : "Units across transfers"} value={units} icon={ArrowRight} />
       </div>
 
-      <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as typeof tab)} />
+      <Card>
+        <CardContent className="p-5">
+          <h2 className="mb-3 font-semibold text-slate-900">{fr ? "Nouveau transfert" : "New transfer"}</h2>
+          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="block text-xs font-medium text-slate-600">
+              {fr ? "Hub d'origine" : "From hub"}
+              <input list="hub-names" className="input-premium mt-1 w-full px-3 py-2 text-sm" value={form.fromHub} onChange={(e) => setForm({ ...form, fromHub: e.target.value })} />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {fr ? "Hub de destination" : "To hub"}
+              <input list="hub-names" className="input-premium mt-1 w-full px-3 py-2 text-sm" value={form.toHub} onChange={(e) => setForm({ ...form, toHub: e.target.value })} />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              SKU
+              <input list="sku-list" className="input-premium mt-1 w-full px-3 py-2 text-sm" value={form.sku} onChange={(e) => pickSku(e.target.value)} />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {fr ? "Produit" : "Product name"}
+              <input className="input-premium mt-1 w-full px-3 py-2 text-sm" value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">
+              {fr ? "Quantité" : "Quantity"}
+              <input type="number" min={1} className="input-premium mt-1 w-full px-3 py-2 text-sm" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+            </label>
+            <datalist id="hub-names">
+              {hubsQ.data.map((h) => <option key={h.id} value={h.name} />)}
+            </datalist>
+            <datalist id="sku-list">
+              {skuOptions.map((o) => <option key={o.sku} value={o.sku}>{o.name}</option>)}
+            </datalist>
+            <div className="sm:col-span-2 lg:col-span-5">
+              {error && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+              <button type="submit" disabled={busy} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60">
+                {busy ? (fr ? "Création…" : "Creating…") : (fr ? "Créer le transfert" : "Create transfer")}
+              </button>
+              <span className="ml-3 text-xs text-slate-500">
+                {fr ? "Le serveur n'offre pas encore d'étape « arrivé / reçu » : le statut reste « demandé »." : "The server has no arrive / receive step yet: a new transfer stays at \"requested\"."}
+              </span>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
-      <div className="space-y-3">
-        {runs.map((run) => {
-          const parcels = parcelsForTransfer(run.id);
-          const isOpen = open === run.id;
-          return (
-            <Card key={run.id}>
-              <CardContent className="p-0">
-                <button
-                  onClick={() => setOpen(isOpen ? null : run.id)}
-                  className="flex w-full flex-wrap items-center gap-3 p-5 text-left"
-                >
-                  <span className="rounded-lg bg-slate-100 p-2">
-                    <Truck className="h-5 w-5 text-slate-600" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900">{run.id}</span>
-                      <Badge variant={run.direction === "return" ? "warning" : "info"}>
-                        {run.direction === "return" ? (fr ? "Retour" : "Return") : (fr ? "Sortant" : "Outbound")}
-                      </Badge>
-                      <Badge variant={STATUS_VARIANT[run.status]}>
-                        {fr ? TRANSFER_STATUS_LABELS[run.status].fr : TRANSFER_STATUS_LABELS[run.status].en}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{run.fromWarehouse} · {run.fromZone}</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{run.toWarehouse} · {run.toZone}</span>
-                    </div>
-                  </div>
-                  <div className="text-right text-xs text-slate-500">
-                    <p className="flex items-center justify-end gap-1"><User className="h-3 w-3" />{run.driver}</p>
-                    <p>{run.vehicle}</p>
-                    <p>{fr ? "Départ" : "Depart"} {run.departAt} · ETA {run.eta}</p>
-                  </div>
-                  <ChevronDown className={cn("h-5 w-5 text-slate-400 transition-transform", isOpen && "rotate-180")} />
-                </button>
-
-                {isOpen && (
-                  <div className="border-t border-[var(--border)] p-5">
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => toast(fr ? `${run.id} marqué arrivé` : `${run.id} marked arrived`, "info")}
-                        className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
-                      >
-                        {fr ? "Marquer arrivé" : "Mark arrived"}
-                      </button>
-                      <button
-                        onClick={() => toast(fr ? `Colis de ${run.id} reçus au hub` : `${run.id} parcels received at hub`)}
-                        className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--primary-hover)]"
-                      >
-                        {fr ? "Réceptionner au hub" : "Receive at destination hub"}
-                      </button>
-                    </div>
-
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      {parcels.length} {fr ? "colis dans ce transfert" : "parcels in this transfer"}
-                    </p>
-                    {parcels.length === 0 ? (
-                      <p className="text-sm text-slate-400">{fr ? "Aucun colis encore affecté." : "No parcels assigned yet."}</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {parcels.map((p) => (
-                          <div key={p.id} className="rounded-xl border border-[var(--border)] p-4">
-                            <div className="mb-2 flex items-center gap-2 text-sm">
-                              <span className="font-medium text-slate-900">{p.orderId}</span>
-                              <span className="text-slate-400">·</span>
-                              <span className="text-slate-600">{p.customer}</span>
-                            </div>
-                            <ParcelJourney legs={p.legs} currentLeg={p.currentLeg} fr={fr} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {transfersQ.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{transfersQ.error}</p>}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable
+            emptyMessage={fr ? "Aucun transfert." : "No transfers yet."}
+            columns={[
+              { key: "reference", label: fr ? "Référence" : "Reference" },
+              { key: "fromHub", label: fr ? "De" : "From" },
+              { key: "toHub", label: fr ? "Vers" : "To" },
+              { key: "sku", label: "SKU" },
+              { key: "productName", label: fr ? "Produit" : "Product", render: (row) => String(row.productName ?? "—") },
+              { key: "qty", label: fr ? "Qté" : "Qty" },
+              { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant="info">{pick(TRANSFER_STATUS[String(row.status)], fr, String(row.status))}</Badge> },
+              { key: "createdAt", label: fr ? "Créé le" : "Created", render: (row) => shortDate(String(row.createdAt), locale) },
+            ]}
+            data={transfersQ.data as unknown as Record<string, unknown>[]}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

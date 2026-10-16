@@ -4,57 +4,53 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { BarcodeScanner } from "@/components/ui/barcode-scanner";
+import { ScanInput } from "@/components/warehouse/scan-input";
+import { useReceiveParcel } from "@/components/warehouse/use-receive";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
-import { useWarehouseData } from "@/lib/warehouse";
+import { STAGE_LABEL, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
+import { shortDate } from "@/lib/warehouse-live";
+import { useOpsPath, useOpsBase } from "@/lib/ops-path";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "received", label: "Received", labelFr: "Reçu" },
+  { value: "inbound", label: STAGE_LABEL.inbound.en, labelFr: STAGE_LABEL.inbound.fr },
+  { value: "received", label: STAGE_LABEL.received.en, labelFr: STAGE_LABEL.received.fr },
 ];
-
-// Parcel status values originate from the shared (non-owned) entities layer.
-const STATUS_FR: Record<string, string> = {
-  inbound: "Entrant",
-  pending: "En attente",
-  received: "Reçu",
-  sorting: "Tri",
-  ready: "Prêt",
-  dispatched: "Expédié",
-};
 
 export default function WarehouseReceivingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const router = useRouter();
-  const { inboundParcels, advanceDelivery } = useWarehouseData();
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const homeLabel = base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse");
+  const homeHref = base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse";
+  const { parcels } = useWarehouseData();
+  const { receive, busyId } = useReceiveParcel();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const data = inboundParcels.slice(0, 5);
 
+  // Receiving works the not-yet-handed-over queue: waiting to be scanned in, or scanned in and waiting for a rider.
+  const queue = useMemo(
+    () => parcels.filter((p) => p.status === "inbound" || p.status === "received"),
+    [parcels],
+  );
   const filtered = useMemo(
     () =>
-      applyListFilters(data, filters, {
-        searchFields: ["id", "orderId", "seller"],
+      applyListFilters(queue, filters, {
+        searchFields: ["id", "orderId", "seller", "barcode"],
         statusField: "status",
       }),
-    [data, filters]
+    [queue, filters],
   );
 
   return (
     <WarehouseListPage
       title={t("receiving")}
-      subtitle={fr ? "Colis en attente d'inspection" : "Parcels awaiting inspection"}
-      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("receiving") }]}
-      actions={
-        <BarcodeScanner
-          onScan={(code) => { toast(fr ? `Scanné : ${code}` : `Scanned: ${code}`); router.push("/warehouse/parcels/PCL-001"); }}
-        />
-      }
+      subtitle={fr ? "Scannez chaque colis à son arrivée au hub" : "Scan each parcel in as it arrives at the hub"}
+      breadcrumbs={[{ label: homeLabel, href: homeHref }, { label: t("receiving") }]}
+      actions={<ScanInput parcels={parcels} onFound={(p) => router.push(ops(`/parcels/${p.id}`))} autoFocus />}
       filters={
         <ListFilters
           values={filters}
@@ -66,16 +62,31 @@ export default function WarehouseReceivingPage() {
       }
       columns={[
         { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
-          <Link href={`/warehouse/parcels/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+          <Link href={ops(`/parcels/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
         )},
         { key: "orderId", label: fr ? "ID commande" : "Order ID" },
         { key: "seller", label: fr ? "Vendeur" : "Seller" },
+        { key: "pickupAddress", label: fr ? "Adresse de collecte" : "Pickup address" },
         { key: "itemsCount", label: fr ? "Articles" : "Items" },
-        { key: "weight", label: fr ? "Poids" : "Weight" },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="info">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
-        { key: "actions", label: t("action"), render: (row) => (
-          <button onClick={async () => { await advanceDelivery(String(row.taskId), "assigned"); toast(fr ? `${row.id} reçu` : `Received ${row.id}`); }} className="text-xs text-emerald-600">{t("receive")}</button>
-        )},
+        { key: "receivedAt", label: fr ? "Reçu le" : "Received at", render: (row) => shortDate(row.receivedAt ? String(row.receivedAt) : null, locale) },
+        { key: "status", label: t("status"), render: (row) => {
+          const s = String(row.status) as ParcelStage;
+          return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
+        }},
+        { key: "actions", label: t("action"), render: (row) => {
+          const p = row as unknown as Parcel;
+          return p.status === "inbound" ? (
+            <button
+              disabled={busyId === p.taskId}
+              onClick={() => void receive(p)}
+              className="text-xs text-emerald-600 hover:underline disabled:opacity-50"
+            >
+              {busyId === p.taskId ? "…" : t("receive")}
+            </button>
+          ) : (
+            <span className="text-xs text-slate-400">{fr ? "En attente d'un livreur" : "Waiting for a rider"}</span>
+          );
+        }},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
     />

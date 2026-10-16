@@ -49,8 +49,22 @@ class EarningsScreen extends StatelessWidget {
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text('\$${e.codCollectedUsd.toStringAsFixed(2)}', key: const ValueKey('cod-total'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
-                        const Text('Cash collected — hand it over at the warehouse', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        const Text('Cash collected', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       ]),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                const SurfaceCard(
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.muted, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Cash from cash-on-delivery orders must be handed over at the warehouse. Warehouse staff record the hand-over; there is nothing to confirm in this app.',
+                        key: ValueKey('cash-note'),
+                        style: TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.4),
+                      ),
                     ),
                   ]),
                 ),

@@ -88,57 +88,30 @@ export function useProduct(id: string | undefined): ShopProduct | undefined {
 }
 
 /**
- * PDP detail shape built from a live backend product. Core commerce fields
- * (name/price/image/rating/reviews/stock/discount/seller) are real; the
- * purely presentational bits (specs, variants, warranty) are generated so the
- * page renders fully without a separate mock detail store.
+ * PDP detail shape built from a live backend product. Only real fields are
+ * exposed (name/price/image/rating/reviews/stock/discount/seller); reviews and
+ * questions are loaded from the server by the page itself.
  */
 export function productDetailFrom(p: ShopProduct) {
   return {
     id: p.id,
-    sku: `SKU-${p.id.slice(0, 6)}`,
     name: p.name,
     nameFr: p.nameFr,
-    brand: p.seller,
     category: p.category,
     categoryFr: p.categoryFr,
-    subcategory: p.category,
     price: p.price,
     originalPrice: p.originalPrice,
     discount: p.discount,
-    tax: Math.round(p.price * 0.1),
     rating: p.rating,
     reviews: p.reviews,
     stock: p.stock,
     inStock: p.stock > 0,
     deliveryDays: p.deliveryDays,
-    codAvailable: true,
-    openBoxAvailable: p.price > 200,
     returnWindow: 7,
     sellerId: p.sellerId,
     seller: p.seller,
-    sellerRating: 4.6,
-    sellerFollowers: 45000,
-    sellerHealthScore: 92,
-    description:
-      p.description ||
-      `Premium ${p.name} with excellent build quality and performance.`,
-    descriptionFr:
-      p.description ||
-      `${p.nameFr} haut de gamme avec une excellente qualité de fabrication.`,
-    features: ["Premium build", "Warranty included", "Fast delivery", "Easy returns"],
-    featuresFr: ["Fabrication haut de gamme", "Garantie incluse", "Livraison rapide", "Retours faciles"],
-    specifications: { Material: "Premium", Warranty: "1 Year" },
-    specificationsFr: { Matériau: "Haut de gamme", Garantie: "1 an" },
-    warranty: "1 Year Manufacturer Warranty",
-    warrantyFr: "Garantie fabricant 1 an",
+    description: p.description,
     image: p.image,
-    images: [p.image, p.image],
-    variants: [
-      { name: "Color", nameFr: "Couleur", options: ["Black", "Blue", "Silver"], optionsFr: ["Noir", "Bleu", "Argent"] },
-    ],
-    reviews_list: [] as { author: string; rating: number; text: string; textFr: string; date: string }[],
-    questions: [] as { q: string; qFr: string; a: string; aFr: string; author: string; authorFr: string }[],
   };
 }
 

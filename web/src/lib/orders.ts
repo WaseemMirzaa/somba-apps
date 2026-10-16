@@ -18,6 +18,8 @@ const PAYMENT_LABEL: Record<string, string> = {
   cod: "COD",
   stripe_card: "Card",
   airtel_money: "Airtel Money",
+  orange_money: "Orange Money",
+  vodacom_mpesa: "Vodacom M-Pesa",
   wallet: "Wallet",
 };
 
@@ -50,14 +52,21 @@ export interface OrderDetail {
   timeline: { label: string; time: string; done: boolean }[];
 }
 
+function parseAddressObject(raw: string | null): { line1?: string; commune?: string; city?: string; phone?: string } | null {
+  if (!raw) return null;
+  try {
+    const a = JSON.parse(raw);
+    return a && typeof a === "object" ? a : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseAddress(raw: string | null): string {
   if (!raw) return "—";
-  try {
-    const a = JSON.parse(raw) as { line1?: string; city?: string };
-    return [a.line1, a.city].filter(Boolean).join(", ") || "—";
-  } catch {
-    return raw;
-  }
+  const a = parseAddressObject(raw);
+  if (!a) return raw;
+  return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "—";
 }
 
 /** Map a live backend Order to the storefront order-detail shape. */
@@ -68,7 +77,7 @@ export function toOrderDetail(o: Order): OrderDetail {
     id: o.id,
     reference: o.reference,
     customer: o.customerName,
-    customerPhone: "",
+    customerPhone: parseAddressObject(o.shippingAddress)?.phone ?? "",
     customerAddress: parseAddress(o.shippingAddress),
     date,
     amount: o.totalUsd,
@@ -76,9 +85,11 @@ export function toOrderDetail(o: Order): OrderDetail {
     paymentStatus:
       o.status === "cancelled" || o.status === "returned"
         ? "refunded"
-        : idx >= 1
+        : idx >= 1 && o.paymentMethod !== "cod"
           ? "paid"
-          : "pending",
+          : o.paymentMethod === "cod" && o.status === "delivered"
+            ? "paid"
+            : "pending",
     status: o.status,
     seller: "Somba&Teka",
     rider: o.riderId ? "Assigned rider" : "—",

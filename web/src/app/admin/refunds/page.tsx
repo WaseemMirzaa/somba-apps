@@ -8,184 +8,133 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
+import { Modal, ErrorNote } from "@/components/admin/modal";
+import { NoticeBar } from "@/components/admin/demo-badge";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
+import { canMoveMoney, errMsg, useRole, type PaymentRow } from "@/lib/admin-live";
+import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
 
-const PENDING_REFUNDS = [
-  {
-    id: "REF-001",
-    orderId: "ORD-2024-001",
-    amount: 1199,
-    method: "Stripe",
-    methodFr: "Stripe",
-    reason: "Return approved",
-    reasonFr: "Retour approuvé",
-    createdAt: "2024-06-07",
-  },
-  {
-    id: "REF-002",
-    orderId: "ORD-2024-003",
-    amount: 129,
-    method: "Manual — Airtel Money",
-    methodFr: "Manuel — Airtel Money",
-    reason: "Refund via Airtel",
-    reasonFr: "Remboursement via Airtel",
-    createdAt: "2024-06-06",
-  },
-];
-
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "succeeded", label: "Paid (refundable)", labelFr: "Payé (remboursable)" },
+  { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
 ];
 
 export default function AdminRefundsPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
-  const [approved, setApproved] = useState<string[]>([]);
+  const rt = useRealtime();
+  const role = useRole();
+  const fr = locale === "fr";
+  const mayRefund = canMoveMoney(role);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const [target, setTarget] = useState<PaymentRow | null>(null);
+  const [toWallet, setToWallet] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const title = locale === "fr" ? "Autorisation de remboursement" : "Refund Authorisation";
-  const subtitle =
-    locale === "fr"
-      ? "AF-15 — Valider les remboursements en attente"
-      : "AF-15 — Authorise pending refunds before payout";
-
-  const refunds = useMemo(
+  const rows = useMemo(
     () =>
-      PENDING_REFUNDS.map((refund) => ({
-        ...refund,
-        status: approved.includes(refund.id) ? "approved" : "pending",
-      })),
-    [approved]
+      (rt.payments as PaymentRow[])
+        .filter((p) => !!p.orderId && p.purpose !== "topup" && (p.status === "succeeded" || p.status === "refunded"))
+        .map((p) => ({ ...p, date: p.createdAt.slice(0, 10) })),
+    [rt.payments],
   );
 
   const filtered = useMemo(
     () =>
-      applyListFilters(refunds, filters, {
-        searchFields: ["id", "orderId", "method", "reason"],
-        dateField: "createdAt",
+      applyListFilters(rows, filters, {
+        searchFields: ["reference", "orderReference", "method"],
+        dateField: "date",
         statusField: "status",
       }),
-    [refunds, filters]
+    [rows, filters],
   );
 
-  const pendingCount = refunds.filter((r) => r.status === "pending").length;
+  const refundable = rows.filter((r) => r.status === "succeeded").length;
+
+  async function refund() {
+    if (!target?.orderId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await socketClient.request("orders:refund", { orderId: target.orderId, toWallet });
+      toast(fr ? `Commande ${target.orderReference} remboursée` : `Order ${target.orderReference} refunded`, "success");
+      setTarget(null);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={title}
-        subtitle={subtitle}
-        breadcrumbs={[
-          adminBreadcrumb(locale),
-          { label: locale === "fr" ? "Remboursements" : "Refunds" },
-        ]}
+        title={fr ? "Remboursements" : "Refunds"}
+        subtitle={
+          fr
+            ? "Paiements réels : remboursez une commande payée, ou consultez les remboursements déjà faits"
+            : "Live payments: refund a paid order, or review refunds already issued"
+        }
+        breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Remboursements" : "Refunds" }]}
       />
+
+      {!mayRefund && (
+        <NoticeBar tone="warn">{fr ? "Seuls l'admin et la finance peuvent rembourser." : "Only admin and finance can issue refunds."}</NoticeBar>
+      )}
 
       <ListFilters
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder={
-          locale === "fr"
-            ? "ID remboursement, commande, motif…"
-            : "Refund ID, order, reason…"
-        }
+        searchPlaceholder={fr ? "Référence, commande, méthode…" : "Reference, order, method…"}
       />
 
       <Card>
         <CardContent className="p-0">
           <div className="border-b border-[var(--border)] px-5 py-3 text-sm text-slate-500">
-            {locale === "fr"
-              ? `${pendingCount} remboursement(s) en attente`
-              : `${pendingCount} refund(s) pending authorisation`}
+            {fr ? `${refundable} paiement(s) remboursable(s)` : `${refundable} refundable payment(s)`}
           </div>
           <DataTable
+            emptyMessage={fr ? "Aucun paiement" : "No payments yet"}
             columns={[
+              { key: "reference", label: fr ? "Paiement" : "Payment", render: (row) => <span className="font-medium text-slate-900">{String(row.reference)}</span> },
               {
-                key: "id",
-                label: locale === "fr" ? "ID remboursement" : "Refund ID",
+                key: "orderReference",
+                label: fr ? "Commande" : "Order",
                 render: (row) => (
-                  <span className="font-medium text-slate-900">{String(row.id)}</span>
-                ),
-              },
-              {
-                key: "orderId",
-                label: locale === "fr" ? "Commande" : "Order",
-                render: (row) => (
-                  <Link
-                    href={`/admin/orders/${row.orderId}`}
-                    className="font-medium text-[var(--primary)] hover:underline"
-                  >
-                    {String(row.orderId)}
+                  <Link href={`/admin/orders/${row.orderId}`} className="font-medium text-[var(--primary)] hover:underline">
+                    {String(row.orderReference)}
                   </Link>
                 ),
               },
-              {
-                key: "amount",
-                label: t("amount"),
-                render: (row) => (
-                  <span className="font-semibold text-slate-900">
-                    {formatCurrency(row.amount as number, locale)}
-                  </span>
-                ),
-              },
-              {
-                key: "method",
-                label: locale === "fr" ? "Méthode" : "Method",
-                render: (row) => <Badge variant="info">{locale === "fr" ? String(row.methodFr ?? row.method) : String(row.method)}</Badge>,
-              },
-              {
-                key: "reason",
-                label: locale === "fr" ? "Motif" : "Reason",
-                render: (row) => (
-                  <span className="max-w-[12rem] text-slate-600">{locale === "fr" ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>
-                ),
-              },
+              { key: "amountUsd", label: t("amount"), render: (row) => <span className="font-semibold text-slate-900">{formatCurrency(row.amountUsd as number, locale)}</span> },
+              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <Badge variant="info">{String(row.method).replace(/_/g, " ")}</Badge> },
               {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={row.status === "approved" ? "success" : "warning"}>
-                    {row.status === "approved" ? t("approved") : t("pending")}
+                  <Badge variant={row.status === "refunded" ? "default" : "success"}>
+                    {row.status === "refunded" ? (fr ? "Remboursé" : "Refunded") : fr ? "Payé" : "Paid"}
                   </Badge>
                 ),
               },
-              {
-                key: "createdAt",
-                label: t("date"),
-              },
+              { key: "date", label: t("date") },
               {
                 key: "actions",
                 label: t("action"),
                 render: (row) => {
-                  const id = String(row.id);
-                  if (approved.includes(id)) {
-                    return (
-                      <span className="ml-4 text-sm font-medium text-emerald-600">
-                        {t("approved")}
-                      </span>
-                    );
-                  }
+                  const p = row as unknown as PaymentRow;
+                  if (p.status === "refunded") return <span className="text-sm text-slate-400">{fr ? "Remboursé" : "Refunded"}</span>;
+                  if (!mayRefund) return <span className="text-sm text-slate-400">—</span>;
                   return (
-                    <Button
-                      variant="approve"
-                      size="sm"
-                      className="ml-4 whitespace-nowrap"
-                      onClick={() => {
-                        setApproved((current) => [...current, id]);
-                        toast(
-                          locale === "fr"
-                            ? `Remboursement ${id} autorisé`
-                            : `Refund ${id} authorised`
-                        );
-                      }}
-                    >
-                      {locale === "fr" ? "Autoriser le remboursement" : "Authorise Refund"}
+                    <Button variant="approve" size="sm" className="whitespace-nowrap" onClick={() => { setTarget(p); setToWallet(true); setError(null); }}>
+                      {fr ? "Autoriser le remboursement" : "Authorise refund"}
                     </Button>
                   );
                 },
@@ -195,6 +144,35 @@ export default function AdminRefundsPage() {
           />
         </CardContent>
       </Card>
+
+      <Modal
+        open={!!target}
+        onClose={() => !busy && setTarget(null)}
+        title={fr ? "Confirmer le remboursement" : "Confirm refund"}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setTarget(null)} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="danger" size="sm" onClick={refund} disabled={busy}>{busy ? "…" : fr ? "Rembourser" : "Refund"}</Button>
+          </>
+        }
+      >
+        {target && (
+          <>
+            <p>
+              {target.orderReference} · {formatCurrency(target.amountUsd, locale)} · {target.method.replace(/_/g, " ")}
+            </p>
+            <label className="flex items-center gap-2">
+              <input type="radio" checked={toWallet} onChange={() => setToWallet(true)} />
+              {fr ? "Vers le portefeuille du client" : "To the customer's wallet"}
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" checked={!toWallet} onChange={() => setToWallet(false)} />
+              {fr ? "Vers le moyen de paiement d'origine" : "To the original payment method"}
+            </label>
+            <ErrorNote message={error} />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

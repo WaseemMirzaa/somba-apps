@@ -48,8 +48,8 @@ class ShopState {
 
   /// Ask the server whether [code] works for the current subtotal.
   /// Returns an error message, or null on success.
-  Future<String?> applyPromo(String code) async {
-    final sub = subtotal;
+  Future<String?> applyPromo(String code, {double? subtotalUsd}) async {
+    final sub = subtotalUsd ?? subtotal;
     try {
       final res = await RealtimeStore.instance.validatePromo(code.trim(), sub);
       if (res['ok'] == true) {

@@ -1,102 +1,205 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { DualCurrency } from "@/components/ui/dual-currency";
+import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useLocale } from "@/context/locale-context";
-import { useAuth } from "@/context/auth-context";
-import { useMarket } from "@/context/market-context";
-import { useShop } from "@/context/shop-context";
-import { BUSINESS } from "@/lib/config";
+import { useRealtime } from "@/context/realtime-context";
+import { useShop, useCartLines } from "@/context/shop-context";
+import { useToast } from "@/context/toast-context";
+import { socketClient } from "@/lib/realtime/socket-client";
+import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
+import type { Address } from "@/lib/realtime/types";
 
-const addresses = [
-  { id: 1, label: "Domicile", address: "8 Rue de la Paix, Apt 4B", city: "Paris", commune: "2e arrondissement", zoneId: "zone-a", default: true },
-  { id: 2, label: "Bureau", address: "45 Avenue des Champs-Élysées", city: "Paris", commune: "8e arrondissement", zoneId: "zone-b", default: false },
-  { id: 3, label: "Kinshasa", address: "12 Ave du Commerce, Gombe", city: "Kinshasa", commune: "Gombe", zoneId: "gombe", default: false },
-];
-
-export default function ShopCheckoutPage() {
+function CheckoutContent() {
   const { locale } = useLocale();
-  const { isAuthenticated } = useAuth();
-  const { profile, getZoneFee } = useMarket();
-  const { cart, promoDiscount } = useShop();
+  const fr = locale === "fr";
+  const rt = useRealtime();
+  const { toast } = useToast();
   const router = useRouter();
-  const [crossCity, setCrossCity] = useState(true);
-  const [openBox, setOpenBox] = useState(true);
-  const [guestEmail, setGuestEmail] = useState("");
-  const [selectedAddress, setSelectedAddress] = useState(addresses.find((a) => a.default)?.id ?? addresses[0].id);
-  const [orderNote, setOrderNote] = useState("");
+  const { promoDiscount, promoCode, zoneId, setZoneId } = useShop();
+  const { lines, subtotal, hasUnavailable } = useCartLines();
+  const settings = usePublicSettings();
+  const zones = settings.deliveryZones;
 
-  const addr = addresses.find((a) => a.id === selectedAddress)!;
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0) || 1498;
-  const deliveryFee = getZoneFee(addr.zoneId);
-  const total = subtotal - promoDiscount + deliveryFee;
+  const [pickedAddress, setPickedAddress] = useState<string | null>(null);
+  const [openBox, setOpenBox] = useState(true);
+  const [orderNote, setOrderNote] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "" });
+
+  const addresses = rt.addresses;
+  // Selected address: the customer's pick, else the default, else the first one.
+  const selectedId = useMemo(() => {
+    if (pickedAddress && addresses.some((a) => a.id === pickedAddress)) return pickedAddress;
+    return (addresses.find((a) => a.isDefault) ?? addresses[0])?.id ?? null;
+  }, [pickedAddress, addresses]);
+  const address = addresses.find((a) => a.id === selectedId) ?? null;
+
+  // Following the chosen address, default the zone to the address's zone.
+  useEffect(() => {
+    if (!address?.zoneId) return;
+    if (zones.some((z) => z.id === address.zoneId) && zoneId !== address.zoneId) setZoneId(address.zoneId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address?.id, address?.zoneId, zones]);
+
+  const zone = zones.find((z) => z.id === zoneId) ?? null;
+  const zoneMissing = zones.length > 0 && !zone;
+  const deliveryFee = zone?.feeUsd ?? 0;
+  const discount = Math.min(promoDiscount, subtotal);
+  const total = Math.max(0, subtotal - discount) + deliveryFee;
+
+  async function saveAddress() {
+    if (!form.line1.trim() || !form.city.trim()) {
+      toast(fr ? "Adresse et ville obligatoires" : "Street address and city are required", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await socketClient.request<Address>("addresses:create", {
+        label: form.label.trim() || (fr ? "Domicile" : "Home"),
+        line1: form.line1.trim(),
+        city: form.city.trim(),
+        commune: form.commune.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        zoneId: form.zoneId || undefined,
+      });
+      setPickedAddress(created.id);
+      if (created.zoneId && zones.some((z) => z.id === created.zoneId)) setZoneId(created.zoneId);
+      setShowAdd(false);
+      setForm({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "" });
+      toast(fr ? "Adresse ajoutée" : "Address added");
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const canContinue = lines.length > 0 && !hasUnavailable && !!address && !zoneMissing;
 
   function continueToPayment() {
-    const params = new URLSearchParams({
-      address: String(selectedAddress),
-      zone: addr.zoneId,
-      fee: String(deliveryFee),
-      total: String(total),
-      crossCity: String(crossCity),
-      openBox: String(openBox),
-      note: orderNote,
-    });
+    if (!address) {
+      toast(fr ? "Choisissez ou ajoutez une adresse de livraison" : "Choose or add a delivery address", "error");
+      return;
+    }
+    if (zoneMissing) {
+      toast(fr ? "Choisissez une zone de livraison" : "Choose a delivery zone", "error");
+      return;
+    }
+    const params = new URLSearchParams({ address: address.id, openBox: String(openBox), note: orderNote });
     router.push(`/shop/checkout/payment?${params}`);
+  }
+
+  if (lines.length === 0) {
+    return (
+      <div className="space-y-4 py-16 text-center">
+        <PageHeader title={fr ? "Caisse" : "Checkout"} />
+        <p className="text-slate-500">{fr ? "Votre panier est vide." : "Your cart is empty."}</p>
+        <Link href="/shop/products" className="text-[var(--primary)] hover:underline">{fr ? "Voir les produits" : "Browse products"}</Link>
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={locale === "fr" ? "Caisse" : "Checkout"} breadcrumbs={[{ label: locale === "fr" ? "Panier" : "Cart", href: "/shop/cart" }, { label: locale === "fr" ? "Caisse" : "Checkout" }]} />
+      <PageHeader title={fr ? "Caisse" : "Checkout"} breadcrumbs={[{ label: fr ? "Panier" : "Cart", href: "/shop/cart" }, { label: fr ? "Caisse" : "Checkout" }]} />
 
-      {!isAuthenticated && (
-        <div className="card-premium p-4">
-          <p className="text-sm font-medium">{locale === "fr" ? "Achat invité activé" : "Guest checkout enabled"}</p>
-          <input className="input-premium mt-2 w-full px-4 py-2.5 text-sm" placeholder={locale === "fr" ? "E-mail" : "Email"} value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
-          <Link href="/shop/login" className="mt-2 inline-block text-xs text-[var(--primary)]">{locale === "fr" ? "Se connecter" : "Sign in"}</Link>
+      {hasUnavailable && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {fr ? "Certains articles ne sont plus disponibles." : "Some items in your cart are no longer available."}{" "}
+          <Link href="/shop/cart" className="font-medium underline">{fr ? "Modifier le panier" : "Edit cart"}</Link>
         </div>
       )}
 
-      <DetailSection title={locale === "fr" ? "Adresse de livraison" : "Delivery Address"}>
+      <DetailSection title={fr ? "Adresse de livraison" : "Delivery Address"}>
         <div className="space-y-3">
+          {addresses.length === 0 && !showAdd && (
+            <p className="text-sm text-slate-500">{fr ? "Vous n'avez pas encore d'adresse enregistrée." : "You have no saved address yet."}</p>
+          )}
           {addresses.map((a) => (
-            <label key={a.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${selectedAddress === a.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>
-              <input type="radio" name="address" checked={selectedAddress === a.id} onChange={() => setSelectedAddress(a.id)} className="mt-1" />
+            <label key={a.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${selectedId === a.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>
+              <input type="radio" name="address" checked={selectedId === a.id} onChange={() => setPickedAddress(a.id)} className="mt-1" />
               <div>
-                <p className="font-medium">{a.label}</p>
-                <p className="text-sm text-slate-500">{a.address}, {a.commune}, {a.city}</p>
-                <p className="text-xs text-[var(--primary)]">{profile.zones.find((z) => z.id === a.zoneId)?.name ?? a.zoneId}</p>
+                <p className="font-medium">{a.label} {a.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
+                <p className="text-sm text-slate-500">{[a.line1, a.commune, a.city].filter(Boolean).join(", ")}</p>
+                {a.phone && <p className="text-xs text-slate-400">{a.phone}</p>}
               </div>
             </label>
           ))}
-          <button type="button" onClick={() => router.push("/shop/account/addresses")} className="text-sm font-medium text-[var(--primary)] hover:underline">{locale === "fr" ? "+ Ajouter une adresse" : "+ Add address"}</button>
+
+          {showAdd ? (
+            <div className="space-y-3 rounded-xl border border-dashed border-blue-200 p-4">
+              <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+              <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse (rue, numéro)" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Commune / Quartier" : "Commune / District"} value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
+                <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Téléphone de contact" : "Contact phone"} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              {zones.length > 0 && (
+                <select className="input-premium w-full px-4 py-2 text-sm" value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value })}>
+                  <option value="">{fr ? "Zone de livraison" : "Delivery zone"}</option>
+                  {zones.map((z) => <option key={z.id} value={z.id}>{zoneLabel(z, fr)} — {z.city}</option>)}
+                </select>
+              )}
+              <div className="flex gap-2">
+                <Button onClick={saveAddress} disabled={saving}>{saving ? "…" : fr ? "Enregistrer l'adresse" : "Save address"}</Button>
+                <Button variant="ghost" onClick={() => setShowAdd(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setShowAdd(true)} className="text-sm font-medium text-[var(--primary)] hover:underline">
+              {fr ? "+ Ajouter une adresse" : "+ Add address"}
+            </button>
+          )}
         </div>
       </DetailSection>
 
-      <DetailSection title={locale === "fr" ? "Options de livraison" : "Delivery Options"}>
-        <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
-          <input type="checkbox" checked={crossCity} onChange={(e) => setCrossCity(e.target.checked)} />
-          <span className="text-sm">{locale === "fr" ? "Livraison inter-villes" : "Cross-city delivery"} {BUSINESS.crossCityDelivery ? (locale === "fr" ? "(autorisée)" : "(allowed)") : (locale === "fr" ? "(bloquée)" : "(blocked)")}</span>
-        </label>
+      <DetailSection title={fr ? "Options de livraison" : "Delivery Options"}>
+        {zones.length > 0 && (
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-slate-700">{fr ? "Zone de livraison" : "Delivery zone"}</label>
+            <select className="input-premium w-full px-3 py-2 text-sm" value={zoneId ?? ""} onChange={(e) => setZoneId(e.target.value || null)}>
+              <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : `$${z.feeUsd.toFixed(2)}`})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />
-          <span className="text-sm">{locale === "fr" ? "Livraison colis ouvert" : "Open Box Delivery"}</span>
+          <span className="text-sm">{fr ? "Livraison colis ouvert" : "Open Box Delivery"}</span>
         </label>
-        <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={locale === "fr" ? "Note de commande (optionnel)" : "Order note (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
+        <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={fr ? "Note pour le livreur (optionnel)" : "Note for the rider (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
         <InfoGrid items={[
-          { label: locale === "fr" ? "Frais de zone" : "Zone delivery fee", value: deliveryFee === 0 ? (locale === "fr" ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
-          { label: locale === "fr" ? "Délai estimé" : "ETA", value: crossCity ? (locale === "fr" ? "3-5 jours" : "3-5 days") : (locale === "fr" ? "1-2 jours" : "1-2 days") },
-          { label: locale === "fr" ? "Total" : "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
+          { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
+          ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"}${promoCode ? ` (${promoCode})` : ""}`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
+          { label: fr ? "Frais de zone" : "Zone delivery fee", value: zoneMissing ? (fr ? "Choisissez une zone" : "Choose a zone") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          { label: "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>
 
-      <Button onClick={continueToPayment} className="w-full">
-        {locale === "fr" ? "Continuer vers le paiement" : "Continue to Payment"}
+      <Button onClick={continueToPayment} disabled={!canContinue} className="w-full">
+        {fr ? "Continuer vers le paiement" : "Continue to Payment"}
       </Button>
     </div>
+  );
+}
+
+export default function ShopCheckoutPage() {
+  return (
+    <RequireSignIn next="/shop/checkout">
+      <CheckoutContent />
+    </RequireSignIn>
   );
 }

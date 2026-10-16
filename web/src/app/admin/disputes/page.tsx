@@ -9,62 +9,41 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { useDisputes } from "@/context/dispute-context";
+import { DISPUTE_STATUS_BADGE, DISPUTE_STATUS_LABEL, DISPUTE_TYPE_LABEL, type DisputeRow } from "@/lib/admin-live";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
-  { value: "seller_responded", label: "Seller responded", labelFr: "Réponse vendeur" },
   { value: "resolved", label: "Resolved", labelFr: "Résolu" },
-  { value: "closed", label: "Closed", labelFr: "Fermé" },
+  { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
 ];
 
-const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  open: "warning",
-  seller_responded: "info",
-  resolved: "success",
-  closed: "default",
-};
-
-const STATUS_FR: Record<string, string> = {
-  open: "Ouvert",
-  seller_responded: "Réponse vendeur",
-  resolved: "Résolu",
-  closed: "Fermé",
-};
-
-const REASON_FR: Record<string, string> = {
-  not_as_described: "Non conforme à la description",
-  defective: "Défectueux",
-  damaged: "Endommagé",
-  wrong_item: "Mauvais article",
-  not_received: "Non reçu",
-  late_delivery: "Livraison en retard",
-};
-
 export default function AdminDisputesPage() {
-  const { disputes } = useDisputes();
+  const rt = useRealtime();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const disputes = (rt.disputes as DisputeRow[]).map((d) => ({ ...d, date: d.createdAt.slice(0, 10) }));
 
-  const openCount = disputes.filter((d) => d.status === "open" || d.status === "seller_responded").length;
+  const openCount = disputes.filter((d) => d.status === "open").length;
 
   const filtered = useMemo(
     () =>
       applyListFilters(disputes, filters, {
-        searchFields: ["id", "buyerName", "sellerName", "orderId", "productName", "reason"],
-        dateField: "createdAt",
+        searchFields: ["reference", "customerName", "orderReference", "reason", "type"],
+        dateField: "date",
         statusField: "status",
       }),
-    [disputes, filters]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rt.disputes, filters],
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "File des litiges" : "Disputes Queue"}
-        subtitle={fr ? `${openCount} dossier${openCount === 1 ? "" : "s"} actif${openCount === 1 ? "" : "s"}` : `${openCount} active case${openCount === 1 ? "" : "s"}`}
+        subtitle={fr ? `${openCount} dossier${openCount === 1 ? "" : "s"} ouvert${openCount === 1 ? "" : "s"} (litiges et retours, en direct)` : `${openCount} open case${openCount === 1 ? "" : "s"} (disputes and returns, live)`}
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Litiges" : "Disputes" }]}
       />
 
@@ -72,67 +51,54 @@ export default function AdminDisputesPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder={fr ? "ID litige, acheteur, vendeur, commande…" : "Dispute ID, buyer, seller, order…"}
+        searchPlaceholder={fr ? "Référence, client, commande, motif…" : "Reference, customer, order, reason…"}
       />
 
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucun litige" : "No disputes"}
             columns={[
               {
-                key: "id",
-                label: fr ? "ID litige" : "Dispute ID",
+                key: "reference",
+                label: fr ? "Référence" : "Reference",
                 render: (row) => (
-                  <Link
-                    href={`/admin/disputes/${row.id}`}
-                    className="font-medium text-[var(--primary)] hover:underline"
-                  >
-                    {String(row.id)}
+                  <Link href={`/admin/disputes/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
+                    {String(row.reference)}
                   </Link>
                 ),
               },
               {
-                key: "orderId",
+                key: "type",
+                label: "Type",
+                render: (row) => <Badge variant={row.type === "return" ? "purple" : "primary"}>{DISPUTE_TYPE_LABEL[String(row.type)]?.[fr ? "fr" : "en"] ?? String(row.type)}</Badge>,
+              },
+              {
+                key: "orderReference",
                 label: fr ? "Commande" : "Order",
                 render: (row) => (
-                  <Link
-                    href={`/admin/orders/${row.orderId}`}
-                    className="text-[var(--primary)] hover:underline"
-                  >
-                    {String(row.orderId)}
+                  <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">
+                    {String(row.orderReference)}
                   </Link>
                 ),
               },
-              { key: "buyerName", label: fr ? "Acheteur" : "Buyer" },
-              { key: "sellerName", label: fr ? "Vendeur" : "Seller" },
-              { key: "productName", label: fr ? "Produit" : "Product" },
-              {
-                key: "reason",
-                label: fr ? "Motif" : "Reason",
-                render: (row) => (
-                  <span className="max-w-[10rem] text-slate-600">
-                    {fr ? (REASON_FR[String(row.reason)] ?? String(row.reason).replace(/_/g, " ")) : String(row.reason).replace(/_/g, " ")}
-                  </span>
-                ),
-              },
+              { key: "customerName", label: fr ? "Client" : "Customer" },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="line-clamp-2 max-w-[16rem] text-slate-600">{String(row.reason)}</span> },
               {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={statusVariant[row.status as string] ?? "default"}>
-                    {fr ? (STATUS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")) : String(row.status).replace(/_/g, " ")}
+                  <Badge variant={DISPUTE_STATUS_BADGE[String(row.status)] ?? "default"}>
+                    {DISPUTE_STATUS_LABEL[String(row.status)]?.[fr ? "fr" : "en"] ?? String(row.status)}
                   </Badge>
                 ),
               },
-              { key: "createdAt", label: t("date") },
+              { key: "date", label: t("date") },
               {
                 key: "actions",
                 label: t("action"),
                 render: (row) => (
-                  <Link
-                    href={`/admin/disputes/${row.id}`}
-                    className="text-sm text-[var(--primary)] hover:underline"
-                  >
+                  <Link href={`/admin/disputes/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
                     {t("view")}
                   </Link>
                 ),

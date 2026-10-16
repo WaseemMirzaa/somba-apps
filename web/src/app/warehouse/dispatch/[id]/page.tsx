@@ -1,166 +1,129 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
-import { ActivityTimeline } from "@/components/ui/timeline";
 import { DataTable } from "@/components/ui/data-table";
-import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
-import { getBatch } from "@/lib/entities";
-import { type RiderEntity } from "@/lib/warehouse-entities";
-import { useWarehouseData } from "@/lib/warehouse";
+import { Badge } from "@/components/ui/badge";
+import { AssignParcelButton } from "@/components/warehouse/assign-parcel-button";
+import { STAGE_LABEL, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
+import { BATCH_STATUS, batchTaskIds, pick, shortDate, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
-
-// Batch status values originate from the shared (non-owned) entities layer.
-const STATUS_FR: Record<string, string> = {
-  ready: "Prêt",
-  dispatched: "Expédié",
-  in_transit: "En transit",
-  delivered: "Livré",
-};
 
 export default function WarehouseBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
-  const { getRider } = useWarehouseData();
-  const batch = getBatch(id);
-  const [status, setStatus] = useState(batch?.status ?? "ready");
-  const [assignedRider, setAssignedRider] = useState<RiderEntity | null>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { parcels, riders } = useWarehouseData();
+  const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
+  const batch = batchesQ.data.find((b) => b.id === id || b.reference === id);
 
   if (!batch) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Lot introuvable" : "Batch not found"}</div>;
+    return (
+      <div className="p-8 text-center text-slate-500">
+        {batchesQ.loading ? (fr ? "Chargement…" : "Loading…") : batchesQ.error ?? (fr ? "Lot introuvable" : "Batch not found")}
+      </div>
+    );
   }
 
-  const rider = assignedRider ?? getRider(batch.riderId);
-  const statusLabel = fr ? STATUS_FR[status] ?? status : status;
-
-  function handleAssignRider(selected: RiderEntity) {
-    setAssignedRider(selected);
-    setShowAssignModal(false);
-    toast(fr ? `${selected.name} assigné à ${batch!.id}` : `${selected.name} assigned to ${batch!.id}`);
-  }
+  const taskIds = batchTaskIds(batch);
+  const rows = taskIds.map((tid) => parcels.find((p) => p.taskId === tid)).filter((p): p is Parcel => !!p);
+  const missing = taskIds.length - rows.length;
+  const delivered = rows.filter((p) => p.status === "delivered").length;
+  const failed = rows.filter((p) => p.status === "exception").length;
+  const rider = riders.find((r) => r.id === batch.riderId);
+  const statusLabel = pick(BATCH_STATUS[batch.status], fr, batch.status);
+  const listHref = ops("/dispatch");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={batch.id}
-        subtitle={`${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"} · ${statusLabel}`}
-        backHref="/warehouse/dispatch"
+        title={batch.reference}
+        subtitle={`${taskIds.length} ${fr ? "colis" : "parcels"} · ${statusLabel}`}
+        backHref={listHref}
         breadcrumbs={[
-          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
-          { label: fr ? "Expédition" : "Dispatch", href: "/warehouse/dispatch" },
-          { label: batch.id },
+          { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+          { label: fr ? "Expédition" : "Dispatch", href: listHref },
+          { label: batch.reference },
         ]}
-        actions={
-          status === "ready" ? (
-            <button onClick={() => { setStatus("dispatched"); toast(fr ? `Lot ${batch.id} expédié` : `Batch ${batch.id} dispatched`); router.push("/warehouse/deliveries"); }} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">{fr ? "Expédier" : "Dispatch"}</button>
-          ) : null
-        }
       />
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Lot" : "Batch"}>
           <InfoGrid items={[
-            { label: fr ? "ID lot" : "Batch ID", value: batch.id },
-            { label: t("zone"), value: batch.zone },
-            { label: fr ? "Colis" : "Parcels", value: batch.parcelCount },
+            { label: fr ? "Référence" : "Reference", value: batch.reference },
             { label: fr ? "Statut" : "Status", value: statusLabel },
+            { label: fr ? "Colis" : "Parcels", value: taskIds.length },
+            { label: fr ? "Livrés" : "Delivered", value: `${delivered} / ${taskIds.length}` },
+            { label: fr ? "Échoués" : "Failed", value: failed },
+            { label: fr ? "Créé le" : "Created", value: shortDate(batch.createdAt, locale) },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Attribution du livreur" : "Rider Assignment"}>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowAssignModal(true)}
-              className="btn-primary rounded-xl px-4 py-2 text-sm font-medium"
-            >
-              {assignedRider ? (fr ? "Changer de livreur" : "Change rider") : (fr ? "Assigner un livreur" : "Assign rider")}
-            </button>
-            {!assignedRider && (
-              <button
-                type="button"
-                onClick={() => {
-                  const nearest = getRider(batch.riderId);
-                  if (nearest) {
-                    setAssignedRider(nearest);
-                    toast(fr ? `${nearest.name} assigné automatiquement` : `Auto-assigned ${nearest.name}`);
-                  }
-                }}
-                className="text-sm text-[var(--primary)] hover:underline"
-              >
-                {fr ? "Assigner automatiquement le livreur le plus proche" : "Auto-assign nearest rider"}
-              </button>
-            )}
-          </div>
-          {rider ? (
-            <>
+        <DetailGridSection title={fr ? "Livreur" : "Rider"}>
           <InfoGrid items={[
-            { label: fr ? "Nom" : "Name", value: rider.name },
-            { label: fr ? "Téléphone" : "Phone", value: rider.phone },
-            { label: fr ? "Véhicule" : "Vehicle", value: fr ? rider.vehicleFr : rider.vehicle },
-            { label: t("zone"), value: rider.zone },
-            { label: fr ? "Performance" : "Performance", value: `${rider.performanceScore}%` },
+            { label: fr ? "Nom" : "Name", value: batch.riderName ?? rider?.name ?? "—" },
+            {
+              label: fr ? "Téléphone" : "Phone",
+              value: rider?.phone ? <a href={`tel:${rider.phone.replace(/\s/g, "")}`} className="text-[var(--primary)] hover:underline">{rider.phone}</a> : "—",
+            },
+            { label: fr ? "Livraisons actives" : "Active deliveries", value: rider?.activeTasks ?? "—" },
           ]} />
-          <div className="mt-4 flex gap-3">
-            <NavLinkButton href={`/warehouse/riders/${rider.id}`}>{fr ? "Ouvrir le livreur →" : "Open Rider →"}</NavLinkButton>
-            <a href={`tel:${rider.phone}`} className="text-sm text-slate-500 hover:text-[var(--primary)]">{fr ? "Appeler le livreur" : "Call Rider"}</a>
-          </div>
-            </>
-          ) : (
-            <p className="text-sm text-slate-500">{fr ? "Aucun livreur assigné pour le moment. Recherchez et assignez un livreur." : "No rider assigned yet. Search and assign a rider."}</p>
+          {batch.riderId && (
+            <p className="mt-4">
+              <Link href={ops(`/riders/${batch.riderId}`)} className="text-sm text-[var(--primary)] hover:underline">
+                {fr ? "Ouvrir le livreur →" : "Open rider →"}
+              </Link>
+            </p>
           )}
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Itinéraire" : "Route"}>
-          <InfoGrid items={[
-            { label: fr ? "Arrêts" : "Stops", value: batch.stops },
-            { label: fr ? "Distance" : "Distance", value: batch.distance },
-            { label: "ETA", value: batch.eta },
-          ]} />
-          <div className="mt-4 flex h-32 items-center justify-center rounded-lg bg-blue-50 text-sm text-slate-500">
-            {fr ? "Aperçu carte (simulation)" : "Map preview (mock)"}
-          </div>
+        <DetailGridSection title={fr ? "Remarque" : "Note"}>
+          <p className="text-sm text-slate-600">
+            {fr
+              ? "Le lot est expédié dès sa création : les colis sont attribués au livreur, qui les collecte et les livre dans l'application. Pour changer de livreur, rouvrez chaque colis avant sa collecte."
+              : "A batch is dispatched as soon as it is created: its parcels are assigned to the rider, who picks up and delivers them in the app. To change rider, re-assign each parcel before it is picked up."}
+          </p>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Colis dans le lot" : "Parcels in Batch"} span={3}>
+          {missing > 0 && (
+            <p className="mb-3 text-xs text-amber-700">
+              {fr ? `${missing} colis du lot ne figurent plus dans la liste en direct (anciens).` : `${missing} parcel(s) of this batch are no longer in the live list (older than the latest 200).`}
+            </p>
+          )}
           <DataTable
+            emptyMessage={fr ? "Aucun colis." : "No parcels."}
             columns={[
-              { key: "parcelId", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-[var(--primary)] hover:underline">{String(row.parcelId)}</Link>
+              { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
+                <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
               )},
               { key: "orderId", label: fr ? "ID commande" : "Order ID" },
               { key: "customer", label: t("customer") },
-              { key: "actions", label: fr ? "Action" : "Action", render: (row) => (
-                <Link href={`/warehouse/parcels/${row.parcelId}`} className="text-xs text-[var(--primary)] hover:underline">{fr ? "Ouvrir" : "Open"}</Link>
-              )},
+              { key: "customerAddress", label: fr ? "Adresse" : "Address" },
+              { key: "rider", label: fr ? "Livreur" : "Rider" },
+              { key: "status", label: t("status"), render: (row) => {
+                const s = String(row.status) as ParcelStage;
+                return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
+              }},
+              { key: "actions", label: fr ? "Action" : "Action", render: (row) => {
+                const p = row as unknown as Parcel;
+                return p.status === "sorting" || p.status === "received" || p.status === "inbound" ? (
+                  <AssignParcelButton parcel={p} className="text-xs text-[var(--primary)] hover:underline" label={fr ? "Changer de livreur" : "Change rider"} />
+                ) : (
+                  <Link href={ops(`/parcels/${p.id}`)} className="text-xs text-[var(--primary)] hover:underline">{fr ? "Ouvrir" : "Open"}</Link>
+                );
+              }},
             ]}
-            data={batch.parcels as unknown as Record<string, unknown>[]}
+            data={rows as unknown as Record<string, unknown>[]}
           />
         </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
-          <ActivityTimeline events={batch.timeline} />
-        </DetailGridSection>
       </DetailGrid>
-
-      <AssignRiderModal
-        open={showAssignModal}
-        title={fr ? "Assigner un livreur au lot" : "Assign rider to batch"}
-        subtitle={`${batch.id} · ${batch.zone} · ${batch.parcelCount} ${fr ? "colis" : "parcels"}`}
-        selectedRiderId={assignedRider?.id ?? batch.riderId}
-        onClose={() => setShowAssignModal(false)}
-        onConfirm={handleAssignRider}
-      />
     </div>
   );
 }

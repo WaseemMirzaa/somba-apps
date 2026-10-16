@@ -4,19 +4,29 @@ import { useMemo, useState } from "react";
 import { Search, Bike } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { riderEntities, type RiderEntity } from "@/lib/warehouse-entities";
+import { errorMessage, useOpsQuery, type WarehouseRider } from "@/lib/warehouse-live";
 
 type AssignRiderModalProps = {
   open: boolean;
   title?: string;
   subtitle?: string;
-  selectedRiderId?: number | null;
+  selectedRiderId?: string | null;
   onClose: () => void;
-  onConfirm: (rider: RiderEntity) => void;
+  /**
+   * Called with the chosen real rider. It must perform the server request and
+   * reject with the server's error on failure — the modal shows that message
+   * and stays open; it closes only when the promise resolves.
+   */
+  onConfirm: (rider: WarehouseRider) => Promise<void>;
 };
 
-export function AssignRiderModal({
-  open,
+export function AssignRiderModal(props: AssignRiderModalProps) {
+  // Mount the body only while open so riders are loaded on demand.
+  if (!props.open) return null;
+  return <AssignRiderModalBody {...props} />;
+}
+
+function AssignRiderModalBody({
   title,
   subtitle,
   selectedRiderId = null,
@@ -26,49 +36,40 @@ export function AssignRiderModal({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const resolvedTitle = title ?? (fr ? "Assigner un livreur" : "Assign rider");
+  const ridersQ = useOpsQuery<WarehouseRider[]>("warehouse:riders", {
+    initial: [] as WarehouseRider[],
+    push: ["delivery:updated"],
+  });
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState<RiderEntity | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(selectedRiderId);
   const [confirmStep, setConfirmStep] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return riderEntities;
-    return riderEntities.filter(
-      (rider) =>
-        rider.name.toLowerCase().includes(q) ||
-        rider.zone.toLowerCase().includes(q) ||
-        rider.location.toLowerCase().includes(q) ||
-        rider.vehicle.toLowerCase().includes(q)
+    if (!q) return ridersQ.data;
+    return ridersQ.data.filter(
+      (r) => r.name.toLowerCase().includes(q) || (r.phone ?? "").toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, ridersQ.data]);
 
-  if (!open) return null;
+  const activeRider = ridersQ.data.find((r) => r.id === pickedId) ?? null;
 
-  function close() {
-    setQuery("");
-    setPicked(null);
-    setConfirmStep(false);
-    onClose();
+  async function confirm() {
+    if (!activeRider || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm(activeRider);
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+      setConfirmStep(false);
+    } finally {
+      setBusy(false);
+    }
   }
-
-  function proceed() {
-    if (!picked) return;
-    setConfirmStep(true);
-  }
-
-  function confirm() {
-    if (!picked) return;
-    onConfirm(picked);
-    setQuery("");
-    setPicked(null);
-    setConfirmStep(false);
-  }
-
-  const initialRider = selectedRiderId
-    ? riderEntities.find((rider) => rider.id === selectedRiderId) ?? null
-    : null;
-
-  const activeRider = picked ?? initialRider;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -83,7 +84,7 @@ export function AssignRiderModal({
                 <input
                   type="search"
                   className="input-premium w-full py-2.5 pl-10 pr-3 text-sm"
-                  placeholder={fr ? "Rechercher un livreur par nom, zone ou lieu…" : "Search rider name, zone, or location…"}
+                  placeholder={fr ? "Rechercher un livreur par nom ou téléphone…" : "Search rider name or phone…"}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   autoFocus
@@ -92,8 +93,19 @@ export function AssignRiderModal({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              {filtered.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-400">{fr ? "Aucun livreur ne correspond à votre recherche." : "No riders match your search."}</p>
+              {error && (
+                <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+              )}
+              {ridersQ.error ? (
+                <p role="alert" className="py-8 text-center text-sm text-red-600">{ridersQ.error}</p>
+              ) : ridersQ.loading ? (
+                <p className="py-8 text-center text-sm text-slate-400">{fr ? "Chargement des livreurs…" : "Loading riders…"}</p>
+              ) : filtered.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">
+                  {ridersQ.data.length === 0
+                    ? (fr ? "Aucun livreur actif." : "No active riders.")
+                    : (fr ? "Aucun livreur ne correspond à votre recherche." : "No riders match your search.")}
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {filtered.map((rider) => {
@@ -102,12 +114,12 @@ export function AssignRiderModal({
                       <li key={rider.id}>
                         <button
                           type="button"
-                          onClick={() => setPicked(rider)}
+                          onClick={() => setPickedId(rider.id)}
                           className={cn(
                             "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
                             selected
                               ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200"
-                              : "border-[var(--border)] hover:border-indigo-200 hover:bg-slate-50"
+                              : "border-[var(--border)] hover:border-indigo-200 hover:bg-slate-50",
                           )}
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
@@ -115,18 +127,10 @@ export function AssignRiderModal({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900">{rider.name}</p>
-                            <p className="text-xs text-slate-500">
-                              {rider.zone} · {rider.location} · {fr ? rider.vehicleFr : rider.vehicle}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-400">
-                              {rider.activeDeliveries} {fr ? "actives" : "active"} · {rider.performanceScore}% {fr ? "performance" : "performance"} · ⭐ {rider.rating}
-                            </p>
+                            <p className="text-xs text-slate-500">{rider.phone ?? "—"}</p>
                           </div>
-                          <span className={cn(
-                            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
-                            rider.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-                          )}>
-                            {fr ? (rider.status === "active" ? "actif" : "inactif") : rider.status}
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                            {rider.activeTasks} {fr ? "actives" : "active"}
                           </span>
                         </button>
                       </li>
@@ -139,14 +143,14 @@ export function AssignRiderModal({
             <div className="flex gap-3 border-t border-[var(--border)] px-6 py-4">
               <button
                 type="button"
-                onClick={close}
+                onClick={onClose}
                 className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 {fr ? "Annuler" : "Cancel"}
               </button>
               <button
                 type="button"
-                onClick={proceed}
+                onClick={() => setConfirmStep(true)}
                 disabled={!activeRider}
                 className="btn-primary flex-1 rounded-xl py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -159,33 +163,33 @@ export function AssignRiderModal({
             <h3 className="text-lg font-semibold text-slate-900">{fr ? "Confirmer l'assignation du livreur" : "Confirm rider assignment"}</h3>
             <p className="mt-3 text-sm text-slate-600">
               {fr ? (
-                <>Assigner <strong>{activeRider?.name}</strong> à ce lot ?</>
+                <>Assigner <strong>{activeRider?.name}</strong> ?</>
               ) : (
-                <>Assign <strong>{activeRider?.name}</strong> to this batch?</>
+                <>Assign <strong>{activeRider?.name}</strong>?</>
               )}
             </p>
             {activeRider && (
               <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-700">
-                <p><span className="text-slate-500">{fr ? "Zone :" : "Zone:"}</span> {activeRider.zone}</p>
-                <p className="mt-1"><span className="text-slate-500">{fr ? "Lieu :" : "Location:"}</span> {activeRider.location}</p>
-                <p className="mt-1"><span className="text-slate-500">{fr ? "Véhicule :" : "Vehicle:"}</span> {fr ? activeRider.vehicleFr : activeRider.vehicle}</p>
-                <p className="mt-1"><span className="text-slate-500">{fr ? "Livraisons actives :" : "Active deliveries:"}</span> {activeRider.activeDeliveries}</p>
+                <p><span className="text-slate-500">{fr ? "Téléphone :" : "Phone:"}</span> {activeRider.phone ?? "—"}</p>
+                <p className="mt-1"><span className="text-slate-500">{fr ? "Livraisons actives :" : "Active deliveries:"}</span> {activeRider.activeTasks}</p>
               </div>
             )}
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmStep(false)}
+                disabled={busy}
                 className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 {fr ? "Retour" : "Back"}
               </button>
               <button
                 type="button"
-                onClick={confirm}
-                className="btn-primary flex-1 rounded-xl py-2.5 text-sm font-medium"
+                onClick={() => void confirm()}
+                disabled={busy}
+                className="btn-primary flex-1 rounded-xl py-2.5 text-sm font-medium disabled:opacity-60"
               >
-                {fr ? "Confirmer l'assignation" : "Confirm assignment"}
+                {busy ? (fr ? "Assignation…" : "Assigning…") : (fr ? "Confirmer l'assignation" : "Confirm assignment")}
               </button>
             </div>
           </div>

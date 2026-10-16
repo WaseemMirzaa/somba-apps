@@ -1,63 +1,83 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { batchParcels } from "@/lib/warehouse-hubs";
-import type { RiderEntity } from "@/lib/warehouse-entities";
+import { STAGE_LABEL, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 
 export default function WarehouseBatchBuilderPage() {
   const router = useRouter();
+  const ops = useOpsPath();
+  const base = useOpsBase();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const [batch, setBatch] = useState<string[]>([]);
+  const { parcels, buildBatch } = useWarehouseData();
+  const [batchIds, setBatchIds] = useState<string[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const available = batchParcels.filter((p) => !batch.includes(p.id));
 
-  function add(id: string) {
-    setBatch([...batch, id]);
+  // Real parcels with no rider yet: scanned in at the hub (received) or still inbound.
+  const pool = useMemo(
+    () => parcels.filter((p) => p.rawStatus === "unassigned").sort((a, b) => Number(!!b.receivedAt) - Number(!!a.receivedAt)),
+    [parcels],
+  );
+  const available = pool.filter((p) => !batchIds.includes(p.taskId));
+  const batchRows = batchIds
+    .map((id) => parcels.find((p) => p.taskId === id))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .map((p, i) => ({ ...p, stop: i + 1 }));
+
+  function sortByZone() {
+    setBatchIds((cur) => {
+      const byId = new Map(parcels.map((p) => [p.taskId, p]));
+      return [...cur].sort((a, b) => {
+        const za = byId.get(a)?.zone ?? "";
+        const zb = byId.get(b)?.zone ?? "";
+        return za.localeCompare(zb) || (byId.get(a)?.orderId ?? "").localeCompare(byId.get(b)?.orderId ?? "");
+      });
+    });
   }
-
-  function remove(id: string) {
-    setBatch(batch.filter((x) => x !== id));
-  }
-
-  const batchRows = batch.map((id, i) => {
-    const p = batchParcels.find((x) => x.id === id)!;
-    return { ...p, stop: i + 1 };
-  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Préparation des lots" : "Batch Builder"}
-        subtitle={fr ? "Ajoutez des colis pour constituer un lot optimisé par itinéraire" : "Add parcels to build a route-optimized batch"}
-        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: fr ? "Préparation des lots" : "Batch Builder" }]}
-        actions={<Button size="sm" onClick={() => { setBatch((b) => [...b].reverse()); toast(fr ? "Itinéraire optimisé" : "Route optimized"); }}>{fr ? "Optimiser l'itinéraire" : "Optimize Route"}</Button>}
+        subtitle={fr ? "Ajoutez des colis sans livreur, triez par zone, puis créez le lot et assignez un livreur" : "Add parcels that have no rider yet, sort by zone, then create the batch and assign a rider"}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Préparation des lots" : "Batch Builder" }]}
+        actions={
+          <Button size="sm" variant="secondary" disabled={batchIds.length < 2} onClick={sortByZone}>
+            {fr ? "Trier par zone" : "Sort by zone"}
+          </Button>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardContent className="p-0">
             <DataTable
+              emptyMessage={fr ? "Aucun colis en attente de livreur." : "No parcels waiting for a rider."}
               columns={[
                 { key: "id", label: fr ? "Colis" : "Parcel" },
                 { key: "customer", label: t("customer") },
                 { key: "zone", label: t("zone") },
-                { key: "weight", label: fr ? "Poids" : "Weight", render: (row) => `${row.weight}kg` },
+                { key: "status", label: t("status"), render: (row) => {
+                  const s = String(row.status) as ParcelStage;
+                  return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
+                }},
                 {
                   key: "actions",
                   label: fr ? "Action" : "Action",
                   render: (row) => (
-                    <Button variant="secondary" size="sm" onClick={() => add(String(row.id))}>
+                    <Button variant="secondary" size="sm" onClick={() => setBatchIds((b) => [...b, String(row.taskId)])} aria-label={fr ? "Ajouter au lot" : "Add to batch"}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   ),
@@ -71,8 +91,8 @@ export default function WarehouseBatchBuilderPage() {
         <div className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              {batch.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-slate-400">{fr ? "Ajoutez des colis pour constituer le lot" : "Add parcels to build batch"}</p>
+              {batchRows.length === 0 ? (
+                <p className="px-5 py-8 text-center text-sm text-slate-400">{fr ? "Ajoutez des colis pour constituer le lot" : "Add parcels to build the batch"}</p>
               ) : (
                 <DataTable
                   columns={[
@@ -83,7 +103,7 @@ export default function WarehouseBatchBuilderPage() {
                       key: "actions",
                       label: fr ? "Action" : "Action",
                       render: (row) => (
-                        <button type="button" onClick={() => remove(String(row.id))} className="text-red-500">
+                        <button type="button" onClick={() => setBatchIds((b) => b.filter((x) => x !== row.taskId))} className="text-red-500" aria-label={fr ? "Retirer" : "Remove"}>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       ),
@@ -94,7 +114,7 @@ export default function WarehouseBatchBuilderPage() {
               )}
             </CardContent>
           </Card>
-          {batch.length > 0 && (
+          {batchIds.length > 0 && (
             <Button className="w-full" onClick={() => setShowAssignModal(true)}>
               {fr ? "Créer le lot et assigner un livreur" : "Create Batch & Assign Rider"}
             </Button>
@@ -105,12 +125,13 @@ export default function WarehouseBatchBuilderPage() {
       <AssignRiderModal
         open={showAssignModal}
         title={fr ? "Assigner un livreur au nouveau lot" : "Assign rider to new batch"}
-        subtitle={fr ? `${batch.length} colis dans le lot` : `${batch.length} parcel${batch.length !== 1 ? "s" : ""} in batch`}
+        subtitle={fr ? `${batchIds.length} colis dans le lot` : `${batchIds.length} parcel${batchIds.length !== 1 ? "s" : ""} in batch`}
         onClose={() => setShowAssignModal(false)}
-        onConfirm={(rider: RiderEntity) => {
-          toast(fr ? `Lot créé — ${rider.name} assigné` : `Batch created — ${rider.name} assigned`);
-          setShowAssignModal(false);
-          router.push("/warehouse/dispatch/BATCH-001");
+        onConfirm={async (rider) => {
+          const batch = await buildBatch(batchIds, rider.id, rider.name);
+          toast(fr ? `Lot ${batch.reference} créé — ${rider.name} assigné` : `Batch ${batch.reference} created — ${rider.name} assigned`);
+          setBatchIds([]);
+          router.push(ops(`/dispatch/${batch.id}`));
         }}
       />
     </div>

@@ -2,20 +2,21 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { products } from "@/lib/mock-data";
-import { categoryLabel } from "@/lib/admin-i18n";
+import { useCatalog } from "@/lib/catalog";
 import { useLocale } from "@/context/locale-context";
 
+/** Live catalogue suggestions: every link opens a real product. */
 export function SearchAutocomplete({ query, onSelect }: { query: string; onSelect?: () => void }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const catalog = useCatalog();
   const suggestions = useMemo(() => {
-    if (!query || query.length < 2) return [];
-    const q = query.toLowerCase();
-    return products
-      .filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+    if (!query || query.trim().length < 2) return [];
+    const q = query.trim().toLowerCase();
+    return catalog
+      .filter((p) => p.name.toLowerCase().includes(q) || p.nameFr.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
       .slice(0, 5);
-  }, [query]);
+  }, [query, catalog]);
 
   if (suggestions.length === 0) return null;
 
@@ -28,7 +29,7 @@ export function SearchAutocomplete({ query, onSelect }: { query: string; onSelec
           onClick={onSelect}
           className="block px-4 py-2 text-sm hover:bg-blue-50"
         >
-          {fr ? p.nameFr : p.name} <span className="text-slate-400">· {fr ? (p.categoryFr ?? categoryLabel(p.category, fr)) : p.category}</span>
+          {fr ? p.nameFr : p.name} <span className="text-slate-400">· {fr ? p.categoryFr : p.category}</span>
         </Link>
       ))}
       <Link href={`/shop/search?q=${encodeURIComponent(query)}`} onClick={onSelect} className="block border-t px-4 py-2 text-sm font-medium text-[var(--primary)]">

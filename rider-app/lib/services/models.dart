@@ -57,6 +57,11 @@ class DeliveryTaskDto {
   final double totalUsd;
   final List<OrderLine> items;
   final DateTime? createdAt;
+  final String? pickupAddress;
+  final int attempts;
+  final String? failureReason;
+  final DateTime? readyAt;
+  final DateTime? receivedAt;
 
   DeliveryTaskDto({
     required this.id,
@@ -71,6 +76,11 @@ class DeliveryTaskDto {
     this.totalUsd = 0,
     this.items = const [],
     this.createdAt,
+    this.pickupAddress,
+    this.attempts = 1,
+    this.failureReason,
+    this.readyAt,
+    this.receivedAt,
   });
 
   bool get isActive => const {'assigned', 'picked_up', 'in_transit'}.contains(status);
@@ -102,6 +112,9 @@ class DeliveryTaskDto {
     return null;
   }
 
+  static DateTime? _date(dynamic v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
+  static String? _str(dynamic v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
+
   factory DeliveryTaskDto.fromJson(Map<String, dynamic> j) {
     final o = j['order'] is Map ? (j['order'] as Map).map((k, v) => MapEntry(k.toString(), v)) : <String, dynamic>{};
     return DeliveryTaskDto(
@@ -118,7 +131,12 @@ class DeliveryTaskDto {
       items: ((o['items'] as List?) ?? const [])
           .map((e) => OrderLine((e as Map)['productName']?.toString() ?? '', (e['qty'] as num?)?.toInt() ?? 1))
           .toList(),
-      createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
+      createdAt: _date(j['createdAt']),
+      pickupAddress: _str(j['pickupAddress']),
+      attempts: (j['attempts'] as num?)?.toInt() ?? 1,
+      failureReason: _str(j['failureReason']),
+      readyAt: _date(j['readyAt']),
+      receivedAt: _date(j['receivedAt']),
     );
   }
 }

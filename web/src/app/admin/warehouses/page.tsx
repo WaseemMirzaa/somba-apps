@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { NavLinkButton } from "@/components/ui/nav-link-button";
+import { NoticeBar } from "@/components/admin/demo-badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
@@ -33,7 +33,7 @@ export default function AdminWarehousesPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(warehouses, filters, {
-        searchFields: ["id", "name", "city", "country", "portalEmail"],
+        searchFields: ["id", "name", "city", "country", "managerEmail"],
         statusField: "status",
       }),
     [warehouses, filters]
@@ -42,8 +42,8 @@ export default function AdminWarehousesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Entrepôts" : "Warehouses"}
-        subtitle={fr ? "Créez des centres de distribution et délivrez des identifiants de portail aux responsables d'entrepôt" : "Create fulfillment centers and issue portal credentials for warehouse managers"}
+        title={fr ? "Entrepôts — annuaire des hubs (local)" : "Warehouses — hub directory (local)"}
+        subtitle={fr ? "Liste de hubs gardée dans ce navigateur : elle n'est pas enregistrée sur le serveur" : "A list of hubs kept in this browser: it is not stored on the server"}
         breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Entrepôts" : "Warehouses" }]}
         actions={
           <>
@@ -52,7 +52,7 @@ export default function AdminWarehousesPage() {
             </Link>
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
-              {fr ? "Créer un entrepôt" : "Create Warehouse"}
+              {fr ? "Ajouter un hub" : "Add hub"}
             </Button>
           </>
         }
@@ -106,7 +106,7 @@ export default function AdminWarehousesPage() {
               { key: "country", label: fr ? "Pays" : "Country" },
               { key: "staff", label: fr ? "Personnel" : "Staff" },
               { key: "capacity", label: fr ? "Capacité" : "Capacity", render: (row) => Number(row.capacity).toLocaleString() },
-              { key: "portalEmail", label: fr ? "Connexion portail" : "Portal Login" },
+              { key: "managerEmail", label: fr ? "Contact responsable" : "Manager contact" },
               { key: "status", label: fr ? "Statut" : "Status", render: (row) => (
                 <Badge variant={row.status === "active" ? "success" : row.status === "setup" ? "warning" : "default"}>{fr ? (WH_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
               )},
@@ -119,25 +119,21 @@ export default function AdminWarehousesPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-5">
-          <p className="text-sm text-slate-600">
-            {fr ? (
-              <>
-                Les responsables d&apos;entrepôt se connectent avec l&apos;e-mail et le mot de passe de portail que vous délivrez ici.
-                Ils ne voient que le <strong>portail Entrepôt</strong> — pas Admin, Vendeur ou les autres portails.
-                En tant qu&apos;admin, utilisez <NavLinkButton href="/admin/fulfillment">Opérations logistiques</NavLinkButton> pour suivre toute l&apos;activité des entrepôts.
-              </>
-            ) : (
-              <>
-                Warehouse managers log in with the portal email and password you issue here.
-                They only see the <strong>Warehouse portal</strong> — not Admin, Seller, or other portals.
-                As admin, use <NavLinkButton href="/admin/fulfillment">Fulfillment Ops</NavLinkButton> to monitor all warehouse activity.
-              </>
-            )}
-          </p>
-        </CardContent>
-      </Card>
+      <NoticeBar>
+        {fr ? (
+          <>
+            Cet annuaire est local à ce navigateur et ne crée aucun identifiant de connexion. Pour donner accès au portail entrepôt, créez un vrai compte dans{" "}
+            <Link href="/admin/warehouses/staff" className="font-semibold underline">Personnel d&apos;entrepôt</Link>. Suivez l&apos;activité dans{" "}
+            <Link href="/admin/fulfillment" className="font-semibold underline">Opérations logistiques</Link>.
+          </>
+        ) : (
+          <>
+            This directory is local to this browser and creates no sign-in credentials. To give someone warehouse-portal access, create a real account under{" "}
+            <Link href="/admin/warehouses/staff" className="font-semibold underline">Warehouse Staff</Link>. Monitor activity in{" "}
+            <Link href="/admin/fulfillment" className="font-semibold underline">Fulfillment Ops</Link>.
+          </>
+        )}
+      </NoticeBar>
     </div>
   );
 }
@@ -151,39 +147,18 @@ function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
     name: "", city: "", country: "France", address: "",
     capacity: 10000, managerName: "", managerEmail: "", portalEmail: "", zones: "Zone A",
   });
-  const [created, setCreated] = useState<{ id: string; password: string } | null>(null);
 
   function submit() {
-    if (!form.name || !form.portalEmail) {
-      toast(fr ? "Nom et e-mail de portail requis" : "Name and portal email required", "error");
+    if (!form.name.trim()) {
+      toast(fr ? "Nom requis" : "Name required", "error");
       return;
     }
-    const { record, password } = createWarehouse({
+    createWarehouse({
       ...form,
       zones: form.zones.split(",").map((z) => z.trim()),
     });
-    setCreated({ id: record.id, password });
-    toast(fr ? "Entrepôt créé — identifiants générés" : "Warehouse created — credentials generated");
-  }
-
-  if (created) {
-    return (
-      <Card>
-        <CardContent className="space-y-4 p-6">
-          <h3 className="font-semibold text-emerald-700">{fr ? "Entrepôt créé — identifiants du portail" : "Warehouse Created — Portal Credentials"}</h3>
-          <p className="text-sm text-slate-600">{fr ? "Partagez ces identifiants avec le responsable d'entrepôt. Il peut se connecter sur /login." : "Share these credentials with the warehouse manager. They can log in at /login."}</p>
-          <div className="rounded-lg bg-slate-50 p-4 font-mono text-sm">
-            <p>{fr ? "ID entrepôt" : "Warehouse ID"}: {created.id}</p>
-            <p>{fr ? "E-mail du portail" : "Portal Email"}: {form.portalEmail}</p>
-            <p>{fr ? "Mot de passe temporaire" : "Temp Password"}: {created.password}</p>
-          </div>
-          <div className="flex gap-2">
-            <Link href={`/admin/warehouses/${created.id}`}><Button size="sm">{fr ? "Voir l'entrepôt" : "View Warehouse"}</Button></Link>
-            <Button variant="ghost" size="sm" onClick={onClose}>{fr ? "Fermer" : "Close"}</Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    toast(fr ? "Hub ajouté à l'annuaire local" : "Hub added to the local directory");
+    onClose();
   }
 
   return (
@@ -197,12 +172,11 @@ function CreateWarehouseForm({ onClose }: { onClose: () => void }) {
           <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Capacité" : "Capacity"} type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
           <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "Adresse" : "Address"} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Nom du responsable" : "Manager name"} value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "E-mail du responsable" : "Manager email"} value={form.managerEmail} onChange={(e) => setForm({ ...form, managerEmail: e.target.value })} />
-          <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "E-mail de connexion au portail (ex. warehouse.city@somba.com)" : "Portal login email (e.g. warehouse.city@somba.com)"} value={form.portalEmail} onChange={(e) => setForm({ ...form, portalEmail: e.target.value })} />
+          <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Contact du responsable" : "Manager contact"} value={form.managerEmail} onChange={(e) => setForm({ ...form, managerEmail: e.target.value })} />
           <input className="input-premium px-4 py-2 text-sm sm:col-span-2" placeholder={fr ? "Zones (séparées par des virgules)" : "Zones (comma-separated)"} value={form.zones} onChange={(e) => setForm({ ...form, zones: e.target.value })} />
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={submit}>{fr ? "Créer et générer les identifiants" : "Create & Generate Credentials"}</Button>
+          <Button size="sm" onClick={submit}>{fr ? "Ajouter à l'annuaire" : "Add to directory"}</Button>
           <Button variant="ghost" size="sm" onClick={onClose}>{fr ? "Annuler" : "Cancel"}</Button>
         </div>
       </CardContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +17,10 @@ import {
   type WarehouseParcel,
 } from "@/lib/warehouse-transfers";
 import { cn } from "@/lib/utils";
+import { DataTable } from "@/components/ui/data-table";
+import { STAGE_LABEL, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
+import { shortDate } from "@/lib/warehouse-live";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 
 const TYPE_BADGE: Record<DeliveryType, "primary" | "info" | "warning" | "default"> = {
   local: "default",
@@ -28,8 +32,13 @@ const TYPE_BADGE: Record<DeliveryType, "primary" | "info" | "warning" | "default
 export default function WarehouseDeliveriesPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { parcels: liveParcels } = useWarehouseData();
+  const [view, setView] = useState<"live" | "demo">("live");
   const [tab, setTab] = useState<DeliveryType | "all">("all");
   const [open, setOpen] = useState<string | null>(null);
+  const live = useMemo(() => liveParcels.filter((p) => p.status !== "inbound" && p.status !== "received"), [liveParcels]);
 
   const counts = deliveryTypeCounts();
   const tabs = [
@@ -40,25 +49,70 @@ export default function WarehouseDeliveriesPage() {
     { id: "return", label: `${DELIVERY_TYPE_SHORT.return[fr ? "fr" : "en"]} (${counts.return})` },
   ];
 
-  const parcels: WarehouseParcel[] =
+  const demoParcels: WarehouseParcel[] =
     tab === "all" ? WAREHOUSE_PARCELS : WAREHOUSE_PARCELS.filter((p) => p.type === tab);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Livraisons par type" : "Deliveries by type"}
+        title={fr ? "Livraisons" : "Deliveries"}
         subtitle={
           fr
-            ? "Files séparées par type d'acheminement : local (même zone), inter-zone (même entrepôt), inter-entrepôts et retours"
-            : "Separate queues per delivery type: local (same zone), cross-zone (same warehouse), inter-warehouse, and returns"
+            ? "Suivi en direct des livraisons : en route, livrées et échouées"
+            : "Live delivery tracking: on the way, delivered and failed"
         }
-        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: fr ? "Livraisons" : "Deliveries" }]}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Livraisons" : "Deliveries" }]}
       />
 
-      <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as DeliveryType | "all")} />
+      <Tabs
+        tabs={[
+          { id: "live", label: `${fr ? "En direct" : "Live"} (${live.length})` },
+          { id: "demo", label: fr ? "Par type (données démo)" : "By type (demo data)" },
+        ]}
+        active={view}
+        onChange={(id) => setView(id as "live" | "demo")}
+      />
 
-      <div className="space-y-3">
-        {parcels.map((p) => {
+      {view === "live" && (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              emptyMessage={fr ? "Aucune livraison en cours." : "No deliveries yet."}
+              columns={[
+                { key: "id", label: fr ? "Colis" : "Parcel", render: (row) => (
+                  <Link href={ops(`/deliveries/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+                )},
+                { key: "orderId", label: fr ? "Commande" : "Order" },
+                { key: "customer", label: fr ? "Client" : "Customer" },
+                { key: "customerAddress", label: fr ? "Adresse" : "Address" },
+                { key: "rider", label: fr ? "Livreur" : "Rider" },
+                { key: "attempts", label: fr ? "Tentatives" : "Attempts" },
+                { key: "status", label: fr ? "Statut" : "Status", render: (row) => {
+                  const st = String(row.status) as ParcelStage;
+                  return <Badge variant={stageVariant(st)}>{fr ? STAGE_LABEL[st].fr : STAGE_LABEL[st].en}</Badge>;
+                }},
+                { key: "updatedAt", label: fr ? "Mis à jour" : "Updated", render: (row) => shortDate(String(row.updatedAt), locale) },
+              ]}
+              data={live as unknown as Record<string, unknown>[]}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {view === "demo" && (
+        <>
+          <div className="flex items-center gap-2">
+            <Badge variant="warning">{fr ? "Données démo" : "Demo data"}</Badge>
+            <span className="text-xs text-slate-500">
+              {fr ? "Le serveur ne suit pas encore le type d'acheminement (local, inter-zone, inter-entrepôts, retour)." : "The server does not track delivery type (local, cross-zone, inter-warehouse, return) yet."}
+            </span>
+          </div>
+          <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as DeliveryType | "all")} />
+        </>
+      )}
+
+      {view === "demo" && <div className="space-y-3">
+        {demoParcels.map((p) => {
           const isOpen = open === p.id;
           const delivered = p.statusFr.includes("Livré") || p.status.toLowerCase().includes("deliver");
           return (
@@ -93,7 +147,7 @@ export default function WarehouseDeliveriesPage() {
                     <Badge variant={delivered ? "success" : "info"}>{fr ? p.statusFr : p.status}</Badge>
                     {p.transferId && (
                       <Link
-                        href="/warehouse/transfers"
+                        href={ops("/transfers")}
                         onClick={(e) => e.stopPropagation()}
                         className="mt-1 flex items-center justify-end gap-1 text-[var(--primary)] hover:underline"
                       >
@@ -113,7 +167,7 @@ export default function WarehouseDeliveriesPage() {
             </Card>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

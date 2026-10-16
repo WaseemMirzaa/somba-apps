@@ -7,7 +7,7 @@ import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
-import '../../widgets/product_card.dart';
+import '../../widgets/product_actions.dart';
 import 'browse.dart';
 
 /// Coupons / promo codes the admin has published (`promos:list`). The code is
@@ -106,7 +106,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
-    final lang = widget.locale.languageCode;
     _q.text = _ctrl.text;
     final items = runQuery(liveCatalog(), _q);
     return Scaffold(
@@ -186,7 +185,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
                     itemCount: items.length,
-                    itemBuilder: (_, i) => ProductCard(product: items[i], lang: lang),
+                    itemBuilder: (_, i) => productCard(context, items[i], widget.locale),
                   ),
           ),
         ],

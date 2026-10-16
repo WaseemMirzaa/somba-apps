@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../data/market_profiles.dart';
+import '../util/format.dart' show marketNotifier;
 import 'auth_service.dart';
 import 'models.dart';
 import 'socket_service.dart';
@@ -31,6 +32,15 @@ class RealtimeStore extends ChangeNotifier {
   double walletBalance = 0;
   final List<WalletTransactionDto> walletTransactions = [];
   final List<PaymentDto> payments = [];
+
+  /// Wallet top-ups that failed while the app was live, kept until the customer
+  /// dismisses them on the wallet screen (instead of silently vanishing).
+  final List<PaymentDto> failedTopups = [];
+
+  void dismissTopupFailure(String paymentId) {
+    failedTopups.removeWhere((p) => p.id == paymentId);
+    notifyListeners();
+  }
   final List<AddressDto> addresses = [];
 
   /// Home-page banners published by the admin (CMS blocks of type `banner`).
@@ -49,7 +59,8 @@ class RealtimeStore extends ChangeNotifier {
   bool hydrated = false;
 
   /// Called when the server ends the session (revoked, suspended, deleted).
-  VoidCallback? onSessionEnded;
+  /// Receives an optional friendly message to show on the sign-in screen.
+  void Function(String? message)? onSessionEnded;
 
   String? _access;
   String? _refresh;
@@ -134,6 +145,7 @@ class RealtimeStore extends ChangeNotifier {
     for (final l in [products, categories, orders, notifications, walletTransactions, payments, addresses]) {
       l.clear();
     }
+    failedTopups.clear();
     wishlistIds.clear();
     riderLocations.clear();
     walletBalance = 0;
@@ -193,10 +205,10 @@ class RealtimeStore extends ChangeNotifier {
     } catch (_) {/* offline: keep retrying */}
   }
 
-  Future<void> _endSession() async {
+  Future<void> _endSession({String? message}) async {
     if (user == null) return;
     await logout();
-    onSessionEnded?.call();
+    onSessionEnded?.call(message);
   }
 
   static bool _expiresWithin(String jwt, Duration d) {
@@ -324,6 +336,9 @@ class RealtimeStore extends ChangeNotifier {
               .map((b) => BannerDto(title: (b['title'] ?? '').toString(), body: (b['body'] ?? '').toString())));
       }),
     ]);
+    // The saved "Prices shown in" choice is only known now (the first read at
+    // sign-in happens before the preferences were downloaded).
+    marketNotifier.value = prefs['market'] == 'FR' ? MarketProfileId.france : MarketProfileId.drc;
     hydrated = true;
     status = ConnStatus.connected;
     notifyListeners();
@@ -511,7 +526,8 @@ class RealtimeStore extends ChangeNotifier {
   /// Permanently deletes the account (server also closes this socket).
   Future<void> deleteAccount(String password) async {
     await _socket.request('me:delete', {'password': password});
-    await logout();
+    // Same path as a suspension: clears the session and returns the app to sign-in.
+    await _endSession(message: 'Your account was deleted');
   }
 
   Future<void> markRead(String id) async {
@@ -620,6 +636,9 @@ class RealtimeStore extends ChangeNotifier {
   void _upsertPayment(dynamic data) {
     final p = PaymentDto.fromJson(_map(data));
     final idx = payments.indexWhere((x) => x.id == p.id);
+    if (p.purpose == 'topup' && p.status == 'failed' && !failedTopups.any((x) => x.id == p.id) && (idx == -1 || payments[idx].status != 'failed')) {
+      failedTopups.insert(0, p);
+    }
     if (idx == -1) {
       payments.insert(0, p);
     } else {

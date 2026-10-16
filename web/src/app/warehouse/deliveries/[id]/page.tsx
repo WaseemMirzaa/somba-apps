@@ -1,214 +1,141 @@
 "use client";
 
-import Image from "next/image";
+import { useState } from "react";
 import { useParams } from "next/navigation";
-import { Phone } from "lucide-react";
+import { MapPin, Phone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
-import { useWarehouseData } from "@/lib/warehouse";
+import { Badge } from "@/components/ui/badge";
+import { ExceptionForm } from "@/components/warehouse/exception-form";
+import { STAGE_LABEL, stageVariant, useWarehouseData } from "@/lib/warehouse";
+import { shortDate } from "@/lib/warehouse-live";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
+import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-
-// Delivery status values originate from the shared (non-owned) entities layer.
-const STATUS_FR: Record<string, string> = {
-  in_transit: "En transit",
-  out_for_delivery: "En livraison",
-  delivered: "Livré",
-};
-
-// Product variant tokens arrive in English from the shared (non-owned) entities
-// layer (e.g. "Default", "256GB Black"). Translate known tokens; fall back unchanged.
-const VARIANT_TOKENS_FR: Record<string, string> = {
-  Default: "Standard",
-  Black: "Noir",
-  White: "Blanc",
-  Blue: "Bleu",
-  Silver: "Argent",
-  Grey: "Gris",
-  Gray: "Gris",
-  Red: "Rouge",
-  Green: "Vert",
-};
-
-const localizeVariant = (variant: string, fr: boolean) =>
-  !fr || !variant
-    ? variant
-    : variant
-        .split(" ")
-        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
-        .join(" ");
 
 export default function WarehouseDeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getDelivery } = useWarehouseData();
-  const delivery = getDelivery(id);
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const rt = useRealtime();
+  const { getParcel, riders, parcels } = useWarehouseData();
+  const [escalate, setEscalate] = useState(false);
+  const delivery = getParcel(id);
 
   if (!delivery) {
     return (
       <div className="p-8 text-center text-slate-500">
-        {fr ? "Livraison introuvable" : "Delivery not found"}
+        {parcels.length === 0 ? (fr ? "Chargement…" : "Loading…") : (fr ? "Livraison introuvable" : "Delivery not found")}
       </div>
     );
   }
 
-  const paymentLabel = delivery.paymentType;
-  const statusLabel = fr
-    ? STATUS_FR[delivery.status] ?? delivery.status.replace("_", " ")
-    : delivery.status.replace("_", " ");
+  const rider = riders.find((r) => r.id === delivery.riderId);
+  const live = rt.riderLocations[delivery.orderUuid];
+  const lat = live?.lat ?? delivery.lat;
+  const lng = live?.lng ?? delivery.lng;
+  const stage = STAGE_LABEL[delivery.status];
+  const listHref = ops("/deliveries");
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={delivery.orderId}
-        subtitle={`${statusLabel} · ETA ${delivery.eta}`}
-        backHref="/warehouse/deliveries"
+        subtitle={`${fr ? stage.fr : stage.en} · ${delivery.id}`}
+        backHref={listHref}
         breadcrumbs={[
-          { label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" },
-          { label: fr ? "Livraisons" : "Deliveries", href: "/warehouse/deliveries" },
+          { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+          { label: fr ? "Livraisons" : "Deliveries", href: listHref },
           { label: delivery.orderId },
         ]}
         actions={
           <>
-            <a
-              href={`tel:${delivery.riderPhone.replace(/\s/g, "")}`}
-              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50"
-            >
-              <Phone className="h-3.5 w-3.5" />
-              {fr ? "Appeler livreur" : "Call Rider"}
-            </a>
-            <button
-              onClick={() => toast(fr ? "Livraison escaladée" : "Delivery escalated to supervisor", "info")}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white"
-            >
-              {fr ? "Escalader" : "Escalate"}
+            {rider?.phone && (
+              <a
+                href={`tel:${rider.phone.replace(/\s/g, "")}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-4 py-2 text-sm hover:bg-indigo-50"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {fr ? "Appeler livreur" : "Call Rider"}
+              </a>
+            )}
+            <button onClick={() => setEscalate((v) => !v)} className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white">
+              {fr ? "Signaler un incident" : "Report an incident"}
             </button>
           </>
         }
       />
 
+      {escalate && (
+        <div className="card-premium p-5">
+          <ExceptionForm
+            taskId={delivery.taskId}
+            orderReference={delivery.orderId}
+            onCancel={() => setEscalate(false)}
+            onCreated={() => {
+              setEscalate(false);
+              toast(fr ? "Incident enregistré — voir Exceptions" : "Incident recorded — see Exceptions", "info");
+            }}
+          />
+        </div>
+      )}
+
       <DetailGrid>
         <DetailGridSection title={t("customer")}>
-          <InfoGrid
-            items={[
-              { label: fr ? "Nom" : "Name", value: delivery.customer },
-              {
-                label: fr ? "Téléphone" : "Phone",
-                value: (
-                  <a
-                    href={`tel:${delivery.customerPhone.replace(/\s/g, "")}`}
-                    className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {delivery.customerPhone}
-                  </a>
-                ),
-              },
-              { label: fr ? "Adresse" : "Address", value: delivery.customerAddress, full: true },
-              { label: t("zone"), value: delivery.zone },
-              { label: "ID", value: delivery.customerId },
-            ]}
-          />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Vendeur" : "Seller"}>
-          <InfoGrid
-            items={[
-              { label: fr ? "Nom" : "Name", value: delivery.seller },
-              { label: fr ? "Boutique" : "Store", value: delivery.sellerStore },
-              {
-                label: fr ? "Téléphone" : "Phone",
-                value: (
-                  <a
-                    href={`tel:${delivery.sellerPhone.replace(/\s/g, "")}`}
-                    className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {delivery.sellerPhone}
-                  </a>
-                ),
-              },
-              { label: "ID", value: delivery.sellerId },
-            ]}
-          />
+          <InfoGrid items={[
+            { label: fr ? "Nom" : "Name", value: delivery.customer },
+            { label: fr ? "Téléphone" : "Phone", value: delivery.customerPhone ?? "—" },
+            { label: fr ? "Adresse" : "Address", value: delivery.customerAddress, full: true },
+            { label: t("zone"), value: delivery.zone },
+          ]} />
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Livreur" : "Rider"}>
-          <InfoGrid
-            items={[
-              { label: fr ? "Nom" : "Name", value: delivery.rider },
-              {
-                label: fr ? "Téléphone" : "Phone",
-                value: (
-                  <a
-                    href={`tel:${delivery.riderPhone.replace(/\s/g, "")}`}
-                    className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {delivery.riderPhone}
-                  </a>
-                ),
-              },
-              { label: fr ? "Véhicule" : "Vehicle", value: delivery.vehicle },
-              { label: "ID", value: delivery.riderId },
-            ]}
-          />
+          <InfoGrid items={[
+            { label: fr ? "Nom" : "Name", value: delivery.rider },
+            { label: fr ? "Téléphone" : "Phone", value: rider?.phone ?? "—" },
+            { label: fr ? "Tentatives" : "Attempts", value: delivery.attempts },
+            { label: fr ? "Dernier échec" : "Last failure", value: delivery.failureReason ?? "—" },
+          ]} />
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Commande" : "Order"}>
-          <InfoGrid
-            items={[
-              { label: fr ? "N° commande" : "Order ID", value: delivery.orderId },
-              { label: fr ? "Articles" : "Items", value: delivery.itemsCount },
-              { label: fr ? "Paiement" : "Payment", value: paymentLabel },
-              { label: fr ? "Statut" : "Status", value: statusLabel },
-            ]}
-          />
+          <InfoGrid items={[
+            { label: fr ? "N° commande" : "Order ID", value: delivery.orderId },
+            { label: fr ? "Articles" : "Items", value: delivery.itemsCount },
+            { label: fr ? "Paiement" : "Payment", value: delivery.paymentLabel },
+            { label: fr ? "Statut" : "Status", value: <Badge variant={stageVariant(delivery.status)}>{fr ? stage.fr : stage.en}</Badge> },
+            { label: fr ? "Mis à jour" : "Updated", value: shortDate(delivery.updatedAt, locale) },
+          ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Produits" : "Products"} span={2}>
-          <div className="space-y-3">
-            {delivery.products.map((item) => (
-              <div
-                key={item.sku}
-                className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3"
+        <DetailGridSection title={fr ? "Position du livreur" : "Rider position"} span={3}>
+          {lat != null && lng != null ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <MapPin className="h-4 w-4 text-slate-500" />
+              <span>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--primary)] hover:underline"
               >
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg">
-                  <Image src={item.image} alt={item.name} fill className="object-cover" sizes="56px" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">{item.name}</p>
-                  <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {localizeVariant(item.variant, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Suivi en direct" : "Live Tracking"} span={3}>
-          <InfoGrid
-            items={[
-              { label: "ETA", value: delivery.eta },
-              {
-                label: fr ? "Arrêt actuel" : "Current Stop",
-                value: `${delivery.currentStop} ${fr ? "sur" : "of"} ${delivery.totalStops}`,
-              },
-              { label: fr ? "Statut" : "Status", value: statusLabel },
-            ]}
-          />
-          <div className="mt-4 flex h-48 items-center justify-center rounded-lg bg-indigo-50 text-sm text-slate-500">
-            {fr ? "Aperçu carte (simulation)" : "Live map preview (mock)"}
-          </div>
+                {fr ? "Ouvrir dans Google Maps" : "Open in Google Maps"}
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{fr ? "Aucune position partagée par le livreur pour le moment." : "The rider has not shared a position yet."}</p>
+          )}
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
-          <ActivityTimeline events={delivery.timeline} />
+          <ActivityTimeline events={delivery.timeline.map((e) => ({ time: e.time, label: fr ? e.labelFr : e.label, done: e.done }))} />
         </DetailGridSection>
       </DetailGrid>
     </div>

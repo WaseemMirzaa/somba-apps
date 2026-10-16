@@ -68,6 +68,7 @@ void main() {
     late Admin admin;
     late String productId;
     var sessionEnded = false;
+    String? endedMessage;
 
     setUpAll(() async {
       SharedPreferences.setMockInitialValues({});
@@ -76,7 +77,10 @@ void main() {
       await admin.connect();
       final p = await admin.call('products:create', {'name': 'Flutter Test Item $tag', 'price': 40, 'category': 'Electronics', 'stock': 50, 'description': 'Created by the Flutter live test'});
       productId = (p as Map)['id'] as String;
-      store.onSessionEnded = () => sessionEnded = true;
+      store.onSessionEnded = (message) {
+        sessionEnded = true;
+        endedMessage = message;
+      };
     });
 
     tearDownAll(() async {
@@ -278,8 +282,12 @@ void main() {
       await admin.call('customers:setActive', {'id': me['id'], 'active': true});
       await store.login(email, 'Flutter-Reset-2026');
       await until(() => store.hydrated, what: 'download after login');
+      sessionEnded = false;
+      endedMessage = null;
       await store.deleteAccount('Flutter-Reset-2026');
       expect(store.isSignedIn, isFalse);
+      expect(sessionEnded, isTrue, reason: 'deleting returns the app to sign-in through the normal session-ended path');
+      expect(endedMessage, 'Your account was deleted');
       await expectLater(AuthService().login(email, 'Flutter-Reset-2026'), throwsA(isA<ApiException>()));
     });
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true with a running API');

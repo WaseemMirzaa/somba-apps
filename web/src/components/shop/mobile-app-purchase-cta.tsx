@@ -9,19 +9,19 @@ export function MobileAppPurchaseCta() {
   const fr = locale === "fr";
 
   return (
-    <div className="rounded-2xl border-2 border-red-200 bg-gradient-to-br from-red-50 to-rose-50 p-6">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <div className="flex items-start gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white">
           <Smartphone className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-bold text-slate-900">
-            {fr ? "Achetez sur l'application mobile" : "Purchase in the mobile app"}
+          <h3 className="text-base font-bold text-slate-900">
+            {fr ? "Préférez-vous l'application mobile ?" : "Prefer the mobile app?"}
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {fr
-              ? "Les achats se font uniquement via l'app Somba&Teka. Téléchargez-la pour ajouter au panier, payer et suivre votre commande."
-              : "Purchases are available only in the Somba&Teka app. Download it to add to cart, checkout, and track your order."}
+              ? "Commandez aussi depuis l'application Somba&Teka : même compte, même panier de commandes, suivi en direct."
+              : "You can also order from the Somba&Teka app: same account, same orders, live tracking."}
           </p>
         </div>
       </div>

@@ -29,6 +29,9 @@ class RiderStore extends ChangeNotifier {
   final List<NotificationDto> notifications = [];
   EarningsDto earnings = const EarningsDto();
 
+  /// Public setting: when true the customer's 4-digit code is needed to deliver.
+  bool requireDeliveryCode = false;
+
   VoidCallback? onSessionEnded;
   String? _access;
   String? _refresh;
@@ -77,6 +80,8 @@ class RiderStore extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _poolTimer?.cancel();
+    _poolTimer = null;
     await location.stop();
     await _auth.clear();
     _socket.disconnect();
@@ -89,6 +94,7 @@ class RiderStore extends ChangeNotifier {
     pool.clear();
     notifications.clear();
     earnings = const EarningsDto();
+    requireDeliveryCode = false;
     notifyListeners();
   }
 
@@ -130,6 +136,7 @@ class RiderStore extends ChangeNotifier {
     }
   }
 
+  Timer? _poolTimer;
   DateTime _lastVerify = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// After a refused connection: is the account still allowed? (revoked, suspended, role changed)
@@ -163,6 +170,12 @@ class RiderStore extends ChangeNotifier {
       status = ConnStatus.connected;
       notifyListeners();
       unawaited(refresh());
+      // The server does not push brand-new pool items to riders yet, so a slow
+      // safety re-read keeps "Available" fresh without pulling to refresh.
+      _poolTimer?.cancel();
+      _poolTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+        if (user != null && isConnected) unawaited(refresh());
+      });
     });
     socket.on('disconnect', (reason) {
       if (user == null) return;
@@ -194,6 +207,29 @@ class RiderStore extends ChangeNotifier {
 
   /// Re-read the rider's queue (own + open pool), earnings and notifications.
   Future<void> refresh() async {
+    // Coalesce bursts of pushes: one read in flight, one more queued at most.
+    if (_refreshing) {
+      _refreshAgain = true;
+      return _refreshDone?.future;
+    }
+    _refreshing = true;
+    final done = _refreshDone = Completer<void>();
+    try {
+      do {
+        _refreshAgain = false;
+        await _refreshOnce();
+      } while (_refreshAgain);
+    } finally {
+      _refreshing = false;
+      done.complete();
+    }
+  }
+
+  bool _refreshing = false;
+  bool _refreshAgain = false;
+  Completer<void>? _refreshDone;
+
+  Future<void> _refreshOnce() async {
     try {
       final rows = ((await _socket.request('rider:tasks')) as List).map((e) => DeliveryTaskDto.fromJson(_map(e))).toList();
       myTasks
@@ -206,6 +242,7 @@ class RiderStore extends ChangeNotifier {
       notifications
         ..clear()
         ..addAll(((await _socket.request('notifications:list')) as List).map((e) => NotificationDto.fromJson(_map(e))));
+      await _readSettings();
       loaded = true;
       status = ConnStatus.connected;
       notifyListeners();
@@ -215,13 +252,26 @@ class RiderStore extends ChangeNotifier {
     }
   }
 
+  Future<void> _readSettings() async {
+    try {
+      final m = _map(await _socket.request('settings:get'));
+      requireDeliveryCode = '${m['requireDeliveryCode']}' == 'true';
+    } catch (_) {/* keep the last known value */}
+  }
+
   Future<void> accept(String taskId) async {
     await _socket.request('delivery:accept', {'taskId': taskId});
     await refresh();
   }
 
-  Future<void> advance(String taskId, String status) async {
-    await _socket.request('delivery:updateStatus', {'taskId': taskId, 'status': status});
+  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.
+  Future<void> advance(String taskId, String status, {String? reason, String? code}) async {
+    await _socket.request('delivery:updateStatus', {
+      'taskId': taskId,
+      'status': status,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+    });
     await refresh();
   }
 

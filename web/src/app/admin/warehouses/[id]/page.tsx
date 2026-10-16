@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
@@ -27,13 +26,11 @@ const FULFILLMENT_LINKS = [
 
 export default function AdminWarehouseDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { getWarehouse, getCredential, resetCredentials, updateWarehouse, deactivateWarehouse } = useWarehouseAdmin();
+  const { getWarehouse, updateWarehouse, deactivateWarehouse } = useWarehouseAdmin();
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
   const warehouse = getWarehouse(id);
-  const [password, setPassword] = useState(getCredential(id) ?? "—");
-  const [showPassword, setShowPassword] = useState(false);
   const stats = warehouseDashboardStats;
 
   if (!warehouse) {
@@ -55,7 +52,7 @@ export default function AdminWarehouseDetailPage() {
           <>
             <Badge variant={warehouse.status === "active" ? "success" : "warning"}>{fr ? (warehouse.status === "active" ? "Actif" : warehouse.status === "setup" ? "Configuration" : "Inactif") : warehouse.status}</Badge>
             {warehouse.status !== "active" && (
-              <Button size="sm" onClick={() => { updateWarehouse(id, { status: "active" }); toast(fr ? "Entrepôt activé" : "Warehouse activated"); }}>{fr ? "Activer" : "Activate"}</Button>
+              <Button size="sm" onClick={() => { updateWarehouse(id, { status: "active" }); toast(fr ? "Hub activé (local)" : "Hub activated (local)", "info"); }}>{fr ? "Activer" : "Activate"}</Button>
             )}
           </>
         }
@@ -80,26 +77,21 @@ export default function AdminWarehouseDetailPage() {
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Identifiants du portail" : "Portal Credentials"} span={2}>
-          <InfoGrid items={[
-            { label: fr ? "E-mail de connexion" : "Login Email", value: warehouse.portalEmail },
-            { label: fr ? "Mot de passe" : "Password", value: showPassword ? password : "••••••••" },
-          ]} />
-          <p className="mt-2 text-xs text-slate-500">{fr ? "Les responsables d'entrepôt les utilisent sur /login — ils ne peuvent pas accéder aux portails Admin ou Vendeur." : "Warehouse managers use these at /login — they cannot access Admin or Seller portals."}</p>
+        <DetailGridSection title={fr ? "Annuaire local" : "Local directory"} span={2}>
+          <p className="text-sm text-slate-600">
+            {fr
+              ? "Cette fiche est locale à ce navigateur. Elle ne contient aucun identifiant : pour donner accès au portail entrepôt, créez un compte réel dans Personnel d'entrepôt."
+              : "This record is local to this browser. It holds no credentials: to give someone warehouse-portal access, create a real account under Warehouse Staff."}
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setShowPassword(!showPassword)}>
-              {fr ? (showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe") : `${showPassword ? "Hide" : "Show"} Password`}
-            </Button>
-            <Button size="sm" onClick={() => { const p = resetCredentials(id); setPassword(p); setShowPassword(true); toast(fr ? "Nouveau mot de passe généré" : "New password generated"); }}>
-              {fr ? "Réinitialiser le mot de passe" : "Reset Password"}
-            </Button>
-            <Button size="sm" variant="danger" onClick={() => { deactivateWarehouse(id); toast(fr ? "Entrepôt désactivé" : "Warehouse deactivated", "error"); }}>
-              {fr ? "Désactiver" : "Deactivate"}
+            <Link href="/admin/warehouses/staff"><Button size="sm" variant="secondary">{fr ? "Personnel d'entrepôt" : "Warehouse staff"}</Button></Link>
+            <Button size="sm" variant="danger" onClick={() => { deactivateWarehouse(id); toast(fr ? "Hub désactivé (local)" : "Hub deactivated (local)", "info"); }}>
+              {fr ? "Désactiver (local)" : "Deactivate (local)"}
             </Button>
           </div>
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Activité du jour" : "Today's Activity"} span={3}>
+        <DetailGridSection title={fr ? "Activité du jour (données démo)" : "Today's Activity (demo data)"} span={3}>
           <InfoGrid columns={4} items={[
             { label: fr ? "Reçus" : "Received", value: stats.receivedToday },
             { label: fr ? "Expédiés" : "Dispatched", value: stats.dispatchedToday },

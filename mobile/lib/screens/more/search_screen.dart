@@ -3,7 +3,7 @@ import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/product_card.dart';
+import '../../widgets/product_actions.dart';
 import 'browse.dart';
 import 'shop_extra.dart';
 
@@ -162,7 +162,7 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         sliver: SliverGrid(
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-          delegate: SliverChildBuilderDelegate((_, i) => ProductCard(product: results[i], lang: lang), childCount: results.length),
+          delegate: SliverChildBuilderDelegate((_, i) => productCard(context, results[i], widget.locale), childCount: results.length),
         ),
       ),
     ]);

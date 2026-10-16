@@ -1,27 +1,26 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCatalog } from "@/lib/catalog";
 import { useShop } from "@/context/shop-context";
 import { useLocale } from "@/context/locale-context";
-import { useModeration } from "@/context/moderation-context";
 
 export default function ShopProductsPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const products = useCatalog();
-  const { isProductVisible } = useModeration();
   const [sort, setSort] = useState("popularity");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
   const [minRating, setMinRating] = useState(0);
   const [minDiscount, setMinDiscount] = useState(0);
-  const [priceMax, setPriceMax] = useState(2000);
+  const [priceCap, setPriceCap] = useState<number | null>(null);
   const { recentlyViewed } = useShop();
 
+  const topPrice = Math.max(10, Math.ceil(Math.max(0, ...products.map((p) => p.price)) / 50) * 50);
+  const priceMax = priceCap ?? topPrice;
   const brands = ["all", ...new Set(products.map((p) => p.seller))];
   const categories = ["all", ...new Set(products.map((p) => p.category))];
   const categoryFrMap = new Map(products.map((p) => [p.category, p.categoryFr]));
@@ -29,7 +28,7 @@ export default function ShopProductsPage() {
     c === "all" ? (fr ? "Toutes les catégories" : "All categories") : fr ? (categoryFrMap.get(c) ?? c) : c;
 
   const sorted = useMemo(() => {
-    let list = products.filter(isProductVisible);
+    let list = [...products];
     if (category !== "all") list = list.filter((p) => p.category === category);
     if (brand !== "all") list = list.filter((p) => p.seller === brand);
     if (minRating > 0) list = list.filter((p) => p.rating >= minRating);
@@ -40,7 +39,7 @@ export default function ShopProductsPage() {
     if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
     if (sort === "discount") list.sort((a, b) => b.discount - a.discount);
     return list;
-  }, [products, sort, category, brand, minRating, minDiscount, priceMax, isProductVisible]);
+  }, [products, sort, category, brand, minRating, minDiscount, priceMax]);
 
   const buyAgain = products.filter((p) => recentlyViewed.includes(p.id)).slice(0, 4);
 
@@ -50,10 +49,10 @@ export default function ShopProductsPage() {
 
       {buyAgain.length > 0 && (
         <section>
-          <h2 className="mb-3 font-semibold">{fr ? "Acheter à nouveau" : "Buy Again"}</h2>
+          <h2 className="mb-3 font-semibold">{fr ? "Récemment consultés" : "Recently viewed"}</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {buyAgain.map((p) => (
-              <Link key={p.id} href={`/shop/products/${p.id}`}><ProductCard product={p} /></Link>
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         </section>
@@ -83,15 +82,13 @@ export default function ShopProductsPage() {
           <option value={10}>{fr ? "10%+ de remise" : "10%+ off"}</option>
           <option value={15}>{fr ? "15%+ de remise" : "15%+ off"}</option>
         </select>
-        <input type="range" min={100} max={2000} step={50} value={priceMax} onChange={(e) => setPriceMax(Number(e.target.value))} className="col-span-2" />
+        <input type="range" min={0} max={topPrice} step={Math.max(1, Math.round(topPrice / 40))} value={priceMax} onChange={(e) => setPriceCap(Number(e.target.value))} className="col-span-2" />
         <span className="text-sm text-slate-500">{fr ? `Max ${priceMax} $` : `Max $${priceMax}`}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {sorted.map((p) => (
-          <Link key={p.id} href={`/shop/products/${p.id}`}>
-            <ProductCard product={p} />
-          </Link>
+          <ProductCard key={p.id} product={p} />
         ))}
       </div>
     </div>

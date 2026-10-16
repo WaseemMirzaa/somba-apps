@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, ShoppingCart, User, Menu, X, Heart } from "lucide-react";
-import { NotificationBell } from "@/components/ui/notification-bell";
+import { Search, ShoppingCart, User, Menu, X, Heart, Bell, LogOut } from "lucide-react";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
 import { useMarket } from "@/context/market-context";
 import { useState, FormEvent } from "react";
@@ -11,6 +10,8 @@ import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useShop } from "@/context/shop-context";
+import { useRealtime } from "@/context/realtime-context";
+import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 
 export function LandingHeader() {
@@ -20,12 +21,22 @@ export function LandingHeader() {
   const router = useRouter();
   const { cartCount } = useShop();
   const { profileId, setProfileId } = useMarket();
+  const rt = useRealtime();
+  const { logout } = useAuth();
+  const signedIn = !!rt.user;
+  const unread = rt.unreadCount;
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
-    const q = query.trim() || "phone";
-    router.push(`/shop/search?q=${encodeURIComponent(q)}`);
+    const q = query.trim();
+    router.push(q ? `/shop/search?q=${encodeURIComponent(q)}` : "/shop/products");
     setMobileOpen(false);
+  }
+
+  function signOut() {
+    logout();
+    setMobileOpen(false);
+    router.push("/");
   }
 
   return (
@@ -85,10 +96,25 @@ export function LandingHeader() {
               <option value="france">FR</option>
               <option value="drc">DRC</option>
             </select>
-            <NotificationBell portal="customer" href="/shop/notifications" className="hidden sm:flex" />
-            <Link href="/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-[var(--primary)] hover:bg-blue-50 sm:block">
-              {locale === "fr" ? "Connexion" : "Login"}
-            </Link>
+            {signedIn && (
+              <Link
+                href="/shop/notifications"
+                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 sm:flex"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </Link>
+            )}
+            {!signedIn && (
+              <Link href="/shop/login" className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-[var(--primary)] hover:bg-blue-50 sm:block">
+                {locale === "fr" ? "Connexion" : "Login"}
+              </Link>
+            )}
             <Link
               href="/shop/account"
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)] sm:block"
@@ -96,6 +122,16 @@ export function LandingHeader() {
             >
               <User className="h-5 w-5" />
             </Link>
+            {signedIn && (
+              <button
+                onClick={signOut}
+                className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-red-600 sm:block"
+                title={locale === "fr" ? "Se déconnecter" : "Sign out"}
+                aria-label={locale === "fr" ? "Se déconnecter" : "Sign out"}
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            )}
             <Link
               href="/shop/wishlist"
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-red-500 sm:block"
@@ -155,6 +191,15 @@ export function LandingHeader() {
               <Link href="/shop/account" className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
                 {t("myAccount")}
               </Link>
+              {signedIn ? (
+                <button onClick={signOut} className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
+                  {locale === "fr" ? "Se déconnecter" : "Sign out"}
+                </button>
+              ) : (
+                <Link href="/shop/login" className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
+                  {locale === "fr" ? "Connexion" : "Login"}
+                </Link>
+              )}
               <Link href="/seller" className="flex-1 rounded-xl border border-white/30 py-2.5 text-center text-sm text-white">
                 {t("becomeSeller")}
               </Link>
@@ -177,9 +222,6 @@ export function LandingHeader() {
           <Link href="/seller" className="whitespace-nowrap text-slate-600 hover:text-[var(--primary)]">
             {t("becomeSeller")}
           </Link>
-          <span className="ml-auto whitespace-nowrap text-xs font-medium text-amber-600">
-            ? {t("prototype")}
-          </span>
         </div>
       </div>
     </header>

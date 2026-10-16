@@ -295,6 +295,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _pass.text,
         name: _name.text.trim(),
         phone: phone,
+        locale: Localizations.localeOf(context).languageCode,
       );
       if (!mounted) return;
       // The account exists and is signed in. Verifying the phone and email is
@@ -477,7 +478,8 @@ class _OtpScreenState extends State<OtpScreen> {
     try {
       await RealtimeStore.instance.verifyPhoneOtp(_code);
       if (!mounted) return;
-      widget.onAuthed?.call();
+      // Opened later from Settings (no next step): go back to where we came from.
+      widget.onAuthed != null ? widget.onAuthed!() : Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -600,8 +602,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _busy = false;
       _msg = verified ? null : 'Not verified yet — tap the link in the email first.';
     });
-    if (verified) widget.onVerified?.call();
+    if (verified) _done();
   }
+
+  /// Sign-up continues with its next step; opened later from the Account page we just go back.
+  void _done() => widget.onVerified != null ? widget.onVerified!() : Navigator.pop(context, true);
 
   @override
   Widget build(BuildContext context) {
@@ -638,7 +643,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ),
         TextButton(
           key: const ValueKey('email-skip'),
-          onPressed: () => widget.onVerified?.call(),
+          onPressed: _done,
           child: const Text('Skip for now', style: TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),

@@ -12,7 +12,7 @@ export default function SellerProductCreatePage() {
     <div className="space-y-6">
       <PageHeader
         title={t("createProduct")}
-        subtitle={fr ? "Assistant interactif en 7 étapes — contenu bilingue EN/FR" : "7-step interactive wizard — bilingual EN/FR content"}
+        subtitle={fr ? "Assistant en 4 étapes — titre EN/FR, photo, prix et stock" : "4-step wizard — EN/FR title, photo, price & stock"}
         backHref="/seller/products"
       />
       <ProductWizard />

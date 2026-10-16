@@ -1,114 +1,163 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import { useParams } from "next/navigation";
-import { Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { Star, ThumbsUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { getProductDetail } from "@/lib/entities";
-import { sellerReviewList } from "@/lib/seller-entities";
+import { useProduct } from "@/lib/catalog";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-import { useReviews } from "@/context/reviews-context";
+import { useRealtime } from "@/context/realtime-context";
+import { socketClient } from "@/lib/realtime/socket-client";
+import type { Review } from "@/lib/realtime/types";
 import { cn } from "@/lib/utils";
+
+type LiveReview = Review & { helpful?: number };
 
 export default function ProductReviewsPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { getReply } = useReviews();
-  const product = getProductDetail(Number(id));
-  const sellerResponses = sellerReviewList
-    .filter((r) => r.productId === Number(id))
-    .map((r) => ({ review: r, reply: getReply(r.id) }))
-    .filter((x) => x.reply);
+  const rt = useRealtime();
+  const product = useProduct(id);
+  const [reviews, setReviews] = useState<LiveReview[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
-  const [extraReviews, setExtraReviews] = useState<{ author: string; rating: number; text: string; date: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [voted, setVoted] = useState<string[]>([]);
 
-  if (!product) return <div className="text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
+  useEffect(() => {
+    if (!id || rt.status !== "connected") return;
+    let alive = true;
+    socketClient
+      .request<LiveReview[]>("reviews:list", { productId: id })
+      .then((list) => alive && setReviews(list))
+      .catch(() => alive && setReviews([]))
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, [id, rt.status]);
+
+  if (!product) {
+    const loading = rt.status !== "connected" || !loaded;
+    return <div className="text-center text-slate-500">{loading ? (fr ? "Chargement…" : "Loading…") : fr ? "Produit introuvable" : "Product not found"}</div>;
+  }
+
+  function openForm() {
+    if (!rt.user) {
+      toast(fr ? "Connectez-vous pour écrire un avis" : "Sign in to write a review", "info");
+      router.push(`/shop/login?next=${encodeURIComponent(`/shop/products/${id}/reviews`)}`);
+      return;
+    }
+    setShowForm(true);
+  }
+
+  async function submit() {
+    if (!rating || reviewText.trim().length < 3) {
+      toast(fr ? "Veuillez ajouter une note et un avis" : "Please add a rating and review", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await socketClient.request<LiveReview>("reviews:create", { productId: id, rating, text: reviewText.trim() });
+      setReviews((cur) => [created, ...cur.filter((r) => r.id !== created.id)]);
+      setShowForm(false);
+      setRating(0);
+      setReviewText("");
+      toast(fr ? "Avis publié — merci !" : "Review published — thank you!");
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function helpful(reviewId: string) {
+    if (!rt.user) {
+      toast(fr ? "Connectez-vous pour voter" : "Sign in to vote", "info");
+      return;
+    }
+    try {
+      await rt.markReviewHelpful(reviewId);
+      setVoted((v) => [...v, reviewId]);
+      setReviews((cur) => cur.map((r) => (r.id === reviewId ? { ...r, helpful: (r.helpful ?? 0) + 1 } : r)));
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  }
+
+  const name = fr ? product.nameFr : product.name;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
-        title={fr ? `Avis — ${product.nameFr}` : `Reviews — ${product.name}`}
-        subtitle={fr ? `${product.rating} ★ · ${product.reviews.toLocaleString()} avis` : `${product.rating} ★ · ${product.reviews.toLocaleString()} reviews`}
+        title={fr ? `Avis — ${name}` : `Reviews — ${name}`}
+        subtitle={fr ? `${product.rating} ★ · ${reviews.length} avis` : `${product.rating} ★ · ${reviews.length} reviews`}
         backHref={`/shop/products/${id}`}
-        actions={<Button size="sm" onClick={() => setShowForm(true)}>{fr ? "Écrire un avis" : "Write Review"}</Button>}
+        actions={<Button size="sm" onClick={openForm}>{fr ? "Écrire un avis" : "Write Review"}</Button>}
       />
 
       {showForm && (
         <div className="card-premium space-y-4 p-6">
           <h3 className="font-semibold">{fr ? "Écrire un avis" : "Write a Review"}</h3>
+          <p className="text-xs text-slate-500">
+            {fr ? "Vous pouvez donner votre avis après avoir reçu le produit." : "You can review a product after it has been delivered to you."}
+          </p>
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
-              <button key={s} type="button" onClick={() => setRating(s)}>
+              <button key={s} type="button" onClick={() => setRating(s)} aria-label={`${s}`}>
                 <Star className={cn("h-6 w-6 cursor-pointer", s <= rating ? "fill-amber-400 text-amber-400" : "text-slate-300")} />
               </button>
             ))}
           </div>
           <textarea className="input-premium w-full px-4 py-3 text-sm" rows={4} placeholder={fr ? "Partagez votre expérience..." : "Share your experience..."} value={reviewText} onChange={(e) => setReviewText(e.target.value)} />
-          <div className="rounded-xl border-2 border-dashed border-[var(--border)] p-8 text-center text-sm text-slate-500">
-            {fr ? "Téléverser des photos (démo) — glisser-déposer ou cliquer" : "Upload photos (mock) — drag & drop or click"}
+          <div className="flex gap-2">
+            <Button onClick={submit} disabled={saving}>{saving ? "…" : fr ? "Soumettre l'avis" : "Submit Review"}</Button>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>{fr ? "Annuler" : "Cancel"}</Button>
           </div>
-          <Button
-            onClick={() => {
-              if (!rating || !reviewText.trim()) { toast(fr ? "Veuillez ajouter une note et un avis" : "Please add a rating and review", "error"); return; }
-              setExtraReviews((r) => [...r, { author: fr ? "Vous" : "You", rating, text: reviewText, date: fr ? "À l'instant" : "Just now" }]);
-              setShowForm(false);
-              setRating(0);
-              setReviewText("");
-              toast(fr ? "Avis soumis — merci !" : "Review submitted — thank you!");
-            }}
-          >
-            {fr ? "Soumettre l'avis" : "Submit Review"}
-          </Button>
         </div>
       )}
 
-      {sellerResponses.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">{fr ? "Réponses du vendeur" : "Seller responses"}</h3>
-          {sellerResponses.map(({ review, reply }) => (
-            <div key={review.id} className="card-premium p-5">
-              <p className="text-amber-500 text-sm">{"★".repeat(review.rating)} <span className="ml-1 text-slate-500">— {review.customer}</span></p>
-              <p className="mt-1 text-sm text-slate-700">{fr ? review.reviewFr : review.review}</p>
-              <div className="mt-3 rounded-lg border-l-2 border-emerald-300 bg-emerald-50 px-3 py-2">
-                <p className="text-xs font-semibold text-emerald-800">{fr ? "Réponse du vendeur" : "Seller response"}</p>
-                <p className="mt-0.5 text-sm text-emerald-900">{reply?.text}</p>
-              </div>
-            </div>
-          ))}
+      {loaded && reviews.length === 0 && (
+        <div className="card-premium p-8 text-center text-sm text-slate-500">
+          {fr ? "Aucun avis pour le moment. Soyez le premier !" : "No reviews yet. Be the first!"}
+          <div className="mt-3">
+            <Link href={`/shop/products/${id}`} className="text-[var(--primary)] hover:underline">
+              {fr ? "← Retour au produit" : "← Back to product"}
+            </Link>
+          </div>
         </div>
       )}
 
       <div className="space-y-4">
-        {[
-          ...extraReviews,
-          ...product.reviews_list.map((r) => ({ author: r.author, rating: r.rating, text: fr ? r.textFr : r.text, date: r.date })),
-        ].map((r, i) => (
-          <div key={i} className="card-premium p-6">
+        {reviews.map((r) => (
+          <div key={r.id} className="card-premium p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
                 {r.author[0]}
               </div>
               <div>
                 <p className="font-semibold">{r.author}</p>
-                <p className="text-amber-500 text-sm">{"★".repeat(r.rating)}</p>
+                <p className="text-sm text-amber-500">{"★".repeat(r.rating)}</p>
               </div>
-              <span className="ml-auto text-xs text-slate-400">{r.date}</span>
+              <span className="ml-auto text-xs text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
             </div>
             <p className="mt-3 text-sm text-slate-700">{r.text}</p>
-            {i === 0 && extraReviews.length === 0 && (
-              <div className="mt-3 flex gap-2">
-                <div className="relative h-16 w-16 overflow-hidden rounded-lg">
-                  <Image src={product.image} alt="review" fill className="object-cover" sizes="64px" />
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => helpful(r.id)}
+              disabled={voted.includes(r.id)}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-[var(--primary)] disabled:opacity-60"
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+              {fr ? "Utile" : "Helpful"} ({r.helpful ?? 0})
+            </button>
           </div>
         ))}
       </div>

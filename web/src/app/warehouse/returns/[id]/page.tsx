@@ -1,101 +1,110 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
-import { ActivityTimeline } from "@/components/ui/timeline";
-import { getReturn } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-
-// Return status can be mutated locally (approve/reject), so map the live value.
-const STATUS_FR: Record<string, string> = {
-  pending: "En attente",
-  pending_inspection: "Inspection en attente",
-  inspecting: "Inspection en cours",
-  approved: "Approuvé",
-  rejected: "Rejeté",
-  refunded: "Remboursé",
-};
+import { errorMessage, shortDate } from "@/lib/warehouse-live";
+import { RETURN_PHASE_LABEL, useReturns } from "@/lib/warehouse-returns";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 
 export default function WarehouseReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const ret = getReturn(id);
-  const [status, setStatus] = useState(ret?.status ?? "pending");
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { returns, loading, error, markReceived } = useReturns();
+  const [restock, setRestock] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const ret = returns.find((r) => r.id === id || r.reference === id);
 
   if (!ret) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
+    return (
+      <div className="p-8 text-center text-slate-500">
+        {loading ? (fr ? "Chargement…" : "Loading…") : error ?? (fr ? "Retour introuvable" : "Return not found")}
+      </div>
+    );
   }
 
-  const reason = fr ? ret.reasonFr : ret.reason;
-  const statusLabel = fr ? STATUS_FR[status] ?? status : status.replace("_", " ");
+  const phase = RETURN_PHASE_LABEL[ret.phase];
+
+  async function receive() {
+    if (!ret || busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await markReceived(ret.id, restock);
+      toast(fr ? "Articles marqués comme reçus" : "Goods marked as received");
+    } catch (e) {
+      setActionError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={ret.id}
-        subtitle={`${fr ? "Commande" : "Order"} ${ret.orderId} · ${reason}`}
-        backHref="/warehouse/returns"
-        actions={
-          status === "pending" ? (
-            <>
-              <button onClick={() => { setStatus("approved"); toast(fr ? "Retour approuvé" : "Return approved"); }} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50">{fr ? "Approuver" : "Approve"}</button>
-              <button onClick={() => { setStatus("rejected"); toast(fr ? "Retour rejeté" : "Return rejected", "error"); }} className="rounded-lg border border-[var(--border-strong)] bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">{fr ? "Rejeter" : "Reject"}</button>
-            </>
-          ) : null
-        }
+        title={ret.reference}
+        subtitle={`${fr ? "Commande" : "Order"} ${ret.orderReference} · ${fr ? phase.fr : phase.en}`}
+        backHref={ops("/returns")}
+        breadcrumbs={[
+          { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+          { label: t("returns"), href: ops("/returns") },
+          { label: ret.reference },
+        ]}
+        actions={<Badge variant={ret.phase === "received" ? "info" : ret.phase === "awaiting_goods" ? "warning" : ret.phase === "rejected" ? "danger" : "success"}>{fr ? phase.fr : phase.en}</Badge>}
       />
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Aperçu" : "Overview"}>
           <InfoGrid items={[
-            { label: fr ? "ID retour" : "Return ID", value: ret.id },
-            { label: fr ? "Commande" : "Order", value: <Link href={`/admin/orders/${ret.orderId}`} className="text-[var(--primary)] hover:underline">{ret.orderId}</Link> },
-            { label: t("customer"), value: <Link href={`/admin/customers/${ret.customerId}`} className="text-[var(--primary)] hover:underline">{ret.customer}</Link> },
-            { label: fr ? "Motif" : "Reason", value: reason },
-            { label: fr ? "Statut" : "Status", value: statusLabel },
+            { label: fr ? "ID retour" : "Return ID", value: ret.reference },
+            { label: fr ? "Commande" : "Order", value: ret.orderReference },
+            { label: t("customer"), value: ret.customerName },
+            { label: fr ? "Demandé le" : "Requested", value: shortDate(ret.createdAt, locale) },
+            { label: fr ? "Articles reçus le" : "Goods received", value: ret.receivedAt ? shortDate(ret.receivedAt, locale) : "—" },
+            { label: fr ? "Motif" : "Reason", value: ret.reason, full: true },
           ]} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Produit" : "Product"}>
-          <div className="flex gap-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
-              <Image src={ret.image} alt={ret.product} fill className="object-cover" sizes="80px" />
+        <DetailGridSection title={fr ? "Action de l'entrepôt" : "Warehouse action"}>
+          {ret.phase === "awaiting_goods" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">
+                {fr
+                  ? "Quand les articles retournés arrivent au hub, confirmez-le. Le remboursement ne peut être accordé qu'après cette étape."
+                  : "When the returned goods reach the hub, confirm it here. A refund can only be granted after this step."}
+              </p>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} />
+                {fr ? "Remettre les articles en stock" : "Put the goods back into stock"}
+              </label>
+              {actionError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
+              <button onClick={() => void receive()} disabled={busy} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60">
+                {busy ? "…" : (fr ? "Marquer les articles reçus" : "Mark goods received")}
+              </button>
             </div>
-            <InfoGrid items={[
-              { label: fr ? "Nom" : "Name", value: <Link href={`/shop/products/${ret.productId}`} className="text-[var(--primary)] hover:underline">{ret.product}</Link> },
-              { label: fr ? "Variante" : "Variant", value: fr ? ret.variantFr : ret.variant },
-              { label: fr ? "Quantité" : "Quantity", value: ret.qty },
-            ]} />
-          </div>
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Remboursement" : "Refund"}>
-          <InfoGrid items={[
-            { label: fr ? "Montant" : "Amount", value: formatCurrency(ret.refund.amount, locale) },
-            { label: fr ? "Méthode" : "Method", value: fr ? ret.refund.methodFr : ret.refund.method },
-            { label: fr ? "Statut" : "Status", value: fr ? ret.refund.statusFr : ret.refund.status },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Inspection" : "Inspection"} span={2}>
-          <InfoGrid items={[
-            { label: fr ? "État" : "Condition", value: fr ? ret.inspection.conditionFr : ret.inspection.condition },
-            { label: fr ? "Photos" : "Photos", value: `${ret.inspection.photos} ${fr ? "téléversée(s)" : "uploaded"}` },
-            { label: fr ? "Notes" : "Notes", value: fr ? ret.inspection.notesFr : ret.inspection.notes, full: true },
-          ]} />
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
-          <ActivityTimeline events={ret.timeline} />
+          ) : (
+            <p className="text-sm text-slate-600">
+              {ret.phase === "received"
+                ? (fr ? "Articles reçus. La décision de remboursement revient à la finance admin." : "Goods received. The refund decision belongs to admin finance.")
+                : ret.phase === "refunded"
+                  ? (fr ? "Dossier résolu par l'administration." : "Resolved by admin.")
+                  : (fr ? "Demande rejetée par l'administration." : "Request rejected by admin.")}
+            </p>
+          )}
+          {ret.resolution && <p className="mt-3 text-sm text-slate-500">{fr ? "Résolution : " : "Resolution: "}{ret.resolution}</p>}
+          <p className="mt-3 text-xs text-slate-400">
+            {fr ? "Approuver, rejeter ou rembourser un retour se fait dans le portail admin (finance)." : "Approving, rejecting or refunding a return is done in the admin portal (finance)."}
+          </p>
         </DetailGridSection>
       </DetailGrid>
     </div>

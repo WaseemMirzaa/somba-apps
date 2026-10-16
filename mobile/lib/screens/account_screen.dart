@@ -9,6 +9,7 @@ import 'orders_screen.dart';
 import 'more/account_more.dart';
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
+import 'more/auth_screens.dart' show VerifyEmailScreen;
 import 'more/catalog_extra.dart';
 import 'more/returns_extra.dart';
 
@@ -127,7 +128,13 @@ class AccountScreen extends StatelessWidget {
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                     const SizedBox(height: 8),
                     if (RealtimeStore.instance.user != null)
-                      Container(
+                      GestureDetector(
+                        key: const ValueKey('email-badge'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: RealtimeStore.instance.user!.emailVerified
+                            ? null
+                            : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen())),
+                        child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
@@ -141,8 +148,13 @@ class AccountScreen extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(RealtimeStore.instance.user!.emailVerified ? 'Email verified' : 'Email not verified',
                                 style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            if (!RealtimeStore.instance.user!.emailVerified) ...[
+                              const SizedBox(width: 2),
+                              const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 15),
+                            ],
                           ],
                         ),
+                      ),
                       ),
                   ],
                 ),

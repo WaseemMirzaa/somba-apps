@@ -5,7 +5,7 @@ import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
-import '../../widgets/product_card.dart';
+import '../../widgets/product_actions.dart';
 import '../order_detail_link.dart';
 import 'support_extra.dart';
 
@@ -28,7 +28,7 @@ class WishlistScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
                   itemCount: items.length,
-                  itemBuilder: (_, i) => ProductCard(product: items[i], lang: locale.languageCode),
+                  itemBuilder: (_, i) => productCard(context, items[i], locale),
                 ),
         );
       },

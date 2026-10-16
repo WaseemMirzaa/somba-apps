@@ -61,6 +61,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
               ]),
             ),
+            for (final p in store.failedTopups) ...[
+              const SizedBox(height: 14),
+              _FailedTopUp(payment: p, lang: _lang),
+            ],
             for (final p in pending) ...[
               const SizedBox(height: 14),
               _PendingTopUp(payment: p, lang: _lang),
@@ -102,6 +106,49 @@ class _WalletScreenState extends State<WalletScreen> {
         Text('${credit ? '+' : '−'}${money(t.amount)}',
             style: TextStyle(fontWeight: FontWeight.w800, color: credit ? AppColors.success : AppColors.ink)),
       ]),
+    );
+  }
+}
+
+/// A top-up the network declined or that expired: say why, until dismissed.
+class _FailedTopUp extends StatelessWidget {
+  final PaymentDto payment;
+  final String lang;
+  const _FailedTopUp({required this.payment, required this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Strings(lang);
+    final reason = payment.failureReason;
+    return Dismissible(
+      key: ValueKey('topup-failed-${payment.id}'),
+      onDismissed: (_) => RealtimeStore.instance.dismissTopupFailure(payment.id),
+      child: Container(
+        key: const ValueKey('topup-failed'),
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.danger.withValues(alpha: 0.35))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(padding: EdgeInsets.only(top: 2), child: Icon(Icons.error_outline_rounded, color: AppColors.danger)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                s.isFr ? 'Recharge de ${money(payment.amountUsd)} non aboutie' : 'Top-up of ${money(payment.amountUsd)} failed',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.danger),
+              ),
+              const SizedBox(height: 2),
+              Text(reason ?? (s.isFr ? 'La demande a été refusée ou a expiré.' : 'The request was declined or expired.'),
+                  key: const ValueKey('topup-failed-reason'), style: const TextStyle(fontSize: 13, height: 1.35)),
+            ]),
+          ),
+          IconButton(
+            key: const ValueKey('topup-failed-dismiss'),
+            tooltip: s.isFr ? 'Fermer' : 'Dismiss',
+            icon: const Icon(Icons.close_rounded, size: 20),
+            onPressed: () => RealtimeStore.instance.dismissTopupFailure(payment.id),
+          ),
+        ]),
+      ),
     );
   }
 }

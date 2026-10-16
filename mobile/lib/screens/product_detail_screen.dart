@@ -444,8 +444,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             onPressed: !canBuy
                 ? null
                 : () {
-                    ShopState.instance.addToCart(p, qty: _qty);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => CheckoutScreen(locale: widget.locale)));
+                    // Buy now = this product only; the saved cart is not touched.
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => CheckoutScreen(locale: widget.locale, lines: [CartItem(product: p, qty: _qty)])));
                   },
             child: Text(canBuy ? '${s.buyNow}  ·  ${money(p.price * _qty)}' : (widget.locale.languageCode == 'fr' ? 'Indisponible' : 'Unavailable')),
           ),

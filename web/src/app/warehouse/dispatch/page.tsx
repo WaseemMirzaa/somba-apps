@@ -6,48 +6,33 @@ import { Badge } from "@/components/ui/badge";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
-import { batchEntities } from "@/lib/entities";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 import { useOpsPath, useOpsBase } from "@/lib/ops-path";
-
-const STATUS_OPTIONS = [
-  { value: "ready", label: "Ready", labelFr: "Prêt" },
-  { value: "dispatched", label: "Dispatched", labelFr: "Expédié" },
-  { value: "in_transit", label: "In transit", labelFr: "En transit" },
-];
-
-// Batch status values originate from the shared (non-owned) entities layer.
-const STATUS_FR: Record<string, string> = {
-  ready: "Prêt",
-  dispatched: "Expédié",
-  in_transit: "En transit",
-  delivered: "Livré",
-};
+import { BATCH_STATUS, batchTaskIds, pick, shortDate, statusOptions, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
 
 export default function WarehouseDispatchPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const ops = useOpsPath();
   const base = useOpsBase();
   const homeLabel = base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse");
   const homeHref = base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse";
+  const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
+  const rows = useMemo(
+    () => batchesQ.data.map((b) => ({ ...b, parcelCount: batchTaskIds(b).length })),
+    [batchesQ.data],
+  );
   const filtered = useMemo(
-    () =>
-      applyListFilters(batchEntities, filters, {
-        searchFields: ["id", "zone", "rider"],
-        statusField: "status",
-      }),
-    [filters]
+    () => applyListFilters(rows, filters, { searchFields: ["reference", "riderName"], statusField: "status" }),
+    [rows, filters],
   );
 
   return (
     <WarehouseListPage
       title={fr ? "Lots d'expédition" : "Dispatch Batches"}
-      subtitle={fr ? "Vue liste — ID lot, Zone, Livreur, Colis, Distance, Statut, Heure d'expédition" : "List View — Batch ID, Zone, Rider, Parcels, Distance, Status, Dispatch Time"}
+      subtitle={fr ? "Lots créés depuis le constructeur de lots, avec leur livreur" : "Batches created in the batch builder, with their rider"}
       breadcrumbs={[{ label: homeLabel, href: homeHref }, { label: t("dispatch") }]}
       actions={
         <Link href={ops("/batch-builder")} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
@@ -55,35 +40,33 @@ export default function WarehouseDispatchPage() {
         </Link>
       }
       filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "ID lot, zone, livreur…" : "Batch ID, zone, rider…"}
-          showDateFilters={false}
-        />
+        <div className="space-y-3">
+          {batchesQ.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{batchesQ.error}</p>}
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            statusOptions={statusOptions(BATCH_STATUS)}
+            searchPlaceholder={fr ? "Référence du lot, livreur…" : "Batch reference, rider…"}
+            showDateFilters={false}
+          />
+        </div>
       }
       columns={[
-        { key: "id", label: fr ? "ID lot" : "Batch ID", render: (row) => (
-          <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+        { key: "reference", label: fr ? "Lot" : "Batch", render: (row) => (
+          <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
         )},
-        { key: "zone", label: t("zone") },
-        { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => (
-          <Link href={ops(`/riders/${row.riderId}`)} className="text-[var(--primary)] hover:underline">{String(row.rider)}</Link>
+        { key: "riderName", label: fr ? "Livreur" : "Rider", render: (row) => (
+          row.riderId
+            ? <Link href={ops(`/riders/${row.riderId}`)} className="text-[var(--primary)] hover:underline">{String(row.riderName ?? row.riderId)}</Link>
+            : "—"
         )},
         { key: "parcelCount", label: fr ? "Colis" : "Parcels" },
-        { key: "distance", label: fr ? "Distance" : "Distance" },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "dispatched" ? "success" : "warning"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
+          <Badge variant={row.status === "dispatched" ? "success" : "warning"}>{pick(BATCH_STATUS[String(row.status)], fr, String(row.status))}</Badge>
         )},
-        { key: "dispatchTime", label: fr ? "Heure d'expédition" : "Dispatch Time" },
+        { key: "createdAt", label: fr ? "Créé le" : "Created", render: (row) => shortDate(String(row.createdAt), locale) },
         { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex gap-2 text-xs">
-            <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
-            {row.status === "ready" && (
-              <button onClick={() => toast(fr ? `Lot ${row.id} expédié` : `Batch ${row.id} dispatched`)} className="text-emerald-600">{fr ? "Expédier" : "Dispatch"}</button>
-            )}
-          </div>
+          <Link href={ops(`/dispatch/${row.id}`)} className="text-xs text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

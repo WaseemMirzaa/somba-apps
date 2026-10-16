@@ -8,76 +8,92 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { returnEntities as initialReturns } from "@/lib/warehouse-entities";
+import { errorMessage, shortDate } from "@/lib/warehouse-live";
+import { RETURN_PHASE_LABEL, RETURN_PHASE_OPTIONS, useReturns, type ReturnPhase } from "@/lib/warehouse-returns";
+import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "pending_inspection", label: "Pending inspection", labelFr: "Inspection en attente" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
-  { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
-];
-
-// Return status can be mutated locally; map the live value for the badge.
-const STATUS_FR: Record<string, string> = {
-  pending: "En attente",
-  pending_inspection: "Inspection en attente",
-  inspecting: "Inspection en cours",
-  approved: "Approuvé",
-  rejected: "Rejeté",
-  refunded: "Remboursé",
+const PHASE_VARIANT: Record<ReturnPhase, "warning" | "info" | "success" | "danger"> = {
+  awaiting_goods: "warning",
+  received: "info",
+  refunded: "success",
+  rejected: "danger",
 };
 
 export default function WarehouseReturnsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const ops = useOpsPath();
+  const base = useOpsBase();
+  const { returns, error, markReceived } = useReturns();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [returns, setReturns] = useState(initialReturns);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
       applyListFilters(returns, filters, {
-        searchFields: ["id", "orderId", "customer", "reason"],
+        searchFields: ["reference", "orderReference", "customerName", "reason"],
         dateField: "createdAt",
-        statusField: "status",
+        statusField: "phase",
       }),
-    [returns, filters]
+    [returns, filters],
   );
 
-  function updateStatus(id: string, status: string) {
-    setReturns((r) => r.map((item) => (item.id === id ? { ...item, status } : item)));
-    toast(fr ? `Retour ${id} ${status}` : `Return ${id} ${status}`);
+  async function receive(id: string, reference: string) {
+    setBusyId(id);
+    try {
+      await markReceived(id, true);
+      toast(fr ? `Retour ${reference} : articles reçus` : `Return ${reference}: goods received`);
+    } catch (e) {
+      toast(errorMessage(e), "error");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
     <WarehouseListPage
       title={t("returns")}
-      subtitle={fr ? "Vue liste — ID retour, ID commande, Client, Motif, Statut" : "List View — Return ID, Order ID, Customer, Reason, Status"}
-      breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: "/warehouse" }, { label: t("returns") }]}
+      subtitle={
+        fr
+          ? "Demandes de retour en direct. Confirmez la réception des articles ; la décision de remboursement appartient à la finance admin."
+          : "Live return requests. Confirm the goods arrived; the refund decision belongs to admin finance."
+      }
+      breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("returns") }]}
       filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={STATUS_OPTIONS}
-          searchPlaceholder={fr ? "ID retour, commande, client…" : "Return ID, order, customer…"}
-        />
+        <div className="space-y-3">
+          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            statusOptions={RETURN_PHASE_OPTIONS}
+            searchPlaceholder={fr ? "Référence, commande, client…" : "Reference, order, customer…"}
+          />
+        </div>
       }
       columns={[
-        { key: "id", label: fr ? "ID retour" : "Return ID", render: (row) => (
-          <Link href={`/warehouse/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+        { key: "reference", label: fr ? "ID retour" : "Return ID", render: (row) => (
+          <Link href={ops(`/returns/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
         )},
-        { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-        { key: "customer", label: t("customer") },
-        { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => String(fr ? row.reasonFr : row.reason) },
-        { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status).replace("_", " ")}</Badge> },
+        { key: "orderReference", label: fr ? "ID commande" : "Order ID" },
+        { key: "customerName", label: t("customer") },
+        { key: "reason", label: fr ? "Motif" : "Reason" },
+        { key: "createdAt", label: fr ? "Demandé le" : "Requested", render: (row) => shortDate(String(row.createdAt), locale) },
+        { key: "phase", label: t("status"), render: (row) => {
+          const p = String(row.phase) as ReturnPhase;
+          return <Badge variant={PHASE_VARIANT[p]}>{fr ? RETURN_PHASE_LABEL[p].fr : RETURN_PHASE_LABEL[p].en}</Badge>;
+        }},
         { key: "actions", label: t("action"), render: (row) => (
-          <div className="flex gap-2 text-xs">
-            <Link href={`/warehouse/returns/${row.id}`} className="text-[var(--primary)] hover:underline">{fr ? "Inspecter" : "Inspect"}</Link>
-            {(row.status === "pending" || row.status === "pending_inspection") && (
-              <>
-                <button onClick={() => updateStatus(String(row.id), "approved")} className="text-emerald-600 hover:underline">{fr ? "Approuver" : "Approve"}</button>
-                <button onClick={() => updateStatus(String(row.id), "rejected")} className="text-red-600 hover:underline">{fr ? "Rejeter" : "Reject"}</button>
-              </>
+          <div className="flex gap-3 text-xs">
+            <Link href={ops(`/returns/${row.id}`)} className="text-[var(--primary)] hover:underline">{t("view")}</Link>
+            {row.phase === "awaiting_goods" && (
+              <button
+                disabled={busyId === row.id}
+                onClick={() => void receive(String(row.id), String(row.reference))}
+                className="text-emerald-600 hover:underline disabled:opacity-50"
+              >
+                {busyId === row.id ? "…" : (fr ? "Marquer reçu" : "Mark goods received")}
+              </button>
             )}
           </div>
         )},

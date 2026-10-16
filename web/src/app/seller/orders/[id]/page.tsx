@@ -1,108 +1,107 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
+import { Badge } from "@/components/ui/badge";
+import { ProductImage } from "@/components/seller/product-image";
 import { useSellerData } from "@/lib/seller";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
-import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
+import {
+  errMessage,
+  orderStatusLabel,
+  orderStatusVariant,
+  shippingStatusLabel,
+  txnStatusLabel,
+} from "@/lib/seller-labels";
+import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 
-const UNAVAILABLE_REASONS = [
-  { id: "out_of_stock", label: "Out of stock", labelFr: "Rupture de stock" },
-  { id: "damaged", label: "Damaged", labelFr: "Endommagé" },
-  { id: "discontinued", label: "Discontinued", labelFr: "Discontinué" },
-];
-
-const ORDER_STATUS_FR: Record<string, string> = {
-  pending: "En attente",
-  processing: "En cours",
-  ready: "Prêt",
-  picked: "Collecté",
-  delivered: "Livré",
-  cancelled: "Annulé",
+const PAYMENT_LABEL: Record<string, { en: string; fr: string }> = {
+  cod: { en: "Cash on Delivery", fr: "Paiement à la livraison" },
+  stripe_card: { en: "Card", fr: "Carte" },
+  airtel_money: { en: "Mobile Money", fr: "Mobile Money" },
+  wallet: { en: "Wallet", fr: "Portefeuille" },
 };
-
-const PAYMENT_STATUS_FR: Record<string, string> = {
-  paid: "Payé",
-  pending: "En attente",
-  refunded: "Remboursé",
-  failed: "Échoué",
-};
-
-const VARIANT_FR: Record<string, string> = {
-  Default: "Standard",
-};
-
-function localizeVariant(variant: string, fr: boolean) {
-  return fr ? VARIANT_FR[variant] ?? variant : variant;
-}
-
-function localizeOrderStatus(status: string, fr: boolean) {
-  return fr ? ORDER_STATUS_FR[status] ?? status : status;
-}
-function localizePaymentStatus(status: string, fr: boolean) {
-  return fr ? PAYMENT_STATUS_FR[status] ?? status : status;
-}
 
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
+  const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, getShipmentByOrderId } = useSellerData();
+  const { getSellerOrder, getShipmentByOrderId, sellerReady } = useSellerData();
   const order = getSellerOrder(id);
   const shipment = order ? getShipmentByOrderId(order.id) : undefined;
-  const [ready, setReady] = useState(false);
-  const [flaggedSku, setFlaggedSku] = useState<string | null>(null);
-  const [unavailReason, setUnavailReason] = useState(UNAVAILABLE_REASONS[0].id);
-  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!order) {
     return (
       <div className="p-8 text-center text-slate-500">
-        {locale === "fr" ? "Commande introuvable" : "Order not found"}
+        {fr ? "Commande introuvable" : "Order not found"}
       </div>
     );
   }
 
-  const fr = locale === "fr";
+  const canMarkReady = ["confirmed", "processing"].includes(order.orderStatus) && !order.readyAt;
+
+  async function markReady() {
+    if (!order) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await sellerReady(order.orderId);
+      toast(fr ? "Colis marqué prêt : le livreur est prévenu" : "Package marked ready: the rider can collect it");
+    } catch (e) {
+      const msg = errMessage(e);
+      setError(msg);
+      toast(msg, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pay = PAYMENT_LABEL[order.paymentMethod];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={order.id}
-        subtitle={`${order.customer} · ${localizeOrderStatus(order.orderStatus, fr)}`}
+        subtitle={`${order.customer} · ${orderStatusLabel(order.orderStatus, fr)}`}
         backHref="/seller/orders"
         actions={
-          !ready && order.shippingStatus !== "ready" ? (
-            <div className="flex gap-2">
-              <button onClick={() => { setReady(true); toast(locale === "fr" ? "Prêt pour enlèvement" : "Marked ready for pickup"); }} className="btn-primary rounded-lg px-4 py-2 text-sm">
-                {locale === "fr" ? "Confirmer prêt" : "Package Ready"}
+          <div className="flex flex-wrap items-center gap-2">
+            {canMarkReady && (
+              <button type="button" disabled={busy} onClick={() => void markReady()} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
+                {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Confirmer colis prêt" : "Package Ready"}
               </button>
-              <button onClick={() => setShowFlagModal(true)} className="rounded-lg border border-amber-300 px-4 py-2 text-sm text-amber-700">
-                {locale === "fr" ? "Indisponible" : "Flag Unavailable"}
-              </button>
-            </div>
-          ) : ready ? (
-            <span className="text-sm text-emerald-600">{locale === "fr" ? "Prêt pour enlèvement" : "Ready for pickup"}</span>
-          ) : null
+            )}
+            {order.readyAt && (
+              <span className="text-sm text-emerald-600">{fr ? "Marqué prêt pour enlèvement" : "Marked ready for pickup"}</span>
+            )}
+            <Link href="/seller/support" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700">
+              {fr ? "Contacter le support à propos de cette commande" : "Contact support about this order"}
+            </Link>
+          </div>
         }
       />
+
+      {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Résumé de la commande" : "Order Summary"}>
           <InfoGrid items={[
             { label: fr ? "Numéro de commande" : "Order Number", value: order.id },
             { label: fr ? "Date de commande" : "Order Date", value: order.date },
-            { label: fr ? "Statut de commande" : "Order Status", value: localizeOrderStatus(order.orderStatus, fr) },
-            { label: fr ? "Montant total" : "Total Amount", value: formatCurrency(order.amount, locale) },
+            { label: fr ? "Statut de commande" : "Order Status", value: <Badge variant={orderStatusVariant(order.orderStatus)}>{orderStatusLabel(order.orderStatus, fr)}</Badge> },
+            { label: fr ? "Expédition" : "Shipping", value: shippingStatusLabel(order.shippingStatus, fr) },
+            { label: fr ? "Montant (vos articles)" : "Amount (your items)", value: formatCurrency(order.amount, locale) },
           ]} />
         </DetailGridSection>
 
@@ -125,9 +124,8 @@ export default function SellerOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Mode de paiement" : "Payment Method", value: formatPaymentMethod(order.paymentMethod, locale) },
-            { label: fr ? "ID transaction" : "Transaction ID", value: order.transactionId },
-            { label: fr ? "Statut" : "Status", value: localizePaymentStatus(order.paymentStatus, fr) },
+            { label: fr ? "Mode de paiement" : "Payment Method", value: pay ? (fr ? pay.fr : pay.en) : order.paymentMethod },
+            { label: fr ? "Statut" : "Status", value: txnStatusLabel(order.paymentStatus, fr) },
             { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
             { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
           ]} />
@@ -139,15 +137,13 @@ export default function SellerOrderDetailPage() {
       ) : (
         <DetailGrid>
           <DetailGridSection title={fr ? "Expédition" : "Shipping"} span={3}>
-            <InfoGrid
-              items={[
-                { label: fr ? "Entrepôt" : "Warehouse", value: order.warehouse },
-                { label: fr ? "Livreur collecte" : "Pickup Rider", value: order.pickupRider ?? "—" },
-                { label: fr ? "Statut suivi" : "Tracking Status", value: localizeOrderStatus(order.trackingStatus, fr) },
-                { label: fr ? "ETA collecte" : "Pickup ETA", value: order.pickupEta },
-                { label: fr ? "N° suivi" : "Tracking Number", value: order.trackingNumber ?? "—" },
-              ]}
-            />
+            <p className="text-sm text-slate-600">
+              {order.orderStatus === "cancelled" || order.orderStatus === "returned"
+                ? (fr ? "Cette commande n'est plus expédiée." : "This order is no longer being shipped.")
+                : fr
+                  ? "L'expédition démarre dès que la commande est confirmée."
+                  : "Shipping starts as soon as the order is confirmed."}
+            </p>
           </DetailGridSection>
         </DetailGrid>
       )}
@@ -155,13 +151,13 @@ export default function SellerOrderDetailPage() {
       <DetailGrid>
         <DetailGridSection title={fr ? "Articles" : "Items"} span={3}>
           {order.items_detail.map((item) => (
-            <div key={item.sku} className={`mb-4 flex gap-4 last:mb-0 ${flaggedSku === item.sku ? "rounded-lg border border-amber-200 bg-amber-50 p-2" : ""}`}>
-              <div className="relative h-14 w-14 overflow-hidden rounded-lg">
-                <Image src={item.image} alt={item.name} fill className="object-cover" sizes="56px" />
+            <div key={`${item.productId}-${item.variant}`} className="mb-4 flex gap-4 last:mb-0">
+              <div className="h-14 w-14 overflow-hidden rounded-lg">
+                <ProductImage src={item.image} alt={item.name} />
               </div>
               <div className="flex-1">
                 <Link href={`/seller/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.name}</Link>
-                <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)} · {item.sku}</p>
+                <p className="text-xs text-slate-500">{item.variant ? `${item.variant} · ` : ""}{item.sku}</p>
               </div>
               <div className="text-right">
                 <p>{formatCurrency(item.price, locale)}</p>
@@ -182,28 +178,6 @@ export default function SellerOrderDetailPage() {
           />
         </DetailGridSection>
       </DetailGrid>
-
-      {showFlagModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="card-premium w-full max-w-md p-6">
-            <h3 className="font-semibold">{locale === "fr" ? "Article indisponible" : "Flag Item Unavailable"}</h3>
-            <select className="input-premium mt-3 w-full px-3 py-2 text-sm" value={order.items_detail[0]?.sku} onChange={(e) => setFlaggedSku(e.target.value)}>
-              {order.items_detail.map((item) => (
-                <option key={item.sku} value={item.sku}>{item.name}</option>
-              ))}
-            </select>
-            <select className="input-premium mt-2 w-full px-3 py-2 text-sm" value={unavailReason} onChange={(e) => setUnavailReason(e.target.value)}>
-              {UNAVAILABLE_REASONS.map((r) => (
-                <option key={r.id} value={r.id}>{locale === "fr" ? r.labelFr : r.label}</option>
-              ))}
-            </select>
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => setShowFlagModal(false)} className="flex-1 rounded-xl border py-2 text-sm">{fr ? "Annuler" : "Cancel"}</button>
-              <button onClick={() => { setFlaggedSku(order.items_detail[0]?.sku ?? null); setShowFlagModal(false); toast(locale === "fr" ? "Article signalé — remboursement partiel" : "Item flagged — partial refund triggered"); }} className="flex-1 rounded-xl bg-amber-600 py-2 text-sm text-white">{fr ? "Confirmer" : "Confirm"}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

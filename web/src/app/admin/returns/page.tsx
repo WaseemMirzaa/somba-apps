@@ -9,46 +9,41 @@ import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { returnEntities } from "@/lib/warehouse-entities";
-import { formatCurrency } from "@/lib/utils";
+import { DISPUTE_STATUS_BADGE, DISPUTE_STATUS_LABEL, type DisputeRow } from "@/lib/admin-live";
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "pending_inspection", label: "Pending inspection", labelFr: "Inspection en attente" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "open", label: "Open", labelFr: "Ouvert" },
+  { value: "resolved", label: "Resolved", labelFr: "Résolu" },
   { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
 ];
-
-const STATUS_FR: Record<string, string> = {
-  pending: "En attente",
-  pending_inspection: "Inspection en attente",
-  inspecting: "Inspection en cours",
-  approved: "Approuvé",
-  rejected: "Rejeté",
-  refunded: "Remboursé",
-};
 
 export default function AdminReturnsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const rt = useRealtime();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const returns = (rt.disputes as DisputeRow[])
+    .filter((d) => d.type === "return")
+    .map((d) => ({ ...d, date: d.createdAt.slice(0, 10), received: d.receivedAt ? "yes" : "no" }));
 
   const filtered = useMemo(
     () =>
-      applyListFilters(returnEntities, filters, {
-        searchFields: ["id", "orderId", "customer", "product", "reason"],
-        dateField: "createdAt",
+      applyListFilters(returns, filters, {
+        searchFields: ["reference", "orderReference", "customerName", "reason"],
+        dateField: "date",
         statusField: "status",
       }),
-    [filters]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rt.disputes, filters],
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("returns")}
-        subtitle={fr ? "Demandes de retour sur toute la plateforme" : "Platform-wide return requests"}
+        subtitle={fr ? "Demandes de retour des clients (en direct)" : "Customer return requests (live)"}
         breadcrumbs={[adminBreadcrumb(locale), { label: t("returns") }]}
       />
 
@@ -56,31 +51,29 @@ export default function AdminReturnsPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder={fr ? "ID retour, commande, client…" : "Return ID, order, customer…"}
+        searchPlaceholder={fr ? "Référence, commande, client…" : "Reference, order, customer…"}
       />
 
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucune demande de retour" : "No return requests"}
             columns={[
-              { key: "id", label: fr ? "ID retour" : "Return ID", render: (row) => (
-                <Link href={`/admin/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
-                  {String(row.id)}
-                </Link>
+              { key: "reference", label: fr ? "Référence" : "Reference", render: (row) => (
+                <Link href={`/admin/returns/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
               )},
-              { key: "orderId", label: fr ? "Commande" : "Order", render: (row) => (
-                <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderId)}</Link>
+              { key: "orderReference", label: fr ? "Commande" : "Order", render: (row) => (
+                <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link>
               )},
-              { key: "customer", label: t("customer") },
-              { key: "product", label: fr ? "Produit" : "Product" },
-              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => (
-                <span className="font-medium text-amber-700">{fr ? String(row.reasonFr ?? row.reason) : String(row.reason)}</span>
+              { key: "customerName", label: t("customer") },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="line-clamp-2 max-w-[16rem] font-medium text-amber-700">{String(row.reason)}</span> },
+              { key: "received", label: fr ? "Reçu à l'entrepôt" : "Received at warehouse", render: (row) => (
+                <Badge variant={row.received === "yes" ? "success" : "default"}>{row.received === "yes" ? (fr ? "Oui" : "Yes") : fr ? "Non" : "No"}</Badge>
               )},
-              { key: "status", label: t("status"), render: (row) => <Badge variant="warning">{fr ? (STATUS_FR[String(row.status)] ?? String(row.status).replace(/_/g, " ")) : String(row.status).replace(/_/g, " ")}</Badge> },
-              { key: "refund", label: fr ? "Remboursement" : "Refund", render: (row) => {
-                const refund = row.refund as { amount: number };
-                return formatCurrency(refund.amount, locale);
-              }},
+              { key: "status", label: t("status"), render: (row) => (
+                <Badge variant={DISPUTE_STATUS_BADGE[String(row.status)] ?? "default"}>{DISPUTE_STATUS_LABEL[String(row.status)]?.[fr ? "fr" : "en"] ?? String(row.status)}</Badge>
+              )},
+              { key: "date", label: t("date") },
               { key: "actions", label: t("action"), render: (row) => (
                 <Link href={`/admin/returns/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
               )},

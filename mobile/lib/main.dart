@@ -35,16 +35,19 @@ class _SombaAppState extends State<SombaApp> {
   bool _restored = false;
   bool _authed = false;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
+  final _navigator = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
     // The server can end a session (revoked, suspended, deleted): go back to sign-in.
-    RealtimeStore.instance.onSessionEnded = () {
+    RealtimeStore.instance.onSessionEnded = (message) {
       if (!mounted) return;
       ShopState.instance.clearSession();
+      // Close every pushed screen (settings, delete-account…) so sign-in is what the user sees.
+      _navigator.currentState?.popUntil((r) => r.isFirst);
       setState(() => _authed = false);
-      _messenger.currentState?.showSnackBar(const SnackBar(content: Text('You were signed out. Please sign in again.')));
+      _messenger.currentState?.showSnackBar(SnackBar(content: Text(message ?? 'You were signed out. Please sign in again.')));
     };
     // Silently restore the previous session (stored refresh token) during the splash.
     RealtimeStore.instance.tryRestore().timeout(const Duration(seconds: 8), onTimeout: () => false).then((ok) {
@@ -91,6 +94,7 @@ class _SombaAppState extends State<SombaApp> {
     return MaterialApp(
       title: 'Somba&Teka',
       scaffoldMessengerKey: _messenger,
+      navigatorKey: _navigator,
       debugShowCheckedModeBanner: false,
       locale: _locale,
       supportedLocales: const [Locale('en'), Locale('fr')],
