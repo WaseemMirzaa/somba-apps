@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Dispute, Order } from '../database/entities';
+import { Dispute, Order, Seller } from '../database/entities';
 import type { DisputeType } from '../database/entities';
 import {
   ADMIN_ROLES,
@@ -20,6 +20,7 @@ export class DisputesService {
   constructor(
     @InjectRepository(Dispute) private readonly disputes: Repository<Dispute>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     private readonly notifications: NotificationsService,
     private readonly payments: PaymentsService,
     private readonly products: ProductsService,
@@ -166,10 +167,33 @@ export class DisputesService {
     return saved;
   }
 
-  list(user: { id: string; role: string }): Promise<Dispute[]> {
-    // Admin roles (support/finance…) see all; everyone else only their own.
+  async list(user: { id: string; role: string }): Promise<Dispute[]> {
+    // Admin roles (support/finance…) see all; warehouse staff see the returns to receive;
+    // a seller sees the requests on orders that contain THEIR products; customers their own.
     if (user.role.startsWith('admin')) {
       return this.disputes.find({ order: { createdAt: 'DESC' }, take: 200 });
+    }
+    if (user.role === 'warehouse_staff') {
+      return this.disputes.find({ where: { type: 'return' }, order: { createdAt: 'DESC' }, take: 200 });
+    }
+    if (user.role === 'seller') {
+      const store = await this.sellers.findOne({ where: { userId: user.id } });
+      const ids = new Set([...(await this.products.idsBySeller(store?.id ?? user.id))]);
+      if (store?.id && store.id !== user.id) for (const id of await this.products.idsBySeller(user.id)) ids.add(id);
+      if (!ids.size) return [];
+      const orders = await this.orders
+        .createQueryBuilder('o')
+        .innerJoin('o.items', 'i')
+        .select('o.id')
+        .where('i.productId IN (:...ids)', { ids: [...ids] })
+        .getMany();
+      if (!orders.length) return [];
+      return this.disputes
+        .createQueryBuilder('d')
+        .where('d.orderId IN (:...oids)', { oids: orders.map((o) => o.id) })
+        .orderBy('d.createdAt', 'DESC')
+        .take(200)
+        .getMany();
     }
     return this.disputes.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
   }

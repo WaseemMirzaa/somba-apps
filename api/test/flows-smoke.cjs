@@ -201,6 +201,10 @@ const register = async (label, role = 'customer') => {
   a = await req(cust.sock, 'disputes:open', { orderId: o3.id, type: 'return', reason: 'Not as described at all' });
   ok(a.ok, 'the customer opens a return on a delivered order');
   const ret = a.data;
+  ok((await req(warehouse.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'warehouse staff can see the return to receive');
+  ok(!(await req(other.sock, 'disputes:list')).data.some((d) => d.id === ret.id), "another customer cannot see it");
+  ok((await req(sellerU.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'the seller of the returned goods can see the request');
+  ok(!(await req(seller2.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'an unrelated seller cannot');
   a = await req(admin.sock, 'disputes:resolve', { disputeId: ret.id, refund: true });
   ok(!a.ok && /received/i.test(a.error ?? ''), 'a refund is refused until the goods are received', a.error ?? '');
   ok(!(await req(cust.sock, 'disputes:markReceived', { disputeId: ret.id })).ok, 'a customer cannot mark their own return as received');
