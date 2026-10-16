@@ -264,7 +264,7 @@ export class OrdersService {
 
   /** Make a paid (or COD) order visible to the warehouse, riders and admins. */
   private async openFulfilment(order: Order): Promise<void> {
-    await this.deliveries.save(
+    const task = await this.deliveries.save(
       this.deliveries.create({
         orderId: order.id,
         orderReference: order.reference,
@@ -276,6 +276,8 @@ export class OrdersService {
         proofCode: String(randomInt(1000, 10000)),
       }),
     );
+    // Riders hear about the new delivery at once (no polling needed in their apps).
+    this.emitter.toRoles([...OPS_ROOMS, 'rider'], 'delivery:updated', task);
     this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
     await this.notifications.toAdmins({
       title: 'New order',
@@ -334,7 +336,9 @@ export class OrdersService {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order || order.customerId !== customerId) throw new NotFoundException('Order not found.');
     const required = (await this.settings.get('requireDeliveryCode')) === 'true';
-    return { required, code: required ? await this.delivery.codeForOrder(orderId) : null };
+    // Only once a rider is on the job; before that there is nothing to hand over.
+    const onItsWay = ['processing', 'shipped', 'out_for_delivery'].includes(order.status);
+    return { required, code: required && onItsWay ? await this.delivery.codeForOrder(orderId) : null };
   }
 
   /** The seller confirms the parcel is packed and ready for the rider. */

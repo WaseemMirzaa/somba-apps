@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useLocale } from "@/context/locale-context";
 import { BrandMark } from "@/components/landing/brand-mark";
 
+const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+
 export function LandingFooter() {
   const { t } = useLocale();
 
@@ -16,9 +18,11 @@ export function LandingFooter() {
               <BrandMark tone="light" full wordClassName="text-white" />
             </div>
             <p className="max-w-sm text-sm leading-relaxed">{t("tagline")}</p>
-            <p className="mt-3 inline-flex rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20">
-              {t("prototypeDesc")}
-            </p>
+            {DEMO && (
+              <p className="mt-3 inline-flex rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20">
+                {t("prototypeDesc")}
+              </p>
+            )}
           </div>
 
           <div>
@@ -44,6 +48,7 @@ export function LandingFooter() {
             </ul>
           </div>
 
+          {DEMO && (
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
               {t("portals")}
@@ -55,6 +60,7 @@ export function LandingFooter() {
               <li><Link href="/login" className="transition-colors hover:text-white">{t("riderApp")}</Link></li>
             </ul>
           </div>
+          )}
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">

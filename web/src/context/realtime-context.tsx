@@ -161,7 +161,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     if (!s) return;
 
     s.off();
-    s.on("connect", () => setStatus("connected"));
+    s.on("connect", () => setStatus("connecting")); // connected = server said `ready`
     s.on("disconnect", () => setStatus("connecting"));
     s.on("connect_error", () => setStatus("error"));
     // Access token likely expired. Try to refresh + reconnect before giving up.
@@ -207,54 +207,74 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       setDisputes((cur) => upsert(cur, d)),
     );
 
-    // Public reads — always available (guests included).
-    const [prod, cats] = await Promise.all([
-      socketClient.request<Product[]>("products:list").catch(() => []),
-      socketClient.request<Category[]>("categories:list").catch(() => []),
-    ]);
-    setProducts(prod);
-    setCategories(cats);
+    // Everything below runs on the server's `ready` (never earlier): requests sent
+    // between the socket opening and the server finishing the sign-in handshake
+    // would be answered as a guest ("Sign in to continue") and silently dropped.
+    const hydrate = async () => {
+      // Public reads — always available (guests included).
+      const [prod, cats] = await Promise.all([
+        socketClient.request<Product[]>("products:list").catch(() => []),
+        socketClient.request<Category[]>("categories:list").catch(() => []),
+      ]);
+      setProducts(prod);
+      setCategories(cats);
 
-    // Personal reads — only for a signed-in account (guests would fail).
-    if (!authApi.getAccess()) return; // guest: nothing personal to load
-    try {
-      const [ord, notif] = await Promise.all([
-        socketClient.request<Order[]>("orders:list").catch(() => []),
-        socketClient
-          .request<AppNotification[]>("notifications:list")
-          .catch(() => []),
-      ]);
-      setOrders(ord);
-      setNotifications(notif);
-      const del = await socketClient
-        .request<DeliveryTask[]>("delivery:list")
-        .catch(() => []);
-      setDeliveries(del);
-      const [wallet, walletTx, pays] = await Promise.all([
-        socketClient
-          .request<{ balance: number }>("wallet:get")
-          .catch(() => ({ balance: 0 })),
-        socketClient
-          .request<WalletTransaction[]>("wallet:transactions")
-          .catch(() => []),
-        socketClient.request<Payment[]>("payments:list").catch(() => []),
-      ]);
-      setWalletBalance(wallet.balance);
-      setWalletTransactions(walletTx);
-      setPayments(pays);
-      const [pos, disp] = await Promise.all([
-        socketClient.request<Payout[]>("payouts:list").catch(() => []),
-        socketClient.request<Dispute[]>("disputes:list").catch(() => []),
-      ]);
-      setPayouts(pos);
-      setDisputes(disp);
-      const addr = await socketClient
-        .request<Address[]>("addresses:list")
-        .catch(() => []);
-      setAddresses(addr);
-    } catch {
-      /* hydration is best-effort; live events still flow */
-    }
+      // Personal reads — only for a signed-in account (guests would fail).
+      if (!authApi.getAccess()) return; // guest: nothing personal to load
+      try {
+        const [ord, notif] = await Promise.all([
+          socketClient.request<Order[]>("orders:list").catch(() => []),
+          socketClient
+            .request<AppNotification[]>("notifications:list")
+            .catch(() => []),
+        ]);
+        setOrders(ord);
+        setNotifications(notif);
+        const del = await socketClient
+          .request<DeliveryTask[]>("delivery:list")
+          .catch(() => []);
+        setDeliveries(del);
+        const [wallet, walletTx, pays] = await Promise.all([
+          socketClient
+            .request<{ balance: number }>("wallet:get")
+            .catch(() => ({ balance: 0 })),
+          socketClient
+            .request<WalletTransaction[]>("wallet:transactions")
+            .catch(() => []),
+          socketClient.request<Payment[]>("payments:list").catch(() => []),
+        ]);
+        setWalletBalance(wallet.balance);
+        setWalletTransactions(walletTx);
+        setPayments(pays);
+        const [pos, disp] = await Promise.all([
+          socketClient.request<Payout[]>("payouts:list").catch(() => []),
+          socketClient.request<Dispute[]>("disputes:list").catch(() => []),
+        ]);
+        setPayouts(pos);
+        setDisputes(disp);
+        const addr = await socketClient
+          .request<Address[]>("addresses:list")
+          .catch(() => []);
+        setAddresses(addr);
+      } catch {
+        /* hydration is best-effort; live events still flow */
+      }
+    };
+    let first = true;
+    let firstDone: () => void = () => {};
+    const firstHydrated = new Promise<void>((res) => { firstDone = res; });
+    s.on("ready", () => {
+      setStatus("connected");
+      const run = hydrate();
+      if (first) {
+        first = false;
+        void run.finally(firstDone);
+      } else {
+        void run;
+      }
+    });
+    // Don't hang the caller forever if the server never answers.
+    await Promise.race([firstHydrated, new Promise<void>((res) => setTimeout(res, 12000))]);
   }, [logout]);
 
   /** Open an anonymous (guest) socket so the public catalog loads. */
