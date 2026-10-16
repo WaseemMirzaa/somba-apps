@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FlashSale, Product } from '../database/entities';
+import { FlashSale, Product, Seller } from '../database/entities';
 import type { ProductStatus } from '../database/entities';
 import { num, oneOf, optStr, price as priceOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -62,8 +62,17 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product) private readonly repo: Repository<Product>,
     @InjectRepository(FlashSale) private readonly flash: Repository<FlashSale>,
+    @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     private readonly emitter: RealtimeEmitter,
-  ) {}
+  ) {
+    // A seller sees their OWN listings change live (including pending / rejected ones).
+    this.emitter.registerFanout(['product:created', 'product:updated'], async (event, payload) => {
+      const p = payload as Product;
+      if (!p?.sellerId) return;
+      const store = await this.sellers.findOne({ where: { id: p.sellerId } });
+      this.emitter.toUser(store?.userId ?? p.sellerId, event, p);
+    });
+  }
 
   /**
    * Show (and charge) the flash-sale price while a sale is running: the listing

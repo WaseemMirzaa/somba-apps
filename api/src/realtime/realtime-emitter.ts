@@ -31,13 +31,33 @@ export class RealtimeEmitter {
     this.emit(RealtimeEmitter.userRoom(userId), event, payload);
   }
 
+  private readonly fanouts = new Map<string, (payload: unknown) => void | Promise<void>>();
+
+  /**
+   * Some events must also reach individual accounts that no role room covers
+   * (a seller only hears about orders and listings that are THEIRS). The owner
+   * of that rule registers it here once; it runs whenever the event is sent to
+   * a role room, so every existing emit site benefits without changes.
+   */
+  registerFanout(events: string[], fn: (event: string, payload: unknown) => void | Promise<void>): void {
+    for (const e of events) this.fanouts.set(e, (payload) => fn(e, payload));
+  }
+
+  private fanout(event: string, payload: unknown): void {
+    const fn = this.fanouts.get(event);
+    if (!fn) return;
+    Promise.resolve(fn(payload)).catch((e) => this.logger.warn(`fanout ${event} failed: ${(e as Error).message}`));
+  }
+
   toRole(role: string, event: string, payload: unknown): void {
     this.emit(RealtimeEmitter.roleRoom(role), event, payload);
+    this.fanout(event, payload);
   }
 
   /** Fan out to several role rooms at once (e.g. all admin sub-roles). */
   toRoles(roles: string[], event: string, payload: unknown): void {
-    for (const role of roles) this.toRole(role, event, payload);
+    for (const role of roles) this.emit(RealtimeEmitter.roleRoom(role), event, payload);
+    this.fanout(event, payload);
   }
 
   private emit(room: string, event: string, payload: unknown): void {

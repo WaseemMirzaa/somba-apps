@@ -72,6 +72,10 @@ export class OrdersService {
     this.payments.registerOrderSettledHandler((payment, outcome) =>
       this.onPaymentSettled(payment, outcome),
     );
+    // Sellers are told live about orders that contain THEIR products (redacted view).
+    this.emitter.registerFanout(['order:created', 'order:updated'], (event, payload) =>
+      this.pushToSellers(event, payload as Order),
+    );
     // A rider could not deliver: re-open the order for another attempt, or
     // cancel + refund it once the limit is reached.
     this.delivery.registerFailedHandler((task, reason) => this.onDeliveryFailed(task, reason));
@@ -279,6 +283,34 @@ export class OrdersService {
       type: 'order',
       entityId: order.id,
     });
+  }
+
+  /** Send each seller the redacted view (their lines only, first name, no address) of an order. */
+  private async pushToSellers(event: string, order: Order): Promise<void> {
+    if (!order?.items?.length) return;
+    const bySeller = new Map<string, OrderItem[]>();
+    for (const item of order.items) {
+      if (item.productId.startsWith('ext:')) continue;
+      const p = await this.products.getRaw(item.productId);
+      if (!p?.sellerId) continue;
+      bySeller.set(p.sellerId, [...(bySeller.get(p.sellerId) ?? []), item]);
+    }
+    for (const [sellerId, items] of bySeller) {
+      const store = await this.sellers.findOne({ where: { id: sellerId } });
+      const userId = store?.userId ?? sellerId; // demo products may store the user id directly
+      const subtotal = Number(items.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
+      this.emitter.toUser(userId, event, {
+        id: order.id,
+        reference: order.reference,
+        status: order.status,
+        paymentMethod: order.paymentMethod,
+        createdAt: order.createdAt,
+        customerName: (order.customerName ?? '').split(' ')[0],
+        items,
+        subtotalUsd: subtotal,
+        totalUsd: subtotal,
+      });
+    }
   }
 
   /** Where the rider collects the parcel: the seller(s)' pickup address, else the hub. */

@@ -75,7 +75,10 @@ const register = async (label, role = 'customer') => {
   ok(list.some((p) => p.id === pending.id), 'the seller sees their own pending listing');
   ok(!(await req(sellerU.sock, 'products:update', { id: pending.id, patch: { status: 'live' } })).ok, 'a seller cannot approve their own listing');
   const sawNote = until(async () => (await req(sellerU.sock, 'notifications:list')).data.find((n) => n.title === 'Product approved'));
+  const pushed = new Promise((res) => { sellerU.sock.once('product:updated', res); setTimeout(() => res(null), 4000); });
   a = await req(admin.sock, 'products:update', { id: pending.id, patch: { status: 'live' } });
+  const sellerSaw = await pushed;
+  ok(sellerSaw?.id === pending.id && sellerSaw?.status === 'live', 'the owning seller gets product:updated live when it is approved');
   ok(a.ok && a.data.status === 'live', 'a moderator approves it');
   list = (await req(cust.sock, 'products:list')).data;
   ok(list.some((p) => p.id === pending.id), 'the approved listing is visible to shoppers');
@@ -97,7 +100,12 @@ const register = async (label, role = 'customer') => {
   list = (await req(cust.sock, 'products:list')).data;
   const listed = list.find((p) => p.id === prod.id);
   ok(listed?.price === 10 && listed?.originalPrice === 25 && listed?.discount === 60, 'the storefront shows the flash price with the normal price struck through', JSON.stringify(listed && { p: listed.price, o: listed.originalPrice, d: listed.discount }));
+  const sellerOrderPush = new Promise((res) => { sellerU.sock.once('order:created', res); setTimeout(() => res(null), 4000); });
+  const otherSellerPush = new Promise((res) => { seller2.sock.once('order:created', res); setTimeout(() => res(null), 1500); });
   a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  const sp = await sellerOrderPush;
+  ok(sp && sp.reference === a.data.reference && !('shippingAddress' in sp) && !('customerId' in sp) && sp.customerName === 'buyer', 'the seller is pushed the order live, without address or customer id');
+  ok((await otherSellerPush) === null, 'a different seller is NOT told about it');
   ok(a.ok && a.data.subtotalUsd === 10, 'checkout charges the flash price', a.error ?? `subtotal ${a.data?.subtotalUsd}`);
 
   // ---- pickup, seller ready, hub receive --------------------------------------
