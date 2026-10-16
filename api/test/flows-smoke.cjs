@@ -145,6 +145,31 @@ const register = async (label, role = 'customer') => {
   ok(mine?.failureReason?.startsWith('Customer unreachable'), 'the failure reason is kept on the task');
   ok(!(await req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' })).ok, 'a finished attempt cannot be revived');
 
+  // ---- proof of delivery code -----------------------------------------------------
+  section('Proof of delivery: the customer code');
+  ok(!(await req(cust.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'true' })).ok, 'customers cannot switch the delivery-code rule');
+  await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'true' });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  const oc = a.data;
+  const tc = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === oc.id));
+  ok(!JSON.stringify(tc).includes('proofCode'), 'the handover code is never part of the task data staff and riders receive');
+  await req(rider.sock, 'delivery:accept', { taskId: tc.id });
+  await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'picked_up' });
+  await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'in_transit' });
+  a = await req(cust.sock, 'orders:deliveryCode', { orderId: oc.id });
+  ok(a.ok && a.data.required && /^\d{4}$/.test(a.data.code ?? ''), 'the customer can see their 4-digit code', JSON.stringify(a));
+  const code = a.data.code;
+  ok(!(await req(other.sock, 'orders:deliveryCode', { orderId: oc.id })).ok, "another customer cannot read someone else's code");
+  ok(!(await req(rider.sock, 'orders:deliveryCode', { orderId: oc.id })).ok, 'the rider cannot read the code either');
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered' });
+  ok(!a.ok && /code/i.test(a.error ?? ''), 'delivering without the code is refused', a.error ?? '');
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code: code === '1234' ? '4321' : '1234' });
+  ok(!a.ok && /Wrong delivery code/.test(a.error ?? ''), 'a wrong code is refused');
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code });
+  ok(a.ok && a.data.status === 'delivered', 'the right code completes the delivery');
+  ok((await req(cust.sock, 'orders:deliveryCode', { orderId: oc.id })).data.code === null, 'the code is gone once delivered');
+  await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'false' });
+
   // ---- customer can cancel after one failed attempt --------------------------------
   a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const o2 = a.data;

@@ -16,6 +16,7 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
+import { randomInt } from 'crypto';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { SettingsService } from '../content/settings.service';
@@ -268,6 +269,7 @@ export class OrdersService {
         zoneId: order.zoneId,
         codAmountUsd: order.paymentMethod === 'cod' ? order.totalUsd : 0,
         pickupAddress: await this.pickupFor(order),
+        proofCode: String(randomInt(1000, 10000)),
       }),
     );
     this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
@@ -293,6 +295,14 @@ export class OrdersService {
     }
     if (lines.length) return lines.join(' | ');
     return (await this.settings.get('hubAddress')) || 'Somba&Teka hub';
+  }
+
+  /** The customer's handover code for an order that is on its way (null when none applies). */
+  async deliveryCode(customerId: string, orderId: string): Promise<{ code: string | null; required: boolean }> {
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order || order.customerId !== customerId) throw new NotFoundException('Order not found.');
+    const required = (await this.settings.get('requireDeliveryCode')) === 'true';
+    return { required, code: required ? await this.delivery.codeForOrder(orderId) : null };
   }
 
   /** The seller confirms the parcel is packed and ready for the rider. */
@@ -361,6 +371,7 @@ export class OrdersService {
         zoneId: task.zoneId,
         codAmountUsd: task.codAmountUsd,
         pickupAddress: task.pickupAddress,
+        proofCode: await this.delivery.getProofCode(task.id),
         readyAt: task.readyAt,
         receivedAt: task.receivedAt,
         attempts: task.attempts + 1,

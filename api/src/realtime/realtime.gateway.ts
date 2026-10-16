@@ -477,7 +477,7 @@ export class RealtimeGateway
   @SubscribeMessage('delivery:updateStatus')
   async deliveryUpdateStatus(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string },
+    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string; code?: string },
   ) {
     try {
       const user = this.requireUser(client);
@@ -485,7 +485,7 @@ export class RealtimeGateway
       if (!(['picked_up', 'in_transit', 'delivered', 'failed'] as string[]).includes(body?.status)) {
         return fail('Invalid delivery status.');
       }
-      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason));
+      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -518,6 +518,20 @@ export class RealtimeGateway
       const task = await this.delivery.markReceived(String(body?.taskId ?? ''));
       await this.audit.record({ actor: user.name, role: user.role, action: 'parcel.received', entity: 'delivery', entityId: task.id, detail: task.orderReference });
       return ok(task);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The customer's 4-digit handover code for an order that is on its way. */
+  @SubscribeMessage('orders:deliveryCode')
+  async ordersDeliveryCode(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.orders.deliveryCode(user.id, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1374,6 +1388,18 @@ export class RealtimeGateway
       await this.audit.record({ actor: user.name, role: user.role, action: 'role.set', entity: 'user', entityId: id, detail: role });
       this.kick(id); // old privileges must not survive on an open socket
       return ok({ id, role });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Active riders (for dispatch screens: assign a task or build a batch). */
+  @SubscribeMessage('warehouse:riders')
+  async warehouseRiders(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      return ok(await this.rider.activeRiders());
     } catch (e) {
       return fail((e as Error).message);
     }

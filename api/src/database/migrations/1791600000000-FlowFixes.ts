@@ -12,6 +12,7 @@ export class FlowFixes1791600000000 implements MigrationInterface {
     await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`attempts\` int NOT NULL DEFAULT 1`);
     await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`failureReason\` varchar(200) NULL`);
     await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`pickupAddress\` text NULL`);
+    await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`proofCode\` text NULL`);
     await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`readyAt\` datetime NULL`);
     await q.query(`ALTER TABLE \`delivery_tasks\` ADD \`receivedAt\` datetime NULL`);
     await q.query(`ALTER TABLE \`disputes\` ADD \`receivedAt\` datetime NULL`);
@@ -27,6 +28,7 @@ export class FlowFixes1791600000000 implements MigrationInterface {
     await q.query(`ALTER TABLE \`disputes\` DROP COLUMN \`receivedAt\``);
     await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`receivedAt\``);
     await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`readyAt\``);
+    await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`proofCode\``);
     await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`pickupAddress\``);
     await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`failureReason\``);
     await q.query(`ALTER TABLE \`delivery_tasks\` DROP COLUMN \`attempts\``);

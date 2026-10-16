@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { DeliveryTask, Order } from '../database/entities';
+import { DeliveryTask, Order, User } from '../database/entities';
 
 const PER_DELIVERY_USD = 2.5;
 
@@ -12,7 +12,21 @@ export class RiderService {
     private readonly tasks: Repository<DeliveryTask>,
     @InjectRepository(Order)
     private readonly orders: Repository<Order>,
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
   ) {}
+
+  /** Active rider accounts with their open workload (for dispatch screens). */
+  async activeRiders() {
+    const riders = await this.users.find({ where: { role: 'rider', active: true } });
+    const open = await this.tasks.find({ where: { status: In(['assigned', 'picked_up', 'in_transit']) } });
+    return riders.map((r) => ({
+      id: r.id,
+      name: r.name,
+      phone: r.phone,
+      activeTasks: open.filter((t) => t.riderId === r.id).length,
+    }));
+  }
 
   /** Earnings + shift summary for a rider. */
   async earnings(riderId: string) {

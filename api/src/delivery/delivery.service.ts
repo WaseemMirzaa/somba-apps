@@ -10,6 +10,7 @@ import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
+import { SettingsService } from '../content/settings.service';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 
@@ -49,6 +50,7 @@ export class DeliveryService {
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
     private readonly payments: PaymentsService,
+    private readonly settings: SettingsService,
   ) {}
 
   listUnassigned(): Promise<DeliveryTask[]> {
@@ -129,10 +131,18 @@ export class DeliveryService {
     status: DeliveryStatus,
     riderId: string,
     reason?: string,
+    code?: string,
   ): Promise<DeliveryTask> {
     const task = await this.tasks.findOne({ where: { id: taskId } });
     // Same answer for "missing" and "someone else's" so ids can't be probed.
     if (!task || task.riderId !== riderId) throw new NotFoundException('Delivery task not found.');
+    // Proof of delivery: the customer's code must be entered to complete the handover.
+    if (status === 'delivered' && (await this.settings.get('requireDeliveryCode')) === 'true') {
+      const expected = await this.getProofCode(task.id);
+      if (expected && String(code ?? '').trim() !== expected) {
+        throw new BadRequestException('Wrong delivery code. Ask the customer for the 4-digit code shown in their app.');
+      }
+    }
     if (!NEXT[task.status]?.includes(status)) {
       throw new BadRequestException(`A ${task.status.replace('_', ' ')} delivery cannot become ${String(status).replace('_', ' ')}.`);
     }
@@ -230,5 +240,18 @@ export class DeliveryService {
     this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
     if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
     return task;
+  }
+
+  /** The handover code (select:false column, so it is only ever read here and by the customer endpoint). */
+  async getProofCode(taskId: string): Promise<string | null> {
+    const row = await this.tasks.createQueryBuilder('t').addSelect('t.proofCode').where('t.id = :id', { id: taskId }).getOne();
+    return row?.proofCode ?? null;
+  }
+
+  /** The code for the customer's CURRENT delivery of an order (only the owner may ask). */
+  async codeForOrder(orderId: string): Promise<string | null> {
+    const task = await this.tasks.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
+    if (!task || task.status === 'delivered' || task.status === 'failed') return null;
+    return this.getProofCode(task.id);
   }
 }

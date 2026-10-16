@@ -83,6 +83,7 @@ async function run() {
     ]),
     commissionPct: '12',
     productModeration: 'true', // new seller listings wait for a moderator
+    requireDeliveryCode: 'true', // riders must enter the customer's 4-digit code on handover
     minPayoutUsd: '10',
   };
   for (const [key, value] of Object.entries(defaults)) {

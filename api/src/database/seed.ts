@@ -204,6 +204,7 @@ async function run() {
     setRepo.create({ key: 'commissionPct', value: '12' }),
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
+    setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),
     setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
   ]);
 

@@ -65,6 +65,10 @@ export class DeliveryTask {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   pickupAddress: string | null;
 
+  /** 4-digit code the customer gives the rider on handover (never sent to staff or riders). */
+  @Column({ type: 'text', nullable: true, select: false, transformer: encryptedColumn })
+  proofCode: string | null;
+
   /** The seller marked the parcel ready for pickup. */
   @Column({ type: 'datetime', nullable: true })
   readyAt: Date | null;
