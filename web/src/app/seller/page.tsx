@@ -24,18 +24,18 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
-  DualMetricChart,
   SegmentDonut,
   FunnelChart,
   HorizontalBarChart,
 } from "@/components/charts/dashboard-charts";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { GoalsCard } from "@/components/seller/goals-card";
+import { RevenueOrdersChart } from "@/components/seller/revenue-chart";
 import { StatTile } from "@/components/seller/stat-tile";
 import { PlanSummary } from "@/components/seller/plan-summary";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData, useSellerLoad } from "@/lib/seller";
-import { campaignStatusLabel, campaignStatusVariant, orderStatusLabel, orderStatusVariant } from "@/lib/seller-labels";
+import { orderStatusLabel, orderStatusVariant } from "@/lib/seller-labels";
 import {
   HEALTH_LABELS,
   formatHours,
@@ -160,8 +160,8 @@ export default function SellerDashboard() {
         <>
           {/* KPI grid */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile title={fr ? "Revenu" : "Revenue"} value={formatCurrency(a.revenue, locale)} spark={a.revenueSeries.map((d) => d.revenue)} icon={DollarSign} />
-            <StatTile title={fr ? "Commandes" : "Orders"} value={String(a.orders)} spark={a.revenueSeries.map((d) => d.orders)} hint={fr ? `${a.units} unités vendues` : `${a.units} units sold`} icon={ShoppingCart} />
+            <StatTile title={fr ? "Revenu" : "Revenue"} value={formatCurrency(a.revenue, locale)} icon={DollarSign} />
+            <StatTile title={fr ? "Commandes" : "Orders"} value={String(a.orders)} hint={fr ? `${a.units} unités vendues` : `${a.units} units sold`} icon={ShoppingCart} />
             <StatTile title={fr ? "Panier moyen" : "Avg. order value"} value={a.orders > 0 ? formatCurrency(a.aov, locale) : "—"} icon={Target} />
             <StatTile
               title={fr ? "Vues produit → commandes" : "Product views → orders"}
@@ -210,7 +210,7 @@ export default function SellerDashboard() {
                 {a.orders === 0 ? (
                   <EmptyState>{fr ? "Aucune commande sur cette période." : "No orders in this period."}</EmptyState>
                 ) : (
-                  <DualMetricChart data={series} height={240} />
+                  <RevenueOrdersChart data={series} height={240} />
                 )}
               </CardContent>
             </Card>
@@ -461,6 +461,7 @@ export default function SellerDashboard() {
                 },
               ]}
               data={lowStockProducts as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucun produit en stock bas." : "No low-stock products."}
               rowAction={(row) => (
                 <Link href={`/seller/products/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
@@ -493,6 +494,7 @@ export default function SellerDashboard() {
                 { key: "orderStatus", label: t("status"), render: (row) => <Badge variant={orderStatusVariant(String(row.orderStatus))}>{orderStatusLabel(String(row.orderStatus), fr)}</Badge> },
               ]}
               data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucune commande pour le moment." : "No orders yet."}
               rowAction={(row) => (
                 <Link href={`/seller/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
@@ -521,9 +523,9 @@ export default function SellerDashboard() {
                   { key: "discount", label: fr ? "Remise" : "Discount", render: (row) => `${row.discount}%` },
                   { key: "orders", label: fr ? "Commandes" : "Orders" },
                   { key: "revenue", label: fr ? "Chiffre d'affaires" : "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
-                  { key: "status", label: t("status"), render: (row) => <Badge variant={campaignStatusVariant(String(row.status))}>{campaignStatusLabel(String(row.status), fr)}</Badge> },
-                ]}
+                                  ]}
                 data={promotionList.filter((p) => p.status === "active") as unknown as Record<string, unknown>[]}
+                emptyMessage={fr ? "Aucune promotion active." : "No active promotions."}
                 rowAction={(row) => (
                   <Link href={`/seller/promotions/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
                 )}

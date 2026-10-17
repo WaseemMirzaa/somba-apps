@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -23,7 +23,7 @@ const STATUS_OPTIONS = [
 export default function AdminSupportPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { items: tickets, error } = useServerList<SupportTicketRow>("support:list", { pushEvents: ["support:updated"] });
+  const { items: tickets, error, reload, loading } = useServerList<SupportTicketRow>("support:list", { pushEvents: ["support:updated"] });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const rows = useMemo(() => tickets.map((tk) => ({ ...tk, date: tk.createdAt.slice(0, 10) })), [tickets]);
@@ -40,7 +40,8 @@ export default function AdminSupportPage() {
         subtitle={fr ? "Tickets de support (en direct)" : "Support tickets (live)"}
         breadcrumbs={[adminBreadcrumb(locale), { label: t("support") }]}
       />
-      {error && <NoticeBar tone="warn">{error}</NoticeBar>}
+      {error && <SectionError message={error} onRetry={reload} />}
+      {loading && !error && <SectionLoading />}
 
       <ListFilters
         values={filters}

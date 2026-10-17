@@ -12,6 +12,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SecretBox } from "@/components/admin/copy-box";
 import { ErrorNote } from "@/components/admin/modal";
 import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -23,7 +24,7 @@ export default function AdminWarehouseStaffPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   // Real accounts: every `warehouse_staff` user the server knows about.
-  const { items, reload, error: loadError } = useServerList<StaffRow>("roles:staff");
+  const { items, reload, error: loadError, loading } = useServerList<StaffRow>("roles:staff");
   const staff = useMemo(() => items.filter((u) => u.role === "warehouse_staff"), [items]);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
@@ -86,7 +87,8 @@ export default function AdminWarehouseStaffPage() {
         }
       />
 
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={reload} />}
+      {loading && !loadError && <SectionLoading />}
       <NoticeBar>
         {fr
           ? "La création de comptes est réservée au super administrateur. Le compte est créé avec un mot de passe temporaire affiché une seule fois. L'affectation à un hub n'existe pas encore côté serveur."

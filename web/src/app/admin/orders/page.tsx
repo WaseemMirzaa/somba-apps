@@ -10,20 +10,42 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { useAdminData } from "@/lib/admin";
+import { useRealtime } from "@/context/realtime-context";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
-import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL, orderStatusLabel } from "@/lib/admin-live";
+import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL, orderStatusLabel, useFeedState } from "@/lib/admin-live";
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABEL).map(([value, l]) => ({ value, label: l.en, labelFr: l.fr }));
 
-const PAYMENT_METHOD_FR: Record<string, string> = {
-  Card: "Carte",
+const PAYMENT_METHOD_LABEL: Record<string, { en: string; fr: string }> = {
+  stripe_card: { en: "Card", fr: "Carte" },
+  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
+  airtel_money: { en: "Mobile money", fr: "Mobile money" },
+  wallet: { en: "Wallet", fr: "Portefeuille" },
 };
 
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { orderEntities } = useAdminData();
+  const rt = useRealtime();
+  const feed = useFeedState();
+  const orderEntities = useMemo(() => {
+    const owner = new Map(rt.products.map((p) => [p.id, p]));
+    return rt.orders.map((o) => {
+      const first = o.items.map((it) => owner.get(it.productId)).find((p) => p?.sellerId);
+      return {
+        id: o.reference,
+        customerId: o.customerId,
+        customer: o.customerName,
+        sellerId: first?.sellerId ?? null,
+        seller: first?.sellerName ?? "—",
+        amount: o.totalUsd,
+        paymentMethod: o.paymentMethod,
+        status: o.status,
+        date: o.createdAt.slice(0, 10),
+      };
+    });
+  }, [rt.orders, rt.products]);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -40,7 +62,7 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("orders")}
-        subtitle={fr ? "Vue liste — ID commande, client, vendeur, montant, paiement, statut, date" : "List View — Order ID, Customer, Seller, Amount, Payment, Status, Date"}
+        subtitle={fr ? `${rt.orders.length} commandes (en direct)` : `${rt.orders.length} orders (live)`}
         breadcrumbs={[
           adminBreadcrumb(locale),
           { label: t("orders") },
@@ -54,9 +76,14 @@ export default function AdminOrdersPage() {
         searchPlaceholder={fr ? "ID commande, client, vendeur…" : "Order ID, customer, seller…"}
       />
 
+      {feed.error && <SectionError message={feed.error} />}
+      {feed.loading && <SectionLoading />}
+
+      {!feed.loading && !feed.error && (
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucune commande" : "No orders yet"}
             columns={[
               {
                 key: "id",
@@ -96,7 +123,7 @@ export default function AdminOrdersPage() {
               {
                 key: "paymentMethod",
                 label: fr ? "Paiement" : "Payment",
-                render: (row) => (fr ? (PAYMENT_METHOD_FR[String(row.paymentMethod)] ?? String(row.paymentMethod)) : String(row.paymentMethod)),
+                render: (row) => (PAYMENT_METHOD_LABEL[String(row.paymentMethod)]?.[fr ? "fr" : "en"] ?? String(row.paymentMethod)),
               },
               {
                 key: "status",
@@ -122,6 +149,7 @@ export default function AdminOrdersPage() {
           />
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { TrendingUp, ShoppingCart, Target, Package, Users, DollarSign, Boxes, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { DualMetricChart, HorizontalBarChart } from "@/components/charts/dashboard-charts";
+import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
+import { RevenueOrdersChart } from "@/components/seller/revenue-chart";
 import { AnalyticsPage } from "@/components/seller/analytics-shell";
 import { EmptyState } from "@/components/seller/data-state";
 import { StatTile } from "@/components/seller/stat-tile";
@@ -46,7 +47,7 @@ export default function SellerAnalyticsPage() {
                 {a.orders === 0 ? (
                   <EmptyState>{fr ? "Aucune commande sur cette période." : "No orders in this period."}</EmptyState>
                 ) : (
-                  <DualMetricChart data={a.revenueSeries.map((d) => ({ label: shortDay(d.date, fr), revenue: d.revenue, orders: d.orders }))} height={240} />
+                  <RevenueOrdersChart data={a.revenueSeries.map((d) => ({ label: shortDay(d.date, fr), revenue: d.revenue, orders: d.orders }))} height={240} />
                 )}
               </CardContent>
             </Card>

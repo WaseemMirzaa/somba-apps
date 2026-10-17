@@ -11,6 +11,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useAdminData } from "@/lib/admin";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -27,13 +28,13 @@ const STATUS_FR: Record<string, string> = {
 export default function AdminCustomersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { customerEntities } = useAdminData();
+  const { customerEntities, loading, error, reload } = useAdminData({ customers: true });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
     () =>
       applyListFilters(customerEntities, filters, {
-        searchFields: ["id", "name", "email", "phone", "city"],
+        searchFields: ["id", "name", "email", "phone"],
         statusField: "status",
       }),
     [customerEntities, filters]
@@ -43,11 +44,7 @@ export default function AdminCustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("customers")}
-        subtitle={
-          fr
-            ? "Vue liste — Nom, E-mail, Téléphone, Ville, Commandes, Total dépensé, Statut"
-            : "List View — Name, Email, Phone, City, Orders, Total Spent, Status"
-        }
+        subtitle={fr ? "Comptes clients, commandes et total dépensé" : "Customer accounts, orders and total spent"}
         breadcrumbs={[
           adminBreadcrumb(locale),
           { label: t("customers") },
@@ -58,13 +55,18 @@ export default function AdminCustomersPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder={fr ? "Nom, e-mail, téléphone, ville…" : "Name, email, phone, city…"}
+        searchPlaceholder={fr ? "Nom, e-mail, téléphone…" : "Name, email, phone…"}
         showDateFilters={false}
       />
 
+      {error && <SectionError message={error} onRetry={reload} />}
+      {loading && !error && <SectionLoading />}
+
+      {!loading && !error && (
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucun client" : "No customers yet"}
             columns={[
               { key: "id", label: "ID" },
               {
@@ -78,7 +80,6 @@ export default function AdminCustomersPage() {
               },
               { key: "email", label: t("email") },
               { key: "phone", label: t("phone") },
-              { key: "city", label: fr ? "Ville" : "City" },
               { key: "orders", label: fr ? "Commandes" : "Orders" },
               {
                 key: "totalSpent",
@@ -104,6 +105,7 @@ export default function AdminCustomersPage() {
           />
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

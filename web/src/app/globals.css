@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Alternate Next dist dirs (NEXT_DIST_DIR) hold binary caches: never scan them for class names. */
+@source not "../../.next-*";
+@source not "../../.next";
 
 :root {
   /* Surfaces & text */

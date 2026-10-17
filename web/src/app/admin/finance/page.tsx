@@ -134,7 +134,7 @@ export default function AdminFinancePage() {
 
       {f && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             <StatCard title={fr ? "GMV brut (hors annulées)" : "Gross GMV (excl. cancelled)"} value={formatCurrency(f.grossGmvUsd, locale)} icon={DollarSign} trend={`${fr ? "dont livraison" : "incl. delivery"} ${formatCurrency(f.deliveryFeesUsd, locale)}`} />
             <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)"} />
             <StatCard title={fr ? `Commission gagnée (${f.commissionPct} %)` : `Commission earned (${f.commissionPct}%)`} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)}`} />
@@ -169,7 +169,7 @@ export default function AdminFinancePage() {
             </ChartCard>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6">
             <Card>
               <CardHeader>
                 <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Créances mobile money" : "Mobile-money receivables"}</h2>
@@ -189,7 +189,7 @@ export default function AdminFinancePage() {
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-2">
+            <Card>
               <CardHeader>
                 <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
                   {fr ? "Paiements récents" : "Recent payments"}

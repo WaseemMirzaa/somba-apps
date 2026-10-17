@@ -39,24 +39,28 @@ export default function AdminReviewsPage() {
     [tab],
   );
 
-  const load = useCallback(async () => {
-    if (!connected) return;
-    setLoading(true);
-    try {
-      const res = await socketClient.request<ReviewRow[]>("reviews:admin", body(0));
-      setRows(Array.isArray(res) ? res : []);
-      setHasMore(Array.isArray(res) && res.length === PAGE);
-      setError(null);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [connected, body]);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!connected) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await socketClient.request<ReviewRow[]>("reviews:admin", body(0));
+        if (!alive) return;
+        setRows(Array.isArray(res) ? res : []);
+        setHasMore(Array.isArray(res) && res.length === PAGE);
+        setError(null);
+      } catch (e) {
+        if (alive) setError(errMsg(e));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [connected, body, attempt]);
 
   async function loadMore() {
     setMoreLoading(true);
@@ -147,7 +151,7 @@ export default function AdminReviewsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <Tabs
           active={tab}
-          onChange={(id) => setTab(id as "all" | "visible" | "hidden")}
+          onChange={(id) => { setLoading(true); setTab(id as "all" | "visible" | "hidden"); }}
           tabs={[
             { id: "all", label: fr ? "Tous" : "All" },
             { id: "visible", label: fr ? "Visibles" : "Visible" },
@@ -155,7 +159,7 @@ export default function AdminReviewsPage() {
           ]}
         />
         <input
-          className="input-premium min-w-0 flex-1 px-4 py-2 text-sm sm:max-w-xs"
+          className="input-premium w-full min-w-0 px-4 py-2 text-sm sm:max-w-xs sm:flex-1"
           placeholder={fr ? "Rechercher produit, auteur, texte…" : "Search product, author, text…"}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -163,7 +167,7 @@ export default function AdminReviewsPage() {
         />
       </div>
 
-      {error && <SectionError message={error} onRetry={load} />}
+      {error && <SectionError message={error} onRetry={() => { setLoading(true); setError(null); setAttempt((a) => a + 1); }} />}
       {loading && !error ? (
         <SectionLoading />
       ) : (

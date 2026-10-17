@@ -8,6 +8,7 @@ import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useAdminData } from "@/lib/admin";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -27,7 +28,7 @@ export default function AdminCustomerDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getCustomer, orderEntities, setCustomerActive } = useAdminData();
+  const { getCustomer, orderEntities, setCustomerActive, loading, error, reload } = useAdminData({ customers: true });
   const customer = getCustomer(id);
   const [status, setStatus] = useState(customer?.status ?? "active");
 
@@ -35,6 +36,8 @@ export default function AdminCustomerDetailPage() {
     setStatus(customer?.status ?? "active");
   }, [customer?.status]);
 
+  if (error) return <SectionError message={error} onRetry={reload} />;
+  if (loading) return <SectionLoading className="min-h-[40vh]" />;
   if (!customer) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Client introuvable" : "Customer not found"}</div>;
   }
@@ -85,7 +88,6 @@ export default function AdminCustomerDetailPage() {
             { label: fr ? "Nom" : "Name", value: customer.name },
             { label: t("email"), value: customer.email },
             { label: t("phone"), value: customer.phone },
-            { label: fr ? "Ville" : "City", value: customer.city },
             { label: fr ? "Statut" : "Status", value: <Badge variant={status === "active" ? "success" : "danger"}>{fr ? (status === "active" ? "Actif" : status === "suspended" ? "Suspendu" : status) : status}</Badge> },
             { label: fr ? "Inscrit le" : "Joined", value: customer.joined },
           ]} />

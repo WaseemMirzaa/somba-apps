@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { SecretBox } from "@/components/admin/copy-box";
 import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote } from "@/components/admin/modal";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
@@ -43,7 +44,7 @@ export default function AdminRolesPage() {
   const fr = locale === "fr";
   const isSuper = role === "admin";
   const [defs, setDefs] = useState<RoleDef[]>([]);
-  const { items: staff, reload, error: staffError } = useServerList<StaffRow>("roles:staff", { enabled: isSuper });
+  const { items: staff, reload, error: staffError, loading } = useServerList<StaffRow>("roles:staff", { enabled: isSuper });
   const [form, setForm] = useState({ name: "", email: "", phone: "", role: "admin_support" });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -167,7 +168,8 @@ export default function AdminRolesPage() {
       </div>
 
       <div className="card-premium overflow-hidden">
-        {staffError && <div className="p-4"><NoticeBar tone="warn">{staffError}</NoticeBar></div>}
+        {staffError && <div className="p-4"><SectionError message={staffError} onRetry={reload} /></div>}
+        {loading && !staffError && isSuper && <SectionLoading />}
         <DataTable
           emptyMessage={fr ? "Aucun compte" : "No staff accounts"}
           data={staff as unknown as Record<string, unknown>[]}

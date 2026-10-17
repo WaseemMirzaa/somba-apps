@@ -10,6 +10,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { Shield, AlertTriangle, Ban } from "lucide-react";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
@@ -32,11 +33,6 @@ const TYPE_EN: Record<string, string> = {
   velocity: "Velocity",
   address_block: "Address block",
 };
-// Generic (non-person-name) customer labels that need translation.
-const CUSTOMER_FR: Record<string, string> = {
-  "Unknown User": "Utilisateur inconnu",
-};
-
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
   { value: "reviewed", label: "Reviewed", labelFr: "Examiné" },
@@ -46,7 +42,7 @@ const STATUS_OPTIONS = [
 export default function AdminFraudPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { fraudAlerts, setFraudStatus } = useAdminData();
+  const { fraudAlerts, setFraudStatus, loading, error, reload } = useAdminData({ fraud: true });
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -91,13 +87,17 @@ export default function AdminFraudPage() {
         searchPlaceholder={fr ? "ID d'alerte, client, commande…" : "Alert ID, customer, order…"}
       />
 
+      {error && <SectionError message={error} onRetry={reload} />}
+      {loading && !error && <SectionLoading />}
+
+      {!loading && !error && (
       <Card>
         <CardContent className="p-0">
           <DataTable
             columns={[
               { key: "id", label: fr ? "Alerte" : "Alert" },
               { key: "type", label: t("type"), render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
-              { key: "customer", label: t("customer"), render: (r) => <span>{fr ? (CUSTOMER_FR[String(r.customer)] ?? String(r.customer)) : String(r.customer)}</span> },
+              { key: "customer", label: t("customer"), render: (r) => <span>{String(r.customer)}</span> },
               { key: "orderId", label: fr ? "Commande" : "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-[var(--primary)]">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },
               { key: "severity", label: fr ? "Gravité" : "Severity", render: (r) => <Badge variant={severityVariant[r.severity as keyof typeof severityVariant]}>{fr ? (SEVERITY_FR[String(r.severity)] ?? String(r.severity)) : String(r.severity)}</Badge> },
@@ -124,6 +124,7 @@ export default function AdminFraudPage() {
           />
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

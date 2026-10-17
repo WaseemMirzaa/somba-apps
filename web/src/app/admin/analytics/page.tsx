@@ -28,7 +28,7 @@ interface Zone {
   nameFr?: string;
 }
 
-function minutesLabel(m: number | null, fr: boolean): string {
+function minutesLabel(m: number | null): string {
   if (m === null) return "—";
   if (m < 90) return `${Math.round(m)} min`;
   return `${(m / 60).toFixed(1)} h`;
@@ -87,7 +87,7 @@ export default function AdminAnalyticsPage() {
       {stats.loading && !s && !stats.error && <SectionLoading />}
 
       {s && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <StatCard
             title={fr ? "GMV, 30 derniers jours" : "GMV, last 30 days"}
             value={formatCurrency(s.gmvLast30, locale)}
@@ -200,8 +200,8 @@ export default function AdminAnalyticsPage() {
             <SectionLoading />
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard title={fr ? "Enlèvement → livraison" : "Pickup to delivery"} value={minutesLabel(w.avgPickupToDeliveryMinutes, fr)} icon={Clock} trend={w.pickupToDeliverySamples ? `${w.pickupToDeliverySamples} ${fr ? "colis (30 j)" : "parcels (30 d)"}` : fr ? "pas assez de données" : "no sample yet"} />
+              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+                <StatCard title={fr ? "Enlèvement → livraison" : "Pickup to delivery"} value={minutesLabel(w.avgPickupToDeliveryMinutes)} icon={Clock} trend={w.pickupToDeliverySamples ? `${w.pickupToDeliverySamples} ${fr ? "colis (30 j)" : "parcels (30 d)"}` : fr ? "pas assez de données" : "no sample yet"} />
                 <StatCard title={fr ? "Taux d'échec" : "Failure rate"} value={w.failureRatePct === null ? "—" : `${w.failureRatePct}%`} icon={PackageX} trend={`${w.failed30} ${fr ? "échecs" : "failed"} · ${w.delivered30} ${fr ? "livrés (30 j)" : "delivered (30 d)"}`} />
                 <StatCard title={fr ? "Ouverts depuis plus de 24 h" : "Open over 24 h"} value={formatNumber(w.agedOver24h, locale)} icon={Truck} />
                 <StatCard title={fr ? "COD à collecter" : "COD to collect"} value={formatCurrency(w.codToCollect, locale)} icon={DollarSign} trend={`${w.unassigned} ${fr ? "non assignés" : "unassigned"} · ${w.inTransit} ${fr ? "en route" : "in transit"}`} />

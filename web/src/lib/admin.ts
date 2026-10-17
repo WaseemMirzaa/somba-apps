@@ -3,41 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import type { Dispute, Order, Payout, Product, Seller } from "@/lib/realtime/types";
+import { errMsg } from "@/lib/admin-live";
+import type { Order, Product } from "@/lib/realtime/types";
 
 /**
- * Live admin data layer — the backend-backed replacement for the mock
- * @/lib/entities + @/lib/admin-entities modules. Everything derives from the
- * signed-in admin's socket, which streams the whole marketplace (all orders,
- * sellers, customers, payouts, disputes, products) plus one-shot admin reads
- * (KPIs, audit, fraud, CMS, roles, flash-sales). Shapes mirror the old mock
- * exports field-for-field so admin pages migrate with a one-line swap.
- *
- * Ids are backend uuid strings (the mock used numbers) — detail pages pass the
- * raw route id instead of Number(id).
+ * Live admin data layer. Orders and products come from the realtime feed; the
+ * customer and fraud lists are loaded on demand (`want`) with real loading and
+ * error state. Nothing here is invented: a field the server does not record is
+ * simply not exposed.
  */
-
-const COMMISSION_PCT = 12;
-
-const PAYMENT_LABEL: Record<string, string> = {
-  cod: "Cash on Delivery",
-  stripe_card: "Card",
-  airtel_money: "Mobile Money",
-  wallet: "Wallet",
-};
-
-interface AdminStats {
-  orders: number;
-  gmv: number;
-  revenue: number;
-  customers: number;
-  sellers: number;
-  liveProducts: number;
-  pendingDisputes: number;
-  pendingPayouts: number;
-  commissionUsd: number;
-  ordersByStatus: Record<string, number>;
-}
 
 interface CustomerRow {
   id: string;
@@ -51,16 +25,6 @@ interface CustomerRow {
   createdAt: string;
 }
 
-interface AuditRow {
-  id: string;
-  actor: string;
-  role: string;
-  action: string;
-  entity: string;
-  entityId: string;
-  timestamp?: string;
-  createdAt?: string;
-}
 interface FraudRow {
   id: string;
   type: string;
@@ -72,190 +36,49 @@ interface FraudRow {
   createdAt?: string;
   date?: string;
 }
-interface FlashSaleRow {
-  id: string;
-  title: string;
-  productName?: string;
-  discount?: number;
-  active?: boolean;
-  startsAt?: string | null;
-  endsAt?: string | null;
-}
-interface CmsRow {
-  id?: string;
-  key: string;
-  title: string;
-  type: string;
-  active: boolean;
-}
-interface RoleDef {
-  key: string;
-  label: string;
-  scope: string;
-}
-interface Broadcast {
-  id: string;
-  title: string;
-  body: string;
-  audience: string;
-  createdAt: string;
-}
 
-function shortId(id: string): string {
-  return id.replace(/-/g, "").slice(0, 6).toUpperCase();
-}
 function dateOf(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
 }
-function parseCityAddr(raw: string | null): { city: string; address: string } {
-  if (!raw) return { city: "Kinshasa", address: "—" };
+function parseAddress(raw: string | null): { city: string; address: string } {
+  if (!raw) return { city: "—", address: "—" };
   try {
     const a = JSON.parse(raw) as { city?: string; line1?: string };
-    return { city: a.city || "Kinshasa", address: [a.line1, a.city].filter(Boolean).join(", ") || "—" };
+    return { city: a.city || "—", address: [a.line1, a.city].filter(Boolean).join(", ") || "—" };
   } catch {
-    return { city: "Kinshasa", address: raw };
+    return { city: "—", address: raw };
   }
 }
 
-function buildAdminData(
-  orders: Order[],
-  products: Product[],
-  payouts: Payout[],
-  disputes: Dispute[],
-  stats: AdminStats | null,
-  customers: CustomerRow[],
-  sellers: Seller[],
-  audit: AuditRow[],
-  fraud: FraudRow[],
-  flash: FlashSaleRow[],
-  cms: CmsRow[],
-  roles: RoleDef[],
-  broadcasts: Broadcast[],
-) {
-  const productSeller = new Map(products.map((p) => [p.id, p.sellerId]));
-  const productName = new Map(products.map((p) => [p.id, p.name]));
-
-  // ── Orders (admin sees all) ────────────────────────────────────────────────
-  const orderEntities = orders.map((o) => {
-    const addr = parseCityAddr(o.shippingAddress);
-    const firstSeller = o.items?.map((it) => productSeller.get(it.productId)).find(Boolean) ?? null;
-    const commission = Math.round(o.totalUsd * (COMMISSION_PCT / 100));
+function buildOrders(orders: Order[], products: Product[]) {
+  const bySeller = new Map(products.map((p) => [p.id, p]));
+  return orders.map((o) => {
+    const addr = parseAddress(o.shippingAddress);
+    const first = o.items?.map((it) => bySeller.get(it.productId)).find((p) => p?.sellerId);
     return {
       id: o.reference,
       orderId: o.id,
       customerId: o.customerId,
       customer: o.customerName,
-      customerPhone: "—",
       customerAddress: addr.address,
       customerCity: addr.city,
-      sellerId: firstSeller,
-      seller: sellers.find((s) => s.id === firstSeller)?.name ?? "Somba&Teka",
+      sellerId: first?.sellerId ?? null,
+      seller: first?.sellerName ?? "—",
       amount: o.totalUsd,
       status: o.status,
-      paymentMethod: PAYMENT_LABEL[o.paymentMethod] ?? o.paymentMethod,
-      paymentStatus:
-        o.status === "cancelled" || o.status === "returned"
-          ? "refunded"
-          : o.status === "pending"
-            ? "pending"
-            : "paid",
-      transactionId: `TXN-${o.reference}`,
       date: dateOf(o.createdAt),
       itemsCount: o.items?.reduce((s, it) => s + it.qty, 0) ?? 0,
-      items: (o.items ?? []).map((it) => ({
-        productId: it.productId,
-        name: it.productName,
-        sku: `SKU-${shortId(it.productId)}`,
-        variant: it.variant || "Default",
-        qty: it.qty,
-        price: it.priceUsd,
-        image: "/brand/logo-stack.png",
-      })),
-      warehouse: "Kinshasa Hub",
-      rider: o.riderId ? "Assigned rider" : "—",
-      trackingNumber: o.reference,
-      commission,
-      sellerEarnings: o.totalUsd - commission,
-      refunds: o.status === "returned" ? o.totalUsd : 0,
-      timeline: [
-        { time: o.createdAt.slice(0, 16).replace("T", " "), label: "Placed", done: true },
-        ...(o.updatedAt && o.updatedAt !== o.createdAt
-          ? [{ time: o.updatedAt.slice(0, 16).replace("T", " "), label: `Status: ${o.status.replace(/_/g, " ")}`, done: o.status === "delivered" }]
-          : []),
-      ],
     };
   });
+}
 
-  // ── Sellers (admin) ─────────────────────────────────────────────────────────
-  const sellerEntities = sellers.map((s) => {
-    const productIds = new Set(products.filter((p) => p.sellerId === s.id).map((p) => p.id));
-    const sellerOrders = orders.filter((o) => o.items?.some((it) => productIds.has(it.productId)));
-    const revenue = sellerOrders.reduce(
-      (sum, o) =>
-        sum + (o.items ?? []).filter((it) => productIds.has(it.productId)).reduce((t, it) => t + it.priceUsd * it.qty, 0),
-      0,
-    );
-    const sellerPayouts = payouts.filter((p) => p.sellerName === s.name);
-    return {
-      id: s.id,
-      storeName: s.name,
-      owner: s.name,
-      email: "—",
-      phone: "—",
-      city: "Kinshasa",
-      country: "DRC",
-      address: "—",
-      status: s.status as "pending" | "approved" | "rejected" | "suspended",
-      category: "General",
-      date: dateOf(s.createdAt),
-      orders: sellerOrders.length,
-      revenue: Number(revenue.toFixed(2)),
-      returns: sellerOrders.filter((o) => o.status === "returned").length,
-      cancellations: sellerOrders.filter((o) => o.status === "cancelled").length,
-      rating: s.rating,
-      healthScore: Math.min(99, 70 + Math.round(s.rating * 5)),
-      availableBalance: Number(
-        sellerPayouts.filter((p) => p.status === "approved").reduce((t, p) => t + p.amountUsd, 0).toFixed(2),
-      ),
-      pendingBalance: Number(
-        sellerPayouts.filter((p) => p.status === "requested").reduce((t, p) => t + p.amountUsd, 0).toFixed(2),
-      ),
-      paidBalance: Number(
-        sellerPayouts.filter((p) => p.status === "paid").reduce((t, p) => t + p.amountUsd, 0).toFixed(2),
-      ),
-      commission: COMMISSION_PCT,
-      productCount: productIds.size,
-      badge: s.badge,
-      timeline: [
-        { time: dateOf(s.createdAt), label: "Registered" },
-        { time: dateOf(s.createdAt), label: s.status === "approved" ? "Approved" : "Pending review", detail: `Status: ${s.status}`, detailFr: `Statut : ${s.status}` },
-      ],
-    };
-  });
-
-  // ── Customers (admin) ─────────────────────────────────────────────────────────
-  const customerEntities = customers.map((c) => ({
-    id: c.id,
-    name: c.name,
-    email: c.email,
-    phone: c.phone ?? "—",
-    city: "Kinshasa",
-    orders: c.orders,
-    totalSpent: c.spendUsd,
-    status: (c.active ? "active" : "suspended") as "active" | "suspended",
-    joined: dateOf(c.createdAt),
-    walletBalance: c.walletBalance,
-  }));
-
-  // ── Products / moderation (admin) ─────────────────────────────────────────────
-  const moderationQueue = products.map((p) => ({
+function buildQueue(products: Product[]) {
+  return products.map((p) => ({
     id: p.id,
     name: p.name,
     sellerId: p.sellerId ?? "",
-    seller: p.sellerName ?? "Somba&Teka",
-    sellerRating: 4.6,
+    seller: p.sellerName ?? "—",
     category: p.category,
-    brand: p.sellerName ?? "Somba&Teka",
     price: p.price,
     discount: p.discount ?? 0,
     description: p.description ?? "",
@@ -269,146 +92,48 @@ function buildAdminData(
             ? "draft"
             : "rejected") as "pending" | "approved" | "rejected" | "removed" | "draft",
     rawStatus: p.status,
-    submittedDate: "—",
     image: p.image ?? "/brand/logo-stack.png",
-    images: [p.image ?? "/brand/logo-stack.png"],
     rating: p.rating,
     stock: p.stock,
   }));
-
-  // ── Payouts (admin) ───────────────────────────────────────────────────────────
-  const adminPayoutEntities = payouts.map((p) => ({
-    id: p.reference,
-    payoutId: p.id,
-    sellerId: p.sellerId,
-    seller: p.sellerName,
-    amount: p.amountUsd,
-    method: PAYMENT_LABEL[p.method] ?? p.method ?? "Bank Transfer",
-    status: p.status as "requested" | "approved" | "rejected" | "paid",
-    requestedAt: dateOf(p.createdAt),
-    bankAccount: "****4521",
-    note: p.note ?? "",
-  }));
-
-  // ── Audit / fraud / cms / roles / flash / broadcasts ──────────────────────────
-  const auditLogs = audit.map((a) => ({
-    id: a.id,
-    actor: a.actor,
-    role: a.role,
-    action: a.action,
-    entity: a.entity,
-    entityId: a.entityId,
-    before: "",
-    after: "",
-    timestamp: a.timestamp ?? (a.createdAt ? a.createdAt.slice(0, 16).replace("T", " ") : "—"),
-  }));
-  const fraudAlerts = fraud.map((f) => ({
-    id: f.id,
-    type: f.type,
-    severity: f.severity,
-    customer: f.customer ?? "Unknown",
-    orderId: f.orderId,
-    score: f.score,
-    status: f.status,
-    date: f.date ?? (f.createdAt ? dateOf(f.createdAt) : "—"),
-  }));
-  const cmsBlocks = cms.map((c) => ({
-    id: c.id ?? c.key,
-    type: c.type,
-    title: c.title,
-    editable: true,
-    active: c.active,
-  }));
-  const flashSales = flash.map((f) => ({
-    id: f.id,
-    name: f.title,
-    nameFr: f.title,
-    start: f.startsAt ? dateOf(f.startsAt) : "—",
-    end: f.endsAt ? dateOf(f.endsAt) : "—",
-    discount: f.discount ?? 0,
-    products: 1,
-    status: f.active === false ? "ended" : "active",
-  }));
-  const adminRoles = roles.map((r) => ({
-    id: r.key,
-    name: r.label,
-    // The backend describes each role by scope text; expose it as the
-    // permission list the roles page renders.
-    permissions: r.scope ? r.scope.split(/,\s*/) : [],
-  }));
-
-  return {
-    stats,
-    orderEntities,
-    sellerEntities,
-    customerEntities,
-    moderationQueue,
-    adminPayoutEntities,
-    auditLogs,
-    fraudAlerts,
-    cmsBlocks,
-    flashSales,
-    adminRoles,
-    broadcasts,
-    getOrder: (id: string) => orderEntities.find((o) => o.id === id || o.orderId === id),
-    getSeller: (id: string | number) => sellerEntities.find((s) => s.id === String(id)),
-    getCustomer: (id: string | number) => customerEntities.find((c) => c.id === String(id)),
-    getModerationProduct: (id: string | number) => moderationQueue.find((p) => p.id === String(id)),
-  };
 }
 
-export type AdminData = ReturnType<typeof buildAdminData>;
-
-export function useAdminData() {
+export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}) {
   const rt = useRealtime();
-  const [stats, setStats] = useState<AdminStats | null>(null);
+  const wantCustomers = !!want.customers;
+  const wantFraud = !!want.fraud;
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
-  const [sellers, setSellers] = useState<Seller[]>([]);
-  const [audit, setAudit] = useState<AuditRow[]>([]);
   const [fraud, setFraud] = useState<FraudRow[]>([]);
-  const [flash, setFlash] = useState<FlashSaleRow[]>([]);
-  const [cms, setCms] = useState<CmsRow[]>([]);
-  const [roles, setRoles] = useState<RoleDef[]>([]);
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
-
+  const [loading, setLoading] = useState(wantCustomers || wantFraud);
+  const [error, setError] = useState<string | null>(null);
   const isAdmin = rt.user?.role?.startsWith("admin") ?? false;
 
   const refresh = useCallback(async () => {
     if (rt.status !== "connected" || !isAdmin) return;
-    const req = <T,>(ev: string, fallback: T) =>
-      socketClient.request<T>(ev).catch(() => fallback);
-    const [st, cus, sel, aud, fr, fl, cm, rl, br] = await Promise.all([
-      req<AdminStats | null>("analytics:admin", null),
-      req<CustomerRow[]>("customers:list", []),
-      req<Seller[]>("sellers:list", []),
-      req<AuditRow[]>("audit:list", []),
-      req<FraudRow[]>("fraud:list", []),
-      req<FlashSaleRow[]>("flashsales:list", []),
-      req<CmsRow[]>("cms:list", []),
-      req<RoleDef[]>("roles:defs", []),
-      req<Broadcast[]>("broadcasts:list", []),
-    ]);
-    setStats(st);
-    setCustomers(cus ?? []);
-    setSellers(sel ?? []);
-    setAudit(aud ?? []);
-    setFraud(fr ?? []);
-    setFlash(fl ?? []);
-    setCms(cm ?? []);
-    setRoles(rl ?? []);
-    setBroadcasts(br ?? []);
-  }, [rt.status, isAdmin]);
+    try {
+      const [cus, fr] = await Promise.all([
+        wantCustomers ? socketClient.request<CustomerRow[]>("customers:list") : Promise.resolve(null),
+        wantFraud ? socketClient.request<FraudRow[]>("fraud:list") : Promise.resolve(null),
+      ]);
+      if (cus) setCustomers(cus);
+      if (fr) setFraud(fr);
+      setError(null);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [rt.status, isAdmin, wantCustomers, wantFraud]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // Keep the one-shot lists fresh when the server pushes a change.
   useEffect(() => {
     if (rt.status !== "connected" || !isAdmin) return;
     const sock = socketClient.current;
     if (!sock) return;
-    const events = ["seller:updated", "customer:updated", "fraud:created", "fraud:updated", "audit:created", "campaign:updated"];
+    const events = ["customer:updated", "fraud:created", "fraud:updated"];
     let timer: ReturnType<typeof setTimeout> | null = null;
     const handler = () => {
       if (timer) clearTimeout(timer);
@@ -421,27 +146,38 @@ export function useAdminData() {
     };
   }, [rt.status, isAdmin, refresh]);
 
-  const data = useMemo(
+  const orderEntities = useMemo(() => buildOrders(rt.orders, rt.products), [rt.orders, rt.products]);
+  const moderationQueue = useMemo(() => buildQueue(rt.products), [rt.products]);
+  const customerEntities = useMemo(
     () =>
-      buildAdminData(
-        rt.orders,
-        rt.products,
-        rt.payouts,
-        rt.disputes,
-        stats,
-        customers,
-        sellers,
-        audit,
-        fraud,
-        flash,
-        cms,
-        roles,
-        broadcasts,
-      ),
-    [rt.orders, rt.products, rt.payouts, rt.disputes, stats, customers, sellers, audit, fraud, flash, cms, roles, broadcasts],
+      customers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone ?? "—",
+        orders: c.orders,
+        totalSpent: c.spendUsd,
+        status: (c.active ? "active" : "suspended") as "active" | "suspended",
+        joined: dateOf(c.createdAt),
+        walletBalance: c.walletBalance,
+      })),
+    [customers],
+  );
+  const fraudAlerts = useMemo(
+    () =>
+      fraud.map((f) => ({
+        id: f.id,
+        type: f.type,
+        severity: f.severity,
+        customer: f.customer ?? "—",
+        orderId: f.orderId,
+        score: f.score,
+        status: f.status,
+        date: f.date ?? (f.createdAt ? dateOf(f.createdAt) : "—"),
+      })),
+    [fraud],
   );
 
-  // ── Write actions: call the live handler, then refresh the one-shot lists ──
   const actions = useMemo(() => {
     const run = async <T,>(ev: string, body?: Record<string, unknown>) => {
       const res = await socketClient.request<T>(ev, body);
@@ -449,36 +185,23 @@ export function useAdminData() {
       return res;
     };
     return {
-      refresh,
-      setSellerStatus: (id: string, status: "approved" | "rejected" | "suspended" | "pending") =>
-        run("sellers:setStatus", { id, status }),
-      setProductStatus: (id: string, status: "live" | "rejected" | "removed") =>
-        run("products:update", { id, patch: { status } }),
-      moderateProduct: (id: string, approve: boolean) =>
-        run("products:update", { id, patch: { status: approve ? "live" : "rejected" } }),
-      deleteProduct: (id: string) => run("products:delete", { id }),
-      resolveDispute: (disputeId: string, refund = false) =>
-        run("disputes:resolve", { disputeId, refund }),
-      rejectDispute: (disputeId: string, resolution?: string) =>
-        run("disputes:reject", { disputeId, resolution }),
-      setCustomerActive: (id: string, active: boolean) =>
-        run("customers:setActive", { id, active }),
-      setFraudStatus: (id: string, status: string) =>
-        run("fraud:setStatus", { id, status }),
-      setRole: (userId: string, role: string) => run("roles:setRole", { id: userId, role }),
-      sendBroadcast: (input: Record<string, unknown>) => run("broadcasts:send", input),
-      createFlashSale: (input: Record<string, unknown>) => run("flashsales:create", input),
-      createPromo: (input: Record<string, unknown>) => run("promos:create", input),
-      upsertCms: (input: Record<string, unknown>) => run("cms:upsert", input),
-      setSetting: (key: string, value: string) => run("settings:set", { key, value }),
-      createCategory: (input: Record<string, unknown>) => run("categories:create", input),
-      updateCategory: (id: string, patch: Record<string, unknown>) =>
-        run("categories:update", { id, patch }),
-      removeCategory: (id: string) => run("categories:remove", { id }),
-      setCampaignStatus: (id: string, status: string) =>
-        run("campaigns:setStatus", { id, status }),
+      setCustomerActive: (id: string, active: boolean) => run("customers:setActive", { id, active }),
+      setFraudStatus: (id: string, status: string) => run("fraud:setStatus", { id, status }),
     };
   }, [refresh]);
 
-  return useMemo(() => ({ ...data, ...actions }), [data, actions]);
+  const feedLoading = rt.status !== "connected";
+  return {
+    orderEntities,
+    moderationQueue,
+    customerEntities,
+    fraudAlerts,
+    loading: feedLoading || loading,
+    error: rt.status === "error" ? (rt.error ?? "Cannot reach the server.") : error,
+    reload: refresh,
+    getOrder: (id: string) => orderEntities.find((o) => o.id === id || o.orderId === id),
+    getCustomer: (id: string | number) => customerEntities.find((c) => c.id === String(id)),
+    getModerationProduct: (id: string | number) => moderationQueue.find((p) => p.id === String(id)),
+    ...actions,
+  };
 }

@@ -11,6 +11,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useAdminData } from "@/lib/admin";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 
@@ -30,18 +31,10 @@ const STATUS_FR: Record<string, string> = {
   draft: "Brouillon",
 };
 
-const CATEGORY_FR: Record<string, string> = {
-  Electronics: "Électronique",
-  Fashion: "Mode",
-  "Home & Living": "Maison & Décoration",
-  Beauty: "Beauté",
-  Grocery: "Épicerie",
-};
-
 export default function AdminProductsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { moderationQueue } = useAdminData();
+  const { moderationQueue, loading, error } = useAdminData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
@@ -68,9 +61,14 @@ export default function AdminProductsPage() {
         searchPlaceholder={fr ? "Produit, vendeur, catégorie…" : "Product, seller, category…"}
       />
 
+      {error && <SectionError message={error} />}
+      {loading && !error && <SectionLoading />}
+
+      {!loading && !error && (
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucun produit" : "No products"}
             columns={[
               { key: "id", label: fr ? "ID produit" : "Product ID", render: (row) => <span className="font-mono text-xs">{String(row.id).slice(0, 8)}</span> },
               {
@@ -133,6 +131,7 @@ export default function AdminProductsPage() {
           />
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

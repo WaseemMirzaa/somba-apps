@@ -21,7 +21,7 @@ export default function WarehouseTransfersPage() {
   const base = useOpsBase();
   const { inventory } = useWarehouseData();
   const transfersQ = useOpsQuery<TransferRow[]>("warehouse:transfers", { initial: [] as TransferRow[], push: ["transfer:updated"] });
-  const hubsQ = useOpsQuery<{ id: string; name: string }[]>("warehouse:hubs", { initial: [] });
+  const hubsQ = useOpsQuery<{ id: string; name: string }[]>("warehouse:hubs", { initial: [], body: { activeOnly: true }, push: ["hub:updated"] });
   const [form, setForm] = useState({ fromHub: "", toHub: "", sku: "", productName: "", qty: "1" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

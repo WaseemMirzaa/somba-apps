@@ -230,6 +230,16 @@ export function canSeeFinance(role: string): boolean {
   return role === "admin" || role === "admin_finance";
 }
 
+/**
+ * Loading / error state of the live feed (orders, products, payments... arrive
+ * through the realtime provider). `error` is the connection error, if any.
+ */
+export function useFeedState(): { loading: boolean; error: string | null } {
+  const rt = useRealtime();
+  if (rt.status === "error") return { loading: false, error: rt.error ?? "Cannot reach the server." };
+  return { loading: rt.status !== "connected", error: null };
+}
+
 export function useRole(): string {
   const rt = useRealtime();
   return rt.user?.role ?? "guest";

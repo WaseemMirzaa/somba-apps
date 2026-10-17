@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -23,7 +23,7 @@ export default function AdminCmsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { items: blocks, reload, error: loadError } = useServerList<CmsServerRow>("cms:list", { pushEvents: ["cms:updated"] });
+  const { items: blocks, reload, error: loadError, loading } = useServerList<CmsServerRow>("cms:list", { pushEvents: ["cms:updated"] });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,8 @@ export default function AdminCmsPage() {
         actions={<Button size="sm" onClick={() => { setDraft({ ...EMPTY }); setError(null); }}>{fr ? "Nouveau bloc" : "New block"}</Button>}
       />
 
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={reload} />}
+      {loading && !loadError && <SectionLoading />}
 
       {draft && (
         <Card>

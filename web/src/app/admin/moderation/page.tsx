@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProductStatusActions } from "@/components/admin/status-actions";
+import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useAdminData } from "@/lib/admin";
 import { useLocale } from "@/context/locale-context";
 
@@ -21,7 +22,7 @@ const CATEGORY_FR: Record<string, string> = {
 export default function AdminModerationPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { moderationQueue } = useAdminData();
+  const { moderationQueue, loading, error } = useAdminData();
   // Live list: rows update from the `product:updated` push after each decision.
   const queue = moderationQueue;
   const pending = queue.filter((p) => p.status === "pending");
@@ -29,6 +30,10 @@ export default function AdminModerationPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={fr ? "Modération des produits" : "Product Moderation"} subtitle={fr ? `${pending.length} en attente d'examen` : `${pending.length} pending review`} breadcrumbs={[{ label: fr ? "Admin" : "Admin", href: "/admin" }, { label: fr ? "Modération" : "Moderation" }]} />
+
+      {error && <SectionError message={error} />}
+      {loading && !error && <SectionLoading />}
+      {!loading && !error && queue.length === 0 && <EmptyState>{fr ? "Aucun produit." : "No products."}</EmptyState>}
 
       <div className="space-y-4">
         {queue.map((p) => (

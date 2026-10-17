@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -21,7 +21,7 @@ export default function AdminCategoriesPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   // No push event exists for categories: the list is re-read after every write.
-  const { items: categories, reload, error: loadError } = useServerList<Category>("categories:list");
+  const { items: categories, reload, error: loadError, loading } = useServerList<Category>("categories:list");
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [open, setOpen] = useState(false);
@@ -98,7 +98,8 @@ export default function AdminCategoriesPage() {
         actions={<Button onClick={openAdd}>{fr ? "+ Ajouter une catégorie" : "+ Add category"}</Button>}
       />
 
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={reload} />}
+      {loading && !loadError && <SectionLoading />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {categories.length === 0 && !loadError && <p className="text-sm text-slate-400">{fr ? "Aucune catégorie." : "No categories yet."}</p>}

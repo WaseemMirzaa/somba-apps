@@ -131,7 +131,7 @@ export default function AdminDashboard() {
         }
         actions={
           <Link href="/admin/sellers" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
-            {t("approve")} sellers
+            {fr ? "Vendeurs à approuver" : "Sellers to approve"}
           </Link>
         }
       />
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
       {stats.loading && !s && !stats.error && <SectionLoading />}
 
       {s && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <StatCard title={fr ? "GMV, 30 derniers jours" : "GMV, last 30 days"} value={formatCurrency(s.gmvLast30, locale)} icon={DollarSign} trend={changeLabel} />
           <StatCard title={fr ? "Commandes, 30 derniers jours" : "Orders, last 30 days"} value={formatNumber(s.ordersLast30, locale)} icon={ShoppingCart} trend={`${formatNumber(s.ordersToday, locale)} ${fr ? "aujourd'hui" : "today"} · ${formatCurrency(s.gmvToday, locale)}`} />
           <StatCard title={fr ? "GMV, total" : "GMV, all time"} value={formatCurrency(s.gmv, locale)} icon={TrendingUp} trend={`${fr ? "Panier moyen" : "Avg. order"} ${formatCurrency(s.aov, locale)}`} />

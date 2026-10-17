@@ -167,10 +167,9 @@ export function useSocketQuery<T>(event: string, body?: Record<string, unknown>,
   const connected = rt.status === "connected";
 
   const load = useCallback(
-    async (silent = false) => {
+    async () => {
       if (!connected || !enabled) return;
       const id = ++seq.current;
-      if (!silent) setLoading(true);
       try {
         const res = await socketClient.request<T>(event, bodyRef.current);
         if (id !== seq.current) return;
@@ -199,11 +198,17 @@ export function useSocketQuery<T>(event: string, body?: Record<string, unknown>,
       first.current = false;
       return;
     }
-    void load(true);
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.refreshKey]);
 
-  return { data, loading, error, reload: () => load(), connected };
+  const reload = () => {
+    setLoading(true);
+    setError(null);
+    return load();
+  };
+
+  return { data, loading, error, reload, connected };
 }
 
 /** Short axis label for a `YYYY-MM-DD` bucket, e.g. "17 Oct". */
@@ -247,4 +252,29 @@ export function rankSellers(orders: Order[], products: Product[], sellers: Selle
   return sellers
     .map((sl) => ({ ...sl, revenue: acc.get(sl.id)?.revenue ?? 0, orderCount: acc.get(sl.id)?.orders.size ?? 0 }))
     .sort((a, b) => b.revenue - a.revenue);
+}
+
+export interface SellerAnalytics {
+  sellerId: string;
+  days: number;
+  from: string;
+  to: string;
+  revenue: number;
+  orders: number;
+  units: number;
+  aov: number;
+  revenueSeries: { date: string; revenue: number; orders: number; units: number }[];
+  topProducts: { productId: string; name: string; units: number; revenue: number }[];
+  customers: { total: number; repeat: number; repeatRatePct: number; windowActive: number; windowNew: number; windowReturning: number };
+  fulfilment: {
+    ordersPlaced: number;
+    avgHoursToReady: number | null;
+    avgHoursToDelivered: number | null;
+    cancelRatePct: number;
+    returnRatePct: number;
+    disputeRatePct: number;
+  };
+  reviews: { average: number | null; count: number; replied: number };
+  health: { score: number | null; grade: string | null; components: { key: string; score: number; weight: number; value: number }[] };
+  funnel: { views: number; orders: number; conversionPct: number | null };
 }

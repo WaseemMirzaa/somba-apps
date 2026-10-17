@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
 import { useLocale } from "@/context/locale-context";
@@ -32,7 +32,17 @@ export function validateHub(f: Form, fr: boolean): Errors {
 }
 
 /** Create (no `hub`) or edit a hub through warehouse:saveHub; server errors are shown in the form. */
-export function HubFormModal({
+export function HubFormModal(props: {
+  open: boolean;
+  hub: HubRow | null;
+  onClose: () => void;
+  onSaved: (hub: HubRow) => void;
+}) {
+  // Mounted only while open so every opening starts from the hub's current values.
+  return props.open ? <HubFormBody {...props} /> : null;
+}
+
+function HubFormBody({
   open,
   hub,
   onClose,
@@ -46,21 +56,12 @@ export function HubFormModal({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const [form, setForm] = useState<Form>(EMPTY);
+  const [form, setForm] = useState<Form>(
+    hub ? { name: hub.name, city: hub.city, country: hub.country ?? "", address: hub.address ?? "", capacity: String(hub.capacity) } : EMPTY,
+  );
   const [errors, setErrors] = useState<Errors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(
-      hub
-        ? { name: hub.name, city: hub.city, country: hub.country ?? "", address: hub.address ?? "", capacity: String(hub.capacity) }
-        : EMPTY,
-    );
-    setErrors({});
-    setServerError(null);
-  }, [open, hub]);
 
   async function submit() {
     const v = validateHub(form, fr);

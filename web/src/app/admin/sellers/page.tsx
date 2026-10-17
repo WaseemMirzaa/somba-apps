@@ -9,9 +9,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useAdminData } from "@/lib/admin";
+import { useRealtime } from "@/context/realtime-context";
+import { useServerList } from "@/lib/admin-live";
+import { rankSellers } from "@/lib/admin-stats";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
+import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency } from "@/lib/utils";
-import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { SellerStatusActions } from "@/components/admin/status-actions";
 
 const STATUS_OPTIONS = [
@@ -23,24 +27,21 @@ const STATUS_OPTIONS = [
 
 const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu", rejected: "Rejeté" };
 
-const CATEGORY_FR: Record<string, string> = {
-  Electronics: "Électronique",
-  Fashion: "Mode",
-  "Home & Living": "Maison & Décoration",
-  Beauty: "Beauté",
-  Grocery: "Épicerie",
-};
-
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { sellerEntities } = useAdminData();
+  const rt = useRealtime();
+  const sellers = useServerList<Seller & { plan?: string }>("sellers:list", { pushEvents: ["seller:updated"] });
+  const sellerEntities = useMemo(
+    () => rankSellers(rt.orders, rt.products, sellers.items).map((s) => ({ ...s, storeName: s.name, date: s.createdAt.slice(0, 10), orders: s.orderCount })),
+    [rt.orders, rt.products, sellers.items],
+  );
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
     () =>
       applyListFilters(sellerEntities, filters, {
-        searchFields: ["storeName", "owner", "email", "category", "id"],
+        searchFields: ["storeName", "id"],
         dateField: "date",
         statusField: "status",
       }),
@@ -51,7 +52,7 @@ export default function AdminSellersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("sellers")}
-        subtitle={fr ? "Vue liste — survol rapide uniquement. Infos complètes sur la page de détail." : "List View — quick scanning only. Full info on detail page."}
+        subtitle={fr ? "Boutiques enregistrées ; le détail est sur la page de chaque vendeur" : "Registered stores; full figures are on each seller's page"}
         breadcrumbs={[adminBreadcrumb(locale), { label: t("sellers") }]}
       />
 
@@ -59,12 +60,17 @@ export default function AdminSellersPage() {
         values={filters}
         onChange={setFilters}
         statusOptions={STATUS_OPTIONS}
-        searchPlaceholder={fr ? "Boutique, propriétaire, e-mail…" : "Store, owner, email…"}
+        searchPlaceholder={fr ? "Boutique, identifiant…" : "Store, id…"}
       />
 
+      {sellers.error && <SectionError message={sellers.error} onRetry={sellers.reload} />}
+      {sellers.loading && !sellers.error && <SectionLoading />}
+
+      {!sellers.loading && !sellers.error && (
       <Card>
         <CardContent className="p-0">
           <DataTable
+            emptyMessage={fr ? "Aucun vendeur" : "No sellers yet"}
             columns={[
               {
                 key: "storeName",
@@ -75,13 +81,8 @@ export default function AdminSellersPage() {
                   </Link>
                 ),
               },
-              { key: "owner", label: fr ? "Propriétaire" : "Owner" },
-              { key: "email", label: t("email") },
-              {
-                key: "category",
-                label: fr ? "Catégorie" : "Category",
-                render: (row) => categoryLabel(String(row.category), fr),
-              },
+              { key: "productCount", label: fr ? "Produits" : "Products" },
+              { key: "plan", label: fr ? "Formule" : "Plan", render: (row) => String(row.plan ?? "free") },
               {
                 key: "orders",
                 label: fr ? "Commandes" : "Orders",
@@ -119,6 +120,7 @@ export default function AdminSellersPage() {
           />
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useAdminData } from "@/lib/admin";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
@@ -29,21 +30,17 @@ const CATEGORY_FR: Record<string, string> = {
   Grocery: "Épicerie",
 };
 
-// moderationQueue lives in entities.ts (not owned) and has no descriptionFr — map locally.
-const DESCRIPTION_FR: Record<string, string> = {
-  "Latest flagship smartphone with advanced camera system.": "Dernier smartphone haut de gamme avec système photo avancé.",
-  "Premium noise-cancelling wireless earbuds.": "Écouteurs sans fil premium à réduction de bruit.",
-  "Elegant summer dresses in various colors.": "Robes d'été élégantes en plusieurs coloris.",
-};
 
 export default function AdminProductModerationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { getModerationProduct } = useAdminData();
+  const { getModerationProduct, loading, error } = useAdminData();
   // Live product: its status follows the server's `product:updated` push.
   const product = getModerationProduct(id);
 
+  if (error) return <SectionError message={error} />;
+  if (loading) return <SectionLoading className="min-h-[40vh]" />;
   if (!product) {
     return <div className="p-8 text-center text-slate-500">{fr ? "Produit introuvable" : "Product not found"}</div>;
   }
@@ -92,16 +89,14 @@ export default function AdminProductModerationDetailPage() {
           <DetailSection title={fr ? "Informations vendeur" : "Seller Information"}>
             <InfoGrid items={[
               { label: fr ? "Vendeur" : "Seller", value: product.sellerId ? <Link href={`/admin/sellers/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link> : product.seller },
-              { label: fr ? "Note de la boutique" : "Store Rating", value: product.sellerRating > 0 ? `⭐ ${product.sellerRating}` : (fr ? "Nouveau vendeur" : "New seller") },
             ]} />
           </DetailSection>
 
           <DetailSection title={fr ? "Informations produit" : "Product Information"}>
             <InfoGrid items={[
               { label: fr ? "Titre" : "Title", value: product.name, full: true },
-              { label: fr ? "Description" : "Description", value: fr ? (DESCRIPTION_FR[product.description] ?? product.description) : product.description, full: true },
+              { label: fr ? "Description" : "Description", value: product.description || "—", full: true },
               { label: fr ? "Catégorie" : "Category", value: fr ? (CATEGORY_FR[product.category] ?? product.category) : product.category },
-              { label: fr ? "Marque" : "Brand", value: product.brand },
             ]} />
           </DetailSection>
 

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { DataTable } from "@/components/ui/data-table";
 import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote } from "@/components/admin/modal";
 import { Send, Megaphone, Users } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
@@ -27,7 +28,7 @@ export default function AdminBroadcastsPage() {
   const { t, locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
-  const { items, setItems, error: loadError } = useServerList<BroadcastServerRow>("broadcasts:list", {
+  const { items, setItems, error: loadError, reload, loading } = useServerList<BroadcastServerRow>("broadcasts:list", {
     pushEvents: ["broadcast:created"],
   });
   const [audience, setAudience] = useState("customer");
@@ -84,7 +85,8 @@ export default function AdminBroadcastsPage() {
           ? "Canaux : push et notification dans l'appli uniquement (pas de SMS ni d'e-mail). L'envoi est immédiat, sans programmation."
           : "Channels: push and in-app notification only (no SMS or email). Sending is immediate; there is no scheduling."}
       </NoticeBar>
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={reload} />}
+      {loading && !loadError && <SectionLoading />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard title={fr ? "Diffusions envoyées" : "Broadcasts sent"} value={items.length} icon={Send} />

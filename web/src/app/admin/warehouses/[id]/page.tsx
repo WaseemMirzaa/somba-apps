@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Pencil, Power } from "lucide-react";
@@ -69,10 +69,6 @@ export default function AdminWarehouseDetailPage() {
     [transfers.data, hub],
   );
 
-  useEffect(() => {
-    setToggleError(null);
-  }, [toggleOpen]);
-
   async function toggleActive() {
     if (!hub) return;
     setBusy(true);
@@ -121,7 +117,7 @@ export default function AdminWarehouseDetailPage() {
                 <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)}>
                   <Pencil className="h-3.5 w-3.5" />{fr ? "Modifier" : "Edit"}
                 </Button>
-                <Button size="sm" variant={hub.active ? "danger" : "primary"} onClick={() => setToggleOpen(true)}>
+                <Button size="sm" variant={hub.active ? "danger" : "primary"} onClick={() => { setToggleError(null); setToggleOpen(true); }}>
                   <Power className="h-3.5 w-3.5" />{hub.active ? (fr ? "Désactiver" : "Deactivate") : fr ? "Activer" : "Activate"}
                 </Button>
               </>

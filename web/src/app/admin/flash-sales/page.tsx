@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/notice-bar";
+import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -37,7 +37,7 @@ export default function AdminFlashSalesPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const rt = useRealtime();
-  const { items: sales, reload, error: loadError } = useServerList<FlashSaleServerRow>("flashsales:list", {
+  const { items: sales, reload, error: loadError, loading } = useServerList<FlashSaleServerRow>("flashsales:list", {
     pushEvents: ["flashsale:updated"],
   });
   const liveProducts = useMemo(() => rt.products.filter((p) => p.status === "live"), [rt.products]);
@@ -97,7 +97,8 @@ export default function AdminFlashSalesPage() {
         actions={<Button size="sm" onClick={() => { setShowCreate((s) => !s); setError(null); }}>{fr ? "Créer une vente flash" : "Create flash sale"}</Button>}
       />
 
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={reload} />}
+      {loading && !loadError && <SectionLoading />}
 
       {showCreate && (
         <Card>

@@ -216,7 +216,10 @@ export interface HubRow {
   name: string;
   city: string;
   country: string | null;
+  address?: string | null;
   capacity: number;
+  /** Inactive hubs are listed but cannot take transfers. */
+  active?: boolean;
 }
 
 export interface ReconcileRow {
