@@ -1,11 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { FlashSale, Product, Seller } from '../database/entities';
+import { In, Not, Repository } from 'typeorm';
+import { Campaign, FlashSale, Product, ProductView, Seller } from '../database/entities';
 import type { ProductStatus } from '../database/entities';
 import { num, oneOf, optStr, price as priceOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { DEFAULT_LIMIT, MAX_LIMIT } from '../common/paging';
+import { bestPrice, campaignCovers, campaignRunning } from './pricing';
+import type { PriceSource } from './pricing';
+
+/**
+ * A listing as shoppers see (and are charged for) it: `price` is the effective
+ * unit price after the best running promotion, `basePrice` the stored one.
+ */
+export type PricedProduct = Product & {
+  basePrice: number;
+  priceSource: PriceSource;
+  /** Percent off from the winning seller campaign (0 when no campaign set the price). */
+  campaignPct: number;
+  campaignId: string | null;
+  campaignName: string | null;
+};
 
 const STATUSES = ['draft', 'pending', 'approved', 'rejected', 'live', 'removed'] as const;
 
@@ -63,6 +79,8 @@ export class ProductsService {
     @InjectRepository(Product) private readonly repo: Repository<Product>,
     @InjectRepository(FlashSale) private readonly flash: Repository<FlashSale>,
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
+    @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
+    @InjectRepository(ProductView) private readonly views: Repository<ProductView>,
     private readonly emitter: RealtimeEmitter,
   ) {
     // A seller sees their OWN listings change live (including pending / rejected ones).
@@ -74,57 +92,104 @@ export class ProductsService {
     });
   }
 
-  /**
-   * Show (and charge) the flash-sale price while a sale is running: the listing
-   * price becomes the flash price and the normal price is kept as the
-   * "was" price. Only the returned copy changes, never the stored row.
-   */
-  private async withFlash(products: Product[]): Promise<Product[]> {
-    if (!products.length) return products;
-    const sales = (await this.flash.find({ where: { active: true } })).filter((f) => {
-      const now = Date.now();
+  /** Flash sales running right now. */
+  private async runningFlash(): Promise<FlashSale[]> {
+    const now = Date.now();
+    return (await this.flash.find({ where: { active: true } })).filter((f) => {
       const from = f.startsAt ? Date.parse(f.startsAt) : NaN;
       const to = f.endsAt ? Date.parse(f.endsAt) : NaN;
       return !(Number.isFinite(from) && now < from) && !(Number.isFinite(to) && now > to);
     });
-    if (!sales.length) return products;
-    const best = new Map<string, number>();
-    for (const f of sales) best.set(f.productId, Math.min(best.get(f.productId) ?? Infinity, f.flashPrice));
+  }
+
+  /** Seller campaigns that are approved and inside their dates right now. */
+  private async runningCampaigns(): Promise<Campaign[]> {
+    const rows = await this.campaigns.find({ where: { status: In(['active', 'scheduled']) } });
+    return rows.filter((c) => campaignRunning(c));
+  }
+
+  /**
+   * Show (and charge) the effective price: the LOWEST of the listing price, a
+   * running flash-sale price and a running seller-campaign discount (they never
+   * stack; see products/pricing.ts). The normal price is kept as the "was"
+   * price. Only the returned copy changes, never the stored row.
+   */
+  private async withPricing(products: Product[]): Promise<PricedProduct[]> {
+    if (!products.length) return [];
+    const [sales, camps] = await Promise.all([this.runningFlash(), this.runningCampaigns()]);
+    const flashBy = new Map<string, number>();
+    for (const f of sales) flashBy.set(f.productId, Math.min(flashBy.get(f.productId) ?? Infinity, f.flashPrice));
     return products.map((p) => {
-      const fp = best.get(p.id);
-      if (fp === undefined || !(fp > 0) || fp >= p.price) return p;
+      let camp: Campaign | undefined;
+      for (const c of camps) {
+        if (campaignCovers(c, p) && (!camp || c.discount > camp.discount)) camp = c;
+      }
+      const best = bestPrice(p.price, flashBy.get(p.id), camp?.discount);
+      const extras = {
+        basePrice: p.price,
+        priceSource: best.source,
+        campaignPct: best.campaignPct,
+        campaignId: best.source === 'campaign' ? (camp?.id ?? null) : null,
+        campaignName: best.source === 'campaign' ? (camp?.name ?? null) : null,
+      };
+      if (best.source === 'base') return Object.assign(Object.create(Object.getPrototypeOf(p)), p, extras) as PricedProduct;
       const was = Math.max(p.originalPrice ?? 0, p.price);
-      return Object.assign(Object.create(Object.getPrototypeOf(p)), p, {
-        price: fp,
+      return Object.assign(Object.create(Object.getPrototypeOf(p)), p, extras, {
+        price: best.price,
         originalPrice: was,
-        discount: Math.min(90, Math.round(((was - fp) / was) * 100)),
-      }) as Product;
+        discount: Math.min(90, Math.round(((was - best.price) / was) * 100)),
+      }) as PricedProduct;
     });
   }
 
-  /** The stored row, without flash pricing — use this whenever the row will be saved back. */
+  /** The stored row, without promotional pricing — use this whenever the row will be saved back. */
   getRaw(id: string): Promise<Product | null> {
     return this.repo.findOne({ where: { id } });
   }
 
-  async list(filter?: { category?: string; status?: string }): Promise<Product[]> {
-    const where: Record<string, string> = {};
-    if (filter?.category) where.category = filter.category;
-    if (filter?.status) where.status = filter.status;
+  /**
+   * Catalogue page. `status` filters exactly; without it soft-removed listings
+   * are left out. `liveOnly` (shoppers) pushes "live" into the query; `ownerIds`
+   * (a seller) additionally lets them see their own non-live listings.
+   * `limit`/`offset` page the result (default {@link DEFAULT_LIMIT}).
+   */
+  async list(filter?: {
+    category?: string;
+    status?: string;
+    liveOnly?: boolean;
+    ownerIds?: string[];
+    limit?: number;
+    offset?: number;
+  }): Promise<PricedProduct[]> {
+    const base: Record<string, unknown> = {};
+    if (filter?.category) base.category = filter.category;
+    let where: Record<string, unknown> | Record<string, unknown>[];
+    if (filter?.liveOnly) {
+      where = filter.ownerIds?.length
+        ? [
+            { ...base, status: 'live' },
+            { ...base, sellerId: In(filter.ownerIds), status: Not('removed') },
+          ]
+        : { ...base, status: 'live' };
+    } else {
+      where = { ...base, status: filter?.status ? filter.status : Not('removed') };
+    }
     const rows = await this.repo.find({
-      where: Object.keys(where).length ? where : undefined,
-      order: { createdAt: 'DESC' },
+      where: where as never,
+      order: { createdAt: 'DESC', id: 'ASC' },
+      take: Math.min(Math.max(1, filter?.limit ?? DEFAULT_LIMIT), MAX_LIMIT),
+      skip: filter?.offset ?? 0,
     });
-    // Soft-removed listings never appear unless explicitly requested.
-    return this.withFlash(filter?.status ? rows : rows.filter((p) => p.status !== 'removed'));
+    return this.withPricing(rows);
   }
 
   /** A live listing by exact (case-insensitive) name — used to re-price snapshot order lines. */
-  async findLiveByName(name: string): Promise<Product | null> {
-    const rows = await this.repo.find({ where: { status: 'live' } });
-    const n = name.trim().toLowerCase();
-    const hit = rows.find((p) => p.name.trim().toLowerCase() === n);
-    return hit ? (await this.withFlash([hit]))[0] : null;
+  async findLiveByName(name: string): Promise<PricedProduct | null> {
+    const hit = await this.repo
+      .createQueryBuilder('p')
+      .where("p.status = 'live' AND LOWER(TRIM(p.name)) = :n", { n: name.trim().toLowerCase() })
+      .getOne();
+    return hit ? (await this.withPricing([hit]))[0] : null;
   }
 
   /** Ids of every product a seller owns (for scoping their order view). */
@@ -132,9 +197,59 @@ export class ProductsService {
     return (await this.repo.find({ where: { sellerId }, select: { id: true } })).map((p) => p.id);
   }
 
-  async get(id: string): Promise<Product | null> {
+  async get(id: string): Promise<PricedProduct | null> {
     const p = await this.repo.findOne({ where: { id } });
-    return p ? (await this.withFlash([p]))[0] : null;
+    return p ? (await this.withPricing([p]))[0] : null;
+  }
+
+  /**
+   * Count one product-detail view (shoppers only). One row per product per UTC
+   * day, incremented atomically; the very first view of a day inserts the row
+   * (a concurrent insert loses on the unique index and simply increments).
+   */
+  async recordView(productId: string): Promise<void> {
+    const viewDate = new Date().toISOString().slice(0, 10);
+    const bump = () =>
+      this.views
+        .createQueryBuilder()
+        .update(ProductView)
+        .set({ views: () => 'views + 1' })
+        .where('productId = :productId AND viewDate = :viewDate', { productId, viewDate })
+        .execute();
+    if ((await bump()).affected) return;
+    try {
+      await this.views.insert({ productId, viewDate, views: 1 });
+    } catch {
+      await bump();
+    }
+  }
+
+  /** A campaign got an order: bump its engagement counters. */
+  async recordCampaignSale(campaignId: string, revenueUsd: number): Promise<void> {
+    await this.campaigns
+      .createQueryBuilder()
+      .update(Campaign)
+      .set({ orders: () => 'orders + 1', revenueUsd: () => `revenueUsd + ${Number(revenueUsd.toFixed(2))}` })
+      .where('id = :campaignId', { campaignId })
+      .execute();
+  }
+
+  /**
+   * A campaign was approved / changed: tell shoppers' screens about the new
+   * effective prices of the products it covers (capped, so a store-wide
+   * campaign on a huge catalogue does not flood the sockets).
+   */
+  async broadcastCampaignPrices(campaign: Campaign, cap = 100): Promise<void> {
+    const where = campaign.productIds?.length
+      ? { id: In(campaign.productIds.slice(0, cap)) }
+      : campaign.sellerId
+        ? { sellerId: campaign.sellerId, status: 'live' as const }
+        : null;
+    if (!where) return;
+    const rows = await this.repo.find({ where, take: cap });
+    for (const p of await this.withPricing(rows)) {
+      this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'product:updated', p);
+    }
   }
 
   async create(data: Partial<Product>): Promise<Product> {

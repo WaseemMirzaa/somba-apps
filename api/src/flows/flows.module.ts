@@ -4,10 +4,12 @@ import {
   Campaign,
   Exchange,
   Order,
+  Product,
   Replacement,
   Seller,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProductsModule } from '../products/products.module';
 import { CampaignsService } from './campaigns.service';
 import { ReplacementsService } from './replacements.service';
 import { ExchangesService } from './exchanges.service';
@@ -18,8 +20,9 @@ import { ExchangesService } from './exchanges.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Campaign, Replacement, Exchange, Order, Seller]),
+    TypeOrmModule.forFeature([Campaign, Replacement, Exchange, Order, Seller, Product]),
     NotificationsModule,
+    ProductsModule,
   ],
   providers: [CampaignsService, ReplacementsService, ExchangesService],
   exports: [CampaignsService, ReplacementsService, ExchangesService],

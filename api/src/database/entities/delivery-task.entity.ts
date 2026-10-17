@@ -16,6 +16,7 @@ export type DeliveryStatus =
   | 'delivered'
   | 'failed';
 
+@Index('IDX_delivery_tasks_status', ['status'])
 @Entity('delivery_tasks')
 export class DeliveryTask {
   @PrimaryGeneratedColumn('uuid')
@@ -76,6 +77,14 @@ export class DeliveryTask {
   /** The hub scanned the parcel in. */
   @Column({ type: 'datetime', nullable: true })
   receivedAt: Date | null;
+
+  /** The rider collected the parcel (status picked_up). */
+  @Column({ type: 'datetime', nullable: true })
+  pickedUpAt: Date | null;
+
+  /** The parcel was handed over to the customer (status delivered). */
+  @Column({ type: 'datetime', nullable: true })
+  deliveredAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

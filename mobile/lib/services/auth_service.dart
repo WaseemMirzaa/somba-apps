@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 import 'models.dart';
 
@@ -23,13 +24,25 @@ class AuthResult {
       );
 }
 
-/// A human-readable failure from the API (already safe to show to the user).
+/// A failure from the API, safe to show to the user. [message] is what the
+/// server (or the client) said in English; printing the exception gives the
+/// text in the user's language (see Strings.serverError).
 class ApiException implements Exception {
   final String message;
   final int? status;
-  ApiException(this.message, [this.status]);
+  final String? localKey;
+  final Map<String, Object?>? args;
+  ApiException(this.message, [this.status])
+      : localKey = null,
+        args = null;
+
+  /// A client-side failure (offline, timeout…): the text comes from the strings layer.
+  ApiException.local(String key, {this.status, this.args})
+      : localKey = key,
+        message = const Strings('en').t(key, args);
+
   @override
-  String toString() => message;
+  String toString() => localKey != null ? Strings.current.t(localKey!, args) : Strings.current.serverError(message);
 }
 
 /// REST is used ONLY for one-shot calls that happen before a socket exists
@@ -57,9 +70,9 @@ class AuthService {
           )
           .timeout(const Duration(seconds: 15));
     } on TimeoutException {
-      throw ApiException('The server took too long to respond. Check your connection and try again.');
+      throw ApiException.local('err_timeout');
     } on http.ClientException {
-      throw ApiException("Can't reach the server. Check your internet connection.");
+      throw ApiException.local('err_offline');
     }
     Map<String, dynamic> json = <String, dynamic>{};
     if (res.body.isNotEmpty) {
@@ -72,10 +85,12 @@ class AuthService {
       // Nest returns `message` as a string, or a list for validation errors.
       final m = json['message'];
       final text = m is List ? m.join('\n') : m?.toString();
-      throw ApiException(
-        text ?? (res.statusCode == 429 ? 'Too many attempts. Please wait a minute.' : 'Request failed (${res.statusCode}).'),
-        res.statusCode,
-      );
+      if (text == null) {
+        throw res.statusCode == 429
+            ? ApiException.local('err_rate_limit', status: 429)
+            : ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode});
+      }
+      throw ApiException(text, res.statusCode);
     }
     return json;
   }

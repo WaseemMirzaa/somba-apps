@@ -16,4 +16,11 @@ export class Hub {
 
   @Column({ type: 'int', default: 500 })
   capacity: number;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  address: string | null;
+
+  /** Inactive hubs stay in the directory but cannot take new transfers. */
+  @Column({ type: 'boolean', default: true })
+  active: boolean;
 }

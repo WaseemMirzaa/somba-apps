@@ -10,6 +10,8 @@ import {
   Seller,
 } from '../database/entities';
 import { ProductsService } from '../products/products.service';
+import type { PricedProduct } from '../products/products.service';
+import { pageOf } from '../common/paging';
 import {
   ADMIN_ROLES,
   NotificationsService,
@@ -103,6 +105,9 @@ export class OrdersService {
     const items: OrderItem[] = [];
     const stockToReserve: { productId: string; qty: number; name: string }[] = [];
     let subtotal = 0;
+    // Seller-campaign discount actually applied on the lines (flash + campaign never stack).
+    let campaignDiscount = 0;
+    const campaignSales = new Map<string, number>();
     for (const line of input.items) {
       const rawQty = Number(line.qty ?? 1);
       if (!Number.isInteger(rawQty) || rawQty < 1 || rawQty > MAX_QTY) {
@@ -121,6 +126,9 @@ export class OrdersService {
       let name: string;
       let price: number;
       let productId: string;
+      let listPrice: number | null = null;
+      let campaignId: string | null = null;
+      let campaignPct = 0;
       if (product) {
         if (product.stock < qty) {
           throw new BadRequestException(
@@ -130,8 +138,16 @@ export class OrdersService {
           );
         }
         name = product.name;
-        price = product.price;
+        price = product.price; // effective: the lowest of normal / flash / campaign price
         productId = product.id;
+        const priced = product as PricedProduct;
+        listPrice = priced.basePrice ?? product.price;
+        if (priced.priceSource === 'campaign' && priced.campaignId) {
+          campaignId = priced.campaignId;
+          campaignPct = priced.campaignPct;
+          campaignDiscount += (listPrice - price) * qty;
+          campaignSales.set(campaignId, (campaignSales.get(campaignId) ?? 0) + price * qty);
+        }
         stockToReserve.push({ productId: product.id, qty, name: product.name });
       } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
         const p = Number(line.priceUsd);
@@ -154,6 +170,9 @@ export class OrdersService {
       item.variant = line.variant ?? 'Default';
       item.qty = qty;
       item.priceUsd = price;
+      item.listPriceUsd = listPrice;
+      item.campaignId = campaignId;
+      item.campaignPct = campaignPct;
       items.push(item);
     }
 
@@ -209,6 +228,7 @@ export class OrdersService {
       deliveryFeeUsd: deliveryFee,
       discountUsd: discount,
       promoCode,
+      campaignDiscountUsd: Number(campaignDiscount.toFixed(2)),
       totalUsd: total,
       zoneId: input.zoneId ?? null,
       shippingAddress: input.shippingAddress ?? null,
@@ -238,6 +258,11 @@ export class OrdersService {
     if (payment.status === 'succeeded') {
       saved.status = 'confirmed';
       saved = await this.orders.save(saved);
+    }
+
+    // Campaign engagement counters (best effort: never fail an order over them).
+    for (const [campaignId, revenue] of campaignSales) {
+      void this.products.recordCampaignSale(campaignId, revenue).catch(() => undefined);
     }
 
     this.emitter.toUser(customer.id, 'order:created', saved);
@@ -587,30 +612,48 @@ export class OrdersService {
    * only the lines of THEIR products (no address, no customer id), everyone else
    * nothing.
    */
-  async list(user: { id: string; role: string }, sellerId?: string): Promise<unknown[]> {
+  async list(user: { id: string; role: string }, sellerId?: string, paging?: unknown): Promise<unknown[]> {
+    const { take, skip } = pageOf(paging);
     if (user.role === 'customer') {
-      return this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
+      return this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take, skip });
     }
     if (user.role === 'rider') {
-      return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' } });
+      return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' }, take, skip });
     }
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
-      return this.orders.find({ order: { createdAt: 'DESC' }, take: 200 });
+      // Staff queues have always been the newest 200; an explicit limit/offset pages further back.
+      const staff = pageOf(paging, { def: 200 });
+      return this.orders.find({ order: { createdAt: 'DESC' }, take: staff.take, skip: staff.skip });
     }
-    if (user.role === 'seller') return this.listForSeller(sellerId ?? user.id);
+    if (user.role === 'seller') return this.listForSeller(sellerId ?? user.id, { take: pageOf(paging, { def: 200 }).take, skip });
     return [];
   }
 
-  private async listForSeller(sellerId: string) {
+  private async listForSeller(sellerId: string, page: { take: number; skip: number }) {
     const ids = await this.products.idsBySeller(sellerId);
     if (!ids.length) return [];
     const mine = new Set(ids);
+    // Page over ORDERS first (joining lines would page over line rows), then load their lines.
+    const orderIds = (
+      await this.orders
+        .createQueryBuilder('o')
+        .select('o.id', 'id')
+        .addSelect('o.createdAt', 'createdAt')
+        .innerJoin('o.items', 'i')
+        .where('i.productId IN (:...ids)', { ids })
+        .groupBy('o.id')
+        .addGroupBy('o.createdAt')
+        .orderBy('o.createdAt', 'DESC')
+        .offset(page.skip)
+        .limit(page.take)
+        .getRawMany<{ id: string }>()
+    ).map((r) => r.id);
+    if (!orderIds.length) return [];
     const rows = await this.orders
       .createQueryBuilder('o')
       .innerJoinAndSelect('o.items', 'i')
-      .where('i.productId IN (:...ids)', { ids })
+      .where('o.id IN (:...orderIds)', { orderIds })
       .orderBy('o.createdAt', 'DESC')
-      .take(200)
       .getMany();
     return rows.map((o) => {
       const items = (o.items ?? []).filter((i) => mine.has(i.productId));

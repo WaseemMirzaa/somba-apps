@@ -6,6 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+export type ReviewStatus = 'visible' | 'hidden';
+
 @Entity('reviews')
 export class Review {
   @PrimaryGeneratedColumn('uuid')
@@ -30,6 +32,17 @@ export class Review {
   /** How many shoppers found this review helpful. */
   @Column({ type: 'int', default: 0 })
   helpful: number;
+
+  /** Moderation: hidden reviews are excluded from public lists and from the product rating. */
+  @Column({ type: 'varchar', length: 10, default: 'visible' })
+  status: ReviewStatus;
+
+  /** The seller's public answer to the review. */
+  @Column({ type: 'text', nullable: true })
+  sellerReply: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  sellerReplyAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

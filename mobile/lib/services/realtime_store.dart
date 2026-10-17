@@ -67,8 +67,8 @@ class RealtimeStore extends ChangeNotifier {
   bool hydrated = false;
 
   /// Called when the server ends the session (revoked, suspended, deleted).
-  /// Receives an optional friendly message to show on the sign-in screen.
-  void Function(String? message)? onSessionEnded;
+  /// Receives an optional strings key for a friendly message to show on the sign-in screen.
+  void Function(String? messageKey)? onSessionEnded;
 
   String? _access;
   String? _refresh;
@@ -177,7 +177,7 @@ class RealtimeStore extends ChangeNotifier {
     final token = _access;
     if (token != null && !_expiresWithin(token, const Duration(seconds: 45))) return token;
     final refresh = _refresh ?? await _auth.getRefresh();
-    if (refresh == null) throw ApiException('Signed out.', 401);
+    if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
     try {
       final r = await _auth.refresh(refresh);
       await _auth.saveTokens(r);
@@ -213,10 +213,10 @@ class RealtimeStore extends ChangeNotifier {
     } catch (_) {/* offline: keep retrying */}
   }
 
-  Future<void> _endSession({String? message}) async {
+  Future<void> _endSession({String? messageKey}) async {
     if (user == null) return;
     await logout();
-    onSessionEnded?.call(message);
+    onSessionEnded?.call(messageKey);
   }
 
   static bool _expiresWithin(String jwt, Duration d) {
@@ -430,7 +430,7 @@ class RealtimeStore extends ChangeNotifier {
       removeListener(check);
       final o = current();
       if (o != null) return o;
-      throw TimeoutException('Order did not settle');
+      throw ApiException.local('err_settle_timeout');
     });
   }
 
@@ -540,7 +540,7 @@ class RealtimeStore extends ChangeNotifier {
   Future<void> deleteAccount(String password) async {
     await _socket.request('me:delete', {'password': password});
     // Same path as a suspension: clears the session and returns the app to sign-in.
-    await _endSession(message: 'Your account was deleted');
+    await _endSession(messageKey: 'err_account_deleted');
   }
 
   Future<void> markRead(String id) async {

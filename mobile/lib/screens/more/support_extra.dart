@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
@@ -14,11 +15,12 @@ class AddressFormScreen extends StatefulWidget {
 }
 
 class _AddressFormScreenState extends State<AddressFormScreen> {
-  final _label = TextEditingController(text: 'Home');
+  final _label = TextEditingController();
   final _phone = TextEditingController();
   final _line1 = TextEditingController();
   final _commune = TextEditingController();
-  final _city = TextEditingController(text: 'Kinshasa');
+  final _city = TextEditingController();
+  bool _seeded = false;
   bool _default = false;
   bool _busy = false;
   String? _lineErr, _cityErr;
@@ -31,17 +33,29 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_seeded) {
+      _seeded = true;
+      final s = Strings.of(context);
+      _label.text = s.addrLabelDefault;
+      _city.text = s.addrCityHint;
+    }
+  }
+
   Future<void> _save() async {
+    final s = Strings.of(context);
     setState(() {
-      _lineErr = _line1.text.trim().isEmpty ? 'Enter the street address' : null;
-      _cityErr = _city.text.trim().isEmpty ? 'Enter the city' : null;
+      _lineErr = _line1.text.trim().isEmpty ? s.addrErrStreet : null;
+      _cityErr = _city.text.trim().isEmpty ? s.addrErrCity : null;
     });
     if (_lineErr != null || _cityErr != null) return;
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       await RealtimeStore.instance.addAddress({
-        'label': _label.text.trim().isEmpty ? 'Home' : _label.text.trim(),
+        'label': _label.text.trim().isEmpty ? s.addrLabelDefault : _label.text.trim(),
         'line1': _line1.text.trim(),
         if (_commune.text.trim().isNotEmpty) 'commune': _commune.text.trim(),
         'city': _city.text.trim(),
@@ -49,7 +63,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         if (_default) 'isDefault': true,
       });
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Address saved')));
+      messenger.showSnackBar(SnackBar(content: Text(s.addrSaved)));
       Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => _busy = false);
@@ -59,19 +73,20 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Add address'),
+      appBar: backAppBar(context, s.addrTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
-        AppField(label: 'Label', hint: 'Home, Work…', icon: Icons.bookmark_outline_rounded, controller: _label),
+        AppField(label: s.addrLabel, hint: s.addrLabelHint, icon: Icons.bookmark_outline_rounded, controller: _label),
         const SizedBox(height: 16),
-        AppField(label: 'Phone (for the rider)', hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone),
+        AppField(label: s.addrPhone, hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone),
         const SizedBox(height: 16),
-        AppField(label: 'Street address', hint: '12 Commerce Ave', icon: Icons.location_on_outlined, controller: _line1, error: _lineErr),
+        AppField(label: s.addrStreet, hint: s.addrStreetHint, icon: Icons.location_on_outlined, controller: _line1, error: _lineErr),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: AppField(label: 'Commune', hint: 'Gombe', controller: _commune)),
+          Expanded(child: AppField(label: s.addrCommune, hint: s.addrCommuneHint, controller: _commune)),
           const SizedBox(width: 12),
-          Expanded(child: AppField(label: 'City', hint: 'Kinshasa', controller: _city, error: _cityErr)),
+          Expanded(child: AppField(label: s.addrCity, hint: s.addrCityHint, controller: _city, error: _cityErr)),
         ]),
         const SizedBox(height: 16),
         CheckboxListTile(
@@ -79,13 +94,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           controlAffinity: ListTileControlAffinity.leading,
           value: _default,
           onChanged: (v) => setState(() => _default = v ?? false),
-          title: const Text('Set as default address', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+          title: Text(s.addrDefault, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
         ),
         const SizedBox(height: 12),
         FilledButton(
           key: const ValueKey('save-address'),
           onPressed: _busy ? null : _save,
-          child: Text(_busy ? '…' : 'Save address'),
+          child: Text(_busy ? '…' : s.addrSave),
         ),
       ]),
     );
@@ -123,7 +138,7 @@ class TicketView {
         'pending' => AppColors.primary,
         _ => AppColors.amber,
       };
-  String get label => switch (status) { 'pending' => 'In progress', 'resolved' => 'Resolved', 'closed' => 'Closed', _ => 'Open' };
+  String labelFor(Strings s) => switch (status) { 'pending' => s.ticketInprogress, 'resolved' => s.ticketResolved, 'closed' => s.ticketClosed, _ => s.ticketOpen };
 }
 
 class SupportListScreen extends StatefulWidget {
@@ -158,6 +173,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
       .toList();
 
   Future<void> _newTicket() async {
+    final s = Strings.of(context);
     final subject = TextEditingController();
     final message = TextEditingController();
     final created = await showModalBottomSheet<bool>(
@@ -166,11 +182,11 @@ class _SupportListScreenState extends State<SupportListScreen> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('New support ticket', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          Text(s.ticketNewTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 12),
-          TextField(key: const ValueKey('ticket-subject'), controller: subject, decoration: const InputDecoration(labelText: 'Subject')),
+          TextField(key: const ValueKey('ticket-subject'), controller: subject, decoration: InputDecoration(labelText: s.ticketSubject)),
           const SizedBox(height: 10),
-          TextField(key: const ValueKey('ticket-message'), controller: message, maxLines: 4, decoration: const InputDecoration(labelText: 'How can we help?')),
+          TextField(key: const ValueKey('ticket-message'), controller: message, maxLines: 4, decoration: InputDecoration(labelText: s.ticketHowHelp)),
           const SizedBox(height: 14),
           FilledButton(
             key: const ValueKey('ticket-submit'),
@@ -184,7 +200,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
                 messenger.showSnackBar(SnackBar(content: Text(e.toString())));
               }
             },
-            child: const Text('Send'),
+            child: Text(s.send),
           ),
         ]),
       ),
@@ -194,8 +210,9 @@ class _SupportListScreenState extends State<SupportListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Support'),
+      appBar: backAppBar(context, s.support),
       body: FutureBuilder<List<TicketView>>(
         future: _future,
         builder: (context, snap) {
@@ -203,7 +220,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
           if (snap.hasError) return Center(child: Text('${snap.error}', style: const TextStyle(color: AppColors.muted)));
           final tickets = snap.data ?? const <TicketView>[];
           return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-            if (tickets.isEmpty) const Panel(child: Text('No tickets yet. Need help? Open one below.', style: TextStyle(color: AppColors.muted))),
+            if (tickets.isEmpty) Panel(child: Text(s.ticketNone, style: const TextStyle(color: AppColors.muted))),
             ...tickets.map((t) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: GestureDetector(
@@ -224,12 +241,12 @@ class _SupportListScreenState extends State<SupportListScreen> {
                         Text(t.subject, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                         Text(t.reference, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       ])),
-                      Pill(t.label, color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
+                      Pill(t.labelFor(s), color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
                     ]),
                   ),
                 ))),
             const SizedBox(height: 4),
-            PrimaryButton('New ticket', icon: Icons.add_rounded, onPressed: _newTicket),
+            PrimaryButton(s.ticketNew, icon: Icons.add_rounded, onPressed: _newTicket),
           ]);
         },
       ),
@@ -242,20 +259,21 @@ class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key, this.locale = const Locale('en')});
   @override
   Widget build(BuildContext context) {
-    const faqs = [
-      ('How do I track my order?', 'Open Account → My Orders and tap the order. Its status updates live, and once a rider is on the way you can see the live position.'),
-      ('Which payment methods are accepted?', 'Airtel Money, Orange Money and Vodacom M-Pesa, or your Somba&Teka wallet. You approve mobile-money payments on your phone.'),
-      ('What are the delivery fees?', 'The fee depends on your delivery zone and is shown at checkout before you pay.'),
-      ('What if my payment is not approved?', 'The order is cancelled automatically and the items are released. Nothing is charged; you can simply try again.'),
-      ('How do I contact support?', 'Open Account → Support and create a ticket. Replies appear there and as notifications.'),
+    final s = Strings.of(context);
+    final faqs = [
+      (s.faqTrackQ, s.faqTrackA),
+      (s.faqPayQ, s.faqPayA),
+      (s.faqFeesQ, s.faqFeesA),
+      (s.faqFailedQ, s.faqFailedA),
+      (s.faqContactQ, s.faqContactA),
     ];
     return Scaffold(
-      appBar: backAppBar(context, 'Help & support'),
+      appBar: backAppBar(context, s.help),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        PrimaryButton('Contact support',
+        PrimaryButton(s.contactSupport,
             icon: Icons.support_agent_rounded,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
-        const SectionHeader('FAQs', padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
+        SectionHeader(s.faqs, padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(
             padding: EdgeInsets.zero,
             child: Column(children: [
@@ -277,7 +295,7 @@ class HelpScreen extends StatelessWidget {
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen())),
           style: TextButton.styleFrom(foregroundColor: AppColors.accentDark),
           icon: const Icon(Icons.delete_outline_rounded, size: 18),
-          label: const Text('Delete my account'),
+          label: Text(s.deleteMyAccount),
         ),
       ]),
     );
@@ -306,7 +324,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   Future<void> _delete() async {
     if (_pw.text.isEmpty) {
-      setState(() => _err = 'Enter your password to confirm');
+      setState(() => _err = Strings.of(context).delaccEnterPw);
       return;
     }
     setState(() {
@@ -330,32 +348,33 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Delete account'),
+      appBar: backAppBar(context, s.delaccTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-          child: const Column(children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.accentDark, size: 40),
-            SizedBox(height: 10),
-            Text('This action is permanent', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
-            SizedBox(height: 6),
-            Text('Your personal data, addresses and wishlist are erased and you are signed out everywhere. Past orders are kept for accounting without your details.',
-                textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
+          child: Column(children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.accentDark, size: 40),
+            const SizedBox(height: 10),
+            Text(s.delaccPermanent, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
+            const SizedBox(height: 6),
+            Text(s.delaccPermanentBody,
+                textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 13, height: 1.4)),
           ]),
         ),
         const SizedBox(height: 16),
-        const Panel(
+        Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Before you go', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-          SizedBox(height: 10),
-          _Bullet('Any wallet balance is forfeited — spend it first'),
-          _Bullet('Active orders should be completed or cancelled'),
-          _Bullet('You can create a new account anytime'),
+          Text(s.delaccBefore, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          const SizedBox(height: 10),
+          _Bullet(s.delaccB1),
+          _Bullet(s.delaccB2),
+          _Bullet(s.delaccB3),
         ])),
         const SizedBox(height: 16),
-        AppField(label: 'Confirm with your password', obscure: true, icon: Icons.lock_outline_rounded, controller: _pw, error: _err),
+        AppField(label: s.delaccConfirmPw, obscure: true, icon: Icons.lock_outline_rounded, controller: _pw, error: _err),
         const SizedBox(height: 20),
         SizedBox(
             width: double.infinity,
@@ -363,10 +382,10 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
               key: const ValueKey('delete-account'),
               style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
               onPressed: _busy ? null : _delete,
-              child: Text(_busy ? '…' : 'Permanently delete account'),
+              child: Text(_busy ? '…' : s.delaccBtn),
             )),
         const SizedBox(height: 10),
-        SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: const Text('Keep my account'))),
+        SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: Text(s.delaccKeep))),
       ]),
     );
   }
@@ -422,6 +441,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
       appBar: backAppBar(context, _t.reference),
       body: Column(children: [
@@ -431,7 +451,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
           child: Row(children: [
             Expanded(child: Text(_t.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-            Pill(_t.label, color: _t.color.withValues(alpha: 0.14), textColor: _t.color, fontSize: 10.5),
+            Pill(_t.labelFor(s), color: _t.color.withValues(alpha: 0.14), textColor: _t.color, fontSize: 10.5),
           ]),
         ),
         const Divider(height: 1),
@@ -474,7 +494,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                   controller: _ctrl,
                   onSubmitted: (_) => _send(),
                   decoration: InputDecoration(
-                    hintText: 'Reply…',
+                    hintText: s.ticketReplyHint,
                     filled: true,
                     fillColor: AppColors.surface,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

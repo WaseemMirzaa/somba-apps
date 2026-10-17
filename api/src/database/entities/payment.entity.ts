@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { encryptedColumn } from '../../common/crypto/field-crypto';
 
-export type PaymentPurpose = 'order' | 'topup';
+export type PaymentPurpose = 'order' | 'topup' | 'plan';
 
 export type PaymentStatus =
   | 'pending' // COD collected on delivery, or mobile money awaiting approval
@@ -16,6 +16,7 @@ export type PaymentStatus =
   | 'failed'
   | 'refunded';
 
+@Index('IDX_payments_status_created', ['status', 'createdAt'])
 @Entity('payments')
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
@@ -33,9 +34,13 @@ export class Payment {
   @Column({ type: 'varchar', nullable: true })
   orderReference: string | null;
 
-  /** What the money is for: an order, or a wallet top-up. */
+  /** What the money is for: an order, a wallet top-up, or a seller plan ('plan'). */
   @Column({ type: 'varchar', length: 10, default: 'order' })
   purpose: PaymentPurpose;
+
+  /** For purpose 'plan': the plan id being bought. */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  subject: string | null;
 
   /** The mobile-money aggregator's own transaction id (for reconciliation). */
   @Column({ type: 'varchar', length: 100, nullable: true })

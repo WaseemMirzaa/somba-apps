@@ -1,7 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Order, Product, ProductQuestion, Review } from '../database/entities';
+import { In } from 'typeorm';
+import { Order, Product, ProductQuestion, Review, Seller } from '../database/entities';
+import type { ReviewStatus } from '../database/entities';
+import { pageOf } from '../common/paging';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
@@ -13,14 +17,31 @@ export class ReviewsService {
     private readonly questions: Repository<ProductQuestion>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     private readonly emitter: RealtimeEmitter,
+    private readonly notifications: NotificationsService,
   ) {}
 
-  listForProduct(productId: string): Promise<Review[]> {
+  /** Public list: hidden (moderated) reviews are left out unless a moderator asks for them. */
+  listForProduct(productId: string, includeHidden = false): Promise<Review[]> {
     return this.reviews.find({
-      where: { productId },
+      where: includeHidden ? { productId } : { productId, status: 'visible' },
       order: { createdAt: 'DESC' },
+      take: 500,
     });
+  }
+
+  /** Moderation queue: reviews across the catalogue, newest first, with the product name. */
+  async listForModeration(filter: { status?: ReviewStatus; productId?: string }, paging?: unknown): Promise<Review[]> {
+    const { take, skip } = pageOf(paging, { def: 200 });
+    const where: Record<string, unknown> = {};
+    if (filter.status) where.status = filter.status;
+    if (filter.productId) where.productId = filter.productId;
+    const rows = await this.reviews.find({ where: where as never, order: { createdAt: 'DESC' }, take, skip });
+    const names = new Map(
+      (rows.length ? await this.products.find({ where: { id: In([...new Set(rows.map((r) => r.productId))]) }, select: { id: true, name: true } }) : []).map((p) => [p.id, p.name]),
+    );
+    return rows.map((r) => Object.assign(r, { productName: names.get(r.productId) ?? '' }));
   }
 
   /** Mark a review helpful (increments the counter). */
@@ -34,13 +55,19 @@ export class ReviewsService {
   }
 
   /** Every review across a seller's catalogue, newest first. */
-  async listForSeller(sellerId: string): Promise<Review[]> {
-    const owned = await this.products.find({ where: { sellerId } });
+  async listForSeller(sellerId: string | string[], paging?: unknown): Promise<Review[]> {
+    const { take, skip } = pageOf(paging);
+    const owned = await this.products.find({
+      where: { sellerId: In(Array.isArray(sellerId) ? sellerId : [sellerId]) },
+      select: { id: true, name: true },
+    });
     if (owned.length === 0) return [];
     const byId = new Map(owned.map((p) => [p.id, p.name]));
     const rows = await this.reviews.find({
-      where: owned.map((p) => ({ productId: p.id })),
+      where: { productId: In(owned.map((p) => p.id)), status: 'visible' },
       order: { createdAt: 'DESC' },
+      take,
+      skip,
     });
     // Attach the product name so the seller UI needn't re-join client-side.
     return rows.map((r) =>
@@ -87,16 +114,77 @@ export class ReviewsService {
     return review;
   }
 
-  /** Refresh the denormalised product rating + review count. */
-  private async recomputeRating(productId: string): Promise<void> {
-    const rows = await this.reviews.find({ where: { productId } });
+  /** Refresh the denormalised product rating + review count (visible reviews only). */
+  async recomputeRating(productId: string): Promise<void> {
+    const agg = await this.reviews
+      .createQueryBuilder('r')
+      .select('COUNT(*)', 'n')
+      .addSelect('COALESCE(AVG(r.rating), 0)', 'avg')
+      .where("r.productId = :productId AND r.status = 'visible'", { productId })
+      .getRawOne<{ n: string; avg: string }>();
     const product = await this.products.findOne({ where: { id: productId } });
-    if (!product || rows.length === 0) return;
-    const avg = rows.reduce((s, r) => s + r.rating, 0) / rows.length;
-    product.rating = Number(avg.toFixed(2));
-    product.reviewsCount = rows.length;
+    if (!product) return;
+    const n = Number(agg?.n ?? 0);
+    product.rating = n ? Number(Number(agg?.avg ?? 0).toFixed(2)) : 0;
+    product.reviewsCount = n;
     await this.products.save(product);
     this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'product:updated', product);
+  }
+
+  /** Moderators hide / restore a review. Hidden reviews drop out of public lists and the product rating. */
+  async setStatus(reviewId: string, status: ReviewStatus): Promise<Review> {
+    const review = await this.reviews.findOne({ where: { id: reviewId } });
+    if (!review) throw new NotFoundException('Review not found.');
+    if (review.status !== status) {
+      review.status = status;
+      await this.reviews.save(review);
+      await this.recomputeRating(review.productId);
+    }
+    // Shoppers only learn that it is gone (no content); staff get the full row.
+    this.emitter.toRoles(
+      ['customer', 'guest'],
+      'review:updated',
+      status === 'hidden' ? { id: review.id, productId: review.productId, status } : review,
+    );
+    this.emitter.toRoles(ADMIN_ROLES, 'review:updated', review);
+    return review;
+  }
+
+  /**
+   * The seller of the reviewed product (or an admin) answers publicly. A second
+   * reply replaces the first. The author is notified live.
+   */
+  async reply(actor: { id: string; role: string; name: string }, reviewId: string, rawText: unknown): Promise<Review> {
+    const text = String(rawText ?? '').trim();
+    if (text.length < 2 || text.length > 1000) throw new BadRequestException('Write a reply of 2 to 1000 characters.');
+    const review = await this.reviews.findOne({ where: { id: reviewId } });
+    if (!review) throw new NotFoundException('Review not found.');
+    const product = await this.products.findOne({ where: { id: review.productId } });
+    if (!actor.role.startsWith('admin')) {
+      const store = await this.sellers.findOne({ where: { userId: actor.id } });
+      const mine = !!product?.sellerId && (product.sellerId === store?.id || product.sellerId === actor.id);
+      // Same answer for "missing" and "not yours" so reviews of other stores cannot be probed.
+      if (actor.role !== 'seller' || !mine) throw new NotFoundException('Review not found.');
+    }
+    review.sellerReply = text;
+    review.sellerReplyAt = new Date();
+    const saved = await this.reviews.save(review);
+    if (saved.status === 'visible') this.emitter.toRoles(['customer', 'guest'], 'review:updated', saved);
+    this.emitter.toRoles(ADMIN_ROLES, 'review:updated', saved);
+    this.emitter.toUser(saved.userId, 'review:updated', saved);
+    if (product?.sellerId) {
+      const store = await this.sellers.findOne({ where: { id: product.sellerId } });
+      if (store?.userId) this.emitter.toUser(store.userId, 'review:updated', saved);
+    }
+    if (saved.userId !== 'seed') {
+      await this.notifications.toUser(saved.userId, {
+        title: 'The seller replied to your review',
+        body: `${product?.name ?? 'Your review'}: ${text.slice(0, 140)}`,
+        type: 'review',
+        entityId: saved.id,
+      });
+    }
+    return saved;
   }
 
   // ---- Q&A ----

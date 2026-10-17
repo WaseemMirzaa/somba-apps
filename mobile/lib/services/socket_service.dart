@@ -49,7 +49,7 @@ class SocketService {
   Future<dynamic> request(String event, [Map<String, dynamic>? body]) {
     final socket = _socket;
     if (socket == null) {
-      return Future.error(StateError('Socket not connected.'));
+      return Future.error(ApiException.local('err_no_connection'));
     }
     final completer = Completer<dynamic>();
     socket.emitWithAck(
@@ -58,7 +58,7 @@ class SocketService {
       ack: (dynamic res) {
         if (completer.isCompleted) return;
         if (res is Map && res['ok'] == false) {
-          completer.completeError(ApiException(res['error']?.toString() ?? 'Request failed.'));
+          completer.completeError(res['error'] == null ? ApiException.local('err_generic') : ApiException(res['error'].toString()));
         } else if (res is Map && res.containsKey('data')) {
           completer.complete(res['data']);
         } else {
@@ -68,7 +68,7 @@ class SocketService {
     );
     return completer.future.timeout(
       const Duration(seconds: 8),
-      onTimeout: () => throw ApiException('The server did not respond. Please try again.'),
+      onTimeout: () => throw ApiException.local('err_no_response'),
     );
   }
 

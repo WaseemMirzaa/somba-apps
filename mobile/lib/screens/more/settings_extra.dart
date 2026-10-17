@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/market_profiles.dart';
+import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -18,38 +19,39 @@ class CustomerSettingsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([RealtimeStore.instance, marketNotifier]),
       builder: (context, _) {
+        final s = Strings.of(context);
         final store = RealtimeStore.instance;
         bool pref(String k) => store.prefs[k] == true;
         return Scaffold(
-          appBar: backAppBar(context, 'Settings'),
+          appBar: backAppBar(context, s.settings),
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-            _group('Notifications', [
-              _toggle(Icons.notifications_active_rounded, 'Push notifications', 'Delivered in the app now; phone push needs the app build with Firebase', pref('push'), (v) => store.setPref('push', v)),
-              _toggle(Icons.mail_outline_rounded, 'Email', 'Receipts & news', pref('email'), (v) => store.setPref('email', v)),
-              _toggle(Icons.sms_outlined, 'SMS', 'Delivery alerts by text', pref('sms'), (v) => store.setPref('sms', v)),
+            _group(s.settingsNotifications, [
+              _toggle(Icons.notifications_active_rounded, s.settingsPush, s.settingsPushSub, pref('push'), (v) => store.setPref('push', v)),
+              _toggle(Icons.mail_outline_rounded, s.settingsEmail, s.settingsEmailSub, pref('email'), (v) => store.setPref('email', v)),
+              _toggle(Icons.sms_outlined, s.settingsSms, s.settingsSmsSub, pref('sms'), (v) => store.setPref('sms', v)),
             ]),
             const SizedBox(height: 14),
-            _group('Prices shown in', [
-              _market(context, MarketProfileId.drc, Icons.paid_rounded),
-              _market(context, MarketProfileId.france, Icons.attach_money_rounded),
+            _group(s.settingsPricesIn, [
+              _market(context, s, MarketProfileId.drc, Icons.paid_rounded),
+              _market(context, s, MarketProfileId.france, Icons.attach_money_rounded),
             ]),
             const SizedBox(height: 14),
-            _group('Privacy', [
-              _toggle(Icons.auto_awesome_rounded, 'Personalized recommendations', 'Use my activity to improve results', pref('personalize'), (v) => store.setPref('personalize', v)),
+            _group(s.settingsPrivacy, [
+              _toggle(Icons.auto_awesome_rounded, s.settingsPersonalize, s.settingsPersonalizeSub, pref('personalize'), (v) => store.setPref('personalize', v)),
             ]),
             const SizedBox(height: 14),
-            _group('Account', [
+            _group(s.account, [
               if (store.user != null && !store.user!.phoneVerified && (store.user!.phone ?? '').isNotEmpty)
-                _nav(Icons.sms_outlined, 'Verify phone', () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: store.user!.phone)))),
+                _nav(Icons.sms_outlined, s.settingsVerifyPhone, () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: store.user!.phone)))),
               if (store.user != null && !store.user!.emailVerified)
-                _nav(Icons.mark_email_unread_outlined, 'Verify email', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen()))),
-              _nav(Icons.lock_reset_rounded, 'Change password', () => _changePassword(context)),
-              _nav(Icons.info_outline_rounded, 'About Somba&Teka', () => showAboutDialog(
+                _nav(Icons.mark_email_unread_outlined, s.settingsVerifyEmail, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen()))),
+              _nav(Icons.lock_reset_rounded, s.settingsChangePw, () => _changePassword(context)),
+              _nav(Icons.info_outline_rounded, s.settingsAbout, () => showAboutDialog(
                     context: context,
                     applicationName: 'Somba&Teka',
                     applicationLegalese: '© 2026 Somba&Teka',
                   )),
-              _nav(Icons.delete_outline_rounded, 'Delete account',
+              _nav(Icons.delete_outline_rounded, s.delaccTitle,
                   () => Navigator.push(context, MaterialPageRoute(builder: (_) => AccountDeleteScreen(onDeleted: onAccountDeleted)))),
             ]),
           ]),
@@ -59,6 +61,7 @@ class CustomerSettingsScreen extends StatelessWidget {
   }
 
   Future<void> _changePassword(BuildContext context) async {
+    final s = Strings.of(context);
     final cur = TextEditingController();
     final next = TextEditingController();
     String? err;
@@ -67,18 +70,18 @@ class CustomerSettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Change password'),
+          title: Text(s.settingsChangePw),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(key: const ValueKey('pw-current'), controller: cur, obscureText: true, decoration: const InputDecoration(labelText: 'Current password')),
+            TextField(key: const ValueKey('pw-current'), controller: cur, obscureText: true, decoration: InputDecoration(labelText: s.pwCurrent)),
             const SizedBox(height: 10),
             TextField(
                 key: const ValueKey('pw-new'),
                 controller: next,
                 obscureText: true,
-                decoration: InputDecoration(labelText: 'New password (8+ characters)', errorText: err)),
+                decoration: InputDecoration(labelText: s.pwNew, errorText: err)),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
             FilledButton(
               key: const ValueKey('pw-save'),
               onPressed: busy
@@ -93,7 +96,7 @@ class CustomerSettingsScreen extends StatelessWidget {
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed. Other devices were signed out.')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.pwChanged)));
                         }
                       } catch (e) {
                         setState(() {
@@ -102,7 +105,7 @@ class CustomerSettingsScreen extends StatelessWidget {
                         });
                       }
                     },
-              child: const Text('Save'),
+              child: Text(s.save),
             ),
           ],
         ),
@@ -133,12 +136,12 @@ class CustomerSettingsScreen extends StatelessWidget {
         onTap: onTap,
       );
 
-  Widget _market(BuildContext context, MarketProfileId id, IconData icon) {
+  Widget _market(BuildContext context, Strings s, MarketProfileId id, IconData icon) {
     final sel = marketNotifier.value == id;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       leading: _icon(icon),
-      title: Text(marketProfiles[id]!.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      title: Text(s.t('market_${id.name}'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
       trailing: Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: sel ? AppColors.primary : AppColors.faint),
       onTap: () {
         marketNotifier.value = id;
@@ -185,7 +188,7 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
     try {
       await RealtimeStore.instance.updateProfile(name: _name.text.trim(), phone: _phone.text.trim());
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Profile updated')));
+      messenger.showSnackBar(SnackBar(content: Text(Strings.of(context).profileUpdated)));
       Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -199,10 +202,11 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     final u = RealtimeStore.instance.user;
     final initials = (u?.name ?? '?').trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0]).join().toUpperCase();
     return Scaffold(
-      appBar: backAppBar(context, 'Edit profile'),
+      appBar: backAppBar(context, s.editProfile),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
         Center(
           child: Container(
@@ -212,9 +216,9 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        AppField(label: 'Full name', hint: 'Your name', icon: Icons.person_outline_rounded, controller: _name),
+        AppField(label: s.fullName, hint: s.yourName, icon: Icons.person_outline_rounded, controller: _name),
         const SizedBox(height: 16),
-        AppField(label: 'Phone', hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone, error: _err),
+        AppField(label: s.phone, hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone, error: _err),
         if (u != null && !u.phoneVerified && (u.phone ?? '').isNotEmpty)
           Align(
             alignment: Alignment.centerLeft,
@@ -222,13 +226,13 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
               key: const ValueKey('verify-phone'),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: u.phone))),
               icon: const Icon(Icons.sms_outlined, size: 18),
-              label: const Text('Verify this phone number'),
+              label: Text(s.verifyThisPhone),
             ),
           ),
         const SizedBox(height: 16),
-        AppField(label: 'Email (your login)', icon: Icons.mail_outline_rounded, initial: u?.email ?? ''),
+        AppField(label: s.emailLogin, icon: Icons.mail_outline_rounded, initial: u?.email ?? ''),
         const SizedBox(height: 24),
-        PrimaryButton(_busy ? '…' : 'Save changes', icon: Icons.check_rounded, onPressed: _busy ? null : _save),
+        PrimaryButton(_busy ? '…' : s.saveChanges, icon: Icons.check_rounded, onPressed: _busy ? null : _save),
       ]),
     );
   }

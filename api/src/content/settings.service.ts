@@ -5,11 +5,12 @@ import { Setting } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { num, oneOf, str } from '../common/validate';
+import { validatePlans } from './plans';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'requireDeliveryCode'] as const;
+export const PUBLIC_SETTINGS = ['fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'requireDeliveryCode', 'requireVerifiedForCheckout'] as const;
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryZones', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode'] as const;
+const WRITABLE = ['fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryZones', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans'] as const;
 
 /**
  * Key/value platform config: FX rate, COD cap, delivery zones (JSON),
@@ -51,6 +52,7 @@ export class SettingsService {
       case 'codEnabled':
         return oneOf(String(value), ['true', 'false'] as const, 'COD flag');
       case 'requireDeliveryCode':
+      case 'requireVerifiedForCheckout':
       case 'productModeration':
         return oneOf(String(value), ['true', 'false'] as const, 'Moderation flag');
       case 'minPayoutUsd':
@@ -59,6 +61,8 @@ export class SettingsService {
         return String(num(value, 'Clearance hours', { min: 0, max: 720, int: true }));
       case 'hubAddress':
         return str(value, 'Hub address', { max: 200 });
+      case 'sellerPlans':
+        return JSON.stringify(validatePlans(value));
       case 'deliveryZones': {
         let zones: unknown;
         try {

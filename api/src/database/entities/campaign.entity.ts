@@ -46,6 +46,28 @@ export class Campaign {
   @Column({ type: 'int', default: 0 })
   discount: number;
 
+  /**
+   * Ids of the products the discount applies to. Empty = every product of the
+   * campaign's seller store. Stored as JSON text, exposed as string[].
+   */
+  @Column({
+    type: 'text',
+    nullable: true,
+    transformer: {
+      to: (v: string[] | null | undefined) => (v == null ? null : JSON.stringify(v)),
+      from: (v: string | null) => {
+        if (!v) return [] as string[];
+        try {
+          const a: unknown = JSON.parse(v);
+          return Array.isArray(a) ? a.map(String) : [];
+        } catch {
+          return [];
+        }
+      },
+    },
+  })
+  productIds: string[] | null;
+
   /** Number of products included in the campaign. */
   @Column({ type: 'int', default: 0 })
   productCount: number;

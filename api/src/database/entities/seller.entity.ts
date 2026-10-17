@@ -36,6 +36,14 @@ export class Seller {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   pickupAddress: string | null;
 
+  /** Subscription plan id (see the `sellerPlans` setting). 'free' = no paid plan. */
+  @Column({ type: 'varchar', length: 30, default: 'free' })
+  plan: string;
+
+  /** When the paid plan lapses (null for free / never subscribed). */
+  @Column({ type: 'datetime', nullable: true })
+  planExpiresAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

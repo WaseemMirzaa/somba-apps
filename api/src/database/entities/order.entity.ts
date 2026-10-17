@@ -28,6 +28,8 @@ export type PaymentMethod =
   | 'vodacom_mpesa'
   | 'wallet';
 
+@Index('IDX_orders_status_created', ['status', 'createdAt'])
+@Index('IDX_orders_created', ['createdAt'])
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid')
@@ -64,6 +66,13 @@ export class Order {
 
   @Column({ type: 'varchar', length: 40, nullable: true })
   promoCode: string | null;
+
+  /**
+   * Part of the line prices that is a seller-campaign discount (already deducted
+   * from the item prices and the subtotal). Per-line detail is on the items.
+   */
+  @Column({ type: 'float', default: 0 })
+  campaignDiscountUsd: number;
 
   @Column({ type: 'float', default: 0 })
   totalUsd: number;

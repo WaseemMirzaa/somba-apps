@@ -19,6 +19,8 @@ export type { DisputeType, DisputeStatus } from './dispute.entity';
 export { Category } from './category.entity';
 export { Address } from './address.entity';
 export { Review } from './review.entity';
+export type { ReviewStatus } from './review.entity';
+export { ProductView } from './product-view.entity';
 export { ProductQuestion } from './product-question.entity';
 export { SupportTicket } from './support-ticket.entity';
 export type { TicketStatus } from './support-ticket.entity';
@@ -65,6 +67,7 @@ import { Dispute } from './dispute.entity';
 import { Category } from './category.entity';
 import { Address } from './address.entity';
 import { Review } from './review.entity';
+import { ProductView } from './product-view.entity';
 import { ProductQuestion } from './product-question.entity';
 import { SupportTicket } from './support-ticket.entity';
 import { Promo } from './promo.entity';
@@ -119,4 +122,5 @@ export const ENTITIES = [
   WishlistItem,
   DeviceToken,
   VerificationToken,
+  ProductView,
 ];

@@ -1,106 +1,121 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'messages.dart';
+import 'server_errors.dart';
+
+export 'strings_keys.dart';
+
+/// UI texts in English and French. Every text lives in `messages.dart`
+/// (key -> (English, French)); the typed accessors in `strings_keys.dart`
+/// (`s.cartEmpty`, `s.itemOne(3)`) are what the screens call.
+///
+/// A screen gets its strings with `Strings.of(context)`, which also makes it
+/// rebuild when the language changes. Code without a [BuildContext] (stores,
+/// formatters) uses [Strings.current].
 class Strings {
   final String lang;
-  Strings(this.lang);
+  const Strings(String code) : lang = code == 'fr' ? 'fr' : 'en';
+
+  static const supportedLanguages = ['fr', 'en'];
+  static const _prefKey = 'somba.lang';
+
+  /// Language of the running app. French is the primary language of the market.
+  static Strings current = const Strings('fr');
+
+  /// Fires when the language changes (the root widget rebuilds on it).
+  static final ValueNotifier<String> langNotifier = ValueNotifier('fr');
+
+  static Strings of(BuildContext context) => Strings(Localizations.localeOf(context).languageCode);
+
+  /// Switches the app language and remembers it on this device.
+  static Future<void> setLang(String code, {bool persist = true}) async {
+    final next = code == 'en' ? 'en' : 'fr';
+    current = Strings(next);
+    langNotifier.value = next;
+    if (!persist) return;
+    try {
+      (await SharedPreferences.getInstance()).setString(_prefKey, next);
+    } catch (_) {/* storage unavailable: the choice just won't survive a restart */}
+  }
+
+  /// Restores the language saved on this device (French when none).
+  static Future<void> restore() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getString(_prefKey);
+      if (saved == 'en' || saved == 'fr') await setLang(saved!, persist: false);
+    } catch (_) {}
+  }
+
   bool get isFr => lang == 'fr';
-
+  Locale get locale => Locale(lang);
   String get brand => 'Somba&Teka';
-  String get home => isFr ? 'Accueil' : 'Home';
-  String get categories => isFr ? 'Catégories' : 'Categories';
-  String get deals => isFr ? 'Offres' : 'Deals';
-  String get account => isFr ? 'Compte' : 'Account';
-  String get search => isFr ? 'Rechercher...' : 'Search products...';
-  String get flashSale => isFr ? 'Vente flash' : 'Flash Sale';
-  String get trending => isFr ? 'Tendances' : 'Trending';
-  String get shopNow => isFr ? 'Acheter' : 'Shop Now';
-  String get prototype => isFr ? 'Mode prototype' : 'Prototype Mode';
-  String get orders => isFr ? 'Commandes' : 'Orders';
-  String get wishlist => isFr ? 'Favoris' : 'Wishlist';
-  String get wallet => isFr ? 'Portefeuille' : 'Wallet';
-  String get settings => isFr ? 'Paramètres' : 'Settings';
-  String get language => isFr ? 'Langue' : 'Language';
-  String get addToCart => isFr ? 'Ajouter' : 'Add to Cart';
-  String get buyNow => isFr ? 'Acheter' : 'Buy Now';
-  String get endsIn => isFr ? 'Se termine dans' : 'Ends in';
 
-  String get seeAll => isFr ? 'Tout voir' : 'See all';
-  String get recentlyViewed => isFr ? 'Vu récemment' : 'Recently Viewed';
-  String get recommended => isFr ? 'Recommandé pour vous' : 'Recommended for you';
-  String get freeDelivery => isFr ? 'Livraison gratuite' : 'Free delivery';
-  String get heroTitle => isFr ? 'Votre marché,\nréinventé' : 'Your marketplace,\nreimagined';
-  String get heroSubtitle => isFr ? 'Des milliers de produits livrés à votre porte.' : 'Thousands of products, delivered to your door.';
-  String get deliverTo => isFr ? 'Livrer à' : 'Deliver to';
-  String get cart => isFr ? 'Panier' : 'Cart';
-  String get cartEmpty => isFr ? 'Votre panier est vide' : 'Your cart is empty';
-  String get cartEmptyHint => isFr ? 'Ajoutez des articles pour commencer' : 'Add items to get started';
-  String get startShopping => isFr ? 'Commencer mes achats' : 'Start shopping';
-  String get checkout => isFr ? 'Passer à la caisse' : 'Checkout';
-  String get subtotal => isFr ? 'Sous-total' : 'Subtotal';
-  String get delivery => isFr ? 'Livraison' : 'Delivery';
-  String get total => isFr ? 'Total' : 'Total';
-  String get free => isFr ? 'Gratuit' : 'Free';
-  String get promoHint => isFr ? 'Code promo' : 'Promo code';
-  String get apply => isFr ? 'Appliquer' : 'Apply';
-  String get placeOrder => isFr ? 'Confirmer la commande' : 'Place order';
-  String get payment => isFr ? 'Paiement' : 'Payment';
-  String get deliveryAddress => isFr ? 'Adresse de livraison' : 'Delivery address';
-  String get orderSummary => isFr ? 'Résumé de la commande' : 'Order summary';
-  String get description => isFr ? 'Description' : 'Description';
-  String get selectVariant => isFr ? 'Choisir une option' : 'Select option';
-  String get quantity => isFr ? 'Quantité' : 'Quantity';
-  String get reviewsLabel => isFr ? 'avis' : 'reviews';
-  String get inStock => isFr ? 'En stock' : 'In stock';
-  String get addedToCart => isFr ? 'Ajouté au panier' : 'Added to cart';
-  String get myOrders => isFr ? 'Mes commandes' : 'My Orders';
-  String get help => isFr ? 'Aide & support' : 'Help & support';
-  String get addresses => isFr ? 'Adresses' : 'Addresses';
-  String get payments => isFr ? 'Moyens de paiement' : 'Payment methods';
-  String get orderConfirmed => isFr ? 'Commande confirmée !' : 'Order Confirmed!';
-  String get orderConfirmedHint => isFr ? 'Merci ! Votre commande est en préparation.' : 'Thank you! Your order is being prepared.';
-  String get continueShopping => isFr ? 'Continuer les achats' : 'Continue shopping';
-  String get trackOrder => isFr ? 'Suivre la commande' : 'Track order';
-  String get topCategories => isFr ? 'Catégories populaires' : 'Top categories';
-  String get items => isFr ? 'articles' : 'items';
-  String itemsCount(int n) => isFr
-      ? '$n article${n > 1 ? 's' : ''}'
-      : '$n item${n == 1 ? '' : 's'}';
+  /// Looks a text up; `{name}` placeholders are replaced from [args].
+  String t(String key, [Map<String, Object?>? args]) {
+    final m = kMessages[key];
+    if (m == null) {
+      assert(false, 'Missing string key: $key');
+      return key;
+    }
+    var text = isFr ? m.$2 : m.$1;
+    if (args != null) {
+      args.forEach((k, v) => text = text.replaceAll('{$k}', '$v'));
+    }
+    return text;
+  }
 
-  String orderStatus(String status) {
-    switch (status) {
-      case 'pending':
-        return isFr ? 'En attente' : 'Pending';
-      case 'confirmed':
-        return isFr ? 'Confirmé' : 'Confirmed';
-      case 'processing':
-        return isFr ? 'En préparation' : 'Processing';
-      case 'shipped':
-        return isFr ? 'Expédié' : 'Shipped';
-      case 'out_for_delivery':
-        return isFr ? 'En livraison' : 'Out for delivery';
-      case 'delivered':
-        return isFr ? 'Livré' : 'Delivered';
-      case 'cancelled':
-        return isFr ? 'Annulé' : 'Cancelled';
-      case 'returned':
-        return isFr ? 'Retourné' : 'Returned';
-      default:
-        return status;
+  bool has(String key) => kMessages.containsKey(key);
+
+  String itemsCount(int n) => n == 1 ? itemOne(n) : itemMany(n);
+
+  String orderStatus(String status) => has('status_$status') ? t('status_$status') : status;
+
+  String paymentLabel(String m) {
+    if (has('pay_$m')) return t('pay_$m');
+    return switch (m) {
+      'airtel_money' => 'Airtel Money',
+      'orange_money' => 'Orange Money',
+      'vodacom_mpesa' => 'Vodacom M-Pesa',
+      _ => m,
+    };
+  }
+
+  /// A server message (always English) in the user's language; unknown messages pass through.
+  String serverError(String raw) => translateServerError(raw, this);
+
+  // ---- dates and numbers, per language ----
+  String _fmt(DateFormat Function(String locale) build, DateTime d) {
+    try {
+      return build(lang).format(d);
+    } catch (_) {
+      return build('en').format(d);
     }
   }
 
-  String paymentLabel(String m) {
-    switch (m) {
-      case 'stripe_card':
-        return isFr ? 'Carte bancaire' : 'Credit / Debit Card';
-      case 'cod':
-        return isFr ? 'Paiement à la livraison' : 'Cash on Delivery';
-      case 'airtel_money':
-        return 'Airtel Money';
-      case 'orange_money':
-        return 'Orange Money';
-      case 'vodacom_mpesa':
-        return 'Vodacom M-Pesa';
-      default:
-        return m;
+  /// `17 oct. 2026` / `Oct 17, 2026`
+  String date(DateTime d) => _fmt((l) => DateFormat.yMMMd(l), d);
+
+  /// `17 oct. 2026, 14:05` / `Oct 17, 2026, 2:05 PM`
+  String dateTime(DateTime d) => _fmt((l) => DateFormat.yMMMd(l).add_jm(), d);
+
+  /// `14:05` / `2:05 PM`
+  String time(DateTime d) => _fmt((l) => DateFormat.jm(l), d);
+
+  /// "today, 14:05" or a full date and time.
+  String when(DateTime d) {
+    final now = DateTime.now();
+    final sameDay = now.year == d.year && now.month == d.month && now.day == d.day;
+    return sameDay ? whenToday(time(d)) : dateTime(d);
+  }
+
+  /// `1 234,5` / `1,234.5`
+  String number(num n, {int decimals = 0}) {
+    try {
+      return NumberFormat.decimalPatternDigits(locale: lang, decimalDigits: decimals).format(n);
+    } catch (_) {
+      return n.toStringAsFixed(decimals);
     }
   }
 }

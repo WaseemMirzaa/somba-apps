@@ -15,6 +15,7 @@ export type ProductStatus =
   | 'live'
   | 'removed';
 
+@Index('IDX_products_status_seller', ['status', 'sellerId'])
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -69,6 +70,7 @@ export class Product {
   @Column({ type: 'varchar', length: 20, default: 'live' })
   status: ProductStatus;
 
+  @Index('IDX_products_seller')
   @Column({ type: 'varchar', nullable: true })
   sellerId: string | null;
 
