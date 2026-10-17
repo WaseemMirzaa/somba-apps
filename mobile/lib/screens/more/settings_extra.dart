@@ -101,7 +101,7 @@ class CustomerSettingsScreen extends StatelessWidget {
                       } catch (e) {
                         setState(() {
                           busy = false;
-                          err = e.toString();
+                          err = Strings.current.errorText(e);
                         });
                       }
                     },
@@ -194,7 +194,7 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _err = e.toString();
+          _err = Strings.current.errorText(e);
         });
       }
     }

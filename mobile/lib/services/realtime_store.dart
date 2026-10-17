@@ -5,6 +5,7 @@ import '../data/market_profiles.dart';
 import '../util/format.dart' show marketNotifier;
 import 'auth_service.dart';
 import 'models.dart';
+import 'push_service.dart';
 import 'socket_service.dart';
 
 enum ConnStatus { disconnected, connecting, connected, error }
@@ -137,10 +138,12 @@ class RealtimeStore extends ChangeNotifier {
 
   Future<void> logout() async {
     final access = _access;
-    if (access != null && _socket.isConnected) {
+    if (access != null && _socket.isConnected && _deviceToken != null) {
       // Stop pushes to this device before the token disappears.
-      unawaited(_socket.request('devices:unregister', {'token': _deviceToken ?? ''}).catchError((_) {}));
+      unawaited(_socket.request('devices:unregister', {'token': _deviceToken}).catchError((_) {}));
     }
+    _deviceToken = null;
+    await PushService.instance.stop();
     await _auth.clear();
     _socket.disconnect();
     _access = null;
@@ -240,6 +243,11 @@ class RealtimeStore extends ChangeNotifier {
       status = ConnStatus.connected;
       notifyListeners();
       unawaited(_hydrate());
+      // Push: asks for the permission and registers this device (no-op without Firebase).
+      unawaited(PushService.instance.start(
+        register: (token, platform) => registerDevice(token, platform: platform),
+        onMessage: () => unawaited(refreshNotifications()),
+      ));
     });
     socket.on('disconnect', (reason) {
       if (user == null) return;
@@ -559,6 +567,12 @@ class RealtimeStore extends ChangeNotifier {
       );
       notifyListeners();
     }
+  }
+
+  /// Re-read the notification list (a push arrived while the app is open).
+  Future<void> refreshNotifications() async {
+    await _load('notifications:list', (d) => _replace(notifications, d, NotificationDto.fromJson));
+    notifyListeners();
   }
 
   Future<void> markAllRead() async {

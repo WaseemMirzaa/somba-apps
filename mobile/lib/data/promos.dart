@@ -1,3 +1,5 @@
+import '../l10n/strings.dart';
+
 /// A promo code as defined by the admin (`promos:list`). The app only PREVIEWS
 /// discounts; the server validates and applies the code when the order is placed.
 class Promo {
@@ -17,13 +19,17 @@ class Promo {
 
   factory Promo.fromJson(Map<String, dynamic> j) => Promo(
         code: j['code'] as String? ?? '',
-        description: (j['description'] as String?)?.isNotEmpty == true
-            ? j['description'] as String
-            : ((j['type'] == 'percent') ? '${(j['value'] as num).toInt()}% off' : '\$${(j['value'] as num).toInt()} off'),
+        description: (j['description'] as String?)?.isNotEmpty == true ? j['description'] as String : '',
         minOrderUsd: (j['minOrder'] as num?)?.toDouble() ?? 0,
         type: j['type'] as String? ?? 'percent',
         value: (j['value'] as num?)?.toDouble() ?? 0,
       );
+
+  /// The admin's description, or a generated "10 % off" in the user's language.
+  String describe(Strings s) {
+    if (description.isNotEmpty) return description;
+    return type == 'percent' ? s.promoPercentOff(value.toInt()) : s.promoFixedOff(value.toInt());
+  }
 }
 
 /// A code the server accepted for a given subtotal.

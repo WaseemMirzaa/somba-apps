@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { In, Not } from 'typeorm';
+import { pageOf } from '../common/paging';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -89,14 +91,52 @@ export class WarehouseService {
     return saved;
   }
 
-  listHubs(): Promise<Hub[]> {
-    return this.hubs.find();
+  // ── Hub directory ────────────────────────────────────────────────────────
+  /** Every hub (inactive ones included, flagged `active:false`); `activeOnly` hides the inactive ones. */
+  listHubs(opts: { activeOnly?: boolean } = {}): Promise<Hub[]> {
+    return this.hubs.find({ where: opts.activeOnly ? { active: true } : undefined, order: { name: 'ASC' } });
+  }
+
+  /** Create (no `id`) or update (`id`) a hub. Only the listed fields are accepted. */
+  async saveHub(data: Record<string, unknown>): Promise<Hub> {
+    const id = data?.id === undefined || data.id === null || data.id === '' ? null : str(data.id, 'Hub', { max: 64 });
+    const existing = id ? await this.hubs.findOne({ where: { id } }) : null;
+    if (id && !existing) throw new Error('Hub not found.');
+    const hub = existing ?? this.hubs.create({ active: true, country: null, address: null });
+    const has = (k: string) => data[k] !== undefined;
+    if (!existing || has('name')) hub.name = str(data.name, 'Hub name', { min: 2, max: 100 });
+    if (!existing || has('city')) hub.city = str(data.city, 'City', { min: 2, max: 100 });
+    if (has('country')) hub.country = data.country === null || data.country === '' ? null : str(data.country, 'Country', { max: 100 });
+    if (has('address')) hub.address = data.address === null || data.address === '' ? null : str(data.address, 'Address', { min: 3, max: 200 });
+    if (!existing || has('capacity')) hub.capacity = num(data.capacity ?? 500, 'Capacity', { min: 1, max: 1_000_000, int: true });
+    // Hub names are how transfers and incidents refer to a hub, so they must stay unique.
+    const clash = (await this.hubs.find({ select: { id: true, name: true } })).find(
+      (h) => h.name.trim().toLowerCase() === hub.name.toLowerCase() && h.id !== hub.id,
+    );
+    if (clash) throw new Error('A hub with this name already exists.');
+    const saved = await this.hubs.save(hub);
+    this.emitter.toRoles(OPS_ROOMS, 'hub:updated', saved);
+    return saved;
+  }
+
+  /** Switch a hub on or off. An inactive hub cannot send or receive stock transfers. */
+  async setHubActive(id: string, active: boolean): Promise<Hub> {
+    const hub = await this.hubs.findOne({ where: { id: str(id, 'Hub', { max: 64 }) } });
+    if (!hub) throw new Error('Hub not found.');
+    if (hub.active !== active) {
+      if (!active && (await this.hubs.count({ where: { active: true, id: Not(hub.id) } })) === 0) {
+        throw new Error('You cannot deactivate the last active hub.');
+      }
+      hub.active = active;
+      await this.hubs.save(hub);
+    }
+    this.emitter.toRoles(OPS_ROOMS, 'hub:updated', hub);
+    return hub;
   }
 
   /** Parcels grouped for the warehouse pipeline (inbound → dispatched). */
-  async parcels(stage?: string): Promise<DeliveryTask[]> {
-    const all = await this.tasks.find({ order: { createdAt: 'DESC' } });
-    if (!stage || stage === 'all') return all;
+  async parcels(stage?: string, paging?: unknown): Promise<DeliveryTask[]> {
+    const { take, skip } = pageOf(paging);
     const map: Record<string, string[]> = {
       inbound: ['unassigned'],
       sorting: ['assigned'],
@@ -104,19 +144,20 @@ export class WarehouseService {
       delivered: ['delivered'],
       exceptions: ['failed'],
     };
-    const statuses = map[stage] ?? [stage];
-    return all.filter((t) => statuses.includes(t.status));
+    const where = !stage || stage === 'all' ? undefined : { status: In(map[stage] ?? [stage]) as never };
+    return this.tasks.find({ where, order: { createdAt: 'DESC' }, take, skip });
   }
 
   /** Parcels not delivered, oldest first. */
-  async aged(): Promise<DeliveryTask[]> {
-    const open = await this.tasks.find({ order: { createdAt: 'ASC' } });
-    return open.filter((t) => t.status !== 'delivered' && t.status !== 'failed');
+  async aged(paging?: unknown): Promise<DeliveryTask[]> {
+    const { take, skip } = pageOf(paging);
+    return this.tasks.find({ where: { status: Not(In(['delivered', 'failed'])) as never }, order: { createdAt: 'ASC' }, take, skip });
   }
 
   /** Inventory levels by product/SKU. */
-  async inventory() {
-    const products = await this.products.find();
+  async inventory(paging?: unknown) {
+    const { take, skip } = pageOf(paging);
+    const products = await this.products.find({ order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
     return products.map((p) => ({
       sku: `SKU-${p.id.slice(0, 6)}`,
       productId: p.id,
@@ -167,19 +208,20 @@ export class WarehouseService {
     return batch;
   }
 
-  /** COD reconciliation: cash collected per rider from delivered parcels. */
+  /** COD reconciliation: cash collected per rider from delivered parcels (one grouped query). */
   async reconcile() {
-    const delivered = await this.tasks.find({ where: { status: 'delivered' } });
-    const byRider: Record<string, { riderId: string; parcels: number; codUsd: number }> = {};
-    for (const t of delivered) {
-      const key = t.riderId ?? 'unassigned';
-      byRider[key] = byRider[key] ?? { riderId: key, parcels: 0, codUsd: 0 };
-      byRider[key].parcels += 1;
-      byRider[key].codUsd += t.codAmountUsd;
-    }
-    return Object.values(byRider).map((r) => ({
-      ...r,
-      codUsd: Number(r.codUsd.toFixed(2)),
+    const rows = await this.tasks
+      .createQueryBuilder('t')
+      .select('t.riderId', 'riderId')
+      .addSelect('COUNT(*)', 'parcels')
+      .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'codUsd')
+      .where("t.status = 'delivered'")
+      .groupBy('t.riderId')
+      .getRawMany<{ riderId: string | null; parcels: string; codUsd: string }>();
+    return rows.map((r) => ({
+      riderId: r.riderId ?? 'unassigned',
+      parcels: Number(r.parcels),
+      codUsd: Number(Number(r.codUsd).toFixed(2)),
     }));
   }
 
@@ -191,6 +233,11 @@ export class WarehouseService {
     const fromHub = str(data?.fromHub, 'From hub', { max: 100 });
     const toHub = str(data?.toHub, 'To hub', { max: 100 });
     if (fromHub.toLowerCase() === toHub.toLowerCase()) throw new Error('Choose two different hubs.');
+    for (const h of await this.hubs.find({ where: { active: false } })) {
+      if ([fromHub, toHub].some((n) => n.toLowerCase() === h.name.trim().toLowerCase())) {
+        throw new Error(`${h.name} is deactivated and cannot take stock transfers.`);
+      }
+    }
     // Only these fields are accepted; reference, status and ids are ours.
     const transfer = await this.transfers.save(
       this.transfers.create({

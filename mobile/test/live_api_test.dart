@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lipcart/data/catalog_live.dart';
 import 'package:lipcart/data/market_profiles.dart';
 import 'package:lipcart/data/shop_state.dart';
+import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/util/format.dart' show marketNotifier;
 import 'package:lipcart/services/auth_service.dart';
 import 'package:lipcart/services/realtime_store.dart';
@@ -76,6 +77,7 @@ void main() {
 
     setUpAll(() async {
       SharedPreferences.setMockInitialValues({});
+      await Strings.setLang('en', persist: false); // server texts are English; the French mapping has its own test
       await ShopState.instance.load();
       admin = Admin();
       await admin.connect();
@@ -227,6 +229,9 @@ void main() {
       expect(await shop.applyPromo('FL$tag'), contains('Minimum order'), reason: 'an empty cart is below the minimum');
       shop.addToCart(productByUuid(productId)!, qty: 2); // 2 x $40 = $80
       expect(await shop.applyPromo('NOPE$tag'), 'Invalid code.');
+      await Strings.setLang('fr', persist: false); // the same server refusal, shown in French
+      expect(await shop.applyPromo('NOPE$tag'), 'Code invalide.');
+      await Strings.setLang('en', persist: false);
       expect(await shop.applyPromo('FL$tag'), isNull);
       expect(shop.promoDiscount(shop.subtotal), 8);
 
@@ -348,7 +353,7 @@ void main() {
       await store.deleteAccount('Flutter-Reset-2026');
       expect(store.isSignedIn, isFalse);
       expect(sessionEnded, isTrue, reason: 'deleting returns the app to sign-in through the normal session-ended path');
-      expect(endedMessage, 'Your account was deleted');
+      expect(endedMessage, 'err_account_deleted', reason: 'a strings key the app shows in the user\'s language');
       await expectLater(AuthService().login(email, 'Flutter-Reset-2026'), throwsA(isA<ApiException>()));
     });
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true with a running API');

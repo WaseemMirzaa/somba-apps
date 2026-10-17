@@ -28,7 +28,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
+    final s = Strings.of(context);
     final order = RealtimeStore.instance.orderById(widget.orderId);
 
     return Scaffold(

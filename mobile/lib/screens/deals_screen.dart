@@ -21,8 +21,8 @@ class _DealsScreenState extends State<DealsScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
-    final lang = widget.locale.languageCode;
+    final s = Strings.of(context);
+    final lang = s.lang;
     final deals = [...liveCatalog().where((p) => p.discount >= 15)]
       ..sort((a, b) => b.discount.compareTo(a.discount));
 
@@ -53,6 +53,12 @@ class _DealsScreenState extends State<DealsScreen> {
               ),
             ),
           ),
+          if (deals.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text(s.dealsNone, style: const TextStyle(color: AppColors.muted))),
+            )
+          else
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             sliver: SliverGrid(

@@ -67,7 +67,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     }
   }
 
@@ -197,7 +197,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
                 await RealtimeStore.instance.call('support:open', {'subject': subject.text, 'message': message.text});
                 nav.pop(true);
               } catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+                messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
               }
             },
             child: Text(s.send),
@@ -340,7 +340,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _err = e.toString();
+          _err = Strings.current.errorText(e);
         });
       }
     }
@@ -433,7 +433,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
       _t = TicketView.fromJson((res as Map).map((k, v) => MapEntry(k.toString(), v)));
       _ctrl.clear();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

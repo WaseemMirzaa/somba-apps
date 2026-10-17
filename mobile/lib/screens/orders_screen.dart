@@ -18,7 +18,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   int _tab = 0;
 
-  static const _tabs = ['All', 'Active', 'Delivered', 'Cancelled'];
+
   static const _active = {'pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery'};
 
   bool _match(String status) {
@@ -36,7 +36,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
+    final s = Strings.of(context);
+    final tabs = [s.ordersTabAll, s.ordersTabActive, s.ordersTabDelivered, s.ordersTabCancelled];
 
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
@@ -55,7 +56,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  itemCount: _tabs.length,
+                  itemCount: tabs.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final sel = _tab == i;
@@ -69,7 +70,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(color: sel ? AppColors.primary : AppColors.line),
                         ),
-                        child: Text(_tabs[i],
+                        child: Text(tabs[i],
                             style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                       ),
                     );
@@ -81,7 +82,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : orders.isEmpty
                         ? Center(
-                            child: Text(s.isFr ? 'Aucune commande pour le moment' : 'No orders here yet',
+                            child: Text(s.ordersEmpty,
                                 style: const TextStyle(color: AppColors.muted)))
                         : ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -138,7 +139,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               onPressed: () => _open(o),
               style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 8), textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              child: Text(s.isFr ? 'Détails' : 'Details'),
+              child: Text(s.details),
             ),
           ]),
         ]),
@@ -187,24 +188,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   String _statusHint(OrderDto o, Strings s) {
-    final fr = s.isFr;
-    switch (o.status) {
-      case 'delivered':
-        return fr ? 'Livrée' : 'Delivered';
-      case 'out_for_delivery':
-        return fr ? 'Le livreur arrive' : 'Rider is on the way';
-      case 'shipped':
-        return fr ? 'En route' : 'On the way';
-      case 'confirmed':
-        return fr ? 'Commande confirmée' : 'Order confirmed';
-      case 'pending':
-        return fr ? 'En attente du paiement' : 'Waiting for payment';
-      case 'cancelled':
-        return fr ? 'Commande annulée' : 'Order cancelled';
-      case 'returned':
-        return fr ? 'Retour remboursé' : 'Return refunded';
-      default:
-        return fr ? "En préparation à l'entrepôt" : 'Being prepared at the warehouse';
-    }
+    return s.has('hint_${o.status}') ? s.t('hint_${o.status}') : s.hintProcessing;
   }
 }

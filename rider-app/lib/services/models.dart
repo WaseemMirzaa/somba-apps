@@ -88,10 +88,10 @@ class DeliveryTaskDto {
   bool get isFinished => status == 'delivered' || status == 'failed';
   bool get collectsCash => codAmountUsd > 0;
 
-  /// A readable delivery address (the order stores it as JSON).
+  /// A readable delivery address (the order stores it as JSON); empty when none was given.
   String get address {
     final raw = addressRaw;
-    if (raw == null || raw.isEmpty) return 'Address not provided';
+    if (raw == null || raw.isEmpty) return '';
     try {
       final m = jsonDecode(raw);
       if (m is Map) {

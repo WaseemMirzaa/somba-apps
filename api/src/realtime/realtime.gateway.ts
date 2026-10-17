@@ -11,6 +11,9 @@ import {
 } from '@nestjs/websockets';
 import { WsThrottleInterceptor } from './ws-throttle.interceptor';
 import { oneOf, str } from '../common/validate';
+import { pageOf } from '../common/paging';
+import { activePlanId } from '../content/plans';
+import { clampDays } from '../ops/analytics.util';
 import { cleanListing } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
 import { Server, Socket } from 'socket.io';
@@ -79,6 +82,12 @@ const GROUPS = {
   insight: ['admin', 'admin_operations', 'admin_finance'],
   audit: ['admin', 'admin_operations'],
   fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation'],
+  /** Money screens: confirm/decline payments, finance dashboard. */
+  finance: ['admin', 'admin_finance'],
+  /** Hide / restore customer reviews. */
+  moderate: ['admin', 'admin_operations', 'admin_moderation'],
+  /** Hub directory (create / edit / deactivate). */
+  hubs: ['admin', 'admin_operations'],
 } as const;
 const ALL_ROLES = ['customer', 'seller', 'admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'] as const;
 
@@ -162,6 +171,18 @@ export class RealtimeGateway
     this.server?.in(RealtimeEmitter.userRoom(userId)).disconnectSockets(true);
   }
 
+  /**
+   * Verification policy: with the public setting `requireVerifiedForCheckout`
+   * on, an account must have a verified phone OR email before it can place an
+   * order or top up its wallet.
+   */
+  private async assertVerifiedForCheckout(userId: string): Promise<void> {
+    if ((await this.settings.get('requireVerifiedForCheckout')) !== 'true') return;
+    const user = await this.users.findById(userId);
+    if (user && (user.phoneVerified || user.emailVerified)) return;
+    throw new Error('Verify your phone number or email address first: open Profile > Verification, confirm a code or link, then try again.');
+  }
+
   afterInit(server: Server): void {
     this.emitter.register(server);
     this.logger.log('Realtime gateway initialised.');
@@ -235,19 +256,21 @@ export class RealtimeGateway
   @SubscribeMessage('products:list')
   async productsList(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { category?: string; status?: string },
+    @MessageBody() body: { category?: string; status?: string; limit?: number; offset?: number },
   ) {
     // Admins may filter by any status; everyone else only ever sees LIVE listings
-    // (plus a seller's own drafts), whatever they ask for.
+    // (plus a seller's own drafts), whatever they ask for. The filtering happens in
+    // the query, and `limit` / `offset` page the result (default 500).
     const user = client.data.user;
     const role = user?.role ?? 'guest';
-    if (this.isAdmin(role)) return ok(await this.products.list(body ?? {}));
-    const rows = await this.products.list({ category: body?.category });
+    const { take, skip } = pageOf(body);
+    if (this.isAdmin(role)) return ok(await this.products.list({ category: body?.category, status: body?.status, limit: take, offset: skip }));
+    let ownerIds: string[] | undefined;
     if (role === 'seller') {
       const mine = await this.sellersSvc.byUser(user!.id);
-      return ok(rows.filter((p) => p.status === 'live' || p.sellerId === mine?.id || p.sellerId === user!.id));
+      ownerIds = [user!.id, ...(mine ? [mine.id] : [])];
     }
-    return ok(rows.filter((p) => p.status === 'live'));
+    return ok(await this.products.list({ category: body?.category, liveOnly: true, ownerIds, limit: take, offset: skip }));
   }
 
   @SubscribeMessage('products:get')
@@ -264,6 +287,10 @@ export class RealtimeGateway
       if (!(role === 'seller' && (p.sellerId === mine?.id || p.sellerId === user!.id))) {
         return fail('Product not found.');
       }
+    }
+    // Only shoppers count as a view (not the owning seller or staff, and only live listings).
+    if (p && p.status === 'live' && (role === 'customer' || role === 'guest')) {
+      void this.products.recordView(p.id).catch(() => undefined);
     }
     return p ? ok(p) : fail('Product not found.');
   }
@@ -303,6 +330,13 @@ export class RealtimeGateway
             : 'Your store is not active. Contact support.',
         );
       }
+      // The seller's plan may cap how many listings they can hold (`maxProducts`; none by default).
+      if (user.role === 'seller' && seller) {
+        const plan = (await this.sellersSvc.plans()).find((p) => p.id === activePlanId(seller));
+        if (plan?.maxProducts && (await this.products.countForSeller(this.analytics.sellerIdsOf(seller))) >= plan.maxProducts) {
+          return fail(`Your ${plan.name} plan allows ${plan.maxProducts} listings. Upgrade your plan to add more.`);
+        }
+      }
       const data = cleanListing(body as ListingInput, { partial: false, allowStatus: false });
       const product = await this.products.create({
         ...data,
@@ -333,7 +367,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      const existing = await this.products.get(body.id);
+      // The stored row (not the promotional price) is what edits are validated against.
+      const existing = await this.products.getRaw(body.id);
       if (!existing) return fail('Product not found.');
       const seller = await this.sellersSvc.byUser(user.id);
       const isOwner =
@@ -380,11 +415,14 @@ export class RealtimeGateway
 
   // ---- Orders -------------------------------------------------------------
   @SubscribeMessage('orders:list')
-  async ordersList(@ConnectedSocket() client: AuthedSocket) {
+  async ordersList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       const user = this.requireUser(client);
       const sellerId = user.role === 'seller' ? (await this.sellersSvc.byUser(user.id))?.id : undefined;
-      return ok(await this.orders.list(user, sellerId));
+      return ok(await this.orders.list(user, sellerId, body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -397,6 +435,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
+      await this.assertVerifiedForCheckout(user.id);
       const order = await this.orders.create(
         { id: user.id, name: user.name },
         body,
@@ -430,26 +469,32 @@ export class RealtimeGateway
 
   // ---- Delivery -----------------------------------------------------------
   @SubscribeMessage('delivery:list')
-  async deliveryList(@ConnectedSocket() client: AuthedSocket) {
+  async deliveryList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       const user = this.requireUser(client);
       if (user.role === 'rider') {
-        return ok(await this.delivery.listForRider(user.id));
+        return ok(await this.delivery.listForRider(user.id, body));
       }
       if (!this.isOps(user.role)) return fail('Not allowed.');
-      return ok(await this.delivery.listAll());
+      return ok(await this.delivery.listAll(body));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
   @SubscribeMessage('delivery:unassigned')
-  async deliveryUnassigned(@ConnectedSocket() client: AuthedSocket) {
+  async deliveryUnassigned(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       // Tasks carry customers' delivery addresses: riders and ops only.
       const user = this.requireUser(client);
       if (user.role !== 'rider' && !this.isOps(user.role)) return fail('Not allowed.');
-      return ok(await this.delivery.listUnassigned());
+      return ok(await this.delivery.listUnassigned(body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -584,6 +629,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
+      await this.assertVerifiedForCheckout(user.id);
       const amount = assertAmount(body?.amountUsd);
       return ok(await this.payments.startTopUp(user.id, amount, String(body?.method ?? ''), body?.phone));
     } catch (e) {
@@ -593,10 +639,13 @@ export class RealtimeGateway
 
   // ---- Payments -----------------------------------------------------------
   @SubscribeMessage('payments:list')
-  async paymentsList(@ConnectedSocket() client: AuthedSocket) {
+  async paymentsList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.payments.list(user));
+      return ok(await this.payments.list(user, body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -878,19 +927,76 @@ export class RealtimeGateway
   }
 
   // ---- Reviews & Q&A (public read; customer writes) ----------------------
+  /** Public. Hidden (moderated) reviews are left out; moderators may pass `includeHidden`. */
   @SubscribeMessage('reviews:list')
-  async reviewsList(@MessageBody() body: { productId: string }) {
-    return ok(await this.reviews.listForProduct(body.productId));
+  async reviewsList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { productId: string; includeHidden?: boolean },
+  ) {
+    const staff = this.can(client.data.user?.role ?? 'guest', 'moderate');
+    return ok(await this.reviews.listForProduct(String(body?.productId ?? ''), staff && body?.includeHidden === true));
   }
 
-  /** All reviews across the signed-in seller's catalogue. */
+  /** All (visible) reviews across the signed-in seller's catalogue, with the seller reply. */
   @SubscribeMessage('reviews:seller')
-  async reviewsSeller(@ConnectedSocket() client: AuthedSocket) {
+  async reviewsSeller(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       const user = this.requireUser(client);
       const seller = await this.sellersSvc.byUser(user.id);
       if (!seller) return ok([]);
-      return ok(await this.reviews.listForSeller(seller.id));
+      return ok(await this.reviews.listForSeller(this.analytics.sellerIdsOf(seller), body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The seller of the product (or an admin) answers a review in public. */
+  @SubscribeMessage('reviews:reply')
+  async reviewsReply(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { reviewId: string; text: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller' && !this.can(user.role, 'moderate')) return fail('Not allowed.');
+      return ok(await this.reviews.reply(user, String(body?.reviewId ?? ''), body?.text));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Moderation: hide or restore a review (hidden ones leave public lists and the product rating). */
+  @SubscribeMessage('reviews:setStatus')
+  async reviewsSetStatus(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { reviewId: string; status: 'visible' | 'hidden' },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'moderate')) return fail('Not allowed.');
+      const status = oneOf(body?.status, ['visible', 'hidden'] as const, 'Status');
+      const review = await this.reviews.setStatus(String(body?.reviewId ?? ''), status);
+      await this.audit.record({ actor: user.name, role: user.role, action: `review.${status}`, entity: 'review', entityId: review.id });
+      return ok(review);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Moderation queue: reviews across the catalogue (filter by status / productId, paged). */
+  @SubscribeMessage('reviews:admin')
+  async reviewsAdmin(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { status?: 'visible' | 'hidden'; productId?: string; limit?: number; offset?: number },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'moderate')) return fail('Not allowed.');
+      const status = body?.status === undefined ? undefined : oneOf(body.status, ['visible', 'hidden'] as const, 'Status');
+      return ok(await this.reviews.listForModeration({ status, productId: body?.productId ? String(body.productId) : undefined }, body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1148,12 +1254,12 @@ export class RealtimeGateway
   @SubscribeMessage('sellers:list')
   async sellersList(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { status?: string },
+    @MessageBody() body: { status?: string; limit?: number; offset?: number },
   ) {
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role)) return fail('Admins only.');
-      return ok(await this.sellersSvc.list(body?.status as never));
+      return ok(await this.sellersSvc.list(body?.status as never, body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1223,7 +1329,31 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       const seller = await this.sellersSvc.byUser(user.id);
-      return ok(seller ?? null);
+      return ok(seller ? this.sellersSvc.withPlanState(seller) : null);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Public: the seller subscription plans (from the `sellerPlans` setting). */
+  @SubscribeMessage('sellers:plans')
+  async sellersPlans() {
+    return ok(await this.sellersSvc.plans());
+  }
+
+  /**
+   * A seller buys a plan: wallet is charged now; mobile money returns a pending
+   * payment and the plan activates when it succeeds (webhook or finance confirm).
+   */
+  @SubscribeMessage('sellers:subscribe')
+  async sellersSubscribe(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { plan: string; method: string; phone?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'seller') return fail('Sellers only.');
+      return ok(await this.sellersSvc.subscribe(user.id, body ?? ({} as never)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1254,12 +1384,55 @@ export class RealtimeGateway
     }
   }
 
+  /** Daily revenue + order counts for the last `days` days (default 7, max 90), zero-filled. */
   @SubscribeMessage('analytics:revenue')
-  async analyticsRevenue(@ConnectedSocket() client: AuthedSocket) {
+  async analyticsRevenue(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { days?: number },
+  ) {
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'insight')) return fail('Not allowed.');
-      return ok(await this.analytics.revenueSeries());
+      return ok(await this.analytics.revenueSeries(body?.days));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Finance dashboard: GMV, commission, refunds, payouts, receivables, 30-day series. admin / admin_finance only. */
+  @SubscribeMessage('analytics:finance')
+  async analyticsFinance(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'finance')) return fail('Not allowed.');
+      return ok(await this.analytics.financeStats());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * Seller analytics. A seller always gets THEIR OWN store (any sellerId sent is
+   * ignored); admin / ops / finance must pass the `sellerId` of the store.
+   */
+  @SubscribeMessage('analytics:seller')
+  async analyticsSeller(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { days?: number; sellerId?: string; top?: number },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      let seller;
+      if (user.role === 'seller') {
+        seller = await this.sellersSvc.byUser(user.id);
+        if (!seller) return fail('Open a store first.');
+      } else if (this.can(user.role, 'insight')) {
+        seller = body?.sellerId ? await this.sellersSvc.get(String(body.sellerId)) : null;
+        if (!seller) return fail('Choose a store (sellerId).');
+      } else {
+        return fail('Not allowed.');
+      }
+      return ok(await this.analytics.sellerStats(seller, clampDays(body?.days, 30), Number(body?.top) || 5));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1304,11 +1477,14 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('customers:list')
-  async customersList(@ConnectedSocket() client: AuthedSocket) {
+  async customersList(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'people')) return fail('Not allowed.');
-      return ok(await this.customers.list());
+      return ok(await this.customers.list(body));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1427,10 +1603,48 @@ export class RealtimeGateway
 
   // ---- Warehouse (staff/admin) -------------------------------------------
   @SubscribeMessage('warehouse:hubs')
-  async whHubs(@ConnectedSocket() client: AuthedSocket) {
+  async whHubs(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { activeOnly?: boolean },
+  ) {
     try {
       if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.listHubs());
+      return ok(await this.warehouse.listHubs({ activeOnly: body?.activeOnly === true }));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Admin / ops create (no `id`) or edit (`id`) a hub: name, city, country, capacity, address. */
+  @SubscribeMessage('warehouse:saveHub')
+  async whSaveHub(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: Record<string, unknown>,
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'hubs')) return fail('Not allowed.');
+      const hub = await this.warehouse.saveHub(body ?? {});
+      await this.audit.record({ actor: user.name, role: user.role, action: body?.id ? 'hub.updated' : 'hub.created', entity: 'hub', entityId: hub.id, detail: hub.name });
+      return ok(hub);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Admin / ops switch a hub on or off. */
+  @SubscribeMessage('warehouse:setHubActive')
+  async whSetHubActive(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; active: boolean },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'hubs')) return fail('Not allowed.');
+      if (typeof body?.active !== 'boolean') return fail('Active must be true or false.');
+      const hub = await this.warehouse.setHubActive(String(body?.id ?? ''), body.active);
+      await this.audit.record({ actor: user.name, role: user.role, action: body.active ? 'hub.activated' : 'hub.deactivated', entity: 'hub', entityId: hub.id, detail: hub.name });
+      return ok(hub);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1439,31 +1653,37 @@ export class RealtimeGateway
   @SubscribeMessage('warehouse:parcels')
   async whParcels(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { stage?: string },
+    @MessageBody() body: { stage?: string; limit?: number; offset?: number },
   ) {
     try {
       if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.parcels(body?.stage));
+      return ok(await this.warehouse.parcels(body?.stage, body));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
   @SubscribeMessage('warehouse:aged')
-  async whAged(@ConnectedSocket() client: AuthedSocket) {
+  async whAged(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.aged());
+      return ok(await this.warehouse.aged(body));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
   @SubscribeMessage('warehouse:inventory')
-  async whInventory(@ConnectedSocket() client: AuthedSocket) {
+  async whInventory(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
     try {
       if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.inventory());
+      return ok(await this.warehouse.inventory(body));
     } catch (e) {
       return fail((e as Error).message);
     }

@@ -1818,9 +1818,11 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `analytics:admin` | group insight: admin, admin_operations, admin_finance | `—` |  |
-| `analytics:warehouse` | Any admin_* role, warehouse_staff | `—` |  |
-| `analytics:revenue` | group insight | `—` | 7-day series |
+| `analytics:admin` | group insight: admin, admin_operations, admin_finance | `—` | GMV/revenue/AOV, by-category, today / 30-day, refunds, alerts — see [ANALYTICS-API.md](ANALYTICS-API.md) |
+| `analytics:warehouse` | Any admin_* role, warehouse_staff | `—` | + 7-day throughput, pickup→delivery time, failure rate, by zone/hub |
+| `analytics:revenue` | group insight | `{ days? ≤ 90 }` | real UTC daily buckets `{date, revenue, orders}`, zero-filled |
+| `analytics:finance` | admin, admin_finance | `—` | GMV, commission, refunds, payouts, receivables, 30-day series |
+| `analytics:seller` | seller (own store) · insight roles with `sellerId` | `{ days?, sellerId?, top? }` | revenue series, top products, repeat buyers, fulfilment, reviews, health score, funnel |
 
 #### `audit:*`
 

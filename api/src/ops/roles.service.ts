@@ -3,7 +3,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from '../database/entities';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -35,11 +35,12 @@ export class RolesService {
 
   /** All admin/staff accounts and their role. */
   async staff() {
-    const rows = await this.users.find();
+    const rows = await this.users.find({
+      where: { role: In(['admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider']) },
+      order: { createdAt: 'ASC' },
+      take: 1000,
+    });
     return rows
-      .filter(
-        (u) => u.role.startsWith('admin') || u.role === 'warehouse_staff' || u.role === 'rider',
-      )
       .map((u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, active: u.active }));
   }
 

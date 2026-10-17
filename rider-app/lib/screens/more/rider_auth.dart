@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../services/rider_store.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../theme/app_theme.dart';
@@ -44,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const Text('Somba&Teka',
                 style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
             const SizedBox(height: 6),
-            Text('Rider partner', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(Strings.of(context).splashSubtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 34),
             SizedBox(
               height: 22,
@@ -81,7 +82,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
 
   Future<void> _submit() async {
     if (_id.text.trim().isEmpty || _pass.text.isEmpty) {
-      setState(() => _error = 'Enter your email and password');
+      setState(() => _error = Strings.of(context).loginMissing);
       return;
     }
     setState(() {
@@ -93,7 +94,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
       if (!mounted) return;
       widget.onSignedIn?.call();
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = Strings.current.errorText(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -101,6 +102,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     final top = MediaQuery.of(context).padding.top;
     return Scaffold(
       body: ListView(padding: EdgeInsets.zero, children: [
@@ -108,24 +110,28 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
           padding: EdgeInsets.fromLTRB(24, top + 52, 24, 44),
           decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(32))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-                height: 56,
-                width: 56,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                child: const Icon(Icons.two_wheeler_rounded, color: AppColors.primary, size: 32)),
+            Row(children: [
+              Container(
+                  height: 56,
+                  width: 56,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: const Icon(Icons.two_wheeler_rounded, color: AppColors.primary, size: 32)),
+              const Spacer(),
+              LanguageToggle(key: const ValueKey('lang-toggle'), label: s.langSwitchTo, onTap: () => Strings.setLang(s.isFr ? 'en' : 'fr')),
+            ]),
             const SizedBox(height: 18),
-            const Text('Welcome back',
-                style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
+            Text(s.welcomeBack,
+                style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.5)),
             const SizedBox(height: 6),
-            Text('Sign in to start your shift', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
+            Text(s.signinSubtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
           ]),
         ),
         Padding(
           padding: const EdgeInsets.all(20),
           child: Column(children: [
-            RiderField(fieldKey: const ValueKey('rider-email'), label: 'Email', hint: 'you@somba.app', icon: Icons.mail_outline_rounded, controller: _id, keyboard: TextInputType.emailAddress),
+            RiderField(fieldKey: const ValueKey('rider-email'), label: s.email, hint: s.emailHint, icon: Icons.mail_outline_rounded, controller: _id, keyboard: TextInputType.emailAddress),
             const SizedBox(height: 16),
-            RiderField(fieldKey: const ValueKey('rider-password'), label: 'Password', hint: 'Enter your password', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
+            RiderField(fieldKey: const ValueKey('rider-password'), label: s.password, hint: s.passwordHint, icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -137,7 +143,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
               child: TextButton(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ForgotPasswordScreen(initialEmail: _id.text.trim()))),
                 style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                child: Text(s.forgotPassword, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               ),
             ),
             const SizedBox(height: 8),
@@ -148,18 +154,18 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                    : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text('Sign in'),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward_rounded, size: 20),
+                    : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(s.signIn),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 20),
                       ]),
               ),
             ),
             const SizedBox(height: 18),
-            const Row(children: [
-              Icon(Icons.shield_outlined, size: 16, color: AppColors.muted),
-              SizedBox(width: 6),
-              Expanded(child: Text('Rider accounts are created by the Somba&Teka fleet team.', style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
+            Row(children: [
+              const Icon(Icons.shield_outlined, size: 16, color: AppColors.muted),
+              const SizedBox(width: 6),
+              Expanded(child: Text(s.accountsNote, style: const TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3))),
             ]),
           ]),
         ),
@@ -194,7 +200,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Future<void> _send() async {
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim())) {
-      setState(() => _msg = 'Enter a valid email');
+      setState(() => _msg = Strings.of(context).errValidEmail);
       return;
     }
     setState(() {
@@ -206,11 +212,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
       setState(() {
         _sent = true;
-        _msg = 'If that email has an account, a reset link is on its way.';
+        _msg = Strings.of(context).forgotSent;
         if (kDebugMode && dev != null) _token.text = dev;
       });
     } catch (e) {
-      if (mounted) setState(() => _msg = e.toString());
+      if (mounted) setState(() => _msg = Strings.current.errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -218,7 +224,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Future<void> _reset() async {
     if (_pass.text.length < 8) {
-      setState(() => _msg = 'Use at least 8 characters');
+      setState(() => _msg = Strings.of(context).errShortPassword);
       return;
     }
     setState(() {
@@ -228,10 +234,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await RiderStore.instance.resetPassword(_token.text, _pass.text);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated — please sign in')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.of(context).passwordUpdated)));
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() => _msg = e.toString());
+      if (mounted) setState(() => _msg = Strings.current.errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -239,8 +245,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Reset password'),
+      appBar: backAppBar(context, s.resetTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
         Container(
           height: 64,
@@ -249,21 +256,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: const Icon(Icons.lock_reset_rounded, color: AppColors.primary, size: 34),
         ),
         const SizedBox(height: 16),
-        const Text('Forgot your password?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+        Text(s.forgotHeading, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
         const SizedBox(height: 6),
-        Text(_sent ? 'Paste the code from the email and choose a new password.' : "Enter your email and we'll send you a reset link.",
+        Text(_sent ? s.forgotEnterCode : s.forgotEnterEmail,
             style: const TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.4)),
         const SizedBox(height: 22),
-        RiderField(fieldKey: const ValueKey('forgot-email'), label: 'Email', hint: 'you@somba.app', icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress),
+        RiderField(fieldKey: const ValueKey('forgot-email'), label: s.email, hint: s.emailHint, icon: Icons.mail_outline_rounded, controller: _email, keyboard: TextInputType.emailAddress),
         if (_sent) ...[
           const SizedBox(height: 14),
-          RiderField(fieldKey: const ValueKey('reset-token'), label: 'Reset code', hint: 'From the email', icon: Icons.key_rounded, controller: _token),
+          RiderField(fieldKey: const ValueKey('reset-token'), label: s.resetCode, hint: s.resetCodeHint, icon: Icons.key_rounded, controller: _token),
           const SizedBox(height: 14),
-          RiderField(fieldKey: const ValueKey('reset-password'), label: 'New password', hint: 'At least 8 characters', icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
+          RiderField(fieldKey: const ValueKey('reset-password'), label: s.newPassword, hint: s.passwordMinHint, icon: Icons.lock_outline_rounded, obscure: true, controller: _pass),
         ],
         if (_msg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_msg!, key: const ValueKey('forgot-msg'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         const SizedBox(height: 22),
-        PrimaryButton(_busy ? '…' : (_sent ? 'Save new password' : 'Send reset link'), icon: _sent ? Icons.check_rounded : Icons.send_rounded, onPressed: _busy ? null : (_sent ? _reset : _send)),
+        PrimaryButton(_busy ? '…' : (_sent ? s.saveNewPassword : s.sendResetLink), icon: _sent ? Icons.check_rounded : Icons.send_rounded, onPressed: _busy ? null : (_sent ? _reset : _send)),
       ]),
     );
   }

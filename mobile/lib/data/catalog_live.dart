@@ -1,3 +1,4 @@
+import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/realtime_store.dart';
 import 'catalog_models.dart';
@@ -16,6 +17,7 @@ Product productFromDto(ProductDto d) => Product(
       reviews: d.reviews,
       image: d.image,
       category: d.category,
+      categoryFr: d.categoryFr,
       stock: d.stock,
       sellerId: d.sellerId,
       sellerName: d.sellerName,
@@ -58,7 +60,7 @@ List<Seller> liveSellers() {
     final id = p.sellerId;
     if (id == null || id.isEmpty) continue;
     final cur = byId[id];
-    byId[id] = (name: p.sellerName ?? 'Store', n: (cur?.n ?? 0) + 1);
+    byId[id] = (name: p.sellerName ?? Strings.current.storeFallback, n: (cur?.n ?? 0) + 1);
   }
   final list = byId.entries.map((e) => Seller(id: e.key, name: e.value.name, productCount: e.value.n)).toList();
   list.sort((a, b) => b.productCount.compareTo(a.productCount));

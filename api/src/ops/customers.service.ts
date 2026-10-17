@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Order, User } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { pageOf } from '../common/paging';
 
 export interface CustomerRow {
   id: string;
@@ -25,8 +26,9 @@ export class CustomersService {
     private readonly emitter: RealtimeEmitter,
   ) {}
 
-  async list(): Promise<CustomerRow[]> {
-    const customers = await this.users.find({ where: { role: 'customer' } });
+  async list(paging?: unknown): Promise<CustomerRow[]> {
+    const { take, skip } = pageOf(paging);
+    const customers = await this.users.find({ where: { role: 'customer' }, order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
     // One aggregate query instead of loading every order into memory.
     const totals = await this.orders
       .createQueryBuilder('o')
@@ -34,6 +36,7 @@ export class CustomersService {
       .addSelect('COUNT(*)', 'n')
       .addSelect('COALESCE(SUM(o.totalUsd), 0)', 'spend')
       .where("o.status != 'cancelled'")
+      .andWhere(customers.length ? 'o.customerId IN (:...cids)' : '1 = 0', { cids: customers.map((c) => c.id) })
       .groupBy('o.customerId')
       .getRawMany<{ id: string; n: string; spend: string }>();
     const byId = new Map(totals.map((t) => [t.id, t]));

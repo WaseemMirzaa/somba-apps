@@ -100,8 +100,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
-    final lang = widget.locale.languageCode;
+    final s = Strings.of(context);
+    final lang = s.lang;
     final deals = liveCatalog().where((p) => p.discount >= 15).toList();
     final feed = _feed();
 
@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// The delivery address chip: the chosen saved address, else the default one.
   String _addressLabel() {
     final list = RealtimeStore.instance.addresses;
-    if (list.isEmpty) return widget.locale.languageCode == 'fr' ? 'Ajouter une adresse' : 'Add an address';
+    if (list.isEmpty) return Strings.of(context).addAnAddress;
     final a = list.firstWhere((x) => x.id == ShopState.instance.selectedAddressId, orElse: () => list.firstWhere((x) => x.isDefault, orElse: () => list.first));
     return [if ((a.commune ?? '').isNotEmpty) a.commune, a.city].join(', ');
   }
@@ -361,9 +361,9 @@ class _HomeScreenState extends State<HomeScreen> {
     void go(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     final items = [
       (Icons.bolt_rounded, s.deals, AppColors.accent, () => go(ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true))),
-      (Icons.storefront_rounded, s.isFr ? 'Boutiques' : 'Stores', AppColors.mint, () => go(SellersDirectoryScreen(locale: widget.locale))),
+      (Icons.storefront_rounded, s.tabStores, AppColors.mint, () => go(SellersDirectoryScreen(locale: widget.locale))),
       (Icons.favorite_rounded, s.wishlist, AppColors.primary, () => go(WishlistScreen(locale: widget.locale))),
-      (Icons.percent_rounded, 'Coupons', AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
+      (Icons.percent_rounded, s.couponsTitle, AppColors.amber, () => go(CouponsScreen(locale: widget.locale))),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -400,10 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---- Feed filter chips ----
   Widget _feedChips(Strings s) {
-    final fr = s.isFr;
-    final tabs = fr
-        ? ['Pour vous', 'Tendances', 'Nouveau', 'Populaire']
-        : ['For You', 'Trending', 'New', 'Popular'];
+    final tabs = [s.feedForYou, s.trending, s.feedNew, s.feedPopular];
     return SizedBox(
       height: 40,
       child: ListView.separated(

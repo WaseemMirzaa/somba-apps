@@ -18,6 +18,7 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { SettingsService } from '../content/settings.service';
+import { DEFAULT_LIMIT, pageOf } from '../common/paging';
 import {
   MOBILE_MONEY_METHODS,
   MOBILE_MONEY_PROVIDER,
@@ -32,6 +33,9 @@ export type OrderPaymentSettledHandler = (
   outcome: 'succeeded' | 'failed',
 ) => Promise<void>;
 
+/** Called once when a seller-plan payment succeeds (set by SellersService), including a wallet purchase. */
+export type PlanPaymentSettledHandler = (payment: Payment) => Promise<void>;
+
 /** Only these admin roles see payment records (live pushes included). */
 const FINANCE_ROLES = ['admin', 'admin_finance'];
 
@@ -42,6 +46,7 @@ const mask = (phone: string | null) =>
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentsService.name);
   private orderSettled: OrderPaymentSettledHandler | null = null;
+  private planSettled: PlanPaymentSettledHandler | null = null;
   private readonly manualInFlight = new Set<string>();
   private sweeper: NodeJS.Timeout | null = null;
   private readonly timers = new Set<NodeJS.Timeout>();
@@ -75,6 +80,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   registerOrderSettledHandler(fn: OrderPaymentSettledHandler) {
     this.orderSettled = fn;
+  }
+
+  registerPlanSettledHandler(fn: PlanPaymentSettledHandler) {
+    this.planSettled = fn;
   }
 
   /** Which payment methods may be used right now (policy + configuration). */
@@ -204,6 +213,71 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException(started.failureReason ?? 'Payment failed.');
     }
     return started;
+  }
+
+  /**
+   * Buy a seller plan. `wallet` is charged at once (and the plan activates);
+   * mobile money stays `pending` until the network / finance confirms, and the
+   * plan activates through the normal settle path (payment:updated -> succeeded).
+   */
+  async startPlanPayment(
+    userId: string,
+    plan: { id: string; priceUsd: number },
+    method: string,
+    phone: unknown,
+  ): Promise<Payment> {
+    const amount = Number(plan.priceUsd.toFixed(2));
+    if (method === 'wallet') {
+      const payment = await this.payments.manager.transaction(async (m) => {
+        await this.wallet.apply(userId, 'debit', amount, `Seller plan ${plan.id}`, m);
+        return m.save(
+          this.payments.create({
+            reference: PaymentsService.newReference(),
+            orderId: null,
+            orderReference: null,
+            purpose: 'plan',
+            subject: plan.id,
+            userId,
+            method: 'wallet',
+            amountUsd: amount,
+            status: 'succeeded',
+          }),
+        );
+      });
+      this.emitter.toUser(userId, 'payment:created', this.view(payment));
+      this.emitter.toRoles(FINANCE_ROLES, 'payment:created', this.view(payment));
+      if (this.planSettled) await this.planSettled(payment);
+      return this.view(payment);
+    }
+    if (!isMobileMoney(method)) {
+      throw new BadRequestException(`Pay with your wallet or mobile money (${MOBILE_MONEY_METHODS.join(', ')}).`);
+    }
+    await this.assertMethodAllowed(method);
+    const open = await this.payments.count({ where: { userId, purpose: 'plan', status: 'pending' } });
+    if (open >= 2) {
+      throw new BadRequestException('You already have a pending plan payment. Approve it or wait for it to expire first.');
+    }
+    const created = await this.payments.save(
+      this.payments.create({
+        reference: PaymentsService.newReference(),
+        orderId: null,
+        orderReference: null,
+        purpose: 'plan',
+        subject: plan.id,
+        userId,
+        method,
+        amountUsd: amount,
+        status: 'pending',
+        phone: PaymentsService.normalisePhone(phone),
+      }),
+    );
+    const started = await this.startMobileMoney(created);
+    this.emitter.toUser(userId, 'payment:created', this.view(started));
+    this.emitter.toRoles(FINANCE_ROLES, 'payment:created', this.view(started));
+    if (started.status === 'failed') {
+      throw new BadRequestException(started.failureReason ?? 'Payment failed.');
+    }
+    return this.view(started);
   }
 
   /** Ask the network to prompt the subscriber; a provider error fails the payment. */
@@ -373,12 +447,17 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (saved.purpose === 'order' && wasPending && this.orderSettled) {
       await this.orderSettled(saved, 'succeeded');
     }
+    if (saved.purpose === 'plan' && wasPending && this.planSettled) {
+      await this.planSettled(saved);
+    }
     await this.notifications.toUser(saved.userId, {
       title: 'Payment received',
       body:
         saved.purpose === 'topup'
           ? `$${saved.amountUsd.toFixed(2)} added to your wallet.`
-          : `Payment for ${saved.orderReference} confirmed.`,
+          : saved.purpose === 'plan'
+            ? `Payment for your ${saved.subject ?? ''} seller plan confirmed.`
+            : `Payment for ${saved.orderReference} confirmed.`,
       type: 'payment',
       entityId: saved.orderId ?? saved.id,
     });
@@ -480,12 +559,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
 
-  async list(user: { id: string; role: string }): Promise<Payment[]> {
+  async list(user: { id: string; role: string }, paging?: unknown): Promise<Payment[]> {
     // Only finance/admin see every payment; everyone else just their own.
     const all = user.role === 'admin' || user.role === 'admin_finance';
+    const { take, skip } = pageOf(paging, { def: all ? 200 : DEFAULT_LIMIT });
     const rows = all
-      ? await this.payments.find({ order: { createdAt: 'DESC' }, take: 200 })
-      : await this.payments.find({ where: { userId: user.id }, order: { createdAt: 'DESC' } });
+      ? await this.payments.find({ order: { createdAt: 'DESC' }, take, skip })
+      : await this.payments.find({ where: { userId: user.id }, order: { createdAt: 'DESC' }, take, skip });
     return rows.map((p) => this.view(p));
   }
 

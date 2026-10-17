@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'app.dart';
 import 'data/market_profiles.dart';
 import 'data/shop_state.dart';
+import 'l10n/strings.dart';
 import 'screens/more/auth_screens.dart';
 import 'services/realtime_store.dart';
 import 'theme/app_theme.dart';
@@ -12,6 +14,8 @@ import 'util/format.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting();
+  await Strings.restore();
   await ShopState.instance.load();
   // Keep the cart's prices/stock in step with the live catalogue.
   RealtimeStore.instance.addListener(ShopState.instance.syncWithCatalog);
@@ -30,7 +34,7 @@ class SombaApp extends StatefulWidget {
 }
 
 class _SombaAppState extends State<SombaApp> {
-  Locale _locale = const Locale('fr');
+  Locale _locale = Locale(Strings.current.lang);
   bool _splashDone = false;
   bool _restored = false;
   bool _authed = false;
@@ -40,14 +44,16 @@ class _SombaAppState extends State<SombaApp> {
   @override
   void initState() {
     super.initState();
+    Strings.langNotifier.addListener(_onLang);
     // The server can end a session (revoked, suspended, deleted): go back to sign-in.
-    RealtimeStore.instance.onSessionEnded = (message) {
+    RealtimeStore.instance.onSessionEnded = (messageKey) {
       if (!mounted) return;
       ShopState.instance.clearSession();
       // Close every pushed screen (settings, delete-account…) so sign-in is what the user sees.
       _navigator.currentState?.popUntil((r) => r.isFirst);
       setState(() => _authed = false);
-      _messenger.currentState?.showSnackBar(SnackBar(content: Text(message ?? 'You were signed out. Please sign in again.')));
+      final s = Strings.current;
+      _messenger.currentState?.showSnackBar(SnackBar(content: Text(s.has(messageKey ?? '') ? s.t(messageKey!) : s.errSignedOut)));
     };
     // Silently restore the previous session (stored refresh token) during the splash.
     RealtimeStore.instance.tryRestore().timeout(const Duration(seconds: 8), onTimeout: () => false).then((ok) {
@@ -59,17 +65,35 @@ class _SombaAppState extends State<SombaApp> {
     });
   }
 
+  @override
+  void dispose() {
+    Strings.langNotifier.removeListener(_onLang);
+    super.dispose();
+  }
+
+  void _onLang() {
+    if (mounted) setState(() => _locale = Locale(Strings.langNotifier.value));
+  }
+
   /// Called once a session exists (restored or freshly signed in).
   void _enter() {
     _authed = true;
     final user = RealtimeStore.instance.user;
-    if (user != null) _locale = Locale(user.locale == 'en' ? 'en' : 'fr');
+    if (user != null) {
+      if (!Strings.hasChoice) {
+        // No choice made on this device yet: follow the account's language.
+        Strings.setLang(user.locale, persist: false);
+      } else if (user.locale != Strings.current.lang) {
+        // The language picked on this device wins; tell the account.
+        unawaited(RealtimeStore.instance.updateProfile(locale: Strings.current.lang).catchError((_) {}));
+      }
+    }
     final market = RealtimeStore.instance.prefs['market'];
     marketNotifier.value = market == 'FR' ? MarketProfileId.france : MarketProfileId.drc;
   }
 
   void _setLocale(Locale locale) {
-    setState(() => _locale = locale);
+    Strings.setLang(locale.languageCode);
     if (RealtimeStore.instance.isSignedIn) {
       unawaited(RealtimeStore.instance.updateProfile(locale: locale.languageCode).catchError((_) {}));
     }

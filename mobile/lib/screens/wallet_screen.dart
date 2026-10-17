@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/notification_text.dart';
 import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/realtime_store.dart';
@@ -18,8 +19,6 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  String get _lang => widget.locale.languageCode;
-
   void _topUp() {
     showModalBottomSheet(
       context: context,
@@ -30,7 +29,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(_lang);
+    final s = Strings.of(context);
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
@@ -43,7 +42,7 @@ class _WalletScreenState extends State<WalletScreen> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(24)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(s.isFr ? 'Solde disponible' : 'Available balance',
+                Text(s.walletAvailable,
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                 const SizedBox(height: 6),
                 Text(money(store.walletBalance),
@@ -57,29 +56,29 @@ class _WalletScreenState extends State<WalletScreen> {
                   onPressed: _topUp,
                   style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.primary),
                   icon: const Icon(Icons.add_rounded),
-                  label: Text(s.isFr ? 'Recharger via Mobile Money' : 'Top up with mobile money'),
+                  label: Text(s.walletTopupBtn),
                 ),
               ]),
             ),
             for (final p in store.failedTopups) ...[
               const SizedBox(height: 14),
-              _FailedTopUp(payment: p, lang: _lang),
+              _FailedTopUp(payment: p),
             ],
             for (final p in pending) ...[
               const SizedBox(height: 14),
-              _PendingTopUp(payment: p, lang: _lang),
+              _PendingTopUp(payment: p),
             ],
             const SizedBox(height: 22),
-            Text(s.isFr ? 'Historique' : 'History', style: Theme.of(context).textTheme.titleMedium),
+            Text(s.walletHistory, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 10),
             if (store.walletTransactions.isEmpty)
-              const Panel(child: Text('No transactions yet.', style: TextStyle(color: AppColors.muted)))
+              Panel(child: Text(s.walletNoTx, style: const TextStyle(color: AppColors.muted)))
             else
               Panel(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Column(children: [
                   for (var i = 0; i < store.walletTransactions.length; i++) ...[
-                    _txTile(store.walletTransactions[i]),
+                    _txTile(s, store.walletTransactions[i]),
                     if (i != store.walletTransactions.length - 1) const Divider(height: 1),
                   ],
                 ]),
@@ -90,7 +89,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _txTile(WalletTransactionDto t) {
+  Widget _txTile(Strings s, WalletTransactionDto t) {
     final credit = const {'credit', 'cashback', 'refund', 'topup'}.contains(t.type);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -102,7 +101,7 @@ class _WalletScreenState extends State<WalletScreen> {
           child: Icon(credit ? Icons.south_west_rounded : Icons.north_east_rounded, size: 20, color: credit ? AppColors.success : AppColors.danger),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(t.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+        Expanded(child: Text(localizeWalletDescription(s, t.description), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
         Text('${credit ? '+' : '−'}${money(t.amount)}',
             style: TextStyle(fontWeight: FontWeight.w800, color: credit ? AppColors.success : AppColors.ink)),
       ]),
@@ -113,12 +112,11 @@ class _WalletScreenState extends State<WalletScreen> {
 /// A top-up the network declined or that expired: say why, until dismissed.
 class _FailedTopUp extends StatelessWidget {
   final PaymentDto payment;
-  final String lang;
-  const _FailedTopUp({required this.payment, required this.lang});
+  const _FailedTopUp({required this.payment});
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(lang);
+    final s = Strings.of(context);
     final reason = payment.failureReason;
     return Dismissible(
       key: ValueKey('topup-failed-${payment.id}'),
@@ -133,17 +131,17 @@ class _FailedTopUp extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
-                s.isFr ? 'Recharge de ${money(payment.amountUsd)} non aboutie' : 'Top-up of ${money(payment.amountUsd)} failed',
+                s.topupFailed(money(payment.amountUsd)),
                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.danger),
               ),
               const SizedBox(height: 2),
-              Text(reason ?? (s.isFr ? 'La demande a été refusée ou a expiré.' : 'The request was declined or expired.'),
+              Text(reason == null ? s.topupFailedDefault : s.serverError(reason),
                   key: const ValueKey('topup-failed-reason'), style: const TextStyle(fontSize: 13, height: 1.35)),
             ]),
           ),
           IconButton(
             key: const ValueKey('topup-failed-dismiss'),
-            tooltip: s.isFr ? 'Fermer' : 'Dismiss',
+            tooltip: s.dismiss,
             icon: const Icon(Icons.close_rounded, size: 20),
             onPressed: () => RealtimeStore.instance.dismissTopupFailure(payment.id),
           ),
@@ -155,12 +153,11 @@ class _FailedTopUp extends StatelessWidget {
 
 class _PendingTopUp extends StatelessWidget {
   final PaymentDto payment;
-  final String lang;
-  const _PendingTopUp({required this.payment, required this.lang});
+  const _PendingTopUp({required this.payment});
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(lang);
+    final s = Strings.of(context);
     return Container(
       key: const ValueKey('topup-pending'),
       padding: const EdgeInsets.all(14),
@@ -170,9 +167,7 @@ class _PendingTopUp extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            s.isFr
-                ? 'Approuvez la demande ${s.paymentLabel(payment.method)} de ${money(payment.amountUsd)} sur votre téléphone.'
-                : 'Approve the ${s.paymentLabel(payment.method)} request for ${money(payment.amountUsd)} on your phone.',
+            s.topupPending(s.paymentLabel(payment.method), money(payment.amountUsd)),
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
           ),
         ),
@@ -203,11 +198,11 @@ class _TopUpSheetState extends State<_TopUpSheet> {
   }
 
   Future<void> _submit() async {
-    final fr = widget.locale.languageCode == 'fr';
+    final s = Strings.of(context);
     final amount = double.tryParse(_amount.text.replaceAll(',', '.'));
     setState(() {
-      _amountErr = (amount == null || amount < 1) ? (fr ? 'Montant minimum 1 \$' : 'Enter an amount of at least \$1') : null;
-      _phoneErr = validateMobileNumber(_phone.text, fr: fr);
+      _amountErr = (amount == null || amount < 1) ? s.topupAmountMin : null;
+      _phoneErr = validateMobileNumber(_phone.text, s);
     });
     if (_amountErr != null || _phoneErr != null) return;
     setState(() => _busy = true);
@@ -216,31 +211,31 @@ class _TopUpSheetState extends State<_TopUpSheet> {
       await RealtimeStore.instance.topUpWallet(amount!, method: _method, phone: _phone.text.trim());
       if (!mounted) return;
       Navigator.pop(context);
-      messenger.showSnackBar(SnackBar(content: Text(fr ? 'Approuvez la demande sur votre téléphone.' : 'Approve the request on your phone.')));
+      messenger.showSnackBar(SnackBar(content: Text(s.topupApproveToast)));
     } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fr = widget.locale.languageCode == 'fr';
+    final s = Strings.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(fr ? 'Recharger le portefeuille' : 'Top up wallet', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+          Text(s.topupTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 14),
           TextField(
             key: const ValueKey('topup-amount'),
             controller: _amount,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: fr ? 'Montant (USD)' : 'Amount (USD)', prefixText: '\$ ', errorText: _amountErr),
+            decoration: InputDecoration(labelText: s.topupAmount, prefixText: '\$ ', errorText: _amountErr),
           ),
           const SizedBox(height: 14),
           MobileMoneyPicker(
-            locale: widget.locale.languageCode,
+            locale: s.lang,
             method: _method,
             onMethod: (m) => setState(() => _method = m),
             phone: _phone,
@@ -250,7 +245,7 @@ class _TopUpSheetState extends State<_TopUpSheet> {
           FilledButton(
             key: const ValueKey('topup-submit'),
             onPressed: _busy ? null : _submit,
-            child: Text(_busy ? '…' : (fr ? 'Envoyer la demande' : 'Send request')),
+            child: Text(_busy ? '…' : s.topupSend),
           ),
         ]),
       ),

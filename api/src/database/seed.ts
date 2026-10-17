@@ -28,6 +28,7 @@ import { UsersService } from '../users/users.service';
 import { OrdersService } from '../orders/orders.service';
 import type { UserRole } from './entities';
 import { seedCategories, seedProducts } from './seed-catalog';
+import { DEFAULT_SELLER_PLANS } from '../content/plans';
 
 /** Every demo account shares one password so the prototype is easy to drive. */
 const DEMO_PASSWORD = 'Somba@2026';
@@ -205,6 +206,9 @@ async function run() {
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
     setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),
+    // Dev/demo accounts are not verified, so the policy is off here; bootstrap-prod turns it on.
+    setRepo.create({ key: 'requireVerifiedForCheckout', value: 'false' }),
+    setRepo.create({ key: 'sellerPlans', value: JSON.stringify(DEFAULT_SELLER_PLANS) }),
     setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
   ]);
 

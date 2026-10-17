@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/strings.dart';
 import '../services/realtime_store.dart';
 import 'catalog_live.dart';
 import 'catalog_models.dart';
@@ -61,9 +62,10 @@ class ShopState {
         return null;
       }
       appliedPromo = null;
-      return (res['reason'] ?? 'Invalid code.').toString();
+      final reason = res['reason']?.toString();
+      return reason == null ? Strings.current.promoInvalid : Strings.current.serverError(reason);
     } catch (e) {
-      return e.toString();
+      return Strings.current.errorText(e);
     }
   }
 

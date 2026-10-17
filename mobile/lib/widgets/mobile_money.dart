@@ -26,7 +26,7 @@ class MobileMoneyPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(locale);
+    final s = Strings.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 10, runSpacing: 10, children: [
         for (final m in mobileMoneyMethods)
@@ -46,13 +46,11 @@ class MobileMoneyPicker extends StatelessWidget {
         controller: phone,
         keyboardType: TextInputType.phone,
         decoration: InputDecoration(
-          labelText: s.isFr ? 'Numéro Mobile Money' : 'Mobile money number',
+          labelText: s.mmNumber,
           hintText: '+243 81 234 5678',
           errorText: phoneError,
           prefixIcon: const Icon(Icons.smartphone_rounded, size: 20),
-          helperText: s.isFr
-              ? 'Vous recevrez une demande de confirmation sur ce numéro.'
-              : 'You will get an approval request on this number.',
+          helperText: s.mmHelper,
         ),
       ),
     ]);
@@ -60,10 +58,8 @@ class MobileMoneyPicker extends StatelessWidget {
 }
 
 /// Client-side sanity check mirroring the server rule (9–15 digits, optional +).
-String? validateMobileNumber(String raw, {bool fr = false}) {
+String? validateMobileNumber(String raw, Strings s) {
   final p = raw.replaceAll(RegExp(r'[\s().-]'), '');
-  if (!RegExp(r'^\+?[0-9]{9,15}$').hasMatch(p)) {
-    return fr ? 'Entrez un numéro valide, ex. +243 81 234 5678' : 'Enter a valid number, e.g. +243 81 234 5678';
-  }
+  if (!RegExp(r'^\+?[0-9]{9,15}$').hasMatch(p)) return s.mmInvalid;
   return null;
 }

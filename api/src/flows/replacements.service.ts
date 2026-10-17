@@ -27,7 +27,7 @@ export class ReplacementsService {
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
       return this.replacements.find({ order: { createdAt: 'DESC' }, take: 200 });
     }
-    return this.replacements.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
+    return this.replacements.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take: 500 });
   }
 
   async create(

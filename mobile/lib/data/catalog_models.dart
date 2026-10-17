@@ -15,6 +15,7 @@ class Product {
   final int reviews;
   final String image;
   final String category;
+  final String categoryFr;
   final int stock;
   final String? sellerId;
   final String? sellerName;
@@ -33,6 +34,7 @@ class Product {
     required this.reviews,
     required this.image,
     required this.category,
+    this.categoryFr = '',
     this.stock = 0,
     this.sellerId,
     this.sellerName,
@@ -41,6 +43,8 @@ class Product {
   });
 
   String displayName(String lang) => lang == 'fr' ? nameFr : name;
+  /// Category name in the app language (falls back to the English name).
+  String displayCategory(String lang) => lang == 'fr' && categoryFr.isNotEmpty ? categoryFr : category;
   bool get inStock => stock > 0;
 }
 

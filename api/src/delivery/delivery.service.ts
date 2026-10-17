@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { SettingsService } from '../content/settings.service';
+import { pageOf } from '../common/paging';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 
@@ -53,22 +54,30 @@ export class DeliveryService {
     private readonly settings: SettingsService,
   ) {}
 
-  listUnassigned(): Promise<DeliveryTask[]> {
+  listUnassigned(paging?: unknown): Promise<DeliveryTask[]> {
+    const { take, skip } = pageOf(paging);
     return this.tasks.find({
       where: { status: 'unassigned' },
       order: { createdAt: 'ASC' },
+      take,
+      skip,
     });
   }
 
-  listForRider(riderId: string): Promise<DeliveryTask[]> {
+  listForRider(riderId: string, paging?: unknown): Promise<DeliveryTask[]> {
+    const { take, skip } = pageOf(paging);
     return this.tasks.find({
       where: { riderId },
       order: { updatedAt: 'DESC' },
+      take,
+      skip,
     });
   }
 
-  listAll(): Promise<DeliveryTask[]> {
-    return this.tasks.find({ order: { updatedAt: 'DESC' }, take: 200 });
+  /** Newest 200 by default (the dispatch desk's view); `limit`/`offset` page further back. */
+  listAll(paging?: unknown): Promise<DeliveryTask[]> {
+    const { take, skip } = pageOf(paging, { def: 200 });
+    return this.tasks.find({ order: { updatedAt: 'DESC' }, take, skip });
   }
 
   /**
@@ -151,7 +160,12 @@ export class DeliveryService {
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
-      .set({ status, ...(failure ? { failureReason: failure } : {}) })
+      .set({
+        status,
+        ...(failure ? { failureReason: failure } : {}),
+        ...(status === 'picked_up' ? { pickedUpAt: new Date() } : {}),
+        ...(status === 'delivered' ? { deliveredAt: new Date() } : {}),
+      })
       .where('id = :id AND status = :cur', { id: taskId, cur: task.status })
       .execute();
     if (!claim.affected) throw new BadRequestException('This delivery was just updated. Refresh and try again.');

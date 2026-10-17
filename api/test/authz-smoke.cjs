@@ -47,6 +47,8 @@ const register = async (label, role = 'customer') => {
 (async () => {
   const admin = await login('admin@somba.app');
   const finance = await login('finance@somba.app');
+  const ops = await login('ops@somba.app');
+  const guest = { sock: await connect() };
   const warehouse = await login('warehouse@somba.app');
   const rider = await login('rider@somba.app');
   const cust = await register('cust');
@@ -315,6 +317,135 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(cust.sock, 'broadcasts:send', { title: 'x', body: 'y' })).ok, 'a customer cannot send broadcasts');
   ok(!(await req(cust.sock, 'analytics:admin')).ok && !(await req(rider.sock, 'analytics:admin')).ok, 'analytics are not open to customers or riders');
   ok(!(await req(cust.sock, 'audit:list')).ok, 'the audit log is not open to customers');
+
+  // ---- analytics, plans, reviews, hubs, campaigns: who may do what ---------------------------
+  section('New analytics events: role boundaries');
+  const everyone = { admin, finance, ops, warehouse, rider, seller: sellerA, customer: cust, guest };
+  const allowed = (ev, who, body) => Promise.all(Object.entries(everyone).map(async ([name, u]) => [name, (await req(u.sock, ev, body)).ok]));
+  const check = async (ev, yes, body) => {
+    const rows = await allowed(ev, null, body);
+    const wrong = rows.filter(([n, ok_]) => ok_ !== yes.includes(n)).map(([n, ok_]) => `${n}:${ok_ ? 'allowed' : 'denied'}`);
+    ok(wrong.length === 0, `${ev} is open to exactly ${yes.join(', ')}`, wrong.join(' '));
+  };
+  await check('analytics:finance', ['admin', 'finance']);
+  await check('analytics:admin', ['admin', 'finance', 'ops']);
+  await check('analytics:revenue', ['admin', 'finance', 'ops'], { days: 5 });
+  await check('analytics:warehouse', ['admin', 'finance', 'ops', 'warehouse']);
+  await check('analytics:seller', ['seller'], {});
+  await check('analytics:seller', ['admin', 'finance', 'ops', 'seller'], { sellerId: sellerA.store.id });
+  ok(!(await req(warehouse.sock, 'analytics:seller', { sellerId: sellerA.store.id })).ok && !(await req(cust.sock, 'analytics:seller', { sellerId: sellerA.store.id })).ok, 'warehouse staff and customers cannot read a store by passing its id');
+
+  section('Seller analytics: own data only');
+  const prodB = (await req(sellerB.sock, 'products:create', { name: `B Gadget ${tag}`, price: 30, category: 'Electronics', stock: 20 })).data;
+  const payIt = (c, pid, qty) => req(c.sock, 'orders:create', { items: [{ productId: pid, qty }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  await payIt(cust, prodA.id, 1);
+  await payIt(cust2, prodB.id, 3);
+  const aA = (await req(sellerA.sock, 'analytics:seller', { days: 30 })).data;
+  const aB = (await req(sellerB.sock, 'analytics:seller', { days: 30 })).data;
+  ok(aA.sellerId === sellerA.store.id && aB.sellerId === sellerB.store.id, 'each seller gets their own store');
+  ok(aA.topProducts.every((t) => t.productId !== prodB.id) && aB.topProducts.every((t) => t.productId !== prodA.id), "neither store's top products contain the other's");
+  ok(aB.topProducts.some((t) => t.productId === prodB.id && t.units === 3 && t.revenue === 90), "store B's numbers are its own: 3 x $30");
+  const spoof = (await req(sellerB.sock, 'analytics:seller', { days: 30, sellerId: sellerA.store.id })).data;
+  ok(spoof.sellerId === sellerB.store.id && spoof.revenue === aB.revenue, "a seller passing another store's sellerId still gets only their own data");
+  const sa2 = (await req(sellerA.sock, 'sellers:stats')).data;
+  const sb2 = (await req(sellerB.sock, 'sellers:stats')).data;
+  ok(sa2.revenue === aA.revenue && sb2.revenue === aB.revenue && sa2.revenue !== sb2.revenue, 'sellers:stats is per store and matches the analytics');
+  ok((await req(sellerP.sock, 'sellers:stats')).data.orders === 0, 'a store with no sales has zero orders');
+
+  section('Seller plans: nobody can grant themselves one');
+  ok((await req(guest.sock, 'sellers:plans')).ok && (await req(cust.sock, 'sellers:plans')).ok, 'sellers:plans is public');
+  for (const [name, u] of Object.entries({ customer: cust, admin, finance, warehouse, rider, guest })) {
+    ok(!(await req(u.sock, 'sellers:subscribe', { plan: 'pro', method: 'wallet' })).ok, `${name} cannot call sellers:subscribe`);
+  }
+  a = await req(sellerB.sock, 'sellers:update', { plan: 'pro', planExpiresAt: '2099-01-01', name: `selB Store ${tag}` });
+  const meB = (await req(sellerB.sock, 'sellers:mine')).data;
+  ok(meB.plan === 'free' && meB.activePlan === 'free' && meB.planExpiresAt === null, 'sellers:update ignores plan / planExpiresAt (no mass assignment)');
+  const sus = await makeSeller('selS', true);
+  await req(admin.sock, 'sellers:setStatus', { id: sus.store.id, status: 'suspended' });
+  ok(!(await req(sus.sock, 'sellers:subscribe', { plan: 'starter', method: 'airtel_money', phone: PHONE })).ok, 'a suspended store cannot buy a plan');
+  a = await req(sellerB.sock, 'sellers:subscribe', { plan: 'starter', method: 'airtel_money', phone: PHONE });
+  ok(a.ok && a.data.status === 'pending', 'a store can start a plan payment');
+  ok(!(await req(sellerB.sock, 'payments:confirm', { reference: a.data.payment.reference })).ok && !(await req(ops.sock, 'payments:confirm', { reference: a.data.payment.reference })).ok, 'neither the seller nor ops can confirm it (finance / admin only)');
+  ok((await req(sellerB.sock, 'sellers:mine')).data.plan === 'free', 'so the plan stays free until the money is confirmed');
+  ok(!(await req(sellerB.sock, 'settings:set', { key: 'sellerPlans', value: '[]' })).ok && !(await req(warehouse.sock, 'settings:set', { key: 'sellerPlans', value: '[]' })).ok, 'sellers and warehouse cannot edit the plan catalogue');
+  ok(!(await req(rider.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' })).ok && !(await req(sellerA.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' })).ok, 'only config roles can change the verification policy');
+  ok((await req(guest.sock, 'settings:get')).data.requireVerifiedForCheckout !== undefined, 'guests can read the verification policy');
+  ok((await req(guest.sock, 'settings:get')).data.sellerPlans === undefined, 'but not the admin-only plan setting (sellers:plans is the public view)');
+
+  section('Reviews: reply and moderation boundaries');
+  const rprod = (await req(sellerA.sock, 'products:create', { name: `A Reviewed ${tag}`, price: 20, category: 'Electronics', stock: 10 })).data;
+  const ro = (await payIt(cust, rprod.id, 1)).data;
+  const rt = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === ro.id));
+  await req(rider.sock, 'delivery:accept', { taskId: rt.id });
+  for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: rt.id, status: st });
+  const rv = (await req(cust.sock, 'reviews:create', { productId: rprod.id, rating: 3, text: 'Average product' })).data;
+  ok(rv && rv.status === 'visible', 'setup: a delivered buyer reviews');
+  for (const [name, u] of Object.entries({ sellerB, customer: cust, cust2, warehouse, rider, guest, finance })) {
+    ok(!(await req(u.sock, 'reviews:reply', { reviewId: rv.id, text: 'Hello from outside' })).ok, `${name} cannot reply to this review`);
+  }
+  for (const [name, u] of Object.entries({ seller: sellerA, customer: cust, warehouse, rider, guest, finance })) {
+    ok(!(await req(u.sock, 'reviews:setStatus', { reviewId: rv.id, status: 'hidden' })).ok, `${name} cannot hide a review`);
+    ok(!(await req(u.sock, 'reviews:admin')).ok, `${name} cannot open the review moderation queue`);
+  }
+  ok((await req(sellerA.sock, 'reviews:reply', { reviewId: rv.id, text: 'Thanks for the feedback' })).ok, 'the owning seller can reply');
+  ok((await req(admin.sock, 'reviews:reply', { reviewId: rv.id, text: 'Admin note to the buyer' })).ok, 'an admin can reply too');
+  a = await req(ops.sock, 'reviews:setStatus', { reviewId: rv.id, status: 'hidden' });
+  ok(a.ok && a.data.status === 'hidden', 'ops can moderate');
+  ok((await req(ops.sock, 'reviews:admin', { status: 'hidden' })).data.some((r) => r.id === rv.id), 'and see the queue');
+  ok(!(await req(sellerA.sock, 'reviews:list', { productId: rprod.id, includeHidden: true })).data.some((r) => r.id === rv.id), 'a seller cannot list hidden reviews either');
+  await req(ops.sock, 'reviews:setStatus', { reviewId: rv.id, status: 'visible' });
+  ok(!(await req(cust2.sock, 'reviews:setStatus', { reviewId: rv.id, status: 'visible' })).ok, 'nor restore them');
+  a = await req(cust.sock, 'reviews:create', { productId: rprod.id, rating: 5, text: 'Second review', status: 'visible', sellerReply: 'I reply to myself', helpful: 99 });
+  ok(!a.ok, 'one review per product, and extra fields never reach the row');
+
+  section('Hub directory: who may change it');
+  for (const [name, u] of Object.entries({ seller: sellerA, customer: cust, warehouse, rider, guest, finance })) {
+    ok(!(await req(u.sock, 'warehouse:saveHub', { name: `Evil Hub ${name} ${tag}`, city: 'Nowhere' })).ok, `${name} cannot create or edit hubs`);
+  }
+  a = await req(ops.sock, 'warehouse:saveHub', { name: `Ops Hub ${tag}`, city: 'Matadi', capacity: 50, active: false, id: undefined });
+  ok(a.ok && a.data.active === true, 'ops can create a hub; an `active` flag in the form is ignored (deactivation has its own event)');
+  const hubId = a.data.id;
+  ok(!(await req(warehouse.sock, 'warehouse:setHubActive', { id: hubId, active: false })).ok && !(await req(finance.sock, 'warehouse:setHubActive', { id: hubId, active: false })).ok && !(await req(sellerA.sock, 'warehouse:setHubActive', { id: hubId, active: false })).ok, 'only admin / ops can deactivate a hub');
+  ok((await req(ops.sock, 'warehouse:setHubActive', { id: hubId, active: false })).ok, 'ops can');
+  a = await req(admin.sock, 'warehouse:saveHub', { id: hubId, name: `Ops Hub ${tag}`, city: 'Matadi', active: true, capacity: 60 });
+  ok(a.ok && a.data.active === false && a.data.capacity === 60, 'editing a hub does not re-activate it');
+
+  section('Campaigns and prices: nothing a client sends can set a discount');
+  const prodC = (await req(sellerB.sock, 'products:create', { name: `A Campaign Item ${tag}`, price: 100, category: 'Electronics', stock: 40 })).data;
+  a = await req(sellerB.sock, 'campaigns:create', { name: `Hack ${tag}`, discount: 40, status: 'active', orders: 999, revenueUsd: 99999, views: 1e6, sellerId: sellerA.store.id, productIds: [prodC.id] });
+  ok(a.ok && a.data.status === 'pending' && a.data.orders === 0 && a.data.revenueUsd === 0 && a.data.views === 0 && a.data.sellerId === sellerB.store.id, 'a seller campaign always starts pending with zero counters, owned by the caller');
+  const hack = a.data;
+  const baseA = 100;
+  const gc = await req(cust.sock, 'products:get', { id: prodC.id });
+  ok(gc.data?.price === baseA, 'a pending campaign does not change the price', JSON.stringify(gc));
+  ok(!(await req(sellerB.sock, 'campaigns:setStatus', { id: hack.id, status: 'active' })).ok && !(await req(cust.sock, 'campaigns:setStatus', { id: hack.id, status: 'active' })).ok && !(await req(warehouse.sock, 'campaigns:setStatus', { id: hack.id, status: 'active' })).ok, 'only admins approve campaigns');
+  ok(!(await req(sellerA.sock, 'campaigns:update', { id: hack.id, patch: { discount: 1 } })).ok, "another seller cannot edit it");
+  ok(!(await req(sellerA.sock, 'campaigns:create', { name: 'Steal A', discount: 30, productIds: [prodC.id] })).ok, "or put the first store's product into theirs");
+  a = await payIt(cust, prodC.id, 1);
+  ok(a.ok && a.data.items[0].priceUsd === baseA, 'checkout charges the database price', JSON.stringify(a));
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodC.id, qty: 1, priceUsd: 1, campaignPct: 90, listPriceUsd: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', campaignDiscountUsd: 999, shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  ok(a.ok && a.data.items[0].priceUsd === baseA && a.data.campaignDiscountUsd === 0 && a.data.items[0].campaignPct === 0 && a.data.items[0].listPriceUsd === baseA, 'client-sent priceUsd / campaignPct / campaignDiscountUsd on an order are ignored');
+  await req(admin.sock, 'campaigns:setStatus', { id: hack.id, status: 'ended' });
+
+  section('Verification policy blocks the right people');
+  const un = await register('unv');
+  await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'true' });
+  try {
+    a = await payIt(un, prodA.id, 1);
+    ok(!a.ok && /verify/i.test(a.error ?? ''), 'an unverified customer cannot check out when the policy is on', a.error ?? '');
+    a = await req(un.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' });
+    ok(!a.ok && /verify/i.test(a.error ?? ''), 'whatever the payment method');
+    ok(!(await req(un.sock, 'wallet:topup', { amountUsd: 5, method: 'airtel_money', phone: PHONE })).ok, 'or top up');
+    ok(!(await req(guest.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet' })).ok, 'a guest never can');
+  } finally {
+    await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
+  }
+
+  section('List limits cannot be abused');
+  ok((await req(cust.sock, 'orders:list', { limit: 1e12, offset: -5 })).ok && (await req(cust.sock, 'products:list', { limit: 'DROP', offset: {} })).ok, 'absurd limit / offset values are normalised, not errors');
+  ok((await req(cust.sock, 'products:list', { limit: 2 })).data.length === 2, 'a small limit is honoured');
+  ok(!(await req(cust.sock, 'customers:list', { limit: 1 })).ok && !(await req(cust.sock, 'warehouse:parcels', { limit: 1 })).ok && !(await req(cust.sock, 'sellers:list', { limit: 1 })).ok, 'paging does not open staff lists to customers');
+  ok((await req(cust2.sock, 'orders:list', { limit: 500 })).data.every((o) => o.customerId === cust2.user.id), 'a customer only ever pages through their own orders');
 
   console.log(fails.length ? `\n❌ ${pass} passed, ${fails.length} failed:\n   - ${fails.join('\n   - ')}` : `\n🎉 ${pass} passed, 0 failed`);
   process.exit(fails.length ? 1 : 0);

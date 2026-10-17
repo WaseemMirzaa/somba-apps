@@ -6,6 +6,7 @@ import { AppModule } from '../app.module';
 import { Category, Hub, Setting, User } from './entities';
 import { UsersService } from '../users/users.service';
 import { seedCategories } from './seed-catalog';
+import { DEFAULT_SELLER_PLANS } from '../content/plans';
 
 /**
  * Production bootstrap — SAFE to run on a live database, any number of times.
@@ -85,6 +86,10 @@ async function run() {
     productModeration: 'true', // new seller listings wait for a moderator
     requireDeliveryCode: 'true', // riders must enter the customer's 4-digit code on handover
     minPayoutUsd: '10',
+    // Verification policy: an account needs a verified phone or email before it can
+    // order or top up its wallet (needs SMTP and/or Twilio to be configured, see docs/DEPLOYMENT.md).
+    requireVerifiedForCheckout: 'true',
+    sellerPlans: JSON.stringify(DEFAULT_SELLER_PLANS),
   };
   for (const [key, value] of Object.entries(defaults)) {
     if (!(await settings.findOne({ where: { key } }))) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/catalog_live.dart';
 import '../../data/catalog_models.dart';
+import '../../l10n/strings.dart';
 import '../../services/models.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
@@ -36,18 +37,19 @@ class _StoreScreenState extends State<StoreScreen> {
     }
   }
 
-  String get _name => (_seller?['name'] as String?) ?? widget.sellerName ?? 'Store';
-  String get _initials {
-    final parts = _name.split(' ').where((w) => w.isNotEmpty).toList();
+  String _name(Strings s) => (_seller?['name'] as String?) ?? widget.sellerName ?? s.storeFallback;
+  String _initials(Strings s) {
+    final name = _name(s);
+    final parts = name.split(' ').where((w) => w.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
-    return (parts.length >= 2 ? '${parts[0][0]}${parts[1][0]}' : _name.substring(0, _name.length >= 2 ? 2 : 1)).toUpperCase();
+    return (parts.length >= 2 ? '${parts[0][0]}${parts[1][0]}' : name.substring(0, name.length >= 2 ? 2 : 1)).toUpperCase();
   }
 
-  static String _badge(String? b) => switch (b) {
-        'gold' => 'Gold seller',
-        'silver' => 'Silver seller',
-        'somba_assured' => 'Somba Assured',
-        'bronze' => 'Bronze seller',
+  static String _badge(Strings s, String? b) => switch (b) {
+        'gold' => s.badgeGold,
+        'silver' => s.badgeSilver,
+        'somba_assured' => s.badgeSombaAssured,
+        'bronze' => s.badgeBronze,
         _ => '',
       };
 
@@ -56,14 +58,15 @@ class _StoreScreenState extends State<StoreScreen> {
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
+        final s = Strings.of(context);
         final items = liveCatalog().where((p) => p.sellerId == widget.sellerId).toList();
         final rating = (_seller?['rating'] as num?)?.toDouble() ?? 0;
-        final badge = _badge(_seller?['badge'] as String?);
+        final badge = _badge(s, _seller?['badge'] as String?);
         return Scaffold(
           body: CustomScrollView(slivers: [
-            SliverToBoxAdapter(child: _header(context, items.length, rating, badge)),
+            SliverToBoxAdapter(child: _header(context, s, items.length, rating, badge)),
             if (items.isEmpty)
-              const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('No products listed right now.', style: TextStyle(color: AppColors.muted))))
+              SliverFillRemaining(hasScrollBody: false, child: Center(child: Text(s.storeNoProducts, style: const TextStyle(color: AppColors.muted))))
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -78,7 +81,7 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  Widget _header(BuildContext context, int count, double rating, String badge) {
+  Widget _header(BuildContext context, Strings s, int count, double rating, String badge) {
     final top = MediaQuery.of(context).padding.top;
     return Container(
       padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
@@ -93,11 +96,11 @@ class _StoreScreenState extends State<StoreScreen> {
               height: 62,
               width: 62,
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-              child: Center(child: Text(_initials, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')))),
+              child: Center(child: Text(_initials(s), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')))),
           const SizedBox(width: 14),
           Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
+            Text(_name(s), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
             if (badge.isNotEmpty) ...[
               const SizedBox(height: 6),
               Container(
@@ -117,8 +120,8 @@ class _StoreScreenState extends State<StoreScreen> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            if (rating > 0) ...[_stat('${rating.toStringAsFixed(1)}★', 'Rating'), _div()],
-            _stat('$count', 'Products'),
+            if (rating > 0) ...[_stat('${s.number(rating, decimals: 1)}★', s.statRating), _div()],
+            _stat('$count', s.products),
           ]),
         ),
       ]),
@@ -148,24 +151,25 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Reviews'),
+      appBar: backAppBar(context, s.reviewsTitle),
       body: FutureBuilder<List<ReviewDto>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
           final reviews = snap.data ?? const <ReviewDto>[];
-          final avg = reviews.isEmpty ? 0.0 : reviews.fold<int>(0, (s, r) => s + r.rating) / reviews.length;
+          final avg = reviews.isEmpty ? 0.0 : reviews.fold<int>(0, (sum, r) => sum + r.rating) / reviews.length;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
             if (reviews.isNotEmpty)
               Panel(
                   child: Row(children: [
                 Column(children: [
-                  Text(avg.toStringAsFixed(1), style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', height: 1)),
+                  Text(s.number(avg, decimals: 1), style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', height: 1)),
                   const SizedBox(height: 4),
                   RatingPill(avg),
                   const SizedBox(height: 4),
-                  Text('${reviews.length} review${reviews.length == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                  Text(reviews.length == 1 ? s.reviewOne(1) : s.reviewMany(reviews.length), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                 ]),
                 const SizedBox(width: 20),
                 Expanded(
@@ -184,7 +188,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 }))),
               ]))
             else
-              const Panel(child: Text('No reviews yet — be the first.', style: TextStyle(color: AppColors.muted))),
+              Panel(child: Text(s.reviewsNone, style: const TextStyle(color: AppColors.muted))),
             const SizedBox(height: 14),
             ...reviews.map((r) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Panel(child: reviewTile(r)))),
           ]);
@@ -192,7 +196,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       ),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
-        child: PrimaryButton('Write a review',
+        child: PrimaryButton(s.reviewTitle,
             icon: Icons.rate_review_rounded,
             onPressed: () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: widget.locale, product: widget.product)));

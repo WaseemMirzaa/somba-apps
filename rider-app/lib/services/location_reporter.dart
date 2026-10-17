@@ -4,8 +4,57 @@ import 'package:geolocator/geolocator.dart';
 
 enum LocationAccess { granted, denied, deniedForever, serviceOff }
 
-/// Streams the rider's REAL position while a delivery is on the road. The
-/// customer (and ops) see it live through `delivery:location`.
+/// Text of the Android foreground-service notification shown while the position
+/// is shared in the background (already in the rider's language).
+class TrackingNotice {
+  final String title;
+  final String text;
+  final String channel;
+  const TrackingNotice({required this.title, required this.text, required this.channel});
+}
+
+/// The settings that keep the position stream alive when the screen is off or
+/// the app is in the background:
+///  * Android: a foreground service of type `location` with an ongoing
+///    notification (geolocator's [ForegroundNotificationConfig]);
+///  * iOS: `allowBackgroundLocationUpdates` (needs the `location` background
+///    mode in Info.plist) with the blue "location in use" indicator;
+///  * anything else (web, desktop, tests): a plain foreground stream.
+LocationSettings trackingSettings(TrackingNotice notice, {TargetPlatform? platform, bool web = kIsWeb}) {
+  const distanceFilter = 10;
+  if (web) return const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: distanceFilter);
+  switch (platform ?? defaultTargetPlatform) {
+    case TargetPlatform.android:
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: distanceFilter,
+        intervalDuration: const Duration(seconds: 5),
+        foregroundNotificationConfig: ForegroundNotificationConfig(
+          notificationTitle: notice.title,
+          notificationText: notice.text,
+          notificationChannelName: notice.channel,
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: distanceFilter,
+        activityType: ActivityType.automotiveNavigation,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    default:
+      return const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: distanceFilter);
+  }
+}
+
+/// Streams the rider's REAL position while a delivery is on the road
+/// (`in_transit`), also with the screen off. The customer (and ops) see it live
+/// through `delivery:location`. Stopped when the delivery ends or on sign-out.
 class LocationReporter {
   StreamSubscription<Position>? _sub;
   String? _taskId;
@@ -39,14 +88,14 @@ class LocationReporter {
 
   /// Start reporting for [taskId]. [send] pushes one fix to the server. Fixes are
   /// throttled to one every 4 s and only when the rider moved at least 10 m.
-  Future<LocationAccess> start(String taskId, Future<void> Function(double lat, double lng) send) async {
+  Future<LocationAccess> start(String taskId, Future<void> Function(double lat, double lng) send, {required TrackingNotice notice}) async {
     final access = await ensureAccess();
     if (access != LocationAccess.granted) return access;
     if (_taskId == taskId && _sub != null) return access;
     await stop();
     _taskId = taskId;
     _sub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10),
+      locationSettings: trackingSettings(notice),
     ).listen((pos) {
       last.value = pos;
       final now = DateTime.now();

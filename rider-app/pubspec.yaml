@@ -16,6 +16,8 @@ dependencies:
   socket_io_client: ^2.0.3+1
   shared_preferences: ^2.3.0
   geolocator: ^14.1.1
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
 
 dev_dependencies:
   flutter_test:

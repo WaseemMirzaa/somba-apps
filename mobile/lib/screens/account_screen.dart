@@ -22,7 +22,7 @@ class AccountScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(locale.languageCode);
+    final s = Strings.of(context);
 
     return ListenableBuilder(listenable: RealtimeStore.instance, builder: (context, _) => Scaffold(
       body: ListView(
@@ -39,22 +39,22 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: locale)))),
             _MenuItem(Icons.account_balance_wallet_outlined, s.wallet, AppColors.royalBlue,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => WalletScreen(locale: locale)))),
-            _MenuItem(Icons.assignment_return_outlined, 'Returns & refunds', AppColors.accent,
+            _MenuItem(Icons.assignment_return_outlined, s.returnsRefunds, AppColors.accent,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnsListScreen(locale: locale)))),
-            _MenuItem(Icons.local_offer_outlined, 'Coupons', AppColors.amber,
+            _MenuItem(Icons.local_offer_outlined, s.couponsTitle, AppColors.amber,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CouponsScreen(locale: locale)))),
           ]),
           const SizedBox(height: 14),
           _languageCard(s),
           const SizedBox(height: 14),
           _menuCard(context, [
-            _MenuItem(Icons.person_outline_rounded, 'Edit profile', AppColors.primary,
+            _MenuItem(Icons.person_outline_rounded, s.editProfile, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerEditProfileScreen(locale: locale)))),
-            _MenuItem(Icons.notifications_none_rounded, 'Notifications', AppColors.primary,
+            _MenuItem(Icons.notifications_none_rounded, s.notifications, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
-            _MenuItem(Icons.confirmation_number_outlined, 'Support', AppColors.royalBlue,
+            _MenuItem(Icons.confirmation_number_outlined, s.support, AppColors.royalBlue,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
-            _MenuItem(Icons.settings_outlined, 'Settings', AppColors.inkSoft,
+            _MenuItem(Icons.settings_outlined, s.settings, AppColors.inkSoft,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSettingsScreen(locale: locale)))),
             _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: locale)))),
@@ -69,7 +69,7 @@ class AccountScreen extends StatelessWidget {
                 boxShadow: AppShadow.card,
               ),
               child: ListTile(
-                onTap: () => _confirmLogout(context),
+                onTap: () => _confirmLogout(context, s),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                 leading: Container(
                   height: 40,
@@ -77,7 +77,7 @@ class AccountScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
                 ),
-                title: const Text('Log out', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
+                title: Text(s.logout, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
               ),
             ),
           ),
@@ -146,7 +146,7 @@ class AccountScreen extends StatelessWidget {
                             Icon(RealtimeStore.instance.user!.emailVerified ? Icons.verified_rounded : Icons.mail_outline_rounded,
                                 color: Colors.white, size: 14),
                             const SizedBox(width: 4),
-                            Text(RealtimeStore.instance.user!.emailVerified ? 'Email verified' : 'Email not verified',
+                            Text(RealtimeStore.instance.user!.emailVerified ? s.emailVerified : s.emailNotVerified,
                                 style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
                             if (!RealtimeStore.instance.user!.emailVerified) ...[
                               const SizedBox(width: 2),
@@ -286,7 +286,7 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  void _confirmLogout(BuildContext context) {
+  void _confirmLogout(BuildContext context, Strings s) {
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
@@ -299,9 +299,9 @@ class AccountScreen extends StatelessWidget {
               child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 28),
             ),
             const SizedBox(height: 16),
-            const Text('Log out?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
+            Text(s.logoutTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, fontFamily: 'PlusJakartaSans')),
             const SizedBox(height: 6),
-            const Text('You can sign back in anytime to see your orders and wishlist.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
+            Text(s.logoutHint, style: const TextStyle(color: AppColors.muted, fontSize: 13.5)),
             const SizedBox(height: 20),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
@@ -311,10 +311,10 @@ class AccountScreen extends StatelessWidget {
                 ShopState.instance.clearSession();
                 onLogout?.call();
               },
-              child: const Text('Log out'),
+              child: Text(s.logout),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            OutlinedButton(onPressed: () => Navigator.pop(context), child: Text(s.cancel)),
           ]),
         ),
       ),

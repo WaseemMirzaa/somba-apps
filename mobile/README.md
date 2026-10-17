@@ -99,3 +99,17 @@ flutter analyze && flutter test                      # widget tests
 flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```
+
+
+## Languages (French / English)
+
+French is the default (the market is DR Congo); the language can be switched on the sign-in screens and in *Account*, is remembered on the device and, once signed in, saved on the account (`me:update {locale}`).
+
+* All texts are in `lib/l10n/messages.dart` as `key → (English, French)`; screens read them as `Strings.of(context).someKey` (typed accessors in `lib/l10n/strings_keys.dart`, same keys). `Strings.current` is the language for code without a `BuildContext`.
+* Amounts and dates follow the language (`3 417 150 FC` / `FC 3,417,150`, `17 oct. 2026` / `Oct 17, 2026`), via `intl`.
+* Server messages arrive in English: `lib/l10n/server_errors.dart` maps the known ones (invalid credentials, out of stock, insufficient wallet balance, order not found, not allowed, …) and shows any other message as received. Server notifications and wallet history lines are translated in `lib/l10n/notification_text.dart`.
+* To add a text: add the key with both languages to `messages.dart` and the one-line accessor to `strings_keys.dart`. `test/l10n_test.dart` fails if a language is missing or empty, if the French equals the English, if a `{placeholder}` differs, or if a screen hard-codes visible text.
+
+## Push notifications
+
+`lib/services/push_service.dart` registers the device with the API after sign-in when the build contains the Firebase configuration, and does nothing otherwise. See `../docs/MOBILE-PUSH.md` for the manual steps with the client's Firebase project.

@@ -231,6 +231,16 @@ ADMIN_NAME='Your Name' \
 npm run bootstrap:prod
 ```
 
+**Verification policy.** The bootstrap inserts the setting `requireVerifiedForCheckout=true`:
+a customer must have a verified phone number **or** e-mail before `orders:create` and
+`wallet:topup` work (the error tells them to verify under Profile → Verification). That only
+works if at least one verification channel is configured — `SMTP_*` (e-mail link) and/or
+`TWILIO_*` (SMS code). Until one is, set it to `false` in Admin → Settings, otherwise nobody
+can check out. The setting is public, so the apps can show the prompt up front. The dev seed
+leaves it `false`. Seller subscription plans live in the `sellerPlans` setting (JSON, defaults
+inserted by the bootstrap; edit in Admin → Settings). Dashboard figures bucket by UTC day, so run
+MySQL with its time zone on UTC.
+
 > ⚠️ **Do NOT run `npm run seed` on a production server.** It is demo-data only:
 > it **wipes every table** and creates accounts that share the public password
 > `Somba@2026`. The demo credentials in Step 0 exist only on a staging/demo box

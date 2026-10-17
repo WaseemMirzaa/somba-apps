@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_models.dart';
+import '../l10n/strings.dart';
 import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
@@ -224,7 +225,7 @@ class _ClaimBar extends StatelessWidget {
             const Icon(Icons.local_fire_department_rounded, size: 12, color: AppColors.accent),
             const SizedBox(width: 2),
             Text(
-              lang == 'fr' ? '$percent% réclamé' : '$percent% claimed',
+              Strings(lang).claimed(percent),
               style: const TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,

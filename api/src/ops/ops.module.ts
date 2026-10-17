@@ -7,13 +7,21 @@ import {
   Dispute,
   FraudAlert,
   Order,
+  OrderItem,
   Payment,
   Payout,
   Product,
+  ProductView,
+  Review,
   Seller,
   User,
+  WarehouseBatch,
+  Hub,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { ContentModule } from '../content/content.module';
+import { ProductsModule } from '../products/products.module';
 import { SellersService } from './sellers.service';
 import { AnalyticsService } from './analytics.service';
 import { AuditService } from './audit.service';
@@ -29,8 +37,13 @@ import { RolesService } from './roles.service';
       Seller,
       Product,
       Order,
+      OrderItem,
       Payout,
       Payment,
+      ProductView,
+      Review,
+      WarehouseBatch,
+      Hub,
       User,
       Dispute,
       DeliveryTask,
@@ -39,6 +52,9 @@ import { RolesService } from './roles.service';
       Broadcast,
     ]),
     NotificationsModule,
+    PaymentsModule,
+    ContentModule,
+    ProductsModule,
     UsersModule,
   ],
   providers: [

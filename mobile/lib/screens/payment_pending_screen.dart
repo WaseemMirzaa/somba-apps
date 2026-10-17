@@ -27,8 +27,6 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
   bool _navigated = false;
   bool _checking = false;
 
-  String get _lang => widget.locale.languageCode;
-
   void _goSuccess() {
     if (_navigated || !mounted) return;
     _navigated = true;
@@ -41,7 +39,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
     try {
       await RealtimeStore.instance.cancelOrder(widget.orderId);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     } finally {
       if (mounted) setState(() => _cancelling = false);
     }
@@ -49,7 +47,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
 
   /// Ask the server for the payment's current state (in case a push was missed).
   Future<void> _check(PaymentDto? payment) async {
-    final fr = _lang == 'fr';
+    final s = Strings.of(context);
     if (payment == null) return;
     setState(() => _checking = true);
     try {
@@ -58,10 +56,10 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
       if (p.isPending) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(fr ? 'Toujours en attente de votre approbation.' : 'Still waiting for your approval on the phone.')));
+          ..showSnackBar(SnackBar(content: Text(s.ppStillWaiting)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -90,9 +88,8 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) => _goSuccess());
         }
         final payment = store.paymentForOrder(order.id);
-        final s = Strings(_lang);
+        final s = Strings.of(context);
         final failed = order.status == 'cancelled';
-        final fr = _lang == 'fr';
 
         return Scaffold(
           body: SafeArea(
@@ -114,8 +111,8 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                 const SizedBox(height: 26),
                 Text(
                   failed
-                      ? (fr ? 'Paiement non abouti' : 'Payment did not go through')
-                      : (fr ? 'Approuvez sur votre téléphone' : 'Approve on your phone'),
+                      ? s.ppFailedTitle
+                      : s.ppApproveTitle,
                   key: const ValueKey('pending-title'),
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
@@ -123,16 +120,14 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                 const SizedBox(height: 10),
                 Text(
                   failed
-                      ? (payment?.failureReason ?? (fr ? 'La commande a été annulée.' : 'The order was cancelled.'))
-                      : (fr
-                          ? 'Une demande ${s.paymentLabel(order.paymentMethod)} de ${money(order.totalUsd)} a été envoyée. Entrez votre code PIN pour confirmer.'
-                          : 'A ${s.paymentLabel(order.paymentMethod)} request for ${money(order.totalUsd)} was sent. Enter your PIN to confirm.'),
+                      ? (payment?.failureReason == null ? s.ppOrderCancelled : s.serverError(payment!.failureReason!))
+                      : s.ppRequestSent(s.paymentLabel(order.paymentMethod), money(order.totalUsd)),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted, fontSize: 14.5, height: 1.4),
                 ),
                 if (!failed) ...[
                   const SizedBox(height: 14),
-                  PaymentExpiryHint(createdAt: order.createdAt, fr: fr),
+                  PaymentExpiryHint(createdAt: order.createdAt),
                 ],
                 const SizedBox(height: 18),
                 Container(
@@ -151,7 +146,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     child: FilledButton(
                       key: const ValueKey('retry'),
                       onPressed: () => _retry(order),
-                      child: Text(fr ? 'Réessayer' : 'Try again'),
+                      child: Text(s.retry),
                     ),
                   ),
                 ] else ...[
@@ -160,7 +155,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     child: OutlinedButton(
                       key: const ValueKey('cancel-order'),
                       onPressed: _cancelling ? null : _cancel,
-                      child: Text(fr ? 'Annuler la commande' : 'Cancel order'),
+                      child: Text(s.cancelOrder),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -172,12 +167,12 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                       icon: _checking
                           ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.refresh_rounded, size: 20),
-                      label: Text(fr ? 'Vérifier le paiement' : 'Check payment status'),
+                      label: Text(s.ppCheck),
                     ),
                   ),
                   TextButton(
                     onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-                    child: Text(fr ? 'Continuer — je confirmerai plus tard' : "Continue shopping — I'll confirm later"),
+                    child: Text(s.ppContinue),
                   ),
                 ],
               ]),
@@ -192,8 +187,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
 /// "Unapproved requests expire after 15 minutes", with the time left when known.
 class PaymentExpiryHint extends StatefulWidget {
   final DateTime? createdAt;
-  final bool fr;
-  const PaymentExpiryHint({super.key, required this.createdAt, required this.fr});
+  const PaymentExpiryHint({super.key, required this.createdAt});
 
   @override
   State<PaymentExpiryHint> createState() => _PaymentExpiryHintState();
@@ -218,17 +212,17 @@ class _PaymentExpiryHintState extends State<PaymentExpiryHint> {
 
   @override
   Widget build(BuildContext context) {
-    final fr = widget.fr;
+    final s = Strings.of(context);
     final created = widget.createdAt;
-    var text = fr ? 'Une demande non approuvée expire après 15 minutes.' : 'Unapproved requests expire after 15 minutes.';
+    var text = s.ppExpiryDefault;
     if (created != null) {
       final left = created.add(const Duration(minutes: 15)).difference(DateTime.now());
       if (left.isNegative) {
-        text = fr ? 'La demande a peut-être expiré — vérifiez le paiement.' : 'The request may have expired — check the payment.';
+        text = s.ppExpiryMaybe;
       } else {
         final mm = left.inMinutes.toString().padLeft(2, '0');
         final ss = (left.inSeconds % 60).toString().padLeft(2, '0');
-        text = fr ? 'Expire dans $mm:$ss si vous n\'approuvez pas.' : 'Expires in $mm:$ss if not approved.';
+        text = s.ppExpiresIn('$mm:$ss');
       }
     }
     return Row(mainAxisAlignment: MainAxisAlignment.center, children: [

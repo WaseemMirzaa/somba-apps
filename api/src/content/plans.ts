@@ -9,6 +9,9 @@ export interface SellerPlan {
   priceUsd: number | null;
   /** Length of one paid period in months. */
   months: number;
+  /** Listing quota enforced by `products:create` while the plan is in force (omit / null = unlimited). */
+  maxProducts?: number | null;
+  /** Marketing bullet points shown on the plan card (informational: only `maxProducts` is enforced). */
   features: string[];
   featuresFr?: string[];
   popular?: boolean;
@@ -16,9 +19,9 @@ export interface SellerPlan {
 
 /** Defaults mirror the plans on the public "Sell online" page. */
 export const DEFAULT_SELLER_PLANS: SellerPlan[] = [
-  { id: 'free', name: 'Free', nameFr: 'Gratuit', priceUsd: 0, months: 1, features: ['List up to 10 products', 'Order management', 'Email support'], featuresFr: ["Jusqu'à 10 produits", 'Gestion des commandes', 'Support par e-mail'] },
-  { id: 'starter', name: 'Starter', nameFr: 'Starter', priceUsd: 49, months: 1, features: ['100 product listings', 'Order management', 'Basic analytics', 'Email support'], featuresFr: ['100 produits', 'Gestion des commandes', 'Analytique de base', 'Support par e-mail'] },
-  { id: 'pro', name: 'Professional', nameFr: 'Professionnel', priceUsd: 99, months: 1, features: ['Unlimited products', 'Promotions & flash sales', 'Advanced analytics', 'Priority support'], featuresFr: ['Produits illimités', 'Promotions et ventes flash', 'Analytique avancée', 'Support prioritaire'], popular: true },
+  { id: 'free', name: 'Free', nameFr: 'Gratuit', priceUsd: 0, months: 1, features: ['Order management', 'Email support'], featuresFr: ['Gestion des commandes', 'Support par e-mail'] },
+  { id: 'starter', name: 'Starter', nameFr: 'Starter', priceUsd: 49, months: 1, features: ['Order management', 'Basic analytics', 'Email support'], featuresFr: ['Gestion des commandes', 'Analytique de base', 'Support par e-mail'] },
+  { id: 'pro', name: 'Professional', nameFr: 'Professionnel', priceUsd: 99, months: 1, features: ['Promotions & flash sales', 'Advanced analytics', 'Priority support'], featuresFr: ['Promotions et ventes flash', 'Analytique avancée', 'Support prioritaire'], popular: true },
   { id: 'enterprise', name: 'Enterprise', nameFr: 'Entreprise', priceUsd: null, months: 1, features: ['Multi-store', 'Custom commission', 'Dedicated manager', 'SLA & onboarding'], featuresFr: ['Multi-boutiques', 'Commission sur mesure', 'Gestionnaire dédié', 'SLA et accompagnement'] },
 ];
 
@@ -48,6 +51,7 @@ export function validatePlans(value: unknown): SellerPlan[] {
       ...(p.nameFr !== undefined ? { nameFr: str(p.nameFr, 'Plan name (FR)', { max: 60 }) } : {}),
       priceUsd,
       months: num(p.months ?? 1, 'Plan length (months)', { min: 1, max: 24, int: true }),
+      ...(p.maxProducts !== undefined && p.maxProducts !== null ? { maxProducts: num(p.maxProducts, 'Product limit', { min: 1, max: 1_000_000, int: true }) } : {}),
       features: feats(p.features ?? [], 'Features') ?? [],
       ...(p.featuresFr !== undefined ? { featuresFr: feats(p.featuresFr, 'Features (FR)') } : {}),
       ...(p.popular === true ? { popular: true } : {}),

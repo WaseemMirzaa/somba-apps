@@ -124,9 +124,10 @@ class AuthButton extends StatelessWidget {
           ),
           child: loading
               ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              : Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
                   if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
+                  // A longer (French) label shrinks to fit instead of overflowing.
+                  Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)))),
                 ]),
         ),
       );

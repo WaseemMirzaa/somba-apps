@@ -53,8 +53,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _content(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
-    final lang = widget.locale.languageCode;
+    final s = Strings.of(context);
+    final lang = s.lang;
     final p = _p;
     final listed = productByUuid(p.uuid) != null;
     final wished = RealtimeStore.instance.wishlistIds.contains(p.uuid);
@@ -99,9 +99,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Pill(p.category, color: AppColors.primary.withValues(alpha: 0.10), textColor: AppColors.primary, fontSize: 11.5),
+                      Pill(p.displayCategory(lang), color: AppColors.primary.withValues(alpha: 0.10), textColor: AppColors.primary, fontSize: 11.5),
                       const Spacer(),
-                      _stockBadge(p, listed, lang),
+                      _stockBadge(s, p, listed),
                     ]),
                     const SizedBox(height: 12),
                     Text(p.displayName(lang), style: Theme.of(context).textTheme.headlineSmall),
@@ -110,7 +110,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Row(children: [
                         RatingPill(p.rating),
                         const SizedBox(width: 8),
-                        Text('${p.rating.toStringAsFixed(1)} · ${compact(p.reviews)} ${s.reviewsLabel}',
+                        Text('${s.number(p.rating, decimals: 1)} · ${compact(p.reviews)} ${s.reviewsLabel}',
                             style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w500)),
                       ]),
                     const SizedBox(height: 16),
@@ -128,9 +128,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Text(money(p.originalPrice),
                               style: const TextStyle(fontSize: 15, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
                         ),
-                        const Spacer(),
-                        Pill('${lang == 'fr' ? 'Éco.' : 'Save'} ${money(save)}',
-                            color: AppColors.success.withValues(alpha: 0.14), textColor: const Color(0xFF047857), fontSize: 12),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Pill(s.pdSave(money(save)),
+                                  color: AppColors.success.withValues(alpha: 0.14), textColor: const Color(0xFF047857), fontSize: 12),
+                            ),
+                          ),
+                        ),
                       ],
                     ]),
                     const SizedBox(height: 22),
@@ -143,8 +150,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 22),
                     _infoCard(
                       Icons.local_shipping_rounded,
-                      lang == 'fr' ? 'Livraison' : 'Delivery',
-                      lang == 'fr' ? 'Frais calculés selon votre zone à la caisse' : 'Fee depends on your zone — shown at checkout',
+                      s.delivery,
+                      s.pdDeliveryInfo,
                     ),
                     if ((p.description ?? '').trim().isNotEmpty) ...[
                       const SizedBox(height: 24),
@@ -154,14 +161,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                     if ((p.sellerName ?? '').isNotEmpty) ...[
                       const SizedBox(height: 24),
-                      _sellerCard(p),
+                      _sellerCard(s, p),
                     ],
                     const SizedBox(height: 24),
-                    _reviewsSection(p),
+                    _reviewsSection(s, p),
                     const SizedBox(height: 24),
-                    _qaSection(p),
+                    _qaSection(s, p),
                     const SizedBox(height: 24),
-                    _related(p, lang),
+                    _related(s, p, lang),
                   ],
                 ),
               ),
@@ -173,15 +180,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _stockBadge(Product p, bool listed, String lang) {
-    final fr = lang == 'fr';
+  Widget _stockBadge(Strings s, Product p, bool listed) {
     final (label, color) = !listed
-        ? (fr ? 'Indisponible' : 'Unavailable', AppColors.danger)
+        ? (s.pdUnavailable, AppColors.danger)
         : p.stock <= 0
-            ? (fr ? 'Rupture de stock' : 'Out of stock', AppColors.danger)
+            ? (s.pdOutOfStock, AppColors.danger)
             : p.stock <= 5
-                ? (fr ? 'Plus que ${p.stock}' : 'Only ${p.stock} left', const Color(0xFFB45309))
-                : (fr ? 'En stock' : 'In stock', AppColors.success);
+                ? (s.pdOnlyLeft(p.stock), const Color(0xFFB45309))
+                : (s.inStock, AppColors.success);
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.inventory_2_rounded, size: 16, color: color),
       const SizedBox(width: 4),
@@ -189,7 +195,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ]);
   }
 
-  Widget _sellerCard(Product p) {
+  Widget _sellerCard(Strings s, Product p) {
     final name = p.sellerName!;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -203,7 +209,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-            const Text('Sold by', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            Text(s.pdSoldBy, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ]),
         ),
         if (p.sellerId != null)
@@ -211,16 +217,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             onPressed: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: p.sellerId, sellerName: name))),
             icon: const Icon(Icons.storefront_rounded, size: 18),
-            label: const Text('Visit store'),
+            label: Text(s.pdVisitStore),
           ),
       ]),
     );
   }
 
-  Widget _reviewsSection(Product p) {
+  Widget _reviewsSection(Strings s, Product p) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text('Reviews', style: Theme.of(context).textTheme.titleMedium),
+        Text(s.reviewsTitle, style: Theme.of(context).textTheme.titleMedium),
         const Spacer(),
         TextButton.icon(
           onPressed: () async {
@@ -229,7 +235,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           },
           icon: const Icon(Icons.rate_review_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: const Text('See all / write'),
+          label: Text(s.pdSeeAllWrite),
         ),
       ]),
       FutureBuilder<List<ReviewDto>>(
@@ -239,7 +245,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
           }
           final items = (snap.data ?? const <ReviewDto>[]).take(2).toList();
-          if (items.isEmpty) return _hint('No reviews yet — be the first to review this product.');
+          if (items.isEmpty) return _hint(s.pdNoReviews);
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -255,16 +261,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ]);
   }
 
-  Widget _qaSection(Product p) {
+  Widget _qaSection(Strings s, Product p) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text('Questions & answers', style: Theme.of(context).textTheme.titleMedium),
-        const Spacer(),
+        Expanded(child: Text(s.pdQa, style: Theme.of(context).textTheme.titleMedium)),
         TextButton.icon(
-          onPressed: () => _askQuestion(p),
+          onPressed: () => _askQuestion(s, p),
           icon: const Icon(Icons.help_outline_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: const Text('Ask'),
+          label: Text(s.pdAsk),
         ),
       ]),
       FutureBuilder<List<QuestionDto>>(
@@ -274,7 +279,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
           }
           final qa = snap.data ?? const <QuestionDto>[];
-          if (qa.isEmpty) return _hint('No questions yet.');
+          if (qa.isEmpty) return _hint(s.pdNoQuestions);
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
@@ -288,7 +293,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ]),
                   Padding(
                     padding: const EdgeInsets.only(left: 24, top: 4),
-                    child: Text(qa[i].answer ?? 'Awaiting seller response…',
+                    child: Text(qa[i].answer ?? s.pdAwaiting,
                         style: TextStyle(
                             color: qa[i].answer == null ? AppColors.faint : AppColors.inkSoft,
                             fontSize: 13,
@@ -312,7 +317,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Text(text, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
       );
 
-  void _askQuestion(Product p) {
+  void _askQuestion(Strings s, Product p) {
     final ctrl = TextEditingController();
     showModalBottomSheet(
       context: context,
@@ -320,14 +325,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Ask a question', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+          Text(s.pdAskTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
           const SizedBox(height: 12),
           TextField(
             controller: ctrl,
             autofocus: true,
             maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'Ask the seller about this product…',
+              hintText: s.pdAskHint,
               filled: true,
               fillColor: AppColors.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
@@ -342,24 +347,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Navigator.pop(ctx);
               try {
                 await RealtimeStore.instance.askQuestion(p.uuid, q);
-                messenger.showSnackBar(const SnackBar(content: Text('Question sent to the seller')));
+                messenger.showSnackBar(SnackBar(content: Text(s.pdQuestionSent)));
                 if (mounted) setState(_reload);
               } catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+                messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
               }
             },
-            child: const Text('Submit question'),
+            child: Text(s.pdSubmitQuestion),
           ),
         ]),
       ),
     );
   }
 
-  Widget _related(Product p, String lang) {
+  Widget _related(Strings s, Product p, String lang) {
     final items = liveCatalog().where((x) => x.category == p.category && x.uuid != p.uuid).take(6).toList();
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('You may also like', style: Theme.of(context).textTheme.titleMedium),
+      Text(s.pdYouMayLike, style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 12),
       SizedBox(
         height: 170,
@@ -450,7 +455,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         MaterialPageRoute(
                             builder: (_) => CheckoutScreen(locale: widget.locale, lines: [CartItem(product: p, qty: _qty)])));
                   },
-            child: Text(canBuy ? '${s.buyNow}  ·  ${money(p.price * _qty)}' : (widget.locale.languageCode == 'fr' ? 'Indisponible' : 'Unavailable')),
+            child: Text(canBuy ? '${s.buyNow}  ·  ${money(p.price * _qty)}' : s.pdUnavailable),
           ),
         ),
       ]),

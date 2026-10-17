@@ -28,13 +28,11 @@ class Zone {
 /// rate come from the server's settings); `france` is simply "show me US dollars".
 class MarketProfile {
   final MarketProfileId id;
-  final String label;
   final String phonePrefix;
   final double? fxRateUsdCdf;
 
   const MarketProfile({
     required this.id,
-    required this.label,
     required this.phonePrefix,
     this.fxRateUsdCdf,
   });
@@ -50,12 +48,10 @@ const fallbackZones = [
 const marketProfiles = {
   MarketProfileId.france: MarketProfile(
     id: MarketProfileId.france,
-    label: 'US dollars (USD)',
     phonePrefix: '+243',
   ),
   MarketProfileId.drc: MarketProfile(
     id: MarketProfileId.drc,
-    label: 'Congolese francs (FC)',
     phonePrefix: '+243',
     fxRateUsdCdf: 2850,
   ),

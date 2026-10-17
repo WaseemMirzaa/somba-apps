@@ -1,0 +1,4 @@
+/* Texte affiché dans les demandes du système et sur l’écran d’accueil (français). */
+"CFBundleDisplayName" = "Somba&Teka Livreur";
+"NSLocationWhenInUseUsageDescription" = "Somba&Teka Livreur partage votre position avec le client pendant une livraison, même lorsque l’écran est éteint. Le partage s’arrête à la fin de la livraison.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Somba&Teka Livreur partage votre position avec le client pendant une livraison, même lorsque l’écran est éteint. Le partage s’arrête à la fin de la livraison.";

@@ -1,8 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { str } from '../common/validate';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { oneOf, str } from '../common/validate';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Order, Payout, Product, Seller } from '../database/entities';
+import { In, Not, Repository } from 'typeorm';
+import { Order, OrderItem, Payment, Payout, Product, Seller } from '../database/entities';
+import { MOBILE_MONEY_METHODS } from '../payments/mobile-money.provider';
+import { PaymentsService } from '../payments/payments.service';
+import { SettingsService } from '../content/settings.service';
+import { activePlanId, extendExpiry, parsePlans } from '../content/plans';
+import type { SellerPlan } from '../content/plans';
+import { pageOf } from '../common/paging';
+import { ProductsService } from '../products/products.service';
 import type { SellerStatus } from '../database/entities/seller.entity';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import {
@@ -16,16 +23,90 @@ export class SellersService {
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(OrderItem) private readonly items: Repository<OrderItem>,
     @InjectRepository(Payout) private readonly payouts: Repository<Payout>,
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
-  ) {}
+    private readonly payments: PaymentsService,
+    private readonly settings: SettingsService,
+    private readonly productsSvc: ProductsService,
+  ) {
+    // A seller-plan payment (wallet now, or mobile money once confirmed) switches the plan on.
+    this.payments.registerPlanSettledHandler((payment) => this.activatePlan(payment));
+  }
 
-  list(status?: SellerStatus): Promise<Seller[]> {
+  list(status?: SellerStatus, paging?: unknown): Promise<Seller[]> {
+    const { take, skip } = pageOf(paging);
     return this.sellers.find({
       where: status ? { status } : undefined,
       order: { createdAt: 'DESC' },
+      take,
+      skip,
     });
+  }
+
+  // ── Subscription plans ────────────────────────────────────────────────────
+  /** The public plan list (the `sellerPlans` setting, or the built-in defaults). */
+  async plans(): Promise<SellerPlan[]> {
+    return parsePlans(await this.settings.get('sellerPlans'));
+  }
+
+  /** The seller as the apps see it: plus the plan that is actually in force right now. */
+  withPlanState(seller: Seller) {
+    return { ...seller, activePlan: activePlanId(seller) };
+  }
+
+  /**
+   * Start buying a plan. Wallet: charged at once and active on return.
+   * Mobile money: returns the pending payment; the plan activates when it
+   * succeeds (network webhook or finance confirmation) via {@link activatePlan}.
+   */
+  async subscribe(
+    userId: string,
+    input: { plan?: unknown; method?: unknown; phone?: unknown },
+  ) {
+    const seller = await this.byUser(userId);
+    if (!seller) throw new NotFoundException('Open a store first.');
+    if (seller.status === 'rejected' || seller.status === 'suspended') {
+      throw new BadRequestException('Your store is not active. Contact support.');
+    }
+    const plans = await this.plans();
+    const plan = plans.find((p) => p.id === String(input?.plan ?? ''));
+    if (!plan) throw new BadRequestException('Unknown plan.');
+    if (plan.priceUsd === null) throw new BadRequestException('This plan is arranged with our sales team — please contact us.');
+    if (!(plan.priceUsd > 0)) throw new BadRequestException('The free plan needs no payment.');
+    const method = oneOf(input?.method, ['wallet', ...MOBILE_MONEY_METHODS] as const, 'Payment method');
+    const payment = await this.payments.startPlanPayment(userId, { id: plan.id, priceUsd: plan.priceUsd }, method, input?.phone);
+    const fresh = (await this.byUser(userId)) ?? seller;
+    return {
+      status: payment.status === 'succeeded' ? ('active' as const) : ('pending' as const),
+      plan,
+      payment,
+      seller: this.withPlanState(fresh),
+    };
+  }
+
+  /** A plan payment succeeded: switch the plan on and extend it by the plan's length. */
+  private async activatePlan(payment: Payment): Promise<void> {
+    const seller = await this.byUser(payment.userId);
+    if (!seller || !payment.subject) return;
+    const plan = (await this.plans()).find((p) => p.id === payment.subject);
+    const months = plan?.months ?? 1;
+    // Renewing the same plan stacks on the time left; switching plans starts a fresh period.
+    const renewing = seller.plan === payment.subject && activePlanId(seller) === seller.plan;
+    seller.plan = payment.subject;
+    seller.planExpiresAt = extendExpiry(renewing ? seller.planExpiresAt : null, months);
+    const saved = await this.sellers.save(seller);
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', saved);
+    if (saved.userId) {
+      this.emitter.toUser(saved.userId, 'seller:updated', this.withPlanState(saved));
+      await this.notifications.toUser(saved.userId, {
+        title: 'Plan activated',
+        body: `Your ${plan?.name ?? payment.subject} plan is active until ${saved.planExpiresAt?.toISOString().slice(0, 10)}.`,
+        type: 'seller',
+        entityId: saved.id,
+      });
+    }
   }
 
   get(id: string): Promise<Seller | null> {
@@ -109,44 +190,52 @@ export class SellersService {
     const seller = await this.get(id);
     // Only approved stores are public; never expose the owner's user id.
     if (!seller || seller.status !== 'approved') return null;
-    const products = await this.products.find({
-      where: { sellerId: id, status: 'live' },
-    });
-    const { userId: _owner, pickupAddress: _pickup, ...publicSeller } = seller;
+    // Through ProductsService so shoppers see the same effective (campaign / flash) prices they are charged.
+    const products = await this.productsSvc.list({ sellerId: id, status: 'live', limit: 500 });
+    const { userId: _owner, pickupAddress: _pickup, planExpiresAt: _exp, plan: _plan, ...publicSeller } = seller;
     void _owner;
     void _pickup;
-    return { seller: publicSeller, products };
+    void _exp;
+    void _plan;
+    // The plan in force is public (a "Pro seller" badge); the expiry date is not.
+    return { seller: { ...publicSeller, plan: activePlanId(seller) }, products };
   }
 
-  /** Seller dashboard KPIs for the signed-in seller. */
+  /**
+   * Seller dashboard KPIs for the signed-in seller, from grouped SQL (no table
+   * is loaded into memory). `orders` / `revenue` count lines of this seller's
+   * products on orders that were not cancelled or returned.
+   */
   async stats(sellerId: string) {
-    const products = await this.products.count({ where: { sellerId } });
-    const allOrders = await this.orders.find();
-    // Orders that contain at least one of this seller's products.
-    const productIds = new Set(
-      (await this.products.find({ where: { sellerId } })).map((p) => p.id),
-    );
-    const sellerOrders = allOrders.filter((o) =>
-      o.items?.some((it) => productIds.has(it.productId)),
-    );
-    const revenue = sellerOrders.reduce(
-      (s, o) =>
-        s +
-        (o.items ?? [])
-          .filter((it) => productIds.has(it.productId))
-          .reduce((t, it) => t + it.priceUsd * it.qty, 0),
-      0,
-    );
-    const payouts = await this.payouts.find({ where: { sellerId } });
-    const paidOut = payouts
-      .filter((p) => p.status === 'paid')
-      .reduce((s, p) => s + p.amountUsd, 0);
+    const seller = await this.sellers.findOne({ where: { id: sellerId } });
+    // Demo products may carry the owner's user id instead of the store id.
+    const ids = [sellerId, ...(seller?.userId ? [seller.userId] : [])];
+    const [products, sales, payoutRows] = await Promise.all([
+      this.products.count({ where: { sellerId: In(ids), status: Not('removed') } }),
+      this.items
+        .createQueryBuilder('i')
+        .innerJoin(Order, 'o', 'o.id = i.orderId')
+        .innerJoin(Product, 'p', 'p.id = i.productId')
+        .select('COUNT(DISTINCT o.id)', 'orders')
+        .addSelect('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'revenue')
+        .where("p.sellerId IN (:...ids) AND o.status NOT IN ('cancelled','returned')", { ids })
+        .getRawOne<{ orders: string; revenue: string }>(),
+      this.payouts
+        .createQueryBuilder('x')
+        .select('x.status', 'status')
+        .addSelect('COUNT(*)', 'n')
+        .addSelect('COALESCE(SUM(x.amountUsd), 0)', 'amount')
+        .where('x.sellerId IN (:...ids)', { ids })
+        .groupBy('x.status')
+        .getRawMany<{ status: string; n: string; amount: string }>(),
+    ]);
+    const by = (st: string) => payoutRows.find((r) => r.status === st);
     return {
       products,
-      orders: sellerOrders.length,
-      revenue: Number(revenue.toFixed(2)),
-      paidOut: Number(paidOut.toFixed(2)),
-      pendingPayouts: payouts.filter((p) => p.status === 'requested').length,
+      orders: Number(sales?.orders ?? 0),
+      revenue: Number(Number(sales?.revenue ?? 0).toFixed(2)),
+      paidOut: Number(Number(by('paid')?.amount ?? 0).toFixed(2)),
+      pendingPayouts: Number(by('requested')?.n ?? 0),
     };
   }
 }

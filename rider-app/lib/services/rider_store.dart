@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../l10n/strings.dart';
 import 'auth_service.dart';
 import 'location_reporter.dart';
 import 'models.dart';
+import 'push_service.dart';
 import 'socket_service.dart';
 
 enum ConnStatus { disconnected, connecting, connected, error }
@@ -17,7 +19,8 @@ class RiderStore extends ChangeNotifier {
 
   final _auth = AuthService();
   final _socket = SocketService();
-  final location = LocationReporter();
+  /// Reports the GPS position while a delivery is `in_transit` (tests swap in a fake).
+  LocationReporter location = LocationReporter();
 
   ConnStatus status = ConnStatus.disconnected;
   BackendUser? user;
@@ -50,7 +53,7 @@ class RiderStore extends ChangeNotifier {
       final r = await _auth.login(email, password);
       if (r.user.role != 'rider') {
         // A customer/admin account must not open the rider app.
-        throw ApiException('This app is for Somba&Teka riders. Use the customer app instead.', 403);
+        throw ApiException.local('err_not_rider', status: 403);
       }
       await _begin(r);
     } catch (e) {
@@ -85,6 +88,12 @@ class RiderStore extends ChangeNotifier {
     _pushTimer?.cancel();
     _pushTimer = null;
     await location.stop();
+    // Stop pushes to this device before the token disappears.
+    if (_socket.isConnected && _deviceToken != null) {
+      unawaited(_socket.request('devices:unregister', {'token': _deviceToken}).catchError((_) {}));
+    }
+    _deviceToken = null;
+    await PushService.instance.stop();
     await _auth.clear();
     _socket.disconnect();
     _access = null;
@@ -115,7 +124,7 @@ class RiderStore extends ChangeNotifier {
     final token = _access;
     if (token != null && !_expiresWithin(token, const Duration(seconds: 45))) return token;
     final refresh = _refresh ?? await _auth.getRefresh();
-    if (refresh == null) throw ApiException('Signed out.', 401);
+    if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
     try {
       final r = await _auth.refresh(refresh);
       await _auth.saveTokens(r);
@@ -172,6 +181,11 @@ class RiderStore extends ChangeNotifier {
       status = ConnStatus.connected;
       notifyListeners();
       unawaited(refresh());
+      // Push: asks for the permission and registers this device (no-op without Firebase).
+      unawaited(PushService.instance.start(
+        register: registerDevice,
+        onMessage: () => unawaited(refreshNotifications()),
+      ));
       // The server does not push brand-new pool items to riders yet, so a slow
       // safety re-read keeps "Available" fresh without pulling to refresh.
       _poolTimer?.cancel();
@@ -300,21 +314,52 @@ class RiderStore extends ChangeNotifier {
     await _socket.request('delivery:location', {'taskId': taskId, 'lat': lat, 'lng': lng});
   }
 
-  /// GPS follows the delivery that is on the road: start when the rider picks the
-  /// parcel up, stop when the delivery ends.
+  /// GPS (also in the background: Android foreground service / iOS background
+  /// location) follows the delivery that is `in_transit` and nothing else: it
+  /// starts when the rider sets off, and stops when the delivery is delivered or
+  /// failed (it leaves `in_transit`), or on sign-out.
   LocationAccess? lastLocationAccess;
+
+  @visibleForTesting
+  void syncLocationNow() => _syncLocation();
+
   void _syncLocation() {
-    final onRoad = myTasks.where((t) => t.status == 'picked_up' || t.status == 'in_transit').toList();
+    final onRoad = myTasks.where((t) => t.status == 'in_transit').toList();
     if (onRoad.isEmpty) {
       if (location.running) unawaited(location.stop());
       return;
     }
     final t = onRoad.first;
     if (location.taskId == t.id && location.running) return;
-    unawaited(location.start(t.id, (lat, lng) => sendLocation(t.id, lat, lng)).then((a) {
+    final s = Strings.current;
+    final notice = TrackingNotice(title: s.bgTitle, text: s.bgText, channel: s.bgChannel);
+    unawaited(location.start(t.id, (lat, lng) => sendLocation(t.id, lat, lng), notice: notice).then((a) {
       lastLocationAccess = a;
       notifyListeners();
     }));
+  }
+
+  // ---- push notifications (FCM) ----
+  String? _deviceToken;
+
+  /// Register this device's FCM token so the server can push to it (also on every
+  /// token rotation). Firebase is optional: without it the live socket still works.
+  Future<void> registerDevice(String token, String platform) async {
+    _deviceToken = token;
+    if (!_socket.isConnected) return;
+    await _socket.request('devices:register', {'token': token, 'platform': platform, 'app': 'rider'});
+  }
+
+  /// Re-read the notification list (a push arrived while the app is open).
+  Future<void> refreshNotifications() async {
+    try {
+      final rows = ((await _socket.request('notifications:list')) as List).map((e) => NotificationDto.fromJson(_map(e))).toList();
+      notifications
+        ..clear()
+        ..addAll(rows);
+      notifyListeners();
+    } catch (_) {/* the socket's own `notification:new` still delivers it */}
+    unawaited(refresh(light: true));
   }
 
   Future<void> markRead(String id) async {

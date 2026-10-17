@@ -24,16 +24,16 @@ Payment providers: `MM_PROVIDER=sandbox` (development: payments stay pending unt
 
 | Command | What it proves | Checks |
 |---|---|---|
-| `npm test` | Unit tests | 35 |
+| `npm test` | Unit tests (incl. pricing rules, analytics helpers, paging, seller plans) | 78 |
 | `npm run smoke` | Main commerce flow over the socket | 33 |
 | `npm run smoke:account` | Sign-up, verification, reset, uploads, suspension, deletion, promos, reviews | 123 |
-| `npm run smoke:authz` | Role boundaries, ownership, mass assignment | 117 |
-| `npm run smoke:flows` | The fixed flows: failed delivery, pickup / ready / receive, moderation, flash price, handover code, returns before refunds, manual payment, staff accounts | 82 |
-| `npm run smoke:coverage` | Every other event: catalogue admin, CMS, fraud, questions, warehouse reads and writes, exchanges… | 101 |
+| `npm run smoke:authz` | Role boundaries, ownership, mass assignment (incl. analytics, plans, reviews, hubs, campaigns, verification policy) | 198 |
+| `npm run smoke:flows` | The fixed flows: failed delivery, pickup / ready / receive, moderation, flash price, handover code, returns before refunds, manual payment, staff accounts, campaign discounts, review replies + moderation, verification policy, seller subscription | 185 |
+| `npm run smoke:coverage` | Every other event: catalogue admin, CMS, fraud, questions, warehouse reads and writes, exchanges, real analytics (admin / finance / warehouse / seller), hub directory, list paging | 223 |
 | `npm run smoke:race` | Concurrency: last unit of stock, double cancel / refund / payout / confirmation, two riders on one task, wallet double-spend | 24 |
-| `npm run check:prod` | Production-mode defaults and manual payment (run against `NODE_ENV=production`) | 12 |
+| `npm run check:prod` | Production-mode defaults (incl. verification policy) and manual payment (run against `NODE_ENV=production`) | 17 |
 
-All of them pass on MySQL (migrations only). On SQLite they pass too, except that the race suite is flaky there: in one run the 4-simultaneous-payout-approvals check failed with a SQLite "cannot start a transaction within a transaction" error, and it passed 24/24 on the rerun. SQLite cannot run concurrent transactions, so treat the race suite as meaningful on MySQL only.
+All of them pass on MySQL (migrations only; run them one after another with a pause — the REST auth endpoints are throttled to 30 requests a minute per IP, so back-to-back suites can hit a 429). On SQLite they pass too, except that the race suite is flaky there: in one run the 4-simultaneous-payout-approvals check failed with a SQLite "cannot start a transaction within a transaction" error, and it passed 24/24 on the rerun. SQLite cannot run concurrent transactions, so treat the race suite as meaningful on MySQL only.
 
 ## 3. Web app
 
@@ -54,4 +54,6 @@ cd mobile     && flutter analyze && flutter test && flutter test test/live_api_t
 cd rider-app  && flutter analyze && flutter test && flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```
 
-Results: customer app 6 widget + 17 live tests, rider app 5 widget + 2 live tests; both `flutter analyze` clean. Not run on a device or emulator (no Android SDK in the sandbox).
+Results: customer app 25 widget/unit tests + 17 live tests, rider app 25 widget/unit tests + 3 live tests (the live ones need the seeded API above); both `flutter analyze` clean, and both `flutter build web` succeed. Not run on a device or emulator (no Android SDK in the sandbox).
+
+Both apps are bilingual (French is the default for the customer app; the rider app follows the phone's language, `fr` → French, anything else → English): the texts live in `lib/l10n/messages.dart` (key → English, French), see the READMEs. Push notifications and the rider's background location are described in [MOBILE-PUSH.md](MOBILE-PUSH.md) and `rider-app/README.md`; neither could be exercised on a phone.

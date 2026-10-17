@@ -175,4 +175,16 @@ void main() {
     admin.close();
     customer.close();
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');
+
+  test('rider: push device registration (devices:register as the rider app) and removal on sign-out', () async {
+    final store = RiderStore.instance;
+    await store.login('rider@somba.app', 'Somba@2026');
+    await until(() => store.isConnected && store.loaded, what: 'rider hydrated');
+    // The same call the PushService makes once Firebase gives the device a token.
+    await store.registerDevice('fcm-rider-flutter-${DateTime.now().millisecondsSinceEpoch}', 'android');
+    // A server error (empty token) comes back as an exception, not a crash.
+    await expectLater(store.registerDevice('', 'android'), throwsA(isA<ApiException>()));
+    await store.logout(); // sends devices:unregister for the token
+    expect(store.isSignedIn, isFalse);
+  }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');
 }

@@ -12,7 +12,11 @@ class AppShell extends StatefulWidget {
   final Locale locale;
   final VoidCallback? onLogout;
 
-  const AppShell({super.key, required this.onLocaleChanged, required this.locale, this.onLogout});
+  const AppShell(
+      {super.key,
+      required this.onLocaleChanged,
+      required this.locale,
+      this.onLogout});
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -23,13 +27,17 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
+    final s = Strings.of(context);
     final screens = [
-      HomeScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
+      HomeScreen(
+          locale: widget.locale, onLocaleChanged: widget.onLocaleChanged),
       CategoriesScreen(locale: widget.locale),
       DealsScreen(locale: widget.locale),
       OrdersScreen(locale: widget.locale),
-      AccountScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
+      AccountScreen(
+          locale: widget.locale,
+          onLocaleChanged: widget.onLocaleChanged,
+          onLogout: widget.onLogout),
     ];
 
     final items = <_NavItem>[
@@ -65,13 +73,15 @@ class _FloatingNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
 
-  const _FloatingNav({required this.items, required this.index, required this.onTap});
+  const _FloatingNav(
+      {required this.items, required this.index, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).padding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(18, 0, 18, 12 + (bottom > 0 ? bottom - 6 : 6)),
+      padding:
+          EdgeInsets.fromLTRB(18, 0, 18, 12 + (bottom > 0 ? bottom - 6 : 6)),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
@@ -84,8 +94,10 @@ class _FloatingNav extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(items.length, (i) {
             final selected = i == index;
-            return Expanded(
-              flex: selected ? 0 : 1,
+            // The selected tab shows its label; it may take up to 3/7 of the bar (French labels are longer).
+            return Flexible(
+              flex: selected ? 3 : 1,
+              fit: selected ? FlexFit.loose : FlexFit.tight,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onTap(i),
@@ -100,28 +112,33 @@ class _FloatingNav extends StatelessWidget {
                     boxShadow: selected ? AppShadow.lifted : null,
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(items[i].icon,
                           size: 23,
                           color: selected ? Colors.white : AppColors.faint),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutCubic,
-                        child: selected
-                            ? Padding(
-                                padding: const EdgeInsets.only(left: 8),
-                                child: Text(
-                                  items[i].label,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13.5,
-                                    letterSpacing: -0.2,
+                      Flexible(
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
+                          child: selected
+                              ? Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Text(
+                                    items[i].label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5,
+                                      letterSpacing: -0.2,
+                                    ),
                                   ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ),
                     ],
                   ),

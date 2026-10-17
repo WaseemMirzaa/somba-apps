@@ -78,3 +78,20 @@ touches `rider-app/`:
 Rendered from the web build. See [`docs/screenshots/`](docs/screenshots).
 
 ![Gallery](docs/screenshots/gallery.png)
+
+
+## Languages (French / English)
+
+The first launch follows the phone (`fr` → French, anything else → English); the choice made on the sign-in screen or in *Profile* is remembered (`shared_preferences`). Texts are in `lib/l10n/messages.dart` (`key → (English, French)`, typed accessors in `strings_keys.dart`, `Strings.of(context)`), server messages are mapped in `lib/l10n/server_errors.dart`. `test/l10n_test.dart` checks that every text exists in both languages and that no screen hard-codes visible text.
+
+## Position sharing while a delivery is in transit (background)
+
+The GPS runs **only while a delivery is `in_transit`**; it stops when the delivery is delivered or failed, and on sign-out (`RiderStore._syncLocation`).
+
+* Android: geolocator's foreground service (`ForegroundNotificationConfig`, ongoing notification "Livraison en cours / Delivery in progress" in the rider's language). Manifest: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `WAKE_LOCK`, `POST_NOTIFICATIONS` (the service type `location` is declared by geolocator). Only the *while in use* location permission is needed because the service is started from the foreground; the app label is localised in `res/values{,-fr}/strings.xml`.
+* iOS (`ios/` project, generated with `flutter create --platforms=ios`): `UIBackgroundModes` = `location` + `remote-notification`, `AppleSettings(allowBackgroundLocationUpdates: true, showBackgroundLocationIndicator: true, pauseLocationUpdatesAutomatically: false)`, and the usage descriptions in `Info.plist` with French/English `InfoPlist.strings` (`en.lproj`, `fr.lproj`, registered in the Xcode project). The usage text is also explained in-app (localised dialog) before the first ride.
+* **Not verified on a device**: it was written against the geolocator API and unit-tested (settings per platform, start/stop rules with a fake reporter), but never run on an Android phone or an iPhone. Check battery behaviour, Android 12+ "foreground service from background" restrictions and the iOS blue indicator on real hardware before release.
+
+## Push notifications
+
+Same `PushService` as the customer app (`app: 'rider'`); see `../docs/MOBILE-PUSH.md`.

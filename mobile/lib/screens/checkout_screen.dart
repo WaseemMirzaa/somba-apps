@@ -63,7 +63,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final error = await shop.applyPromo(code, subtotalUsd: _subtotal);
     if (!mounted) return;
     setState(() {});
-    _toast(error ?? '${shop.appliedPromo!.code} ${_lang == 'fr' ? 'appliqué' : 'applied'}');
+    _toast(error ?? Strings.of(context).promoApplied(shop.appliedPromo!.code));
   }
 
   @override
@@ -73,7 +73,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  String get _lang => widget.locale.languageCode;
 
   /// The address the order will be delivered to (chosen, else default, else first).
   AddressDto? get _address {
@@ -85,20 +84,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder(double deliveryFee) async {
     final store = RealtimeStore.instance;
-    final fr = _lang == 'fr';
+    final s = Strings.of(context);
     final address = _address;
     if (_lines.isEmpty) return;
     if (address == null) {
-      _toast(fr ? 'Ajoutez une adresse de livraison.' : 'Add a delivery address first.');
+      _toast(s.checkoutAddAddressFirst);
       return;
     }
     if (isMobileMoney(payment)) {
-      final err = validateMobileNumber(_phone.text, fr: fr);
+      final err = validateMobileNumber(_phone.text, s);
       setState(() => _phoneError = err);
       if (err != null) return;
     }
     if (payment == 'wallet' && store.walletBalance + 0.001 < _subtotal + deliveryFee - shop.promoDiscount(_subtotal)) {
-      _toast(fr ? 'Solde du portefeuille insuffisant.' : 'Your wallet balance is not enough for this order.');
+      _toast(s.checkoutWalletLow);
       return;
     }
     setState(() => _placing = true);
@@ -137,7 +136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
-      _toast(e.toString());
+      _toast(Strings.current.errorText(e));
     } finally {
       if (mounted) setState(() => _placing = false);
     }
@@ -153,7 +152,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
-    final s = Strings(_lang);
+    final s = Strings.of(context);
+    final lang = s.lang;
     final store = RealtimeStore.instance;
     final deliveryFee = deliveryFeeUsd;
     if (_buyNow) _refreshLines();
@@ -183,10 +183,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: address == null
-                    ? Text(_lang == 'fr' ? 'Aucune adresse enregistrée' : 'No saved address yet',
+                    ? Text(s.checkoutNoAddress,
                         key: const ValueKey('no-address'), style: const TextStyle(color: AppColors.muted, fontSize: 14))
                     : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${address.label}${(address.phone ?? '').isEmpty ? '' : ' · ${address.phone}'}',
+                        Text([address.label, if ((address.phone ?? '').isNotEmpty) address.phone].join(' · '),
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                         const SizedBox(height: 2),
                         Text(address.oneLine, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
@@ -198,12 +198,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale, pickMode: true)));
                   if (mounted) setState(() {});
                 },
-                child: Text(address == null ? (_lang == 'fr' ? 'Ajouter' : 'Add') : (_lang == 'fr' ? 'Changer' : 'Change')),
+                child: Text(address == null ? s.add : s.change),
               ),
             ]),
           ),
           const SizedBox(height: 22),
-          _sectionTitle(_lang == 'fr' ? 'Zone de livraison' : 'Delivery zone'),
+          _sectionTitle(s.deliveryZone),
           const SizedBox(height: 10),
           _card(
             child: Column(children: [
@@ -219,9 +219,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         color: selectedZone.id == z.id ? AppColors.primary : AppColors.faint, size: 22),
                     const SizedBox(width: 12),
                     Expanded(
-                        child: Text('${_lang == 'fr' ? z.nameFr : z.name} · ${z.city}',
+                        child: Text('${lang == 'fr' ? z.nameFr : z.name} · ${z.city}',
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-                    Text(z.deliveryFeeUsd == 0 ? 'FREE' : money(z.deliveryFeeUsd),
+                    Text(z.deliveryFeeUsd == 0 ? s.free.toUpperCase() : money(z.deliveryFeeUsd),
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: z.deliveryFeeUsd == 0 ? AppColors.success : AppColors.ink)),
                   ]),
                 ),
@@ -233,7 +233,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _sectionTitle(s.payment),
           const SizedBox(height: 10),
           _methodTile('wallet', Icons.account_balance_wallet_rounded,
-              '${_lang == 'fr' ? 'Portefeuille' : 'Wallet'} · ${money(store.walletBalance)}'),
+              '${s.payWallet} · ${money(store.walletBalance)}'),
           for (final m in mobileMoneyMethods) _methodTile(m, Icons.smartphone_rounded, s.paymentLabel(m)),
           if (isMobileMoney(payment)) ...[
             const SizedBox(height: 4),
@@ -242,18 +242,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               controller: _phone,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
-                labelText: _lang == 'fr' ? 'Numéro Mobile Money' : 'Mobile money number',
+                labelText: s.mmNumber,
                 hintText: '+243 81 234 5678',
                 errorText: _phoneError,
                 prefixIcon: const Icon(Icons.smartphone_rounded, size: 20),
-                helperText: _lang == 'fr'
-                    ? 'Vous recevrez une demande de confirmation sur ce numéro.'
-                    : 'You will get an approval request on this number.',
+                helperText: s.mmHelper,
               ),
             ),
           ],
           const SizedBox(height: 18),
-          _sectionTitle(_lang == 'fr' ? 'Code promo' : 'Promo code'),
+          _sectionTitle(s.promoHint),
           const SizedBox(height: 10),
           _card(
             child: Row(children: [
@@ -283,10 +281,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(children: [
               _row(s.subtotal, money(subtotal)),
               const SizedBox(height: 8),
-              _row('${s.delivery} · ${selectedZone.name}', deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
+              _row('${s.delivery} · ${lang == 'fr' ? selectedZone.nameFr : selectedZone.name}', deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
               if (discount > 0) ...[
                 const SizedBox(height: 8),
-                _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
+                _row(s.promoRow(shop.appliedPromo!.code), '- ${money(discount)}'),
               ],
               const Divider(height: 22),
               _row(s.total, money(total), bold: true),

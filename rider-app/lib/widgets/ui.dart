@@ -131,3 +131,29 @@ class SurfaceCard extends StatelessWidget {
     );
   }
 }
+
+/// Small pill on the sign-in header that switches the language. [label] names
+/// the language it switches TO, written in that language.
+class LanguageToggle extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const LanguageToggle({super.key, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.white.withValues(alpha: 0.2),
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.translate_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            ]),
+          ),
+        ),
+      );
+}

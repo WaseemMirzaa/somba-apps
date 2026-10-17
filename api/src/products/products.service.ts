@@ -156,6 +156,7 @@ export class ProductsService {
   async list(filter?: {
     category?: string;
     status?: string;
+    sellerId?: string;
     liveOnly?: boolean;
     ownerIds?: string[];
     limit?: number;
@@ -163,6 +164,7 @@ export class ProductsService {
   }): Promise<PricedProduct[]> {
     const base: Record<string, unknown> = {};
     if (filter?.category) base.category = filter.category;
+    if (filter?.sellerId) base.sellerId = filter.sellerId;
     let where: Record<string, unknown> | Record<string, unknown>[];
     if (filter?.liveOnly) {
       where = filter.ownerIds?.length
@@ -190,6 +192,11 @@ export class ProductsService {
       .where("p.status = 'live' AND LOWER(TRIM(p.name)) = :n", { n: name.trim().toLowerCase() })
       .getOne();
     return hit ? (await this.withPricing([hit]))[0] : null;
+  }
+
+  /** How many listings (any status except removed) a store has — for plan quotas. */
+  countForSeller(sellerIds: string[]): Promise<number> {
+    return this.repo.count({ where: { sellerId: In(sellerIds), status: Not('removed') } });
   }
 
   /** Ids of every product a seller owns (for scoping their order view). */

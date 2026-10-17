@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'deliveries_screen.dart';
 import 'earnings_screen.dart';
@@ -20,15 +21,16 @@ class _RiderShellState extends State<RiderShell> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     final screens = [
       const DeliveriesScreen(),
       const EarningsScreen(),
       ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
     final items = <_NavItem>[
-      _NavItem(Icons.two_wheeler_rounded, 'Deliveries'),
-      _NavItem(Icons.account_balance_wallet_rounded, 'Earnings'),
-      _NavItem(Icons.person_rounded, 'Profile'),
+      _NavItem(Icons.two_wheeler_rounded, s.navDeliveries),
+      _NavItem(Icons.account_balance_wallet_rounded, s.navEarnings),
+      _NavItem(Icons.person_rounded, s.navProfile),
     ];
 
     return Scaffold(

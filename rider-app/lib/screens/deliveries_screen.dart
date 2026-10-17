@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/strings.dart';
 import '../services/location_reporter.dart';
 import '../services/models.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+
+/// Ids of the failure reasons a rider can pick (texts: `fail_<id>`).
+const kFailReasonIds = ['unreachable', 'wrong_address', 'refused', 'payment', 'other'];
 
 /// The rider's work: deliveries on the road, the open pool to claim from, and
 /// what was finished. Everything is live from the server.
@@ -24,21 +29,48 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     try {
       await action();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  /// status -> (next status, strings key of the button, icon)
   static const _next = {
-    'assigned': ('picked_up', 'Picked up the parcel', Icons.inventory_2_rounded),
-    'picked_up': ('in_transit', 'On my way to the customer', Icons.two_wheeler_rounded),
-    'in_transit': ('delivered', 'Delivered', Icons.check_circle_rounded),
+    'assigned': ('picked_up', 'act_picked_up', Icons.inventory_2_rounded),
+    'picked_up': ('in_transit', 'act_in_transit', Icons.two_wheeler_rounded),
+    'in_transit': ('delivered', 'act_delivered', Icons.check_circle_rounded),
   };
 
-  static const failReasons = ['Customer unreachable', 'Wrong address', 'Customer refused', 'Payment issue', 'Other'];
+
+  static const _rationaleSeenKey = 'somba.rider.bgLocationExplained';
+
+  /// Before the first ride: say why the position is shared even with the screen off.
+  /// (The system permission prompt follows; this runs once per install.)
+  Future<void> _explainBackgroundLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_rationaleSeenKey) == true || !mounted) return;
+      final s = Strings.of(context);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          key: const ValueKey('bg-location-rationale'),
+          icon: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+          title: Text(s.bgRationaleTitle),
+          content: Text(s.bgRationaleBody),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: Text(s.bgRationaleContinue))],
+        ),
+      );
+      await prefs.setBool(_rationaleSeenKey, true);
+    } catch (_) {/* storage unavailable: skip the explanation */}
+  }
 
   Future<void> _advance(DeliveryTaskDto t, String to) async {
+    final s = Strings.of(context);
+    if (to == 'in_transit') await _explainBackgroundLocation();
+    if (!mounted) return;
     if (to == 'failed') {
       final reason = await showModalBottomSheet<String>(
         context: context,
@@ -55,11 +87,11 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Cash collected?'),
-            content: Text('Confirm you collected \$${t.codAmountUsd.toStringAsFixed(2)} in cash from ${t.customerName ?? 'the customer'}.'),
+            title: Text(s.cashTitle),
+            content: Text(s.cashBody(s.usd(t.codAmountUsd), t.customerName ?? s.theCustomer)),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not yet')),
-              FilledButton(key: const ValueKey('confirm-cash'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, collected')),
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.notYet)),
+              FilledButton(key: const ValueKey('confirm-cash'), onPressed: () => Navigator.pop(ctx, true), child: Text(s.yesCollected)),
             ],
           ),
         );
@@ -83,6 +115,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
+        final s = Strings.of(context);
         final lists = [store.active, store.pool, store.finished];
         final rows = lists[_tab];
         final top = MediaQuery.of(context).padding.top;
@@ -92,16 +125,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(26))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Expanded(child: Text('Hi, ${store.user?.name.split(' ').first ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800))),
-                _status(),
+                Expanded(child: Text(s.hiName(store.user?.name.split(' ').first ?? ''), style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800))),
+                _status(s),
               ]),
               const SizedBox(height: 14),
               Row(children: [
-                _seg('Active', 0, store.active.length),
+                _seg(s.tabActive, 0, store.active.length),
                 const SizedBox(width: 8),
-                _seg('Available', 1, store.pool.length),
+                _seg(s.tabAvailable, 1, store.pool.length),
                 const SizedBox(width: 8),
-                _seg('Done', 2, store.finished.length),
+                _seg(s.tabDone, 2, store.finished.length),
               ]),
             ]),
           ),
@@ -111,12 +144,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               child: !store.loaded
                   ? ListView(children: const [SizedBox(height: 120), Center(child: CircularProgressIndicator())])
                   : rows.isEmpty
-                      ? ListView(children: [const SizedBox(height: 90), _empty()])
+                      ? ListView(children: [const SizedBox(height: 90), _empty(s)])
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
                           itemCount: rows.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (_, i) => _tab == 1 ? _poolCard(rows[i]) : _taskCard(rows[i]),
+                          itemBuilder: (_, i) => _tab == 1 ? _poolCard(s, rows[i]) : _taskCard(s, rows[i]),
                         ),
             ),
           ),
@@ -125,12 +158,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     );
   }
 
-  Widget _status() {
+  Widget _status(Strings s) {
     final (c, l) = switch (store.status) {
-      ConnStatus.connected => (const Color(0xFF34D399), 'Online'),
-      ConnStatus.connecting => (const Color(0xFFFBBF24), 'Connecting…'),
-      ConnStatus.error => (const Color(0xFFF87171), 'Error'),
-      ConnStatus.disconnected => (Colors.white54, 'Offline'),
+      ConnStatus.connected => (const Color(0xFF34D399), s.connOnline),
+      ConnStatus.connecting => (const Color(0xFFFBBF24), s.connConnecting),
+      ConnStatus.error => (const Color(0xFFF87171), s.connError),
+      ConnStatus.disconnected => (Colors.white54, s.connOffline),
     };
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.circle, size: 10, color: c),
@@ -156,8 +189,8 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     );
   }
 
-  Widget _empty() {
-    final msg = ['No delivery in progress.\nClaim one from “Available”.', 'No deliveries waiting right now.\nThey appear here the moment an order is paid.', 'Nothing finished yet.'][_tab];
+  Widget _empty(Strings s) {
+    final msg = [s.emptyActive, s.emptyAvailable, s.emptyDone][_tab];
     return Column(children: [
       Icon(Icons.inbox_rounded, size: 56, color: AppColors.faint),
       const SizedBox(height: 12),
@@ -165,19 +198,19 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     ]);
   }
 
-  Widget _poolCard(DeliveryTaskDto t) {
+  Widget _poolCard(Strings s, DeliveryTaskDto t) {
     return SurfaceCard(
       key: ValueKey('pool-${t.orderReference}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(t.orderReference, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-          if (t.collectsCash) Pill('COD \$${t.codAmountUsd.toStringAsFixed(2)}', color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A)),
+          if (t.collectsCash) Pill(s.codPill(s.usd(t.codAmountUsd)), color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A)),
         ]),
         const SizedBox(height: 8),
-        if (t.pickupAddress != null) _line(Icons.storefront_rounded, 'Collect at: ${t.pickupAddress}'),
-        _line(Icons.location_on_rounded, 'Deliver to: ${t.address}'),
+        if (t.pickupAddress != null) _line(Icons.storefront_rounded, s.collectAt(t.pickupAddress)),
+        _line(Icons.location_on_rounded, s.deliverTo(_address(s, t))),
         if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(t)),
-        if (t.attempts > 1) Padding(padding: const EdgeInsets.only(top: 2, bottom: 4), child: Wrap(children: [_attemptPill(t)])),
+        if (t.attempts > 1) Padding(padding: const EdgeInsets.only(top: 2, bottom: 4), child: Wrap(children: [_attemptPill(s, t)])),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
@@ -185,35 +218,35 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             key: ValueKey('accept-${t.orderReference}'),
             onPressed: _busy ? null : () => _run(() => store.accept(t.id)),
             icon: const Icon(Icons.add_task_rounded, size: 20),
-            label: const Text('Accept this delivery'),
+            label: Text(s.acceptDelivery),
           ),
         ),
       ]),
     );
   }
 
-  Widget _taskCard(DeliveryTaskDto t) {
+  Widget _taskCard(Strings s, DeliveryTaskDto t) {
     final next = _next[t.status];
     return SurfaceCard(
       key: ValueKey('task-${t.orderReference}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(t.orderReference, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-          Pill(t.status.replaceAll('_', ' '), color: _statusColor(t.status).withValues(alpha: 0.14), textColor: _statusColor(t.status)),
+          Pill(s.has('task_${t.status}') ? s.t('task_${t.status}') : t.status.replaceAll('_', ' '), color: _statusColor(t.status).withValues(alpha: 0.14), textColor: _statusColor(t.status)),
         ]),
         const SizedBox(height: 10),
         if (t.attempts > 1 || t.readyAt != null || t.receivedAt != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Wrap(spacing: 6, runSpacing: 6, children: [
-              if (t.attempts > 1) _attemptPill(t),
-              if (t.readyAt != null) Pill('Seller ready', color: AppColors.success.withValues(alpha: 0.14), textColor: AppColors.success),
-              if (t.receivedAt != null) Pill('Received at hub', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
+              if (t.attempts > 1) _attemptPill(s, t),
+              if (t.readyAt != null) Pill(s.sellerReady, color: AppColors.success.withValues(alpha: 0.14), textColor: AppColors.success),
+              if (t.receivedAt != null) Pill(s.receivedAtHub, color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
             ]),
           ),
         if ((t.customerName ?? '').isNotEmpty) _line(Icons.person_rounded, t.customerName!),
-        if (t.pickupAddress != null && (t.status == 'assigned' || t.isFinished)) _line(Icons.storefront_rounded, 'Collect at: ${t.pickupAddress}'),
-        _line(Icons.location_on_rounded, t.isFinished || t.pickupAddress == null ? t.address : 'Deliver to: ${t.address}'),
+        if (t.pickupAddress != null && (t.status == 'assigned' || t.isFinished)) _line(Icons.storefront_rounded, s.collectAt(t.pickupAddress)),
+        _line(Icons.location_on_rounded, t.isFinished || t.pickupAddress == null ? _address(s, t) : s.deliverTo(_address(s, t))),
         if (t.status == 'failed' && t.failureReason != null)
           Container(
             key: ValueKey('failure-${t.orderReference}'),
@@ -223,7 +256,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             child: Row(children: [
               const Icon(Icons.error_outline_rounded, size: 18, color: AppColors.danger),
               const SizedBox(width: 8),
-              Expanded(child: Text('Failed: ${t.failureReason}', style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13))),
+              Expanded(child: Text(s.failedWithReason(t.failureReason), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13))),
             ]),
           ),
         if (t.phone != null) _line(Icons.phone_rounded, t.phone!),
@@ -236,12 +269,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             child: Row(children: [
               const Icon(Icons.payments_rounded, color: Color(0xFF92610A)),
               const SizedBox(width: 10),
-              Expanded(child: Text('Collect \$${t.codAmountUsd.toStringAsFixed(2)} in cash', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF92610A)))),
+              Expanded(child: Text(s.collectCash(s.usd(t.codAmountUsd)), style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF92610A)))),
             ]),
           )
         else if (t.isActive)
-          const Padding(padding: EdgeInsets.only(top: 8), child: Text('Already paid online — no cash to collect.', style: TextStyle(color: AppColors.muted, fontSize: 12.5))),
-        if (t.status == 'picked_up' || t.status == 'in_transit') _gpsRow(),
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.alreadyPaid, style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
+        if (t.status == 'in_transit') _gpsRow(s),
         if (next != null) ...[
           const SizedBox(height: 12),
           SizedBox(
@@ -250,7 +283,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               key: ValueKey('next-${t.orderReference}'),
               onPressed: _busy ? null : () => _advance(t, next.$1),
               icon: Icon(next.$3, size: 20),
-              label: Text(next.$2),
+              label: Text(s.t(next.$2)),
             ),
           ),
           if (t.isActive)
@@ -260,7 +293,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                 key: ValueKey('fail-${t.orderReference}'),
                 onPressed: _busy ? null : () => _advance(t, 'failed'),
                 style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                child: const Text('Could not deliver'),
+                child: Text(s.couldNotDeliver),
               ),
             ),
         ],
@@ -268,16 +301,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     );
   }
 
-  Widget _gpsRow() {
+  Widget _gpsRow(Strings s) {
     final a = store.lastLocationAccess;
     final sharing = store.location.running;
     final (icon, color, text) = sharing
-        ? (Icons.my_location_rounded, AppColors.success, 'Sharing your live location with the customer')
+        ? (Icons.my_location_rounded, AppColors.success, s.gpsSharing)
         : switch (a) {
-            LocationAccess.denied => (Icons.location_off_rounded, AppColors.danger, 'Location permission is off — the customer cannot follow you'),
-            LocationAccess.deniedForever => (Icons.location_off_rounded, AppColors.danger, 'Location is blocked. Enable it in the phone settings.'),
-            LocationAccess.serviceOff => (Icons.location_off_rounded, AppColors.danger, 'Turn on GPS to share your position'),
-            _ => (Icons.location_searching_rounded, AppColors.muted, 'Getting your position…'),
+            LocationAccess.denied => (Icons.location_off_rounded, AppColors.danger, s.gpsDenied),
+            LocationAccess.deniedForever => (Icons.location_off_rounded, AppColors.danger, s.gpsBlocked),
+            LocationAccess.serviceOff => (Icons.location_off_rounded, AppColors.danger, s.gpsOff),
+            _ => (Icons.location_searching_rounded, AppColors.muted, s.gpsGetting),
           };
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -291,7 +324,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             onPressed: () async {
               await store.location.openSettings(a!);
             },
-            child: const Text('Open settings'),
+            child: Text(s.openSettings),
           ),
       ]),
     );
@@ -306,7 +339,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         ]),
       );
 
-  Widget _attemptPill(DeliveryTaskDto t) => Pill('Attempt ${t.attempts}', color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A));
+  /// The delivery address, or a "not provided" line.
+  static String _address(Strings s, DeliveryTaskDto t) => t.address.isEmpty ? s.addressMissing : t.address;
+
+  Widget _attemptPill(Strings s, DeliveryTaskDto t) => Pill(s.attemptN(t.attempts), color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A));
 
   static String _itemsText(DeliveryTaskDto t) => t.items.map((i) => '${i.qty}× ${i.name}').join(', ');
 
@@ -336,27 +372,31 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
     super.dispose();
   }
 
-  String? get _reason {
+  /// The reason as sent to support/the customer: in the rider's language.
+  String? _reason(Strings s) {
     final extra = _other.text.trim();
     if (_chip == null) return extra.isEmpty ? null : extra;
-    if (_chip == 'Other') return extra.isEmpty ? null : 'Other: $extra';
-    return extra.isEmpty ? _chip : '$_chip - $extra';
+    final label = s.t('fail_$_chip');
+    if (_chip == 'other') return extra.isEmpty ? null : s.failOtherPrefix(extra);
+    return extra.isEmpty ? label : '$label - $extra';
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    final reason = _reason(s);
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Why could you not deliver?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        Text(s.failTitle, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
-        const Text('The parcel goes back to the pool for another attempt. Support will see your reason.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+        Text(s.failHint, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
         const SizedBox(height: 14),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final r in _DeliveriesScreenState.failReasons)
+          for (final r in kFailReasonIds)
             ChoiceChip(
               key: ValueKey('reason-$r'),
-              label: Text(r),
+              label: Text(s.t('fail_$r')),
               selected: _chip == r,
               onSelected: (_) => setState(() => _chip = r),
             ),
@@ -367,15 +407,15 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
           controller: _other,
           maxLength: 200,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'Details (optional)', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: s.failDetails, border: const OutlineInputBorder()),
         ),
         SizedBox(
           width: double.infinity,
           child: FilledButton(
             key: const ValueKey('reason-submit'),
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: _reason == null ? null : () => Navigator.pop(context, _reason),
-            child: const Text('Mark as failed'),
+            onPressed: reason == null ? null : () => Navigator.pop(context, reason),
+            child: Text(s.failSubmit),
           ),
         ),
       ]),
@@ -406,7 +446,7 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
   Future<void> _submit() async {
     final code = _ctrl.text.trim();
     if (code.length != 4) {
-      setState(() => _error = 'Enter the 4-digit code from the customer.');
+      setState(() => _error = Strings.of(context).codeErrLen);
       return;
     }
     setState(() {
@@ -420,7 +460,7 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = e.toString().replaceFirst('ApiException: ', '');
+          _error = Strings.current.errorText(e);
         });
       }
     }
@@ -428,10 +468,11 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return AlertDialog(
-      title: const Text('Customer delivery code'),
+      title: Text(s.codeTitle),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Ask the customer for the 4-digit code shown in their app and type it here.'),
+        Text(s.codeBody),
         const SizedBox(height: 12),
         TextField(
           key: const ValueKey('delivery-code-field'),
@@ -448,8 +489,8 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, key: const ValueKey('delivery-code-error'), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600))),
       ]),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: const Text('Cancel')),
-        FilledButton(key: const ValueKey('delivery-code-submit'), onPressed: _busy ? null : _submit, child: Text(_busy ? 'Checking…' : 'Confirm delivery')),
+        TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(s.cancel)),
+        FilledButton(key: const ValueKey('delivery-code-submit'), onPressed: _busy ? null : _submit, child: Text(_busy ? s.codeChecking : s.codeConfirm)),
       ],
     );
   }

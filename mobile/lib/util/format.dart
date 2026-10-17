@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../data/market_profiles.dart';
 import '../data/shop_state.dart';
+import '../l10n/strings.dart';
 import '../services/realtime_store.dart';
 
 /// App-wide market/currency selection. France → USD, DRC → Congolese Franc
@@ -11,11 +12,16 @@ final marketNotifier = ValueNotifier<MarketProfileId>(MarketProfileId.drc);
 
 MarketProfile get currentMarket => marketProfiles[marketNotifier.value]!;
 
-final _usd = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 0);
-final _cdf = NumberFormat.currency(locale: 'en_US', symbol: 'FC ', decimalDigits: 0);
+// Amounts follow the language: `3 417 150 FC` / `1 199 $` in French, `FC 3,417,150` / `$1,199` in English.
+final _usdEn = NumberFormat.currency(locale: 'en_US', symbol: '\$', decimalDigits: 0);
+final _cdfEn = NumberFormat.currency(locale: 'en_US', symbol: 'FC ', decimalDigits: 0);
+final _usdFr = NumberFormat.currency(locale: 'fr', symbol: '\$', decimalDigits: 0);
+final _cdfFr = NumberFormat.currency(locale: 'fr', symbol: 'FC', decimalDigits: 0);
 
-/// Formats a USD amount in the active market's currency.
-/// France → `$1,199`  ·  DRC → `FC 3,417,150`.
+NumberFormat get _usd => Strings.current.isFr ? _usdFr : _usdEn;
+NumberFormat get _cdf => Strings.current.isFr ? _cdfFr : _cdfEn;
+
+/// Formats a USD amount in the active market's currency and language.
 String money(num usdValue) {
   final rate = _fxRate;
   if (rate != null) return _cdf.format(usdValue * rate);
@@ -50,9 +56,10 @@ String? secondaryMoney(num usdValue) {
   return null;
 }
 
-/// Compact count, e.g. `2.3k` reviews.
+/// Compact count, e.g. `2.3k` reviews (`2,3 k` in French).
 String compact(num value) {
-  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
-  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  final s = Strings.current;
+  if (value >= 1000000) return '${s.number(value / 1000000, decimals: 1)} M';
+  if (value >= 1000) return '${s.number(value / 1000, decimals: 1)}${s.isFr ? ' k' : 'k'}';
   return value.toString();
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../services/models.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
@@ -39,7 +40,7 @@ class ReturnView {
       );
 
   Color get color => switch (status) { 'resolved' => AppColors.success, 'rejected' => AppColors.danger, _ => AppColors.amber };
-  String get label => switch (status) { 'resolved' => 'Resolved', 'rejected' => 'Declined', _ => 'Under review' };
+  String labelFor(Strings s) => switch (status) { 'resolved' => s.returnResolved, 'rejected' => s.returnRejected, _ => s.returnOpen };
 }
 
 /// Ask for a return (or raise a problem) on a delivered order. One request per
@@ -57,7 +58,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   final _details = TextEditingController();
   bool _busy = false;
   String? _err;
-  static const _reasons = ['Damaged / defective', 'Wrong item received', 'Not as described', 'No longer needed', 'Other'];
+  List<String> _reasons(Strings s) => [s.returnR0, s.returnR1, s.returnR2, s.returnR3, s.returnR4];
 
   @override
   void dispose() {
@@ -75,7 +76,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
       final res = await RealtimeStore.instance.call('disputes:open', {
         'orderId': widget.order.id,
         'type': 'return',
-        'reason': '${_reasons[_reason]}${text.isEmpty ? '' : ' — $text'}',
+        'reason': '${_reasons(Strings.of(context))[_reason]}${text.isEmpty ? '' : ' — $text'}',
       });
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -86,7 +87,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _err = e.toString();
+          _err = Strings.current.errorText(e);
         });
       }
     }
@@ -94,13 +95,15 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    final reasons = _reasons(s);
     final o = widget.order;
     return Scaffold(
-      appBar: backAppBar(context, 'Return · ${o.reference}'),
+      appBar: backAppBar(context, s.returnTitle(o.reference)),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Your order', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          Text(s.yourOrder, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 8),
           for (final i in o.items)
             Padding(
@@ -112,9 +115,9 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
             ),
         ])),
         const SizedBox(height: 16),
-        const Text('What went wrong?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        Text(s.returnWhatWrong, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
-        for (var i = 0; i < _reasons.length; i++)
+        for (var i = 0; i < reasons.length; i++)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
@@ -124,7 +127,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
                   child: Row(children: [
                     Icon(_reason == i ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: _reason == i ? AppColors.primary : AppColors.faint),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(_reasons[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _reason == i ? AppColors.ink : AppColors.inkSoft))),
+                    Expanded(child: Text(reasons[i], style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: _reason == i ? AppColors.ink : AppColors.inkSoft))),
                   ])),
             ),
           ),
@@ -133,12 +136,12 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
           key: const ValueKey('return-details'),
           controller: _details,
           maxLines: 3,
-          decoration: InputDecoration(labelText: 'Tell us more (optional)', errorText: _err, alignLabelWithHint: true),
+          decoration: InputDecoration(labelText: s.returnMore, errorText: _err, alignLabelWithHint: true),
         ),
         const SizedBox(height: 12),
-        const Text('If approved, the refund is added to your Somba&Teka wallet.', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+        Text(s.returnRefundNote, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
         const SizedBox(height: 16),
-        PrimaryButton(_busy ? '…' : 'Submit return request', icon: Icons.assignment_return_rounded, onPressed: _busy ? null : _submit),
+        PrimaryButton(_busy ? '…' : s.returnSubmit, icon: Icons.assignment_return_rounded, onPressed: _busy ? null : _submit),
       ]),
     );
   }
@@ -152,6 +155,7 @@ class ReturnStatusScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     final r = returnRequest;
     return Scaffold(
       appBar: backAppBar(context, r.reference),
@@ -164,9 +168,9 @@ class ReturnStatusScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r.label, key: const ValueKey('return-status'), style: TextStyle(color: r.color, fontWeight: FontWeight.w800, fontSize: 16)),
+                Text(r.labelFor(s), key: const ValueKey('return-status'), style: TextStyle(color: r.color, fontWeight: FontWeight.w800, fontSize: 16)),
                 Text(
-                  r.status == 'open' ? 'Our team is reviewing your request.' : (r.resolution ?? ''),
+                  r.status == 'open' ? s.returnReviewing : (r.resolution ?? ''),
                   style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
                 ),
               ]),
@@ -176,11 +180,11 @@ class ReturnStatusScreen extends StatelessWidget {
         const SizedBox(height: 16),
         Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _kv('Order', r.orderReference),
+          _kv(s.kvOrder, r.orderReference),
           const SizedBox(height: 8),
-          _kv('Type', r.type == 'return' ? 'Return' : 'Dispute'),
+          _kv(s.kvType, r.type == 'return' ? s.typeReturn : s.typeDispute),
           const Divider(height: 22),
-          const Text('Your message', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          Text(s.yourMessage, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           const SizedBox(height: 4),
           Text(r.reason, style: const TextStyle(fontSize: 13.5, height: 1.4)),
         ])),
@@ -229,8 +233,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Returns & refunds'),
+      appBar: backAppBar(context, s.returnsRefunds),
       body: FutureBuilder<List<ReturnView>>(
         future: _future,
         builder: (context, snap) {
@@ -238,7 +243,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
           if (snap.hasError) return Center(child: Text('${snap.error}', style: const TextStyle(color: AppColors.muted)));
           final rows = snap.data ?? const <ReturnView>[];
           if (rows.isEmpty) {
-            return const Center(child: Text('No returns yet. Open a delivered order to start one.', style: TextStyle(color: AppColors.muted)));
+            return Center(child: Text(s.returnsNone, style: const TextStyle(color: AppColors.muted)));
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -253,12 +258,12 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                   Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(r.reference, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                    Text('Order ${r.orderReference}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                    Text(s.orderRef(r.orderReference), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                   ])),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(color: r.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
-                    child: Text(r.label, style: TextStyle(color: r.color, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    child: Text(r.labelFor(s), style: TextStyle(color: r.color, fontSize: 11.5, fontWeight: FontWeight.w700)),
                   ),
                 ])),
               );

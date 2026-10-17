@@ -101,7 +101,10 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `promos:list/validate/create`, `flashsales:list/create` | promotions | all/admin |
 | `cms:list/upsert`, `settings:get/set`, `categories:create/update/remove` | content/config | admin |
 | `sellers:list/storefront/register/setStatus/stats` | seller lifecycle | seller/admin |
-| `analytics:admin/warehouse/revenue` | dashboard KPIs | admin/staff |
+| `analytics:admin/warehouse/revenue/finance/seller` | dashboard KPIs, computed in SQL (see [`docs/ANALYTICS-API.md`](../docs/ANALYTICS-API.md)) | admin/staff · finance · seller |
+| `reviews:reply/setStatus/admin` | seller reply, hide/restore, moderation queue | seller/admin |
+| `sellers:plans/subscribe` | seller subscription plans (wallet or mobile money) | public · seller |
+| `warehouse:saveHub/setHubActive` | hub directory | admin/ops |
 | `audit:list`, `fraud:list/setStatus`, `customers:list/setActive` | admin ops | admin |
 | `broadcasts:list/send`, `roles:defs/staff/setRole` | marketing + roles | admin |
 | `warehouse:hubs/parcels/aged/inventory/batches/buildBatch/reconcile/transfers` | WMS | staff |
@@ -121,7 +124,7 @@ socket.on('ready', ({ user }) => { /* connected */ });
 Account handlers: `me:get|update|prefs|setPrefs|changePassword|delete`,
 `devices:register|unregister` (optional FCM push token registry).
 
-**113 realtime handlers across 33 domains and 34 entities** cover every
+**132 realtime handlers across 33 domains and 34 entities** cover every
 portal (customer, seller, admin, warehouse, rider) — including marketing
 campaigns, replacements, exchanges, and warehouse exceptions.
 
@@ -163,6 +166,8 @@ Optional integrations (all no-ops when unset): `FIREBASE_SERVICE_ACCOUNT_JSON` /
 ## Payments, money and security notes
 
 * **Mobile money** (`airtel_money`, `orange_money`, `mpesa`): orders/payments stay `pending` until the signed webhook `POST /api/v1/payments/webhook/mobile-money` (HMAC over the raw body, `MM_WEBHOOK_SECRET`) — or the sandbox provider in development (`MM_PROVIDER=sandbox`). Production default is `MM_PROVIDER=none`: mobile money is refused (fails closed) until an aggregator adapter is configured.
+* **Verification policy:** with the public setting `requireVerifiedForCheckout=true` (the production bootstrap default; off in the dev seed) an account needs a verified phone or e-mail to place orders or top up its wallet.
+* **Campaign discounts** are applied server-side at checkout, never stacked with flash sales (lowest price wins; a promo code still applies on top) — see `docs/ANALYTICS-API.md`.
 * **COD** is off unless an admin sets `codEnabled=true`. **Account is mandatory** (no guest checkout).
 * Prices, promo discounts and delivery fees (`deliveryZones` setting) are computed server-side; stock and wallet moves are atomic.
 * Tests: `npm test` (unit), `npm run smoke`, `npm run smoke:account`, `npm run smoke:authz` against a seeded running server (`npm run seed`; the seed switches COD back off after creating demo orders).

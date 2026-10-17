@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
+import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
@@ -25,15 +26,16 @@ class _CouponsScreenState extends State<CouponsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     return Scaffold(
-      appBar: backAppBar(context, 'Coupons'),
+      appBar: backAppBar(context, s.couponsTitle),
       body: FutureBuilder<List<Promo>>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
           final promos = snap.data ?? const <Promo>[];
           return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-            if (promos.isEmpty) const Panel(child: Text('No coupons available right now.', style: TextStyle(color: AppColors.muted))),
+            if (promos.isEmpty) Panel(child: Text(s.couponsNone, style: const TextStyle(color: AppColors.muted))),
             ...promos.map((p) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Panel(
@@ -49,26 +51,26 @@ class _CouponsScreenState extends State<CouponsScreen> {
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(p.code, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 0.5)),
                         const SizedBox(height: 2),
-                        Text(p.description, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                        if (p.minOrderUsd > 0) Text('Min. order ${money(p.minOrderUsd)}', style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                        Text(p.describe(s), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        if (p.minOrderUsd > 0) Text(s.couponMinOrder(money(p.minOrderUsd)), style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
                       ])),
                       TextButton.icon(
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: p.code));
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${p.code} copied')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.couponCopied(p.code))));
                         },
                         icon: const Icon(Icons.copy_rounded, size: 15),
-                        label: const Text('Copy'),
+                        label: Text(s.copy),
                       ),
                     ]),
                   ),
                 )),
             const SizedBox(height: 4),
-            const Panel(
+            Panel(
               child: Row(children: [
-                Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
-                SizedBox(width: 10),
-                Expanded(child: Text('Apply a coupon code in your cart before checkout.', style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
+                const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(s.couponHint, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5, height: 1.3))),
               ]),
             ),
           ]);
@@ -92,7 +94,7 @@ class ProductListScreen extends StatefulWidget {
 class _ProductListScreenState extends State<ProductListScreen> {
   final _ctrl = TextEditingController();
   late final ProductQuery _q = ProductQuery(category: widget.category, dealsOnly: widget.dealsOnly);
-  static const _quickSorts = ['Popular', 'Price ↑', 'Price ↓', 'Top rated', 'Deals'];
+  List<String> _quickSorts(Strings s) => [s.sortPopular, s.sortPriceAsc, s.sortPriceDesc, s.sortTopRated, s.sortDeals];
 
   @override
   void dispose() {
@@ -106,22 +108,24 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
+    final s = Strings.of(context);
+    final sorts = _quickSorts(s);
     _q.text = _ctrl.text;
     final items = runQuery(liveCatalog(), _q);
     return Scaffold(
-      appBar: backAppBar(context, widget.title ?? widget.category ?? 'Products'),
+      appBar: backAppBar(context, widget.title ?? widget.category ?? s.products),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: BrowseSearchField(controller: _ctrl, hint: 'Search in ${widget.category ?? 'products'}…', onChanged: (_) => setState(() {})),
+            child: BrowseSearchField(controller: _ctrl, hint: widget.category != null ? s.searchInCat(widget.category) : s.search, onChanged: (_) => setState(() {})),
           ),
           SizedBox(
             height: 40,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              itemCount: _quickSorts.length + 1,
+              itemCount: sorts.length + 1,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, idx) {
                 if (idx == 0) {
@@ -144,7 +148,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       child: Row(children: [
                         Icon(Icons.tune_rounded, size: 15, color: n > 0 ? AppColors.primary : AppColors.muted),
                         const SizedBox(width: 4),
-                        Text(n > 0 ? 'Filters · $n' : 'Filters', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
+                        Text(n > 0 ? s.filtersN(n) : s.filters, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
                       ]),
                     ),
                   );
@@ -167,7 +171,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(color: active ? AppColors.primary : AppColors.line),
                     ),
-                    child: Text(_quickSorts[i], style: TextStyle(color: active ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    child: Text(sorts[i], style: TextStyle(color: active ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
                   ),
                 );
               },
@@ -175,11 +179,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 6, 16, 4),
-            child: Align(alignment: Alignment.centerLeft, child: Text('${items.length} items', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+            child: Align(alignment: Alignment.centerLeft, child: Text(s.itemsCount(items.length), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
           ),
           Expanded(
             child: items.isEmpty
-                ? const Center(child: Text('No products match your filters', style: TextStyle(color: AppColors.muted)))
+                ? Center(child: Text(s.noProductsMatch, style: const TextStyle(color: AppColors.muted)))
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -222,19 +226,20 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
     try {
       await RealtimeStore.instance.addReview(p.uuid, _rating, _ctrl.text);
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Thanks for your review!')));
+      messenger.showSnackBar(SnackBar(content: Text(Strings.of(context).reviewThanks)));
       Navigator.pop(context);
     } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
     final p = widget.product;
     return Scaffold(
-      appBar: backAppBar(context, 'Write a review'),
+      appBar: backAppBar(context, s.reviewTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         if (p != null)
           Panel(
@@ -245,7 +250,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
             ]),
           ),
         const SizedBox(height: 18),
-        const Center(child: Text('How would you rate it?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+        Center(child: Text(s.reviewRate, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) {
           final on = i < _rating;
@@ -258,23 +263,23 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           );
         })),
         const SizedBox(height: 20),
-        const Text('Your review', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+        Text(s.reviewYours, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
         const SizedBox(height: 10),
         TextField(
           key: const ValueKey('review-text'),
           controller: _ctrl,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Share what you liked or what could be better…',
+            hintText: s.reviewHint,
             filled: true,
             fillColor: AppColors.surface,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
           ),
         ),
         const SizedBox(height: 8),
-        const Text('You can review a product once it has been delivered to you.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        Text(s.reviewAfterDelivery, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(height: 20),
-        PrimaryButton(_busy ? '…' : 'Submit review', icon: Icons.send_rounded, onPressed: _busy ? null : _submit),
+        PrimaryButton(_busy ? '…' : s.reviewSubmit, icon: Icons.send_rounded, onPressed: _busy ? null : _submit),
       ]),
     );
   }

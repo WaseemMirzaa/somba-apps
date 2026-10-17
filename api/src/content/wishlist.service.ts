@@ -15,7 +15,7 @@ export class WishlistService {
 
   /** The product ids on a user's wishlist. */
   async list(userId: string): Promise<string[]> {
-    const rows = await this.items.find({ where: { userId } });
+    const rows = await this.items.find({ where: { userId }, take: 500 });
     return rows.map((r) => r.productId);
   }
 

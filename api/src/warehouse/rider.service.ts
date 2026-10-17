@@ -28,20 +28,26 @@ export class RiderService {
     }));
   }
 
-  /** Earnings + shift summary for a rider. */
+  /** Earnings + shift summary for a rider (grouped counts, not every task in memory). */
   async earnings(riderId: string) {
-    const mine = await this.tasks.find({ where: { riderId } });
-    const delivered = mine.filter((t) => t.status === 'delivered');
-    const codCollected = delivered.reduce((s, t) => s + t.codAmountUsd, 0);
-    const active = mine.filter(
-      (t) => t.status !== 'delivered' && t.status !== 'failed',
-    ).length;
+    const rows = await this.tasks
+      .createQueryBuilder('t')
+      .select('t.status', 'status')
+      .addSelect('COUNT(*)', 'n')
+      .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'cod')
+      .where('t.riderId = :riderId', { riderId })
+      .groupBy('t.status')
+      .getRawMany<{ status: string; n: string; cod: string }>();
+    const total = rows.reduce((s, r) => s + Number(r.n), 0);
+    const done = rows.find((r) => r.status === 'delivered');
+    const delivered = Number(done?.n ?? 0);
+    const active = rows.filter((r) => r.status !== 'delivered' && r.status !== 'failed').reduce((s, r) => s + Number(r.n), 0);
     return {
-      totalTasks: mine.length,
-      delivered: delivered.length,
+      totalTasks: total,
+      delivered,
       active,
-      codCollectedUsd: Number(codCollected.toFixed(2)),
-      earningsUsd: Number((delivered.length * PER_DELIVERY_USD).toFixed(2)),
+      codCollectedUsd: Number(Number(done?.cod ?? 0).toFixed(2)),
+      earningsUsd: Number((delivered * PER_DELIVERY_USD).toFixed(2)),
     };
   }
 
@@ -54,6 +60,7 @@ export class RiderService {
     const rows = await this.tasks.find({
       where: [{ riderId }, { status: 'unassigned' }],
       order: { createdAt: 'DESC' },
+      take: 500,
     });
     const orderIds = [...new Set(rows.map((t) => t.orderId))];
     const orders = orderIds.length

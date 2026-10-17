@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
+import '../../l10n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../services/realtime_store.dart';
 import '../../util/format.dart';
@@ -94,10 +95,10 @@ class _FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<_FilterSheet> {
   late ProductQuery q = widget.query;
-  static const _sorts = ['Relevance', 'Price: low to high', 'Price: high to low', 'Top rated', 'Biggest discount'];
-
   @override
   Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    final sorts = [s.filterSort0, s.filterSort1, s.filterSort2, s.filterSort3, s.filterSort4];
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
@@ -110,24 +111,24 @@ class _FilterSheetState extends State<_FilterSheet> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
             child: Row(children: [
-              const Text('Filters', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
+              Text(s.filters, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
               const Spacer(),
-              TextButton(onPressed: () => setState(() => q = ProductQuery(text: q.text)), child: const Text('Reset')),
+              TextButton(onPressed: () => setState(() => q = ProductQuery(text: q.text)), child: Text(s.filterReset)),
             ]),
           ),
           Expanded(
             child: ListView(controller: controller, padding: const EdgeInsets.fromLTRB(20, 4, 20, 20), children: [
-              _label('Sort by'),
-              Wrap(spacing: 8, runSpacing: 8, children: List.generate(_sorts.length, (i) => _chip(_sorts[i], q.sort == i, () => setState(() => q.sort = i)))),
+              _label(s.filterSortBy),
+              Wrap(spacing: 8, runSpacing: 8, children: List.generate(sorts.length, (i) => _chip(sorts[i], q.sort == i, () => setState(() => q.sort = i)))),
               const SizedBox(height: 20),
-              _label('Category'),
+              _label(s.filterCategory),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                _chip('All', q.category == null, () => setState(() => q.category = null)),
-                ...liveCategories().map((c) => _chip(c.name, q.category == c.name, () => setState(() => q.category = c.name))),
+                _chip(s.filterAll, q.category == null, () => setState(() => q.category = null)),
+                ...liveCategories().map((c) => _chip(c.displayName(s.lang), q.category == c.name, () => setState(() => q.category = c.name))),
               ]),
               const SizedBox(height: 20),
               Row(children: [
-                _label('Price range'),
+                _label(s.filterPrice),
                 const Spacer(),
                 Text('${money(q.minPrice)} – ${money(q.maxPrice ?? liveMaxPrice())}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 13)),
               ]),
@@ -142,9 +143,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                 }),
               ),
               const SizedBox(height: 12),
-              _label('Minimum rating'),
+              _label(s.filterMinRating),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                _chip('Any', q.minRating == 0, () => setState(() => q.minRating = 0)),
+                _chip(s.filterAny, q.minRating == 0, () => setState(() => q.minRating = 0)),
                 _chip('4.0★+', q.minRating == 4.0, () => setState(() => q.minRating = 4.0)),
                 _chip('4.5★+', q.minRating == 4.5, () => setState(() => q.minRating = 4.5)),
               ]),
@@ -154,8 +155,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                 activeThumbColor: AppColors.primary,
                 value: q.dealsOnly,
                 onChanged: (v) => setState(() => q.dealsOnly = v),
-                title: const Text('Deals only', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                subtitle: const Text('Show items with 15%+ off', style: TextStyle(fontSize: 12.5)),
+                title: Text(s.filterDealsOnly, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                subtitle: Text(s.filterDealsSub, style: const TextStyle(fontSize: 12.5)),
               ),
             ]),
           ),
@@ -167,7 +168,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () => Navigator.pop(context, q),
-                  child: Text('Show ${runQuery(liveCatalog(), q).length} results'),
+                  child: Text(s.filterShow(runQuery(liveCatalog(), q).length)),
                 ),
               ),
             ),
@@ -216,27 +217,28 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
+        final tr = Strings.of(context);
         final t = _ctrl.text.trim().toLowerCase();
         final list = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
         return Scaffold(
-          appBar: backAppBar(context, 'Stores & sellers'),
+          appBar: backAppBar(context, tr.sellersTitle),
           body: Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: _SearchField(controller: _ctrl, hint: 'Search stores or businesses…', onChanged: (_) => setState(() {})),
+              child: _SearchField(controller: _ctrl, hint: tr.sellersSearch, onChanged: (_) => setState(() {})),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-              child: Align(alignment: Alignment.centerLeft, child: Text('${list.length} stores', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
+              child: Align(alignment: Alignment.centerLeft, child: Text(list.length == 1 ? tr.storeOne(1) : tr.storeMany(list.length), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))),
             ),
             Expanded(
               child: list.isEmpty
-                  ? const Center(child: Text('No stores match your search', style: TextStyle(color: AppColors.muted)))
+                  ? Center(child: Text(tr.sellersNone, style: const TextStyle(color: AppColors.muted)))
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: list.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => _sellerTile(list[i]),
+                      itemBuilder: (_, i) => _sellerTile(tr, list[i]),
                     ),
             ),
           ]),
@@ -245,7 +247,7 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
     );
   }
 
-  Widget _sellerTile(Seller s) {
+  Widget _sellerTile(Strings tr, Seller s) {
     return Panel(
       padding: const EdgeInsets.all(12),
       child: Row(children: [
@@ -255,12 +257,12 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
           const SizedBox(height: 2),
-          Text('${s.productCount} product${s.productCount == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          Text(s.productCount == 1 ? tr.productOne(1) : tr.productMany(s.productCount), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
         ])),
         FilledButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name))),
           style: FilledButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 16)),
-          child: const Text('Visit'),
+          child: Text(tr.visit),
         ),
       ]),
     );

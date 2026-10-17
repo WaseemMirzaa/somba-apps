@@ -3,10 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/main.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  // French is the app's default language (the market is DR Congo).
+  const fr = Strings('fr');
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    Strings.hasChoice = false;
+    await Strings.setLang('fr', persist: false);
+  });
 
   testWidgets('boots into the splash, then a real sign-in form (no demo shortcuts)', (tester) async {
     await tester.pumpWidget(const SombaApp());
@@ -18,8 +26,8 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
 
-    expect(find.text('Welcome back'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    expect(find.text(fr.welcomeBack), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, fr.signIn), findsOneWidget);
 
     // The account is mandatory: no guest entry, no fake social sign-in, no
     // pre-filled demo credentials.
@@ -34,15 +42,15 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.tap(find.widgetWithText(FilledButton, fr.signIn));
     await tester.pump();
-    expect(find.text('Enter your email'), findsOneWidget);
-    expect(find.text('Enter your password'), findsOneWidget);
+    expect(find.text(fr.errEnterEmail), findsOneWidget);
+    expect(find.text(fr.errEnterPassword), findsOneWidget);
 
     await tester.enterText(find.descendant(of: find.byKey(const ValueKey('login-email')), matching: find.byType(TextField)), 'not-an-email');
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.tap(find.widgetWithText(FilledButton, fr.signIn));
     await tester.pump();
-    expect(find.text('Enter a valid email'), findsOneWidget);
+    expect(find.text(fr.errValidEmail), findsOneWidget);
   });
 
   testWidgets('create-account form requires an 8+ character password and matching confirmation', (tester) async {
@@ -55,7 +63,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('go-register')));
     await tester.pumpAndSettle();
-    expect(find.text('Create account'), findsWidgets);
+    expect(find.text(fr.registerTitle), findsWidgets);
 
     Finder field(String key) => find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(TextField));
     await tester.enterText(field('reg-name'), 'Aline Kabila');
@@ -63,9 +71,9 @@ void main() {
     await tester.enterText(field('reg-email'), 'aline@example.com');
     await tester.enterText(field('reg-password'), 'short');
     await tester.enterText(field('reg-confirm'), 'different');
-    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.tap(find.widgetWithText(FilledButton, fr.registerTitle));
     await tester.pump();
-    expect(find.text('Use at least 8 characters'), findsOneWidget);
-    expect(find.text('Passwords do not match'), findsOneWidget);
+    expect(find.text(fr.regErrPass), findsOneWidget);
+    expect(find.text(fr.regErrMatch), findsOneWidget);
   });
 }

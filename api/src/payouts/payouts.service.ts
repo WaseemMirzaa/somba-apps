@@ -162,7 +162,7 @@ export class PayoutsService {
     if (user.role === 'admin' || user.role === 'admin_finance') {
       return this.payouts.find({ order: { createdAt: 'DESC' }, take: 200 });
     }
-    return this.payouts.find({ where: { sellerId: user.id }, order: { createdAt: 'DESC' } });
+    return this.payouts.find({ where: { sellerId: user.id }, order: { createdAt: 'DESC' }, take: 500 });
   }
 
   private static newReference(): string {

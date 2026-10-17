@@ -60,7 +60,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(tester.widget<FilledButton>(find.byKey(const ValueKey('reason-submit'))).onPressed, isNull);
-    await tester.tap(find.byKey(const ValueKey('reason-Wrong address')));
+    await tester.tap(find.byKey(const ValueKey('reason-wrong_address')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('reason-submit')));
     await tester.pumpAndSettle();

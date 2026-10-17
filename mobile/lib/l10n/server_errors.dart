@@ -99,6 +99,19 @@ final Map<String, String> _exactFr = {
   'Write a message first.': 'Écrivez d’abord un message.',
   'Subject and message are required.': 'L’objet et le message sont obligatoires.',
   'Ticket not found.': 'Ticket introuvable.',
+  // promo codes
+  'Invalid code.': 'Code invalide.',
+  'This code has expired.': 'Ce code a expiré.',
+  'This code is no longer available.': 'Ce code n’est plus disponible.',
+  'You have already used this code.': 'Vous avez déjà utilisé ce code.',
+  // payment outcomes
+  'Payment failed.': 'Le paiement a échoué.',
+  'Payment was not approved.': 'Le paiement n’a pas été validé.',
+  'Declined by subscriber.': 'Refusé par l’abonné.',
+  'Declined by finance.': 'Refusé par la comptabilité.',
+  'Timed out waiting for approval.': 'Délai de validation dépassé.',
+  'Cancelled by customer.': 'Annulé par le client.',
+  'Could not reach the mobile-money network. Please try again.': 'Impossible de joindre le réseau mobile money. Veuillez réessayer.',
   // addresses
   'Street address and city are required.': 'L’adresse (rue) et la ville sont obligatoires.',
   // returns / exchanges
@@ -146,6 +159,7 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   (RegExp(r'^An order that is (.+) cannot be marked ready\.$'), (m) => 'Une commande « ${m[1]} » ne peut pas être marquée comme prête.'),
   (RegExp(r'^A (\w+) parcel cannot be received\.$'), (m) => 'Un colis « ${m[1]} » ne peut pas être réceptionné.'),
   (RegExp(r'^A (.+) delivery cannot become (.+)\.$'), (m) => 'Une livraison « ${m[1]} » ne peut pas passer à « ${m[2]} ».'),
+  (RegExp(r'^Minimum order \$([\d.,]+)\.$'), (m) => 'Commande minimum de ${m[1]} \$.'),
   (RegExp(r'^Request failed \((\d+)\)\.$'), (m) => 'La requête a échoué (${m[1]}).'),
   // class-validator messages (sign-up / reset forms)
   (RegExp(r'^email must be an email$'), (m) => 'Saisissez un e-mail valide.'),

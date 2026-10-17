@@ -12,6 +12,11 @@ describe('seller plans', () => {
     expect(() => validatePlans([{ id: 'ok', name: 'x', priceUsd: 5 }, { id: 'ok', name: 'y', priceUsd: 6 }])).toThrow(/unique/);
     expect(() => validatePlans([{ id: 'ok', name: 'x', priceUsd: 5, months: 0 }])).toThrow(/months/);
   });
+  it('validates an optional listing quota', () => {
+    expect(validatePlans([{ id: 'cap', name: 'Cap', priceUsd: 5, maxProducts: 10 }])[0].maxProducts).toBe(10);
+    expect(validatePlans([{ id: 'cap', name: 'Cap', priceUsd: 5, maxProducts: null }])[0].maxProducts).toBeUndefined();
+    expect(() => validatePlans([{ id: 'cap', name: 'Cap', priceUsd: 5, maxProducts: 0 }])).toThrow(/Product limit/);
+  });
   it('allows a null price (contact sales)', () => {
     expect(validatePlans([{ id: 'big', name: 'Big', priceUsd: null }])[0].priceUsd).toBeNull();
   });

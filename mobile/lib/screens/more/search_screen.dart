@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
+import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/product_actions.dart';
@@ -23,7 +24,7 @@ class _SearchScreenState extends State<SearchScreen> {
   late final ProductQuery _q = ProductQuery(text: widget.initialText ?? '');
   late int _tab = widget.initialTab;
 
-  static const _quickSorts = ['Relevance', 'Price ↑', 'Price ↓', 'Top rated', 'Deals'];
+  List<String> _quickSorts(Strings s) => [s.sortRelevance, s.sortPriceAsc, s.sortPriceDesc, s.sortTopRated, s.sortDeals];
 
   @override
   void dispose() {
@@ -37,7 +38,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
-    final lang = widget.locale.languageCode;
+    final tr = Strings.of(context);
+    final lang = tr.lang;
     _q.text = _ctrl.text;
     final results = runQuery(liveCatalog(), _q);
     final t = _ctrl.text.trim().toLowerCase();
@@ -51,7 +53,7 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.only(right: 12),
           child: BrowseSearchField(
             controller: _ctrl,
-            hint: 'Search products or stores…',
+            hint: tr.searchBothHint,
             autofocus: widget.initialText == null,
             onChanged: (_) => setState(() {}),
           ),
@@ -62,14 +64,14 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
           child: Row(children: [
-            _seg('Products', 0), const SizedBox(width: 8), _seg('Stores', 1),
+            _seg(tr.products, 0), const SizedBox(width: 8), _seg(tr.tabStores, 1),
             const Spacer(),
             if (_tab == 0)
-              _filterButton(),
+              _filterButton(tr),
           ]),
         ),
-        if (_tab == 0) _quickSortRow(),
-        Expanded(child: _tab == 0 ? _productResults(results, lang) : _storeResults(stores)),
+        if (_tab == 0) _quickSortRow(tr),
+        Expanded(child: _tab == 0 ? _productResults(tr, results, lang) : _storeResults(tr, stores)),
       ]),
     );
   }
@@ -91,7 +93,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _filterButton() {
+  Widget _filterButton(Strings tr) {
     final n = _q.activeCount;
     return GestureDetector(
       onTap: () async {
@@ -113,18 +115,18 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(children: [
           Icon(Icons.tune_rounded, size: 16, color: n > 0 ? AppColors.primary : AppColors.muted),
           const SizedBox(width: 5),
-          Text(n > 0 ? 'Filters · $n' : 'Filters', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
+          Text(n > 0 ? tr.filtersN(n) : tr.filters, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: n > 0 ? AppColors.primary : AppColors.muted)),
         ]),
       ),
     );
   }
 
-  Widget _quickSortRow() => SizedBox(
+  Widget _quickSortRow(Strings tr) => SizedBox(
         height: 40,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: _quickSorts.length,
+          itemCount: _quickSorts(tr).length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (_, i) {
             final active = (i < 4 && _q.sort == i) || (i == 4 && _q.dealsOnly);
@@ -144,19 +146,19 @@ class _SearchScreenState extends State<SearchScreen> {
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(color: active ? AppColors.primary : AppColors.line),
                 ),
-                child: Text(_quickSorts[i], style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: active ? Colors.white : AppColors.muted)),
+                child: Text(_quickSorts(tr)[i], style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: active ? Colors.white : AppColors.muted)),
               ),
             );
           },
         ),
       );
 
-  Widget _productResults(List<Product> results, String lang) {
-    if (results.isEmpty) return _empty('No products match “${_ctrl.text}”');
+  Widget _productResults(Strings tr, List<Product> results, String lang) {
+    if (results.isEmpty) return _empty(tr.noProductsFor(_ctrl.text));
     return CustomScrollView(slivers: [
       SliverToBoxAdapter(child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-        child: Text('${results.length} results', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+        child: Text(results.length == 1 ? tr.resultOne(1) : tr.resultMany(results.length), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 13)),
       )),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -168,8 +170,8 @@ class _SearchScreenState extends State<SearchScreen> {
     ]);
   }
 
-  Widget _storeResults(List<Seller> stores) {
-    if (stores.isEmpty) return _empty('No stores match “${_ctrl.text}”');
+  Widget _storeResults(Strings tr, List<Seller> stores) {
+    if (stores.isEmpty) return _empty(tr.noStoresFor(_ctrl.text));
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: stores.length,
@@ -187,7 +189,7 @@ class _SearchScreenState extends State<SearchScreen> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                 const SizedBox(height: 2),
-                Text('${s.productCount} product${s.productCount == 1 ? '' : 's'}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                Text(s.productCount == 1 ? tr.productOne(1) : tr.productMany(s.productCount), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
               ])),
               const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
             ]),

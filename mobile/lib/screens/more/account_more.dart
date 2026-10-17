@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/catalog_live.dart';
+import '../../l10n/notification_text.dart';
+import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../data/shop_state.dart';
 import '../../theme/app_theme.dart';
@@ -18,12 +20,13 @@ class WishlistScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
+        final s = Strings.of(context);
         final ids = RealtimeStore.instance.wishlistIds;
         final items = liveCatalog().where((p) => ids.contains(p.uuid)).toList();
         return Scaffold(
-          appBar: backAppBar(context, 'Wishlist'),
+          appBar: backAppBar(context, s.wishlist),
           body: items.isEmpty
-              ? const Center(child: Text('Tap the heart on a product to save it here.', style: TextStyle(color: AppColors.muted)))
+              ? Center(child: Text(s.wishlistEmpty, style: const TextStyle(color: AppColors.muted)))
               : GridView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
@@ -49,13 +52,13 @@ class NotificationsScreen extends StatelessWidget {
         _ => (Icons.notifications_rounded, AppColors.primary),
       };
 
-  static String _ago(DateTime? d) {
+  static String _ago(Strings s, DateTime? d) {
     if (d == null) return '';
     final diff = DateTime.now().difference(d);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    return '${diff.inDays}d';
+    if (diff.inMinutes < 1) return s.agoNow;
+    if (diff.inMinutes < 60) return s.agoM(diff.inMinutes);
+    if (diff.inHours < 24) return s.agoH(diff.inHours);
+    return s.agoD(diff.inDays);
   }
 
   @override
@@ -63,21 +66,23 @@ class NotificationsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
+        final s = Strings.of(context);
         final store = RealtimeStore.instance;
         final items = store.notifications;
         final unread = store.unreadCount;
         return Scaffold(
-          appBar: backAppBar(context, unread > 0 ? 'Notifications ($unread)' : 'Notifications', actions: [
-            TextButton(onPressed: unread == 0 ? null : () => store.markAllRead(), child: const Text('Mark all')),
+          appBar: backAppBar(context, unread > 0 ? s.notificationsN(unread) : s.notifications, actions: [
+            TextButton(onPressed: unread == 0 ? null : () => store.markAllRead(), child: Text(s.markAll)),
           ]),
           body: items.isEmpty
-              ? const Center(child: Text('You are all caught up.', style: TextStyle(color: AppColors.muted)))
+              ? Center(child: Text(s.allCaughtUp, style: const TextStyle(color: AppColors.muted)))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final n = items[i];
+                    final text = localizeNotification(s, n.title, n.body);
                     final (icon, color) = _style(n.type);
                     return GestureDetector(
                       onTap: () {
@@ -98,11 +103,11 @@ class NotificationsScreen extends StatelessWidget {
                           Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Row(children: [
-                              Expanded(child: Text(n.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
-                              Text(_ago(n.createdAt), style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
+                              Expanded(child: Text(text.$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+                              Text(_ago(s, n.createdAt), style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
                             ]),
                             const SizedBox(height: 3),
-                            Text(n.body, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                            Text(text.$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
                           ])),
                           if (!n.read)
                             Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
@@ -129,14 +134,15 @@ class AddressBookScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
+        final s = Strings.of(context);
         final store = RealtimeStore.instance;
         final selectedId = ShopState.instance.selectedAddressId;
         return Scaffold(
-          appBar: backAppBar(context, pickMode ? 'Deliver to' : 'Addresses'),
+          appBar: backAppBar(context, pickMode ? s.deliverTo : s.addresses),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              if (store.addresses.isEmpty) const Panel(child: Text('No saved addresses yet.', style: TextStyle(color: AppColors.muted))),
+              if (store.addresses.isEmpty) Panel(child: Text(s.addrNone, style: const TextStyle(color: AppColors.muted))),
               ...store.addresses.map((a) {
                 final chosen = pickMode && (a.id == selectedId || (selectedId == null && a.isDefault));
                 return Padding(
@@ -162,7 +168,7 @@ class AddressBookScreen extends StatelessWidget {
                           Row(children: [
                             Text(a.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                             const SizedBox(width: 8),
-                            if (a.isDefault) Pill('Default', color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
+                            if (a.isDefault) Pill(s.defaultLabel, color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
                           ]),
                           const SizedBox(height: 4),
                           Text(a.oneLine, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
@@ -172,7 +178,7 @@ class AddressBookScreen extends StatelessWidget {
                           ],
                         ])),
                         IconButton(
-                          tooltip: 'Delete',
+                          tooltip: s.delete,
                           icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.faint),
                           onPressed: () async {
                             final messenger = ScaffoldMessenger.of(context);
@@ -180,7 +186,7 @@ class AddressBookScreen extends StatelessWidget {
                               await store.removeAddress(a.id);
                               if (ShopState.instance.selectedAddressId == a.id) ShopState.instance.selectedAddressId = null;
                             } catch (e) {
-                              messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+                              messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
                             }
                           },
                         ),
@@ -194,7 +200,7 @@ class AddressBookScreen extends StatelessWidget {
                   key: const ValueKey('add-address'),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),
                   icon: const Icon(Icons.add_location_alt_rounded, size: 20),
-                  label: const Text('Add new address')),
+                  label: Text(s.addrAddNew)),
             ],
           ),
         );

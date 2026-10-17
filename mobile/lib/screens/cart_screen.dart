@@ -35,7 +35,7 @@ class _CartScreenState extends State<CartScreen> {
     final error = await shop.applyPromo(code);
     if (!mounted) return;
     setState(() {});
-    messenger.showSnackBar(SnackBar(content: Text(error ?? '${shop.appliedPromo!.code} applied')));
+    messenger.showSnackBar(SnackBar(content: Text(error ?? Strings.of(context).promoApplied(shop.appliedPromo!.code))));
   }
 
   /// A cart change invalidates a previewed discount: re-check it.
@@ -57,8 +57,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _scaffold(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
-    final lang = widget.locale.languageCode;
+    final s = Strings.of(context);
+    final lang = s.lang;
     final empty = shop.cart.isEmpty;
 
     return Scaffold(
@@ -155,7 +155,7 @@ class _CartScreenState extends State<CartScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       const SizedBox(height: 3),
-                      Text(item.variant,
+                      Text(s.variant(item.variant),
                           style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       const SizedBox(height: 8),
                       Row(
@@ -228,10 +228,10 @@ class _CartScreenState extends State<CartScreen> {
           const Divider(height: 18),
           _row(s.subtotal, money(shop.subtotal)),
           const SizedBox(height: 6),
-          _row(s.delivery, deliveryFee == 0 ? 'FREE' : money(deliveryFee)),
+          _row(s.delivery, deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
           if (discount > 0) ...[
             const SizedBox(height: 6),
-            _row('Promo ${shop.appliedPromo!.code}', '- ${money(discount)}'),
+            _row(s.promoRow(shop.appliedPromo!.code), '- ${money(discount)}'),
           ],
           const SizedBox(height: 10),
           _row(s.total, money(total), bold: true),

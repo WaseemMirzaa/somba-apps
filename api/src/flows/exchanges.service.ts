@@ -25,7 +25,7 @@ export class ExchangesService {
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
       return this.exchanges.find({ order: { createdAt: 'DESC' }, take: 200 });
     }
-    return this.exchanges.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
+    return this.exchanges.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take: 500 });
   }
 
   async create(

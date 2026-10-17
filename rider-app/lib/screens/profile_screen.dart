@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/notification_text.dart';
+import '../l10n/strings.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -22,6 +24,7 @@ class ProfileScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
+        final s = Strings.of(context);
         final u = store.user;
         return ListView(padding: EdgeInsets.zero, children: [
           Container(
@@ -47,7 +50,7 @@ class ProfileScreen extends StatelessWidget {
                 child: Row(children: [
                   const Icon(Icons.translate_rounded, color: AppColors.primary),
                   const SizedBox(width: 12),
-                  const Expanded(child: Text('Language', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5))),
+                  Expanded(child: Text(s.language, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5))),
                   SegmentedButton<String>(
                     showSelectedIcon: false,
                     style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact, selectedBackgroundColor: AppColors.primary, selectedForegroundColor: Colors.white),
@@ -58,10 +61,10 @@ class ProfileScreen extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 18),
-              Text(store.unreadCount > 0 ? 'Notifications (${store.unreadCount} new)' : 'Notifications', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              Text(store.unreadCount > 0 ? s.notificationsNew(store.unreadCount) : s.notifications, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 10),
               if (store.notifications.isEmpty)
-                const SurfaceCard(child: Text('Nothing yet. New deliveries and updates show up here.', style: TextStyle(color: AppColors.muted)))
+                SurfaceCard(child: Text(s.notificationsNone, style: const TextStyle(color: AppColors.muted)))
               else
                 for (final n in store.notifications.take(15))
                   Padding(
@@ -72,9 +75,9 @@ class ProfileScreen extends StatelessWidget {
                       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(n.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                            Text(localizeNotification(s, n.title, n.body).$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
                             const SizedBox(height: 2),
-                            Text(n.body, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                            Text(localizeNotification(s, n.title, n.body).$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
                           ]),
                         ),
                         if (!n.read) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
@@ -92,7 +95,7 @@ class ProfileScreen extends StatelessWidget {
                   },
                   style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger)),
                   icon: const Icon(Icons.logout_rounded, size: 20),
-                  label: const Text('Sign out'),
+                  label: Text(s.signOut),
                 ),
               ),
             ]),

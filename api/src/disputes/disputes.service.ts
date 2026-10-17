@@ -195,7 +195,7 @@ export class DisputesService {
         .take(200)
         .getMany();
     }
-    return this.disputes.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' } });
+    return this.disputes.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take: 500 });
   }
 
   private static newReference(type: DisputeType): string {

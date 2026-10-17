@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart' show ApiException;
 import 'messages.dart';
 import 'server_errors.dart';
 
@@ -24,6 +24,9 @@ class Strings {
   /// Language of the running app. French is the primary language of the market.
   static Strings current = const Strings('fr');
 
+  /// True once the user picked a language on this device (it then wins over the account's).
+  static bool hasChoice = false;
+
   /// Fires when the language changes (the root widget rebuilds on it).
   static final ValueNotifier<String> langNotifier = ValueNotifier('fr');
 
@@ -35,6 +38,7 @@ class Strings {
     current = Strings(next);
     langNotifier.value = next;
     if (!persist) return;
+    hasChoice = true;
     try {
       (await SharedPreferences.getInstance()).setString(_prefKey, next);
     } catch (_) {/* storage unavailable: the choice just won't survive a restart */}
@@ -44,7 +48,10 @@ class Strings {
   static Future<void> restore() async {
     try {
       final saved = (await SharedPreferences.getInstance()).getString(_prefKey);
-      if (saved == 'en' || saved == 'fr') await setLang(saved!, persist: false);
+      if (saved == 'en' || saved == 'fr') {
+        await setLang(saved!, persist: false);
+        hasChoice = true;
+      }
     } catch (_) {}
   }
 
@@ -68,7 +75,10 @@ class Strings {
 
   bool has(String key) => kMessages.containsKey(key);
 
-  String itemsCount(int n) => n == 1 ? itemOne(n) : itemMany(n);
+  /// The cart/order line variant; the default one is stored as 'Default'.
+  String variant(String v) => v == 'Default' ? t('variant_default') : v;
+
+  String itemsCount(int n) => t(n == 1 ? 'itemOne' : 'itemMany', {'n': n});
 
   String orderStatus(String status) => has('status_$status') ? t('status_$status') : status;
 
@@ -82,6 +92,10 @@ class Strings {
     };
   }
 
+  /// What to show for a failure: the API's message in the user's language, or a
+  /// neutral sentence for anything unexpected (never a raw exception dump).
+  String errorText(Object e) => e is ApiException ? e.toString() : t('err_unexpected');
+
   /// A server message (always English) in the user's language; unknown messages pass through.
   String serverError(String raw) => translateServerError(raw, this);
 
@@ -90,7 +104,8 @@ class Strings {
     try {
       return build(lang).format(d);
     } catch (_) {
-      return build('en').format(d);
+      // Date data not loaded (it is, at app start): fall back to a plain form.
+      return d.toString().split('.').first;
     }
   }
 
@@ -107,7 +122,7 @@ class Strings {
   String when(DateTime d) {
     final now = DateTime.now();
     final sameDay = now.year == d.year && now.month == d.month && now.day == d.day;
-    return sameDay ? whenToday(time(d)) : dateTime(d);
+    return sameDay ? t('when_today', {'time': time(d)}) : t('when_date', {'date': dateTime(d)});
   }
 
   /// `1 234,5` / `1,234.5`

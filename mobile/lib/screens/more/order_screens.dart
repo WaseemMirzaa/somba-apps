@@ -26,16 +26,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _busy = false;
 
   Future<void> _cancel(OrderDto o) async {
+    final s = Strings.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this order?'),
-        content: Text(o.status == 'pending'
-            ? 'It has not been paid yet; nothing will be charged.'
-            : 'You will be refunded to your Somba&Teka wallet.'),
+        title: Text(s.orderCancelQ),
+        content: Text(o.status == 'pending' ? s.orderCancelUnpaid : s.orderCancelRefund),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep order')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel order')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.orderKeep)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(s.cancelOrder)),
         ],
       ),
     );
@@ -44,7 +43,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       await RealtimeStore.instance.cancelOrder(o.id);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -52,14 +51,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(widget.locale.languageCode);
+    final s = Strings.of(context);
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
         final store = RealtimeStore.instance;
         final o = store.orderById(widget.orderId);
         if (o == null) {
-          return Scaffold(appBar: backAppBar(context, 'Order'), body: const Center(child: Text('Order not found.')));
+          return Scaffold(appBar: backAppBar(context, s.kvOrder), body: Center(child: Text(s.orderNotFound)));
         }
         final payment = store.paymentForOrder(o.id);
         final cancellable = o.status == 'pending' || o.status == 'confirmed';
@@ -72,7 +71,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         };
 
         return Scaffold(
-          appBar: backAppBar(context, 'Order ${o.reference}'),
+          appBar: backAppBar(context, s.orderRef(o.reference)),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
@@ -90,20 +89,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Text(s.orderStatus(o.status), key: const ValueKey('order-status'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                       const SizedBox(height: 2),
                       if (o.createdAt != null)
-                        Text('Placed ${_when(o.createdAt!)}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        Text(s.orderPlacedWhen(s.when(o.createdAt!)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                     ]),
                   ),
                   if (o.status == 'pending' && payment != null && payment.isPending)
                     FilledButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentPendingScreen(locale: widget.locale, orderId: o.id))),
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
-                      child: const Text('Pay'),
+                      child: Text(s.orderPay),
                     )
                   else if (trackable)
                     FilledButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, orderId: o.id))),
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
-                      child: const Text('Track'),
+                      child: Text(s.orderTrack),
                     ),
                 ]),
               ),
@@ -111,7 +110,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: 14),
               Panel(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Items', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(s.orderItems, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   const SizedBox(height: 12),
                   ...o.items.map((i) {
                     final p = productByUuid(i.productId);
@@ -133,7 +132,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(i.productName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                           const SizedBox(height: 2),
-                          Text('Qty ${i.qty}', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                          Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                         ])),
                         Text(money(i.priceUsd * i.qty), style: const TextStyle(fontWeight: FontWeight.w800)),
                       ]),
@@ -144,15 +143,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: 14),
               Panel(
                 child: Column(children: [
-                  _row('Subtotal', money(o.subtotalUsd)),
+                  _row(s.subtotal, money(o.subtotalUsd)),
                   const SizedBox(height: 8),
-                  _row('Delivery', o.deliveryFeeUsd == 0 ? 'Free' : money(o.deliveryFeeUsd)),
+                  _row(s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd)),
                   if (o.discountUsd > 0) ...[
                     const SizedBox(height: 8),
-                    _row('Promo ${o.promoCode ?? ''}', '- ${money(o.discountUsd)}'),
+                    _row(s.promoRow(o.promoCode ?? ''), '- ${money(o.discountUsd)}'),
                   ],
                   const Divider(height: 22),
-                  _row('Total', money(o.totalUsd), bold: true),
+                  _row(s.total, money(o.totalUsd), bold: true),
                   const SizedBox(height: 12),
                   Row(children: [
                     Icon(
@@ -163,7 +162,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${_paymentState(payment)} · ${s.paymentLabel(o.paymentMethod)}',
+                        '${_paymentState(s, payment)} · ${s.paymentLabel(o.paymentMethod)}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                     ),
@@ -178,7 +177,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       key: const ValueKey('cancel-order'),
                       onPressed: _busy ? null : () => _cancel(o),
                       icon: const Icon(Icons.close_rounded, size: 18),
-                      label: const Text('Cancel order'),
+                      label: Text(s.cancelOrder),
                     ),
                   )
                 else if (o.status == 'delivered')
@@ -186,7 +185,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale, order: o))),
                       icon: const Icon(Icons.assignment_return_rounded, size: 18),
-                      label: const Text('Return'),
+                      label: Text(s.orderReturn),
                     ),
                   ),
                 if (cancellable || o.status == 'delivered') const SizedBox(width: 12),
@@ -194,7 +193,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: widget.locale))),
                     icon: const Icon(Icons.headset_mic_rounded, size: 18),
-                    label: const Text('Help'),
+                    label: Text(s.orderHelp),
                   ),
                 ),
               ]),
@@ -205,21 +204,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  static String _paymentState(PaymentDto? p) {
-    if (p == null) return 'Paid';
+  static String _paymentState(Strings s, PaymentDto? p) {
+    if (p == null) return s.orderPaid;
     return switch (p.status) {
-      'succeeded' => 'Paid',
-      'pending' => 'Awaiting payment',
-      'refunded' => 'Refunded',
-      _ => 'Payment failed',
+      'succeeded' => s.orderPaid,
+      'pending' => s.orderAwaiting,
+      'refunded' => s.orderRefunded,
+      _ => s.orderPayFailed,
     };
-  }
-
-  static String _when(DateTime d) {
-    final now = DateTime.now();
-    final sameDay = now.year == d.year && now.month == d.month && now.day == d.day;
-    final hm = '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    return sameDay ? 'today, $hm' : '${d.day}/${d.month}/${d.year} $hm';
   }
 
   Widget _row(String l, String v, {bool bold = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -237,14 +229,14 @@ class OrderTrackingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = Strings(locale.languageCode);
+    final s = Strings.of(context);
     return ListenableBuilder(
       listenable: RealtimeStore.instance,
       builder: (context, _) {
         final store = RealtimeStore.instance;
         final o = store.orderById(orderId);
         if (o == null) {
-          return Scaffold(appBar: backAppBar(context, 'Track order'), body: const Center(child: Text('Order not found.')));
+          return Scaffold(appBar: backAppBar(context, s.trackOrder), body: Center(child: Text(s.orderNotFound)));
         }
         const flow = ['confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered'];
         final reached = flow.indexOf(o.status);
@@ -252,12 +244,12 @@ class OrderTrackingScreen extends StatelessWidget {
         final loc = store.riderLocations[o.id];
         String label(int i) => s.orderStatus(flow[i]);
         final steps = <(String, String, bool)>[
-          ('Order placed', o.reference, true),
+          (s.trackPlaced, o.reference, true),
           for (var i = 0; i < flow.length; i++)
-            (label(i), i == reached ? 'Current status' : '', !cancelled && reached >= i),
+            (label(i), i == reached ? s.trackCurrent : '', !cancelled && reached >= i),
         ];
         return Scaffold(
-          appBar: backAppBar(context, 'Track order'),
+          appBar: backAppBar(context, s.trackOrder),
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
             Panel(
               child: Row(children: [
@@ -271,13 +263,13 @@ class OrderTrackingScreen extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(
-                      loc != null ? 'Your rider is on the way' : (o.status == 'out_for_delivery' ? 'Rider is heading to you' : 'Rider not on the road yet'),
+                      loc != null ? s.trackOnway : (o.status == 'out_for_delivery' ? s.trackHeading : s.trackNotYet),
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
                     ),
                     Text(
                       loc != null
-                          ? 'Live position: ${loc.lat.toStringAsFixed(4)}, ${loc.lng.toStringAsFixed(4)}'
-                          : "Live location appears here once the rider starts the delivery.",
+                          ? s.trackLivePos(loc.lat.toStringAsFixed(4), loc.lng.toStringAsFixed(4))
+                          : s.trackLiveHint,
                       style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
                     ),
                   ]),
@@ -289,14 +281,14 @@ class OrderTrackingScreen extends StatelessWidget {
               const SizedBox(height: 14),
               Panel(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Rider position: ${loc.lat.toStringAsFixed(5)}, ${loc.lng.toStringAsFixed(5)}',
+                  Text(s.trackRiderPos(loc.lat.toStringAsFixed(5), loc.lng.toStringAsFixed(5)),
                       key: const ValueKey('rider-coords'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     key: const ValueKey('open-maps'),
                     onPressed: () => openInMaps(context, loc.lat, loc.lng),
                     icon: const Icon(Icons.map_rounded, size: 18),
-                    label: const Text('Open in maps'),
+                    label: Text(s.trackOpenMaps),
                   ),
                 ]),
               ),
@@ -313,11 +305,12 @@ class OrderTrackingScreen extends StatelessWidget {
 /// Opens the rider's position in the phone's maps app (or the browser).
 Future<void> openInMaps(BuildContext context, double lat, double lng) async {
   final messenger = ScaffoldMessenger.of(context);
+  final failed = Strings.of(context).trackMapsFail;
   try {
     final ok = await launchUrl(Uri.parse('https://www.google.com/maps?q=$lat,$lng'), mode: LaunchMode.externalApplication);
-    if (!ok) messenger.showSnackBar(const SnackBar(content: Text('Could not open the maps app.')));
+    if (!ok) messenger.showSnackBar(SnackBar(content: Text(failed)));
   } catch (_) {
-    messenger.showSnackBar(const SnackBar(content: Text('Could not open the maps app.')));
+    messenger.showSnackBar(SnackBar(content: Text(failed)));
   }
 }
 
@@ -369,6 +362,7 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
   Widget build(BuildContext context) {
     final code = _code;
     if (code == null) return const SizedBox.shrink();
+    final s = Strings.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 14),
       child: Container(
@@ -384,11 +378,11 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                const Text('Delivery code  ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('${s.codeTitle}  ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
                 Text(code, key: const ValueKey('delivery-code'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 6)),
               ]),
               const SizedBox(height: 4),
-              Text('Give this code to the rider when you receive your parcel.',
+              Text(s.codeHint,
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 12.5, height: 1.3)),
             ]),
           ),

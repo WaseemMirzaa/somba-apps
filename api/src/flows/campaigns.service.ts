@@ -37,6 +37,7 @@ export class CampaignsService {
       return this.campaigns.find({
         where: [{ sellerId }, { sellerId: user.id }],
         order: { createdAt: 'DESC' },
+        take: 200,
       });
     }
     if (user.role.startsWith('admin')) {

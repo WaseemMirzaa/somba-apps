@@ -1,0 +1,4 @@
+/* Shown in the system prompts and on the home screen (English). */
+"CFBundleDisplayName" = "Somba&Teka Rider";
+"NSLocationWhenInUseUsageDescription" = "Somba&Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Somba&Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.";

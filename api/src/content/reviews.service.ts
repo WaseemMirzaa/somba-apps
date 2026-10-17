@@ -9,6 +9,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
+/** Staff who may answer a review on a seller's behalf (the same people who moderate reviews). */
+const REPLY_STAFF = ['admin', 'admin_operations', 'admin_moderation'];
+
 @Injectable()
 export class ReviewsService {
   constructor(
@@ -160,7 +163,7 @@ export class ReviewsService {
     const review = await this.reviews.findOne({ where: { id: reviewId } });
     if (!review) throw new NotFoundException('Review not found.');
     const product = await this.products.findOne({ where: { id: review.productId } });
-    if (!actor.role.startsWith('admin')) {
+    if (!REPLY_STAFF.includes(actor.role)) {
       const store = await this.sellers.findOne({ where: { userId: actor.id } });
       const mine = !!product?.sellerId && (product.sellerId === store?.id || product.sellerId === actor.id);
       // Same answer for "missing" and "not yours" so reviews of other stores cannot be probed.
@@ -192,6 +195,7 @@ export class ReviewsService {
     return this.questions.find({
       where: { productId },
       order: { createdAt: 'DESC' },
+      take: 200,
     });
   }
 
