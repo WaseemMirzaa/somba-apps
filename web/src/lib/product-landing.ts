@@ -1,16 +1,5 @@
 import { BRAND } from "./config";
 
-/** Single brand blue — no gradients */
-export const BRAND_BLUE = "#1d4ed8";
-
-/** Free Unsplash image — retail marketplace / shopping district (Unsplash License) */
-export const HERO_IMAGE = {
-  src: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=2400&q=80",
-  alt: "Retail shopping district with storefronts and shoppers",
-  credit: "Unsplash",
-  creditUrl: "https://unsplash.com/photos/062f824d29cc",
-} as const;
-
 /** Login hero — retail checkout / e-commerce shopping (Unsplash License) */
 export const LOGIN_HERO_IMAGE = {
   src: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=2400&q=80",
@@ -19,34 +8,20 @@ export const LOGIN_HERO_IMAGE = {
   creditUrl: "https://unsplash.com/photos/0cfed4f6a45d",
 } as const;
 
+/**
+ * Store links come from the build environment (set them once the apps are
+ * published); a missing link is hidden in the UI instead of pointing nowhere.
+ */
+const envUrl = (v: string | undefined) => (v && /^https?:\/\//.test(v) ? v : null);
 export const APP_LINKS = {
-  ios: "https://apps.apple.com/app/somba-shop",
-  android: "https://play.google.com/store/apps/details?id=com.somba.shop",
-  customerApp: "https://apps.apple.com/app/somba-shop",
-  riderApp: "https://play.google.com/store/apps/details?id=com.somba.rider",
+  ios: envUrl(process.env.NEXT_PUBLIC_IOS_APP_URL),
+  android: envUrl(process.env.NEXT_PUBLIC_ANDROID_APP_URL),
+  customerApp: envUrl(process.env.NEXT_PUBLIC_IOS_APP_URL),
+  riderApp: envUrl(process.env.NEXT_PUBLIC_RIDER_APP_URL),
   sellerSignup: "/login",
   sellOnline: "/sell-online",
   contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%26Teka%20Support`,
 } as const;
-
-/** Flipkart-style quick-access strip — portal entry points */
-export const PORTAL_QUICK_ACCESS = [
-  { id: "admin", label: "Admin", labelFr: "Admin", icon: "Shield" },
-  { id: "seller", label: "Seller", labelFr: "Vendeur", icon: "Store" },
-  { id: "warehouse", label: "Warehouse", labelFr: "Entrepôt", icon: "Warehouse" },
-  { id: "rider", label: "Rider", labelFr: "Livreur", icon: "Bike" },
-  { id: "shop", label: "Shop", labelFr: "Boutique", icon: "ShoppingBag" },
-] as const;
-
-/** Marketplace deal highlight cards */
-export const DEAL_HIGHLIGHTS = [
-  { title: "Flash Deals", titleFr: "Offres flash", subtitle: "Up to 50% off", subtitleFr: "Jusqu'à -50 %", tag: "Today", tagFr: "Aujourd'hui", href: "/shop/deals" },
-  { title: "Electronics", titleFr: "Électronique", subtitle: "From $349", subtitleFr: "À partir de 349 $", tag: "Top rated", tagFr: "Mieux notés", href: "/shop/products" },
-  { title: "Fashion", titleFr: "Mode", subtitle: "New arrivals", subtitleFr: "Nouveautés", tag: "Trending", tagFr: "Tendance", href: "/shop/products" },
-  { title: "Fast Delivery", titleFr: "Livraison rapide", subtitle: "1–3 days", subtitleFr: "1–3 jours", tag: "Nationwide", tagFr: "National", href: "#modules" },
-  { title: "Become a Seller", titleFr: "Devenir vendeur", subtitle: "From $49/mo", subtitleFr: "À partir de 49 $/mois", tag: "Open now", tagFr: "Ouvert", href: "/sell-online" },
-  { title: "Mobile App", titleFr: "App mobile", subtitle: "iOS & Android", subtitleFr: "iOS et Android", tag: "Download", tagFr: "Télécharger", href: "#apps" },
-] as const;
 
 export const PORTAL_IMAGES = {
   admin: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1200&auto=format&fit=crop",
@@ -86,8 +61,8 @@ export const PORTALS = [
     taglineFr: "Parcourir, acheter, suivre, retourner",
     name: "Customer Shop",
     nameFr: "Boutique Client",
-    desc: "Your everyday marketplace — thousands of products, deals across categories, and delivery to your door.",
-    descFr: "Votre marketplace du quotidien — milliers de produits, offres par catégorie et livraison à domicile.",
+    desc: "Your everyday marketplace — products from verified sellers, deals across categories, and delivery to your door.",
+    descFr: "Votre marketplace du quotidien — produits de vendeurs vérifiés, offres par catégorie et livraison à domicile.",
     icon: "ShoppingBag",
     image: PORTAL_IMAGES.shop,
     loginHref: "/shop/products",
@@ -95,7 +70,7 @@ export const PORTALS = [
     features: ["Categories, search & flash deals", "Secure checkout with mobile money & wallet", "Order tracking & easy returns"],
     featuresFr: ["Catégories, recherche et ventes flash", "Paiement sécurisé par mobile money et portefeuille", "Suivi de commande et retours faciles"],
     trust: [
-      { icon: "Truck", label: "1–3 day delivery", labelFr: "Livraison 1–3 jours" },
+      { icon: "Truck", label: "Live delivery tracking", labelFr: "Suivi de livraison en direct" },
       { icon: "Globe", label: "Web + mobile app", labelFr: "Web + app mobile" },
     ],
     modules: [
@@ -117,8 +92,8 @@ export const PORTALS = [
         name: "After Purchase",
         nameFr: "Après achat",
         icon: "PackageCheck",
-        items: ["Order tracking", "Returns & support", "Refer & earn", "Account settings"],
-        itemsFr: ["Suivi de commande", "Retours et assistance", "Parrainer et gagner", "Paramètres du compte"],
+        items: ["Order tracking", "Returns & support", "Wallet & top-up", "Account settings"],
+        itemsFr: ["Suivi de commande", "Retours et assistance", "Portefeuille et rechargement", "Paramètres du compte"],
       },
     ],
   },
@@ -140,9 +115,9 @@ export const PORTALS = [
     featuresFr: ["Assistant produit et stock", "Commandes, expédition et retours", "Promotions et analytics revenus"],
     subscription: true,
     trust: [
-      { icon: "Users", label: "48K+ shoppers", labelFr: "48K+ acheteurs" },
+      { icon: "Users", label: "Orders in one dashboard", labelFr: "Commandes dans un seul tableau de bord" },
       { icon: "TrendingUp", label: "Growth tools", labelFr: "Outils de croissance" },
-      { icon: "Wallet", label: "Weekly payouts", labelFr: "Paiements hebdo" },
+      { icon: "Wallet", label: "Payout requests", labelFr: "Demandes de paiement" },
     ],
     modules: [
       {
@@ -346,10 +321,10 @@ export const PLATFORM_MODULES = [
     id: "fulfillment",
     name: "Fast Fulfillment",
     nameFr: "Livraison rapide",
-    desc: "Seller to warehouse to your doorstep — live tracking on every order, 1–3 day delivery in most areas.",
-    descFr: "Du vendeur à votre porte — suivi en direct, livraison en 1–3 jours dans la plupart des zones.",
-    highlight: "1–3 day delivery",
-    highlightFr: "Livraison 1–3 jours",
+    desc: "Seller to warehouse to your doorstep — live tracking on every order.",
+    descFr: "Du vendeur à votre porte — suivi en direct de chaque commande.",
+    highlight: "Live tracking",
+    highlightFr: "Suivi en direct",
     cta: "Shop with fast delivery",
     ctaFr: "Acheter avec livraison rapide",
     href: "/shop/products",
@@ -367,10 +342,10 @@ export const PLATFORM_MODULES = [
     id: "payments",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Card or mobile money — fraud-checked checkout with buyer protection on every order.",
-    descFr: "Carte ou mobile money — paiement vérifié avec protection acheteur sur chaque commande.",
-    highlight: "Card + mobile money",
-    highlightFr: "Carte + mobile money",
+    desc: "Mobile money or your Somba wallet — pay at checkout, with refunds handled through returns and disputes.",
+    descFr: "Mobile money ou portefeuille Somba — payez à la caisse, remboursements gérés via retours et litiges.",
+    highlight: "Mobile money + wallet",
+    highlightFr: "Mobile money + portefeuille",
     cta: "See payment options",
     ctaFr: "Voir les paiements",
     href: "/shop/products",
@@ -400,18 +375,17 @@ export const PLATFORM_MODULES = [
     image: "https://images.unsplash.com/photo-1607083207634-bd02781bccb9?auto=format&fit=crop&w=1200&q=80",
     trust: [
       { icon: "PackageCheck", label: "Door pickup", labelFr: "Collecte à domicile" },
-      { icon: "RefreshCw", label: "Quick refunds", labelFr: "Remboursements rapides" },
-      { icon: "Headphones", label: "24/7 support", labelFr: "Assistance 24h/24, 7j/7" },
+      { icon: "Headphones", label: "Support tickets", labelFr: "Tickets d'assistance" },
     ],
   },
   {
     id: "subscription",
     name: "Sell on Somba&Teka",
     nameFr: "Vendre sur Somba&Teka",
-    desc: "Join 1,200+ verified sellers — list products, reach 48K+ shoppers, and get weekly payouts from $49/mo.",
-    descFr: "Rejoignez 1 200+ vendeurs vérifiés — listez, touchez 48K+ acheteurs et soyez payé chaque semaine dès 49 $/mois.",
-    highlight: "From $49/mo",
-    highlightFr: "À partir de 49 $/mois",
+    desc: "Open your store — list products, run promotions and request payouts from one seller dashboard.",
+    descFr: "Ouvrez votre boutique — listez vos produits, lancez des promotions et demandez vos paiements depuis un seul tableau de bord.",
+    highlight: "Seller plans",
+    highlightFr: "Plans vendeur",
     cta: "Start selling online",
     ctaFr: "Vendre en ligne",
     href: "/sell-online",
@@ -425,24 +399,6 @@ export const PLATFORM_MODULES = [
       { icon: "BadgeCheck", label: "Simple onboarding", labelFr: "Onboarding simple" },
     ],
   },
-] as const;
-
-export const PAYMENT_OPTIONS = [
-  { title: "Card & Mobile Money", titleFr: "Mobile money et portefeuille", desc: "Pay securely at checkout with saved cards or mobile money (Airtel, Orange, M-Pesa).", descFr: "Payez en toute sécurité par carte ou mobile money (Airtel, Orange, M-Pesa)." },
-  { title: "Seller Plans", titleFr: "Plans vendeur", desc: "Monthly plans from $49 for businesses that want to sell on Somba&Teka.", descFr: "Plans mensuels à partir de 49 $ pour vendre sur Somba&Teka." },
-  { title: "Mobile App", titleFr: "Application mobile", desc: "Shop and track orders on iOS and Android — same account, same cart.", descFr: "Achetez et suivez vos commandes sur iOS et Android." },
-] as const;
-
-/** Why shoppers and sellers choose Somba&Teka */
-export const WHY_CHOOSE = [
-  { title: "Verified sellers", titleFr: "Vendeurs vérifiés", desc: "Every store on Somba&Teka is reviewed — shop with confidence from trusted merchants.", descFr: "Chaque boutique est vérifiée — achetez en confiance." },
-  { title: "Fast delivery", titleFr: "Livraison rapide", desc: "1–3 day delivery nationwide with real-time tracking from warehouse to doorstep.", descFr: "Livraison en 1–3 jours avec suivi en temps réel." },
-  { title: "Thousands of products", titleFr: "Des milliers de produits", desc: "Electronics, fashion, home, beauty, grocery, and more — all in one marketplace.", descFr: "Électronique, mode, maison, beauté, épicerie et plus — tout au même endroit." },
-  { title: "Easy returns", titleFr: "Retours faciles", desc: "Start a return in seconds from your account — replacements and refunds handled for you.", descFr: "Retour en quelques clics — remplacement ou remboursement géré pour vous." },
-  { title: "Sell and grow", titleFr: "Vendre et grandir", desc: "Open your store, list products, run promotions, and reach customers across the country.", descFr: "Ouvrez votre boutique, listez vos produits et touchez des clients partout." },
-  { title: "Bilingual FR/EN", titleFr: "Bilingue FR/EN", desc: "Shop, sell, and get support in French or English across web and mobile.", descFr: "Achetez, vendez et obtenez de l'aide en français ou en anglais." },
-  { title: "Mobile & web", titleFr: "Mobile et web", desc: "Shop on the web or download the Somba&Teka app — same cart, same orders, anywhere.", descFr: "Achetez sur le web ou l'app Somba&Teka — même panier, mêmes commandes." },
-  { title: "Secure payments", titleFr: "Paiements sécurisés", desc: "Card and mobile money options with buyer protection on every order.", descFr: "Carte et mobile money avec protection acheteur sur chaque commande." },
 ] as const;
 
 export const SELLER_PLANS = [
@@ -475,40 +431,26 @@ export const SELLER_PLANS = [
   },
 ] as const;
 
-export const PLATFORM_STATS = [
-  { value: "12K+", label: "Products listed", labelFr: "Produits listés" },
-  { value: "1,200+", label: "Verified sellers", labelFr: "Vendeurs vérifiés" },
-  { value: "1–3d", label: "Avg. delivery", labelFr: "Livraison moy." },
-  { value: "FR/EN", label: "Bilingual support", labelFr: "Support bilingue" },
-] as const;
-
 export const PRODUCT_HERO = {
   title: BRAND.tagline,
   titleFr: `Achetez malin. Livré vite.`,
-  subtitle: `${BRAND.fullName} is your online marketplace — shop thousands of products from verified sellers, with fast delivery, secure payments, and easy returns.`,
-  subtitleFr: `${BRAND.fullName} est votre marketplace en ligne — des milliers de produits de vendeurs vérifiés, livraison rapide, paiements sécurisés et retours faciles.`,
+  subtitle: `${BRAND.fullName} is your online marketplace — shop products from verified sellers, pay with mobile money or your wallet, and follow your delivery live.`,
+  subtitleFr: `${BRAND.fullName} est votre marketplace en ligne — des produits de vendeurs vérifiés, paiement par mobile money ou portefeuille et suivi de livraison en direct.`,
   intro: `Whether you're shopping for electronics, fashion, or everyday essentials — browse, add to cart, and get it delivered. Want to grow your business? Open a seller store on Somba&Teka and reach customers nationwide.`,
   introFr: `Que vous cherchiez de l'électronique, de la mode ou l'essentiel du quotidien — parcourez, ajoutez au panier et recevez chez vous. Vous voulez développer votre activité ? Ouvrez une boutique vendeur sur Somba&Teka.`,
   bullets: [
-    "Thousands of products from verified sellers",
-    "1–3 day delivery with real-time tracking",
-    "Card and mobile money",
+    "Products from verified sellers",
+    "Live delivery tracking",
+    "Mobile money and wallet",
   ],
   bulletsFr: [
-    "Des milliers de produits de vendeurs vérifiés",
-    "Livraison en 1–3 jours avec suivi en temps réel",
+    "Des produits de vendeurs vérifiés",
+    "Suivi de livraison en direct",
     "Mobile money et portefeuille",
   ],
   guarantee: "Free to browse · Mobile money & wallet · Easy returns within 7 days",
   guaranteeFr: "Navigation gratuite · Mobile money et portefeuille · Retours faciles sous 7 jours",
 };
-
-export const TRUST_SIGNALS = [
-  { label: "Verified sellers", labelFr: "Vendeurs vérifiés" },
-  { label: "Fast 1–3 day delivery", labelFr: "Livraison 1–3 jours" },
-  { label: "Secure checkout", labelFr: "Paiement sécurisé" },
-  { label: "Easy 7-day returns", labelFr: "Retours 7 jours" },
-] as const;
 
 export const CONVERSION_PATHS = [
   {
@@ -596,8 +538,8 @@ export const FAQ_ITEMS = [
   {
     q: "How do I become a seller?",
     qFr: "Comment devenir vendeur ?",
-    a: "Visit /sell-online for the full seller guide. Choose a plan (Starter from $49/mo, Pro $99/mo, or Enterprise), sign up at /login, and start listing products.",
-    aFr: "Consultez /sell-online pour le guide vendeur complet. Choisissez un plan, inscrivez-vous sur /login et listez vos produits.",
+    a: "Visit /sell-online for the full seller guide. Choose a plan, sign up, open your store and start listing products once it is approved.",
+    aFr: "Consultez /sell-online pour le guide vendeur complet. Choisissez un plan, inscrivez-vous, ouvrez votre boutique et listez vos produits une fois approuvée.",
   },
   {
     q: "What payment methods are accepted?",
@@ -608,8 +550,8 @@ export const FAQ_ITEMS = [
   {
     q: "How long does delivery take?",
     qFr: "Quel est le délai de livraison ?",
-    a: "Most orders arrive in 1–3 business days. You'll get real-time tracking from dispatch to doorstep via your account or the mobile app.",
-    aFr: "La plupart des commandes arrivent en 1–3 jours ouvrés. Suivi en temps réel via votre compte ou l'app mobile.",
+    a: "The estimated delivery time is shown on each product page. You can follow your order live from dispatch to your door in your account or the mobile app.",
+    aFr: "Le délai estimé est indiqué sur chaque fiche produit. Suivez votre commande en direct, de l'expédition à votre porte, depuis votre compte ou l'app mobile.",
   },
   {
     q: "How do returns work?",
@@ -667,7 +609,7 @@ export const SELL_ONLINE_FAQ = [
   { q: "Who can sell on Somba&Teka?", qFr: "Qui peut vendre sur Somba&Teka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
   { q: "What are the seller fees?", qFr: "Quels sont les frais vendeur ?", a: "Monthly plans start at $49/mo (Starter). Platform commission applies per category (typically 8–15%). No hidden listing fees on Pro and Enterprise.", aFr: "Plans mensuels à partir de 49 $/mois (Starter). Commission par catégorie (8–15 % en général). Pas de frais de listing cachés sur Pro et Entreprise." },
   { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use Somba&Teka's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride Somba&Teka — entrepôt, tri et livraison dernier kilomètre." },
-  { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Paiements hebdomadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },
+  { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Demandes de paiementmadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },
   { q: "How fast can I go live?", qFr: "Quel délai pour être en ligne ?", a: "Most sellers list their first products within 24 hours of subscribing. Our onboarding team can help with catalog setup.", aFr: "La plupart des vendeurs listent leurs premiers produits sous 24 h après abonnement. Notre équipe aide à la mise en place du catalogue." },
 ] as const;
 
@@ -675,12 +617,3 @@ export const SELL_ONLINE_IMAGE = {
   src: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=85&w=2400&auto=format&fit=crop",
   alt: "Business team growing online sales",
 } as const;
-
-/** Bento grid cell sizes for portal showcase */
-export const PORTAL_BENTO: Record<string, "large" | "medium" | "small"> = {
-  admin: "large",
-  seller: "medium",
-  warehouse: "small",
-  rider: "small",
-  shop: "medium",
-};

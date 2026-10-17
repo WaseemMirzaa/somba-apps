@@ -10,7 +10,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
-import { useMyOrder, orderStatusLabel, canCancelOrder, hasDeliveryCodeStage } from "@/lib/orders";
+import { useMyOrder, orderStatusLabel, orderStatusTitle, canCancelOrder, hasDeliveryCodeStage } from "@/lib/orders";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -71,8 +71,14 @@ function OrderDetail() {
   }, [orderUuid, orderStatus, rt.status]);
 
   const paymentStatusLabel = (status: string) => {
-    const map: Record<string, string> = { paid: "Payé", refunded: "Remboursé", pending: "En attente" };
-    return fr ? (map[status] ?? status) : status;
+    const map: Record<string, { en: string; fr: string }> = {
+      paid: { en: "Paid", fr: "Payé" },
+      refunded: { en: "Refunded", fr: "Remboursé" },
+      failed: { en: "Failed", fr: "Échoué" },
+      pending: { en: "Pending", fr: "En attente" },
+    };
+    const m = map[status];
+    return m ? (fr ? m.fr : m.en) : status;
   };
 
   // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
@@ -83,7 +89,7 @@ function OrderDetail() {
     if (!order) return;
     order.items.forEach((item) => {
       if (item.productId.startsWith("ext:")) return;
-      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: order.seller, variant: item.variant || "Default", qty: item.qty });
+      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: "", variant: item.variant || "Default", qty: item.qty });
     });
     toast(fr ? "Articles ajoutés au panier" : "Items added to cart");
     router.push("/shop/cart");
@@ -177,6 +183,17 @@ function OrderDetail() {
             { label: fr ? "Statut" : "Status", value: paymentStatusLabel(order.paymentStatus) },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(order.amount, locale) },
           ]} />
+          <dl className="mt-4 space-y-1 border-t border-[var(--border)] pt-3 text-sm">
+            <div className="flex justify-between"><dt>{fr ? "Sous-total" : "Subtotal"}</dt><dd>{formatCurrency(order.subtotal, locale)}</dd></div>
+            {order.campaignDiscount > 0 && (
+              <div className="flex justify-between text-amber-800"><dt>{fr ? "Dont promotions déjà déduites" : "Promotions already deducted"}</dt><dd>{formatCurrency(order.campaignDiscount, locale)}</dd></div>
+            )}
+            {order.discount > 0 && (
+              <div className="flex justify-between text-emerald-700"><dt>{fr ? "Code promo" : "Promo code"}</dt><dd>-{formatCurrency(order.discount, locale)}</dd></div>
+            )}
+            <div className="flex justify-between"><dt>{fr ? "Livraison" : "Delivery"}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
+            <div className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold"><dt>Total</dt><dd>{formatCurrency(order.amount, locale)}</dd></div>
+          </dl>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Produits" : "Products"} span={3}>
@@ -191,6 +208,12 @@ function OrderDetail() {
               </div>
               <div className="text-right">
                 <p className="font-medium">{formatCurrency(item.price, locale)}</p>
+                {item.listPrice != null && (
+                  <s className="block text-xs text-slate-500">
+                    <span className="sr-only">{fr ? "Prix normal " : "List price "}</span>{formatCurrency(item.listPrice, locale)}
+                  </s>
+                )}
+                {item.campaignPct > 0 && <p className="text-xs font-semibold text-amber-800">-{item.campaignPct}%</p>}
                 <p className="text-xs">{fr ? "Qté" : "Qty"}: {item.qty}</p>
               </div>
             </div>
@@ -198,9 +221,8 @@ function OrderDetail() {
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Suivi de commande" : "Order Tracking"} span={2}>
-          <p className="mb-4 text-sm text-slate-500">{fr ? "Suivi" : "Tracking"}: {order.trackingNumber} · {fr ? "Livreur" : "Rider"}: {order.rider}</p>
           <Link href={`/shop/orders/${order.id}/tracking`} className="mb-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Suivre la livraison →" : "Track delivery →"}</Link>
-          <ActivityTimeline events={order.timeline} />
+          <ActivityTimeline events={order.timeline.map((e) => ({ ...e, label: orderStatusTitle(e.label, fr) }))} />
         </DetailGridSection>
 
         <DetailGridSection title="Support">

@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
-import { useMyOrder, orderStatusLabel } from "@/lib/orders";
+import { useMyOrder, orderStatusLabel, orderStatusTitle } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useSocketEvent } from "@/lib/shop-live";
@@ -75,12 +75,11 @@ function Tracking() {
       </div>
 
       <DetailSection title={fr ? "Chronologie" : "Timeline"}>
-        <ActivityTimeline events={order.timeline} />
+        <ActivityTimeline events={order.timeline.map((e) => ({ ...e, label: orderStatusTitle(e.label, fr) }))} />
       </DetailSection>
       <DetailSection title={fr ? "Colis" : "Parcel"}>
         <InfoGrid items={[
-          { label: fr ? "Suivi" : "Tracking", value: order.trackingNumber },
-          { label: fr ? "Livreur" : "Rider", value: order.rider },
+          { label: fr ? "Référence" : "Reference", value: order.reference },
           { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
         ]} />
       </DetailSection>

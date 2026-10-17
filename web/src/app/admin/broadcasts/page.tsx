@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { DataTable } from "@/components/ui/data-table";
-import { NoticeBar } from "@/components/admin/demo-badge";
+import { NoticeBar } from "@/components/admin/notice-bar";
 import { ErrorNote } from "@/components/admin/modal";
 import { Send, Megaphone, Users } from "lucide-react";
 import { useLocale } from "@/context/locale-context";

@@ -23,7 +23,7 @@ const ROLE_GROUPS = [
   { label: "Rider", labelFr: "Livreur", roles: ["rider"] as UserRole[] },
 ];
 
-// The one-click role picker is a demo convenience; production sets this to "false".
+// The one-click role picker is a development convenience; production builds set this to "false".
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
 
 export default function LoginPage() {
@@ -33,7 +33,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
-  const { t, locale } = useLocale();
+  const { locale } = useLocale();
   const fr = locale === "fr";
   const router = useRouter();
   const [group, setGroup] = useState("Customer");
@@ -125,7 +125,6 @@ export default function LoginPage() {
           </div>
           {DEMO_MODE && (
           <div className="space-y-3 text-sm text-white/80">
-            <p>{t("prototypeDesc")}</p>
             <p className="rounded-lg bg-white/10 p-4 backdrop-blur-sm">
               {fr
                 ? "Chaque rôle est isolé : l'Admin gère les entrepôts et voit la logistique uniquement dans Admin. Les vendeurs ont besoin d'un abonnement actif. Le personnel d'entrepôt ne peut pas accéder aux autres portails."
@@ -144,7 +143,7 @@ export default function LoginPage() {
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               {DEMO_MODE
-                ? (fr ? "Connectez-vous ou choisissez un rôle de démonstration — vous n'accéderez qu'à votre portail" : "Sign in, or pick a demo role — you will only access your portal")
+                ? (fr ? "Connectez-vous ou choisissez un rôle de test — vous n'accéderez qu'à votre portail" : "Sign in, or pick a test role — you will only access your portal")
                 : (fr ? "Connectez-vous avec votre compte — vous n'accéderez qu'à votre portail" : "Sign in with your account — you will only access your portal")}
             </p>
           </div>
@@ -152,8 +151,8 @@ export default function LoginPage() {
           {(
             <div className="space-y-4">
               <form onSubmit={signInWithAccount} className="space-y-3">
-                <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
-                <input className="input-premium w-full px-4 py-3 text-sm" type="password" autoComplete="current-password" placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" aria-label={fr ? "E-mail" : "Email"} placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input className="input-premium w-full px-4 py-3 text-sm" type="password" autoComplete="current-password" aria-label={fr ? "Mot de passe" : "Password"} placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />
                 {signInError && <p role="alert" className="text-sm text-red-600">{signInError}</p>}
                 <Button type="submit" disabled={signingIn} className="w-full">
                   {signingIn ? (fr ? "Veuillez patienter…" : "Please wait…") : (fr ? "Se connecter" : "Sign in")}
@@ -161,7 +160,7 @@ export default function LoginPage() {
               </form>
               {DEMO_MODE && (
               <>
-              <p className="pt-2 text-center text-xs uppercase tracking-wide text-slate-400">{fr ? "ou essayer un rôle de démonstration" : "or try a demo role"}</p>
+              <p className="pt-2 text-center text-xs uppercase tracking-wide text-slate-400">{fr ? "ou essayer un rôle de test" : "or try a test role"}</p>
               <div className="flex flex-wrap gap-2">
                 {ROLE_GROUPS.map((g) => (
                   <button

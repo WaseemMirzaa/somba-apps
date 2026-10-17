@@ -6,10 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number, locale = "en") {
+  // Whole dollars stay compact ("$89"); anything with cents shows both digits
+  // ("$71.20") so a total is never rounded away from what is charged.
+  const cents = Math.abs(amount - Math.round(amount)) > 0.004;
   return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 0,
   }).format(amount);
 }
 

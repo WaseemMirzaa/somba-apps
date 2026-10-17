@@ -47,6 +47,12 @@ interface RealtimeValue {
   payments: Payment[];
   payouts: Payout[];
   disputes: Dispute[];
+  /** The server returns lists in pages (default 500): more rows may exist beyond what is loaded. */
+  hasMoreOrders: boolean;
+  hasMoreDeliveries: boolean;
+  /** Fetch the next page (limit/offset) and append it. Rejects with the server's error. */
+  loadMoreOrders: () => Promise<void>;
+  loadMoreDeliveries: () => Promise<void>;
 
   login: (email: string, password: string) => Promise<BackendUser>;
   register: (input: {
@@ -105,6 +111,15 @@ interface RealtimeValue {
 
 const RealtimeContext = createContext<RealtimeValue | null>(null);
 
+/** Page size used for the big lists (the server default; its maximum is 1000). */
+const PAGE_SIZE = 500;
+
+/** Append rows that are not in the list yet (older pages), keeping live-pushed rows where they are. */
+function appendNew<T extends { id: string }>(list: T[], more: T[]): T[] {
+  const seen = new Set(list.map((x) => x.id));
+  return [...list, ...more.filter((x) => !seen.has(x.id))];
+}
+
 function upsert<T extends { id: string }>(list: T[], item: T): T[] {
   const idx = list.findIndex((x) => x.id === item.id);
   if (idx === -1) return [item, ...list];
@@ -133,6 +148,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [hasMoreDeliveries, setHasMoreDeliveries] = useState(false);
+  // How many rows the server has handed out per list (live pushes do not count): the next `offset`.
+  const fetched = useRef({ orders: 0, deliveries: 0 });
   const booted = useRef(false);
   // Assigned below; lets the socket's `unauthorized` handler trigger a token
   // refresh + reconnect without a circular hook dependency.
@@ -153,6 +172,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     setPayouts([]);
     setDisputes([]);
     setAddresses([]);
+    setHasMoreOrders(false);
+    setHasMoreDeliveries(false);
+    fetched.current = { orders: 0, deliveries: 0 };
   }, []);
 
   /** Wire socket listeners + hydrate initial state after connect. */
@@ -229,11 +251,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             .catch(() => []),
         ]);
         setOrders(ord);
+        fetched.current.orders = ord.length;
+        setHasMoreOrders(ord.length >= PAGE_SIZE);
         setNotifications(notif);
         const del = await socketClient
           .request<DeliveryTask[]>("delivery:list")
           .catch(() => []);
         setDeliveries(del);
+        fetched.current.deliveries = del.length;
+        setHasMoreDeliveries(del.length >= PAGE_SIZE);
         const [wallet, walletTx, pays] = await Promise.all([
           socketClient
             .request<{ balance: number }>("wallet:get")
@@ -393,6 +419,28 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       .request<DeliveryTask[]>("delivery:list")
       .catch(() => []);
     setDeliveries(del);
+    fetched.current.deliveries = del.length;
+    setHasMoreDeliveries(del.length >= PAGE_SIZE);
+  }, []);
+
+  const loadMoreOrders = useCallback(async () => {
+    const rows = await socketClient.request<Order[]>("orders:list", {
+      limit: PAGE_SIZE,
+      offset: fetched.current.orders,
+    });
+    fetched.current.orders += rows.length;
+    setOrders((cur) => appendNew(cur, rows));
+    setHasMoreOrders(rows.length >= PAGE_SIZE);
+  }, []);
+
+  const loadMoreDeliveries = useCallback(async () => {
+    const rows = await socketClient.request<DeliveryTask[]>("delivery:list", {
+      limit: PAGE_SIZE,
+      offset: fetched.current.deliveries,
+    });
+    fetched.current.deliveries += rows.length;
+    setDeliveries((cur) => appendNew(cur, rows));
+    setHasMoreDeliveries(rows.length >= PAGE_SIZE);
   }, []);
 
   const updateDeliveryStatus = useCallback(
@@ -520,6 +568,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       payments,
       payouts,
       disputes,
+      hasMoreOrders,
+      hasMoreDeliveries,
+      loadMoreOrders,
+      loadMoreDeliveries,
       login,
       register,
       logout,
@@ -561,6 +613,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       payments,
       payouts,
       disputes,
+      hasMoreOrders,
+      hasMoreDeliveries,
+      loadMoreOrders,
+      loadMoreDeliveries,
       login,
       register,
       logout,

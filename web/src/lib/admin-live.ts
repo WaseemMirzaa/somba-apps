@@ -24,7 +24,9 @@ export type PayoutRow = Payout & {
 };
 export type DisputeRow = Dispute & { receivedAt?: string | null };
 export type PaymentRow = Payment & {
-  purpose?: "order" | "topup";
+  purpose?: "order" | "topup" | "plan";
+  /** For `purpose: "plan"`, the plan id being bought. */
+  subject?: string | null;
   providerRef?: string | null;
   failureReason?: string | null;
 };
@@ -61,6 +63,8 @@ export interface CampaignRow {
   nameFr: string | null;
   discount: number;
   productCount: number;
+  /** Product ids the discount covers; empty = every product of the campaign's store. */
+  productIds?: string[] | null;
   budgetUsd: number;
   startDate: string | null;
   endDate: string | null;
@@ -214,6 +218,16 @@ export function useRun() {
     },
     [toast],
   );
+}
+
+/** Roles that may create / edit / switch hubs (server group `hubs`). */
+export function canManageHubs(role: string): boolean {
+  return role === "admin" || role === "admin_operations";
+}
+
+/** Roles that may open the finance figures (`analytics:finance`). */
+export function canSeeFinance(role: string): boolean {
+  return role === "admin" || role === "admin_finance";
 }
 
 export function useRole(): string {

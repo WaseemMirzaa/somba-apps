@@ -46,7 +46,12 @@ export interface OrderItem {
   productName: string;
   variant: string;
   qty: number;
+  /** Unit price actually charged (after flash sale / campaign). */
   priceUsd: number;
+  /** The normal listing price at the time of the order. */
+  listPriceUsd?: number | null;
+  campaignId?: string | null;
+  campaignPct?: number | null;
 }
 
 export interface Order {
@@ -58,6 +63,10 @@ export interface Order {
   paymentMethod: "stripe_card" | "cod" | "airtel_money" | "wallet";
   subtotalUsd: number;
   deliveryFeeUsd: number;
+  /** Promo-code discount already deducted from the total. */
+  discountUsd?: number;
+  /** Campaign discount already deducted from subtotalUsd / totalUsd. */
+  campaignDiscountUsd?: number;
   totalUsd: number;
   zoneId: string | null;
   riderId: string | null;
@@ -85,6 +94,13 @@ export interface Product {
   status: string;
   sellerId: string | null;
   sellerName: string | null;
+  /** The stored listing price (before flash sale / campaign). */
+  basePrice?: number;
+  /** Percent off from the winning campaign; 0 when no campaign set the price. */
+  campaignPct?: number;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  priceSource?: "base" | "flash" | "campaign";
 }
 
 export interface Category {
@@ -230,6 +246,10 @@ export interface Review {
   rating: number;
   text: string;
   createdAt: string;
+  status?: "visible" | "hidden";
+  /** The seller's public answer to this review. */
+  sellerReply?: string | null;
+  sellerReplyAt?: string | null;
 }
 
 /** Standard ack envelope returned by every request→ack socket handler. */

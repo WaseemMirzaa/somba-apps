@@ -9,6 +9,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/seller/product-image";
+import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useSellerData } from "@/lib/seller";
 import {
   errMessage,
@@ -27,17 +28,15 @@ export default function SellerProductDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerProductFull, pauseProduct, publishProduct, deleteProduct, productsLoaded } = useSellerData();
+  const { getSellerProductFull, pauseProduct, publishProduct, deleteProduct, productsLoaded, load } = useSellerData();
   const product = getSellerProductFull(id);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!product) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        {productsLoaded ? (fr ? "Produit introuvable" : "Product not found") : fr ? "Chargement…" : "Loading…"}
-      </div>
-    );
+    if (load.error) return <LoadError message={load.error} onRetry={load.retry} />;
+    if (!productsLoaded) return <SectionLoader />;
+    return <EmptyState>{fr ? "Produit introuvable" : "Product not found"}</EmptyState>;
   }
 
   const status = product.status;
@@ -148,8 +147,24 @@ export default function SellerProductDetailPage() {
 
           <DetailGridSection title={fr ? "Tarification" : "Pricing"}>
             <InfoGrid items={[
-              { label: fr ? "Prix de vente" : "Sale Price", value: formatCurrency(product.price, locale) },
+              { label: fr ? "Prix catalogue" : "List price", value: formatCurrency(product.price, locale) },
               { label: fr ? "Prix barré" : "Compare-at", value: product.originalPrice ? formatCurrency(product.originalPrice, locale) : "—" },
+              ...(product.priceSource !== "base"
+                ? [{
+                    label: fr ? "Prix payé par les clients" : "Price shoppers pay now",
+                    value: (
+                      <span className="text-emerald-700">
+                        {formatCurrency(product.effectivePrice, locale)}{" "}
+                        <span className="text-xs font-normal">
+                          {product.priceSource === "campaign"
+                            ? `(${fr ? "campagne" : "campaign"} ${product.campaignName ?? ""} -${product.campaignPct}%)`
+                            : `(${fr ? "vente flash" : "flash sale"})`}
+                        </span>
+                      </span>
+                    ),
+                    full: true,
+                  }]
+                : []),
               { label: fr ? "Commission" : "Commission", value: `${product.commission}%` },
               { label: fr ? "Revenu net par vente" : "Net per sale", value: formatCurrency(product.netRevenue, locale) },
             ]} />

@@ -11,6 +11,7 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
+import { formatCurrency } from "@/lib/utils";
 
 // Variant strings come from the shop/cart data layer as free-form English tokens
 // (e.g. "256GB Black", "White", "Default"). Translate the known tokens locally.
@@ -43,7 +44,7 @@ export default function ShopCartPage() {
   const fr = locale === "fr";
   const rt = useRealtime();
   const { updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, applyPromo, removePromo, zoneId, setZoneId } = useShop();
-  const { lines, subtotal, hasUnavailable } = useCartLines();
+  const { lines, subtotal, hasUnavailable, savings } = useCartLines();
   const settings = usePublicSettings();
   const { toast } = useToast();
   const [promoInput, setPromoInput] = useState("");
@@ -117,11 +118,18 @@ export default function ShopCartPage() {
                     <p className="text-xs font-medium text-red-600">{fr ? "Indisponible" : "Unavailable"}</p>
                   )}
                   {!item.unavailable && item.livePrice !== item.price && (
-                    <p className="text-xs text-amber-600">{fr ? "Le prix a changé" : "Price has changed"}</p>
+                    <p className="text-xs text-amber-700">{fr ? "Le prix a changé" : "Price has changed"}</p>
+                  )}
+                  {item.priceInfo && item.priceInfo.source !== "base" && item.priceInfo.was != null && (
+                    <p className="mt-0.5 text-xs font-semibold text-amber-800">
+                      {item.priceInfo.source === "flash" ? (fr ? "Vente flash" : "Flash sale") : item.priceInfo.campaignName ?? (fr ? "Promotion" : "Campaign")}
+                      {" · -"}{item.priceInfo.pct}%
+                    </p>
                   )}
                   <div className="mt-2 flex items-center gap-3">
                     <select
                       className="rounded border border-blue-200 px-2 py-1 text-sm"
+                      aria-label={`${fr ? "Quantité" : "Quantity"}: ${fr ? item.nameFr : item.name}`}
                       value={item.qty}
                       onChange={(e) => updateQty(item.id, item.variant, Number(e.target.value))}
                     >
@@ -129,7 +137,7 @@ export default function ShopCartPage() {
                         <option key={n} value={n}>{n}</option>
                       ))}
                     </select>
-                    <button className="text-xs text-red-500" onClick={() => { removeFromCart(item.id, item.variant); toast(fr ? "Retiré" : "Removed"); }}>
+                    <button className="text-xs text-red-600" aria-label={`${fr ? "Supprimer" : "Remove"} ${fr ? item.nameFr : item.name}`} onClick={() => { removeFromCart(item.id, item.variant); toast(fr ? "Retiré" : "Removed"); }}>
                       {fr ? "Supprimer" : "Remove"}
                     </button>
                     <button className="text-xs text-slate-500" onClick={() => { moveToWishlist(item.id, item.variant); toast(fr ? "Enregistré" : "Saved"); }}>
@@ -137,7 +145,16 @@ export default function ShopCartPage() {
                     </button>
                   </div>
                 </div>
-                <DualCurrency amount={item.livePrice * item.qty} className="font-semibold text-blue-700" />
+                <div className="text-right">
+                  <DualCurrency amount={item.livePrice * item.qty} className="font-semibold text-blue-700" />
+                  {item.priceInfo?.was != null && item.priceInfo.was > item.livePrice && item.qty > 0 && (
+                    <s className="block text-xs text-slate-500">
+                      <span className="sr-only">{fr ? "Ancien prix " : "Was "}</span>
+                      {formatCurrency(item.priceInfo.was * item.qty, locale)}
+                    </s>
+                  )}
+                  {item.qty > 1 && <p className="text-xs text-slate-500">{formatCurrency(item.livePrice, locale)} × {item.qty}</p>}
+                </div>
               </div>
             ))}
           </div>
@@ -194,6 +211,11 @@ export default function ShopCartPage() {
       <div className="card-premium p-6">
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span>{fr ? "Sous-total" : "Subtotal"}</span><DualCurrency amount={subtotal} /></div>
+          {savings > 0 && (
+            <div className="flex justify-between text-xs text-amber-800">
+              <span>{fr ? "Dont économisé grâce aux promotions" : "Includes promotion savings of"}</span><span>{formatCurrency(savings, locale)}</span>
+            </div>
+          )}
           {discount > 0 && (
             <div className="flex justify-between text-emerald-600">
               <span>{fr ? "Réduction" : "Discount"}</span><span>-<DualCurrency amount={discount} /></span>

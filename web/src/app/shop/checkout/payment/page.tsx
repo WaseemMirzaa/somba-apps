@@ -10,6 +10,8 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { PageLoader } from "@/components/ui/loader";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { PaymentPending } from "@/components/shop/payment-pending";
+import { OrderLines } from "@/components/shop/order-lines";
+import { VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useShop, useCartLines, type CartLine } from "@/context/shop-context";
@@ -19,9 +21,12 @@ import {
   MOBILE_MONEY_METHODS,
   addressToShipping,
   isMobileMoneyMethod,
+  isVerificationError,
   usePublicSettings,
+  useVerificationStatus,
   zoneLabel,
 } from "@/lib/shop-live";
+import { formatCurrency } from "@/lib/utils";
 import type { Order } from "@/lib/realtime/types";
 
 function PaymentContent() {
@@ -32,7 +37,8 @@ function PaymentContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { promoCode, promoDiscount, zoneId, clearCart, addToCart } = useShop();
-  const { lines, subtotal, hasUnavailable } = useCartLines();
+  const { lines, subtotal, hasUnavailable, savings } = useCartLines();
+  const verification = useVerificationStatus();
   const settings = usePublicSettings();
 
   const addressId = params.get("address");
@@ -44,7 +50,7 @@ function PaymentContent() {
   const zoneMissing = settings.deliveryZones.length > 0 && !zone;
   const deliveryFee = zone?.feeUsd ?? 0;
   const discount = Math.min(promoDiscount, subtotal);
-  const total = Math.max(0, subtotal - discount) + deliveryFee;
+  const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
   const balance = rt.walletBalance;
   const walletEnough = balance >= total;
@@ -92,6 +98,10 @@ function PaymentContent() {
 
   async function placeOrder() {
     setError(null);
+    if (verification.blocked) {
+      setError(null);
+      return;
+    }
     if (!address) {
       setError(fr ? "Choisissez une adresse de livraison." : "Choose a delivery address first.");
       return;
@@ -173,10 +183,12 @@ function PaymentContent() {
       <PageHeader title={fr ? "Paiement" : "Payment"} breadcrumbs={[{ label: fr ? "Caisse" : "Checkout", href: "/shop/checkout" }, { label: fr ? "Paiement" : "Payment" }]} />
 
       <DetailSection title={fr ? "Récapitulatif" : "Summary"}>
+        <OrderLines lines={lines} />
         <InfoGrid items={[
           { label: fr ? "Livraison à" : "Deliver to", value: `${address.label} — ${[address.line1, address.commune, address.city].filter(Boolean).join(", ")}`, full: true },
           { label: fr ? "Articles" : "Items", value: lines.reduce((s, l) => s + l.qty, 0) },
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
+          ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"} (${promoCode})`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
           { label: `${fr ? "Livraison" : "Delivery"}${zone ? ` — ${zoneLabel(zone, fr)}` : ""}`, value: deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
         ]} />
@@ -228,11 +240,13 @@ function PaymentContent() {
 
         <p className="mt-4 text-lg font-bold">Total: <DualCurrency amount={total} /></p>
 
-        {error && (
+        {(verification.blocked || isVerificationError(error)) ? (
+          <div className="mt-3"><VerificationNotice status={verification} serverMessage={isVerificationError(error) ? error : null} /></div>
+        ) : error && (
           <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>
         )}
 
-        <Button onClick={placeOrder} disabled={placing || zoneMissing} className="mt-4 w-full">
+        <Button onClick={placeOrder} disabled={placing || zoneMissing || verification.blocked} className="mt-4 w-full">
           {placing ? (fr ? "Traitement…" : "Placing…") : fr ? "Payer" : "Pay"}
         </Button>
         <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">{fr ? "← Retour" : "← Back"}</Link>

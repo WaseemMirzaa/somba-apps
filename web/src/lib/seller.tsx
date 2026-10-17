@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useRealtime } from "@/context/realtime-context";
@@ -14,6 +15,7 @@ import { authApi } from "@/lib/realtime/auth-api";
 import type {
   Dispute,
   Order,
+  Payment,
   Payout,
   Product,
   Review,
@@ -36,11 +38,62 @@ import type {
 
 const DEFAULT_COMMISSION_PCT = 12;
 const LOW_STOCK_THRESHOLD = 10;
-const REFRESH_MS = 45_000;
+/** Pushes arrive in bursts (an order + its payment + its delivery): coalesce the follow-up reads. */
+const PUSH_DEBOUNCE_MS = 400;
 const FALLBACK_IMAGE = "/brand/logo-stack.png";
 
 // ─── Server shapes not (yet) in lib/realtime/types ───────────────────────────
-export type SellerStore = Seller & { pickupAddress?: string | null };
+export type SellerStore = Seller & {
+  pickupAddress?: string | null;
+  /** The plan stored on the row (may have lapsed). */
+  plan?: string | null;
+  planExpiresAt?: string | null;
+  /** The plan actually in force right now (a lapsed paid plan reads "free"). */
+  activePlan?: string;
+};
+
+/** A product row as `products:list` / `product:updated` return it for the owning seller. */
+export type SellerProductRow = Product & {
+  /** The stored listing price (`price` is the effective price shoppers pay). */
+  basePrice?: number;
+  campaignPct?: number;
+  campaignId?: string | null;
+  campaignName?: string | null;
+  priceSource?: "base" | "flash" | "campaign";
+};
+
+export type SellerReview = Review & {
+  status?: "visible" | "hidden";
+  sellerReply?: string | null;
+  sellerReplyAt?: string | null;
+};
+
+/** A public seller subscription plan (`sellers:plans`). */
+export interface SellerPlanInfo {
+  id: string;
+  name: string;
+  nameFr?: string;
+  /** null = "contact sales" (cannot be bought online); 0 = free. */
+  priceUsd: number | null;
+  months: number;
+  maxProducts?: number | null;
+  features: string[];
+  featuresFr?: string[];
+  popular?: boolean;
+}
+
+export type PlanPayment = Payment & {
+  purpose?: string;
+  subject?: string | null;
+  failureReason?: string | null;
+};
+
+export interface SubscribeResult {
+  status: "active" | "pending";
+  plan: SellerPlanInfo;
+  payment: PlanPayment;
+  seller: SellerStore;
+}
 
 export interface PayoutAvailability {
   earned: number;
@@ -67,6 +120,8 @@ export interface Campaign {
   startDate: string | null;
   endDate: string | null;
   status: "draft" | "pending" | "scheduled" | "active" | "ended" | "rejected";
+  /** Products the campaign covers; empty = every product of the store. */
+  productIds?: string[];
   views: number;
   clicks: number;
   orders: number;
@@ -255,11 +310,11 @@ interface BuildInput {
   storeName: string;
   seller: SellerStore | null;
   stats: SellerStats | null;
-  products: Product[];
+  products: SellerProductRow[];
   orders: Order[];
   payouts: SellerPayout[];
   disputes: Dispute[];
-  reviews: Review[];
+  reviews: SellerReview[];
   available: PayoutAvailability | null;
   campaigns: Campaign[];
   replacements: Replacement[];
@@ -304,13 +359,25 @@ function buildSellerData(input: BuildInput) {
 
   const sellerProductList = mine.map((p) => {
     const sale = soldByProduct.get(p.id) ?? { qty: 0, revenue: 0, orders: 0, inFlight: 0 };
+    // `price` from the server is the EFFECTIVE price (after a campaign / flash
+    // sale); the stored list price is `basePrice`. Pages show/edit the list
+    // price and surface the promotion separately.
+    const listPrice = p.basePrice ?? p.price;
+    const priceSource = p.priceSource ?? "base";
+    // While a promotion runs the server's `originalPrice` is the "was" price
+    // (= max(compare-at, list price)); only a value above the list price is a real compare-at.
+    const compareAt = priceSource === "base" ? p.originalPrice : p.originalPrice && p.originalPrice > listPrice ? p.originalPrice : null;
     return {
       id: p.id,
       sku: `SKU-${shortId(p.id)}`,
       name: p.name,
       nameFr: p.nameFr ?? p.name,
-      price: p.price,
-      originalPrice: p.originalPrice,
+      price: listPrice,
+      originalPrice: compareAt,
+      effectivePrice: p.price,
+      priceSource,
+      campaignPct: p.campaignPct ?? 0,
+      campaignName: p.campaignName ?? null,
       image: p.image || FALLBACK_IMAGE,
       hasImage: !!p.image,
       status: p.status, // REAL: live | pending | rejected | draft | approved
@@ -327,7 +394,7 @@ function buildSellerData(input: BuildInput) {
       rating: p.rating || 0,
       reviewsCount: p.reviewsCount,
       commission: commissionPct,
-      netRevenue: money(p.price * (1 - rate)),
+      netRevenue: money(p.price * (1 - rate)), // per sale at the price shoppers pay now
       lowStockThreshold: LOW_STOCK_THRESHOLD,
       allocatedStock: sale.inFlight,
       orders: sale.orders,
@@ -351,6 +418,7 @@ function buildSellerData(input: BuildInput) {
           customer: r.author,
           rating: r.rating,
           review: r.text,
+          reply: r.sellerReply ?? null,
           date: dayOf(r.createdAt),
         })),
     };
@@ -584,17 +652,21 @@ function buildSellerData(input: BuildInput) {
     }))
     .sort((a, b) => b.gross - a.gross);
 
-  // Reviews (read-only: the server has no reply / report event).
-  const sellerReviewList = reviews.map((r, i) => ({
-    id: i + 1,
-    reviewId: r.id,
-    customer: r.author,
-    productId: r.productId,
-    product: r.productName ?? mine.find((p) => p.id === r.productId)?.name ?? "—",
-    rating: r.rating,
-    review: r.text,
-    date: dayOf(r.createdAt),
-  }));
+  // Reviews on this store's products, newest first; `reply` is the seller's public answer.
+  const sellerReviewList = [...reviews]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((r) => ({
+      id: r.id,
+      reviewId: r.id,
+      customer: r.author,
+      productId: r.productId,
+      product: r.productName ?? mine.find((p) => p.id === r.productId)?.name ?? "—",
+      rating: r.rating,
+      review: r.text,
+      reply: r.sellerReply ?? null,
+      repliedAt: r.sellerReplyAt ?? null,
+      date: dayOf(r.createdAt),
+    }));
 
   // Returns / disputes visible to this account.
   const orderAmountByRef = new Map(sellerOrderList.map((o) => [o.id, o.amount]));
@@ -623,8 +695,10 @@ function buildSellerData(input: BuildInput) {
     .reduce((s, o) => s + o.amount, 0);
   const revenue = stats?.revenue ?? liveRevenue;
   const productsSold = sellerProductList.reduce((s, p) => s + p.soldCount, 0);
-  const avgRating =
-    mine.length > 0 ? Number((mine.reduce((s, p) => s + (p.rating || 0), 0) / mine.length).toFixed(1)) : 0;
+  // Store rating: the server's own figure, else the review-weighted mean of the rated listings.
+  const rated = mine.filter((p) => (p.reviewsCount ?? 0) > 0);
+  const ratedCount = rated.reduce((s, p) => s + p.reviewsCount, 0);
+  const avgRating = ratedCount > 0 ? Number((rated.reduce((s, p) => s + p.rating * p.reviewsCount, 0) / ratedCount).toFixed(1)) : 0;
 
   const sellerDashboardStats = {
     todayRevenue: money(todayOrders.reduce((s, o) => s + o.amount, 0)),
@@ -632,7 +706,6 @@ function buildSellerData(input: BuildInput) {
     pendingOrders,
     productsSold,
     storeRating: seller?.rating || avgRating,
-    healthScore: Math.min(99, 70 + Math.round((seller?.rating || avgRating) * 5)),
     pendingReturns: sellerReturnList.filter((r) => r.status === "open").length,
     pendingReplacements: replacements.filter((r) => r.status === "requested").length,
   };
@@ -641,7 +714,6 @@ function buildSellerData(input: BuildInput) {
     name: storeName,
     owner: storeName,
     rating: seller?.rating || avgRating,
-    healthScore: sellerDashboardStats.healthScore,
     status: seller?.status ?? "pending",
     pickupAddress: seller?.pickupAddress ?? "",
     badge:
@@ -688,6 +760,7 @@ function buildSellerData(input: BuildInput) {
     reference: c.reference,
     campaign: c.name,
     products: c.productCount,
+    productIds: c.productIds ?? [],
     discount: c.discount,
     startDate: c.startDate ?? "—",
     endDate: c.endDate ?? "—",
@@ -714,8 +787,57 @@ function buildSellerData(input: BuildInput) {
     date: dayOf(r.createdAt),
   }));
 
+  // Recent activity: the latest real events of this store, newest first.
+  const activity: { at: string; kind: "order" | "payout" | "review" | "campaign"; text: string; textFr: string; href: string }[] = [];
+  for (const o of sellerOrderList) {
+    activity.push({
+      at: o.createdAt,
+      kind: "order",
+      text: `New order ${o.id} — $${o.amount.toFixed(2)}`,
+      textFr: `Nouvelle commande ${o.id} — ${o.amount.toFixed(2)} $`,
+      href: `/seller/orders/${o.id}`,
+    });
+  }
+  for (const p of payouts) {
+    const word: Record<string, [string, string]> = {
+      requested: ["requested", "demandé"],
+      approved: ["approved", "approuvé"],
+      paid: ["paid", "versé"],
+      rejected: ["rejected", "refusé"],
+    };
+    const [en, frw] = word[p.status] ?? [p.status, p.status];
+    activity.push({
+      at: p.createdAt,
+      kind: "payout",
+      text: `Payout ${p.reference} ${en} — $${p.amountUsd.toFixed(2)}`,
+      textFr: `Paiement ${p.reference} ${frw} — ${p.amountUsd.toFixed(2)} $`,
+      href: `/seller/finance/payouts/${p.id}`,
+    });
+  }
+  for (const r of reviews) {
+    const name = r.productName ?? mine.find((p) => p.id === r.productId)?.name ?? "—";
+    activity.push({
+      at: r.createdAt,
+      kind: "review",
+      text: `Review received — ${r.rating}★ on ${name}`,
+      textFr: `Avis reçu — ${r.rating}★ sur ${name}`,
+      href: "/seller/reviews",
+    });
+  }
+  for (const c of campaigns) {
+    activity.push({
+      at: c.updatedAt || c.createdAt,
+      kind: "campaign",
+      text: `Campaign ${c.name}: ${c.status}`,
+      textFr: `Campagne ${c.name} : ${c.status}`,
+      href: `/seller/promotions/${c.id}`,
+    });
+  }
+  const recentActivity = activity.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8);
+
   return {
     sellerStore,
+    recentActivity,
     sellerDashboardStats,
     sellerFinanceStats,
     sellerProductList,
@@ -766,6 +888,7 @@ interface Actions {
   /** sellers:update {name?, pickupAddress?} */
   updateStore: (patch: { name?: string; pickupAddress?: string | null }) => Promise<SellerStore>;
   createProduct: (input: ProductInput) => Promise<Product>;
+  /** Only send the fields that changed: `price` is the stored LIST price, never the discounted one. */
   updateProduct: (id: string, patch: Partial<ProductInput> & { status?: "live" | "draft" }) => Promise<Product>;
   pauseProduct: (id: string) => Promise<Product>;
   publishProduct: (id: string) => Promise<Product>;
@@ -777,33 +900,52 @@ interface Actions {
     startDate?: string;
     endDate?: string;
     budgetUsd?: number;
-    productCount?: number;
+    /** The seller's own product ids; omitted / empty = every product of the store. */
+    productIds?: string[];
   }) => Promise<Campaign>;
   requestPayout: (input: { amountUsd: number; method: "bank" | "mobile_money" | "wallet"; account?: string }) => Promise<SellerPayout>;
   /** orders:sellerReady — only flags the order as ready AFTER the server accepted. */
   sellerReady: (orderId: string) => Promise<void>;
   openTicket: (input: { subject: string; message: string; category?: string; orderId?: string }) => Promise<SupportTicket>;
   replyTicket: (id: string, text: string) => Promise<SupportTicket>;
+  /** reviews:reply — publishes (or replaces) the seller's public answer to a review. */
+  replyReview: (reviewId: string, text: string) => Promise<SellerReview>;
   uploadImage: (file: File) => Promise<string>;
+}
+
+/** What the portal knows about how fresh its data is. */
+export interface SellerLoadState {
+  /** First load of the core lists has not finished yet. */
+  loading: boolean;
+  /** The server's message for the first core read that failed (null when all is well). */
+  error: string | null;
+  retry: () => Promise<void>;
 }
 
 interface SellerCtx {
   seller: SellerStore | null;
   sellerLoaded: boolean;
   stats: SellerStats | null;
-  reviews: Review[];
-  ownProducts: Product[] | null;
+  reviews: SellerReview[];
+  ownProducts: SellerProductRow[] | null;
   ordersRaw: Order[] | null;
   available: PayoutAvailability | null;
   campaigns: Campaign[];
   tickets: SupportTicket[];
   replacements: Replacement[];
+  plans: SellerPlanInfo[] | null;
   readyAt: Record<string, string>;
+  load: SellerLoadState;
+  /** Increments (debounced) whenever a push changed something analytics are computed from. */
+  liveTick: number;
   refresh: () => Promise<void>;
   actions: Actions;
 }
 
 const SellerContext = createContext<SellerCtx | null>(null);
+
+/** Keys of the reads a page cannot do without; a failure of one shows the error + retry. */
+const CORE_KEYS = ["products", "orders", "reviews", "campaigns"] as const;
 
 export function SellerDataProvider({ children }: { children: React.ReactNode }) {
   const rt = useRealtime();
@@ -813,14 +955,18 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [seller, setSeller] = useState<SellerStore | null>(null);
   const [sellerLoaded, setSellerLoaded] = useState(false);
   const [stats, setStats] = useState<SellerStats | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [ownProducts, setOwnProducts] = useState<Product[] | null>(null);
+  const [reviews, setReviews] = useState<SellerReview[]>([]);
+  const [ownProducts, setOwnProducts] = useState<SellerProductRow[] | null>(null);
   const [ordersRaw, setOrdersRaw] = useState<Order[] | null>(null);
   const [available, setAvailable] = useState<PayoutAvailability | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [replacements, setReplacements] = useState<Replacement[]>([]);
+  const [plans, setPlans] = useState<SellerPlanInfo[] | null>(null);
   const [readyAt, setReadyAt] = useState<Record<string, string>>({});
+  const [liveTick, setLiveTick] = useState(0);
+  const [firstLoadDone, setFirstLoadDone] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Remembered "ready" flags (only ever written after the server accepted).
   useEffect(() => {
@@ -834,31 +980,40 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     }
   }, [userId]);
 
-  const refreshSeller = useCallback(async () => {
+  /** Run one read; remember the server's error text for it (cleared on success). */
+  const read = useCallback(async <T,>(key: string, event: string, apply: (v: T) => void, body?: unknown) => {
     try {
-      const mine = await request<SellerStore | null>("sellers:mine");
-      setSeller(mine);
-      setSellerLoaded(true);
-      return mine;
-    } catch {
-      /* keep what we have */
+      apply(await request<T>(event, body));
+      setErrors((cur) => {
+        if (!(key in cur)) return cur;
+        const { [key]: _gone, ...rest } = cur;
+        void _gone;
+        return rest;
+      });
+    } catch (e) {
+      setErrors((cur) => ({ ...cur, [key]: e instanceof Error ? e.message : "Request failed." }));
     }
   }, []);
-  const refreshProducts = useCallback(async () => {
-    try {
-      setOwnProducts(await request<Product[]>("products:list"));
-    } catch { /* keep */ }
-  }, []);
-  const refreshOrders = useCallback(async () => {
-    try {
-      setOrdersRaw(await request<Order[]>("orders:list"));
-    } catch { /* keep */ }
-  }, []);
-  const refreshAvailable = useCallback(async () => {
-    try {
-      setAvailable(await request<PayoutAvailability>("payouts:available"));
-    } catch { /* not approved / not a seller yet */ }
-  }, []);
+
+  const refreshSeller = useCallback(
+    () => read<SellerStore | null>("seller", "sellers:mine", (m) => { setSeller(m); setSellerLoaded(true); }),
+    [read],
+  );
+  const refreshProducts = useCallback(() => read<SellerProductRow[]>("products", "products:list", setOwnProducts), [read]);
+  const refreshOrders = useCallback(() => read<Order[]>("orders", "orders:list", setOrdersRaw), [read]);
+  const refreshAvailable = useCallback(() => read<PayoutAvailability>("available", "payouts:available", setAvailable), [read]);
+  const refreshStats = useCallback(() => read<SellerStats>("stats", "sellers:stats", setStats), [read]);
+  const refreshReviews = useCallback(() => read<SellerReview[]>("reviews", "reviews:seller", (r) => setReviews(r ?? [])), [read]);
+  const refreshCampaigns = useCallback(() => read<Campaign[]>("campaigns", "campaigns:list", (c) => setCampaigns(c ?? [])), [read]);
+  const refreshTickets = useCallback(
+    () => read<unknown[]>("tickets", "support:list", (t) => setTickets((t ?? []).map(parseTicket))),
+    [read],
+  );
+  const refreshReplacements = useCallback(
+    () => read<Replacement[]>("replacements", "replacements:list", (r) => setReplacements(r ?? [])),
+    [read],
+  );
+  const refreshPlans = useCallback(() => read<SellerPlanInfo[]>("plans", "sellers:plans", setPlans), [read]);
 
   const refresh = useCallback(async () => {
     await refreshSeller();
@@ -866,66 +1021,136 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       refreshProducts(),
       refreshOrders(),
       refreshAvailable(),
-      request<SellerStats>("sellers:stats").then(setStats),
-      request<Review[]>("reviews:seller").then((r) => setReviews(r ?? [])),
-      request<Campaign[]>("campaigns:list").then((c) => setCampaigns(c ?? [])),
-      request<unknown[]>("support:list").then((t) => setTickets((t ?? []).map(parseTicket))),
-      request<Replacement[]>("replacements:list").then((r) => setReplacements(r ?? [])),
+      refreshStats(),
+      refreshReviews(),
+      refreshCampaigns(),
+      refreshTickets(),
+      refreshReplacements(),
+      refreshPlans(),
     ]);
-  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable]);
+    setFirstLoadDone(true);
+    setLiveTick((n) => n + 1);
+  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable, refreshStats, refreshReviews, refreshCampaigns, refreshTickets, refreshReplacements, refreshPlans]);
 
-  // Initial load + periodic / on-focus refresh (sellers receive no order or
-  // product pushes from the server, so we re-read instead).
+  // Initial load, and again every time the socket (re)connects and the server
+  // says `ready` (isSeller flips false → true): whatever was pushed while we
+  // were offline is read back. There is NO polling.
   useEffect(() => {
     if (!isSeller) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial server fetch
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial / reconnect server fetch
     void refresh();
-    const tick = () => {
-      if (document.visibilityState === "visible") void refresh();
-    };
-    const id = window.setInterval(tick, REFRESH_MS);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", tick);
-    };
   }, [isSeller, refresh]);
 
-  // New notification (order placed, product approved, payout paid…) → re-read.
-  const notifCount = rt.notifications.length;
-  useEffect(() => {
-    if (!isSeller || notifCount === 0) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-read after a server notification
-    void refresh();
-  }, [isSeller, notifCount, refresh]);
+  // Debounced follow-up reads after pushes: the derived figures (balance, stats,
+  // analytics) change when an order / payout / notification arrives.
+  const followUp = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleFollowUp = useCallback(
+    (what: { money?: boolean; analytics?: boolean; cases?: boolean }) => {
+      if (followUp.current) clearTimeout(followUp.current);
+      pendingWhat.current = {
+        money: pendingWhat.current.money || what.money,
+        analytics: pendingWhat.current.analytics || what.analytics,
+        cases: pendingWhat.current.cases || what.cases,
+      };
+      followUp.current = setTimeout(() => {
+        const w = pendingWhat.current;
+        pendingWhat.current = {};
+        followUp.current = null;
+        if (w.money) {
+          void refreshStats();
+          void refreshAvailable();
+        }
+        if (w.cases) void refreshReplacements();
+        if (w.analytics) setLiveTick((n) => n + 1);
+      }, PUSH_DEBOUNCE_MS);
+    },
+    [refreshStats, refreshAvailable, refreshReplacements],
+  );
+  const pendingWhat = useRef<{ money?: boolean; analytics?: boolean; cases?: boolean }>({});
+  useEffect(
+    () => () => {
+      if (followUp.current) clearTimeout(followUp.current);
+    },
+    [],
+  );
 
-  // Live pushes the seller room DOES receive.
+  // Live pushes the server sends to a seller (their own orders, listings,
+  // payouts, reviews, campaigns, tickets, store row and notifications).
   useEffect(() => {
     if (!isSeller) return;
     const s = socketClient.current;
     if (!s) return;
+    const onOrder = (o: Order) => {
+      setOrdersRaw((cur) => upsert(cur ?? [], o));
+      scheduleFollowUp({ money: true, analytics: true });
+    };
+    const onProduct = (p: SellerProductRow) => {
+      let reviewsMoved = false;
+      setOwnProducts((cur) => {
+        const prev = cur?.find((x) => x.id === p.id);
+        reviewsMoved = !!prev && (prev.reviewsCount !== p.reviewsCount || prev.rating !== p.rating);
+        // A product the push says is removed leaves the list.
+        if (p.status === "removed") return (cur ?? []).filter((x) => x.id !== p.id);
+        return upsert(cur ?? [], p);
+      });
+      // A new / hidden review changes the product's rating: the server does not push the review
+      // itself to the seller, but it does push the product, so re-read the feed.
+      if (reviewsMoved) {
+        void refreshReviews();
+        scheduleFollowUp({ analytics: true });
+      }
+    };
+    const onReview = (r: SellerReview) => {
+      setReviews((cur) => {
+        // Hidden by a moderator: it leaves the seller's feed.
+        if (r.status === "hidden") return cur.filter((x) => x.id !== r.id);
+        const has = cur.some((x) => x.id === r.id);
+        return has ? cur.map((x) => (x.id === r.id ? { ...x, ...r } : x)) : [r, ...cur];
+      });
+      scheduleFollowUp({ analytics: true });
+    };
     const onSeller = (x: SellerStore) => {
       if (x.userId === userId) {
         setSeller(x);
         setSellerLoaded(true);
         void refreshProducts();
-        void refreshAvailable();
+        scheduleFollowUp({ money: true });
       }
     };
+    const onPayout = () => scheduleFollowUp({ money: true });
+    const onNotify = () => scheduleFollowUp({ money: true, cases: true });
     const onCampaign = (c: Campaign) => setCampaigns((cur) => upsert(cur, c));
     const onTicket = (t: unknown) => setTickets((cur) => upsert(cur, parseTicket(t)));
     const onReplacement = (r: Replacement) => setReplacements((cur) => upsert(cur, r));
+    s.on("order:created", onOrder);
+    s.on("order:updated", onOrder);
+    s.on("product:created", onProduct);
+    s.on("product:updated", onProduct);
+    s.on("review:created", onReview);
+    s.on("review:updated", onReview);
     s.on("seller:updated", onSeller);
+    s.on("payout:created", onPayout);
+    s.on("payout:updated", onPayout);
+    s.on("notification:new", onNotify);
     s.on("campaign:updated", onCampaign);
     s.on("support:updated", onTicket);
     s.on("replacement:updated", onReplacement);
     return () => {
+      s.off("order:created", onOrder);
+      s.off("order:updated", onOrder);
+      s.off("product:created", onProduct);
+      s.off("product:updated", onProduct);
+      s.off("review:created", onReview);
+      s.off("review:updated", onReview);
       s.off("seller:updated", onSeller);
+      s.off("payout:created", onPayout);
+      s.off("payout:updated", onPayout);
+      s.off("notification:new", onNotify);
       s.off("campaign:updated", onCampaign);
       s.off("support:updated", onTicket);
       s.off("replacement:updated", onReplacement);
     };
-  }, [isSeller, userId, rt.status, refreshProducts, refreshAvailable]);
+  }, [isSeller, userId, scheduleFollowUp, refreshProducts, refreshReviews]);
 
   // A sign-out / account switch clears everything.
   useEffect(() => {
@@ -941,11 +1166,14 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     setCampaigns([]);
     setTickets([]);
     setReplacements([]);
+    setPlans(null);
+    setErrors({});
+    setFirstLoadDone(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [rt.user?.role, userId]);
 
   const actions = useMemo<Actions>(() => {
-    const afterProductWrite = async (p: Product): Promise<Product> => {
+    const afterProductWrite = async (p: SellerProductRow): Promise<SellerProductRow> => {
       setOwnProducts((cur) => upsert(cur ?? [], p));
       void refreshProducts();
       return p;
@@ -959,24 +1187,24 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       },
       updateStore: async (patch) => {
         const s = await request<SellerStore>("sellers:update", patch);
-        setSeller(s);
+        setSeller((cur) => ({ ...(cur ?? ({} as SellerStore)), ...s }));
         return s;
       },
       createProduct: async (input) =>
-        afterProductWrite(await request<Product>("products:create", input)),
+        afterProductWrite(await request<SellerProductRow>("products:create", input)),
       updateProduct: async (id, patch) =>
-        afterProductWrite(await request<Product>("products:update", { id, patch })),
+        afterProductWrite(await request<SellerProductRow>("products:update", { id, patch })),
       pauseProduct: async (id) =>
-        afterProductWrite(await request<Product>("products:update", { id, patch: { status: "draft" } })),
+        afterProductWrite(await request<SellerProductRow>("products:update", { id, patch: { status: "draft" } })),
       publishProduct: async (id) =>
-        afterProductWrite(await request<Product>("products:update", { id, patch: { status: "live" } })),
+        afterProductWrite(await request<SellerProductRow>("products:update", { id, patch: { status: "live" } })),
       deleteProduct: async (id) => {
         await request("products:delete", { id });
         setOwnProducts((cur) => (cur ?? []).filter((p) => p.id !== id));
         void refreshProducts();
       },
       adjustStock: async (id, stock) =>
-        afterProductWrite(await request<Product>("products:update", { id, patch: { stock } })),
+        afterProductWrite(await request<SellerProductRow>("products:update", { id, patch: { stock } })),
       createCampaign: async (input) => {
         const c = await request<Campaign>("campaigns:create", input);
         setCampaigns((cur) => upsert(cur, c));
@@ -1009,16 +1237,26 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         setTickets((cur) => upsert(cur, t));
         return t;
       },
+      replyReview: async (reviewId, text) => {
+        const saved = await request<SellerReview>("reviews:reply", { reviewId, text });
+        setReviews((cur) => cur.map((x) => (x.id === saved.id ? { ...x, ...saved, productName: x.productName } : x)));
+        return saved;
+      },
       uploadImage,
     };
   }, [refreshProducts, refreshAvailable, refreshOrders, userId]);
 
+  const load = useMemo<SellerLoadState>(() => {
+    const failed = CORE_KEYS.find((k) => errors[k]);
+    return { loading: !firstLoadDone, error: failed ? errors[failed] : null, retry: refresh };
+  }, [firstLoadDone, errors, refresh]);
+
   const value = useMemo<SellerCtx>(
     () => ({
       seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available,
-      campaigns, tickets, replacements, readyAt, refresh, actions,
+      campaigns, tickets, replacements, plans, readyAt, load, liveTick, refresh, actions,
     }),
-    [seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, readyAt, refresh, actions],
+    [seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, plans, readyAt, load, liveTick, refresh, actions],
   );
 
   return <SellerContext.Provider value={value}>{children}</SellerContext.Provider>;
@@ -1047,6 +1285,36 @@ export function useSellerTickets() {
   return { tickets: ctx.tickets, openTicket: ctx.actions.openTicket, replyTicket: ctx.actions.replyTicket };
 }
 
+/** Loading / error state of the portal's core lists (for the "loading", "failed + retry" UI). */
+export function useSellerLoad(): SellerLoadState {
+  return useSellerCtx().load;
+}
+
+/** Bumps (debounced) whenever a push changed what the analytics are computed from. */
+export function useSellerLiveTick(): number {
+  return useSellerCtx().liveTick;
+}
+
+/** The plan the store is on right now, with its listing quota. */
+export function useSellerPlan() {
+  const ctx = useSellerCtx();
+  const planId = ctx.seller?.activePlan ?? ctx.seller?.plan ?? "free";
+  const plan = ctx.plans?.find((p) => p.id === planId) ?? null;
+  const used = (ctx.ownProducts ?? []).filter((p) => p.status !== "removed").length;
+  const max = plan?.maxProducts ?? null;
+  return {
+    plans: ctx.plans,
+    planId,
+    plan,
+    expiresAt: planId === "free" ? null : (ctx.seller?.planExpiresAt ?? null),
+    used,
+    max,
+    /** True when the store holds as many listings as its plan allows. */
+    atLimit: max !== null && used >= max,
+    loaded: ctx.plans !== null && ctx.ownProducts !== null,
+  };
+}
+
 /** The one hook every seller page uses. */
 export function useSellerData() {
   const rt = useRealtime();
@@ -1059,7 +1327,7 @@ export function useSellerData() {
         storeName,
         seller: ctx.seller,
         stats: ctx.stats,
-        products: ctx.ownProducts ?? rt.products,
+        products: ctx.ownProducts ?? (rt.products as SellerProductRow[]),
         orders: ctx.ordersRaw ?? rt.orders,
         payouts: rt.payouts as SellerPayout[],
         disputes: rt.disputes,
@@ -1079,11 +1347,12 @@ export function useSellerData() {
       seller: ctx.seller,
       availability: ctx.available,
       refresh: ctx.refresh,
+      load: ctx.load,
       /** The raw server row of one of the seller's products (for the edit form). */
-      getRawProduct: (id: string): Product | undefined =>
-        (ctx.ownProducts ?? rt.products).find((p) => p.id === id),
+      getRawProduct: (id: string): SellerProductRow | undefined =>
+        (ctx.ownProducts ?? (rt.products as SellerProductRow[])).find((p) => p.id === id),
       productsLoaded: ctx.ownProducts !== null,
     }),
-    [data, ctx.actions, ctx.seller, ctx.available, ctx.refresh, ctx.ownProducts, rt.products],
+    [data, ctx.actions, ctx.seller, ctx.available, ctx.refresh, ctx.load, ctx.ownProducts, rt.products],
   );
 }

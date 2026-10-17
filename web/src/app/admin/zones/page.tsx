@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
-import { NoticeBar } from "@/components/admin/demo-badge";
-import { MapPin, Bike, Layers, Plus, X } from "lucide-react";
+import { NoticeBar } from "@/components/admin/notice-bar";
+import { MapPin, Package, Layers, Plus } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { errMsg, type ZoneSetting } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { ZONE_RIDERS } from "@/lib/zones-admin";
+import { useSocketQuery, type WarehouseStats } from "@/lib/admin-stats";
+import { SectionError } from "@/components/admin/query-state";
 
 function slug(s: string): string {
   return s
@@ -50,10 +51,9 @@ export default function AdminZonesPage() {
   const [city, setCity] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", nameFr: "", city: "Kinshasa", fee: "3" });
-  // Rider planning notes: local to this browser, never sent to the server.
   const [feeText, setFeeText] = useState<Record<string, string>>({});
-  const [plan, setPlan] = useState<Record<string, string[]>>({});
-  const [riderNames, setRiderNames] = useState<string[]>([...ZONE_RIDERS]);
+  const wh = useSocketQuery<WarehouseStats>("analytics:warehouse");
+  const parcelsByZone = useMemo(() => new Map((wh.data?.byZone ?? []).map((z) => [z.zoneId, z])), [wh.data]);
 
   const load = useCallback(async () => {
     try {
@@ -71,18 +71,12 @@ export default function AdminZonesPage() {
   useEffect(() => {
     if (rt.status !== "connected") return;
     void load();
-    socketClient
-      .request<{ id: string; name: string }[]>("warehouse:riders")
-      .then((r) => {
-        if (Array.isArray(r) && r.length) setRiderNames(r.map((x) => x.name));
-      })
-      .catch(() => {});
   }, [rt.status, load]);
 
   const cities = useMemo(() => Array.from(new Set(zones.map((z) => z.city))), [zones]);
   const filtered = city === "all" ? zones : zones.filter((z) => z.city === city);
   const dirty = JSON.stringify(zones) !== JSON.stringify(saved);
-  const assignedRiders = new Set(Object.values(plan).flat()).size;
+  const parcels30 = (wh.data?.byZone ?? []).reduce((sum, z) => sum + z.parcels, 0);
 
   function addZone() {
     const name = form.name.trim();
@@ -149,7 +143,7 @@ export default function AdminZonesPage() {
         }
       />
 
-      {loadError && <NoticeBar tone="warn">{loadError}</NoticeBar>}
+      {loadError && <SectionError message={loadError} onRetry={load} />}
       {saveError && (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
           {saveError}
@@ -162,14 +156,14 @@ export default function AdminZonesPage() {
       )}
       <NoticeBar>
         {fr
-          ? "Les frais par zone sont ceux facturés au paiement. La colonne livreurs est une aide de planification locale à ce navigateur : elle n'est pas enregistrée et n'affecte pas la répartition."
-          : "Zone fees are what shoppers are charged at checkout. The riders column is a planning aid local to this browser: it is not saved and does not drive dispatch."}
+          ? "Les frais par zone sont ceux facturés au paiement. Les colis par zone viennent des livraisons réelles des 30 derniers jours."
+          : "Zone fees are what shoppers are charged at checkout. Parcel counts per zone come from real deliveries over the last 30 days."}
       </NoticeBar>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Zones" : "Zones"} value={zones.length} icon={MapPin} />
         <StatCard title={fr ? "Villes" : "Cities"} value={cities.length} icon={Layers} />
-        <StatCard title={fr ? "Livreurs notés (local)" : "Riders noted (local)"} value={assignedRiders} icon={Bike} />
+        <StatCard title={fr ? "Colis (30 j)" : "Parcels (30 d)"} value={wh.data ? parcels30 : "…"} icon={Package} />
       </div>
 
       {showAdd && (
@@ -216,32 +210,16 @@ export default function AdminZonesPage() {
                 ),
               },
               {
-                key: "riders",
-                label: fr ? "Livreurs (note locale)" : "Riders (local note)",
+                key: "parcels",
+                label: fr ? "Colis (30 j)" : "Parcels (30 d)",
                 render: (row) => {
-                  const id = String(row.id);
-                  const assigned = plan[id] ?? [];
-                  return (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {assigned.map((r) => (
-                        <span key={r} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs">
-                          {r}
-                          <button onClick={() => setPlan((p) => ({ ...p, [id]: (p[id] ?? []).filter((x) => x !== r) }))} className="text-slate-400 hover:text-red-500">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                      <select
-                        className="input-premium px-2 py-1 text-xs"
-                        value=""
-                        onChange={(e) => e.target.value && setPlan((p) => ({ ...p, [id]: [...(p[id] ?? []), e.target.value] }))}
-                      >
-                        <option value="">{fr ? "+ Noter" : "+ Note"}</option>
-                        {riderNames.filter((r) => !assigned.includes(r)).map((r) => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                      </select>
-                    </div>
+                  const z = parcelsByZone.get(String(row.id));
+                  if (wh.error) return <span className="text-xs text-red-600">—</span>;
+                  if (!wh.data) return <span className="text-xs text-slate-400">…</span>;
+                  return z ? (
+                    <span className="text-xs text-slate-600">{z.parcels} · {z.delivered} {fr ? "livrés" : "delivered"}{z.failed ? ` · ${z.failed} ${fr ? "échecs" : "failed"}` : ""}</span>
+                  ) : (
+                    <span className="text-xs text-slate-400">0</span>
                   );
                 },
               },

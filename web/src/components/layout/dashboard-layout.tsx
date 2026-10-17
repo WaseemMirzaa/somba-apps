@@ -30,7 +30,6 @@ import {
   LogOut,
   Menu,
   X,
-  Sparkles,
   Zap,
   Shield,
   FileText,
@@ -241,7 +240,7 @@ export function DashboardLayout({
                   : t(config.title)}
             </p>
           </div>
-          <button className="text-slate-400 lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <button className="text-slate-400 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label={locale === "fr" ? "Fermer le menu" : "Close menu"}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -285,7 +284,7 @@ export function DashboardLayout({
 
       <div className="flex min-h-screen min-w-0 flex-col lg:pl-[272px]">
         <header className="relative z-30 flex h-[72px] items-center gap-4 border-b border-[var(--border)] bg-white px-4 lg:sticky lg:top-0 lg:bg-white/80 lg:px-8 lg:backdrop-blur-xl">
-          <button className="rounded-xl border border-[var(--border)] p-2.5 lg:hidden" onClick={() => setSidebarOpen(true)}>
+          <button className="rounded-xl border border-[var(--border)] p-2.5 lg:hidden" onClick={() => setSidebarOpen(true)} aria-label={locale === "fr" ? "Ouvrir le menu" : "Open menu"} aria-expanded={sidebarOpen}>
             <Menu className="h-5 w-5 text-slate-600" />
           </button>
 
@@ -319,13 +318,6 @@ export function DashboardLayout({
           <Link href="/login" className="hidden text-sm text-slate-600 hover:text-[var(--primary)] sm:block">
             {persona.name}
           </Link>
-
-          {process.env.NEXT_PUBLIC_DEMO_MODE !== "false" && (
-            <span className="hidden items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200 sm:flex">
-              <Sparkles className="h-3 w-3" />
-              {t("prototype")}
-            </span>
-          )}
 
           <button onClick={() => { logout(); router.push("/login"); }} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600">
             <LogOut className="h-4 w-4" />

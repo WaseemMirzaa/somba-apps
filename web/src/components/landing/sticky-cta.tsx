@@ -31,13 +31,13 @@ export function StickyCta() {
         <X className="h-4 w-4" />
       </button>
       <p className="pr-8 font-[family-name:var(--font-display)] text-sm font-bold text-slate-900">
-        {fr ? "Des milliers de produits vous attendent" : "Thousands of products await"}
+        {fr ? "Prêt à commander ?" : "Ready to order?"}
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        {fr ? "Livraison rapide · Paiement sécurisé · Retours faciles" : "Fast delivery · Secure checkout · Easy returns"}
+        {fr ? "Mobile money · Portefeuille · Suivi en direct" : "Mobile money · Wallet · Live tracking"}
       </p>
       <div className="mt-3 flex gap-2">
-        <Link href="/get-app" className="btn-primary flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm">
+        <Link href="/shop/products" className="btn-primary flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm">
           {fr ? "Acheter" : "Shop now"}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>

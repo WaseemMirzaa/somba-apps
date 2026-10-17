@@ -12,10 +12,10 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Home", labelFr: "Accueil" },
-  { href: "/get-app", label: "Shop", labelFr: "Boutique" },
+  { href: "/shop/products", label: "Shop", labelFr: "Boutique" },
   { href: "/sell-online", label: "Sell Online", labelFr: "Vendre en ligne" },
-  { href: "#modules", label: "Services", labelFr: "Nos services" },
-  { href: "#portals", label: "About", labelFr: "À propos" },
+  { href: "/#modules", label: "Services", labelFr: "Nos services" },
+  { href: "/#portals", label: "About", labelFr: "À propos" },
 ];
 
 export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
@@ -78,6 +78,8 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
             >
               <button
                 onClick={() => setLocale("en")}
+                aria-label="English"
+                aria-pressed={locale === "en"}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold",
                   locale === "en" && (overlay ? "bg-white/20 text-white shadow-sm" : "bg-white shadow-sm"),
@@ -88,6 +90,8 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
               </button>
               <button
                 onClick={() => setLocale("fr")}
+                aria-label="Français"
+                aria-pressed={locale === "fr"}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold",
                   locale === "fr" && (overlay ? "bg-white/20 text-white shadow-sm" : "bg-white shadow-sm"),
@@ -120,13 +124,14 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                 </Link>
               )
             )}
-            <Link href="/get-app" className="btn-primary hidden px-5 py-2.5 text-sm sm:inline-flex">
+            <Link href="/shop/products" className="btn-primary hidden px-5 py-2.5 text-sm sm:inline-flex">
               {fr ? "Acheter" : "Shop Now"}
             </Link>
             <button
               onClick={() => setOpen(!open)}
               className={cn("rounded-lg p-2 lg:hidden", overlay ? "text-white" : "text-slate-600")}
-              aria-label={fr ? "Menu" : "Menu"}
+              aria-label={open ? (fr ? "Fermer le menu" : "Close menu") : (fr ? "Ouvrir le menu" : "Open menu")}
+              aria-expanded={open}
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -155,7 +160,7 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
                   {fr ? "Connexion équipe" : "Staff login"}
                 </Link>
               )}
-              <Link href="/get-app" onClick={() => setOpen(false)} className="mt-2 rounded-xl bg-white px-5 py-2.5 text-center text-sm font-semibold text-[var(--primary)] hover:bg-white/90">
+              <Link href="/shop/products" onClick={() => setOpen(false)} className="mt-2 rounded-xl bg-white px-5 py-2.5 text-center text-sm font-semibold text-[var(--primary)] hover:bg-white/90">
                 {fr ? "Acheter maintenant" : "Shop now"}
               </Link>
             </nav>

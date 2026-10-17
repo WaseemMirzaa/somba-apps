@@ -8,12 +8,15 @@ import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { OrderLines } from "@/components/shop/order-lines";
+import { VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useShop, useCartLines } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
+import { formatCurrency } from "@/lib/utils";
+import { usePublicSettings, useVerificationStatus, zoneLabel } from "@/lib/shop-live";
 import type { Address } from "@/lib/realtime/types";
 
 function CheckoutContent() {
@@ -23,7 +26,8 @@ function CheckoutContent() {
   const { toast } = useToast();
   const router = useRouter();
   const { promoDiscount, promoCode, zoneId, setZoneId } = useShop();
-  const { lines, subtotal, hasUnavailable } = useCartLines();
+  const { lines, subtotal, hasUnavailable, savings } = useCartLines();
+  const verification = useVerificationStatus();
   const settings = usePublicSettings();
   const zones = settings.deliveryZones;
 
@@ -53,7 +57,7 @@ function CheckoutContent() {
   const zoneMissing = zones.length > 0 && !zone;
   const deliveryFee = zone?.feeUsd ?? 0;
   const discount = Math.min(promoDiscount, subtotal);
-  const total = Math.max(0, subtotal - discount) + deliveryFee;
+  const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
   async function saveAddress() {
     if (!form.line1.trim() || !form.city.trim()) {
@@ -82,7 +86,7 @@ function CheckoutContent() {
     }
   }
 
-  const canContinue = lines.length > 0 && !hasUnavailable && !!address && !zoneMissing;
+  const canContinue = lines.length > 0 && !hasUnavailable && !!address && !zoneMissing && !verification.blocked;
 
   function continueToPayment() {
     if (!address) {
@@ -117,6 +121,12 @@ function CheckoutContent() {
           <Link href="/shop/cart" className="font-medium underline">{fr ? "Modifier le panier" : "Edit cart"}</Link>
         </div>
       )}
+
+      {verification.blocked && <VerificationNotice status={verification} />}
+
+      <DetailSection title={fr ? "Votre commande" : "Your order"}>
+        <OrderLines lines={lines} />
+      </DetailSection>
 
       <DetailSection title={fr ? "Adresse de livraison" : "Delivery Address"}>
         <div className="space-y-3">
@@ -183,6 +193,7 @@ function CheckoutContent() {
         <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={fr ? "Note pour le livreur (optionnel)" : "Note for the rider (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
         <InfoGrid items={[
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
+          ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"}${promoCode ? ` (${promoCode})` : ""}`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
           { label: fr ? "Frais de zone" : "Zone delivery fee", value: zoneMissing ? (fr ? "Choisissez une zone" : "Choose a zone") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
           { label: "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },

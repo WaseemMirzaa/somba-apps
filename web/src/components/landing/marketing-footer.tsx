@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "@/context/locale-context";
 import { BrandMark } from "@/components/landing/brand-mark";
-import { BRAND, MARKET } from "@/lib/config";
+import { BRAND, LEGAL_LINKS, MARKET } from "@/lib/config";
 import { APP_LINKS, PORTALS } from "@/lib/product-landing";
 
 export function MarketingFooter() {
@@ -32,10 +32,11 @@ export function MarketingFooter() {
               {fr ? "Boutique" : "Shop"}
             </h4>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/get-app" className="transition-colors hover:text-white">{fr ? "Tous les produits" : "All products"}</Link></li>
-              <li><a href="#modules" className="transition-colors hover:text-white">{fr ? "Nos services" : "Our services"}</a></li>
+              <li><Link href="/shop/products" className="transition-colors hover:text-white">{fr ? "Tous les produits" : "All products"}</Link></li>
+              <li><Link href="/shop/deals" className="transition-colors hover:text-white">{fr ? "Ventes flash" : "Flash deals"}</Link></li>
+              <li><Link href="/#modules" className="transition-colors hover:text-white">{fr ? "Nos services" : "Our services"}</Link></li>
               <li><Link href="/sell-online" className="transition-colors hover:text-white">{fr ? "Vendre en ligne" : "Sell online"}</Link></li>
-              <li><a href="#portals" className="transition-colors hover:text-white">{fr ? "À propos" : "About us"}</a></li>
+              <li><Link href="/#portals" className="transition-colors hover:text-white">{fr ? "À propos" : "About us"}</Link></li>
             </ul>
           </div>
 
@@ -46,7 +47,7 @@ export function MarketingFooter() {
             <ul className="space-y-3 text-sm">
               {PORTALS.map((p) => (
                 <li key={p.id}>
-                  <Link href="/login" className="transition-colors hover:text-white">
+                  <Link href={p.loginHref} className="transition-colors hover:text-white">
                     {fr ? p.nameFr : p.name}
                   </Link>
                 </li>
@@ -59,33 +60,39 @@ export function MarketingFooter() {
               {fr ? "Applications" : "Apps"}
             </h4>
             <ul className="space-y-3 text-sm">
-              <li>
-                <a href={APP_LINKS.ios} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  iOS — {fr ? "App boutique" : "Shop app"}
-                </a>
-              </li>
-              <li>
-                <a href={APP_LINKS.android} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  Android — {fr ? "App boutique" : "Shop app"}
-                </a>
-              </li>
-              <li>
-                <a href={APP_LINKS.customerApp} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  {fr ? "App boutique client" : "Customer shop app"}
-                </a>
-              </li>
-              <li>
-                <a href={APP_LINKS.riderApp} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
-                  {fr ? "App livreur" : "Rider app"}
-                </a>
-              </li>
-              <li><Link href="/get-app" className="transition-colors hover:text-white">{fr ? "Acheter sur l'app" : "Shop on the app"}</Link></li>
+              {APP_LINKS.ios && (
+                <li>
+                  <a href={APP_LINKS.ios} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
+                    iOS — {fr ? "App boutique" : "Shop app"}
+                  </a>
+                </li>
+              )}
+              {APP_LINKS.android && (
+                <li>
+                  <a href={APP_LINKS.android} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
+                    Android — {fr ? "App boutique" : "Shop app"}
+                  </a>
+                </li>
+              )}
+              {APP_LINKS.riderApp && (
+                <li>
+                  <a href={APP_LINKS.riderApp} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-white">
+                    {fr ? "App livreur" : "Rider app"}
+                  </a>
+                </li>
+              )}
+              <li><Link href="/get-app" className="transition-colors hover:text-white">{fr ? "Obtenir l'app" : "Get the app"}</Link></li>
             </ul>
           </div>
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
           <p className="text-sm">{BRAND.copyright}</p>
+          <nav aria-label={fr ? "Mentions légales" : "Legal"} className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+            {LEGAL_LINKS.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-white">{fr ? l.labelFr : l.label}</Link>
+            ))}
+          </nav>
           <div className="flex gap-6 text-sm">
             <a href={APP_LINKS.contactSupport} className="hover:text-white">{fr ? "Support" : "Support"}</a>
             <Link href="/login" className="hover:text-white">{fr ? "Connexion" : "Login"}</Link>

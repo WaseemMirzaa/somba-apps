@@ -12,7 +12,6 @@ import {
   User,
   Bell,
   RotateCcw,
-  Gift,
   HelpCircle,
   Zap,
   Wallet,
@@ -21,12 +20,13 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { VerificationCard, VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent } from "@/lib/shop-live";
+import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
 import type { BackendUser, Payment } from "@/lib/realtime/types";
 
 const menuItems = [
@@ -38,8 +38,7 @@ const menuItems = [
   { href: "/shop/support", icon: Headphones, title: { en: "Support", fr: "Support" }, desc: { en: "Open or follow a ticket", fr: "Ouvrir ou suivre un ticket" } },
   { href: "/shop/help", icon: HelpCircle, title: { en: "Help", fr: "Aide" }, desc: { en: "FAQ & account deletion", fr: "FAQ et suppression de compte" } },
   { href: "/shop/deals", icon: Zap, title: { en: "Flash deals", fr: "Ventes flash" }, desc: { en: "Limited-time offers", fr: "Offres limitées" } },
-  { href: "/shop/refer", icon: Gift, title: { en: "Refer & earn", fr: "Parrainer et gagner" }, desc: { en: "Coming soon", fr: "Bientôt disponible" } },
-];
+  ];
 
 function ProfileCard() {
   const { locale, setLocale } = useLocale();
@@ -125,6 +124,7 @@ function WalletCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  const verification = useVerificationStatus();
 
   // Live status of the top-up we just started (payment:updated push).
   const payment = reference ? rt.payments.find((p) => p.reference === reference) : undefined;
@@ -176,8 +176,12 @@ function WalletCard() {
             </select>
           </div>
           <input className="input-premium w-full px-4 py-2 text-sm" type="tel" placeholder="+243 8X XXX XXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <Button onClick={topUp} disabled={busy}>{busy ? "…" : fr ? "Envoyer la demande" : "Send request"}</Button>
+          {(verification.blocked || isVerificationError(error)) ? (
+            <VerificationNotice status={verification} serverMessage={isVerificationError(error) ? error : null} />
+          ) : (
+            error && <p role="alert" className="text-sm text-red-600">{error}</p>
+          )}
+          <Button onClick={topUp} disabled={busy || verification.blocked}>{busy ? "…" : fr ? "Envoyer la demande" : "Send request"}</Button>
         </div>
       )}
 
@@ -224,6 +228,7 @@ function AccountContent() {
       />
 
       <ProfileCard />
+      <VerificationCard />
       <WalletCard />
 
       <div className="grid gap-3">

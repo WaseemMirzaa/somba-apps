@@ -77,6 +77,49 @@ export function useOpsQuery<T>(
   );
 }
 
+// ───────────────────────── analytics:warehouse ─────────────────────────
+
+export interface WarehouseAnalytics {
+  totalParcels: number;
+  unassigned: number;
+  inTransit: number;
+  delivered: number;
+  /** COD of parcels not delivered and not failed. */
+  codToCollect: number;
+  byStatus: Record<string, number>;
+  /** Last 7 UTC days, oldest first. */
+  throughput: { date: string; received: number; pickedUp: number; delivered: number }[];
+  /** Average minutes rider pickup to delivery (parcels delivered in the last 30 days); null = no sample. */
+  avgPickupToDeliveryMinutes: number | null;
+  pickupToDeliverySamples: number;
+  failureRatePct: number | null;
+  failed30: number;
+  delivered30: number;
+  agedOver24h: number;
+  /** Per delivery zone, last 30 days. */
+  byZone: { zoneId: string | null; parcels: number; delivered: number; failed: number }[];
+  /** Dispatch batches built per hub in the last 30 days (parcels are not assigned to hubs). */
+  byHub: { hubId: string; hub: string; batches30: number }[];
+}
+
+/** Real warehouse figures from the server (`analytics:warehouse`), refreshed when deliveries or batches change. */
+export function useWarehouseAnalytics() {
+  return useOpsQuery<WarehouseAnalytics | null>("analytics:warehouse", {
+    initial: null,
+    push: ["delivery:updated", "batch:updated"],
+  });
+}
+
+/** "3 h 20 min" / "45 min" from minutes. */
+export function formatMinutes(min: number | null | undefined, fr: boolean): string {
+  if (min == null) return "—";
+  if (min < 1) return fr ? "< 1 min" : "< 1 min";
+  if (min < 60) return `${Math.round(min)} min`;
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 // ───────────────────────── server row shapes ─────────────────────────
 
 export interface WarehouseRider {

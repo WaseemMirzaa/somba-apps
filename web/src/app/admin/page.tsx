@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ShoppingCart,
   DollarSign,
   Users,
   AlertTriangle,
   TrendingUp,
-  Target,
   BarChart3,
   RotateCcw,
   ArrowUpRight,
@@ -17,6 +16,13 @@ import {
   Wallet,
   Scale,
   Package,
+  Percent,
+  Receipt,
+  Truck,
+  CreditCard,
+  Store,
+  ClipboardCheck,
+  PackageX,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -24,173 +30,149 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
-import { DemoBadge } from "@/components/admin/demo-badge";
 import { SellerStatusActions } from "@/components/admin/status-actions";
+import { PeriodTabs, type PeriodDays } from "@/components/admin/period-tabs";
+import { DailyBarChart } from "@/components/admin/series-charts";
+import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
+import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useRealtime } from "@/context/realtime-context";
-import { ORDER_STATUS_BADGE, orderStatusLabel } from "@/lib/admin-live";
-import {
-  DualMetricChart,
-  HorizontalBarChart,
-  GoalProgress,
-  Sparkline,
-} from "@/components/charts/dashboard-charts";
-import {
-  AnalyticsKpiCard,
-  AnalyticsPeriodControls,
-  EMPTY_ANALYTICS_DATE_RANGE,
-} from "@/components/seller/analytics-kpi";
-import type { AnalyticsPeriod, AnalyticsDateRange } from "@/components/seller/analytics-kpi";
 import { useLocale } from "@/context/locale-context";
-import { useAdminData } from "@/lib/admin";
-import {
-  adminRevenueTrend,
-  adminExtendedKpis,
-  adminSellerGrowth,
-  adminCategoryGmv,
-  adminGoals,
-  adminDashboardAlerts,
-  adminReturnMetrics,
-  adminMarketplaceHealth,
-} from "@/lib/admin-analytics";
-import { formatCurrency, formatNumber, cn } from "@/lib/utils";
+import { ORDER_STATUS_BADGE, orderStatusLabel, useServerList } from "@/lib/admin-live";
+import { rankSellers, useSocketQuery, type AdminStatsFull, type RevenuePoint } from "@/lib/admin-stats";
+import type { Seller } from "@/lib/realtime/types";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
-const alertPriorityVariant: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  Critical: "danger",
-  High: "warning",
-  Medium: "info",
-  Low: "default",
+const SEVERITY_VARIANT = { critical: "danger", warning: "warning", info: "info" } as const;
+const SEVERITY_LABEL = {
+  critical: { en: "Critical", fr: "Critique" },
+  warning: { en: "Warning", fr: "Attention" },
+  info: { en: "Info", fr: "Info" },
+} as const;
+
+/** Where each server alert is handled. */
+const ALERT_TARGET: Record<string, { href: string; icon: typeof Truck }> = {
+  unassigned_deliveries: { href: "/admin/fulfillment/deliveries", icon: Truck },
+  pending_payments: { href: "/admin/finance", icon: CreditCard },
+  open_disputes: { href: "/admin/disputes", icon: Scale },
+  payout_requests: { href: "/admin/payouts", icon: Wallet },
+  out_of_stock: { href: "/admin/products", icon: PackageX },
+  low_stock: { href: "/admin/products", icon: Package },
+  products_pending_moderation: { href: "/admin/moderation", icon: ClipboardCheck },
+  sellers_pending: { href: "/admin/sellers", icon: Store },
 };
 
-const alertIcon = {
-  fraud: Shield,
-  returns: RotateCcw,
-  dispute: Scale,
-  payout: Wallet,
-} as const;
+interface AuditItem {
+  id: string;
+  actor: string;
+  action: string;
+  entity: string;
+  createdAt?: string;
+  timestamp?: string;
+}
+interface FraudItem {
+  id: string;
+  status: string;
+}
 
 export default function AdminDashboard() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const [period, setPeriod] = useState<AnalyticsPeriod>("30D");
-  const [dateRange, setDateRange] = useState<AnalyticsDateRange>(EMPTY_ANALYTICS_DATE_RANGE);
-  const { orderEntities, sellerEntities, stats, fraudAlerts, moderationQueue, auditLogs } = useAdminData();
   const rt = useRealtime();
-  const k = adminExtendedKpis;
-  const openDisputes = rt.disputes.filter((d) => d.status === "open").length;
-  const requestedPayouts = rt.payouts.filter((p) => p.status === "requested");
-  const openFraud = fraudAlerts.filter((f) => f.status === "open").length;
-  const pendingProducts = moderationQueue.filter((p) => p.status === "pending").length;
-  const pendingSellers = sellerEntities.filter((s) => s.status === "pending").length;
-  const topSellers = [...sellerEntities].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-  const queue = [...sellerEntities].sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending")).slice(0, 8);
+  const [days, setDays] = useState<PeriodDays>(30);
 
-  const revenueSpark = adminRevenueTrend.map((d) => d.revenue);
-  const ordersSpark = adminRevenueTrend.map((d) => d.orders);
+  // Re-fetch the figures when the live order / payment feed changes.
+  const refreshKey = `${rt.orders.length}:${rt.payments.length}:${rt.payouts.length}:${rt.disputes.length}`;
+  const stats = useSocketQuery<AdminStatsFull>("analytics:admin", undefined, { refreshKey });
+  const series = useSocketQuery<RevenuePoint[]>("analytics:revenue", { days }, { refreshKey });
+  const sellers = useServerList<Seller>("sellers:list", { pushEvents: ["seller:updated"] });
+  const audit = useServerList<AuditItem>("audit:list", { pushEvents: ["audit:created"] });
+  const fraud = useServerList<FraudItem>("fraud:list", { pushEvents: ["fraud:created", "fraud:updated"] });
+
+  const s = stats.data;
+  const openFraud = fraud.items.filter((f) => f.status === "open").length;
+  const pendingSellers = sellers.items.filter((x) => x.status === "pending").length;
+
+  const topSellers = useMemo(() => rankSellers(rt.orders, rt.products, sellers.items).slice(0, 5), [rt.orders, rt.products, sellers.items]);
+
+  const queue = useMemo(
+    () => [...sellers.items].sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending")).slice(0, 8),
+    [sellers.items],
+  );
+
+  const orderRows = rt.orders.slice(0, 5).map((o) => ({ id: o.id, reference: o.reference, customer: o.customerName, amount: o.totalUsd, status: o.status }));
 
   const quickLinks = [
-    { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(stats?.orders ?? orderEntities.length, locale)} ${fr ? "au total" : "total"}`, icon: ShoppingCart },
+    { href: "/admin/orders", label: t("orders"), sub: `${formatNumber(s?.orders ?? rt.orders.length, locale)} ${fr ? "au total" : "total"}`, icon: ShoppingCart },
     { href: "/admin/sellers", label: t("sellers"), sub: `${pendingSellers} ${fr ? "en attente" : "pending"}`, icon: Users },
-    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: `${requestedPayouts.length} ${fr ? "à traiter" : "to process"}`, icon: Wallet },
+    { href: "/admin/payouts", label: fr ? "Versements" : "Payouts", sub: `${rt.payouts.filter((p) => p.status === "requested").length} ${fr ? "à traiter" : "to process"}`, icon: Wallet },
     { href: "/admin/fraud", label: fr ? "Fraude" : "Fraud", sub: `${openFraud} ${fr ? "alertes ouvertes" : "open flags"}`, icon: Shield },
     { href: "/admin/returns", label: fr ? "Retours" : "Returns", sub: `${rt.disputes.filter((d) => d.type === "return" && d.status === "open").length} ${fr ? "ouverts" : "open"}`, icon: RotateCcw },
-    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: `${openDisputes} ${fr ? "ouverts" : "open"}`, icon: Scale },
-    { href: "/admin/moderation", label: fr ? "Modération" : "Moderation", sub: `${pendingProducts} ${fr ? "produits en attente" : "products pending"}`, icon: Package },
-    { href: "/admin/analytics", label: t("analytics"), sub: fr ? "Analyse détaillée (démo)" : "Deep dive (demo)", icon: BarChart3 },
+    { href: "/admin/disputes", label: fr ? "Litiges" : "Disputes", sub: `${s?.pendingDisputes ?? rt.disputes.filter((d) => d.status === "open").length} ${fr ? "ouverts" : "open"}`, icon: Scale },
+    { href: "/admin/moderation", label: fr ? "Modération" : "Moderation", sub: fr ? "File des produits" : "Product queue", icon: Package },
+    { href: "/admin/analytics", label: t("analytics"), sub: fr ? "Analyse détaillée" : "Deep dive", icon: BarChart3 },
   ];
+
+  const change = s?.gmvChangePct;
+  const changeLabel =
+    change === null || change === undefined
+      ? fr ? "pas de période précédente" : "no previous period"
+      : `${change >= 0 ? "+" : ""}${change}% ${fr ? "vs 30 j précédents" : "vs previous 30 days"}`;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Tableau de bord marketplace" : "Marketplace dashboard"}
         subtitle={
-          stats
+          s
             ? fr
-              ? `GMV ${formatCurrency(stats.gmv, locale)} · ${formatNumber(stats.orders, locale)} commandes · ${formatNumber(stats.customers, locale)} clients (en direct)`
-              : `GMV ${formatCurrency(stats.gmv, locale)} · ${formatNumber(stats.orders, locale)} orders · ${formatNumber(stats.customers, locale)} customers (live)`
-            : fr ? "Chargement des indicateurs en direct…" : "Loading live figures…"
+              ? `${formatNumber(s.orders, locale)} commandes · ${formatNumber(s.customers, locale)} clients · ${formatNumber(s.sellers, locale)} vendeurs`
+              : `${formatNumber(s.orders, locale)} orders · ${formatNumber(s.customers, locale)} customers · ${formatNumber(s.sellers, locale)} sellers`
+            : fr ? "Chargement des indicateurs…" : "Loading figures…"
         }
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <AnalyticsPeriodControls
-              period={period}
-              onPeriodChange={setPeriod}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
-            <Link href="/admin/sellers" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
-              {t("approve")} sellers
-            </Link>
-          </div>
+          <Link href="/admin/sellers" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
+            {t("approve")} sellers
+          </Link>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title={fr ? "GMV (en direct)" : "GMV (live)"} value={formatCurrency(stats?.gmv ?? 0, locale)} icon={DollarSign} />
-        <StatCard title={fr ? "Commandes (en direct)" : "Orders (live)"} value={formatNumber(stats?.orders ?? 0, locale)} icon={ShoppingCart} />
-        <StatCard title={fr ? "Commission plateforme (en direct)" : "Platform commission (live)"} value={formatCurrency(stats?.commissionUsd ?? 0, locale)} icon={Wallet} />
-        <StatCard title={fr ? "Produits en ligne (en direct)" : "Live products (live)"} value={formatNumber(stats?.liveProducts ?? 0, locale)} icon={Package} />
-      </div>
+      {stats.error && <SectionError message={stats.error} onRetry={stats.reload} />}
+      {stats.loading && !s && !stats.error && <SectionLoading />}
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-        {fr ? "Indicateurs illustratifs" : "Illustrative indicators"}
-        <DemoBadge fr={fr} />
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <AnalyticsKpiCard title={fr ? "GMV (MTD)" : "GMV (MTD)"} value={formatCurrency(k.gmvMtd, locale)} change={k.gmvChange} spark={revenueSpark} icon={DollarSign} />
-        <AnalyticsKpiCard title={fr ? "Commandes (MTD)" : "Orders (MTD)"} value={formatNumber(k.ordersMtd, locale)} change={k.ordersChange} spark={ordersSpark} icon={ShoppingCart} />
-        <AnalyticsKpiCard title={t("activeSellers")} value={formatNumber(k.activeSellers, locale)} change={k.sellersChange} spark={adminSellerGrowth.map((d) => d.sellers)} icon={Users} />
-        <AnalyticsKpiCard title={fr ? "Clients actifs" : "Active customers"} value={formatNumber(k.activeCustomers, locale)} change={k.customersChange} spark={[42000, 43800, 45100, 46200, 47100, 47800, 48200]} icon={TrendingUp} />
-        <AnalyticsKpiCard title={fr ? "Taux de conversion" : "Conversion rate"} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[3.2, 3.4, 3.5, 3.6, 3.7, 3.75, 3.8]} icon={BarChart3} />
-        <AnalyticsKpiCard title={fr ? "Panier moyen" : "Avg. order value"} value={formatCurrency(k.avgOrderValue, locale)} change={k.aovChange} spark={revenueSpark.map((v, i) => v / Math.max(ordersSpark[i], 1))} icon={Target} />
-        <AnalyticsKpiCard title={fr ? "Taux de retour" : "Return rate"} value={`${k.returnRate}%`} change={k.returnChange} positive={false} spark={[2.4, 2.3, 2.2, 2.2, 2.1, 2.1, 2.1]} icon={RotateCcw} />
-        <AnalyticsKpiCard title={fr ? "Approbations en attente" : "Pending approvals"} value={String(k.pendingApprovals)} change={-12} positive={false} spark={[31, 28, 26, 25, 24, 23, 23]} icon={AlertTriangle} />
-      </div>
+      {s && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard title={fr ? "GMV, 30 derniers jours" : "GMV, last 30 days"} value={formatCurrency(s.gmvLast30, locale)} icon={DollarSign} trend={changeLabel} />
+          <StatCard title={fr ? "Commandes, 30 derniers jours" : "Orders, last 30 days"} value={formatNumber(s.ordersLast30, locale)} icon={ShoppingCart} trend={`${formatNumber(s.ordersToday, locale)} ${fr ? "aujourd'hui" : "today"} · ${formatCurrency(s.gmvToday, locale)}`} />
+          <StatCard title={fr ? "GMV, total" : "GMV, all time"} value={formatCurrency(s.gmv, locale)} icon={TrendingUp} trend={`${fr ? "Panier moyen" : "Avg. order"} ${formatCurrency(s.aov, locale)}`} />
+          <StatCard title={fr ? "Encaissé" : "Collected revenue"} value={formatCurrency(s.revenue, locale)} icon={Receipt} trend={`${fr ? "Remboursé" : "Refunded"} ${formatCurrency(s.refundsUsd, locale)}`} />
+          <StatCard title={fr ? `Commission (${s.commissionPct} %)` : `Commission (${s.commissionPct}%)`} value={formatCurrency(s.commissionUsd, locale)} icon={Percent} />
+          <StatCard title={fr ? "Abonnements vendeurs" : "Seller subscriptions"} value={formatCurrency(s.subscriptionRevenueUsd, locale)} icon={Wallet} />
+          <StatCard title={fr ? "Clients" : "Customers"} value={formatNumber(s.customers, locale)} icon={Users} />
+          <StatCard title={fr ? "Produits en ligne" : "Live products"} value={formatNumber(s.liveProducts, locale)} icon={Package} trend={`${formatNumber(s.sellers, locale)} ${fr ? "vendeurs" : "sellers"}`} />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
-                {fr ? "GMV & commandes" : "GMV & orders"}
-                <DemoBadge fr={fr} />
-              </h2>
-              <p className="text-xs text-slate-500">
-                {fr ? "Tendance revenu marketplace" : "Marketplace revenue trend"} · {period}
-              </p>
+              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Encaissements et commandes" : "Collected revenue & orders"}</h2>
+              <p className="text-xs text-slate-500">{fr ? `Par jour (UTC) · ${days} derniers jours` : `Per day (UTC) · last ${days} days`}</p>
             </div>
-            <Badge variant="success">+{k.gmvChange}%</Badge>
+            <PeriodTabs value={days} onChange={setDays} />
           </CardHeader>
           <CardContent>
-            <DualMetricChart data={adminRevenueTrend} height={240} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Objectifs juin" : "June goals"}<DemoBadge fr={fr} /></h2>
-            <p className="text-xs text-slate-500">{fr ? "Progression mensuelle" : "Monthly progress"}</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <GoalProgress label={fr ? "Objectif GMV" : "GMV goal"} current={adminGoals.gmvCurrent} target={adminGoals.gmvTarget} format={(n) => formatCurrency(n, locale)} />
-            <GoalProgress label={fr ? "Objectif commandes" : "Orders goal"} current={adminGoals.ordersCurrent} target={adminGoals.ordersTarget} />
-            <GoalProgress label={fr ? "Objectif vendeurs" : "Sellers goal"} current={adminGoals.sellersCurrent} target={adminGoals.sellersTarget} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "GMV par catégorie" : "GMV by category"}<DemoBadge fr={fr} /></h2>
-            <p className="text-xs text-slate-500">MTD</p>
-          </CardHeader>
-          <CardContent>
-            <HorizontalBarChart
-              items={adminCategoryGmv.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.gmv }))}
-              valueKey="revenue"
-              labelKey="name"
-              formatValue={(v) => formatCurrency(v, locale)}
-            />
+            {series.error ? (
+              <SectionError message={series.error} onRetry={series.reload} />
+            ) : series.loading && !series.data ? (
+              <SectionLoading />
+            ) : (
+              <DailyBarChart
+                data={(series.data ?? []).map((d) => ({ date: d.date, value: d.revenue, secondary: d.orders }))}
+                valueLabel={fr ? "Encaissé (USD)" : "Collected (USD)"}
+                secondaryLabel={fr ? "Commandes" : "Orders"}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -198,72 +180,68 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Alertes opérationnelles" : "Operational alerts"}<DemoBadge fr={fr} /></h2>
-              <p className="text-xs text-slate-500">{fr ? "Fraude · Retours · Litiges · Versements" : "Fraud · Returns · Disputes · Payouts"}</p>
+              <h2 className="font-semibold text-slate-900">{fr ? "Alertes opérationnelles" : "Operational alerts"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Calculées par le serveur" : "Computed by the server"}</p>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {adminDashboardAlerts.map((alert) => {
-              const Icon = alertIcon[alert.type];
-              return (
-                <Link
-                  key={alert.id}
-                  href={alert.href}
-                  className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 transition-colors hover:border-[var(--primary-tint)] hover:bg-[var(--primary-light)]"
-                >
-                  <div className="rounded-lg bg-amber-50 p-2">
-                    <Icon className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{fr ? alert.titleFr : alert.title}</p>
-                      <Badge variant={alertPriorityVariant[alert.priority] ?? "default"}>
-                        {fr ? alert.priorityFr : alert.priority}
-                      </Badge>
+            {stats.error ? (
+              <SectionError message={stats.error} onRetry={stats.reload} />
+            ) : !s ? (
+              <SectionLoading />
+            ) : s.alerts.length === 0 ? (
+              <EmptyState>{fr ? "Rien à signaler : aucune alerte ouverte." : "All clear: no open alerts."}</EmptyState>
+            ) : (
+              s.alerts.map((alert) => {
+                const target = ALERT_TARGET[alert.kind] ?? { href: "/admin", icon: AlertTriangle };
+                const Icon = target.icon;
+                return (
+                  <Link
+                    key={alert.kind}
+                    href={target.href}
+                    className="flex items-start gap-3 rounded-lg border border-slate-100 p-3 transition-colors hover:border-[var(--primary-tint)] hover:bg-[var(--primary-light)]"
+                  >
+                    <div className={alert.severity === "critical" ? "rounded-lg bg-red-50 p-2" : "rounded-lg bg-amber-50 p-2"}>
+                      <Icon className={alert.severity === "critical" ? "h-4 w-4 text-red-600" : "h-4 w-4 text-amber-600"} />
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500">{fr ? alert.detailFr : alert.detail}</p>
-                    <p className="mt-1 text-xs text-slate-400">{fr ? alert.timeFr : alert.time}</p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400" />
-                </Link>
-              );
-            })}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={SEVERITY_VARIANT[alert.severity]}>{fr ? SEVERITY_LABEL[alert.severity].fr : SEVERITY_LABEL[alert.severity].en}</Badge>
+                        <span className="text-xs font-bold text-slate-900">{alert.count}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-700">{fr ? alert.messageFr : alert.message}</p>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400" />
+                  </Link>
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Top vendeurs" : "Top sellers"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Classés par chiffre d'affaires (en direct)" : "Ranked by revenue (live)"}</p>
-            </div>
-            <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-slate-900">{fr ? "GMV par catégorie" : "GMV by category"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Valeur des articles, commandes non annulées" : "Item value on non-cancelled orders"}</p>
           </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              columns={[
-                {
-                  key: "storeName",
-                  label: fr ? "Vendeur" : "Seller",
-                  render: (row) => (
-                    <Link href={`/admin/sellers/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
-                      {String(row.storeName)}
-                    </Link>
-                  ),
-                },
-                { key: "revenue", label: fr ? "Chiffre d'affaires" : "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
-                { key: "orders", label: t("orders") },
-                { key: "rating", label: fr ? "Note" : "Rating", render: (row) => (Number(row.rating) > 0 ? `★ ${row.rating}` : "—") },
-                { key: "returns", label: fr ? "Retours" : "Returns" },
-              ]}
-              data={topSellers as unknown as Record<string, unknown>[]}
-              emptyMessage={fr ? "Aucun vendeur" : "No sellers yet"}
-              rowAction={(row) => (
-                <Link href={`/admin/sellers/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-              )}
-            />
+          <CardContent>
+            {stats.error ? (
+              <SectionError message={stats.error} onRetry={stats.reload} />
+            ) : !s ? (
+              <SectionLoading />
+            ) : s.gmvByCategory.length === 0 ? (
+              <EmptyState>{fr ? "Aucune vente pour le moment." : "No sales yet."}</EmptyState>
+            ) : (
+              <HorizontalBarChart
+                items={s.gmvByCategory.map((c) => ({ name: `${c.category} · ${c.orders} ${fr ? "cmd" : "orders"}`, gmv: c.gmv }))}
+                valueKey="gmv"
+                labelKey="name"
+                maxBars={8}
+                formatValue={(v) => formatCurrency(v, locale)}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -274,17 +252,81 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { href: "/admin/sellers", label: fr ? "Vendeurs à approuver" : "Sellers to approve", count: pendingSellers },
-              { href: "/admin/moderation", label: fr ? "Produits à modérer" : "Products to moderate", count: pendingProducts },
-              { href: "/admin/payouts", label: fr ? "Versements demandés" : "Payouts requested", count: requestedPayouts.length },
-              { href: "/admin/disputes", label: fr ? "Litiges ouverts" : "Open disputes", count: openDisputes },
-              { href: "/admin/fraud", label: fr ? "Alertes fraude ouvertes" : "Open fraud alerts", count: openFraud },
+              { href: "/admin/sellers", label: fr ? "Vendeurs à approuver" : "Sellers to approve", count: pendingSellers, err: sellers.error },
+              { href: "/admin/payouts", label: fr ? "Versements demandés" : "Payouts requested", count: rt.payouts.filter((p) => p.status === "requested").length },
+              { href: "/admin/disputes", label: fr ? "Litiges ouverts" : "Open disputes", count: s?.pendingDisputes ?? rt.disputes.filter((d) => d.status === "open").length },
+              { href: "/admin/fraud", label: fr ? "Alertes fraude ouvertes" : "Open fraud alerts", count: openFraud, err: fraud.error },
             ].map((action) => (
               <Link key={action.href} href={action.href} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 hover:border-[var(--primary-tint)]">
                 <span className="text-sm text-slate-700">{action.label}</span>
-                <span className="font-bold text-slate-900">{action.count}</span>
+                <span className="font-bold text-slate-900">{action.err ? "!" : action.count}</span>
               </Link>
             ))}
+            {(sellers.error || fraud.error) && <SectionError message={sellers.error ?? fraud.error ?? ""} onRetry={() => { void sellers.reload(); void fraud.reload(); }} />}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-900">{fr ? "Top vendeurs" : "Top sellers"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Classés par chiffre d'affaires (hors annulées et retournées)" : "Ranked by revenue (excluding cancelled and returned)"}</p>
+            </div>
+            <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
+          </CardHeader>
+          <CardContent className="p-0">
+            {sellers.error ? (
+              <div className="p-4"><SectionError message={sellers.error} onRetry={sellers.reload} /></div>
+            ) : sellers.loading ? (
+              <SectionLoading />
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "name",
+                    label: fr ? "Vendeur" : "Seller",
+                    render: (row) => (
+                      <Link href={`/admin/sellers/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
+                        {String(row.name)}
+                      </Link>
+                    ),
+                  },
+                  { key: "revenue", label: fr ? "Chiffre d'affaires" : "Revenue", render: (row) => formatCurrency(row.revenue as number, locale) },
+                  { key: "orderCount", label: t("orders") },
+                  { key: "rating", label: fr ? "Note" : "Rating", render: (row) => (Number(row.rating) > 0 ? `★ ${Number(row.rating).toFixed(1)}` : "—") },
+                ]}
+                data={topSellers as unknown as Record<string, unknown>[]}
+                emptyMessage={fr ? "Aucun vendeur" : "No sellers yet"}
+                rowAction={(row) => (
+                  <Link href={`/admin/sellers/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
+                )}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Activity className="h-4 w-4 text-[var(--primary)]" />
+            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente (journal d'audit)" : "Recent activity (audit log)"}</h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {audit.error ? (
+              <SectionError message={audit.error} onRetry={audit.reload} />
+            ) : audit.loading ? (
+              <SectionLoading />
+            ) : audit.items.length === 0 ? (
+              <EmptyState>{fr ? "Aucune activité" : "No activity yet"}</EmptyState>
+            ) : (
+              audit.items.slice(0, 6).map((item) => (
+                <div key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                  <p className="text-xs text-slate-400">{item.timestamp ?? (item.createdAt ? item.createdAt.slice(0, 16).replace("T", " ") : "")}</p>
+                  <p className="mt-1 break-words text-sm text-slate-700">{item.actor} · {item.action} · {item.entity}</p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
@@ -320,10 +362,10 @@ export default function AdminDashboard() {
             <DataTable
               columns={[
                 {
-                  key: "id",
+                  key: "reference",
                   label: "ID",
                   render: (row) => (
-                    <Link href={`/admin/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+                    <Link href={`/admin/orders/${row.reference}`} className="text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
                   ),
                 },
                 { key: "customer", label: t("customer") },
@@ -338,73 +380,62 @@ export default function AdminDashboard() {
                   ),
                 },
               ]}
-              data={orderEntities.slice(0, 5) as unknown as Record<string, unknown>[]}
+              data={orderRows as unknown as Record<string, unknown>[]}
+              emptyMessage={fr ? "Aucune commande" : "No orders yet"}
               rowAction={(row) => (
-                <Link href={`/admin/orders/${row.id}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
+                <Link href={`/admin/orders/${row.reference}`} className="text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
               )}
             />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Activity className="h-4 w-4 text-[var(--primary)]" />
-            <h2 className="font-semibold text-slate-900">{fr ? "Activité récente (journal d'audit)" : "Recent activity (audit log)"}</h2>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-900">{t("sellerQueue")}</h2>
+              <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {auditLogs.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucune activité" : "No activity yet"}</p>}
-            {auditLogs.slice(0, 6).map((item) => (
-              <div key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                <p className="text-xs text-slate-400">{item.timestamp}</p>
-                <p className="mt-1 text-sm text-slate-700">{item.actor} · {item.action} · {item.entity}</p>
-              </div>
-            ))}
+          <CardContent className="p-0">
+            {sellers.error ? (
+              <div className="p-4"><SectionError message={sellers.error} onRetry={sellers.reload} /></div>
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    key: "name",
+                    label: fr ? "Boutique" : "Store",
+                    render: (row) => (
+                      <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.name)}</Link>
+                    ),
+                  },
+                  {
+                    key: "status",
+                    label: t("status"),
+                    render: (row) => (
+                      <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
+                        {String(row.status)}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    key: "action",
+                    label: t("action"),
+                    render: (row) =>
+                      row.status === "pending" ? (
+                        <SellerStatusActions sellerId={String(row.id)} status="pending" name={String(row.name)} />
+                      ) : (
+                        <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
+                      ),
+                  },
+                ]}
+                data={queue as unknown as Record<string, unknown>[]}
+                emptyMessage={fr ? "Aucun vendeur" : "No sellers yet"}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">{t("sellerQueue")}</h2>
-            <NavLinkButton href="/admin/sellers">{t("viewAll")}</NavLinkButton>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            columns={[
-              {
-                key: "storeName",
-                label: fr ? "Boutique" : "Store",
-                render: (row) => (
-                  <Link href={`/admin/sellers/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.storeName)}</Link>
-                ),
-              },
-              { key: "owner", label: t("name") },
-              {
-                key: "status",
-                label: t("status"),
-                render: (row) => (
-                  <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
-                    {String(row.status)}
-                  </Badge>
-                ),
-              },
-              {
-                key: "action",
-                label: t("action"),
-                render: (row) =>
-                  row.status === "pending" ? (
-                    <SellerStatusActions sellerId={String(row.id)} status="pending" name={String(row.storeName)} />
-                  ) : (
-                    <Link href={`/admin/sellers/${row.id}`} className="text-xs font-medium text-[var(--nav-accent)] hover:underline">{t("view")}</Link>
-                  ),
-              },
-            ]}
-            data={queue as unknown as Record<string, unknown>[]}
-          />
-        </CardContent>
-      </Card>
     </div>
   );
 }

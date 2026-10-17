@@ -50,6 +50,7 @@ export default function SellerPromotionsPage() {
         )},
         { key: "reference", label: fr ? "Référence" : "Reference" },
         { key: "discount", label: fr ? "Remise" : "Discount", render: (row) => `${row.discount}%` },
+        { key: "products", label: fr ? "Produits" : "Products", render: (row) => ((row.productIds as string[] | undefined)?.length ? String(row.products) : fr ? "Tous" : "All") },
         { key: "startDate", label: fr ? "Début" : "Start" },
         { key: "endDate", label: fr ? "Fin" : "End" },
         { key: "status", label: t("status"), render: (row) => (
@@ -60,6 +61,7 @@ export default function SellerPromotionsPage() {
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
+      emptyMessage={fr ? "Aucune campagne. Créez-en une pour proposer une remise sur vos produits." : "No campaigns yet. Create one to offer a discount on your products."}
     />
   );
 }

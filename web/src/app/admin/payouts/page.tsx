@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { Modal, ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/demo-badge";
+import { NoticeBar } from "@/components/admin/notice-bar";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";

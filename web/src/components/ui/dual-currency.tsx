@@ -5,9 +5,9 @@ import { useLocale } from "@/context/locale-context";
 import { formatDualCurrency } from "@/lib/utils";
 
 export function DualCurrency({ amount, className = "" }: { amount: number; className?: string }) {
-  const { profile, showDualCurrency } = useMarket();
+  const { fxRate, showDualCurrency } = useMarket();
   const { locale } = useLocale();
-  const { usd, cdf } = formatDualCurrency(amount, locale, profile.fxRateUsdCdf);
+  const { usd, cdf } = formatDualCurrency(amount, locale, fxRate ?? undefined);
 
   return (
     <span className={className}>

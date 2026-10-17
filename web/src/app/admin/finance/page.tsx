@@ -1,50 +1,34 @@
 "use client";
 
-import { DollarSign, TrendingUp, Wallet, CreditCard, Percent, Scale, Receipt, Banknote } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { DollarSign, Wallet, CreditCard, Percent, Receipt, Banknote, Smartphone, PiggyBank, Tag, Truck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import {
-  DualMetricChart,
-  SegmentDonut,
-  FunnelChart,
-  HorizontalBarChart,
-} from "@/components/charts/dashboard-charts";
-import { useState } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
-import { DemoBadge } from "@/components/admin/demo-badge";
+import { DailyBarChart } from "@/components/admin/series-charts";
+import { NoAccess, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { canMoveMoney, errMsg, useRole, type PaymentRow } from "@/lib/admin-live";
+import { canMoveMoney, canSeeFinance, errMsg, useRole, type PaymentRow } from "@/lib/admin-live";
+import { ageLabel, useSocketQuery, type FinanceStats } from "@/lib/admin-stats";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import {
-  financeKpis,
-  revenueVsPayouts,
-  commissionByCategory,
-  paymentMethodSplit,
-  settlementAging,
-  cashFlowStages,
-  refundReasons,
-} from "@/lib/finance-analytics";
 
 const PAY_STATUS_FR: Record<string, string> = { succeeded: "Réussi", pending: "En attente", failed: "Échoué", refunded: "Remboursé" };
 const PAY_STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "default"> = { succeeded: "success", pending: "warning", failed: "danger", refunded: "default" };
 
-function ChartCard({ title, subtitle, children, className, fr }: { title: string; subtitle?: string; children: React.ReactNode; className?: string; fr?: boolean }) {
+function ChartCard({ title, subtitle, children, className }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
     <Card className={className}>
       <CardHeader>
-        <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
-          {title}
-          <DemoBadge fr={fr} />
-        </h2>
+        <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{title}</h2>
         {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
       </CardHeader>
       <CardContent>{children}</CardContent>
@@ -52,14 +36,29 @@ function ChartCard({ title, subtitle, children, className, fr }: { title: string
   );
 }
 
+const METHOD_LABEL: Record<string, { en: string; fr: string }> = {
+  airtel_money: { en: "Airtel Money", fr: "Airtel Money" },
+  orange_money: { en: "Orange Money", fr: "Orange Money" },
+  vodacom_mpesa: { en: "Vodacom M-Pesa", fr: "Vodacom M-Pesa" },
+  stripe_card: { en: "Card", fr: "Carte" },
+  wallet: { en: "Wallet", fr: "Portefeuille" },
+  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
+};
+function methodLabel(m: string, fr: boolean) {
+  const l = METHOD_LABEL[m];
+  return l ? (fr ? l.fr : l.en) : m.replace(/_/g, " ");
+}
+
 export default function AdminFinancePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const k = financeKpis;
   const rt = useRealtime();
   const role = useRole();
   const { toast } = useToast();
   const mayDecide = canMoveMoney(role);
+  const allowed = canSeeFinance(role);
+  const refreshKey = `${rt.payments.length}:${rt.payouts.length}:${rt.orders.length}`;
+  const fin = useSocketQuery<FinanceStats>("analytics:finance", undefined, { enabled: allowed, refreshKey });
   const payments = (rt.payments as PaymentRow[]).filter((p) => p.purpose !== "topup");
   const pending = payments.filter((p) => p.status === "pending" && p.method !== "cod");
   const [declineTarget, setDeclineTarget] = useState<PaymentRow | null>(null);
@@ -95,102 +94,127 @@ export default function AdminFinancePage() {
     }
   }
 
-  const commissionSegments = commissionByCategory.map((c) => ({ label: fr ? c.labelFr : c.label, pct: c.pct, color: c.color }));
-  const paymentSegments = paymentMethodSplit.map((c) => ({ label: fr ? c.labelFr : c.label, pct: c.pct, color: c.color }));
-  const agingItems = settlementAging.map((b) => ({ name: fr ? b.bucketFr : b.bucket, amount: b.amount }));
-  const reasonItems = refundReasons.map((r) => ({ name: fr ? r.reasonFr : r.reason, count: r.count }));
-  const funnelStages = cashFlowStages.map((s) => ({ stage: fr ? s.stageFr : s.stage, count: s.count, pct: s.pct }));
+  const header = (
+    <PageHeader
+      title={t("finance")}
+      subtitle={fr ? "Chiffre d'affaires, commissions, versements, remboursements et créances" : "Revenue, commission, payouts, refunds & receivables"}
+      breadcrumbs={[adminBreadcrumb(locale), { label: t("finance") }]}
+    />
+  );
+
+  // Only finance and admin may read these figures. The server refuses everyone else.
+  if (rt.user && !allowed) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <NoAccess
+          title={fr ? "Réservé à la finance" : "Finance access only"}
+          detail={
+            fr
+              ? "Les chiffres financiers sont réservés aux rôles admin et finance. Le rôle opérations n'y a pas accès."
+              : "Financial figures are limited to the admin and finance roles. The operations role cannot open them."
+          }
+        />
+      </div>
+    );
+  }
+
+  const f = fin.data;
+  const gmvSeries = (f?.series30 ?? []).map((d) => ({ date: d.date, value: d.gmv, secondary: d.orders }));
+  const collectedSeries = (f?.series30 ?? []).map((d) => ({ date: d.date, value: d.revenue }));
+  const refunds30 = (f?.series30 ?? []).reduce((sum, d) => sum + d.refunds, 0);
+  const collected30 = (f?.series30 ?? []).reduce((sum, d) => sum + d.revenue, 0);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t("finance")}
-        subtitle={fr ? "Chiffre d'affaires, commissions, versements, remboursements et règlements" : "Revenue, commission, payouts, refunds & settlements"}
-        breadcrumbs={[adminBreadcrumb(locale), { label: t("finance") }]}
-      />
+      {header}
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-        {fr ? "Indicateurs" : "Indicators"}
-        <DemoBadge fr={fr} />
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title={fr ? "Chiffre brut" : "Gross revenue"} value={formatCurrency(k.grossRevenue, locale)} icon={DollarSign} trend={`+${k.grossChange}% ${fr ? "cette semaine" : "this week"}`} />
-        <StatCard title={fr ? "Revenu net" : "Net revenue"} value={formatCurrency(k.netRevenue, locale)} icon={TrendingUp} trend={`+${k.netChange}%`} />
-        <StatCard title={fr ? "Commissions" : "Commission earned"} value={formatCurrency(k.commissionEarned, locale)} icon={Percent} trend={`+${k.commissionChange}%`} />
-        <StatCard title={fr ? "Versements en attente" : "Pending payouts"} value={formatCurrency(k.pendingPayouts, locale)} icon={Wallet} />
-        <StatCard title={fr ? "Remboursements (MTD)" : "Refunds (MTD)"} value={formatCurrency(k.refundsMtd, locale)} icon={Receipt} />
-        <StatCard title={fr ? "Paiements en souffrance" : "Outstanding"} value={formatCurrency(k.outstanding, locale)} icon={CreditCard} />
-        <StatCard title={fr ? "Retenue fiscale" : "Tax withheld"} value={formatCurrency(k.taxWithheld, locale)} icon={Banknote} />
-        <StatCard title={fr ? "Gel litiges" : "Dispute hold"} value={formatCurrency(k.disputeHold, locale)} icon={Scale} />
-      </div>
+      {fin.error && <SectionError message={fin.error} onRetry={fin.reload} />}
+      {fin.loading && !f && !fin.error && <SectionLoading />}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <ChartCard
-          fr={fr}
-          className="lg:col-span-2"
-          title={fr ? "Chiffre d'affaires vs versements" : "Revenue vs payouts"}
-          subtitle={fr ? "Barres : chiffre brut · Ligne : versements vendeurs (8 semaines)" : "Bars: gross revenue · Line: seller payouts (8 weeks)"}
-        >
-          <DualMetricChart data={revenueVsPayouts} height={240} />
-        </ChartCard>
+      {f && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title={fr ? "GMV brut (hors annulées)" : "Gross GMV (excl. cancelled)"} value={formatCurrency(f.grossGmvUsd, locale)} icon={DollarSign} trend={`${fr ? "dont livraison" : "incl. delivery"} ${formatCurrency(f.deliveryFeesUsd, locale)}`} />
+            <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)"} />
+            <StatCard title={fr ? `Commission gagnée (${f.commissionPct} %)` : `Commission earned (${f.commissionPct}%)`} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)}`} />
+            <StatCard title={fr ? "Remboursements" : "Refunds"} value={formatCurrency(f.refundsUsd, locale)} icon={Receipt} trend={`${f.refundsCount} ${fr ? "paiement(s)" : "payment(s)"}`} />
+            <StatCard title={fr ? "Versements payés" : "Payouts paid"} value={formatCurrency(f.payouts.paidUsd, locale)} icon={Wallet} trend={`${f.payouts.paidCount} ${fr ? "versement(s)" : "payout(s)"}`} />
+            <StatCard title={fr ? "Versements à payer" : "Payouts owed"} value={formatCurrency(f.payouts.pendingUsd, locale)} icon={PiggyBank} trend={`${f.payouts.requestedCount} ${fr ? "à examiner" : "to review"} · ${f.payouts.pendingCount} ${fr ? "en cours" : "open"}`} />
+            <StatCard title={fr ? "Mobile money en attente" : "Mobile money receivable"} value={formatCurrency(f.receivables.amountUsd, locale)} icon={Smartphone} trend={`${f.receivables.count} ${fr ? "paiement(s)" : "payment(s)"}${f.receivables.count ? ` · ${fr ? "plus ancien" : "oldest"} ${ageLabel(f.receivables.oldestMinutes, fr)}` : ""}`} />
+            <StatCard title={fr ? "COD à encaisser" : "COD outstanding"} value={formatCurrency(f.codOutstandingUsd, locale)} icon={Truck} trend={`${f.codOutstandingCount} ${fr ? "commande(s)" : "order(s)"}`} />
+            <StatCard title={fr ? "Portefeuilles clients (dette)" : "Customer wallet liability"} value={formatCurrency(f.walletLiabilityUsd, locale)} icon={CreditCard} />
+            <StatCard title={fr ? "Abonnements vendeurs" : "Seller subscriptions"} value={formatCurrency(f.subscriptionRevenueUsd, locale)} icon={Wallet} />
+            <StatCard title={fr ? "Remises promo déduites" : "Promo discounts given"} value={formatCurrency(f.promoDiscountsUsd, locale)} icon={Tag} />
+          </div>
 
-        <ChartCard fr={fr} title={fr ? "Commissions par catégorie" : "Commission by category"} subtitle={fr ? "Part des commissions" : "Share of commission earned"}>
-          <SegmentDonut segments={commissionSegments} />
-        </ChartCard>
-      </div>
+          <p className="text-xs text-slate-500">
+            {fr
+              ? `La commission est de ${f.commissionPct} % de la valeur des articles des commandes livrées (la base des versements vendeurs). Les frais des opérateurs mobile money ne sont pas suivis.`
+              : `Commission is ${f.commissionPct}% of the item value of delivered orders (the base seller payouts use). Mobile-money operator fees are not tracked.`}
+          </p>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <ChartCard fr={fr} title={fr ? "Flux de trésorerie" : "Cash flow"} subtitle={fr ? "Du brut au net plateforme" : "Gross → net to platform"}>
-          <FunnelChart stages={funnelStages} />
-        </ChartCard>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartCard
+              title={fr ? "GMV par jour" : "GMV per day"}
+              subtitle={fr ? "30 derniers jours (UTC) · points : commandes" : "Last 30 days (UTC) · dots: orders"}
+            >
+              <DailyBarChart data={gmvSeries} valueLabel="GMV (USD)" secondaryLabel={fr ? "Commandes" : "Orders"} />
+            </ChartCard>
+            <ChartCard
+              title={fr ? "Encaissements par jour" : "Collected per day"}
+              subtitle={`${fr ? "30 derniers jours" : "Last 30 days"} · ${formatCurrency(collected30, locale)} · ${fr ? "remboursé" : "refunded"} ${formatCurrency(refunds30, locale)}`}
+            >
+              <DailyBarChart data={collectedSeries} valueLabel={fr ? "Encaissé (USD)" : "Collected (USD)"} />
+            </ChartCard>
+          </div>
 
-        <ChartCard fr={fr} title={fr ? "Modes de paiement" : "Payment methods"} subtitle={fr ? "Part du volume encaissé" : "Share of collected volume"}>
-          <SegmentDonut segments={paymentSegments} />
-        </ChartCard>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Créances mobile money" : "Mobile-money receivables"}</h2>
+                <p className="text-xs text-slate-500">{fr ? "Débits en attente de l'abonné ou de la finance" : "Charges waiting for the subscriber or finance"}</p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  emptyMessage={fr ? "Aucune créance" : "Nothing outstanding"}
+                  columns={[
+                    { key: "method", label: fr ? "Réseau" : "Network", render: (row) => methodLabel(String(row.method), fr) },
+                    { key: "count", label: fr ? "Nb" : "Count" },
+                    { key: "amountUsd", label: t("amount"), render: (row) => formatCurrency(Number(row.amountUsd), locale) },
+                    { key: "oldestMinutes", label: fr ? "Plus ancien" : "Oldest", render: (row) => ageLabel(Number(row.oldestMinutes), fr) },
+                  ]}
+                  data={f.receivables.byMethod as unknown as Record<string, unknown>[]}
+                />
+              </CardContent>
+            </Card>
 
-        <ChartCard fr={fr} title={fr ? "Ancienneté des règlements" : "Settlement aging"} subtitle={fr ? "Versements en attente par cohorte" : "Pending payouts by age"}>
-          <HorizontalBarChart
-            items={agingItems}
-            valueKey="amount"
-            labelKey="name"
-            formatValue={(v) => formatCurrency(v, locale)}
-          />
-        </ChartCard>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <ChartCard className="lg:col-span-1" title={fr ? "Motifs de remboursement" : "Top refund reasons"} subtitle={fr ? "Nombre ce mois-ci" : "Count this month"}>
-          <HorizontalBarChart items={reasonItems} valueKey="count" labelKey="name" formatValue={(v) => String(v)} />
-        </ChartCard>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
-              {fr ? "Paiements récents (en direct)" : "Recent payments (live)"}
-            </h2>
-          </CardHeader>
-          <CardContent className="p-0">
-            <DataTable
-              emptyMessage={fr ? "Aucun paiement" : "No payments yet"}
-              columns={[
-                { key: "reference", label: t("transaction") },
-                {
-                  key: "orderReference",
-                  label: fr ? "Commande" : "Order",
-                  render: (row) => row.orderId ? <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link> : <span>{fr ? "Recharge" : "Top-up"}</span>,
-                },
-                { key: "method", label: t("type"), render: (row) => <span>{String(row.method).replace(/_/g, " ")}</span> },
-                { key: "amountUsd", label: t("amount"), render: (row) => <span className={row.status === "refunded" ? "text-red-600" : "text-emerald-600"}>{formatCurrency(Number(row.amountUsd), locale)}</span> },
-                { key: "status", label: t("status"), render: (row) => (
-                  <Badge variant={PAY_STATUS_VARIANT[String(row.status)] ?? "default"}>{fr ? (PAY_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
-                )},
-                { key: "createdAt", label: t("date"), render: (row) => <span>{String(row.createdAt).slice(0, 10)}</span> },
-              ]}
-              data={(rt.payments as PaymentRow[]).slice(0, 15) as unknown as Record<string, unknown>[]}
-            />
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
+                  {fr ? "Paiements récents" : "Recent payments"}
+                </h2>
+              </CardHeader>
+              <CardContent className="p-0">
+                <DataTable
+                  emptyMessage={fr ? "Aucun paiement" : "No payments yet"}
+                  columns={[
+                    { key: "reference", label: t("transaction") },
+                    { key: "orderReference", label: fr ? "Objet" : "For", render: (row) => <PaymentSubject row={row as unknown as PaymentRow} fr={fr} /> },
+                    { key: "method", label: t("type"), render: (row) => <span>{methodLabel(String(row.method), fr)}</span> },
+                    { key: "amountUsd", label: t("amount"), render: (row) => <span className={row.status === "refunded" ? "text-red-600" : "text-emerald-600"}>{formatCurrency(Number(row.amountUsd), locale)}</span> },
+                    { key: "status", label: t("status"), render: (row) => (
+                      <Badge variant={PAY_STATUS_VARIANT[String(row.status)] ?? "default"}>{fr ? (PAY_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
+                    )},
+                    { key: "createdAt", label: t("date"), render: (row) => <span>{String(row.createdAt).slice(0, 10)}</span> },
+                  ]}
+                  data={payments.slice(0, 15) as unknown as Record<string, unknown>[]}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       <Card>
         <CardHeader>
@@ -208,12 +232,8 @@ export default function AdminFinancePage() {
             emptyMessage={fr ? "Aucun paiement en attente" : "No pending mobile-money payments"}
             columns={[
               { key: "reference", label: fr ? "Référence" : "Reference" },
-              {
-                key: "orderReference",
-                label: fr ? "Commande" : "Order",
-                render: (row) => row.orderId ? <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link> : <span>{fr ? "Recharge" : "Top-up"}</span>,
-              },
-              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <span>{String(row.method).replace(/_/g, " ")}</span> },
+              { key: "orderReference", label: fr ? "Objet" : "For", render: (row) => <PaymentSubject row={row as unknown as PaymentRow} fr={fr} /> },
+              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <span>{methodLabel(String(row.method), fr)}</span> },
               { key: "amountUsd", label: t("amount"), render: (row) => formatCurrency(Number(row.amountUsd), locale) },
               { key: "createdAt", label: t("date"), render: (row) => <span>{String(row.createdAt).slice(0, 16).replace("T", " ")}</span> },
               {
@@ -264,4 +284,10 @@ export default function AdminFinancePage() {
       </Modal>
     </div>
   );
+}
+
+function PaymentSubject({ row, fr }: { row: PaymentRow; fr: boolean }) {
+  if (row.purpose === "plan") return <span>{fr ? "Abonnement" : "Plan"} {row.subject ?? ""}</span>;
+  if (row.orderId) return <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link>;
+  return <span>{fr ? "Recharge" : "Top-up"}</span>;
 }

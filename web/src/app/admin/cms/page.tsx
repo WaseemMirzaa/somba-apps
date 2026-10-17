@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/demo-badge";
+import { NoticeBar } from "@/components/admin/notice-bar";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";

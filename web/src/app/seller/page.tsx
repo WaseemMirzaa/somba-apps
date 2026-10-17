@@ -6,7 +6,6 @@ import {
   DollarSign,
   ShoppingCart,
   Package,
-  RotateCcw,
   TrendingUp,
   Users,
   Target,
@@ -14,9 +13,10 @@ import {
   Wallet,
   Truck,
   ArrowUpRight,
-  ArrowDownRight,
   Activity,
   BarChart3,
+  Star,
+  XCircle,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -25,88 +25,48 @@ import { PageHeader } from "@/components/ui/page-header";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
   DualMetricChart,
-  RetentionBarChart,
   SegmentDonut,
   FunnelChart,
   HorizontalBarChart,
-  GoalProgress,
-  Sparkline,
 } from "@/components/charts/dashboard-charts";
+import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
+import { GoalsCard } from "@/components/seller/goals-card";
+import { StatTile } from "@/components/seller/stat-tile";
+import { PlanSummary } from "@/components/seller/plan-summary";
 import { useLocale } from "@/context/locale-context";
-import { useSellerGoals } from "@/context/seller-goals-context";
-import { DemoBadge } from "@/components/seller/demo-badge";
-import { useSellerData } from "@/lib/seller";
+import { useSellerData, useSellerLoad } from "@/lib/seller";
 import { campaignStatusLabel, campaignStatusVariant, orderStatusLabel, orderStatusVariant } from "@/lib/seller-labels";
 import {
-  sellerRevenueTrend,
-  sellerRetentionTrend,
-  sellerCustomerSegments,
-  sellerOrderFunnel,
-  sellerExtendedKpis,
-  sellerHealthBreakdown,
-  sellerFulfillmentMetrics,
-  sellerRecentActivity,
+  HEALTH_LABELS,
+  formatHours,
+  healthValue,
+  shortDay,
+  useSellerAnalytics,
+  type AnalyticsDays,
 } from "@/lib/seller-analytics";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
-const PERIODS = ["7D", "30D", "90D"] as const;
+const PERIODS: { label: string; days: AnalyticsDays }[] = [
+  { label: "7D", days: 7 },
+  { label: "30D", days: 30 },
+  { label: "90D", days: 90 },
+];
 
-function KpiCard({
-  title,
-  value,
-  change,
-  positive,
-  spark,
-  icon: Icon,
-  demo,
-}: {
-  title: string;
-  value: string;
-  /** Only passed for illustrative KPIs: live KPIs have no "vs last period" number. */
-  change?: number;
-  positive?: boolean;
-  spark?: number[];
-  icon: React.ComponentType<{ className?: string }>;
-  demo?: boolean;
-}) {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
-  const up = (change ?? 0) >= 0;
-  const good = positive !== undefined ? (positive ? up : !up) : up;
-
-  return (
-    <div className="card-premium p-5">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500">{title}{demo && <DemoBadge />}</p>
-          <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
-          {change !== undefined && (
-            <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
-              {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-              {Math.abs(change)}% {fr ? "vs période précédente" : "vs last period"}
-            </p>
-          )}
-        </div>
-        <div className="grid justify-items-end gap-2">
-          <div className="rounded-xl bg-blue-50 p-2">
-            <Icon className="h-4 w-4 text-[var(--primary)]" />
-          </div>
-          {spark && (
-            <div className="hidden lg:block">
-              <Sparkline values={spark} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+/** "3 min ago" / "il y a 3 min" for the activity feed. */
+function ago(iso: string, fr: boolean): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return fr ? "à l'instant" : "just now";
+  if (mins < 60) return fr ? `il y a ${mins} min` : `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  if (h < 48) return fr ? `il y a ${h} h` : `${h} h ago`;
+  return fr ? `il y a ${Math.round(h / 24)} j` : `${Math.round(h / 24)} d ago`;
 }
 
 export default function SellerDashboard() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30D");
+  const [days, setDays] = useState<AnalyticsDays>(30);
   const {
     sellerStore,
     sellerDashboardStats,
@@ -114,32 +74,15 @@ export default function SellerDashboard() {
     lowStockProducts,
     promotionList,
     sellerFinanceStats,
-    topSellingProducts,
     categoryRevenue,
+    recentActivity,
   } = useSellerData();
+  const load = useSellerLoad();
+  const an = useSellerAnalytics(days);
   const s = sellerDashboardStats;
-  // Headline KPIs: real revenue/orders/AOV/net from the server; the behavioural
-  // metrics (retention, CLV, conversion, funnel…) have no server data yet and
-  // are labelled "Demo data".
-  const liveOrders = sellerOrderList.length;
-  const k = {
-    ...sellerExtendedKpis,
-    mtdRevenue: sellerFinanceStats.revenue,
-    mtdOrders: liveOrders,
-    avgOrderValue: liveOrders > 0 ? Number((sellerFinanceStats.revenue / liveOrders).toFixed(2)) : 0,
-    netEarnings: Number((sellerFinanceStats.revenue - sellerFinanceStats.commissionPaid).toFixed(2)),
-  };
-  const { goals } = useSellerGoals();
-
+  const a = an.data;
   const needsPickup = !sellerStore.pickupAddress;
-
-  const healthLabelsFr: Record<string, string> = {
-    "Fulfillment speed": "Vitesse de traitement",
-    "Return rate": "Taux de retour",
-    "Customer rating": "Note des clients",
-    "Stock availability": "Disponibilité du stock",
-    "Response time": "Temps de réponse",
-  };
+  const periodLabel = fr ? `${days} derniers jours` : `last ${days} days`;
 
   const quickActions = [
     { href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
@@ -148,11 +91,17 @@ export default function SellerDashboard() {
     { href: "/seller/promotions/create", label: fr ? "Demander une promotion" : "Request promotion", sub: fr ? "Booster les ventes" : "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
   ];
 
+  const series = a?.revenueSeries.map((d) => ({ label: shortDay(d.date, fr), revenue: d.revenue, orders: d.orders })) ?? [];
+  const openShipments = sellerOrderList.filter((o) => !["delivered", "cancelled", "returned"].includes(o.orderStatus)).length;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={sellerStore.name}
-        subtitle={fr ? `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Vendeur · ⭐ ${Number(sellerStore.rating).toFixed(1)}` : `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge} Seller · ⭐ ${Number(sellerStore.rating).toFixed(1)}`}
+        subtitle={
+          (fr ? `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge}` : `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge}`) +
+          (Number(sellerStore.rating) > 0 ? ` · ⭐ ${Number(sellerStore.rating).toFixed(1)}` : "")
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/seller/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
@@ -164,6 +113,8 @@ export default function SellerDashboard() {
           </div>
         }
       />
+
+      {load.error && <LoadError message={load.error} onRetry={load.retry} />}
 
       {needsPickup && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -177,247 +128,287 @@ export default function SellerDashboard() {
         </div>
       )}
 
-      {/* KPI grid */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={fr ? "Revenu (total)" : "Revenue (total)"} value={formatCurrency(k.mtdRevenue, locale)} icon={DollarSign} />
-        <KpiCard title={fr ? "Commandes (total)" : "Orders (total)"} value={String(k.mtdOrders)} icon={ShoppingCart} />
-        <KpiCard title={fr ? "Panier moyen" : "Avg. order value"} value={formatCurrency(k.avgOrderValue, locale)} icon={Target} />
-        <KpiCard demo title={fr ? "Taux de conversion" : "Conversion rate"} value={`${k.conversionRate}%`} change={k.conversionChange} spark={[2.8, 3.0, 3.1, 3.2, 3.4, 3.5, 3.8]} icon={BarChart3} />
-        <KpiCard demo title={fr ? "Rétention client" : "Customer retention"} value={`${k.retentionRate}%`} change={k.retentionChange} spark={sellerRetentionTrend.map((d) => d.retention)} icon={RefreshCw} />
-        <KpiCard demo title={fr ? "Clients fidèles" : "Repeat customers"} value={`${k.repeatCustomerRate}%`} change={k.repeatChange} spark={[44, 46, 48, 49, 50, 51, 52]} icon={Users} />
-        <KpiCard demo title={fr ? "Valeur vie client" : "Customer LTV"} value={formatCurrency(k.customerLifetimeValue, locale)} change={k.clvChange} spark={[240, 252, 260, 268, 275, 280, 284]} icon={TrendingUp} />
-        <KpiCard demo title={fr ? "Taux de remboursement" : "Refund rate"} value={`${k.refundRate}%`} change={k.refundChange} positive={false} spark={[1.8, 1.6, 1.5, 1.4, 1.3, 1.2, 1.2]} icon={RotateCcw} />
+      <PlanSummary />
+
+      {/* Period + analytics state */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">
+          {fr ? "Performance" : "Performance"} <span className="text-sm font-medium text-slate-500">· {periodLabel}</span>
+        </h2>
+        <div className="flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label={fr ? "Période" : "Period"}>
+          {PERIODS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={days === p.days}
+              onClick={() => setDays(p.days)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-semibold transition-colors",
+                days === p.days ? "bg-[var(--primary)] text-white" : "text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Main charts row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Revenu et commandes" : "Revenue & orders"} <DemoBadge /></h2>
-              <p className="text-xs text-slate-500">{fr ? "Gains nets (réels)" : "Net earnings (real)"} {formatCurrency(k.netEarnings, locale)}</p>
-            </div>
-            <div className="flex rounded-lg border border-slate-200 p-0.5">
-              {PERIODS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPeriod(p)}
-                  className={cn(
-                    "rounded-md px-3 py-1 text-xs font-semibold transition-colors",
-                    period === p ? "bg-[var(--primary)] text-white" : "text-slate-600 hover:bg-slate-50"
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DualMetricChart data={sellerRevenueTrend} height={240} />
-          </CardContent>
-        </Card>
+      {an.error && <LoadError message={an.error} onRetry={an.retry} />}
+      {an.loading && !a && <SectionLoader />}
 
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-2">
-            <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du mois" : "Monthly goals"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Vos objectifs (enregistrés dans ce navigateur)" : "Your targets (saved in this browser)"}</p>
-            </div>
-            <NavLinkButton href="/seller/settings" className="shrink-0">{fr ? "Modifier" : "Edit"}</NavLinkButton>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {goals.length === 0 ? (
-              <p className="text-sm text-slate-400">{fr ? "Aucun objectif défini. Ajoutez-en dans les paramètres." : "No goals yet — add some in Settings."}</p>
-            ) : (
-              goals.map((g) => (
-                <GoalProgress
-                  key={g.id}
-                  label={fr ? g.labelFr : g.label}
-                  current={g.current}
-                  target={g.target}
-                  unit={g.metric === "percent" ? "%" : ""}
-                  format={g.metric === "currency" ? (n) => formatCurrency(n, locale) : undefined}
+      {a && (
+        <>
+          {/* KPI grid */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile title={fr ? "Revenu" : "Revenue"} value={formatCurrency(a.revenue, locale)} spark={a.revenueSeries.map((d) => d.revenue)} icon={DollarSign} />
+            <StatTile title={fr ? "Commandes" : "Orders"} value={String(a.orders)} spark={a.revenueSeries.map((d) => d.orders)} hint={fr ? `${a.units} unités vendues` : `${a.units} units sold`} icon={ShoppingCart} />
+            <StatTile title={fr ? "Panier moyen" : "Avg. order value"} value={a.orders > 0 ? formatCurrency(a.aov, locale) : "—"} icon={Target} />
+            <StatTile
+              title={fr ? "Vues produit → commandes" : "Product views → orders"}
+              value={a.funnel.views > 0 ? `${a.funnel.conversionPct}%` : "—"}
+              hint={fr ? `${a.funnel.views} vues · ${a.funnel.orders} commandes` : `${a.funnel.views} views · ${a.funnel.orders} orders`}
+              icon={BarChart3}
+            />
+            <StatTile
+              title={fr ? "Acheteurs récurrents" : "Repeat buyers"}
+              value={a.customers.total > 0 ? `${a.customers.repeatRatePct}%` : "—"}
+              hint={fr ? `${a.customers.repeat} sur ${a.customers.total} acheteurs` : `${a.customers.repeat} of ${a.customers.total} buyers`}
+              icon={RefreshCw}
+            />
+            <StatTile
+              title={fr ? "Clients actifs" : "Active customers"}
+              value={String(a.customers.windowActive)}
+              hint={fr ? `${a.customers.windowNew} nouveaux · ${a.customers.windowReturning} fidèles` : `${a.customers.windowNew} new · ${a.customers.windowReturning} returning`}
+              icon={Users}
+            />
+            <StatTile
+              title={fr ? "Taux d'annulation" : "Cancellation rate"}
+              value={a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.cancelRatePct}%` : "—"}
+              hint={fr ? `${a.fulfilment.ordersPlaced} commandes passées` : `${a.fulfilment.ordersPlaced} orders placed`}
+              icon={XCircle}
+            />
+            <StatTile
+              title={fr ? "Note moyenne" : "Average rating"}
+              value={a.reviews.average !== null ? `⭐ ${a.reviews.average.toFixed(1)}` : "—"}
+              hint={fr ? `${a.reviews.count} avis · ${a.reviews.replied} avec réponse` : `${a.reviews.count} reviews · ${a.reviews.replied} replied`}
+              icon={Star}
+            />
+          </div>
+
+          {/* Main charts row */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">{fr ? "Revenu et commandes" : "Revenue & orders"}</h2>
+                <p className="text-xs text-slate-500">
+                  {fr ? "Par jour (UTC), hors commandes annulées ou retournées · " : "Per day (UTC), excluding cancelled or returned orders · "}
+                  {fr ? "gains nets (tout temps) " : "net earnings (all time) "}
+                  {formatCurrency(sellerFinanceStats.revenue - sellerFinanceStats.commissionPaid, locale)}
+                </p>
+              </CardHeader>
+              <CardContent>
+                {a.orders === 0 ? (
+                  <EmptyState>{fr ? "Aucune commande sur cette période." : "No orders in this period."}</EmptyState>
+                ) : (
+                  <DualMetricChart data={series} height={240} />
+                )}
+              </CardContent>
+            </Card>
+
+            <GoalsCard />
+          </div>
+
+          {/* Customers + funnel */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-slate-900">{fr ? "Clients" : "Customers"}</h2>
+                <p className="text-xs text-slate-500">
+                  {fr ? `Acheteurs de la période (${periodLabel}) : nouveaux ou déjà clients` : `Buyers in the period (${periodLabel}): new or returning`}
+                </p>
+              </CardHeader>
+              <CardContent>
+                {a.customers.windowActive === 0 ? (
+                  <EmptyState>{fr ? "Aucun acheteur sur cette période." : "No buyers in this period."}</EmptyState>
+                ) : (
+                  <SegmentDonut
+                    segments={[
+                      { label: fr ? "Nouveaux" : "New", pct: Math.round((a.customers.windowNew / a.customers.windowActive) * 100), color: "#1d4ed8" },
+                      { label: fr ? "Fidèles" : "Returning", pct: Math.round((a.customers.windowReturning / a.customers.windowActive) * 100), color: "#059669" },
+                    ]}
+                  />
+                )}
+                <div className="mt-4 flex gap-4 rounded-xl bg-slate-50 p-4 text-center text-sm">
+                  <div className="flex-1">
+                    <p className="font-bold text-slate-900">{a.customers.total}</p>
+                    <p className="text-xs text-slate-500">{fr ? "Acheteurs (total)" : "Buyers (all time)"}</p>
+                  </div>
+                  <div className="w-px bg-slate-200" />
+                  <div className="flex-1">
+                    <p className="font-bold text-emerald-600">{a.customers.repeat}</p>
+                    <p className="text-xs text-slate-500">{fr ? "Plusieurs commandes" : "Ordered more than once"}</p>
+                  </div>
+                  <div className="w-px bg-slate-200" />
+                  <div className="flex-1">
+                    <p className="font-bold text-[var(--primary)]">{a.customers.repeatRatePct}%</p>
+                    <p className="text-xs text-slate-500">{fr ? "Taux de récurrence" : "Repeat rate"}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-slate-900">{fr ? "Vues produit et commandes" : "Product views vs orders"}</h2>
+                <p className="text-xs text-slate-500">
+                  {fr
+                    ? "Pages produit ouvertes par des clients et visiteurs, comparées aux commandes passées. Les étapes panier et paiement ne sont pas suivies."
+                    : "Product pages opened by shoppers and visitors, against orders placed. Cart and checkout steps are not tracked."}
+                </p>
+              </CardHeader>
+              <CardContent>
+                {a.funnel.views === 0 && a.funnel.orders === 0 ? (
+                  <EmptyState>{fr ? "Pas encore de vues enregistrées sur cette période." : "No views recorded in this period yet."}</EmptyState>
+                ) : (
+                  <FunnelChart
+                    stages={[
+                      { stage: fr ? "Vues produit" : "Product views", count: a.funnel.views, pct: 100 },
+                      { stage: fr ? "Commandes" : "Orders", count: a.funnel.orders, pct: a.funnel.views > 0 ? a.funnel.conversionPct : 0 },
+                    ]}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Health + fulfilment + quick actions */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-slate-900">{fr ? "Score de santé de la boutique" : "Store health score"}</h2>
+                {a.health.score !== null ? (
+                  <p className="text-3xl font-bold text-[var(--primary)]">
+                    {a.health.score}/100 <span className="text-lg text-slate-500">· {fr ? "note" : "grade"} {a.health.grade}</span>
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-500">{fr ? "Pas assez d'activité pour calculer un score." : "Not enough activity to score yet."}</p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {a.health.components.map((h) => {
+                  const [en, frl] = HEALTH_LABELS[h.key] ?? [h.key, h.key];
+                  return (
+                    <div key={h.key}>
+                      <div className="mb-1 flex justify-between gap-2 text-xs">
+                        <span className="text-slate-600">{fr ? frl : en} <span className="text-slate-400">({healthValue(h.key, h.value, fr)})</span></span>
+                        <span className="font-bold text-slate-900">{h.score}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${h.score}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {a.health.components.length > 0 && (
+                  <p className="pt-1 text-[11px] text-slate-400">
+                    {fr ? "Calculé par la plateforme à partir de vos commandes, avis et retours." : "Computed by the platform from your orders, reviews and returns."}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-slate-900">{fr ? "Indicateurs de traitement" : "Fulfilment metrics"}</h2>
+                <p className="text-xs text-slate-500">{fr ? `Commandes passées (${periodLabel})` : `Orders placed (${periodLabel})`}</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { label: fr ? "Délai de préparation" : "Time to pack", value: formatHours(a.fulfilment.avgHoursToReady, fr) },
+                    { label: fr ? "Délai de livraison" : "Time to deliver", value: formatHours(a.fulfilment.avgHoursToDelivered, fr) },
+                    { label: fr ? "Retours" : "Returns", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.returnRatePct}%` : "—" },
+                    { label: fr ? "Litiges" : "Disputes", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.disputeRatePct}%` : "—" },
+                    { label: fr ? "Annulations" : "Cancellations", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.cancelRatePct}%` : "—" },
+                    { label: fr ? "Commandes ouvertes" : "Open orders", value: String(openShipments) },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-lg bg-slate-50 p-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{m.label}</p>
+                      <p className="mt-1 text-lg font-bold text-slate-900">{m.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-slate-900">{fr ? "Actions rapides" : "Quick actions"}</h2>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {quickActions.map((q) => (
+                  <Link
+                    key={q.href}
+                    href={q.href}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition-colors hover:border-blue-200 hover:bg-blue-50/50"
+                  >
+                    <div className={cn("rounded-lg p-2", q.color)}>
+                      <q.icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">{q.label}</p>
+                      <p className="text-xs text-slate-500">{q.sub}</p>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 text-slate-400" />
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Category revenue */}
+          <Card>
+            <CardHeader>
+              <h2 className="font-semibold text-slate-900">{fr ? "Chiffre d'affaires par catégorie" : "Revenue by category"}</h2>
+              <p className="text-xs text-slate-500">{fr ? "Toutes vos ventes (hors annulées / retournées)" : "All your sales (excluding cancelled / returned)"}</p>
+            </CardHeader>
+            <CardContent>
+              {categoryRevenue.length === 0 ? (
+                <EmptyState>{fr ? "Aucune vente pour le moment." : "No sales yet."}</EmptyState>
+              ) : (
+                <HorizontalBarChart
+                  items={categoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.gross }))}
+                  valueKey="revenue"
+                  labelKey="name"
+                  formatValue={(v) => formatCurrency(v, locale)}
                 />
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Retention + customer segments */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="flex items-center gap-2 font-semibold text-slate-900">{fr ? "Rétention client" : "Customer retention"} <DemoBadge /></h2>
-              <p className="text-xs text-slate-500">{fr ? "Taux de rachat d'un mois à l'autre" : "Month-over-month repeat purchase rate"}</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <RetentionBarChart data={sellerRetentionTrend} />
-            <div className="mt-4 flex gap-4 rounded-xl bg-slate-50 p-4 text-center text-sm">
-              <div className="flex-1">
-                <p className="font-bold text-slate-900">1,478</p>
-                <p className="text-xs text-slate-500">{fr ? "Total clients" : "Total customers"}</p>
-              </div>
-              <div className="w-px bg-slate-200" />
-              <div className="flex-1">
-                <p className="font-bold text-emerald-600">891</p>
-                <p className="text-xs text-slate-500">{fr ? "Récurrents (60j)" : "Returning (60d)"}</p>
-              </div>
-              <div className="w-px bg-slate-200" />
-              <div className="flex-1">
-                <p className="font-bold text-amber-600">156</p>
-                <p className="text-xs text-slate-500">{fr ? "À risque" : "At-risk"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="flex items-center gap-2 font-semibold text-slate-900">{fr ? "Segments de clients" : "Customer segments"} <DemoBadge /></h2>
-            <p className="text-xs text-slate-500">{fr ? "Répartition par comportement d'achat" : "Breakdown by purchase behavior"}</p>
-          </CardHeader>
-          <CardContent>
-            <SegmentDonut
-              segments={sellerCustomerSegments.map((seg) => ({
-                label: fr ? seg.labelFr : seg.label,
-                pct: seg.pct,
-                color: seg.color,
-              }))}
-            />
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {sellerCustomerSegments.map((seg) => (
-                <div key={seg.id} className="rounded-lg border border-slate-100 p-3">
-                  <p className="text-xs text-slate-500">{fr ? seg.labelFr : seg.label}</p>
-                  <p className="text-lg font-bold text-slate-900">{seg.value.toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Funnel + category revenue */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h2 className="flex items-center gap-2 font-semibold text-slate-900">{fr ? "Entonnoir de conversion" : "Conversion funnel"} <DemoBadge /></h2>
-            <p className="text-xs text-slate-500">{fr ? "Vues → livré (30 derniers jours)" : "Views → delivered (last 30 days)"}</p>
-          </CardHeader>
-          <CardContent>
-            <FunnelChart
-              stages={sellerOrderFunnel.map((f) => ({
-                stage: fr ? f.stageFr : f.stage,
-                count: f.count,
-                pct: f.pct,
-              }))}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Chiffre d'affaires par catégorie" : "Revenue by category"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "Ventes réelles (hors annulées / retournées)" : "Real sales (excluding cancelled / returned)"}</p>
-          </CardHeader>
-          <CardContent>
-            <HorizontalBarChart
-              items={categoryRevenue.map((c) => ({ name: fr ? c.categoryFr : c.category, revenue: c.gross }))}
-              valueKey="revenue"
-              labelKey="name"
-              formatValue={(v) => formatCurrency(v, locale)}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Health + fulfillment + quick actions */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <h2 className="flex items-center gap-2 font-semibold text-slate-900">{fr ? "Score de santé de la boutique" : "Store health score"} <DemoBadge /></h2>
-            <p className="text-3xl font-bold text-[var(--primary)]">{s.healthScore}%</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {sellerHealthBreakdown.map((h) => (
-              <div key={h.label}>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-slate-600">{fr ? healthLabelsFr[h.label] ?? h.label : h.label}</span>
-                  <span className="font-bold text-slate-900">{h.score}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${h.score}%` }} />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="flex items-center gap-2 font-semibold text-slate-900">{fr ? "Indicateurs de traitement" : "Fulfillment metrics"} <DemoBadge /></h2>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: fr ? "Livraison à temps" : "On-time delivery", value: `${sellerFulfillmentMetrics.onTimeDelivery}%` },
-                { label: fr ? "Expédition moy." : "Avg dispatch", value: `${sellerFulfillmentMetrics.avgDispatchHours}h` },
-                { label: fr ? "Taux de retour" : "Return rate", value: `${sellerFulfillmentMetrics.returnRate}%` },
-                { label: fr ? "Annulation" : "Cancellation", value: `${sellerFulfillmentMetrics.cancellationRate}%` },
-                { label: fr ? "Expéditions ouvertes" : "Open shipments", value: String(sellerFulfillmentMetrics.openShipments) },
-                { label: fr ? "Note moy." : "Avg rating", value: `⭐ ${sellerFulfillmentMetrics.avgRating}` },
-              ].map((m) => (
-                <div key={m.label} className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{m.label}</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">{m.value}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Actions rapides" : "Quick actions"}</h2>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {quickActions.map((a) => (
-              <Link
-                key={a.href}
-                href={a.href}
-                className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition-colors hover:border-blue-200 hover:bg-blue-50/50"
-              >
-                <div className={cn("rounded-lg p-2", a.color)}>
-                  <a.icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-900">{a.label}</p>
-                  <p className="text-xs text-slate-500">{a.sub}</p>
-                </div>
-                <ArrowUpRight className="h-4 w-4 text-slate-400" />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Products chart + activity + orders */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="font-semibold text-slate-900">{fr ? "Meilleurs produits" : "Top products"}</h2>
+            <div>
+              <h2 className="font-semibold text-slate-900">{fr ? "Meilleurs produits" : "Top products"}</h2>
+              <p className="text-xs text-slate-500">{periodLabel}</p>
+            </div>
             <NavLinkButton href="/seller/analytics/products">{fr ? "Détails" : "Details"}</NavLinkButton>
           </CardHeader>
           <CardContent>
-            <HorizontalBarChart
-              items={topSellingProducts.map((p) => ({ name: p.name, sold: p.soldCount }))}
-              valueKey="sold"
-              labelKey="name"
-              formatValue={(v) => fr ? `${v} vendus` : `${v} sold`}
-            />
+            {!a || a.topProducts.length === 0 ? (
+              <EmptyState>{a ? (fr ? "Aucune vente sur cette période." : "No sales in this period.") : fr ? "Chargement…" : "Loading…"}</EmptyState>
+            ) : (
+              <HorizontalBarChart
+                items={a.topProducts.map((p) => ({ name: p.name, sold: p.units }))}
+                valueKey="sold"
+                labelKey="name"
+                formatValue={(v) => (fr ? `${v} vendus` : `${v} sold`)}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -425,20 +416,23 @@ export default function SellerDashboard() {
           <CardHeader className="flex flex-row items-center gap-2">
             <Activity className="h-4 w-4 text-[var(--primary)]" />
             <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
-            <DemoBadge />
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3">
-              {sellerRecentActivity.map((a, i) => (
-                <li key={i} className="flex gap-3 border-b border-slate-50 pb-3 last:border-0 last:pb-0">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
-                  <div>
-                    <p className="text-sm text-slate-800">{fr ? a.textFr : a.text}</p>
-                    <p className="text-xs text-slate-400">{fr ? a.timeFr : a.time}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {recentActivity.length === 0 ? (
+              <EmptyState>{fr ? "Rien pour le moment." : "Nothing yet."}</EmptyState>
+            ) : (
+              <ul className="space-y-3">
+                {recentActivity.map((e, i) => (
+                  <li key={`${e.kind}-${e.at}-${i}`} className="flex gap-3 border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
+                    <div className="min-w-0">
+                      <Link href={e.href} className="block break-words text-sm text-slate-800 hover:text-[var(--primary)]">{fr ? e.textFr : e.text}</Link>
+                      <p className="text-xs text-slate-400">{ago(e.at, fr)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
 

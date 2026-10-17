@@ -11,7 +11,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SecretBox } from "@/components/admin/copy-box";
 import { ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/demo-badge";
+import { NoticeBar } from "@/components/admin/notice-bar";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";

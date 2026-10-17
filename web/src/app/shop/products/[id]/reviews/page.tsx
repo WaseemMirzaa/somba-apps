@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Star, ThumbsUp } from "lucide-react";
@@ -11,10 +11,8 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import type { Review } from "@/lib/realtime/types";
+import { useProductReviews, type LiveReview } from "@/lib/shop-live";
 import { cn } from "@/lib/utils";
-
-type LiveReview = Review & { helpful?: number };
 
 export default function ProductReviewsPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,29 +22,15 @@ export default function ProductReviewsPage() {
   const fr = locale === "fr";
   const rt = useRealtime();
   const product = useProduct(id);
-  const [reviews, setReviews] = useState<LiveReview[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const { reviews, loaded, error, reload, put, patch } = useProductReviews(id);
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [saving, setSaving] = useState(false);
   const [voted, setVoted] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (!id || rt.status !== "connected") return;
-    let alive = true;
-    socketClient
-      .request<LiveReview[]>("reviews:list", { productId: id })
-      .then((list) => alive && setReviews(list))
-      .catch(() => alive && setReviews([]))
-      .finally(() => alive && setLoaded(true));
-    return () => {
-      alive = false;
-    };
-  }, [id, rt.status]);
-
   if (!product) {
-    const loading = rt.status !== "connected" || !loaded;
+    const loading = rt.status !== "connected" || (!loaded && !error);
     return <div className="text-center text-slate-500">{loading ? (fr ? "Chargement…" : "Loading…") : fr ? "Produit introuvable" : "Product not found"}</div>;
   }
 
@@ -67,7 +51,7 @@ export default function ProductReviewsPage() {
     setSaving(true);
     try {
       const created = await socketClient.request<LiveReview>("reviews:create", { productId: id, rating, text: reviewText.trim() });
-      setReviews((cur) => [created, ...cur.filter((r) => r.id !== created.id)]);
+      put(created);
       setShowForm(false);
       setRating(0);
       setReviewText("");
@@ -87,7 +71,7 @@ export default function ProductReviewsPage() {
     try {
       await rt.markReviewHelpful(reviewId);
       setVoted((v) => [...v, reviewId]);
-      setReviews((cur) => cur.map((r) => (r.id === reviewId ? { ...r, helpful: (r.helpful ?? 0) + 1 } : r)));
+      patch(reviewId, (r: LiveReview) => ({ ...r, helpful: (r.helpful ?? 0) + 1 }));
     } catch (e) {
       toast((e as Error).message, "error");
     }
@@ -125,7 +109,14 @@ export default function ProductReviewsPage() {
         </div>
       )}
 
-      {loaded && reviews.length === 0 && (
+      {error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}{" "}
+          <button type="button" onClick={() => void reload()} className="font-medium underline">{fr ? "Réessayer" : "Retry"}</button>
+        </div>
+      )}
+
+      {loaded && !error && reviews.length === 0 && (
         <div className="card-premium p-8 text-center text-sm text-slate-500">
           {fr ? "Aucun avis pour le moment. Soyez le premier !" : "No reviews yet. Be the first!"}
           <div className="mt-3">
@@ -147,9 +138,18 @@ export default function ProductReviewsPage() {
                 <p className="font-semibold">{r.author}</p>
                 <p className="text-sm text-amber-500">{"★".repeat(r.rating)}</p>
               </div>
-              <span className="ml-auto text-xs text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
+              <span className="ml-auto text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</span>
             </div>
             <p className="mt-3 text-sm text-slate-700">{r.text}</p>
+            {r.sellerReply && (
+              <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+                <p className="text-xs font-semibold text-slate-700">
+                  {fr ? "Réponse du vendeur" : "Seller reply"}
+                  {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
+                </p>
+                <p className="mt-1 text-slate-600">{r.sellerReply}</p>
+              </div>
+            )}
             <button
               onClick={() => helpful(r.id)}
               disabled={voted.includes(r.id)}

@@ -83,7 +83,17 @@ export default function SellerProductsPage() {
         )},
         { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => (fr ? String(row.categoryFr ?? row.category) : String(row.category)) },
         { key: "sku", label: "SKU" },
-        { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },
+        { key: "price", label: fr ? "Prix" : "Price", render: (row) => (
+          <span>
+            {formatCurrency(row.price as number, locale)}
+            {row.priceSource !== "base" && (
+              <span className="ml-1.5 block text-xs font-medium text-emerald-700 sm:inline" title={row.campaignName ? String(row.campaignName) : undefined}>
+                {formatCurrency(row.effectivePrice as number, locale)}{" "}
+                {row.priceSource === "campaign" ? `(-${row.campaignPct}%)` : fr ? "(flash)" : "(flash)"}
+              </span>
+            )}
+          </span>
+        )},
         { key: "availableStock", label: "Stock" },
         { key: "soldCount", label: fr ? "Vendus" : "Sold" },
         { key: "rating", label: fr ? "Note" : "Rating", render: (row) => (Number(row.rating) > 0 ? `⭐ ${Number(row.rating).toFixed(1)}` : "—") },

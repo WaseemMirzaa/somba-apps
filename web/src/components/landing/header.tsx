@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, ShoppingCart, User, Menu, X, Heart, Bell, LogOut } from "lucide-react";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
-import { useMarket } from "@/context/market-context";
 import { useState, FormEvent } from "react";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
@@ -20,7 +19,6 @@ export function LandingHeader() {
   const [query, setQuery] = useState("");
   const router = useRouter();
   const { cartCount } = useShop();
-  const { profileId, setProfileId } = useMarket();
   const rt = useRealtime();
   const { logout } = useAuth();
   const signedIn = !!rt.user;
@@ -55,6 +53,7 @@ export function LandingHeader() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("searchPlaceholder")}
+                aria-label={t("searchPlaceholder")}
                 className="input-premium w-full py-3 pl-11 pr-4 text-sm shadow-sm"
               />
               <SearchAutocomplete query={query} onSelect={() => setMobileOpen(false)} />
@@ -69,6 +68,8 @@ export function LandingHeader() {
             <div className="hidden items-center gap-1 rounded-xl border border-[var(--border)] bg-slate-50 p-1 sm:flex">
               <button
                 onClick={() => setLocale("en")}
+                aria-label="English"
+                aria-pressed={locale === "en"}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold transition-all",
                   locale === "en" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
@@ -78,6 +79,8 @@ export function LandingHeader() {
               </button>
               <button
                 onClick={() => setLocale("fr")}
+                aria-label="Français"
+                aria-pressed={locale === "fr"}
                 className={cn(
                   "rounded-lg px-2.5 py-1 text-xs font-semibold transition-all",
                   locale === "fr" ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500"
@@ -87,15 +90,6 @@ export function LandingHeader() {
               </button>
             </div>
 
-            <select
-              value={profileId}
-              onChange={(e) => setProfileId(e.target.value as "france" | "drc")}
-              className="hidden rounded-lg border border-[var(--border)] bg-slate-50 px-2 py-1 text-xs font-medium lg:block"
-              title={locale === "fr" ? "Profil de marché" : "Market profile"}
-            >
-              <option value="france">FR</option>
-              <option value="drc">DRC</option>
-            </select>
             {signedIn && (
               <Link
                 href="/shop/notifications"
@@ -119,6 +113,7 @@ export function LandingHeader() {
               href="/shop/account"
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)] sm:block"
               title={t("myAccount")}
+              aria-label={t("myAccount")}
             >
               <User className="h-5 w-5" />
             </Link>
@@ -134,12 +129,14 @@ export function LandingHeader() {
             )}
             <Link
               href="/shop/wishlist"
+              aria-label={locale === "fr" ? "Liste de souhaits" : "Wishlist"}
               className="hidden rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-red-500 sm:block"
             >
               <Heart className="h-5 w-5" />
             </Link>
             <Link
               href="/shop/cart"
+              aria-label={`${locale === "fr" ? "Panier" : "Cart"}${cartCount > 0 ? ` (${cartCount})` : ""}`}
               className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[var(--primary)]"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -153,6 +150,8 @@ export function LandingHeader() {
             <button
               className="rounded-xl p-2.5 md:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? (locale === "fr" ? "Fermer le menu" : "Close menu") : (locale === "fr" ? "Ouvrir le menu" : "Open menu")}
+              aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -167,6 +166,7 @@ export function LandingHeader() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("searchPlaceholder")}
+                aria-label={t("searchPlaceholder")}
                 className="input-premium w-full px-4 py-2.5 text-sm"
               />
             </form>

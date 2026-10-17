@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useCatalog } from "@/lib/catalog";
+import { useCatalog, priceView, type PriceView } from "@/lib/catalog";
 
 /**
  * A cart line. `id` IS the live backend product id, so checkout can send
@@ -184,7 +184,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   // Subtotal at LIVE catalogue prices (the server prices the order the same way).
   const subtotal = useMemo(() => {
     const byId = new Map(catalog.map((p) => [p.id, p.price]));
-    return cart.reduce((s, i) => s + (byId.get(i.id) ?? i.price) * i.qty, 0);
+    return Math.round(cart.reduce((s, i) => s + (byId.get(i.id) ?? i.price) * i.qty, 0) * 100) / 100;
   }, [cart, catalog]);
 
   const applyPromo = useCallback(
@@ -309,16 +309,26 @@ export function useShop() {
   return ctx;
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export type CartLine = CartItem & {
   /** Live unit price from the catalogue (falls back to the price saved in the cart). */
   livePrice: number;
   stock: number | null;
   /** The product is no longer live in the catalogue. */
   unavailable: boolean;
+  /** Struck-through price / badge for the live price (null when the product left the catalogue). */
+  priceInfo: PriceView | null;
 };
 
 /** Cart lines enriched with the live catalogue (price, stock, availability). */
-export function useCartLines(): { lines: CartLine[]; subtotal: number; hasUnavailable: boolean } {
+export function useCartLines(): {
+  lines: CartLine[];
+  subtotal: number;
+  hasUnavailable: boolean;
+  /** What the campaigns / flash sales currently save on this cart (already inside `subtotal`). */
+  savings: number;
+} {
   const { cart } = useShop();
   const rt = useRealtime();
   const catalog = useCatalog();
@@ -332,12 +342,16 @@ export function useCartLines(): { lines: CartLine[]; subtotal: number; hasUnavai
         livePrice: p ? p.price : i.price,
         stock: p ? p.stock : null,
         unavailable: catalogReady && (!p || p.stock <= 0),
+        priceInfo: p ? priceView(p) : null,
       };
     });
     return {
       lines,
-      subtotal: lines.reduce((s, l) => s + l.livePrice * l.qty, 0),
+      subtotal: round2(lines.reduce((s, l) => s + l.livePrice * l.qty, 0)),
       hasUnavailable: lines.some((l) => l.unavailable),
+      savings: round2(
+        lines.reduce((s, l) => (l.priceInfo && l.priceInfo.source !== "base" && l.priceInfo.was ? s + (l.priceInfo.was - l.livePrice) * l.qty : s), 0),
+      ),
     };
   }, [cart, catalog, rt.status]);
 }

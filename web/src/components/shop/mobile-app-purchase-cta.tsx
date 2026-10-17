@@ -7,6 +7,8 @@ import { APP_LINKS } from "@/lib/product-landing";
 export function MobileAppPurchaseCta() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  // No store links configured yet: nothing to advertise.
+  if (!APP_LINKS.ios && !APP_LINKS.android) return null;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -20,13 +22,13 @@ export function MobileAppPurchaseCta() {
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {fr
-              ? "Commandez aussi depuis l'application Somba&Teka : même compte, même panier de commandes, suivi en direct."
+              ? "Commandez aussi depuis l'application Somba&Teka : même compte, suivi en direct."
               : "You can also order from the Somba&Teka app: same account, same orders, live tracking."}
           </p>
         </div>
       </div>
       <div className="mt-5 flex flex-wrap gap-3">
-        <a
+        {APP_LINKS.ios && <a
           href={APP_LINKS.ios}
           target="_blank"
           rel="noopener noreferrer"
@@ -34,8 +36,8 @@ export function MobileAppPurchaseCta() {
         >
           <Smartphone className="h-4 w-4" />
           App Store
-        </a>
-        <a
+        </a>}
+        {APP_LINKS.android && <a
           href={APP_LINKS.android}
           target="_blank"
           rel="noopener noreferrer"
@@ -43,7 +45,7 @@ export function MobileAppPurchaseCta() {
         >
           <Smartphone className="h-4 w-4" />
           Google Play
-        </a>
+        </a>}
       </div>
     </div>
   );

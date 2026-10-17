@@ -1,37 +1,44 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { sellerGoals } from "@/lib/seller-analytics";
+import type { SellerAnalytics } from "@/lib/seller-analytics";
 
-/** How a goal's current/target values are rendered. */
-export type GoalMetric = "currency" | "number" | "percent";
+/**
+ * Personal targets for the last 30 days. Only the TARGET is stored (in this
+ * browser: the server has no goals feature); the "current" value is always the
+ * live figure from `analytics:seller`, never something typed by hand.
+ */
+export type GoalMetric = "revenue" | "orders" | "rating" | "repeat";
 
 export type SellerGoal = {
   id: string;
-  label: string;
-  labelFr: string;
   metric: GoalMetric;
-  current: number;
   target: number;
 };
+
+export const GOAL_METRICS: {
+  value: GoalMetric;
+  label: string;
+  labelFr: string;
+  kind: "currency" | "number" | "rating" | "percent";
+  /** Current value, from the 30-day analytics (null = no data to judge yet). */
+  current: (a: SellerAnalytics) => number | null;
+}[] = [
+  { value: "revenue", label: "Revenue (30 days)", labelFr: "Revenu (30 jours)", kind: "currency", current: (a) => a.revenue },
+  { value: "orders", label: "Orders (30 days)", labelFr: "Commandes (30 jours)", kind: "number", current: (a) => a.orders },
+  { value: "rating", label: "Average rating", labelFr: "Note moyenne", kind: "rating", current: (a) => a.reviews.average },
+  { value: "repeat", label: "Repeat buyers", labelFr: "Clients récurrents", kind: "percent", current: (a) => (a.customers.total > 0 ? a.customers.repeatRatePct : null) },
+];
 
 type SellerGoalsContextType = {
   goals: SellerGoal[];
   goalsReady: boolean;
   /** Replace the whole set of goals (used by the settings editor). */
   saveGoals: (next: SellerGoal[]) => void;
-  /** Restore the default monthly goals. */
-  resetGoals: () => void;
 };
 
-const STORAGE_KEY = "somba-teka-seller-goals";
-
-/** Seeded from the seller analytics data so the dashboard looks the same on first load. */
-const DEFAULT_GOALS: SellerGoal[] = [
-  { id: "revenue", label: "Revenue goal", labelFr: "Objectif revenu", metric: "currency", current: sellerGoals.revenueCurrent, target: sellerGoals.revenueTarget },
-  { id: "orders", label: "Orders goal", labelFr: "Objectif commandes", metric: "number", current: sellerGoals.ordersCurrent, target: sellerGoals.ordersTarget },
-  { id: "retention", label: "Retention goal", labelFr: "Objectif rétention", metric: "percent", current: sellerGoals.retentionCurrent, target: sellerGoals.retentionTarget },
-];
+const STORAGE_KEY = "somba-teka-seller-goals-v2";
+const VALID = new Set<string>(GOAL_METRICS.map((m) => m.value));
 
 const SellerGoalsContext = createContext<SellerGoalsContextType | null>(null);
 
@@ -40,7 +47,7 @@ export function newGoalId() {
 }
 
 export function SellerGoalsProvider({ children }: { children: React.ReactNode }) {
-  const [goals, setGoals] = useState<SellerGoal[]>(DEFAULT_GOALS);
+  const [goals, setGoals] = useState<SellerGoal[]>([]);
   const [goalsReady, setGoalsReady] = useState(false);
 
   useEffect(() => {
@@ -48,10 +55,17 @@ export function SellerGoalsProvider({ children }: { children: React.ReactNode })
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setGoals(parsed);
+        if (Array.isArray(parsed)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring browser-stored targets once on mount
+          setGoals(
+            parsed.filter(
+              (g): g is SellerGoal => !!g && VALID.has(g.metric) && Number.isFinite(Number(g.target)) && Number(g.target) > 0,
+            ),
+          );
+        }
       }
     } catch {
-      /* ignore */
+      /* storage unavailable: no goals */
     }
     setGoalsReady(true);
   }, []);
@@ -65,17 +79,8 @@ export function SellerGoalsProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  const resetGoals = useCallback(() => {
-    setGoals(DEFAULT_GOALS);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   return (
-    <SellerGoalsContext.Provider value={{ goals, goalsReady, saveGoals, resetGoals }}>
+    <SellerGoalsContext.Provider value={{ goals, goalsReady, saveGoals }}>
       {children}
     </SellerGoalsContext.Provider>
   );

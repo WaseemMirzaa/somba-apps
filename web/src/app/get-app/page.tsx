@@ -22,19 +22,18 @@ export default function GetAppPage() {
     if (/iPad|iPhone|iPod/i.test(ua)) platform = "ios";
     else if (/android/i.test(ua)) platform = "android";
 
-    if (platform === "ios") {
+    const target = platform === "ios" ? APP_LINKS.ios : platform === "android" ? APP_LINKS.android : null;
+    if (target) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRedirecting(true);
-      window.location.href = APP_LINKS.ios;
-    } else if (platform === "android") {
-      setRedirecting(true);
-      window.location.href = APP_LINKS.android;
+      window.location.href = target;
     }
   }, []);
 
   const features = [
-    { icon: Truck, en: "1–3 day delivery with live tracking", fr: "Livraison 1–3 jours avec suivi en direct" },
+    { icon: Truck, en: "Live delivery tracking", fr: "Suivi de livraison en direct" },
     { icon: ShieldCheck, en: "Mobile money & wallet", fr: "Mobile money et portefeuille" },
-    { icon: RotateCcw, en: "Easy 7-day returns", fr: "Retours faciles sous 7 jours" },
+    { icon: RotateCcw, en: "Returns within 7 days", fr: "Retours sous 7 jours" },
   ];
 
   return (
@@ -61,11 +60,13 @@ export default function GetAppPage() {
                 ? "Redirection vers la boutique d'applications…"
                 : "Taking you to the app store…"
               : fr
-                ? "Parcourez, achetez, suivez et retournez vos commandes depuis l'application mobile — ou commandez directement sur le site."
-                : "Browse, buy, track and return your orders from the mobile app — or order right here on the website."}
+                ? "Parcourez, achetez, suivez et retournez vos commandes depuis l'application mobile, ou commandez directement sur le site."
+                : "Browse, buy, track and return your orders from the mobile app, or order right here on the website."}
           </p>
 
+          {APP_LINKS.ios || APP_LINKS.android ? (
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+            {APP_LINKS.ios && (
             <a
               href={APP_LINKS.ios}
               target="_blank"
@@ -75,6 +76,8 @@ export default function GetAppPage() {
               <Smartphone className="h-5 w-5" />
               {fr ? "App Store" : "Download — App Store"}
             </a>
+            )}
+            {APP_LINKS.android && (
             <a
               href={APP_LINKS.android}
               target="_blank"
@@ -84,7 +87,13 @@ export default function GetAppPage() {
               <Smartphone className="h-5 w-5" />
               {fr ? "Google Play" : "Get it — Google Play"}
             </a>
+            )}
           </div>
+          ) : (
+            <p className="mt-9 rounded-xl bg-white/10 px-5 py-3 text-sm text-white/90 ring-1 ring-white/20">
+              {fr ? "Les liens de téléchargement ne sont pas encore publiés. Commandez dès maintenant sur le site." : "The download links are not published yet. You can order on the website right now."}
+            </p>
+          )}
 
           <Link href="/shop/products" className="mt-6 inline-block text-sm font-semibold text-white underline underline-offset-4">
             {fr ? "Ou acheter sur le site →" : "Or shop on the website →"}

@@ -26,6 +26,50 @@ export interface ShopProduct {
   stock: number;
   deliveryDays: number;
   description: string;
+  /** The stored listing price (before any flash sale / campaign). */
+  basePrice: number;
+  campaignPct: number;
+  campaignName: string | null;
+  priceSource: "base" | "flash" | "campaign";
+}
+
+/** What a price tag shows: the price charged, the struck-through price and the badge. */
+export interface PriceView {
+  price: number;
+  /** Struck-through price (null when nothing was reduced). */
+  was: number | null;
+  /** Discount badge percent (0 = no badge). */
+  pct: number;
+  source: "base" | "flash" | "campaign";
+  campaignName: string | null;
+}
+
+/**
+ * One rule for every price tag (cards, detail, cart, checkout): the price is the
+ * one the server charges; the struck-through price is the normal listing price
+ * (`basePrice`) when a campaign or flash sale lowered it, otherwise the
+ * seller's own "was" price; the badge is the campaign percent, or the real
+ * percent between the two prices.
+ */
+export function priceView(p: {
+  price: number;
+  basePrice?: number;
+  originalPrice?: number;
+  discount?: number;
+  campaignPct?: number;
+  campaignName?: string | null;
+  priceSource?: "base" | "flash" | "campaign";
+}): PriceView {
+  const source = p.priceSource ?? "base";
+  const base = p.basePrice ?? p.originalPrice ?? p.price;
+  if (source === "campaign" && base > p.price) {
+    return { price: p.price, was: base, pct: p.campaignPct || Math.round((1 - p.price / base) * 100), source, campaignName: p.campaignName ?? null };
+  }
+  if (source === "flash" && base > p.price) {
+    return { price: p.price, was: base, pct: Math.round((1 - p.price / base) * 100), source, campaignName: null };
+  }
+  const was = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : null;
+  return { price: p.price, was, pct: p.discount ?? (was ? Math.round((1 - p.price / was) * 100) : 0), source: "base", campaignName: null };
 }
 
 export function toShopProduct(p: Product): ShopProduct {
@@ -46,6 +90,10 @@ export function toShopProduct(p: Product): ShopProduct {
     stock: p.stock ?? 0,
     deliveryDays: p.deliveryDays ?? 3,
     description: p.description ?? "",
+    basePrice: p.basePrice ?? p.price,
+    campaignPct: p.campaignPct ?? 0,
+    campaignName: p.campaignName ?? null,
+    priceSource: p.priceSource ?? "base",
   };
 }
 
@@ -102,6 +150,10 @@ export function productDetailFrom(p: ShopProduct) {
     price: p.price,
     originalPrice: p.originalPrice,
     discount: p.discount,
+    basePrice: p.basePrice,
+    campaignPct: p.campaignPct,
+    campaignName: p.campaignName,
+    priceSource: p.priceSource,
     rating: p.rating,
     reviews: p.reviews,
     stock: p.stock,

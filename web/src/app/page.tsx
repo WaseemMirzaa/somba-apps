@@ -17,10 +17,6 @@ import {
   Shield,
   Sparkles,
   Smartphone,
-  Quote,
-  Clock,
-  Users,
-  TrendingUp,
   ChevronRight,
   BadgeCheck,
   Wallet,
@@ -39,18 +35,16 @@ import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import {
   APP_LINKS,
-  SELLER_PLANS,
-  PLATFORM_STATS,
   PRODUCT_HERO,
   CONVERSION_PATHS,
   HOW_IT_WORKS,
-  TESTIMONIALS,
   PORTAL_SECTION,
   MODULES_SECTION,
   PLATFORM_MODULES,
 } from "@/lib/product-landing";
 import { BRAND } from "@/lib/config";
-import { useCatalog, useShopCategories } from "@/lib/catalog";
+import { useCatalog, useShopCategories, priceView } from "@/lib/catalog";
+import { useSellerPlans } from "@/lib/shop-live";
 import { formatCurrency } from "@/lib/utils";
 import type { UserRole } from "@/lib/portal-access";
 import { cn } from "@/lib/utils";
@@ -63,12 +57,10 @@ const MODULE_ICONS = {
 } as const;
 
 const MARQUEE_ITEMS = [
-  { icon: Truck, en: "1–3 day delivery", fr: "Livraison 1–3 jours" },
-  { icon: ShieldCheck, en: "Buyer protection", fr: "Protection acheteur" },
-  { icon: RotateCcw, en: "7-day returns", fr: "Retours 7 jours" },
+  { icon: Truck, en: "Live delivery tracking", fr: "Suivi de livraison en direct" },
+  { icon: RotateCcw, en: "7-day returns", fr: "Retours sous 7 jours" },
   { icon: Wallet, en: "Mobile money · Wallet", fr: "Mobile money · Portefeuille" },
   { icon: BadgeCheck, en: "Verified sellers", fr: "Vendeurs vérifiés" },
-  { icon: Headphones, en: "24/7 support", fr: "Assistance 24h/24, 7j/7" },
   { icon: Globe, en: "Bilingual FR / EN", fr: "Bilingue FR / EN" },
 ] as const;
 
@@ -103,7 +95,6 @@ export default function HomePage() {
   const role = persona.role as UserRole;
   const [explorePortal, setExplorePortal] = useState<string | undefined>(undefined);
   const [query, setQuery] = useState("");
-  const [showBar, setShowBar] = useState(true);
 
   function handleExplorePortal(portalId: string) {
     setExplorePortal(portalId);
@@ -120,29 +111,22 @@ export default function HomePage() {
   const sellPath = CONVERSION_PATHS.find((p) => p.id === "seller")!;
   const staffPath = CONVERSION_PATHS.find((p) => p.id === "staff")!;
   const heroProducts = products.slice(0, 2);
+  const { plans, error: plansError, reload: reloadPlans } = useSellerPlans();
+  const topRated = [...products]
+    .sort((a, b) => (b.reviews > 0 ? b.rating : 0) - (a.reviews > 0 ? a.rating : 0) || b.reviews - a.reviews)
+    .slice(0, 8);
+  const cheapestPaid = (plans ?? []).filter((p) => p.priceUsd != null && p.priceUsd > 0).sort((a, b) => (a.priceUsd as number) - (b.priceUsd as number))[0];
+  // Real figures only: what the live catalogue says right now (the list is capped at 500 rows).
+  const PAGE = 500;
+  const storeCount = new Set(products.map((p) => p.sellerId).filter(Boolean)).size;
+  const liveStats = [
+    { value: products.length >= PAGE ? `${PAGE}+` : String(products.length), label: "Products on sale", labelFr: "Produits en vente" },
+    { value: String(storeCount), label: "Stores with products", labelFr: "Boutiques avec des produits" },
+    { value: String(categories.length), label: "Categories", labelFr: "Catégories" },
+  ];
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── ANNOUNCEMENT BAR ── */}
-      {showBar && (
-        <div className="announce-bar relative z-[60]">
-          <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-10 py-2 text-center text-xs font-medium sm:text-sm">
-            <Sparkles className="hidden h-4 w-4 sm:block" />
-            <span>{fr ? "Livraison gratuite sur votre première commande" : "Free delivery on your first order"}</span>
-            <Link href="/shop/products" className="font-bold underline underline-offset-2">
-              {fr ? "Acheter →" : "Shop now →"}
-            </Link>
-            <button
-              onClick={() => setShowBar(false)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/80 hover:bg-white/15 hover:text-white"
-              aria-label={fr ? "Fermer" : "Dismiss"}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
       <MarketingHeader />
 
       {/* ── HERO ── */}
@@ -237,9 +221,9 @@ export default function HomePage() {
                     sizes="320px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  {heroProducts[1].discount > 0 && (
+                  {priceView(heroProducts[1]).pct > 0 && (
                   <span className="absolute left-3 top-3 rounded-full bg-[var(--brand-red)] px-2.5 py-1 text-[10px] font-bold text-white shadow">
-                    -{heroProducts[1].discount}%
+                    -{priceView(heroProducts[1]).pct}%
                   </span>
                   )}
                 </div>
@@ -290,16 +274,6 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Floating chips */}
-            <div className="showcase-chip float-b absolute -bottom-5 right-6 flex items-center gap-2 px-3.5 py-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary-light)]">
-                <Truck className="h-4 w-4 text-[var(--primary)]" />
-              </span>
-              <div>
-                <p className="text-sm font-extrabold leading-none text-slate-900">{fr ? "Livraison rapide" : "Fast delivery"}</p>
-                <p className="text-[11px] text-slate-500">{fr ? "1–3 jours" : "1–3 days"}</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -360,16 +334,18 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex items-end justify-between gap-4">
             <SectionIntro
-              label={fr ? "Sélection" : "Trending"}
-              title={fr ? "Produits populaires" : "Trending this week"}
-              desc={fr ? "Les articles les mieux notés par nos acheteurs." : "Top-rated picks loved by shoppers right now."}
+              label={fr ? "Sélection" : "Top rated"}
+              title={fr ? "Les mieux notés" : "Top-rated products"}
+              desc={fr ? "Classés selon les notes laissées par nos acheteurs." : "Ranked by the ratings shoppers have left."}
             />
             <Link href="/shop/products" className="mb-1 hidden shrink-0 items-center gap-1 text-sm font-semibold text-[var(--primary)] hover:underline sm:inline-flex">
               {fr ? "Boutique complète" : "Full shop"} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
-            {products.slice(0, 8).map((p) => (
+            {topRated.map((p) => {
+              const pv = priceView(p);
+              return (
               <Link key={p.id} href={`/shop/products/${p.id}`} className="pcard group block">
                 <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-[var(--primary-light)]">
                   <Image
@@ -379,30 +355,36 @@ export default function HomePage() {
                     sizes="(max-width: 1024px) 50vw, 280px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  {p.discount > 0 && (
+                  {pv.pct > 0 && (
                     <span className="absolute left-3 top-3 rounded-lg bg-[var(--brand-red)] px-2.5 py-1 text-xs font-bold text-white shadow-md">
-                      -{p.discount}%
+                      -{pv.pct}%
                     </span>
                   )}
-                  <span className="absolute right-3 top-3 flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-xs font-bold text-amber-600 shadow-sm">
-                    <Star className="h-3 w-3 fill-current" />
-                    {p.rating}
-                  </span>
+                  {p.reviews > 0 && (
+                    <span className="absolute right-3 top-3 flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-xs font-bold text-amber-700 shadow-sm">
+                      <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                      {p.rating}
+                    </span>
+                  )}
                 </div>
                 <div className="p-4">
                   <p className="line-clamp-1 text-sm font-bold text-slate-900 group-hover:text-[var(--primary)]">{fr ? p.nameFr : p.name}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{p.seller}</p>
                   <div className="mt-2.5 flex items-baseline gap-2">
                     <span className="font-[family-name:var(--font-display)] text-lg font-extrabold text-[var(--primary)]">
-                      {formatCurrency(p.price, locale)}
+                      {formatCurrency(pv.price, locale)}
                     </span>
-                    {p.originalPrice > p.price && (
-                      <span className="text-xs text-slate-400 line-through">{formatCurrency(p.originalPrice, locale)}</span>
+                    {pv.was != null && (
+                      <s className="text-xs text-slate-500">
+                        <span className="sr-only">{fr ? "Ancien prix " : "Was "}</span>
+                        {formatCurrency(pv.was, locale)}
+                      </s>
                     )}
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -524,15 +506,11 @@ export default function HomePage() {
               </h3>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-white/80">{fr ? sellPath.descFr : sellPath.desc}</p>
               <div className="mt-6 flex flex-wrap gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <Clock className="h-3.5 w-3.5" /> {fr ? "En ligne en 24 h" : "Live in 24 hours"}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <Users className="h-3.5 w-3.5" /> {fr ? "48K+ clients" : "48K+ customers"}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
-                  <TrendingUp className="h-3.5 w-3.5" /> {fr ? "Dès 49 $/mois" : "From $49/mo"}
-                </span>
+                {cheapestPaid && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/15">
+                    {fr ? `Dès ${cheapestPaid.priceUsd} $/mois` : `From $${cheapestPaid.priceUsd}/mo`}
+                  </span>
+                )}
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
@@ -634,11 +612,11 @@ export default function HomePage() {
       {/* ── STATS BAND ── */}
       <section className="py-20">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
-            {PLATFORM_STATS.map((stat) => (
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+            {liveStats.map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className="big-stat text-gradient-brand text-5xl lg:text-6xl">{stat.value}</p>
-                <p className="mt-3 text-sm font-semibold text-slate-500">{fr ? stat.labelFr : stat.label}</p>
+                <p className="mt-3 text-sm font-semibold text-slate-600">{fr ? stat.labelFr : stat.label}</p>
               </div>
             ))}
           </div>
@@ -658,79 +636,63 @@ export default function HomePage() {
                 : "Open your store — pick a plan and start selling to customers nationwide."
             }
           />
+          {plansError ? (
+            <p role="alert" className="mx-auto mt-12 max-w-md text-center text-sm text-red-700">
+              {plansError}{" "}
+              <button type="button" onClick={reloadPlans} className="font-medium underline">{fr ? "Réessayer" : "Retry"}</button>
+            </p>
+          ) : !plans ? (
+            <p className="mx-auto mt-12 text-center text-sm text-slate-500">{fr ? "Chargement des plans…" : "Loading plans…"}</p>
+          ) : (
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-3">
-            {SELLER_PLANS.map((plan) => (
+            {plans.map((plan) => {
+              const features = (fr && plan.featuresFr?.length ? plan.featuresFr : plan.features) ?? [];
+              const contact = plan.priceUsd === null;
+              return (
               <div key={plan.id} className={cn("landing-pricing-card flex flex-col p-7", plan.popular && "landing-pricing-card--popular")}>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">{plan.name}</h3>
+                  <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">{fr && plan.nameFr ? plan.nameFr : plan.name}</h3>
                   {plan.popular && (
                     <span className="rounded-full bg-[var(--brand-red)] px-2 py-0.5 text-[10px] font-bold text-white">
                       {fr ? "Populaire" : "Popular"}
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-slate-500">{plan.desc}</p>
                 <p className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold text-slate-900">
-                  {plan.price !== null ? `$${plan.price}` : fr ? "Sur mesure" : "Custom"}
-                  {plan.price !== null && <span className="text-sm font-medium text-slate-500">/mo</span>}
+                  {contact ? (fr ? "Sur mesure" : "Custom") : plan.priceUsd === 0 ? (fr ? "Gratuit" : "Free") : `$${plan.priceUsd}`}
+                  {!contact && (plan.priceUsd as number) > 0 && (
+                    <span className="text-sm font-medium text-slate-500">/{plan.months === 1 ? (fr ? "mois" : "mo") : fr ? `${plan.months} mois` : `${plan.months} mo`}</span>
+                  )}
                 </p>
+                {plan.maxProducts != null && (
+                  <p className="mt-2 text-sm text-slate-500">{fr ? `Jusqu'à ${plan.maxProducts} produits` : `Up to ${plan.maxProducts} products`}</p>
+                )}
                 <ul className="mt-6 flex-1 space-y-2.5">
-                  {plan.features.map((f) => (
+                  {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--primary)]" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--primary)]" aria-hidden="true" />
                       {f}
                     </li>
                   ))}
                 </ul>
                 <Link
-                  href={plan.id === "enterprise" ? APP_LINKS.contactSupport : "/login"}
+                  href={contact ? APP_LINKS.contactSupport : "/sell-online"}
                   className={cn(
                     "mt-7 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold",
                     plan.popular ? "btn-primary" : "border border-slate-200 text-slate-800 hover:bg-slate-50"
                   )}
                 >
-                  {plan.id === "enterprise" ? (fr ? "Nous contacter" : "Contact sales") : fr ? "S'abonner" : "Get started"}
+                  {contact ? (fr ? "Nous contacter" : "Contact sales") : fr ? "Voir le plan" : "See the plan"}
                 </Link>
               </div>
-            ))}
+              );
+            })}
           </div>
+          )}
           <Link href="/sell-online" className="mx-auto mt-8 flex w-fit items-center gap-1.5 text-sm font-bold text-[var(--primary)] hover:underline">
             {fr ? "En savoir plus sur la vente en ligne" : "Learn more about selling online"}
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ── */}
-      <section className="py-20">
-        <div className="mx-auto max-w-7xl px-4">
-          <SectionIntro
-            center
-            label={fr ? "Témoignages" : "Testimonials"}
-            title={fr ? "Ce que disent nos clients" : "Loved by shoppers & sellers"}
-          />
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="landing-testimonial p-7">
-                <Quote className="absolute right-5 top-5 h-9 w-9 text-[var(--primary-tint)]" />
-                <div className="flex gap-1 text-amber-400">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-current" />
-                  ))}
-                </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{fr ? t.quoteFr : t.quote}&rdquo;</p>
-                <div className="mt-6 flex items-center gap-3 border-t border-[var(--border)] pt-5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] text-xs font-bold text-white shadow-md">
-                    {t.initials}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{fr ? t.roleFr : t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -762,8 +724,8 @@ export default function HomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-lg text-white/75">
             {fr
-              ? "Parcourez des milliers de produits ou ouvrez votre boutique sur Somba&Teka."
-              : "Browse thousands of products or open your seller store on Somba&Teka."}
+              ? "Parcourez les produits ou ouvrez votre boutique sur Somba&Teka."
+              : "Browse the products or open your seller store on Somba&Teka."}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
@@ -777,7 +739,9 @@ export default function HomePage() {
               {fr ? "Vendre en ligne" : "Sell online"}
             </Link>
           </div>
+          {(APP_LINKS.ios || APP_LINKS.android) && (
           <div className="mt-10 flex flex-wrap justify-center gap-4">
+            {APP_LINKS.ios && (
             <a
               href={APP_LINKS.ios}
               target="_blank"
@@ -786,6 +750,8 @@ export default function HomePage() {
             >
               <Smartphone className="h-4 w-4" /> App Store
             </a>
+            )}
+            {APP_LINKS.android && (
             <a
               href={APP_LINKS.android}
               target="_blank"
@@ -794,7 +760,9 @@ export default function HomePage() {
             >
               <Smartphone className="h-4 w-4" /> Google Play
             </a>
+            )}
           </div>
+          )}
         </div>
       </section>
 

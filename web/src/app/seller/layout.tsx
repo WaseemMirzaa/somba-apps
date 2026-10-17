@@ -14,14 +14,12 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
   // exists, so it sits outside the portal guard and the store gate.
   if (pathname === "/seller/register") return <>{children}</>;
 
-  const isSubscribe = pathname === "/seller/subscribe";
-
   return (
     <PortalGuard>
       <SellerDataProvider>
         <SellerStoreGate>
           <SellerGoalsProvider>
-            {isSubscribe ? children : <DashboardLayout portal="seller">{children}</DashboardLayout>}
+            <DashboardLayout portal="seller">{children}</DashboardLayout>
           </SellerGoalsProvider>
         </SellerStoreGate>
       </SellerDataProvider>

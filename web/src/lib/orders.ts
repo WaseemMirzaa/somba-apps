@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useCatalog } from "@/lib/catalog";
-import type { Dispute, Order } from "@/lib/realtime/types";
+import type { Dispute, Order, Payment } from "@/lib/realtime/types";
 
 const STATUS_FLOW = [
   "pending",
@@ -30,15 +30,20 @@ export interface OrderDetail {
   customerPhone: string;
   customerAddress: string;
   date: string;
+  /** Total charged (what the server computed). */
   amount: number;
+  subtotal: number;
+  deliveryFee: number;
+  /** Promo-code discount already deducted. */
+  discount: number;
+  /** Campaign discount already deducted from the subtotal. */
+  campaignDiscount: number;
+  /** Raw payment method id (`cod`, `wallet`, `airtel_money`...). */
+  paymentMethodId: string;
   paymentMethod: string;
-  paymentStatus: string;
+  /** From the order's payment record: paid, refunded, failed or pending. */
+  paymentStatus: "paid" | "refunded" | "failed" | "pending";
   status: string;
-  seller: string;
-  rider: string;
-  warehouse: string;
-  trackingNumber: string;
-  transactionId: string;
   itemsCount: number;
   items: {
     productId: string;
@@ -47,6 +52,9 @@ export interface OrderDetail {
     variant: string;
     qty: number;
     price: number;
+    /** Normal price when a campaign or flash sale lowered the charged price. */
+    listPrice: number | null;
+    campaignPct: number;
     image: string;
   }[];
   timeline: { label: string; time: string; done: boolean }[];
@@ -69,10 +77,29 @@ function parseAddress(raw: string | null): string {
   return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "—";
 }
 
-/** Map a live backend Order to the storefront order-detail shape. */
-export function toOrderDetail(o: Order): OrderDetail {
+const when = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString();
+};
+
+/** Map a live backend Order (+ its payment record) to the storefront order-detail shape. */
+export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
   const idx = STATUS_FLOW.indexOf(o.status as (typeof STATUS_FLOW)[number]);
   const date = new Date(o.createdAt).toLocaleDateString();
+  const ended = o.status === "cancelled" || o.status === "returned";
+  const paymentStatus: OrderDetail["paymentStatus"] =
+    payment?.status === "succeeded" ? "paid" : payment?.status === "refunded" ? "refunded" : payment?.status === "failed" ? "failed" : "pending";
+  // The server records only creation and last-update times, so only those two steps carry a time.
+  const timeline: OrderDetail["timeline"] = ended
+    ? [
+        { label: "pending", time: when(o.createdAt), done: true },
+        { label: o.status, time: when(o.updatedAt), done: true },
+      ]
+    : STATUS_FLOW.map((s, i) => ({
+        label: s,
+        time: i === 0 ? when(o.createdAt) : i === idx ? when(o.updatedAt) : "",
+        done: idx < 0 ? false : i <= idx,
+      }));
   return {
     id: o.id,
     reference: o.reference,
@@ -81,21 +108,14 @@ export function toOrderDetail(o: Order): OrderDetail {
     customerAddress: parseAddress(o.shippingAddress),
     date,
     amount: o.totalUsd,
+    subtotal: o.subtotalUsd,
+    deliveryFee: o.deliveryFeeUsd,
+    discount: o.discountUsd ?? 0,
+    campaignDiscount: o.campaignDiscountUsd ?? 0,
+    paymentMethodId: o.paymentMethod,
     paymentMethod: PAYMENT_LABEL[o.paymentMethod] ?? o.paymentMethod,
-    paymentStatus:
-      o.status === "cancelled" || o.status === "returned"
-        ? "refunded"
-        : idx >= 1 && o.paymentMethod !== "cod"
-          ? "paid"
-          : o.paymentMethod === "cod" && o.status === "delivered"
-            ? "paid"
-            : "pending",
+    paymentStatus: ended && paymentStatus === "paid" ? "refunded" : paymentStatus,
     status: o.status,
-    seller: "Somba&Teka",
-    rider: o.riderId ? "Assigned rider" : "—",
-    warehouse: "Kinshasa Hub",
-    trackingNumber: o.reference,
-    transactionId: `TXN-${o.reference}`,
     itemsCount: o.items?.reduce((s, i) => s + i.qty, 0) ?? 0,
     items: (o.items ?? []).map((it) => ({
       productId: it.productId,
@@ -104,25 +124,25 @@ export function toOrderDetail(o: Order): OrderDetail {
       variant: it.variant,
       qty: it.qty,
       price: it.priceUsd,
+      listPrice: it.listPriceUsd != null && it.listPriceUsd > it.priceUsd ? it.listPriceUsd : null,
+      campaignPct: it.campaignPct ?? 0,
       image: "",
     })),
-    timeline: STATUS_FLOW.map((s, i) => ({
-      label: s.replace(/_/g, " "),
-      time: i <= idx ? date : "",
-      done: idx < 0 ? false : i <= idx,
-    })),
+    timeline,
   };
 }
 
 /** The signed-in customer's live orders (list rows), with product images. */
 export function useMyOrders(): OrderDetail[] {
-  const { orders } = useRealtime();
+  const { orders, payments } = useRealtime();
   const catalog = useCatalog();
   return useMemo(() => {
     const byId = new Map(catalog.map((p) => [p.id, p.image]));
     const byName = new Map(catalog.map((p) => [p.name, p.image]));
+    const payByOrder = new Map<string, Payment>();
+    for (const p of payments) if (p.orderId && !payByOrder.has(p.orderId)) payByOrder.set(p.orderId, p);
     return orders.map((o) => {
-      const d = toOrderDetail(o);
+      const d = toOrderDetail(o, payByOrder.get(o.id));
       d.items = d.items.map((it) => ({
         ...it,
         image:
@@ -132,7 +152,7 @@ export function useMyOrders(): OrderDetail[] {
       }));
       return d;
     });
-  }, [orders, catalog]);
+  }, [orders, payments, catalog]);
 }
 
 /** A single live order by id (uuid), with product images. */
@@ -180,6 +200,12 @@ const STATUS_FR: Record<string, string> = {
 /** Customer-facing label for an order status (EN is the status with spaces). */
 export function orderStatusLabel(status: string, fr: boolean): string {
   return fr ? (STATUS_FR[status] ?? status) : status.replace(/_/g, " ");
+}
+
+/** Same, with a capital first letter (timelines and headings). */
+export function orderStatusTitle(status: string, fr: boolean): string {
+  const l = orderStatusLabel(status, fr);
+  return l.charAt(0).toUpperCase() + l.slice(1);
 }
 
 /** Statuses in which the customer may still cancel (the server refuses anything else). */

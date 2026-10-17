@@ -9,22 +9,16 @@ import { ProductImage } from "@/components/seller/product-image";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
-import { useSellerData } from "@/lib/seller";
+import { useSellerData, useSellerPlan, type SellerProductRow } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
 import type { Product } from "@/lib/realtime/types";
+import { formatCurrency } from "@/lib/utils";
 
 const STEPS = [
   { en: "Basic Info", fr: "Infos de base" },
   { en: "Photo", fr: "Photo" },
   { en: "Pricing & stock", fr: "Prix et stock" },
   { en: "Review", fr: "Vérification" },
-];
-
-const FALLBACK_CATEGORIES = [
-  { name: "Electronics", nameFr: "Électronique" },
-  { name: "Fashion", nameFr: "Mode" },
-  { name: "Home", nameFr: "Maison" },
-  { name: "Beauty", nameFr: "Beauté" },
 ];
 
 type FormState = {
@@ -38,14 +32,30 @@ type FormState = {
   image: string;
 };
 
-function initialForm(p?: Product | null): FormState {
+/**
+ * The form is filled with the STORED list price (`basePrice`), never the price
+ * shoppers currently pay: while a campaign or flash sale runs, `price` is the
+ * discounted one and `originalPrice` is the "was" price, neither of which must
+ * be written back as the list price / compare-at price.
+ */
+function listPriceOf(p: SellerProductRow): number {
+  return p.basePrice ?? p.price;
+}
+function compareAtOf(p: SellerProductRow): number | null {
+  const list = listPriceOf(p);
+  if ((p.priceSource ?? "base") === "base") return p.originalPrice;
+  return p.originalPrice && p.originalPrice > list ? p.originalPrice : null;
+}
+
+function initialForm(p?: SellerProductRow | null): FormState {
+  const compare = p ? compareAtOf(p) : null;
   return {
     title: p?.name ?? "",
     titleFr: p?.nameFr ?? "",
     category: p?.category ?? "",
     description: p?.description ?? "",
-    price: p ? String(p.price) : "",
-    originalPrice: p?.originalPrice ? String(p.originalPrice) : "",
+    price: p ? String(listPriceOf(p)) : "",
+    originalPrice: compare ? String(compare) : "",
     stock: p ? String(p.stock) : "",
     image: p?.image ?? "",
   };
@@ -56,19 +66,18 @@ function initialForm(p?: Product | null): FormState {
  * stores: name (EN/FR), category, description, price, compare-at price, stock
  * and one photo. Everything is validated before the Next / Submit buttons enable.
  */
-export function ProductWizard({ product }: { product?: Product | null }) {
+export function ProductWizard({ product }: { product?: SellerProductRow | null }) {
   const router = useRouter();
   const { toast } = useToast();
   const { locale } = useLocale();
   const { categories } = useRealtime();
   const { createProduct, updateProduct, uploadImage } = useSellerData();
+  const { plan, used, max, atLimit } = useSellerPlan();
   const fr = locale === "fr";
   const editing = !!product;
 
   const categoryOptions = useMemo(() => {
-    const base = categories.length
-      ? categories.map((c) => ({ name: c.name, nameFr: c.nameFr ?? c.name }))
-      : FALLBACK_CATEGORIES;
+    const base = categories.map((c) => ({ name: c.name, nameFr: c.nameFr ?? c.name }));
     if (product?.category && !base.some((c) => c.name === product.category)) {
       base.push({ name: product.category, nameFr: product.categoryFr ?? product.category });
     }
@@ -155,14 +164,24 @@ export function ProductWizard({ product }: { product?: Product | null }) {
     setSubmitError(null);
     try {
       if (editing && product) {
-        await updateProduct(product.id, {
-          ...payload,
-          // explicit values so a cleared field is cleared on the server too
-          nameFr: form.titleFr.trim(),
-          originalPrice: form.originalPrice.trim() ? origNum : null,
-          description: form.description.trim(),
-          image: form.image,
-        });
+        // Send ONLY what the seller changed. In particular the price fields are left out unless
+        // edited, so a promotional price can never be saved back as the list price.
+        const before = initialForm(product);
+        const patch: Record<string, unknown> = {};
+        if (form.title.trim() !== before.title) patch.name = payload.name;
+        if (form.titleFr.trim() !== before.titleFr) patch.nameFr = form.titleFr.trim();
+        if (category !== before.category) {
+          patch.category = category;
+          patch.categoryFr = chosen?.nameFr;
+        }
+        if (form.description.trim() !== before.description.trim()) patch.description = form.description.trim();
+        if (form.image !== before.image) patch.image = form.image;
+        if (priceNum !== Number(before.price)) patch.price = priceNum;
+        if (form.originalPrice.trim() !== before.originalPrice.trim()) {
+          patch.originalPrice = form.originalPrice.trim() ? origNum : null;
+        }
+        if (stockNum !== Number(before.stock)) patch.stock = stockNum;
+        if (Object.keys(patch).length > 0) await updateProduct(product.id, patch);
         toast(fr ? "Modifications enregistrées" : "Changes saved");
         router.push(`/seller/products/${product.id}`);
       } else {
@@ -209,8 +228,33 @@ export function ProductWizard({ product }: { product?: Product | null }) {
   const input = "input-premium w-full px-4 py-2.5 text-sm";
   const label = "mb-1 block text-xs font-medium text-slate-600";
 
+  const promo = editing && product && (product.priceSource ?? "base") !== "base" ? product : null;
+  const quotaExceeded = !editing && atLimit;
+  const quotaServerError = !!submitError && /plan allows|upgrade your plan/i.test(submitError);
+
   return (
     <div className="space-y-6">
+      {!editing && max !== null && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${quotaExceeded ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"}`}
+          data-testid="quota-banner"
+        >
+          {quotaExceeded ? (
+            <>
+              <strong>
+                {fr
+                  ? `Votre offre ${plan?.nameFr ?? plan?.name ?? ""} autorise ${max} annonces et vous les avez toutes utilisées.`
+                  : `Your ${plan?.name ?? ""} plan allows ${max} listings and you have used all of them.`}
+              </strong>{" "}
+              {fr ? "Passez à une offre supérieure pour en ajouter d'autres." : "Upgrade your plan to add more."}{" "}
+              <Link href="/seller/subscribe" className="font-semibold underline">{fr ? "Voir les offres" : "See plans"}</Link>
+            </>
+          ) : (
+            <>{fr ? `Annonces utilisées : ${used} sur ${max} (offre ${plan?.nameFr ?? plan?.name ?? ""}).` : `Listings used: ${used} of ${max} (${plan?.name ?? ""} plan).`}</>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-1 overflow-x-auto">
         {STEPS.map((s, i) => {
           const reachable = i <= step || stepValid.slice(0, i).every(Boolean);
@@ -244,7 +288,8 @@ export function ProductWizard({ product }: { product?: Product | null }) {
             </div>
             <div>
               <label className={label}>{fr ? "Catégorie *" : "Category *"}</label>
-              <select className={input} value={category} onChange={(e) => { set({ category: e.target.value }); }}>
+              <select className={input} value={category} onChange={(e) => { set({ category: e.target.value }); }} disabled={categoryOptions.length === 0}>
+                {categoryOptions.length === 0 && <option value="">{fr ? "Catégories indisponibles" : "Categories unavailable"}</option>}
                 {categoryOptions.map((c) => (
                   <option key={c.name} value={c.name}>{fr ? c.nameFr : c.name}</option>
                 ))}
@@ -307,6 +352,17 @@ export function ProductWizard({ product }: { product?: Product | null }) {
               {fieldErr("stock")}
             </div>
           </div>
+          {promo && (
+            <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800" data-testid="promo-note">
+              {promo.priceSource === "campaign"
+                ? fr
+                  ? `La campagne « ${promo.campaignName ?? ""} » (-${promo.campaignPct} %) fait payer ${formatCurrency(promo.price, locale)} aux clients en ce moment. Le prix ci-dessus est votre prix catalogue : il n'est pas modifié par la campagne.`
+                  : `Campaign “${promo.campaignName ?? ""}” (-${promo.campaignPct}%) currently makes shoppers pay ${formatCurrency(promo.price, locale)}. The price above is your list price: the campaign does not change it.`
+                : fr
+                  ? `Une vente flash fait payer ${formatCurrency(promo.price, locale)} aux clients en ce moment. Le prix ci-dessus est votre prix catalogue.`
+                  : `A flash sale currently makes shoppers pay ${formatCurrency(promo.price, locale)}. The price above is your list price.`}
+            </p>
+          )}
           <p className="mt-3 text-xs text-slate-500">
             {fr ? "Commission de la plateforme déduite de chaque vente : voir la page Finance." : "Platform commission is deducted from each sale: see the Finance page."}
           </p>
@@ -341,7 +397,17 @@ export function ProductWizard({ product }: { product?: Product | null }) {
                 : "If moderation is switched on the product stays “pending” until a moderator approves it; otherwise it is published right away. The real outcome is shown after you submit."}
             </p>
           )}
-          {submitError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
+          {submitError && (
+            <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {submitError}
+              {quotaServerError && (
+                <>
+                  {" "}
+                  <Link href="/seller/subscribe" className="font-semibold underline">{fr ? "Voir les offres" : "See plans"}</Link>
+                </>
+              )}
+            </p>
+          )}
         </DetailSection>
       )}
 

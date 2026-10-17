@@ -8,7 +8,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { ErrorNote } from "@/components/admin/modal";
-import { NoticeBar } from "@/components/admin/demo-badge";
+import { CampaignDetailModal, CampaignPhaseBadge, CampaignScopeLine } from "@/components/admin/campaign-detail";
+import { SectionError } from "@/components/admin/query-state";
 import { Tag, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -40,11 +41,13 @@ export default function AdminPromotionsPage() {
   const { locale } = useLocale();
   const { toast } = useToast();
   const fr = locale === "fr";
-  const { items: campaigns, setItems: setCampaigns, error: campErr } = useServerList<CampaignRow>("campaigns:list", { pushEvents: ["campaign:updated"] });
-  const { items: promos, reload: reloadPromos, error: promoErr } = useServerList<PromoRow>("promos:list", { pushEvents: ["promo:updated"] });
+  const { items: campaigns, setItems: setCampaigns, error: campErr, reload: reloadCampaigns, loading: campLoading } = useServerList<CampaignRow>("campaigns:list", { pushEvents: ["campaign:updated"] });
+  const { items: promos, reload: reloadPromos, error: promoErr, loading: promoLoading } = useServerList<PromoRow>("promos:list", { pushEvents: ["promo:updated"] });
   const [tab, setTab] = useState("campaigns");
   const [filter, setFilter] = useState("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = campaigns.find((c) => c.id === detailId) ?? null;
   const [form, setForm] = useState(EMPTY_PROMO);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -111,7 +114,7 @@ export default function AdminPromotionsPage() {
 
       {tab === "campaigns" && (
         <>
-          {campErr && <NoticeBar tone="warn">{campErr}</NoticeBar>}
+          {campErr && <SectionError message={campErr} onRetry={reloadCampaigns} />}
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard title={fr ? "En attente" : "Pending"} value={pending} icon={Clock} />
             <StatCard title={fr ? "Approuvées" : "Approved"} value={approved} icon={CheckCircle2} />
@@ -130,7 +133,7 @@ export default function AdminPromotionsPage() {
           <div className="card-premium overflow-hidden">
             <DataTable
               data={shown as unknown as Record<string, unknown>[]}
-              emptyMessage={fr ? "Aucune campagne" : "No campaigns"}
+              emptyMessage={campLoading ? (fr ? "Chargement…" : "Loading…") : fr ? "Aucune campagne" : "No campaigns"}
               columns={[
                 {
                   key: "name",
@@ -146,20 +149,27 @@ export default function AdminPromotionsPage() {
                   },
                 },
                 { key: "discount", label: fr ? "Remise" : "Discount", render: (row) => <span className="font-semibold">{Number(row.discount)}%</span> },
-                { key: "productCount", label: fr ? "Produits" : "Products" },
+                { key: "productCount", label: fr ? "Produits concernés" : "Products covered", render: (row) => <span className="text-xs text-slate-600"><CampaignScopeLine campaign={row as unknown as CampaignRow} /></span> },
                 { key: "budgetUsd", label: "Budget", render: (row) => formatCurrency(Number(row.budgetUsd), locale) },
                 { key: "startDate", label: fr ? "Période" : "Window", render: (row) => <span className="text-xs text-slate-500">{String(row.startDate ?? "—")} → {String(row.endDate ?? "—")}</span> },
-                { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={statusVariant[String(row.status)] ?? "default"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+                { key: "status", label: fr ? "Statut" : "Status", render: (row) => (
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={statusVariant[String(row.status)] ?? "default"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
+                    <CampaignPhaseBadge campaign={row as unknown as CampaignRow} />
+                  </div>
+                ) },
                 {
                   key: "actions",
                   label: "",
                   render: (row) => {
                     const c = row as unknown as CampaignRow;
-                    if (c.status !== "pending") return <span className="text-xs text-slate-400">—</span>;
                     return (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button onClick={() => setDetailId(c.id)} className="text-sm font-medium text-[var(--primary)] hover:underline">{fr ? "Détails" : "Details"}</button>
+                        {c.status === "pending" && (<>
                         <button disabled={busyId === c.id} onClick={() => decide(c, "active")} className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50">{fr ? "Approuver" : "Approve"}</button>
                         <button disabled={busyId === c.id} onClick={() => decide(c, "rejected")} className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50">{fr ? "Rejeter" : "Reject"}</button>
+                        </>)}
                       </div>
                     );
                   },
@@ -170,9 +180,11 @@ export default function AdminPromotionsPage() {
         </>
       )}
 
+      <CampaignDetailModal campaign={detail} onClose={() => setDetailId(null)} />
+
       {tab === "codes" && (
         <>
-          {promoErr && <NoticeBar tone="warn">{promoErr}</NoticeBar>}
+          {promoErr && <SectionError message={promoErr} onRetry={reloadPromos} />}
           <div className="card-premium space-y-4 p-6">
             <h3 className="flex items-center gap-2 font-semibold"><Tag className="h-4 w-4 text-[var(--primary)]" />{fr ? "Nouveau code promo" : "New promo code"}</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -202,7 +214,7 @@ export default function AdminPromotionsPage() {
           <div className="card-premium overflow-hidden">
             <DataTable
               data={promos as unknown as Record<string, unknown>[]}
-              emptyMessage={fr ? "Aucun code promo" : "No promo codes yet"}
+              emptyMessage={promoLoading ? (fr ? "Chargement…" : "Loading…") : fr ? "Aucun code promo" : "No promo codes yet"}
               columns={[
                 { key: "code", label: "Code", render: (row) => <span className="font-mono font-semibold text-slate-900">{String(row.code)}</span> },
                 { key: "value", label: fr ? "Remise" : "Discount", render: (row) => <span>{row.type === "percent" ? `${row.value}%` : formatCurrency(Number(row.value), locale)}</span> },

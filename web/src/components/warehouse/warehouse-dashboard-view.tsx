@@ -13,6 +13,8 @@ import {
   Bike,
   Layers,
   Banknote,
+  Clock,
+  Percent,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -20,23 +22,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
-import {
-  DualMetricChart,
-  HorizontalBarChart,
-  GoalProgress,
-} from "@/components/charts/dashboard-charts";
+import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
-import { useWarehouseAdmin } from "@/context/warehouse-admin-context";
 import { warehouseRoleLevel, canWarehouseAccess } from "@/lib/warehouse-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
-import {
-  warehouseInboundDispatchTrend,
-  warehouseLaneUtilization,
-  warehouseHealthBreakdown,
-  warehouseRecentActivity,
-  warehouseGoals,
-} from "@/lib/warehouse-analytics";
 import { useOpsPath } from "@/lib/ops-path";
 import { useWarehouseData } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
@@ -45,28 +35,26 @@ import {
   batchTaskIds,
   pick,
   shortDate,
+  formatMinutes,
   useOpsQuery,
+  useWarehouseAnalytics,
   type BatchRow,
   type ExceptionRow,
 } from "@/lib/warehouse-live";
-
-function DemoBadge({ fr }: { fr: boolean }) {
-  return <Badge variant="warning">{fr ? "Données démo" : "Demo data"}</Badge>;
-}
 
 export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { persona } = useAuth();
-  const { getWarehouse } = useWarehouseAdmin();
   const ops = useOpsPath();
   const { stats, parcels, riders } = useWarehouseData();
   const excQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const { returns } = useReturns();
+  const analyticsQ = useWarehouseAnalytics();
+  const an = analyticsQ.data;
 
-  const warehouse = persona.warehouseId ? getWarehouse(persona.warehouseId) : undefined;
-  const title = hubName ?? warehouse?.name ?? (fr ? "Opérations fulfillment" : "Fulfillment Operations");
+  const title = hubName ?? (fr ? "Opérations fulfillment" : "Fulfillment Operations");
 
   // Role-tiered dashboard. Only gate inside the warehouse portal; admins viewing
   // /admin/fulfillment (no warehouseRole) see everything.
@@ -79,12 +67,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const pendingReturns = returns.filter((r) => r.phase === "awaiting_goods").length;
   const activeBatches = batchesQ.data.filter((b) => b.status !== "completed").length;
   const onTheWay = stats.ready + stats.dispatched;
-
-  const throughputData = warehouseInboundDispatchTrend.map((d) => ({
-    label: fr ? d.labelFr : d.label,
-    revenue: d.inbound,
-    orders: d.dispatch,
-  }));
 
   const quickLinks = [
     { path: "/inbound", label: fr ? "File entrante" : "Inbound Queue", count: stats.inbound, icon: Inbox },
@@ -159,7 +141,23 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <StatCard title={fr ? "Livraisons échouées" : "Failed deliveries"} value={stats.exception} icon={AlertTriangle} />
         <StatCard title={fr ? "Livreurs actifs" : "Active riders"} value={`${stats.activeRiders} / ${stats.riders}`} icon={Bike} />
         <StatCard title={fr ? "Lots actifs" : "Active batches"} value={activeBatches} icon={Layers} />
+        <StatCard
+          title={fr ? "Délai ramassage → livraison (30 j)" : "Pickup → delivery time (30 d)"}
+          value={an ? formatMinutes(an.avgPickupToDeliveryMinutes, fr) : "…"}
+          icon={Clock}
+        />
+        <StatCard
+          title={fr ? "Taux d'échec (30 j)" : "Failure rate (30 d)"}
+          value={an ? (an.failureRatePct == null ? "—" : `${an.failureRatePct}%`) : "…"}
+          icon={Percent}
+        />
+        <StatCard
+          title={fr ? "COD à encaisser" : "COD to collect"}
+          value={an ? `$${an.codToCollect.toFixed(2)}` : "…"}
+          icon={Banknote}
+        />
       </div>
+      {analyticsQ.error && <OpsError message={analyticsQ.error} onRetry={() => void analyticsQ.reload()} />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {visibleQuickLinks.map((link) => (
@@ -294,103 +292,31 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         </Card>
       )}
 
-      <div className="flex items-center gap-2">
-        <h2 className="font-semibold text-slate-900">{fr ? "Exemples d'analyses" : "Sample analytics"}</h2>
-        <DemoBadge fr={fr} />
-        <span className="text-xs text-slate-500">
-          {fr ? "Le serveur ne fournit pas encore ces mesures." : "The server does not provide these measures yet."}
-        </span>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
-                {fr ? "Débit hebdomadaire" : "Weekly throughput"}
-              </h2>
-              <p className="text-xs text-slate-500">{fr ? "Réception & expédition" : "Inbound & dispatch"}</p>
-            </div>
-            <DemoBadge fr={fr} />
-          </CardHeader>
-          <CardContent>
-            <DualMetricChart data={throughputData} height={220} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Objectifs du jour" : "Today's goals"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Cibles opérationnelles" : "Operational targets"}</p>
-            </div>
-            <DemoBadge fr={fr} />
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <GoalProgress label={fr ? "Objectif expédition" : "Dispatch target"} current={warehouseGoals.dispatchCurrent} target={warehouseGoals.dispatchTarget} />
-            <GoalProgress label={fr ? "Objectif réception" : "Inbound target"} current={warehouseGoals.inboundCurrent} target={warehouseGoals.inboundTarget} />
-            <GoalProgress label={fr ? "Objectif à l'heure" : "On-time target"} current={warehouseGoals.onTimeCurrent} target={warehouseGoals.onTimeTarget} format={(n) => `${n}%`} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">{fr ? "Utilisation des lanes" : "Lane utilization"}</h2>
-              <p className="text-xs text-slate-500">{fr ? "Capacité lanes de tri" : "Sort lane capacity today"}</p>
-            </div>
-            <DemoBadge fr={fr} />
-          </CardHeader>
-          <CardContent>
-            <HorizontalBarChart
-              items={warehouseLaneUtilization.map((l) => ({ name: fr ? l.laneFr : l.lane, revenue: l.pct }))}
-              valueKey="revenue"
-              labelKey="name"
-              formatValue={(v) => `${v}%`}
-            />
-          </CardContent>
-        </Card>
-
-        {canSupervise && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-slate-900">{fr ? "Score ops" : "Ops health score"}</h2>
-                <p className="text-xs text-slate-500">{fr ? "Réception aux exceptions" : "Inbound through exceptions"}</p>
-              </div>
-              <DemoBadge fr={fr} />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {warehouseHealthBreakdown.map((h) => (
-                <div key={h.label}>
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="text-slate-600">{fr ? h.labelFr : h.label}</span>
-                    <span className="font-bold text-slate-900">{h.score}%</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${h.score}%` }} />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <h2 className="font-semibold text-slate-900">{fr ? "Activité récente" : "Recent activity"}</h2>
-          <DemoBadge fr={fr} />
+          <div>
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-slate-900">
+              {fr ? "Activité des 7 derniers jours" : "Last 7 days"}
+            </h2>
+            <p className="text-xs text-slate-500">
+              {fr ? "Colis reçus au hub, collectés par un livreur et livrés, par jour (UTC)" : "Parcels received at the hub, picked up by a rider and delivered, per day (UTC)"}
+            </p>
+          </div>
+          <NavLinkButton href={ops("/analytics")}>{fr ? "Analyses" : "Analytics"}</NavLinkButton>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {warehouseRecentActivity.map((item) => (
-            <div key={item.text} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-              <p className="text-xs text-slate-400">{fr ? item.timeFr : item.time}</p>
-              <p className="mt-1 text-sm text-slate-700">{fr ? item.textFr : item.text}</p>
-            </div>
-          ))}
+        <CardContent>
+          {!an ? (
+            <p className="py-6 text-center text-sm text-slate-500">{analyticsQ.error ? "—" : fr ? "Chargement…" : "Loading…"}</p>
+          ) : (
+            <DailyGroupedBars
+              days={an.throughput.map((d) => d.date)}
+              series={[
+                { label: fr ? "Reçus" : "Received", color: "#94a3b8", values: an.throughput.map((d) => d.received) },
+                { label: fr ? "Collectés" : "Picked up", color: "#3b82f6", values: an.throughput.map((d) => d.pickedUp) },
+                { label: fr ? "Livrés" : "Delivered", color: "#16a34a", values: an.throughput.map((d) => d.delivered) },
+              ]}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

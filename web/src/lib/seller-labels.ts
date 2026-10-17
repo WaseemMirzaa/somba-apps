@@ -226,3 +226,15 @@ export function errMessage(e: unknown, fallback = "Something went wrong."): stri
   if (typeof e === "string" && e) return e;
   return fallback;
 }
+
+// ─── Payment methods on orders (orders.paymentMethod) ────────────────────────
+const ORDER_PAYMENT: Record<string, { en: string; fr: string }> = {
+  wallet: { en: "Somba wallet", fr: "Portefeuille Somba" },
+  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
+  airtel_money: { en: "Airtel Money", fr: "Airtel Money" },
+  orange_money: { en: "Orange Money", fr: "Orange Money" },
+  vodacom_mpesa: { en: "Vodacom M-Pesa", fr: "Vodacom M-Pesa" },
+  stripe_card: { en: "Card", fr: "Carte" },
+};
+export const paymentMethodLabel = (m: string, fr: boolean) =>
+  ORDER_PAYMENT[m] ? (fr ? ORDER_PAYMENT[m].fr : ORDER_PAYMENT[m].en) : m;

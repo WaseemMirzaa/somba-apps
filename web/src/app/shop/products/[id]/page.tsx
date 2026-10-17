@@ -11,15 +11,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ProductCard } from "@/components/landing/product-card";
-import { useProductDetail, useCatalog } from "@/lib/catalog";
+import { useProductDetail, useCatalog, priceView } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSocketEvent, usePublicSettings, zoneLabel } from "@/lib/shop-live";
-import type { Review } from "@/lib/realtime/types";
+import { useSocketEvent, usePublicSettings, useProductReviews, zoneLabel } from "@/lib/shop-live";
 
 type ProductQuestion = {
   id: string;
@@ -46,7 +45,7 @@ export default function ShopProductDetailPage() {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const { reviews, loaded: reviewsLoaded, error: reviewsError, reload: reloadReviews } = useProductReviews(productId);
   const product = useProductDetail(productId);
   const catalog = useCatalog();
 
@@ -65,10 +64,6 @@ export default function ShopProductDetailPage() {
   useEffect(() => {
     if (!productId || rt.status !== "connected") return;
     loadQuestions();
-    socketClient
-      .request<Review[]>("reviews:list", { productId })
-      .then(setReviews)
-      .catch(() => setReviews([]));
   }, [productId, rt.status, loadQuestions]);
 
   // The seller's answer arrives live.
@@ -119,6 +114,7 @@ export default function ShopProductDetailPage() {
     );
   }
 
+  const priceInfo = priceView(product);
   const name = fr ? product.nameFr : product.name;
   const category = fr ? product.categoryFr : product.category;
   const related = catalog.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
@@ -168,13 +164,25 @@ export default function ShopProductDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-baseline gap-3">
-            <DualCurrency amount={product.price} className="text-3xl font-bold text-blue-700" />
-            {product.originalPrice > product.price && (
-              <span className="text-lg text-slate-400 line-through">{formatCurrency(product.originalPrice, locale)}</span>
-            )}
-            {product.discount > 0 && (
-              <span className="rounded bg-[var(--primary)] px-2 py-0.5 text-sm font-bold text-white">-{product.discount}%</span>
+          <div>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <DualCurrency amount={priceInfo.price} className="text-3xl font-bold text-blue-700" />
+              {priceInfo.was != null && (
+                <s className="text-lg text-slate-500">
+                  <span className="sr-only">{fr ? "Ancien prix " : "Was "}</span>
+                  {formatCurrency(priceInfo.was, locale)}
+                </s>
+              )}
+              {priceInfo.pct > 0 && (
+                <span className="rounded bg-[var(--primary)] px-2 py-0.5 text-sm font-bold text-white">-{priceInfo.pct}%</span>
+              )}
+            </div>
+            {priceInfo.source !== "base" && (
+              <p className="mt-1 inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                {priceInfo.source === "flash"
+                  ? (fr ? "Vente flash" : "Flash sale")
+                  : priceInfo.campaignName ?? (fr ? "Promotion en cours" : "Campaign price")}
+              </p>
             )}
           </div>
 
@@ -295,7 +303,14 @@ export default function ShopProductDetailPage() {
           action={<Link href={`/shop/products/${product.id}/reviews`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Voir tout" : "View all"}</Link>}
           span={3}
         >
-          {reviews.length === 0 ? (
+          {reviewsError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {reviewsError}{" "}
+              <button type="button" onClick={() => void reloadReviews()} className="font-medium underline">{fr ? "Réessayer" : "Retry"}</button>
+            </p>
+          ) : !reviewsLoaded ? (
+            <p className="text-sm text-slate-500">{fr ? "Chargement…" : "Loading…"}</p>
+          ) : reviews.length === 0 ? (
             <p className="text-sm text-slate-500">{fr ? "Aucun avis pour le moment." : "No reviews yet."}</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
@@ -306,7 +321,16 @@ export default function ShopProductDetailPage() {
                     <span className="text-amber-500">{"★".repeat(r.rating)}</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">{r.text}</p>
-                  <p className="text-xs text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</p>
+                  {r.sellerReply && (
+                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
+                      <p className="text-xs font-semibold text-slate-700">
+                        {fr ? "Réponse du vendeur" : "Seller reply"}
+                        {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
+                      </p>
+                      <p className="mt-1 text-slate-600">{r.sellerReply}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
