@@ -51,6 +51,8 @@ export default function WarehouseAgedPage() {
 
   return (
     <WarehouseListPage
+      error={agedQ.error}
+      onRetry={() => void agedQ.reload()}
       title={fr ? "Colis bloqués / anciens" : "Aged / Stuck Parcels"}
       subtitle={
         fr

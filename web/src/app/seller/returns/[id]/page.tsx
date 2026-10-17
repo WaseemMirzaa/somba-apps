@@ -9,18 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { useSellerData } from "@/lib/seller";
 import { caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getSellerReturn } = useSellerData();
+  const { getSellerReturn, load } = useSellerData();
   const ret = getSellerReturn(id);
 
-  if (!ret) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Retour introuvable" : "Return not found"}</div>;
-  }
+  if (!ret) return <MissingRecord load={load} label="Return not found" labelFr="Retour introuvable" />;
 
   return (
     <div className="space-y-6">

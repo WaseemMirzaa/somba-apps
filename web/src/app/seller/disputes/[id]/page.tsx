@@ -7,16 +7,17 @@ import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { useSellerData } from "@/lib/seller";
 import { caseStatusLabel, caseStatusVariant } from "@/lib/seller-labels";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerDisputeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { sellerDisputeList } = useSellerData();
+  const { sellerDisputeList, load } = useSellerData();
   const { locale } = useLocale();
   const fr = locale === "fr";
   const dispute = sellerDisputeList.find((d) => d.id === id || d.disputeId === id);
 
-  if (!dispute) return <div className="p-8 text-center text-slate-500">{fr ? "Introuvable" : "Not found"}</div>;
+  if (!dispute) return <MissingRecord load={load} label="Dispute not found" labelFr="Litige introuvable" />;
 
   return (
     <div className="space-y-6">

@@ -16,38 +16,27 @@ import {
   errMessage,
   orderStatusLabel,
   orderStatusVariant,
+  paymentMethodLabel,
   shippingStatusLabel,
   txnStatusLabel,
 } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-
-const PAYMENT_LABEL: Record<string, { en: string; fr: string }> = {
-  cod: { en: "Cash on Delivery", fr: "Paiement à la livraison" },
-  stripe_card: { en: "Card", fr: "Carte" },
-  airtel_money: { en: "Mobile Money", fr: "Mobile Money" },
-  wallet: { en: "Wallet", fr: "Portefeuille" },
-};
 
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, getShipmentByOrderId, sellerReady } = useSellerData();
+  const { getSellerOrder, getShipmentByOrderId, sellerReady, load } = useSellerData();
   const order = getSellerOrder(id);
   const shipment = order ? getShipmentByOrderId(order.id) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!order) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        {fr ? "Commande introuvable" : "Order not found"}
-      </div>
-    );
-  }
+  if (!order) return <MissingRecord load={load} label="Order not found" labelFr="Commande introuvable" />;
 
   const canMarkReady = ["confirmed", "processing"].includes(order.orderStatus) && !order.readyAt;
 
@@ -67,7 +56,6 @@ export default function SellerOrderDetailPage() {
     }
   }
 
-  const pay = PAYMENT_LABEL[order.paymentMethod];
 
   return (
     <div className="space-y-6">
@@ -124,7 +112,7 @@ export default function SellerOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Mode de paiement" : "Payment Method", value: pay ? (fr ? pay.fr : pay.en) : order.paymentMethod },
+            { label: fr ? "Mode de paiement" : "Payment Method", value: paymentMethodLabel(order.paymentMethod, fr) },
             { label: fr ? "Statut" : "Status", value: txnStatusLabel(order.paymentStatus, fr) },
             { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
             { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },

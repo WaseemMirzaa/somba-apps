@@ -37,6 +37,7 @@ export default function WarehouseInboundPage() {
 
   return (
     <WarehouseListPage
+      paged
       title={`${t("inbound")} ${fr ? "File" : "Queue"}`}
       subtitle={
         fr

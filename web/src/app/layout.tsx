@@ -7,16 +7,8 @@ import { ToastProvider } from "@/context/toast-context";
 import { ShopProvider } from "@/context/shop-context";
 import { WarehouseAdminProvider } from "@/context/warehouse-admin-context";
 import { WarehouseStaffProvider } from "@/context/warehouse-staff-context";
-import { SellerSubscriptionProvider } from "@/context/seller-subscription-context";
 import { MarketProvider } from "@/context/market-context";
-import { NotificationProvider } from "@/context/notification-context";
-import { DisputeProvider } from "@/context/dispute-context";
-import { ModerationProvider } from "@/context/moderation-context";
-import { CategoriesProvider } from "@/context/categories-context";
-import { SupportProvider } from "@/context/support-context";
 import { ReviewsProvider } from "@/context/reviews-context";
-import { ReplacementProvider } from "@/context/replacement-context";
-import { RiderZoneProvider } from "@/context/rider-zone-context";
 import { RealtimeProvider } from "@/context/realtime-context";
 
 const inter = Inter({
@@ -31,8 +23,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "S&T Marketplace — Complete Marketplace Platform",
-  description: "S&T Marketplace — Admin, Seller, Warehouse, Rider & Customer apps. Purchase and deploy your marketplace.",
+  title: "S&T Marketplace — Shop, sell and deliver",
+  description: "S&T Marketplace: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
   icons: {
     icon: "/brand/logo-stack.png",
     apple: "/brand/logo-stack.png",
@@ -47,35 +39,19 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[var(--background)]">
         <LocaleProvider>
           <RealtimeProvider>
-          <MarketProvider>
-            <WarehouseStaffProvider>
-              <AuthProvider>
-                <NotificationProvider>
-                  <DisputeProvider>
-                    <SellerSubscriptionProvider>
-                      <WarehouseAdminProvider>
-                        <ModerationProvider>
-                          <CategoriesProvider>
-                            <SupportProvider>
-                              <ReviewsProvider>
-                                <ReplacementProvider>
-                                  <RiderZoneProvider>
-                                    <ShopProvider>
-                                      <ToastProvider>{children}</ToastProvider>
-                                    </ShopProvider>
-                                  </RiderZoneProvider>
-                                </ReplacementProvider>
-                              </ReviewsProvider>
-                            </SupportProvider>
-                          </CategoriesProvider>
-                        </ModerationProvider>
-                      </WarehouseAdminProvider>
-                    </SellerSubscriptionProvider>
-                  </DisputeProvider>
-                </NotificationProvider>
-              </AuthProvider>
-            </WarehouseStaffProvider>
-          </MarketProvider>
+            <MarketProvider>
+              <WarehouseStaffProvider>
+                <AuthProvider>
+                  <WarehouseAdminProvider>
+                    <ReviewsProvider>
+                      <ShopProvider>
+                        <ToastProvider>{children}</ToastProvider>
+                      </ShopProvider>
+                    </ReviewsProvider>
+                  </WarehouseAdminProvider>
+                </AuthProvider>
+              </WarehouseStaffProvider>
+            </MarketProvider>
           </RealtimeProvider>
         </LocaleProvider>
       </body>

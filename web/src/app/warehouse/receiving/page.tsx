@@ -47,6 +47,7 @@ export default function WarehouseReceivingPage() {
 
   return (
     <WarehouseListPage
+      paged
       title={t("receiving")}
       subtitle={fr ? "Scannez chaque colis à son arrivée au hub" : "Scan each parcel in as it arrives at the hub"}
       breadcrumbs={[{ label: homeLabel, href: homeHref }, { label: t("receiving") }]}

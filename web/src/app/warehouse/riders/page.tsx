@@ -7,7 +7,6 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useRiderZones } from "@/context/rider-zone-context";
 import { useWarehouseData } from "@/lib/warehouse";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
@@ -17,7 +16,6 @@ export default function WarehouseRidersPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
-  const { zoneOptions, getRiderZone, setRiderZone } = useRiderZones();
   const { riders, ridersError, parcels } = useWarehouseData();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
@@ -45,8 +43,8 @@ export default function WarehouseRidersPage() {
       title={fr ? "Livreurs" : "Riders"}
       subtitle={
         fr
-          ? "Comptes livreurs actifs avec leurs livraisons en cours. La zone est une note gardée sur cet appareil."
-          : "Active rider accounts with their live deliveries. Zone is a note kept on this device."
+          ? "Comptes livreurs actifs avec leurs livraisons en cours."
+          : "Active rider accounts with their live deliveries."
       }
       breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("riders") }]}
       filters={
@@ -68,19 +66,6 @@ export default function WarehouseRidersPage() {
         { key: "phone", label: fr ? "Téléphone" : "Phone", render: (row) => row.phone ? (
           <a href={`tel:${String(row.phone).replace(/\s/g, "")}`} className="text-[var(--primary)] hover:underline">{String(row.phone)}</a>
         ) : "—" },
-        { key: "zone", label: fr ? "Zone (sur cet appareil)" : "Zone (this device)", render: (row) => (
-          <select
-            value={getRiderZone(String(row.id))}
-            onChange={(e) => setRiderZone(String(row.id), e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
-            aria-label={fr ? "Zone, note locale" : "Zone, local note"}
-          >
-            <option value="">—</option>
-            {zoneOptions.map((z) => (
-              <option key={z} value={z}>{z}</option>
-            ))}
-          </select>
-        )},
         { key: "activeTasks", label: fr ? "Livraisons actives" : "Active Deliveries", render: (row) => (
           <Badge variant={Number(row.activeTasks) > 0 ? "info" : "default"}>{String(row.activeTasks)}</Badge>
         )},

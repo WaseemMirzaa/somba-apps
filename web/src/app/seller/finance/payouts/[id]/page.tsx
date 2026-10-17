@@ -8,22 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { useSellerData } from "@/lib/seller";
 import { payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerPayoutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getPayout } = useSellerData();
+  const { getPayout, load } = useSellerData();
   const payout = getPayout(id);
 
-  if (!payout) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        {fr ? "Versement introuvable" : "Payout not found"}
-      </div>
-    );
-  }
+  if (!payout) return <MissingRecord load={load} label="Payout not found" labelFr="Versement introuvable" />;
 
   const label = payoutStatusLabel(payout.status, fr);
 

@@ -973,7 +973,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     if (!userId) return;
     try {
       const raw = localStorage.getItem(`somba-seller-ready:${userId}`);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring a browser-stored flag map once the user is known
+       
       if (raw) setReadyAt(JSON.parse(raw) as Record<string, string>);
     } catch {
       /* storage unavailable */
@@ -1037,7 +1037,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   // were offline is read back. There is NO polling.
   useEffect(() => {
     if (!isSeller) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial / reconnect server fetch
+     
     void refresh();
   }, [isSeller, refresh]);
 
@@ -1155,7 +1155,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   // A sign-out / account switch clears everything.
   useEffect(() => {
     if (rt.user?.role === "seller") return;
-    /* eslint-disable react-hooks/set-state-in-effect -- sign-out / account switch resets the cache */
+     
     setSeller(null);
     setSellerLoaded(false);
     setStats(null);
@@ -1169,7 +1169,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     setPlans(null);
     setErrors({});
     setFirstLoadDone(false);
-    /* eslint-enable react-hooks/set-state-in-effect */
+     
   }, [rt.user?.role, userId]);
 
   const actions = useMemo<Actions>(() => {

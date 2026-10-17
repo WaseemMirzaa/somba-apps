@@ -41,6 +41,7 @@ export default function WarehouseSortingPage() {
 
   return (
     <WarehouseListPage
+      paged
       title={fr ? "Table de tri" : "Sorting Board"}
       subtitle={
         fr

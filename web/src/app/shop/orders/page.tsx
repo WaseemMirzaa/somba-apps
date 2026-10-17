@@ -8,11 +8,14 @@ import { useMyOrders, orderStatusLabel } from "@/lib/orders";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { LoadMore } from "@/components/ui/load-more";
+import { useRealtime } from "@/context/realtime-context";
 
 function OrdersList() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const orders = useMyOrders();
+  const rt = useRealtime();
 
   const statusLabel = (status: string) => orderStatusLabel(status, fr);
 
@@ -24,7 +27,15 @@ function OrdersList() {
     <div className="space-y-6">
       <PageHeader title={fr ? "Mes commandes" : "My Orders"} subtitle={fr ? "Vos commandes, mises à jour en direct" : "Your orders, updated live"} />
 
+      {rt.listError && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span className="min-w-0 flex-1">{rt.listError}</span>
+          <button type="button" onClick={() => void rt.reloadLists()} className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-red-100">{fr ? "Réessayer" : "Retry"}</button>
+        </div>
+      )}
+
       <DataTable
+        emptyMessage={rt.status !== "connected" ? (fr ? "Chargement…" : "Loading…") : fr ? "Vous n'avez pas encore de commande." : "You have no orders yet."}
         columns={[
           { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
             <Link href={`/shop/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
@@ -45,6 +56,8 @@ function OrdersList() {
         ]}
         data={orders as unknown as Record<string, unknown>[]}
       />
+
+      <LoadMore hasMore={rt.hasMoreOrders} onLoad={rt.loadMoreOrders} loaded={orders.length} noun={{ en: "orders", fr: "commandes" }} />
     </div>
   );
 }

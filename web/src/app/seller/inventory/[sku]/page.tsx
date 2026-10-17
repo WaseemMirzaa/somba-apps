@@ -9,18 +9,17 @@ import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StockAdjust } from "@/components/seller/stock-adjust";
 import { useSellerData } from "@/lib/seller";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerInventoryDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { getSellerInventory } = useSellerData();
+  const { getSellerInventory, load } = useSellerData();
   const item = getSellerInventory(decodeURIComponent(sku));
 
-  if (!item) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Stock introuvable" : "Inventory not found"}</div>;
-  }
+  if (!item) return <MissingRecord load={load} label="Inventory not found" labelFr="Stock introuvable" />;
 
   return (
     <div className="space-y-6">

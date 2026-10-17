@@ -59,3 +59,23 @@ export function SectionLoader({ className }: { className?: string }) {
 export function EmptyState({ children, className }: { children: React.ReactNode; className?: string }) {
   return <p className={cn("rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500", className)}>{children}</p>;
 }
+
+/**
+ * What a detail page shows when the record is not in memory: the loader while
+ * the first read is in flight, the server's error + retry if it failed, and
+ * only then "not found".
+ */
+export function MissingRecord({
+  load,
+  label,
+  labelFr,
+}: {
+  load: { loading: boolean; error: string | null; retry: () => void | Promise<void> };
+  label: string;
+  labelFr: string;
+}) {
+  const { locale } = useLocale();
+  if (load.error) return <LoadError message={load.error} onRetry={load.retry} />;
+  if (load.loading) return <SectionLoader />;
+  return <EmptyState>{locale === "fr" ? labelFr : label}</EmptyState>;
+}

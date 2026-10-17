@@ -50,6 +50,10 @@ interface RealtimeValue {
   /** The server returns lists in pages (default 500): more rows may exist beyond what is loaded. */
   hasMoreOrders: boolean;
   hasMoreDeliveries: boolean;
+  /** Set when the initial orders/deliveries load failed: the server's own message. */
+  listError: string | null;
+  /** Run the initial load again (after a failed one). */
+  reloadLists: () => Promise<void>;
   /** Fetch the next page (limit/offset) and append it. Rejects with the server's error. */
   loadMoreOrders: () => Promise<void>;
   loadMoreDeliveries: () => Promise<void>;
@@ -152,6 +156,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [hasMoreDeliveries, setHasMoreDeliveries] = useState(false);
   // How many rows the server has handed out per list (live pushes do not count): the next `offset`.
   const fetched = useRef({ orders: 0, deliveries: 0 });
+  const [listError, setListError] = useState<string | null>(null);
+  const hydrateRef = useRef<() => Promise<void>>(async () => {});
   const booted = useRef(false);
   // Assigned below; lets the socket's `unauthorized` handler trigger a token
   // refresh + reconnect without a circular hook dependency.
@@ -244,8 +250,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       // Personal reads — only for a signed-in account (guests would fail).
       if (!authApi.getAccess()) return; // guest: nothing personal to load
       try {
+        let failure: string | null = null;
+        const keep = (e: unknown): never[] => {
+          failure ??= e instanceof Error && e.message ? e.message : "Request failed.";
+          return [];
+        };
         const [ord, notif] = await Promise.all([
-          socketClient.request<Order[]>("orders:list").catch(() => []),
+          socketClient.request<Order[]>("orders:list").catch(keep),
           socketClient
             .request<AppNotification[]>("notifications:list")
             .catch(() => []),
@@ -256,10 +267,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setNotifications(notif);
         const del = await socketClient
           .request<DeliveryTask[]>("delivery:list")
-          .catch(() => []);
+          .catch(keep);
         setDeliveries(del);
         fetched.current.deliveries = del.length;
         setHasMoreDeliveries(del.length >= PAGE_SIZE);
+        setListError(failure);
         const [wallet, walletTx, pays] = await Promise.all([
           socketClient
             .request<{ balance: number }>("wallet:get")
@@ -286,6 +298,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         /* hydration is best-effort; live events still flow */
       }
     };
+    hydrateRef.current = hydrate;
     let first = true;
     let firstDone: () => void = () => {};
     const firstHydrated = new Promise<void>((res) => { firstDone = res; });
@@ -422,6 +435,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     fetched.current.deliveries = del.length;
     setHasMoreDeliveries(del.length >= PAGE_SIZE);
   }, []);
+
+  const reloadLists = useCallback(() => hydrateRef.current(), []);
 
   const loadMoreOrders = useCallback(async () => {
     const rows = await socketClient.request<Order[]>("orders:list", {
@@ -570,6 +585,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       disputes,
       hasMoreOrders,
       hasMoreDeliveries,
+      listError,
+      reloadLists,
       loadMoreOrders,
       loadMoreDeliveries,
       login,
@@ -615,6 +632,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       disputes,
       hasMoreOrders,
       hasMoreDeliveries,
+      listError,
+      reloadLists,
       loadMoreOrders,
       loadMoreDeliveries,
       login,

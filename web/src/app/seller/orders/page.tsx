@@ -12,17 +12,11 @@ import {
   ORDER_STATUS_OPTIONS,
   orderStatusLabel,
   orderStatusVariant,
+  paymentMethodLabel,
   shippingStatusLabel,
   shippingStatusVariant,
 } from "@/lib/seller-labels";
-import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
-
-const PAYMENT_LABEL: Record<string, string> = {
-  cod: "Cash on Delivery",
-  stripe_card: "Card",
-  airtel_money: "Mobile Money",
-  wallet: "Wallet",
-};
+import { formatCurrency } from "@/lib/utils";
 
 export default function SellerOrdersPage() {
   const { t, locale } = useLocale();
@@ -61,7 +55,7 @@ export default function SellerOrdersPage() {
         { key: "customer", label: t("customer") },
         { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-        { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(PAYMENT_LABEL[String(row.paymentMethod)] ?? String(row.paymentMethod), locale) },
+        { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => paymentMethodLabel(String(row.paymentMethod), fr) },
         { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant={orderStatusVariant(String(row.orderStatus))}>{orderStatusLabel(String(row.orderStatus), fr)}</Badge> },
         { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge variant={shippingStatusVariant(String(row.shippingStatus))}>{shippingStatusLabel(String(row.shippingStatus), fr)}</Badge> },
         { key: "date", label: t("date") },
@@ -70,6 +64,7 @@ export default function SellerOrdersPage() {
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}
+      emptyMessage={fr ? "Aucune commande pour le moment. Elles apparaissent ici dès qu'un client commande un de vos produits." : "No orders yet. They appear here as soon as a customer orders one of your products."}
     />
   );
 }

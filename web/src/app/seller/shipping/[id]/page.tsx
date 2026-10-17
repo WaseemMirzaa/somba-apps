@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { useSellerData } from "@/lib/seller";
 import { shippingStatusLabel, shippingStatusVariant } from "@/lib/seller-labels";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 
 
@@ -13,16 +14,10 @@ export default function SellerShipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { getShipment } = useSellerData();
+  const { getShipment, load } = useSellerData();
   const shipment = getShipment(id);
 
-  if (!shipment) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        {fr ? "Expédition introuvable" : "Shipment not found"}
-      </div>
-    );
-  }
+  if (!shipment) return <MissingRecord load={load} label="Shipment not found" labelFr="Expédition introuvable" />;
 
   return (
     <div className="space-y-6">

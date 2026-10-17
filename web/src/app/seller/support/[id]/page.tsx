@@ -6,9 +6,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { useSellerTickets } from "@/lib/seller";
+import { useSellerLoad, useSellerTickets } from "@/lib/seller";
 import { errMessage, ticketStatusLabel, ticketStatusVariant } from "@/lib/seller-labels";
 
 export default function SellerSupportDetailPage() {
@@ -17,14 +18,13 @@ export default function SellerSupportDetailPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { tickets, replyTicket } = useSellerTickets();
+  const load = useSellerLoad();
   const ticket = tickets.find((tk) => tk.id === id || tk.reference === id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!ticket) {
-    return <div className="p-8 text-center text-slate-500">{fr ? "Ticket introuvable" : "Ticket not found"}</div>;
-  }
+  if (!ticket) return <MissingRecord load={load} label="Ticket not found" labelFr="Ticket introuvable" />;
 
   const closed = ticket.status === "closed";
 

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
+import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
 import { replacementStatusLabelReal, replacementStatusVariantReal } from "@/lib/seller-labels";
@@ -14,16 +15,10 @@ export default function SellerReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getSellerReplacement } = useSellerData();
+  const { getSellerReplacement, load } = useSellerData();
   const rep = getSellerReplacement(id);
 
-  if (!rep) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        {fr ? "Remplacement introuvable" : "Replacement not found"}
-      </div>
-    );
-  }
+  if (!rep) return <MissingRecord load={load} label="Replacement not found" labelFr="Remplacement introuvable" />;
 
   return (
     <div className="space-y-6">

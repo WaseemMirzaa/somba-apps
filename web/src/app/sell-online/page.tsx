@@ -6,28 +6,23 @@ import {
   ArrowRight,
   Check,
   Store,
-  Star,
-  Quote,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MarketingHeader } from "@/components/landing/marketing-header";
 import { MarketingFooter } from "@/components/landing/marketing-footer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
+import { LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 import { BRAND } from "@/lib/config";
-import {
-  SELLER_PLANS,
-  SELL_ONLINE_HERO,
-  SELL_ONLINE_STATS,
-  SELL_ONLINE_WHY,
-  SELL_ONLINE_STEPS,
-  SELL_ONLINE_TOOLS,
-  SELL_ONLINE_FAQ,
-  SELL_ONLINE_IMAGE,
-  TESTIMONIALS,
-} from "@/lib/product-landing";
-import { cn } from "@/lib/utils";
+import { SELL_ONLINE_IMAGE } from "@/lib/product-landing";
+import { SELL_ONLINE_HERO, SELL_ONLINE_WHY, SELL_ONLINE_STEPS, SELL_ONLINE_TOOLS, SELL_ONLINE_FAQ } from "@/lib/sell-online-content";
+import { socketClient } from "@/lib/realtime/socket-client";
+import type { SellerPlanInfo } from "@/lib/seller";
+import { errMessage } from "@/lib/seller-labels";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useCallback, useEffect, useState } from "react";
 
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
   const icons = LucideIcons as unknown as Record<string, LucideIcon>;
@@ -35,11 +30,31 @@ function DynamicIcon({ name, className }: { name: string; className?: string }) 
   return <Icon className={className} />;
 }
 
-const sellerTestimonials = TESTIMONIALS.filter((t) => t.role.includes("Store") || t.role.includes("Owner"));
+/** The public plan list (`sellers:plans`): real prices and listing limits, never a copy of them. */
+function usePublicPlans() {
+  const rt = useRealtime();
+  const [plans, setPlans] = useState<SellerPlanInfo[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setPlans(await socketClient.request<SellerPlanInfo[]>("sellers:plans"));
+    } catch (e) {
+      setError(errMessage(e));
+    }
+  }, []);
+  useEffect(() => {
+    if (rt.status !== "connected") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- server read once the socket is ready
+    void load();
+  }, [rt.status, load]);
+  return { plans, error, retry: load };
+}
 
 export default function SellOnlinePage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const { plans, error: plansError, retry } = usePublicPlans();
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -75,18 +90,6 @@ export default function SellOnlinePage() {
               </a>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Stats strip */}
-      <section className="border-b border-[var(--border)] bg-white py-10">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 sm:grid-cols-4">
-          {SELL_ONLINE_STATS.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="font-[family-name:var(--font-display)] text-3xl font-extrabold text-[var(--primary)]">{stat.value}</p>
-              <p className="mt-1 text-sm text-slate-600">{fr ? stat.labelFr : stat.label}</p>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -184,86 +187,75 @@ export default function SellOnlinePage() {
             <span className="section-label">{fr ? "Tarifs" : "Pricing"}</span>
             <h2 className="section-title mt-4">{fr ? "Plans vendeur" : "Seller plans"}</h2>
             <p className="mt-4 text-slate-600">
-              {fr ? "Choisissez le plan adapté à votre activité — changez à tout moment." : "Pick the plan that fits your business — upgrade anytime."}
+              {fr ? "Prix et limites d'annonces à jour, payables par portefeuille Somba ou Mobile Money." : "Current prices and listing limits, payable by Somba wallet or Mobile Money."}
             </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-5xl gap-6 lg:grid-cols-3">
-            {SELLER_PLANS.map((plan) => (
-              <div
-                key={plan.id}
-                className={cn(
-                  "flex flex-col rounded-2xl border p-7",
-                  plan.popular ? "border-[var(--primary)] shadow-lg ring-1 ring-[var(--primary)]/15" : "border-[var(--border)]"
-                )}
-              >
-                {plan.popular && (
-                  <span className="mb-4 inline-flex w-fit rounded-full bg-[var(--primary)] px-3 py-1 text-[10px] font-bold uppercase text-white">
-                    {fr ? "Populaire" : "Popular"}
-                  </span>
-                )}
-                <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{plan.name}</h3>
-                <p className="mt-2 text-sm text-slate-500">{plan.desc}</p>
-                <p className="mt-6 font-[family-name:var(--font-display)] text-3xl font-extrabold text-slate-900">
-                  {plan.price !== null ? `$${plan.price}` : fr ? "Sur mesure" : "Custom"}
-                  {plan.price !== null && <span className="text-sm font-medium text-slate-500">/mo</span>}
-                </p>
-                <ul className="mt-6 flex-1 space-y-2.5">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                      <Check className="h-4 w-4 shrink-0 text-[var(--primary)]" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href={
-                    plan.id === "enterprise"
-                      ? "/sell-online/subscribe?plan=enterprise"
-                      : `/sell-online/subscribe?plan=${plan.id}`
-                  }
-                  className={cn(
-                    "mt-8 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
-                    plan.popular ? "btn-primary" : "border border-slate-200 hover:bg-slate-50"
-                  )}
-                >
-                  {plan.id === "enterprise" ? (fr ? "Contact" : "Contact sales") : (fr ? "Commencer" : "Get started")}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Seller testimonials */}
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="text-center">
-            <span className="section-label">{fr ? "Témoignages" : "Success stories"}</span>
-            <h2 className="section-title mt-4">{fr ? "Ils vendent sur Somba&Teka" : "Sellers who grew with us"}</h2>
-          </div>
-          <div className="mt-12 grid gap-6 md:grid-cols-2">
-            {(sellerTestimonials.length > 0 ? sellerTestimonials : TESTIMONIALS.slice(1, 3)).map((t) => (
-              <div key={t.name} className="relative rounded-2xl border border-[var(--border)] bg-white p-7">
-                <Quote className="absolute right-5 top-5 h-8 w-8 text-blue-100" />
-                <div className="flex gap-1 text-amber-400">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-current" />
-                  ))}
-                </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-700">&ldquo;{fr ? t.quoteFr : t.quote}&rdquo;</p>
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">
-                    {t.initials}
+          {plansError ? (
+            <div className="mx-auto mt-12 max-w-xl"><LoadError message={plansError} onRetry={retry} /></div>
+          ) : plans === null ? (
+            <SectionLoader className="mt-12" />
+          ) : (
+            <div className="mx-auto mt-12 grid max-w-6xl gap-6 md:grid-cols-2 xl:grid-cols-4" data-testid="public-plans">
+              {plans.map((plan) => {
+                const features = (fr ? plan.featuresFr : undefined) ?? plan.features;
+                const contact = plan.priceUsd === null;
+                const free = plan.priceUsd === 0;
+                return (
+                  <div
+                    key={plan.id}
+                    className={cn(
+                      "flex flex-col rounded-2xl border p-7",
+                      plan.popular ? "border-[var(--primary)] shadow-lg ring-1 ring-[var(--primary)]/15" : "border-[var(--border)]"
+                    )}
+                  >
+                    {plan.popular && (
+                      <span className="mb-4 inline-flex w-fit rounded-full bg-[var(--primary)] px-3 py-1 text-[10px] font-bold uppercase text-white">
+                        {fr ? "Populaire" : "Popular"}
+                      </span>
+                    )}
+                    <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{fr ? (plan.nameFr ?? plan.name) : plan.name}</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {plan.maxProducts ? (fr ? `Jusqu'à ${plan.maxProducts} annonces` : `Up to ${plan.maxProducts} listings`) : fr ? "Annonces illimitées" : "Unlimited listings"}
+                    </p>
+                    <p className="mt-5 font-[family-name:var(--font-display)] text-3xl font-extrabold text-slate-900">
+                      {contact ? (fr ? "Sur mesure" : "Custom") : free ? (fr ? "Gratuit" : "Free") : formatCurrency(plan.priceUsd as number, locale)}
+                      {!contact && !free && (
+                        <span className="text-sm font-medium text-slate-500"> / {plan.months === 1 ? (fr ? "mois" : "month") : fr ? `${plan.months} mois` : `${plan.months} months`}</span>
+                      )}
+                    </p>
+                    <ul className="mt-6 flex-1 space-y-2.5">
+                      {features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                          <Check className="h-4 w-4 shrink-0 text-[var(--primary)]" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    {contact ? (
+                      <a
+                        href="mailto:sales@somba.com?subject=Somba%20seller%20plan"
+                        className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-sm font-semibold hover:bg-slate-50"
+                      >
+                        {fr ? "Contacter les ventes" : "Contact sales"}
+                        <ArrowRight className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <Link
+                        href={free ? "/seller/register" : `/sell-online/subscribe?plan=${plan.id}`}
+                        className={cn(
+                          "mt-8 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold",
+                          plan.popular ? "btn-primary" : "border border-slate-200 hover:bg-slate-50"
+                        )}
+                      >
+                        {free ? (fr ? "Commencer gratuitement" : "Start for free") : fr ? "Choisir cette offre" : "Choose this plan"}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{fr ? t.roleFr : t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
