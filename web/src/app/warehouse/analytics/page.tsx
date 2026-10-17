@@ -11,6 +11,7 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
+import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useWarehouseData } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
@@ -125,12 +126,12 @@ export default function WarehouseAnalyticsPage() {
           icon={Percent}
         />
         <StatCard title={fr ? "Colis ouverts > 24 h" : "Open parcels > 24 h"} value={an ? num(an.agedOver24h) : "…"} icon={AlertTriangle} />
-        <StatCard title={fr ? "COD à encaisser" : "COD to collect"} value={an ? `$${an.codToCollect.toFixed(2)}` : "…"} icon={Banknote} />
+        <StatCard title={fr ? "COD à encaisser" : "COD to collect"} value={an ? formatCurrency(an.codToCollect, locale) : "…"} icon={Banknote} />
       </div>
       {an && (
         <p className="-mt-3 text-xs text-slate-500">
           {fr
-            ? `Délai moyen calculé sur ${an.pickupToDeliverySamples} colis livrés ; taux d'échec : ${an.failed30} échecs pour ${an.delivered30} livraisons (colis créés sur 30 jours).`
+            ? `Délai moyen calculé sur ${an.pickupToDeliverySamples} colis livrés ; taux d'échec : ${an.failed30} ${an.failed30 > 1 ? "échecs" : "échec"} pour ${an.delivered30} livraison${an.delivered30 > 1 ? "s" : ""} (colis créés sur 30 jours).`
             : `Average time is over ${an.pickupToDeliverySamples} delivered parcels; failure rate: ${an.failed30} failed vs ${an.delivered30} delivered (parcels created in the last 30 days).`}
         </p>
       )}

@@ -116,7 +116,7 @@ interface RealtimeValue {
 const RealtimeContext = createContext<RealtimeValue | null>(null);
 
 /** Page size used for the big lists (the server default; its maximum is 1000). */
-const PAGE_SIZE = 500;
+const PAGE_SIZE = Math.min(1000, Math.max(1, Number(process.env.NEXT_PUBLIC_LIST_PAGE_SIZE) || 500));
 
 /** Append rows that are not in the list yet (older pages), keeping live-pushed rows where they are. */
 function appendNew<T extends { id: string }>(list: T[], more: T[]): T[] {
@@ -256,7 +256,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           return [];
         };
         const [ord, notif] = await Promise.all([
-          socketClient.request<Order[]>("orders:list").catch(keep),
+          socketClient.request<Order[]>("orders:list", { limit: PAGE_SIZE }).catch(keep),
           socketClient
             .request<AppNotification[]>("notifications:list")
             .catch(() => []),
@@ -266,7 +266,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setHasMoreOrders(ord.length >= PAGE_SIZE);
         setNotifications(notif);
         const del = await socketClient
-          .request<DeliveryTask[]>("delivery:list")
+          .request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE })
           .catch(keep);
         setDeliveries(del);
         fetched.current.deliveries = del.length;
@@ -429,7 +429,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const acceptDelivery = useCallback(async (taskId: string) => {
     await socketClient.request("delivery:accept", { taskId });
     const del = await socketClient
-      .request<DeliveryTask[]>("delivery:list")
+      .request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE })
       .catch(() => []);
     setDeliveries(del);
     fetched.current.deliveries = del.length;

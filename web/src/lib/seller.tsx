@@ -965,6 +965,10 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [plans, setPlans] = useState<SellerPlanInfo[] | null>(null);
   const [readyAt, setReadyAt] = useState<Record<string, string>>({});
   const [liveTick, setLiveTick] = useState(0);
+  const productsRef = useRef<SellerProductRow[] | null>(null);
+  useEffect(() => {
+    productsRef.current = ownProducts;
+  }, [ownProducts]);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -1085,14 +1089,12 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       scheduleFollowUp({ money: true, analytics: true });
     };
     const onProduct = (p: SellerProductRow) => {
-      let reviewsMoved = false;
-      setOwnProducts((cur) => {
-        const prev = cur?.find((x) => x.id === p.id);
-        reviewsMoved = !!prev && (prev.reviewsCount !== p.reviewsCount || prev.rating !== p.rating);
+      const prev = productsRef.current?.find((x) => x.id === p.id);
+      const reviewsMoved = !!prev && (prev.reviewsCount !== p.reviewsCount || prev.rating !== p.rating);
+      setOwnProducts((cur) =>
         // A product the push says is removed leaves the list.
-        if (p.status === "removed") return (cur ?? []).filter((x) => x.id !== p.id);
-        return upsert(cur ?? [], p);
-      });
+        p.status === "removed" ? (cur ?? []).filter((x) => x.id !== p.id) : upsert(cur ?? [], p),
+      );
       // A new / hidden review changes the product's rating: the server does not push the review
       // itself to the seller, but it does push the product, so re-read the feed.
       if (reviewsMoved) {

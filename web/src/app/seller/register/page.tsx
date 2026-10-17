@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
+import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Seller } from "@/lib/realtime/types";
@@ -16,6 +17,7 @@ export default function SellerRegisterPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const rt = useRealtime();
+  const { signInReal } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const isSeller = rt.user?.role === "seller";
@@ -24,6 +26,10 @@ export default function SellerRegisterPage() {
   const [checking, setChecking] = useState(true);
   const [name, setName] = useState("");
   const [pickup, setPickup] = useState("");
+  // Only for a visitor without an account: the seller account is created together with the store.
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +69,23 @@ export default function SellerRegisterPage() {
     }
     setBusy(true);
     setError(null);
+    if (!rt.user) {
+      if (!email.trim() || password.length < 8 || fullName.trim().length < 2) {
+        setError(fr ? "Renseignez votre nom, un e-mail et un mot de passe d'au moins 8 caractères." : "Enter your name, an email and a password of at least 8 characters.");
+        setBusy(false);
+        return;
+      }
+      try {
+        const user = await rt.register({ email: email.trim(), password, name: fullName.trim(), role: "seller" });
+        signInReal(user.role, { name: user.name, email: user.email });
+      } catch (err) {
+        const msg = errMessage(err);
+        setError(msg);
+        toast(msg, "error");
+        setBusy(false);
+        return;
+      }
+    }
     try {
       await socketClient.request<Seller>("sellers:register", { name: trimmed });
     } catch (err) {
@@ -94,33 +117,39 @@ export default function SellerRegisterPage() {
         subtitle={fr ? "Ouvrez votre boutique — la modération valide ensuite votre demande" : "Open your store — moderation then reviews your application"}
       />
 
-      {!isSeller ? (
+      {rt.user && !isSeller ? (
         <div className="card-premium space-y-4 p-6">
           <p className="text-sm text-slate-700">
-            {rt.user
-              ? fr
-                ? "Vous êtes connecté avec un compte qui n'est pas un compte vendeur. Une boutique ne peut être ouverte que depuis un compte vendeur."
-                : "You are signed in with an account that is not a seller account. A store can only be opened from a seller account."
-              : fr
-                ? "Créez d'abord un compte vendeur, puis revenez ici pour ouvrir votre boutique."
-                : "Create a seller account first, then come back here to open your store."}
+            {fr
+              ? "Vous êtes connecté avec un compte qui n'est pas un compte vendeur. Une boutique ne peut être ouverte que depuis un compte vendeur."
+              : "You are signed in with an account that is not a seller account. A store can only be opened from a seller account."}
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/shop/register?role=seller" className="btn-primary rounded-lg px-4 py-2 text-sm font-medium">
-              {fr ? "Créer un compte vendeur" : "Create a seller account"}
-            </Link>
-            <Link href="/login" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">
-              {fr ? "Se connecter" : "Sign in"}
-            </Link>
-          </div>
-          <p className="text-xs text-slate-500">
-            {fr ? "Aucun document requis pour la demande." : "No documents are required to apply."}
-          </p>
+          <Link href="/login" className="inline-flex rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">
+            {fr ? "Se connecter avec un autre compte" : "Sign in with another account"}
+          </Link>
         </div>
       ) : checking ? (
         <p className="text-center text-sm text-slate-500">{fr ? "Chargement…" : "Loading…"}</p>
       ) : (
         <form onSubmit={submit} className="card-premium space-y-4 p-6">
+          {!rt.user && (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium" htmlFor="sr-name">{fr ? "Votre nom complet" : "Your full name"}</label>
+                <input id="sr-name" required className="input-premium w-full px-4 py-2 text-sm" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="sr-email">{fr ? "E-mail" : "Email"}</label>
+                  <input id="sr-email" required type="email" className="input-premium w-full px-4 py-2 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="sr-pw">{fr ? "Mot de passe" : "Password"}</label>
+                  <input id="sr-pw" required type="password" minLength={8} className="input-premium w-full px-4 py-2 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+                </div>
+              </div>
+            </>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">{fr ? "Nom de l'entreprise / boutique" : "Business / store name"}</label>
             <input
@@ -146,7 +175,7 @@ export default function SellerRegisterPage() {
           </div>
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Soumettre ma demande" : "Submit application"}
+            {busy ? (fr ? "Envoi…" : "Sending…") : rt.user ? (fr ? "Soumettre ma demande" : "Submit application") : fr ? "Créer mon compte et ma boutique" : "Create my account and store"}
           </Button>
         </form>
       )}

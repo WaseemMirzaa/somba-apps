@@ -79,7 +79,7 @@ export default function SellOnlinePage() {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
-                href="/login"
+                href="/seller/register"
                 className="btn-primary inline-flex items-center gap-2 px-8 py-4 text-base font-bold"
               >
                 {fr ? SELL_ONLINE_HERO.ctaFr : SELL_ONLINE_HERO.cta}
@@ -147,7 +147,7 @@ export default function SellOnlinePage() {
             ))}
           </div>
           <div className="mt-12 text-center">
-            <Link href="/login" className="btn-primary inline-flex items-center gap-2 px-8 py-3.5 text-base">
+            <Link href="/seller/register" className="btn-primary inline-flex items-center gap-2 px-8 py-3.5 text-base">
               {fr ? "Créer un compte vendeur" : "Create seller account"}
               <ArrowRight className="h-5 w-5" />
             </Link>
@@ -287,7 +287,7 @@ export default function SellOnlinePage() {
               : `Join ${BRAND.fullName} and reach thousands of shoppers this week.`}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/login" className="inline-flex items-center gap-2 rounded-xl bg-white px-10 py-4 text-base font-bold text-[var(--primary)] shadow-xl hover:bg-white/95">
+            <Link href="/seller/register" className="inline-flex items-center gap-2 rounded-xl bg-white px-10 py-4 text-base font-bold text-[var(--primary)] shadow-xl hover:bg-white/95">
               {fr ? "Commencer à vendre" : "Start selling now"}
               <ArrowRight className="h-5 w-5" />
             </Link>

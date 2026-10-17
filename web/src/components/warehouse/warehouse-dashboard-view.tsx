@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
+import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { warehouseRoleLevel, canWarehouseAccess } from "@/lib/warehouse-access";
@@ -153,7 +154,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         />
         <StatCard
           title={fr ? "COD à encaisser" : "COD to collect"}
-          value={an ? `$${an.codToCollect.toFixed(2)}` : "…"}
+          value={an ? formatCurrency(an.codToCollect, locale) : "…"}
           icon={Banknote}
         />
       </div>
