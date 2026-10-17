@@ -111,15 +111,17 @@ class _FloatingNav extends StatelessWidget {
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: selected ? AppShadow.lifted : null,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(items[i].icon,
-                          size: 23,
-                          color: selected ? Colors.white : AppColors.faint),
-                      Flexible(
-                        child: AnimatedSize(
+                  // FittedBox: a longer (French) label, or the frames of the
+                  // selection animation, shrink the content instead of overflowing.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(items[i].icon,
+                            size: 23,
+                            color: selected ? Colors.white : AppColors.faint),
+                        AnimatedSize(
                           duration: const Duration(milliseconds: 240),
                           curve: Curves.easeOutCubic,
                           child: selected
@@ -128,7 +130,6 @@ class _FloatingNav extends StatelessWidget {
                                   child: Text(
                                     items[i].label,
                                     maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
@@ -139,8 +140,8 @@ class _FloatingNav extends StatelessWidget {
                                 )
                               : const SizedBox.shrink(),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
