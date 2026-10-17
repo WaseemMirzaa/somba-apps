@@ -38,7 +38,9 @@ async function bootstrap() {
     credentials: true,
   });
   // Lock the WebSocket transport to the same CORS allow-list.
-  app.useWebSocketAdapter(new SocketIoAdapter(app));
+  const wsAdapter = new SocketIoAdapter(app);
+  if (process.env.REDIS_URL) await wsAdapter.connectRedis(process.env.REDIS_URL);
+  app.useWebSocketAdapter(wsAdapter);
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );

@@ -54,7 +54,7 @@ die() { printf '\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 log "Installing system packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl gnupg git nginx ufw build-essential openssl mysql-server >/dev/null
+apt-get install -y -qq ca-certificates curl gnupg git nginx ufw build-essential openssl mysql-server unattended-upgrades >/dev/null
 [[ "$SSL" == "1" ]] && apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
 
 if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node.split(".")[0]')" != "22" ]]; then
@@ -172,6 +172,14 @@ ln -sf /etc/nginx/sites-available/somba.conf /etc/nginx/sites-enabled/somba.conf
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
+# ── 9b. Nightly backups + automatic security updates ────────────────────────
+log "Backups (daily 03:15, 14 days kept) and unattended security updates"
+install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/bin/somba-backup
+printf 'UPLOAD_DIR=%s/uploads\n15 3 * * * root /usr/local/bin/somba-backup >> /var/log/somba-backup.log 2>&1\n' "$APP_DIR" > /etc/cron.d/somba-backup
+chmod 644 /etc/cron.d/somba-backup
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
+/usr/local/bin/somba-backup >/dev/null 2>&1 || printf '\033[1;33m⚠ first backup failed — run somba-backup by hand to see why\033[0m\n'
+
 # ── 10. Firewall + HTTPS ─────────────────────────────────────────────────────
 log "Firewall"
 ufw allow OpenSSH >/dev/null; ufw allow 'Nginx Full' >/dev/null; ufw --force enable >/dev/null
@@ -216,6 +224,6 @@ cat <<EOF
     Aggregator webhook URL: $BASE_URL/api/v1/payments/webhook/mobile-money
     Then set the delivery zones/fees: admin Settings → deliveryZones
  Logs:   sudo -u $APP_USER pm2 logs
- Update: re-run this same command (idempotent; backs nothing up — run mysqldump first).
+ Update: re-run this same command (idempotent; a nightly backup also runs: /var/backups/somba).
 ══════════════════════════════════════════════════════════════════════════════
 EOF
