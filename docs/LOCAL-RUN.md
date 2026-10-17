@@ -54,6 +54,6 @@ cd mobile     && flutter analyze && flutter test && flutter test test/live_api_t
 cd rider-app  && flutter analyze && flutter test && flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```
 
-Results: customer app 25 widget/unit tests + 17 live tests, rider app 25 widget/unit tests + 3 live tests (the live ones need the seeded API above); both `flutter analyze` clean, and both `flutter build web` succeed. Not run on a device or emulator (no Android SDK in the sandbox).
+Results: customer app 55 widget/unit tests + 19 live tests, rider app 29 widget/unit tests + 3 live tests (the live ones need the seeded API above); both `flutter analyze` clean, and both `flutter build web` succeed. Not run on a device or emulator (no Android SDK in the sandbox).
 
 Both apps are bilingual (French is the default for the customer app; the rider app follows the phone's language, `fr` → French, anything else → English): the texts live in `lib/l10n/messages.dart` (key → English, French), see the READMEs. Push notifications and the rider's background location are described in [MOBILE-PUSH.md](MOBILE-PUSH.md) and `rider-app/README.md`; neither could be exercised on a phone.

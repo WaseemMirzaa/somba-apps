@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../util/format.dart';
 import '../widgets/kit.dart';
 import '../widgets/mobile_money.dart';
+import '../widgets/verify_prompt.dart';
 
 /// Wallet: balance, history and top-up through mobile money. The balance only
 /// changes when the network confirms — the server pushes `wallet:updated`.
@@ -199,6 +200,12 @@ class _TopUpSheetState extends State<_TopUpSheet> {
 
   Future<void> _submit() async {
     final s = Strings.of(context);
+    if (RealtimeStore.instance.needsVerification) {
+      final nav = Navigator.of(context);
+      nav.pop(); // close the sheet, then explain and open the verification screen
+      await ensureVerified(nav.context, forTopUp: true);
+      return;
+    }
     final amount = double.tryParse(_amount.text.replaceAll(',', '.'));
     setState(() {
       _amountErr = (amount == null || amount < 1) ? s.topupAmountMin : null;
@@ -214,6 +221,12 @@ class _TopUpSheetState extends State<_TopUpSheet> {
       messenger.showSnackBar(SnackBar(content: Text(s.topupApproveToast)));
     } catch (e) {
       if (mounted) setState(() => _busy = false);
+      if (isVerificationError(e) && mounted) {
+        final nav = Navigator.of(context);
+        nav.pop();
+        await ensureVerified(nav.context, forTopUp: true, force: true);
+        return;
+      }
       messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
     }
   }

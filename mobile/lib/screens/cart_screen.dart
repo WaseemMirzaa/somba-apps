@@ -163,6 +163,14 @@ class _CartScreenState extends State<CartScreen> {
                           Text(money(item.product.price),
                               style: const TextStyle(
                                   fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary)),
+                          if (item.product.strikePrice != null) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(money(item.product.strikePrice!),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
+                            ),
+                          ],
                           const Spacer(),
                           QuantityStepper(
                             value: item.qty,
@@ -227,6 +235,16 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const Divider(height: 18),
           _row(s.subtotal, money(shop.subtotal)),
+          if (_savings > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(s.youSave(money(_savings)),
+                    key: const ValueKey('cart-savings'),
+                    style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
+              ),
+            ),
           const SizedBox(height: 6),
           _row(s.delivery, deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
           if (discount > 0) ...[
@@ -252,6 +270,9 @@ class _CartScreenState extends State<CartScreen> {
       ),
     );
   }
+
+  /// What the shopper saves compared with the old prices (information only: the totals already use the charged prices).
+  double get _savings => shop.cart.fold(0.0, (sum, i) => sum + ((i.product.strikePrice ?? i.product.price) - i.product.price) * i.qty);
 
   Widget _row(String label, String value, {bool bold = false}) {
     return Row(

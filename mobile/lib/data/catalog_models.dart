@@ -22,6 +22,10 @@ class Product {
   final String? description;
   final DateTime? createdAt;
 
+  /// `base` | `flash` | `campaign`: what set [price] (the charged price).
+  final String priceSource;
+  final int campaignPct;
+
   const Product({
     required this.id,
     required this.uuid,
@@ -40,12 +44,17 @@ class Product {
     this.sellerName,
     this.description,
     this.createdAt,
+    this.priceSource = 'base',
+    this.campaignPct = 0,
   });
 
   String displayName(String lang) => lang == 'fr' ? nameFr : name;
   /// Category name in the app language (falls back to the English name).
   String displayCategory(String lang) => lang == 'fr' && categoryFr.isNotEmpty ? categoryFr : category;
   bool get inStock => stock > 0;
+
+  /// The old price struck through next to [price]; null when not discounted.
+  double? get strikePrice => originalPrice > price ? originalPrice : null;
 }
 
 class Category {

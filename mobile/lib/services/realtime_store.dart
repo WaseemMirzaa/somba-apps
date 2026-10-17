@@ -59,6 +59,19 @@ class RealtimeStore extends ChangeNotifier {
   List<Zone> zones = [];
   double? fxRate;
 
+  /// Public setting: with it on, an account needs a verified phone OR email to
+  /// place an order or top up the wallet.
+  bool requireVerifiedForCheckout = false;
+
+  /// True when the app should send the user to verification instead of the server refusing the order/top-up.
+  bool get needsVerification {
+    final u = user;
+    return requireVerifiedForCheckout && u != null && !(u.phoneVerified || u.emailVerified);
+  }
+
+  /// Bumped when the server pushes a review change (a seller reply…), so open review lists reload.
+  final ValueNotifier<int> reviewRevision = ValueNotifier(0);
+
   /// Account preferences (`me:prefs`): push / email / sms / personalize / market.
   Map<String, dynamic> prefs = {'push': true, 'email': true, 'sms': false, 'personalize': true, 'market': 'DRC'};
   final Set<String> wishlistIds = {};
@@ -296,6 +309,7 @@ class RealtimeStore extends ChangeNotifier {
       supportRevision.value++;
     });
     _socket.on('dispute:updated', (_) => disputeRevision.value++);
+    _socket.on('review:updated', (_) => reviewRevision.value++);
     _socket.on('payment:created', _upsertPayment);
     _socket.on('payment:updated', _upsertPayment);
     _socket.on('product:created', (d) => _upsertProduct(d));
@@ -310,6 +324,7 @@ class RealtimeStore extends ChangeNotifier {
     _socket.on('settings:updated', (d) {
       final m = _map(d);
       fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
+      if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
       try {
         if (m['deliveryZones'] != null) {
           zones = (jsonDecode(m['deliveryZones'] as String) as List).map((z) => Zone.fromJson(_map(z))).toList();
@@ -341,6 +356,7 @@ class RealtimeStore extends ChangeNotifier {
       _load('settings:get', (d) {
         final m = _map(d);
         fxRate = double.tryParse('${m['fxRate'] ?? ''}');
+        requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
         try {
           zones = (jsonDecode((m['deliveryZones'] ?? '[]') as String) as List).map((z) => Zone.fromJson(_map(z))).toList();
         } catch (_) {

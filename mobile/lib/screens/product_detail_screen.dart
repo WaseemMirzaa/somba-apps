@@ -36,6 +36,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     ShopState.instance.addRecentlyViewed(widget.product.uuid);
     _reload();
+    RealtimeStore.instance.reviewRevision.addListener(_onReviewPush);
+  }
+
+  /// A seller replied to (or moderation changed) a review: show it without reopening the page.
+  void _onReviewPush() {
+    if (mounted) setState(_reload);
+  }
+
+  @override
+  void dispose() {
+    RealtimeStore.instance.reviewRevision.removeListener(_onReviewPush);
+    super.dispose();
   }
 
   void _reload() {
@@ -140,6 +152,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                       ],
                     ]),
+                    if (p.priceSource == 'campaign' || p.priceSource == 'flash') ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Pill(p.priceSource == 'campaign' ? s.priceCampaign(p.campaignPct) : s.priceFlash,
+                            key: const ValueKey('price-source'),
+                            color: AppColors.accent.withValues(alpha: 0.14),
+                            textColor: AppColors.accentDark,
+                            icon: Icons.local_offer_rounded,
+                            fontSize: 12),
+                      ),
+                    ],
                     const SizedBox(height: 22),
                     if (p.inStock)
                       Row(children: [
@@ -251,7 +275,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
             child: Column(children: [
               for (var i = 0; i < items.length; i++) ...[
-                reviewTile(items[i]),
+                reviewTile(items[i], s),
                 if (i != items.length - 1) const Divider(height: 22),
               ],
             ]),
@@ -464,7 +488,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 }
 
 /// A single review row (shared by the product page and the reviews screen).
-Widget reviewTile(ReviewDto r) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         CircleAvatar(
             radius: 16,
@@ -481,4 +505,20 @@ Widget reviewTile(ReviewDto r) => Column(crossAxisAlignment: CrossAxisAlignment.
       ]),
       const SizedBox(height: 8),
       Text(r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+      if (r.sellerReply != null)
+        Container(
+          key: const ValueKey('seller-reply'),
+          margin: const EdgeInsets.only(top: 10, left: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border(left: BorderSide(color: AppColors.primary.withValues(alpha: 0.5), width: 3)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(s.reviewSellerReply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primary)),
+            const SizedBox(height: 3),
+            Text(r.sellerReply!, style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.inkSoft)),
+          ]),
+        ),
     ]);

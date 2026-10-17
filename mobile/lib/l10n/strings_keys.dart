@@ -457,4 +457,15 @@ extension StringsKeys on Strings {
   String get codeTitle => t('code_title');
   String get codeHint => t('code_hint');
   String get errUnexpected => t('err_unexpected');
+  String priceCampaign(Object? pct) => t('price_campaign', {'pct': pct});
+  String get priceFlash => t('price_flash');
+  String youSave(Object? amount) => t('you_save', {'amount': amount});
+  String orderCampaignSaved(Object? amount) => t('order_campaign_saved', {'amount': amount});
+  String get reviewSellerReply => t('review_seller_reply');
+  String get verifyTitle => t('verify_title');
+  String get verifyBodyOrder => t('verify_body_order');
+  String get verifyBodyTopup => t('verify_body_topup');
+  String get verifyPhoneBtn => t('verify_phone_btn');
+  String get verifyEmailBtn => t('verify_email_btn');
+  String get verifyLater => t('verify_later');
 }

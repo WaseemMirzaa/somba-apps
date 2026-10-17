@@ -23,6 +23,8 @@ Product productFromDto(ProductDto d) => Product(
       sellerName: d.sellerName,
       description: d.description,
       createdAt: d.createdAt,
+      priceSource: d.priceSource,
+      campaignPct: d.campaignPct,
     );
 
 Category categoryFromDto(CategoryDto d) =>

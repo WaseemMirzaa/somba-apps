@@ -134,7 +134,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           const SizedBox(height: 2),
                           Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                         ])),
-                        Text(money(i.priceUsd * i.qty), style: const TextStyle(fontWeight: FontWeight.w800)),
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text(money(i.priceUsd * i.qty), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          if (i.listPriceUsd > i.priceUsd)
+                            Text(money(i.listPriceUsd * i.qty),
+                                style: const TextStyle(fontSize: 11.5, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
+                        ]),
                       ]),
                     );
                   }),
@@ -144,6 +149,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Panel(
                 child: Column(children: [
                   _row(s.subtotal, money(o.subtotalUsd)),
+                  if (o.campaignDiscountUsd > 0)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(s.orderCampaignSaved(money(o.campaignDiscountUsd)),
+                          key: const ValueKey('order-campaign-saved'),
+                          style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
+                    ),
                   const SizedBox(height: 8),
                   _row(s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd)),
                   if (o.discountUsd > 0) ...[

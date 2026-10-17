@@ -15,6 +15,7 @@ import 'package:lipcart/data/shop_state.dart';
 import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/util/format.dart' show marketNotifier;
 import 'package:lipcart/services/auth_service.dart';
+import 'package:lipcart/widgets/verify_prompt.dart' show isVerificationError;
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/services/socket_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -245,6 +246,69 @@ void main() {
       expect(order.totalUsd, 80 - 8 + 3);
       await store.cancelOrder(order.id);
       shop.clearCart();
+    });
+
+    test('campaign price arrives live (base price struck through) and the order is charged exactly that price', () async {
+      final camp = await admin.call('campaigns:create', {'name': 'Flutter campaign $tag', 'discount': 25, 'productIds': [productId]}) as Map;
+      await admin.call('campaigns:setStatus', {'id': camp['id'], 'status': 'active'});
+      await until(() => productByUuid(productId)?.priceSource == 'campaign', what: 'campaign price pushed');
+      final p = productByUuid(productId)!;
+      expect(p.price, 30, reason: '25% off 40');
+      expect(p.strikePrice, 40);
+      expect(p.campaignPct, 25);
+      expect(store.products.firstWhere((x) => x.id == productId).basePrice, 40);
+
+      // What the app shows (subtotal of the cart line) is what the server charges.
+      final shop = ShopState.instance..clearCart();
+      shop.addToCart(p, qty: 2);
+      final order = await store.placeOrder(
+        items: shop.cart.map((c) => {'productId': c.product.uuid, 'qty': c.qty}).toList(),
+        paymentMethod: 'orange_money',
+        paymentPhone: '+243 81 234 5678',
+        zoneId: 'gombe',
+      );
+      expect(order.subtotalUsd, shop.subtotal, reason: 'client total == server total');
+      expect(order.subtotalUsd, 60);
+      expect(order.campaignDiscountUsd, 20, reason: '2 x (40 - 30)');
+      expect(order.items.single.priceUsd, 30);
+      expect(order.items.single.listPriceUsd, 40);
+      await store.cancelOrder(order.id);
+      shop.clearCart();
+
+      await admin.call('campaigns:setStatus', {'id': camp['id'], 'status': 'ended'});
+      await until(() => productByUuid(productId)?.priceSource == 'base', what: 'campaign end pushed');
+      expect(productByUuid(productId)!.price, 40);
+      expect(productByUuid(productId)!.strikePrice, isNull);
+    });
+
+    test('verification policy: the app knows before ordering, and the server refusal is recognised', () async {
+      expect(store.user!.phoneVerified || store.user!.emailVerified, isFalse);
+      await admin.call('settings:set', {'key': 'requireVerifiedForCheckout', 'value': 'true'});
+      try {
+        await until(() => store.requireVerifiedForCheckout, what: 'policy pushed (settings:updated)');
+        expect(store.needsVerification, isTrue);
+        Object? refused;
+        try {
+          await store.placeOrder(items: [
+            {'productId': productId, 'qty': 1},
+          ], paymentMethod: 'wallet', zoneId: 'gombe');
+        } catch (e) {
+          refused = e;
+        }
+        expect(refused, isNotNull);
+        expect(isVerificationError(refused!), isTrue, reason: 'shown as the localised prompt, not a raw error');
+        Object? refusedTopUp;
+        try {
+          await store.topUpWallet(5, method: 'airtel_money', phone: '+243812345678');
+        } catch (e) {
+          refusedTopUp = e;
+        }
+        expect(isVerificationError(refusedTopUp!), isTrue);
+      } finally {
+        await admin.call('settings:set', {'key': 'requireVerifiedForCheckout', 'value': 'false'});
+      }
+      await until(() => !store.requireVerifiedForCheckout, what: 'policy switched off');
+      expect(store.needsVerification, isFalse);
     });
 
     test('proof of delivery: the customer sees the 4-digit code while the parcel is on its way', () async {

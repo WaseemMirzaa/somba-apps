@@ -7,6 +7,7 @@ import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import '../widgets/mobile_money.dart';
+import '../widgets/verify_prompt.dart';
 import 'order_success_screen.dart';
 import 'payment_pending_screen.dart';
 import 'more/account_more.dart';
@@ -87,6 +88,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final s = Strings.of(context);
     final address = _address;
     if (_lines.isEmpty) return;
+    if (!await ensureVerified(context, forTopUp: false)) return;
+    if (!mounted) return;
     if (address == null) {
       _toast(s.checkoutAddAddressFirst);
       return;
@@ -136,7 +139,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
-      _toast(Strings.current.errorText(e));
+      if (isVerificationError(e) && mounted) {
+        await ensureVerified(context, forTopUp: false, force: true);
+      } else {
+        _toast(Strings.current.errorText(e));
+      }
     } finally {
       if (mounted) setState(() => _placing = false);
     }
@@ -161,6 +168,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final discount = shop.promoDiscount(subtotal);
     final total = subtotal + deliveryFee - discount;
     final address = _address;
+    final savings = _lines.fold(0.0, (sum, i) => sum + ((i.product.strikePrice ?? i.product.price) - i.product.price) * i.qty);
 
     return Scaffold(
       appBar: AppBar(
@@ -280,6 +288,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _card(
             child: Column(children: [
               _row(s.subtotal, money(subtotal)),
+              if (savings > 0)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(s.youSave(money(savings)),
+                      key: const ValueKey('checkout-savings'),
+                      style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
+                ),
               const SizedBox(height: 8),
               _row('${s.delivery} · ${lang == 'fr' ? selectedZone.nameFr : selectedZone.name}', deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
               if (discount > 0) ...[

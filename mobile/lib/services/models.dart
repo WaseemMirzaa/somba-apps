@@ -57,6 +57,16 @@ class ProductDto {
   final String? description;
   final DateTime? createdAt;
 
+  /// The stored listing price (`price` is what is charged: the lowest of the
+  /// listing, a running flash sale and a running campaign).
+  final double basePrice;
+
+  /// Percent off from the winning seller campaign (0 when none).
+  final int campaignPct;
+
+  /// `base` | `flash` | `campaign`: what set [price].
+  final String priceSource;
+
   ProductDto({
     required this.id,
     required this.name,
@@ -74,7 +84,10 @@ class ProductDto {
     this.sellerName,
     this.description,
     this.createdAt,
-  });
+    double? basePrice,
+    this.campaignPct = 0,
+    this.priceSource = 'base',
+  }) : basePrice = basePrice ?? price;
 
   /// Localised display name (falls back to the English name).
   String displayName(String lang) => lang == 'fr' && nameFr.isNotEmpty ? nameFr : name;
@@ -100,6 +113,9 @@ class ProductDto {
         sellerName: j['sellerName'] as String?,
         description: j['description'] as String?,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String) : null,
+        basePrice: (j['basePrice'] as num?)?.toDouble(),
+        campaignPct: (j['campaignPct'] as num?)?.toInt() ?? 0,
+        priceSource: j['priceSource'] as String? ?? 'base',
       );
 }
 
@@ -117,7 +133,10 @@ class ReviewDto {
   final int helpful;
   final DateTime? createdAt;
 
-  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt});
+  /// The seller's public answer to this review (null when none).
+  final String? sellerReply;
+
+  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt, this.sellerReply});
 
   factory ReviewDto.fromJson(Map<String, dynamic> j) => ReviewDto(
         id: j['id'] as String,
@@ -126,6 +145,7 @@ class ReviewDto {
         text: j['text'] as String? ?? '',
         helpful: (j['helpful'] as num?)?.toInt() ?? 0,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
+        sellerReply: (j['sellerReply'] as String?)?.trim().isNotEmpty == true ? (j['sellerReply'] as String).trim() : null,
       );
 }
 
@@ -204,13 +224,17 @@ class OrderItemDto {
   final int qty;
   final double priceUsd;
 
+  /// The normal (undiscounted) unit price; equals [priceUsd] when nothing was discounted.
+  final double listPriceUsd;
+
   OrderItemDto({
     required this.productId,
     required this.productName,
     required this.variant,
     required this.qty,
     required this.priceUsd,
-  });
+    double? listPriceUsd,
+  }) : listPriceUsd = listPriceUsd ?? priceUsd;
 
   factory OrderItemDto.fromJson(Map<String, dynamic> j) => OrderItemDto(
         productId: j['productId'] as String? ?? '',
@@ -218,6 +242,7 @@ class OrderItemDto {
         variant: j['variant'] as String? ?? 'Default',
         qty: (j['qty'] as num?)?.toInt() ?? 1,
         priceUsd: (j['priceUsd'] as num?)?.toDouble() ?? 0,
+        listPriceUsd: (j['listPriceUsd'] as num?)?.toDouble(),
       );
 }
 
@@ -235,6 +260,9 @@ class OrderDto {
   final DateTime? createdAt;
   final List<OrderItemDto> items;
 
+  /// Campaign savings already deducted from [subtotalUsd] / [totalUsd].
+  final double campaignDiscountUsd;
+
   OrderDto({
     required this.id,
     required this.reference,
@@ -248,6 +276,7 @@ class OrderDto {
     this.promoCode,
     this.createdAt,
     this.items = const [],
+    this.campaignDiscountUsd = 0,
   });
 
   int get itemCount => items.fold(0, (s, i) => s + i.qty);
@@ -263,6 +292,7 @@ class OrderDto {
         discountUsd: (j['discountUsd'] as num?)?.toDouble() ?? 0,
         promoCode: j['promoCode'] as String?,
         totalUsd: (j['totalUsd'] as num?)?.toDouble() ?? 0,
+        campaignDiscountUsd: (j['campaignDiscountUsd'] as num?)?.toDouble() ?? 0,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         items: ((j['items'] as List?) ?? const [])
             .map((e) => OrderItemDto.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))

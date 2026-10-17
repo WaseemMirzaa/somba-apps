@@ -45,6 +45,8 @@ final Map<String, String> _exactFr = {
   'Code expired or too many attempts. Request a new code.': 'Code expiré ou trop de tentatives. Demandez un nouveau code.',
   'Please wait before requesting another code.': 'Patientez avant de demander un nouveau code.',
   'Please wait before requesting another email.': 'Patientez avant de demander un nouvel e-mail.',
+  'Verify your phone number or email address first: open Profile > Verification, confirm a code or link, then try again.':
+      'Vérifiez d’abord votre numéro de téléphone ou votre adresse e-mail : ouvrez Profil > Vérification, confirmez le code ou le lien, puis réessayez.',
   // permissions / generic
   'Not allowed.': 'Action non autorisée.',
   'Customers only.': 'Réservé aux clients.',

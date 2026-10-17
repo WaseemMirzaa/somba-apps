@@ -150,6 +150,22 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   late Future<List<ReviewDto>> _future = RealtimeStore.instance.reviewsFor(widget.product.uuid);
 
   @override
+  void initState() {
+    super.initState();
+    RealtimeStore.instance.reviewRevision.addListener(_onPush);
+  }
+
+  void _onPush() {
+    if (mounted) setState(() => _future = RealtimeStore.instance.reviewsFor(widget.product.uuid));
+  }
+
+  @override
+  void dispose() {
+    RealtimeStore.instance.reviewRevision.removeListener(_onPush);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
     return Scaffold(
@@ -190,7 +206,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             else
               Panel(child: Text(s.reviewsNone, style: const TextStyle(color: AppColors.muted))),
             const SizedBox(height: 14),
-            ...reviews.map((r) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Panel(child: reviewTile(r)))),
+            ...reviews.map((r) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Panel(child: reviewTile(r, s)))),
           ]);
         },
       ),
