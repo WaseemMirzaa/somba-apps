@@ -20,10 +20,17 @@ const ok = (cond, name, extra = '') => {
 };
 const section = (t) => console.log(`\n— ${t}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The API allows 30 sign-ins/registrations a minute per address; when the suites run back to back (CI), wait and retry.
 const rest = async (path, body, token) => {
-  const res = await fetch(API + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
-  let json = null; try { json = await res.json(); } catch {}
-  return { status: res.status, json };
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(API + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+    let json = null; try { json = await res.json(); } catch {}
+    if (res.status === 429 && /ThrottlerException/.test(json?.message ?? '') && attempt < 6) {
+      await new Promise((r) => setTimeout(r, 15000));
+      continue;
+    }
+    return { status: res.status, json };
+  }
 };
 const connect = (token) => new Promise((resolve, reject) => {
   const s = io(API, { auth: { token }, transports: ['websocket'], forceNew: true });

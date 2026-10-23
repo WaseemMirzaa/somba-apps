@@ -20,15 +20,23 @@ const ok = (cond, name, extra = '') => {
   else { fails.push(name); console.log(`  ❌ ${name} ${extra}`); }
 };
 
+// The API allows 30 sign-ins/registrations a minute per address; when the suites run back to back (CI), wait and retry.
+// Only the general limiter's 429 is retried; the resend cooldown's own 429 is what one check expects.
 const rest = async (method, path, body, token, raw) => {
-  const res = await fetch(API + path, {
-    method,
-    headers: { ...(body && !raw ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: raw ? body : body ? JSON.stringify(body) : undefined,
-  });
-  let json = null;
-  try { json = await res.json(); } catch { /* non-JSON */ }
-  return { status: res.status, json };
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(API + path, {
+      method,
+      headers: { ...(body && !raw ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: raw ? body : body ? JSON.stringify(body) : undefined,
+    });
+    let json = null;
+    try { json = await res.json(); } catch { /* non-JSON */ }
+    if (res.status === 429 && /ThrottlerException/.test(json?.message ?? '') && attempt < 6) {
+      await new Promise((r) => setTimeout(r, 15000));
+      continue;
+    }
+    return { status: res.status, json };
+  }
 };
 const connect = (token) => new Promise((resolve, reject) => {
   const s = io(API, { auth: { token }, transports: ['websocket'] });
@@ -36,7 +44,18 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+// Ask the API over the socket. The API allows 40 events a second per connection; a test that runs faster than
+// that waits a second and asks again, as a well-behaved client would.
+const req = async (s, ev, b = {}) => {
+  for (let attempt = 0; ; attempt++) {
+    const res = await new Promise((r) => s.emit(ev, b, r));
+    if (res?.ok === false && /Too many requests/.test(res.error ?? '') && attempt < 5) {
+      await new Promise((r) => setTimeout(r, 1100));
+      continue;
+    }
+    return res;
+  }
+};
 
 // 1x1 transparent PNG
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');

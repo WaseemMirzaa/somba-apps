@@ -19,10 +19,17 @@ const ok = (cond, name, extra = '') => {
 };
 const section = (t) => console.log(`\n— ${t}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The API allows 30 sign-ins/registrations a minute per address; when the suites run back to back (CI), wait and retry.
 const rest = async (path, body, token) => {
-  const res = await fetch(API + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
-  let json = null; try { json = await res.json(); } catch {}
-  return { status: res.status, json };
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(API + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+    let json = null; try { json = await res.json(); } catch {}
+    if (res.status === 429 && /ThrottlerException/.test(json?.message ?? '') && attempt < 6) {
+      await new Promise((r) => setTimeout(r, 15000));
+      continue;
+    }
+    return { status: res.status, json };
+  }
 };
 const connect = (token) => new Promise((resolve, reject) => {
   const s = io(API, { auth: token ? { token } : {}, transports: ['websocket'], forceNew: true });
@@ -30,7 +37,18 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+// Ask the API over the socket. The API allows 40 events a second per connection; a test that runs faster than
+// that waits a second and asks again, as a well-behaved client would.
+const req = async (s, ev, b = {}) => {
+  for (let attempt = 0; ; attempt++) {
+    const res = await new Promise((r) => s.emit(ev, b, r));
+    if (res?.ok === false && /Too many requests/.test(res.error ?? '') && attempt < 5) {
+      await new Promise((r) => setTimeout(r, 1100));
+      continue;
+    }
+    return res;
+  }
+};
 const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 const login = async (email, pw = PW) => {
   const r = await rest('/api/v1/auth/login', { email, password: pw });

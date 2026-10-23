@@ -351,7 +351,12 @@ export class OrdersService {
 
   /** Make a paid (or COD) order visible to the warehouse, riders and admins. */
   private async openFulfilment(order: Order): Promise<void> {
-    const task = await this.deliveries.save(
+    await this.announceFulfilment(order, await this.createFulfilmentTask(order));
+  }
+
+  /** The order's delivery task (unassigned), routed to the warehouse that serves its zone. */
+  private async createFulfilmentTask(order: Order): Promise<DeliveryTask> {
+    return this.deliveries.save(
       this.deliveries.create({
         orderId: order.id,
         orderReference: order.reference,
@@ -364,6 +369,10 @@ export class OrdersService {
         proofCode: String(randomInt(1000, 10000)),
       }),
     );
+  }
+
+  /** Tell the warehouse, riders, admins and sellers about a new delivery. */
+  private async announceFulfilment(order: Order, task: DeliveryTask): Promise<void> {
     // Riders of the task's warehouse hear about the new delivery at once (no polling needed in their apps).
     this.emitTask(task);
     this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
@@ -817,9 +826,12 @@ export class OrdersService {
     if (!order || order.status !== 'pending') return;
 
     if (outcome === 'succeeded') {
+      // The delivery task exists before the order reads "confirmed", so whoever sees the confirmed order (the
+      // customer, ops, a test) also finds its parcel in the warehouse queue.
+      const task = await this.createFulfilmentTask(order);
       order.status = 'confirmed';
       const saved = await this.orders.save(order);
-      await this.openFulfilment(saved);
+      await this.announceFulfilment(saved, task);
       this.emitter.toUser(saved.customerId, 'order:updated', saved);
       return;
     }
