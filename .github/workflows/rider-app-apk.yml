@@ -1,7 +1,7 @@
 name: Rider App · Build APK
 
 # Builds and releases the Somba&Teka rider Flutter app (rider-app/) as an
-# Android APK using Flutter 3.35.7.
+# Android APK using Flutter 3.47.7.
 
 on:
   push:
@@ -22,7 +22,7 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: '3.35.7'
+  FLUTTER_VERSION: '3.47.7'
 
 jobs:
   build-apk:
