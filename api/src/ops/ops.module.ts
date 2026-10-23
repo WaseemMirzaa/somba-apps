@@ -15,6 +15,7 @@ import {
   Review,
   Seller,
   User,
+  Setting,
   WarehouseBatch,
   Hub,
 } from '../database/entities';
@@ -50,6 +51,7 @@ import { RolesService } from './roles.service';
       AuditLog,
       FraudAlert,
       Broadcast,
+      Setting,
     ]),
     NotificationsModule,
     PaymentsModule,

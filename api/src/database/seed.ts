@@ -190,7 +190,7 @@ async function run() {
     cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
   ]);
   const hubRepo = ds.getRepository(Hub);
-  await hubRepo.save([
+  const [kinshasaHub, , parisHub] = await hubRepo.save([
     hubRepo.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
     hubRepo.create({ name: 'Lubumbashi Hub', city: 'Lubumbashi', country: 'DRC', capacity: 400 }),
     hubRepo.create({ name: 'Paris Hub', city: 'Paris', country: 'France', capacity: 600 }),
@@ -201,7 +201,8 @@ async function run() {
     setRepo.create({ key: 'codCapUsd', value: '500' }),
     // Demo cash orders below need COD on; it is switched back to the client scope (off) right after.
     setRepo.create({ key: 'codEnabled', value: 'true' }),
-    setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0 }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5 }]) }),
+    // Each zone (commune) is delivered by one warehouse.
+    setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3, hubId: kinshasaHub.id }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5, hubId: kinshasaHub.id }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0, hubId: parisHub.id }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5, hubId: parisHub.id }]) }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
@@ -211,6 +212,13 @@ async function run() {
     setRepo.create({ key: 'sellerPlans', value: JSON.stringify(DEFAULT_SELLER_PLANS) }),
     setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
   ]);
+  // The demo rider and warehouse staff work at the Kinshasa warehouse; the rider prefers Gombe.
+  for (const [email, extra] of [
+    ['rider@somba.app', { preferredZones: JSON.stringify(['gombe']) }],
+    ['warehouse@somba.app', {}],
+  ] as const) {
+    await userRepo.update({ emailHash: UsersService.emailHash(email) }, { hubId: kinshasaHub.id, ...extra });
+  }
 
   // A couple of seed reviews on the first product.
   const firstProduct = await productRepo.findOne({ where: {} });

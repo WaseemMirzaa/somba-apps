@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,7 +27,7 @@ export default function AdminReturnsPage() {
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const returns = (rt.disputes as DisputeRow[])
     .filter((d) => d.type === "return")
-    .map((d) => ({ ...d, date: d.createdAt.slice(0, 10), received: d.receivedAt ? "yes" : "no" }));
+    .map((d) => ({ ...d, date: localDay(d.createdAt), received: d.receivedAt ? "yes" : "no" }));
 
   const filtered = useMemo(
     () =>

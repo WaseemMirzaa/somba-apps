@@ -7,6 +7,7 @@
  *   API_URL=http://localhost:3001 node test/race-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { kyc } = require('./kyc.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -53,7 +54,7 @@ const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'or
   const mk = await req(admin.sock, 'roles:createStaff', { email: `rider2${tag}@race.test`, name: 'Second Rider', role: 'rider' });
   const rider2 = await login(`rider2${tag}@race.test`, mk.data.tempPassword);
   const sellerU = await register('seller', 'seller');
-  const store = (await req(sellerU.sock, 'sellers:register', { name: `Race Store ${tag}` })).data;
+  const store = (await req(sellerU.sock, 'sellers:register', kyc(`Race Store ${tag}`))).data;
   await req(admin.sock, 'sellers:setStatus', { id: store.id, status: 'approved' });
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   const buyers = [];

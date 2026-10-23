@@ -142,6 +142,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: Text(s.details),
             ),
           ]),
+          if (o.cancelledLineCount > 0 && o.status != 'cancelled')
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(children: [
+                const Icon(Icons.remove_shopping_cart_outlined, size: 15, color: AppColors.danger),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    o.cancelledLineCount == 1 ? s.ordersCancelledOne : s.ordersCancelledMany(o.cancelledLineCount),
+                    key: ValueKey('order-cancelled-hint-${o.reference}'),
+                    style: const TextStyle(fontSize: 12, color: AppColors.danger, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ]),
+            ),
         ]),
       ),
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,7 +27,7 @@ export default function AdminSupportPage() {
   const { items: tickets, error, reload, loading } = useServerList<SupportTicketRow>("support:list", { pushEvents: ["support:updated"] });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
-  const rows = useMemo(() => tickets.map((tk) => ({ ...tk, date: tk.createdAt.slice(0, 10) })), [tickets]);
+  const rows = useMemo(() => tickets.map((tk) => ({ ...tk, date: localDay(tk.createdAt) })), [tickets]);
 
   const filtered = useMemo(
     () => applyListFilters(rows, filters, { searchFields: ["reference", "subject", "userName", "category"], dateField: "date", statusField: "status" }),

@@ -42,6 +42,11 @@ export class Exchange {
   @Column({ type: 'varchar' })
   customerName: string;
 
+  /** The store whose item is exchanged (null on old rows or when it can't be told). */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  sellerId: string | null;
+
   @Column({ type: 'varchar' })
   fromSku: string;
 

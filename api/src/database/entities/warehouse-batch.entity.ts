@@ -23,8 +23,8 @@ export class WarehouseBatch {
   riderName: string | null;
 
   /** JSON array of delivery-task ids in the batch. */
-  @Column({ type: 'text', default: '[]' })
-  taskIds: string;
+  @Column({ type: 'text' })
+  taskIds: string = '[]';
 
   @Column({ type: 'varchar', length: 20, default: 'building' })
   status: string; // building | dispatched | completed

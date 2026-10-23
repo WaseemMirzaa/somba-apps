@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay, localDateTime } from "@/lib/dates";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
@@ -42,7 +43,7 @@ export default function AdminDisputeResolutionPage() {
     <div className="space-y-6">
       <PageHeader
         title={dispute.reference}
-        subtitle={`${dispute.createdAt.slice(0, 10)} · ${typeLabel} · ${statusLabel} · ${dispute.orderReference}`}
+        subtitle={`${localDay(dispute.createdAt)} · ${typeLabel} · ${statusLabel} · ${dispute.orderReference}`}
         backHref="/admin/disputes"
         breadcrumbs={[
           adminBreadcrumb(locale),
@@ -71,10 +72,10 @@ export default function AdminDisputeResolutionPage() {
           <InfoGrid items={[
             { label: fr ? "Référence" : "Reference", value: dispute.reference },
             { label: "Type", value: typeLabel },
-            { label: fr ? "Ouvert le" : "Opened", value: dispute.createdAt.slice(0, 16).replace("T", " ") },
+            { label: fr ? "Ouvert le" : "Opened", value: localDateTime(dispute.createdAt) },
             { label: fr ? "Statut" : "Status", value: statusLabel },
             ...(dispute.type === "return"
-              ? [{ label: fr ? "Marchandise reçue" : "Goods received", value: dispute.receivedAt ? dispute.receivedAt.slice(0, 16).replace("T", " ") : (fr ? "Pas encore" : "Not yet") }]
+              ? [{ label: fr ? "Marchandise reçue" : "Goods received", value: dispute.receivedAt ? localDateTime(dispute.receivedAt) : (fr ? "Pas encore" : "Not yet") }]
               : []),
             ...(dispute.resolution ? [{ label: fr ? "Décision" : "Resolution", value: dispute.resolution, full: true }] : []),
           ]} />

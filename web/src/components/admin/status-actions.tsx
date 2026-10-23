@@ -18,7 +18,13 @@ type Action = {
   confirmFr: string;
   done: string;
   doneFr: string;
+  /** A note sent as `reason`: "required" blocks Confirm until it is valid; "optional" may be left empty. */
+  reason?: "required" | "optional";
 };
+
+/** Same bounds as the server (`SellersService.setStatus`). */
+const REASON_MIN = 5;
+const REASON_MAX = 500;
 
 function useStatusFlow(event: string, idKey: string, onDone?: () => void) {
   const { locale } = useLocale();
@@ -51,23 +57,23 @@ const SELLER_ACTIONS: Record<string, Action> = {
     status: "approved", label: "Approve", labelFr: "Approuver", variant: "approve",
     confirm: "Approve this store? The seller can publish products and request payouts.",
     confirmFr: "Approuver cette boutique ? Le vendeur pourra publier et demander des versements.",
-    done: "Seller approved", doneFr: "Vendeur approuvé",
+    done: "Seller approved", doneFr: "Vendeur approuvé", reason: "optional",
   },
   rejected: {
     status: "rejected", label: "Reject", labelFr: "Rejeter", variant: "reject",
     confirm: "Reject this store application?", confirmFr: "Rejeter cette candidature ?",
-    done: "Seller rejected", doneFr: "Vendeur rejeté",
+    done: "Seller rejected", doneFr: "Vendeur rejeté", reason: "required",
   },
   suspended: {
     status: "suspended", label: "Suspend", labelFr: "Suspendre", variant: "reject",
     confirm: "Suspend this store? The seller can no longer operate until reinstated.",
     confirmFr: "Suspendre cette boutique ? Le vendeur ne peut plus opérer tant qu'elle n'est pas rétablie.",
-    done: "Seller suspended", doneFr: "Vendeur suspendu",
+    done: "Seller suspended", doneFr: "Vendeur suspendu", reason: "required",
   },
   reinstated: {
     status: "approved", label: "Reinstate", labelFr: "Rétablir", variant: "approve",
     confirm: "Reinstate this store?", confirmFr: "Rétablir cette boutique ?",
-    done: "Seller reinstated", doneFr: "Vendeur rétabli",
+    done: "Seller reinstated", doneFr: "Vendeur rétabli", reason: "optional",
   },
 };
 
@@ -101,13 +107,18 @@ export function SellerStatusActions({
   onDone?: () => void;
 }) {
   const { fr, action, setAction, busy, error, setError, run } = useStatusFlow("sellers:setStatus", "id", onDone);
+  // The note the seller will read (rejection / suspension reason, or an optional approval note).
+  const [reason, setReason] = useState("");
   const actions = sellerActionsFor(status);
   if (actions.length === 0) return null;
+  const note = reason.trim();
+  const needsReason = action?.reason === "required";
+  const reasonOk = !action?.reason || ((!needsReason || note.length >= REASON_MIN) && note.length <= REASON_MAX);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
         {actions.map((a) => (
-          <Button key={a.label} variant={a.variant} size={size} onClick={() => { setError(null); setAction(a); }}>
+          <Button key={a.label} variant={a.variant} size={size} onClick={() => { setError(null); setReason(""); setAction(a); }}>
             {fr ? a.labelFr : a.label}
           </Button>
         ))}
@@ -119,13 +130,42 @@ export function SellerStatusActions({
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={() => setAction(null)} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button size="sm" variant={action?.variant === "reject" ? "danger" : "primary"} onClick={() => run(sellerId, (s) => ({ status: s }))} disabled={busy}>
+            <Button size="sm" variant={action?.variant === "reject" ? "danger" : "primary"} onClick={() => run(sellerId, (s) => ({ status: s, ...(note ? { reason: note } : {}) }))} disabled={busy || !reasonOk}>
               {busy ? "…" : fr ? "Confirmer" : "Confirm"}
             </Button>
           </>
         }
       >
         <p>{action ? (fr ? action.confirmFr : action.confirm) : ""}</p>
+        {action?.reason && (
+          <div>
+            <label htmlFor="status-reason" className="mb-1 block text-xs font-medium text-slate-600">
+              {needsReason
+                ? fr ? "Motif (visible par le vendeur)" : "Reason (the seller will see it)"
+                : fr ? "Note pour le vendeur (optionnel)" : "Note for the seller (optional)"}
+            </label>
+            <textarea
+              id="status-reason"
+              className="input-premium w-full px-3 py-2 text-sm"
+              rows={3}
+              maxLength={REASON_MAX}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={busy}
+              aria-invalid={needsReason && note.length < REASON_MIN ? true : undefined}
+              placeholder={
+                needsReason
+                  ? fr ? "Ex. : la photo de la pièce d'identité est illisible." : "E.g. the ID photo is unreadable."
+                  : ""
+              }
+            />
+            <p className={`mt-1 text-xs ${needsReason && note.length < REASON_MIN ? "text-red-600" : "text-slate-500"}`}>
+              {needsReason && note.length < REASON_MIN
+                ? fr ? `Au moins ${REASON_MIN} caractères.` : `At least ${REASON_MIN} characters.`
+                : `${note.length}/${REASON_MAX}`}
+            </p>
+          </div>
+        )}
         <ErrorNote message={error} />
       </Modal>
     </>
@@ -160,7 +200,6 @@ export function productActionsFor(status: string): Action[] {
     case "pending":
       return [PRODUCT_ACTIONS.live, PRODUCT_ACTIONS.rejected];
     case "live":
-    case "approved":
       return [PRODUCT_ACTIONS.removed];
     case "removed":
       return [PRODUCT_ACTIONS.unblock];

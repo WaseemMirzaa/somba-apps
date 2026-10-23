@@ -8,7 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_actions.dart';
-import '../order_detail_link.dart';
+import '../notice_router.dart';
 import 'support_extra.dart';
 
 /// Wishlist — stored on the server, so it follows the customer across devices.
@@ -45,8 +45,10 @@ class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key, this.locale = const Locale('en')});
 
   static (IconData, Color) _style(String type) => switch (type) {
-        'order' => (Icons.local_shipping_rounded, AppColors.primary),
+        'order' => (Icons.receipt_long_rounded, AppColors.primary),
+        'delivery' => (Icons.local_shipping_rounded, AppColors.primary),
         'payment' => (Icons.payments_rounded, AppColors.success),
+        'return' || 'dispute' || 'exchange' || 'replacement' => (Icons.assignment_return_rounded, AppColors.royalBlue),
         'broadcast' || 'promo' => (Icons.campaign_rounded, AppColors.royalBlue),
         'support' => (Icons.headset_mic_rounded, AppColors.royalBlue),
         _ => (Icons.notifications_rounded, AppColors.primary),
@@ -85,12 +87,9 @@ class NotificationsScreen extends StatelessWidget {
                     final text = localizeNotification(s, n.title, n.body);
                     final (icon, color) = _style(n.type);
                     return GestureDetector(
-                      onTap: () {
-                        if (!n.read) store.markRead(n.id);
-                        if (n.type == 'order' && n.entityId != null && store.orderById(n.entityId!) != null) {
-                          openOrder(context, locale, n.entityId!);
-                        }
-                      },
+                      // Same destinations as a push tap: the order, its tracking, the wallet, the return or the ticket.
+                      onTap: () => openNotice(Navigator.of(context), locale,
+                          type: n.type, entityId: n.entityId, notificationId: n.id, fromInbox: true),
                       child: Panel(
                         padding: const EdgeInsets.all(14),
                         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -172,23 +171,47 @@ class AddressBookScreen extends StatelessWidget {
                           ]),
                           const SizedBox(height: 4),
                           Text(a.oneLine, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                          if ((a.line2 ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text('↳ ${a.line2}', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontStyle: FontStyle.italic)),
+                            ),
+                          if (a.hasPin)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3),
+                              child: Text('📍 ${s.addrMapPinnedBadge}', style: const TextStyle(color: AppColors.success, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                            ),
                           if ((a.phone ?? '').isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(a.phone!, style: const TextStyle(color: AppColors.faint, fontSize: 12)),
                           ],
                         ])),
-                        IconButton(
-                          tooltip: s.delete,
-                          icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.faint),
-                          onPressed: () async {
+                        PopupMenuButton<String>(
+                          key: ValueKey('address-menu-${a.id}'),
+                          icon: const Icon(Icons.more_vert_rounded, color: AppColors.faint),
+                          onSelected: (v) async {
                             final messenger = ScaffoldMessenger.of(context);
                             try {
-                              await store.removeAddress(a.id);
-                              if (ShopState.instance.selectedAddressId == a.id) ShopState.instance.selectedAddressId = null;
+                              switch (v) {
+                                case 'edit':
+                                  await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale, existing: a)));
+                                case 'default':
+                                  await store.updateAddress(a.id, {'isDefault': true});
+                                  messenger.showSnackBar(SnackBar(content: Text(s.addrDefaultDone)));
+                                case 'delete':
+                                  await store.removeAddress(a.id);
+                                  if (ShopState.instance.selectedAddressId == a.id) ShopState.instance.selectedAddressId = null;
+                                  messenger.showSnackBar(SnackBar(content: Text(s.addrRemoved)));
+                              }
                             } catch (e) {
                               messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
                             }
                           },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(value: 'edit', key: const ValueKey('address-edit'), child: Text(s.addrEdit)),
+                            if (!a.isDefault) PopupMenuItem(value: 'default', key: const ValueKey('address-make-default'), child: Text(s.addrMakeDefault)),
+                            PopupMenuItem(value: 'delete', key: const ValueKey('address-delete'), child: Text(s.delete, style: const TextStyle(color: AppColors.danger))),
+                          ],
                         ),
                       ]),
                     ),

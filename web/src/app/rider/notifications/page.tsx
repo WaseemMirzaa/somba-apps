@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { noticeHref } from "@/lib/notice-links";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +86,18 @@ export default function RiderNotificationsPage() {
               {filtered.map((n) => (
                 <li key={n.id} className="flex items-start gap-3 p-4">
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-medium ${n.read ? "text-slate-600" : "text-slate-900"}`}>{n.title}</p>
+                    {n.type === "task" ? (
+                      // A delivery notice opens that delivery.
+                      <Link
+                        href={noticeHref(n, "rider")}
+                        onClick={() => !n.read && void markRead(n.id)}
+                        className={`text-sm font-medium hover:underline ${n.read ? "text-slate-600" : "text-emerald-700"}`}
+                      >
+                        {n.title}
+                      </Link>
+                    ) : (
+                      <p className={`text-sm font-medium ${n.read ? "text-slate-600" : "text-slate-900"}`}>{n.title}</p>
+                    )}
                     <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>
                     <p className="mt-1 text-xs text-slate-400">
                       {new Date(n.createdAt).toLocaleString(locale)} · {n.type.replace(/_/g, " ")}

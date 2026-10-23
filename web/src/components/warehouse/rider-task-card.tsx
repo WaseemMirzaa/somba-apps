@@ -70,6 +70,7 @@ export function RiderTaskCard({
         <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
           <Package className="h-3.5 w-3.5" />
           {task.items} {fr ? "article(s)" : "item(s)"} · {task.zone}
+          {task.isPool && task.preferred && <Badge variant="success">{fr ? "Votre zone" : "Your zone"}</Badge>}
         </p>
       </Link>
       {action && <div className="mt-3">{action}</div>}

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
 import '../services/location_reporter.dart';
 import '../services/models.dart';
+import '../services/navigation_link.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -14,7 +15,9 @@ const kFailReasonIds = ['unreachable', 'wrong_address', 'refused', 'payment', 'o
 /// The rider's work: deliveries on the road, the open pool to claim from, and
 /// what was finished. Everything is live from the server.
 class DeliveriesScreen extends StatefulWidget {
-  const DeliveriesScreen({super.key});
+  /// Opens a navigation link; defaults to the system (Google Maps app / browser). Replaced in tests.
+  final Future<bool> Function(Uri uri)? launcher;
+  const DeliveriesScreen({super.key, this.launcher});
   @override
   State<DeliveriesScreen> createState() => _DeliveriesScreenState();
 }
@@ -23,6 +26,29 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   final store = RiderStore.instance;
   int _tab = 0; // 0 active · 1 available · 2 done
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    store.focus.addListener(_onFocus);
+    _onFocus();
+  }
+
+  @override
+  void dispose() {
+    store.focus.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  /// A tapped notification: open Active or Available, then clear the request.
+  void _onFocus() {
+    final sub = store.focus.value?.deliveriesTab;
+    if (sub == null) return;
+    setState(() => _tab = sub);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (store.focus.value?.deliveriesTab != null) store.focus.value = null;
+    });
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     setState(() => _busy = true);
@@ -210,6 +236,15 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         if (t.pickupAddress != null) _line(Icons.storefront_rounded, s.collectAt(t.pickupAddress)),
         _line(Icons.location_on_rounded, s.deliverTo(_address(s, t))),
         if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(t)),
+        if (t.zoneName != null || t.preferred)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 4),
+            child: Wrap(spacing: 6, runSpacing: 6, children: [
+              if (t.zoneName != null) Pill(s.zoneLabel(t.zoneName), color: AppColors.primary.withValues(alpha: 0.10), textColor: AppColors.primary),
+              if (t.preferred)
+                Pill(s.yourZone, key: ValueKey('your-zone-${t.orderReference}'), color: AppColors.success.withValues(alpha: 0.14), textColor: AppColors.success),
+            ]),
+          ),
         if (t.attempts > 1) Padding(padding: const EdgeInsets.only(top: 2, bottom: 4), child: Wrap(children: [_attemptPill(s, t)])),
         const SizedBox(height: 12),
         SizedBox(
@@ -261,6 +296,21 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
           ),
         if (t.phone != null) _line(Icons.phone_rounded, t.phone!),
         if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(t)),
+        if (t.deliverByText != null) _line(Icons.event_available_rounded, s.deliverBy(t.deliverByText)),
+        if (t.isActive && t.pin != null && t.status != 'assigned') _line(Icons.push_pin_rounded, s.pinExact),
+        if (t.isActive)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: ValueKey('navigate-${t.orderReference}'),
+                onPressed: () => _navigate(s, t),
+                icon: const Icon(Icons.navigation_rounded, size: 20),
+                label: Text(_toPickup(t) ? s.navigatePickup : s.navigateCustomer),
+              ),
+            ),
+          ),
         if (t.collectsCash && t.isActive)
           Container(
             margin: const EdgeInsets.only(top: 10),
@@ -299,6 +349,23 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         ],
       ]),
     );
+  }
+
+  /// Before pickup the rider heads to the seller; afterwards to the customer.
+  static bool _toPickup(DeliveryTaskDto t) => t.status == 'assigned' && t.pickupAddress != null;
+
+  Future<void> _navigate(Strings s, DeliveryTaskDto t) async {
+    final toPickup = _toPickup(t);
+    final opened = await openNavigation(
+      pin: toPickup ? null : t.pin, // the pin is the customer's spot, never the seller's
+      addressText: toPickup ? t.pickupAddress : t.mapsQuery,
+      launcher: widget.launcher,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(s.navFailed)));
+    }
   }
 
   Widget _gpsRow(Strings s) {

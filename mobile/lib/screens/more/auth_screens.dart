@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../widgets/mobile_money.dart';
 import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
@@ -332,6 +333,13 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 4),
         AuthButton(s.signIn,
             icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
+        const SizedBox(height: 6),
+        TextButton(
+          key: const ValueKey('go-phone-login'),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneLoginScreen(onAuthed: widget.onAuthed))),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+          child: Text(s.phoneLoginLink, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
         const SizedBox(height: 22),
         Center(
           child: GestureDetector(
@@ -904,6 +912,127 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           child:
               Text(s.skip, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
+      ]),
+    );
+  }
+}
+
+// ============ Phone-code login ============
+/// Sign in without a password: a 6-digit code goes by SMS to the account's verified number.
+class PhoneLoginScreen extends StatefulWidget {
+  final VoidCallback? onAuthed;
+  const PhoneLoginScreen({super.key, this.onAuthed});
+  @override
+  State<PhoneLoginScreen> createState() => _PhoneLoginScreenState();
+}
+
+class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
+  final _phone = TextEditingController(text: '+243 ');
+  final _code = TextEditingController();
+  bool _codeSent = false;
+  bool _busy = false;
+  String? _phoneErr, _codeErr;
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    _code.dispose();
+    super.dispose();
+  }
+
+  void _snack(String m) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _send() async {
+    final s = Strings.of(context);
+    final err = validateMobileNumber(_phone.text, s);
+    setState(() => _phoneErr = err);
+    if (err != null) {
+      _snack(err);
+      return;
+    }
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final dev = await RealtimeStore.instance.sendLoginCode(_phone.text);
+      if (!mounted) return;
+      setState(() {
+        _codeSent = true;
+        if (kDebugMode && dev != null) _code.text = dev; // local dev has no SMS gateway
+      });
+      messenger.showSnackBar(SnackBar(content: Text(s.phoneLoginSent)));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _phoneErr = Strings.current.errorText(e));
+        _snack(Strings.current.errorText(e));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _verify() async {
+    final s = Strings.of(context);
+    if (!RegExp(r'^[0-9]{6}$').hasMatch(_code.text.trim())) {
+      setState(() => _codeErr = s.phoneLoginCodeInvalid);
+      _snack(s.phoneLoginCodeInvalid);
+      return;
+    }
+    setState(() {
+      _codeErr = null;
+      _busy = true;
+    });
+    try {
+      await RealtimeStore.instance.loginWithPhoneCode(_phone.text, _code.text);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      widget.onAuthed?.call();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _codeErr = Strings.current.errorText(e));
+        _snack(Strings.current.errorText(e));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    return _AuthPage(
+      title: s.phoneLoginTitle,
+      subtitle: _codeSent ? s.phoneLoginCodeSubtitle : s.phoneLoginSubtitle,
+      showBack: true,
+      form: Column(children: [
+        KeyedSubtree(
+            key: const ValueKey('phone-login-phone'),
+            child: _GlassField(
+                label: s.phone,
+                hint: '+243 81 234 5678',
+                icon: Icons.phone_iphone_rounded,
+                controller: _phone,
+                keyboard: TextInputType.phone,
+                error: _phoneErr)),
+        if (_codeSent) ...[
+          const SizedBox(height: 14),
+          KeyedSubtree(
+              key: const ValueKey('phone-login-code'),
+              child: _GlassField(
+                  label: s.phoneLoginCode,
+                  hint: '123456',
+                  icon: Icons.password_rounded,
+                  controller: _code,
+                  keyboard: TextInputType.number,
+                  error: _codeErr)),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(onPressed: _busy ? null : _send, child: Text(s.phoneLoginResend)),
+          ),
+        ],
+        const SizedBox(height: 16),
+        AuthButton(_codeSent ? s.signIn : s.phoneLoginSend, loading: _busy, onPressed: _codeSent ? _verify : _send),
       ]),
     );
   }

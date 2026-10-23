@@ -1,8 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { num, optStr, str } from '../common/validate';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { In } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Campaign, Product, Seller } from '../database/entities';
 import type { CampaignStatus } from '../database/entities';
 import {
@@ -13,13 +12,18 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { campaignWindow } from '../products/pricing';
 
+/** How often campaigns are started and ended on their dates (CAMPAIGN_SWEEP_MS, 0 turns it off). */
+const SWEEP_MS = Number(process.env.CAMPAIGN_SWEEP_MS ?? 5 * 60_000);
+
 /**
  * Marketing campaigns: sellers propose, marketing/admins approve. An approved
  * campaign (`active`, inside its dates) really lowers the price of the products
  * it covers — see products/pricing.ts for the rules. `discount` is the percent off.
  */
 @Injectable()
-export class CampaignsService {
+export class CampaignsService implements OnModuleInit, OnModuleDestroy {
+  private sweeper: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     @InjectRepository(Campaign) private readonly campaigns: Repository<Campaign>,
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
@@ -28,6 +32,89 @@ export class CampaignsService {
     private readonly emitter: RealtimeEmitter,
     private readonly products: ProductsService,
   ) {}
+
+  onModuleInit(): void {
+    if (SWEEP_MS > 0) {
+      this.sweeper = setInterval(() => void this.sweep().catch(() => undefined), SWEEP_MS);
+      this.sweeper.unref();
+    }
+  }
+
+  onModuleDestroy(): void {
+    if (this.sweeper) clearInterval(this.sweeper);
+  }
+
+  /**
+   * Move campaigns along their dates: an approved campaign whose end date has passed is `ended`, and a `scheduled`
+   * one whose start date has passed becomes `active`. Prices were already right (pricing reads the dates); this keeps
+   * the stored status, the seller's screens and shoppers' prices in step, and tells the seller.
+   */
+  async sweep(now = Date.now()): Promise<number> {
+    let moved = 0;
+    for (const c of await this.campaigns.find({ where: { status: In(['active', 'scheduled']) } })) {
+      const { from, to } = campaignWindow(c);
+      let next: CampaignStatus | null = null;
+      if (to !== null && now > to) next = 'ended';
+      else if (c.status === 'scheduled' && from !== null && now >= from) next = 'active';
+      if (!next) continue;
+      // Conditional, so two API instances sweeping at once move each campaign only once.
+      const claim = await this.campaigns
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({ status: next })
+        .where('id = :id AND status = :from', { id: c.id, from: c.status })
+        .execute();
+      if (!claim.affected) continue;
+      moved++;
+      const saved = (await this.campaigns.findOne({ where: { id: c.id } }))!;
+      await this.publish(saved, {
+        title: next === 'ended' ? 'Campaign ended' : 'Campaign started',
+        body: next === 'ended' ? `"${saved.name}" reached its end date; prices are back to normal.` : `"${saved.name}" is now live.`,
+      });
+    }
+    return moved;
+  }
+
+  /** Push a campaign change to admins and the owning seller, refresh prices, and optionally notify the seller. */
+  private async publish(saved: Campaign, notice: { title: string; body: string } | null): Promise<void> {
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', saved);
+    // Prices move when a campaign starts or stops discounting: refresh shoppers' screens.
+    void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
+    const userId = await this.ownerUserId(saved);
+    if (!userId) return;
+    this.emitter.toUser(userId, 'campaign:updated', saved);
+    if (notice) await this.notifications.toUser(userId, { ...notice, type: 'campaign', entityId: saved.id });
+  }
+
+  /** The seller account that owns a campaign (old rows may store the user id directly). */
+  private async ownerUserId(c: Campaign): Promise<string | null> {
+    if (!c.sellerId) return null;
+    const seller = await this.sellers.findOne({ where: { id: c.sellerId } });
+    return seller?.userId ?? c.sellerId;
+  }
+
+  /** The seller stops their own campaign at any point; marketing is told. */
+  async withdraw(user: { id: string; role: string }, id: string): Promise<Campaign> {
+    const campaign = await this.campaigns.findOne({ where: { id } });
+    if (!campaign || !(await this.owns(user, campaign))) throw new NotFoundException('Campaign not found.');
+    if (campaign.status === 'ended') throw new BadRequestException('This campaign has already ended.');
+    const claim = await this.campaigns
+      .createQueryBuilder()
+      .update(Campaign)
+      .set({ status: 'ended' })
+      .where('id = :id AND status = :from', { id, from: campaign.status })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
+    const saved = (await this.campaigns.findOne({ where: { id } }))!;
+    await this.publish(saved, null);
+    await this.notifications.toRole('admin_marketing', {
+      title: 'Campaign withdrawn',
+      body: `${saved.sellerName ?? 'A seller'} withdrew "${saved.name}".`,
+      type: 'campaign',
+      entityId: saved.id,
+    });
+    return saved;
+  }
 
   /** Seller sees their own campaigns; ops/admin see everything. */
   async list(user: { id: string; role: string }): Promise<Campaign[]> {
@@ -81,11 +168,7 @@ export class CampaignsService {
         status: 'pending',
       }),
     );
-    this.emitter.toRoles(
-      [...ADMIN_ROLES, 'admin_marketing'],
-      'campaign:updated',
-      campaign,
-    );
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', campaign);
     if (seller?.userId) this.emitter.toUser(seller.userId, 'campaign:updated', campaign);
     await this.notifications.toRole('admin_marketing', {
       title: 'New campaign request',
@@ -140,25 +223,7 @@ export class CampaignsService {
     if (!campaign) throw new NotFoundException('Campaign not found.');
     campaign.status = status;
     const saved = await this.campaigns.save(campaign);
-    this.emitter.toRoles(
-      [...ADMIN_ROLES, 'admin_marketing'],
-      'campaign:updated',
-      saved,
-    );
-    // Prices move when a campaign starts or stops discounting: refresh shoppers' screens.
-    void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
-    if (saved.sellerId) {
-      const seller = await this.sellers.findOne({ where: { id: saved.sellerId } });
-      if (seller?.userId) {
-        this.emitter.toUser(seller.userId, 'campaign:updated', saved);
-        await this.notifications.toUser(seller.userId, {
-          title: `Campaign ${status}`,
-          body: `"${saved.name}" is now ${status}.`,
-          type: 'campaign',
-          entityId: saved.id,
-        });
-      }
-    }
+    await this.publish(saved, { title: `Campaign ${status}`, body: `"${saved.name}" is now ${status}.` });
     return saved;
   }
 
@@ -185,8 +250,11 @@ export class CampaignsService {
     Object.assign(campaign, fields);
     if (!admin) campaign.status = 'pending'; // an edit needs re-approval
     const saved = await this.campaigns.save(campaign);
-    this.emitter.toRoles([...ADMIN_ROLES, 'admin_marketing'], 'campaign:updated', saved);
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', saved);
     if (admin) void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
+    // The seller's own screens follow their edit (and an admin's edit of their campaign).
+    const owner = await this.ownerUserId(saved);
+    if (owner) this.emitter.toUser(owner, 'campaign:updated', saved);
     return saved;
   }
 }

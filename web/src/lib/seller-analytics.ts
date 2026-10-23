@@ -16,6 +16,8 @@ export interface SellerAnalytics {
   from: string;
   to: string;
   revenue: number;
+  /** Commission on `revenue`: the amounts stored on the order lines (absent on an older server). */
+  commissionUsd?: number;
   orders: number;
   units: number;
   aov: number;

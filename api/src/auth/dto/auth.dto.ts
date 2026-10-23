@@ -80,3 +80,16 @@ export class CodeDto {
   @IsString()
   code: string;
 }
+
+export class PhoneDto {
+  @IsString()
+  phone: string;
+}
+
+export class PhoneLoginDto {
+  @IsString()
+  phone: string;
+
+  @IsString()
+  code: string;
+}

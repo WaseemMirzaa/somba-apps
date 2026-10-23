@@ -241,8 +241,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(pay && !pay.phone.includes('81 234') && pay.phone.includes('…'), 'subscriber number is masked in payment records');
   const unassignedNow = (await req(admin, 'delivery:unassigned')).data;
   ok(a.ok && !unassignedNow.some((t) => t.orderId === mm1.id), 'unpaid order is NOT visible to the warehouse/riders yet');
-  a = await req(admin, 'orders:updateStatus', { orderId: mm1.id, status: 'shipped' });
-  ok(!a.ok && /payment/i.test(a.error ?? ''), 'staff cannot ship an unpaid order', a.error ?? '');
+  a = await req(admin, 'orders:updateStatus', { orderId: mm1.id, status: 'confirmed' });
+  ok(!a.ok && /payment/i.test(a.error ?? ''), 'staff cannot confirm/fulfil an unpaid order', a.error ?? '');
   ok((await req(s, 'products:get', { id: pid })).data.stock === stockBefore - 1, 'stock is reserved while waiting for approval');
 
   const confirmed = await until(async () => { const o = await orderOf(mm1.id); return o?.status === 'confirmed' ? o : null; });
@@ -357,7 +357,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await until(async () => (await orderOf(rv.id))?.status === 'confirmed');
   a = await req(s, 'reviews:create', { productId: pid, rating: 5, text: 'Great!' });
   ok(!a.ok, 'cannot review before delivery');
-  await req(admin, 'orders:updateStatus', { orderId: rv.id, status: 'delivered' });
+  for (const st of ['processing', 'shipped', 'out_for_delivery', 'delivered']) await req(admin, 'orders:updateStatus', { orderId: rv.id, status: st });
   a = await req(s, 'reviews:create', { productId: pid, rating: 4, text: 'Works well, fast delivery.' });
   ok(a.ok && a.data.rating === 4, 'can review after delivery', a.error ?? '');
   a = await req(s, 'reviews:create', { productId: pid, rating: 1, text: 'Changed my mind' });

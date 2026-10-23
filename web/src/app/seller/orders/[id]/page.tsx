@@ -14,13 +14,20 @@ import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
   errMessage,
+  lineStateLabel,
+  lineStateVariant,
   orderStatusLabel,
   orderStatusVariant,
+  packageStatusLabel,
+  packageStatusVariant,
   paymentMethodLabel,
   shippingStatusLabel,
   txnStatusLabel,
 } from "@/lib/seller-labels";
+import { canMarkReady, cancellableLines, waitingForOtherSellers } from "@/lib/seller-packages";
+import { CancelItemsDialog } from "@/components/seller/cancel-items-dialog";
 import { formatCurrency } from "@/lib/utils";
+import { dayLabel } from "@/lib/delivery-estimate";
 import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -35,10 +42,18 @@ export default function SellerOrderDetailPage() {
   const shipment = order ? getShipmentByOrderId(order.id) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   if (!order) return <MissingRecord load={load} label="Order not found" labelFr="Commande introuvable" />;
 
-  const canMarkReady = ["confirmed", "processing"].includes(order.orderStatus) && !order.readyAt;
+  // Everything below comes from the server's state (package status + each line's fulfilment).
+  const pkg = { status: order.orderStatus, packageStatus: order.packageStatus, items: order.items_detail };
+  const showReady = canMarkReady(pkg);
+  const cancellable = cancellableLines(pkg);
+  const isReady = order.packageStatus === "ready" || order.packageStatus === "at_hub";
+  const shared = order.sellerCount > 1;
+  const waiting = waitingForOtherSellers(order) && order.orderStatus !== "processing";
+  const otherSellers = order.sellerCount - 1;
 
   async function markReady() {
     if (!order) return;
@@ -46,7 +61,13 @@ export default function SellerOrderDetailPage() {
     setError(null);
     try {
       await sellerReady(order.orderId);
-      toast(fr ? "Colis marqué prêt : le livreur est prévenu" : "Package marked ready: the rider can collect it");
+      // Others still packing (the server's count; unknown on old payloads → assume yes).
+      const othersStillPacking = shared && (order.otherSellersPacking ?? 1) > 0;
+      toast(
+        othersStillPacking
+          ? (fr ? "Colis marqué prêt : le livreur passera quand tous les vendeurs seront prêts" : "Package marked ready: the rider comes once every seller is ready")
+          : (fr ? "Colis marqué prêt : le livreur est prévenu" : "Package marked ready: the rider can collect it"),
+      );
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
@@ -61,17 +82,25 @@ export default function SellerOrderDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={order.id}
-        subtitle={`${order.customer} · ${orderStatusLabel(order.orderStatus, fr)}`}
+        subtitle={`${order.customer} · ${packageStatusLabel(order.packageStatus, fr)}`}
         backHref="/seller/orders"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {canMarkReady && (
+            {showReady && (
               <button type="button" disabled={busy} onClick={() => void markReady()} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
                 {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Confirmer colis prêt" : "Package Ready"}
               </button>
             )}
-            {order.readyAt && (
-              <span className="text-sm text-emerald-600">{fr ? "Marqué prêt pour enlèvement" : "Marked ready for pickup"}</span>
+            {isReady && !waiting && (
+              <span className="text-sm text-emerald-600">{order.packageStatus === "at_hub" ? (fr ? "Reçu au hub" : "Received at the hub") : fr ? "Marqué prêt pour enlèvement" : "Marked ready for pickup"}</span>
+            )}
+            {waiting && (
+              <span className="text-sm text-amber-600">{fr ? "En attente des autres vendeurs" : "Waiting for the other sellers"}</span>
+            )}
+            {cancellable.length > 0 && (
+              <button type="button" onClick={() => setCancelOpen(true)} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                {fr ? "Annuler des articles" : "Cancel items"}
+              </button>
             )}
             <Link href="/seller/support" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700">
               {fr ? "Contacter le support à propos de cette commande" : "Contact support about this order"}
@@ -80,6 +109,14 @@ export default function SellerOrderDetailPage() {
         }
       />
 
+      {shared && (
+        <p role="note" className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-800">
+          {fr
+            ? `Cette commande contient aussi des articles de ${otherSellers} autre${otherSellers > 1 ? "s" : ""} vendeur${otherSellers > 1 ? "s" : ""}. Vous ne voyez et ne préparez que vos articles ; le colis part quand tous les vendeurs sont prêts.`
+            : `This order also contains items from ${otherSellers} other seller${otherSellers > 1 ? "s" : ""}. You only see and pack your items; the parcel leaves once every seller is ready.`}
+        </p>
+      )}
+
       {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
       <DetailGrid>
@@ -87,9 +124,13 @@ export default function SellerOrderDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Numéro de commande" : "Order Number", value: order.id },
             { label: fr ? "Date de commande" : "Order Date", value: order.date },
+            { label: fr ? "Votre colis" : "Your package", value: <Badge variant={packageStatusVariant(order.packageStatus)}>{packageStatusLabel(order.packageStatus, fr)}</Badge> },
             { label: fr ? "Statut de commande" : "Order Status", value: <Badge variant={orderStatusVariant(order.orderStatus)}>{orderStatusLabel(order.orderStatus, fr)}</Badge> },
             { label: fr ? "Expédition" : "Shipping", value: shippingStatusLabel(order.shippingStatus, fr) },
+            { label: fr ? "À livrer avant le" : "Deliver by", value: dayLabel(order.estimatedDeliveryDate, fr) ?? "—" },
+            ...(shared ? [{ label: fr ? "Vendeurs" : "Sellers", value: fr ? `Commande partagée · ${order.sellerCount} vendeurs` : `Shared order · ${order.sellerCount} sellers` }] : []),
             { label: fr ? "Montant (vos articles)" : "Amount (your items)", value: formatCurrency(order.amount, locale) },
+            ...(order.refunded > 0 ? [{ label: fr ? "Remboursé au client" : "Refunded to customer", value: formatCurrency(order.refunded, locale) }] : []),
           ]} />
         </DetailGridSection>
 
@@ -114,7 +155,10 @@ export default function SellerOrderDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Mode de paiement" : "Payment Method", value: paymentMethodLabel(order.paymentMethod, fr) },
             { label: fr ? "Statut" : "Status", value: txnStatusLabel(order.paymentStatus, fr) },
-            { label: fr ? "Commission" : "Commission", value: formatCurrency(order.commission, locale) },
+            {
+              label: fr ? "Commission" : "Commission",
+              value: `${formatCurrency(order.commission, locale)}${order.commissionRate === "mixed" ? (fr ? " (taux variés)" : " (mixed rates)") : typeof order.commissionRate === "number" ? ` (${order.commissionRate}%)` : ""}`,
+            },
             { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
           ]} />
         </DetailGridSection>
@@ -138,21 +182,33 @@ export default function SellerOrderDetailPage() {
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Articles" : "Items"} span={3}>
-          {order.items_detail.map((item) => (
-            <div key={`${item.productId}-${item.variant}`} className="mb-4 flex gap-4 last:mb-0">
-              <div className="h-14 w-14 overflow-hidden rounded-lg">
-                <ProductImage src={item.image} alt={item.name} />
+          {order.items_detail.map((item) => {
+            const cancelled = item.state === "cancelled";
+            return (
+              <div key={item.itemId} className="mb-4 flex gap-4 last:mb-0">
+                <div className={`h-14 w-14 overflow-hidden rounded-lg ${cancelled ? "opacity-50" : ""}`}>
+                  <ProductImage src={item.image} alt={item.name} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/seller/products/${item.productId}`} className={`font-medium text-[var(--primary)] hover:underline ${cancelled ? "line-through opacity-70" : ""}`}>{item.name}</Link>
+                    <Badge variant={lineStateVariant(item.state)}>{lineStateLabel(item.state, fr)}</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">{item.variant ? `${item.variant} · ` : ""}{item.sku}</p>
+                  {cancelled && (
+                    <p className="mt-1 text-xs text-red-700">
+                      {fr ? "Motif" : "Reason"}: {item.cancelReason || "—"}
+                      {item.refundedUsd > 0 && ` · ${fr ? "Remboursé" : "Refunded"} ${formatCurrency(item.refundedUsd, locale)}`}
+                    </p>
+                  )}
+                </div>
+                <div className={`text-right ${cancelled ? "line-through opacity-60" : ""}`}>
+                  <p>{formatCurrency(item.price, locale)}</p>
+                  <p className="text-xs">{fr ? "Qté" : "Qty"}: {item.qty}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <Link href={`/seller/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.name}</Link>
-                <p className="text-xs text-slate-500">{item.variant ? `${item.variant} · ` : ""}{item.sku}</p>
-              </div>
-              <div className="text-right">
-                <p>{formatCurrency(item.price, locale)}</p>
-                <p className="text-xs">{fr ? "Qté" : "Qty"}: {item.qty}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
@@ -166,6 +222,13 @@ export default function SellerOrderDetailPage() {
           />
         </DetailGridSection>
       </DetailGrid>
+      {cancelOpen && (
+        <CancelItemsDialog
+          orderId={order.orderId}
+          lines={cancellable.map((l) => ({ itemId: l.itemId, name: l.name, variant: l.variant, qty: l.qty, price: l.price }))}
+          onClose={() => setCancelOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/catalog_models.dart';
 import '../../data/catalog_live.dart';
@@ -24,10 +25,61 @@ class _SearchScreenState extends State<SearchScreen> {
   late final ProductQuery _q = ProductQuery(text: widget.initialText ?? '');
   late int _tab = widget.initialTab;
 
+  // Server search (`products:search`): ranked ids for the current text, typo- and accent-tolerant. While it is
+  // unavailable (offline, old API) the phone filters the downloaded catalogue instead.
+  Timer? _debounce;
+  List<String>? _serverIds;
+  String _serverFor = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if ((widget.initialText ?? '').trim().length >= 2) _searchServer();
+  }
+
+  void _onText() {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), _searchServer);
+  }
+
+  Future<void> _searchServer() async {
+    final text = _ctrl.text.trim();
+    if (text.length < 2) {
+      if (mounted) setState(() => _serverIds = null);
+      return;
+    }
+    try {
+      final res = await RealtimeStore.instance.call('products:search', {'q': text, 'limit': 100});
+      if (!mounted || _ctrl.text.trim() != text) return;
+      setState(() {
+        _serverIds = ((res as Map)['ids'] as List).map((e) => '$e').toList();
+        _serverFor = text;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _serverIds = null);
+    }
+  }
+
+  List<Product> _results() {
+    final text = _ctrl.text.trim();
+    final ids = _serverIds;
+    if (ids == null || _serverFor != text) return runQuery(liveCatalog(), _q);
+    final byId = {for (final p in liveCatalog()) p.uuid: p};
+    final ranked = ids.map((id) => byId[id]).whereType<Product>().toList();
+    // Filters and sorts still apply; with "relevance" the server's order is kept.
+    final saved = _q.text;
+    _q.text = '';
+    final out = runQuery(ranked, _q);
+    _q.text = saved;
+    return out;
+  }
+
   List<String> _quickSorts(Strings s) => [s.sortRelevance, s.sortPriceAsc, s.sortPriceDesc, s.sortTopRated, s.sortDeals];
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -41,7 +93,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final tr = Strings.of(context);
     final lang = tr.lang;
     _q.text = _ctrl.text;
-    final results = runQuery(liveCatalog(), _q);
+    final results = _results();
     final t = _ctrl.text.trim().toLowerCase();
     final stores = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
 
@@ -55,7 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
             controller: _ctrl,
             hint: tr.searchBothHint,
             autofocus: widget.initialText == null,
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _onText(),
           ),
         ),
       ),

@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -43,7 +44,7 @@ export default function SellerSupportPage() {
         category: tk.category,
         subject: tk.subject,
         status: tk.status,
-        lastUpdate: new Date(tk.updatedAt).toISOString().slice(0, 10),
+        lastUpdate: localDay(tk.updatedAt),
         messages: tk.messages.length,
       })),
     [tickets]

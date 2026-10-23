@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,7 +25,7 @@ export default function AdminDisputesPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const disputes = (rt.disputes as DisputeRow[]).map((d) => ({ ...d, date: d.createdAt.slice(0, 10) }));
+  const disputes = (rt.disputes as DisputeRow[]).map((d) => ({ ...d, date: localDay(d.createdAt) }));
 
   const openCount = disputes.filter((d) => d.status === "open").length;
 

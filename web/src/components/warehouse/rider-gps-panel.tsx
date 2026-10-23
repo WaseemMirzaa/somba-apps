@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useRiderGps } from "@/lib/rider-gps";
@@ -9,10 +10,16 @@ export function RiderGpsPanel() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const gps = useRiderGps();
+  // Ticking clock for the "last sent N s ago" label (kept out of render so it stays pure).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   if (gps.state === "idle") return null;
 
-  const sentAgo = gps.lastSentAt ? Math.max(0, Math.round((Date.now() - gps.lastSentAt) / 1000)) : null;
+  const sentAgo = gps.lastSentAt ? Math.max(0, Math.round((now - gps.lastSentAt) / 1000)) : null;
 
   let tone = "border-slate-200 bg-slate-50 text-slate-700";
   let text = "";

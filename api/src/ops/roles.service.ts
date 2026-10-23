@@ -4,7 +4,9 @@ import { randomBytes } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { User } from '../database/entities';
+import { Hub, Setting, User } from '../database/entities';
+import { parsePreferredZones } from '../common/zones/hub-scope';
+import { parseZones } from '../common/zones/zone-match';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
@@ -27,7 +29,41 @@ export class RolesService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly usersSvc: UsersService,
     private readonly emitter: RealtimeEmitter,
+    @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
+    @InjectRepository(Setting) private readonly settings: Repository<Setting>,
   ) {}
+
+  /**
+   * Tie a rider or warehouse staff member to their home warehouse (null = not tied: sees every warehouse), and set a
+   * rider's preferred zones (offered first). The caller then reconnects the user so they join the right rooms.
+   */
+  async setHub(userId: string, hubId: string | null, preferredZones?: unknown) {
+    const target = await this.users.findOne({ where: { id: userId } });
+    if (!target || (target.role !== 'rider' && target.role !== 'warehouse_staff')) {
+      throw new Error('Only riders and warehouse staff have a home warehouse.');
+    }
+    if (hubId) {
+      const hub = await this.hubs.findOne({ where: { id: hubId } });
+      if (!hub) throw new Error('Pick a warehouse from the list.');
+      if (!hub.active) throw new Error('That warehouse is switched off. Switch it on first.');
+    }
+    const patch: Partial<User> = { hubId: hubId || null };
+    if (preferredZones !== undefined) {
+      if (target.role !== 'rider') throw new Error('Only riders have preferred zones.');
+      const wanted = Array.isArray(preferredZones) ? preferredZones.map(String) : [];
+      const row = await this.settings.findOne({ where: { key: 'deliveryZones' } });
+      const zones = parseZones(row?.value);
+      const known = new Set(zones.filter((z) => !hubId || !z.hubId || z.hubId === hubId).map((z) => z.id));
+      const unknown = wanted.filter((id) => !known.has(id));
+      if (unknown.length) throw new Error("A preferred zone is not one of this warehouse's zones.");
+      patch.preferredZones = JSON.stringify([...new Set(wanted)].slice(0, 50));
+    }
+    await this.users.update({ id: userId }, patch);
+    const saved = (await this.users.findOne({ where: { id: userId } }))!;
+    const view = { id: saved.id, role: saved.role, hubId: saved.hubId ?? null, preferredZones: parsePreferredZones(saved.preferredZones) };
+    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
+    return view;
+  }
 
   defs() {
     return ROLE_DEFS;
@@ -41,7 +77,16 @@ export class RolesService {
       take: 1000,
     });
     return rows
-      .map((u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, active: u.active }));
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        active: u.active,
+        hubId: u.hubId ?? null,
+        preferredZones: parsePreferredZones(u.preferredZones),
+      }));
   }
 
   async setRole(id: string, role: UserRole): Promise<void> {

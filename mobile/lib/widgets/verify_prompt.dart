@@ -10,7 +10,8 @@ bool isVerificationError(Object e) => e is ApiException && e.message.startsWith(
 /// When the platform requires a verified phone or email before ordering or
 /// topping up the wallet and this account has neither, tells the user why and
 /// offers the existing verification screens instead of letting the server
-/// refuse. Returns true when the user may go on right now.
+/// refuse. Returns true when the user may go on right now (already verified,
+/// or just verified from the prompt).
 Future<bool> ensureVerified(BuildContext context, {required bool forTopUp, bool force = false}) async {
   final store = RealtimeStore.instance;
   if (!force && !store.needsVerification) return true;
@@ -32,11 +33,18 @@ Future<bool> ensureVerified(BuildContext context, {required bool forTopUp, bool 
     ),
   );
   if (!context.mounted) return false;
+  bool? verified;
   if (choice == 'phone') {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: phone)));
+    verified = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: phone)));
   } else if (choice == 'email') {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen()));
+    verified = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const VerifyEmailScreen()));
   }
-  // The verify screens refresh the profile; the user then taps "place order" / "send" again.
+  if (!context.mounted) return false;
+  // The verify screens pop `true` and refresh the profile: the caller carries on with what the user asked for.
+  if (verified == true || (choice != null && !force && !store.needsVerification)) return true;
+  // "Not now", or backed out of the verify screen: say why nothing happened.
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(s.verifyLaterNote)));
   return false;
 }

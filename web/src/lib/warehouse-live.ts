@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 
@@ -36,8 +36,7 @@ export function useOpsQuery<T>(
   opts: { body?: Record<string, unknown>; push?: string[]; initial: T; enabled?: boolean },
 ): OpsQuery<T> {
   const rt = useRealtime();
-  const initialRef = useRef(opts.initial);
-  const [data, setData] = useState<T>(initialRef.current);
+  const [data, setData] = useState<T>(opts.initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bodyKey = JSON.stringify(opts.body ?? {});

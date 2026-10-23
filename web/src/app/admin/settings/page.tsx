@@ -41,7 +41,7 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Prix et commission",
     fields: [
       { key: "fxRate", kind: "text", label: "FX rate (1 USD = ? CDF)", labelFr: "Taux de change (1 USD = ? CDF)", hint: "Used to show prices in CDF. Shoppers see it immediately.", hintFr: "Sert à afficher les prix en CDF. Visible immédiatement.", inputMode: "decimal" },
-      { key: "commissionPct", kind: "text", label: "Platform commission (%)", labelFr: "Commission de la plateforme (%)", hint: "Between 0 and 60.", hintFr: "Entre 0 et 60.", inputMode: "decimal" },
+      { key: "commissionPct", kind: "text", label: "Platform commission (%)", labelFr: "Commission de la plateforme (%)", hint: "Between 0 and 60. Applies to new orders; past orders keep the rate stored when they were placed.", hintFr: "Entre 0 et 60. S'applique aux nouvelles commandes ; les commandes passées gardent le taux enregistré à leur création.", inputMode: "decimal" },
     ],
   },
   {

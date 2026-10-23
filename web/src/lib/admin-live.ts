@@ -21,6 +21,8 @@ export function errMsg(e: unknown): string {
 export type PayoutRow = Payout & {
   account?: string | null;
   providerRef?: string | null;
+  /** The network's receipt number of a pawaPay payout. */
+  receiptRef?: string | null;
 };
 export type DisputeRow = Dispute & { receivedAt?: string | null };
 export type PaymentRow = Payment & {
@@ -29,7 +31,18 @@ export type PaymentRow = Payment & {
   subject?: string | null;
   providerRef?: string | null;
   failureReason?: string | null;
+  /** Where a refund went, and the state of a phone refund (pawaPay). */
+  refundTo?: "wallet" | "phone" | null;
+  refundStatus?: "sending" | "completed" | "failed" | null;
+  refundedUsd?: number | null;
 };
+
+/** What the finance screens can offer (`payments:provider`): the live provider, refunds to the phone, pawaPay payouts. */
+export interface PaymentCapabilities {
+  provider: string | null;
+  phoneRefunds: boolean;
+  pawapayPayouts: boolean;
+}
 export interface FlashSaleServerRow {
   id: string;
   title: string;
@@ -100,6 +113,10 @@ export interface StaffRow {
   phone?: string | null;
   role: string;
   active?: boolean;
+  /** Riders and warehouse staff: home warehouse (null = every warehouse). */
+  hubId?: string | null;
+  /** Riders: zone ids listed first in their queue. */
+  preferredZones?: string[];
 }
 export interface SupportMessage {
   from: string;
@@ -126,6 +143,8 @@ export interface ZoneSetting {
   nameFr?: string;
   city: string;
   feeUsd: number;
+  /** The warehouse that delivers this zone; its riders get the zone's deliveries. */
+  hubId?: string | null;
 }
 
 export function parseMessages(raw: string | SupportMessage[] | undefined): SupportMessage[] {
@@ -279,13 +298,22 @@ export const ORDER_STATUS_BADGE: Record<string, "success" | "warning" | "danger"
 
 const FLOW = ["pending", "confirmed", "processing", "shipped", "out_for_delivery", "delivered"];
 
-/** Statuses an admin may move an order to (mirrors the server rules). */
+/**
+ * The ONE forward step an admin may take on an order. The server's
+ * `orders:updateStatus` allows exactly: pending->confirmed, confirmed->processing,
+ * processing->shipped, shipped->out_for_delivery, out_for_delivery->delivered,
+ * delivered->returned. Anything else is refused (use `orders:adminCancel` to cancel).
+ */
 export function nextOrderStatuses(current: string): string[] {
-  if (current === "cancelled" || current === "returned") return [];
   if (current === "delivered") return ["returned"];
   const idx = FLOW.indexOf(current);
-  if (idx === -1) return [];
-  return FLOW.slice(idx + 1);
+  if (idx === -1 || idx === FLOW.length - 1) return [];
+  return [FLOW[idx + 1]];
+}
+
+/** Statuses at which an operator may cancel an order (`orders:adminCancel`). */
+export function canAdminCancel(status: string): boolean {
+  return status === "pending" || status === "confirmed" || status === "processing";
 }
 
 export const DISPUTE_STATUS_LABEL: Record<string, { en: string; fr: string }> = {

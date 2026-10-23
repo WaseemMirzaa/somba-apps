@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { localDateTime } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/admin/modal";
@@ -89,7 +90,7 @@ export function CampaignPhaseBadge({ campaign }: { campaign: CampaignRow }) {
 
 function dateLabel(s: string | null, fr: boolean) {
   if (!s) return fr ? "sans limite" : "open";
-  return s.length > 10 ? s.slice(0, 16).replace("T", " ") : s;
+  return localDateTime(s);
 }
 
 /** Full scope + effect of one campaign: window, discount, covered products with before/after price, results. */

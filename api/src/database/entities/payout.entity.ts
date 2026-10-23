@@ -8,7 +8,8 @@ import {
 } from 'typeorm';
 import { encryptedColumn } from '../../common/crypto/field-crypto';
 
-export type PayoutStatus = 'requested' | 'approved' | 'rejected' | 'paid';
+/** One step: requested → paid (or rejected). `sending` = a pawaPay transfer is on its way. */
+export type PayoutStatus = 'requested' | 'sending' | 'rejected' | 'paid';
 
 @Entity('payouts')
 export class Payout {
@@ -43,9 +44,35 @@ export class Payout {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   account: string | null;
 
-  /** Reference of the real transfer, entered by finance when marking it paid. */
+  /** Reference of the real transfer, entered by finance when marking it paid (the pawaPay payoutId when sent through pawaPay). */
+  @Index()
   @Column({ type: 'varchar', length: 100, nullable: true })
   providerRef: string | null;
+
+  /** The network's receipt number for a pawaPay payout. */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  receiptRef: string | null;
+
+  /** Settlement statement totals (null on payouts issued before statements existed). */
+  @Column({ type: 'float', nullable: true })
+  statementGrossUsd: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  statementCommissionUsd: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  statementRefundsUsd: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  statementNetUsd: number | null;
+
+  /** Balance carried in: available before this statement's new lines. */
+  @Column({ type: 'float', nullable: true })
+  openingBalanceUsd: number | null;
+
+  /** Balance left after this payout: available - amountUsd. */
+  @Column({ type: 'float', nullable: true })
+  closingBalanceUsd: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

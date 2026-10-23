@@ -57,6 +57,10 @@ class RealtimeStore extends ChangeNotifier {
 
   /// Delivery zones + USD→CDF rate from the server's public settings.
   List<Zone> zones = [];
+
+
+  /// The account cart as the server last sent it ({lines, saved}); ShopState merges / applies it.
+  final ValueNotifier<Map<String, dynamic>?> serverCart = ValueNotifier(null);
   double? fxRate;
 
   /// Public setting: with it on, an account needs a verified phone OR email to
@@ -105,6 +109,23 @@ class RealtimeStore extends ChangeNotifier {
       rethrow;
     }
   }
+
+  /// Sign in with a one-time code texted to the account's verified phone number.
+  Future<void> loginWithPhoneCode(String phone, String code) async {
+    error = null;
+    status = ConnStatus.connecting;
+    notifyListeners();
+    try {
+      await _begin(await _auth.loginWithCode(phone, code));
+    } catch (e) {
+      error = e.toString();
+      status = ConnStatus.error;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<String?> sendLoginCode(String phone) => _auth.sendLoginCode(phone);
 
   Future<void> register({
     required String email,
@@ -259,7 +280,7 @@ class RealtimeStore extends ChangeNotifier {
       // Push: asks for the permission and registers this device (no-op without Firebase).
       unawaited(PushService.instance.start(
         register: (token, platform) => registerDevice(token, platform: platform),
-        onMessage: () => unawaited(refreshNotifications()),
+        onMessage: (_) => unawaited(refreshNotifications()),
       ));
     });
     socket.on('disconnect', (reason) {
@@ -314,6 +335,10 @@ class RealtimeStore extends ChangeNotifier {
     _socket.on('payment:updated', _upsertPayment);
     _socket.on('product:created', (d) => _upsertProduct(d));
     _socket.on('product:updated', (d) => _upsertProduct(d));
+    _socket.on('cart:updated', (d) {
+      serverCart.value = _map(d);
+      notifyListeners();
+    });
     _socket.on('wishlist:updated', (d) {
       wishlistIds
         ..clear()
@@ -364,6 +389,7 @@ class RealtimeStore extends ChangeNotifier {
         }
       }),
       _load('me:prefs', (d) => prefs = {...prefs, ..._map(d)}),
+      _load('cart:get', (d) => serverCart.value = _map(d)),
       _load('cms:list', (d) {
         banners
           ..clear()
@@ -402,6 +428,10 @@ class RealtimeStore extends ChangeNotifier {
 
   // ---- actions (writes over the socket) ----
 
+  /// Tests stand in for the server on [placeOrder] (event + body in, the ack's data out).
+  @visibleForTesting
+  Future<dynamic> Function(String event, [Map<String, dynamic>? body])? debugPlaceOrderRequest;
+
   /// Place an order. Lines reference real listings by id; the SERVER prices
   /// them (the app only displays prices). For mobile-money methods the order is
   /// created `pending` and confirmed later by the network — watch [orders] /
@@ -415,7 +445,7 @@ class RealtimeStore extends ChangeNotifier {
     String? zoneId,
     String? promoCode,
   }) async {
-    final res = await _socket.request('orders:create', {
+    final res = await (debugPlaceOrderRequest ?? _socket.request)('orders:create', {
       'items': items,
       'paymentMethod': paymentMethod,
       'deliveryFeeUsd': deliveryFeeUsd,
@@ -521,8 +551,26 @@ class RealtimeStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tests: answers `addresses:create` instead of the socket (the list is then updated locally).
+  @visibleForTesting
+  Future<dynamic> Function(String event, [Map<String, dynamic>? body])? debugAddressRequest;
+
   Future<AddressDto> addAddress(Map<String, dynamic> body) async {
+    final hook = debugAddressRequest;
+    if (hook != null) {
+      final a = AddressDto.fromJson(_map(await hook('addresses:create', body)));
+      addresses.add(a);
+      notifyListeners();
+      return a;
+    }
     final res = await _socket.request('addresses:create', body);
+    await _loadAddresses();
+    return AddressDto.fromJson(_map(res));
+  }
+
+  /// Edit an address (or make it the default with `{'isDefault': true}`); the server clears the other defaults.
+  Future<AddressDto> updateAddress(String id, Map<String, dynamic> patch) async {
+    final res = await _socket.request('addresses:update', {'id': id, 'patch': patch});
     await _loadAddresses();
     return AddressDto.fromJson(_map(res));
   }

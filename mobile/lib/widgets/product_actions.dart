@@ -11,16 +11,21 @@ void openProduct(BuildContext context, Product p, Locale locale) {
   Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p, locale: locale)));
 }
 
-/// Quick "+" on a card: add one to the cart and confirm with a snackbar that
-/// links to the cart. [after] lets the caller refresh its own cart badge.
+/// Quick "+" on a card: add one to the cart (stock permitting) and confirm with
+/// a snackbar that links to the cart. [after] lets the caller refresh its own cart badge.
 void addProductToCart(BuildContext context, Product p, Locale locale, {VoidCallback? after}) {
-  ShopState.instance.addToCart(p);
+  // A size/colour must be chosen first: open the product instead of guessing.
+  if (p.variants.isNotEmpty) {
+    openProduct(context, p, locale);
+    return;
+  }
+  final added = ShopState.instance.addToCart(p);
   after?.call();
   final s = Strings(locale.languageCode);
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      content: Text('${p.displayName(locale.languageCode)} — ${s.addedToCart}'),
+      content: Text(added == 0 ? s.cartStockCap(p.stock) : '${p.displayName(locale.languageCode)} — ${s.addedToCart}'),
       action: SnackBarAction(
         label: s.cart,
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(locale: locale))),

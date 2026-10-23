@@ -6,7 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-export type VerificationKind = 'email' | 'phone' | 'reset';
+/** `login` = a one-time code to sign in with a phone number (no password). */
+export type VerificationKind = 'email' | 'phone' | 'reset' | 'login';
 
 /**
  * A single-use secret proving control of an email/phone or authorising a

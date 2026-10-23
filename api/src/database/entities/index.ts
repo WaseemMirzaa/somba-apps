@@ -6,6 +6,7 @@ export type { ProductStatus } from './product.entity';
 export { Order } from './order.entity';
 export type { OrderStatus, PaymentMethod } from './order.entity';
 export { OrderItem } from './order-item.entity';
+export type { ItemFulfilment } from './order-item.entity';
 export { Notification } from './notification.entity';
 export { DeliveryTask } from './delivery-task.entity';
 export type { DeliveryStatus } from './delivery-task.entity';
@@ -14,10 +15,13 @@ export { Payment } from './payment.entity';
 export type { PaymentStatus, PaymentPurpose } from './payment.entity';
 export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
+export { PayoutStatementLine } from './payout-statement-line.entity';
+export type { StatementLineKind } from './payout-statement-line.entity';
 export { Dispute } from './dispute.entity';
 export type { DisputeType, DisputeStatus } from './dispute.entity';
 export { Category } from './category.entity';
 export { Address } from './address.entity';
+export { CartLine } from './cart-line.entity';
 export { Review } from './review.entity';
 export type { ReviewStatus } from './review.entity';
 export { ProductView } from './product-view.entity';
@@ -63,9 +67,11 @@ import { DeliveryTask } from './delivery-task.entity';
 import { WalletTransaction } from './wallet-transaction.entity';
 import { Payment } from './payment.entity';
 import { Payout } from './payout.entity';
+import { PayoutStatementLine } from './payout-statement-line.entity';
 import { Dispute } from './dispute.entity';
 import { Category } from './category.entity';
 import { Address } from './address.entity';
+import { CartLine } from './cart-line.entity';
 import { Review } from './review.entity';
 import { ProductView } from './product-view.entity';
 import { ProductQuestion } from './product-question.entity';
@@ -99,9 +105,11 @@ export const ENTITIES = [
   WalletTransaction,
   Payment,
   Payout,
+  PayoutStatementLine,
   Dispute,
   Category,
   Address,
+  CartLine,
   Review,
   ProductQuestion,
   SupportTicket,

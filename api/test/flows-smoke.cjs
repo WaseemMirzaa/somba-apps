@@ -6,6 +6,7 @@
  *   API_URL=http://localhost:3001 node test/flows-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { kyc } = require('./kyc.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -54,10 +55,10 @@ const register = async (label, role = 'customer') => {
 
   // an approved seller with a pickup address
   const sellerU = await register('shop', 'seller');
-  const store = (await req(sellerU.sock, 'sellers:register', { name: `Flow Store ${tag}` })).data;
+  const store = (await req(sellerU.sock, 'sellers:register', kyc(`Flow Store ${tag}`))).data;
   await req(admin.sock, 'sellers:setStatus', { id: store.id, status: 'approved' });
   const seller2 = await register('shop2', 'seller');
-  const store2 = (await req(seller2.sock, 'sellers:register', { name: `Other Store ${tag}` })).data;
+  const store2 = (await req(seller2.sock, 'sellers:register', kyc(`Other Store ${tag}`))).data;
   await req(admin.sock, 'sellers:setStatus', { id: store2.id, status: 'approved' });
   let a = await req(sellerU.sock, 'sellers:update', { pickupAddress: '7 Rue du Marché, Limete' });
   ok(a.ok && a.data.pickupAddress === '7 Rue du Marché, Limete', 'a seller saves their pickup address');
@@ -216,6 +217,48 @@ const register = async (label, role = 'customer') => {
   ok(stockAfterReturn === stockBeforeReturn + 2, 'the returned goods go back into stock', `${stockBeforeReturn} → ${stockAfterReturn}`);
   a = await req(admin.sock, 'disputes:resolve', { disputeId: ret.id, refund: true });
   ok(a.ok && a.data.status === 'resolved', 'with the goods received, finance resolves with a refund');
+
+  // ---- sellers are told about returns, replacements and exchanges on their items ----------
+  section('Sellers hear about after-sale requests on their items');
+  const noticesOf = async (u) => (await req(u.sock, 'notifications:list')).data ?? [];
+  let sellerNotes = await until(async () => {
+    const n = await noticesOf(sellerU);
+    return n.some((x) => x.entityId === ret.id && x.title === 'Return resolved') ? n : null;
+  });
+  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.type === 'return' && x.title === 'Return requested on your order'), 'the seller was told when the return was opened');
+  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Returned goods received'), 'the seller was told when the warehouse received the goods');
+  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Return resolved'), 'the seller was told how the return ended');
+  ok(!(await noticesOf(seller2)).some((x) => x.entityId === ret.id), 'an unrelated seller hears nothing');
+  ok((await noticesOf(rider)).some((x) => x.type === 'task' && x.title === 'New delivery available'), 'riders were told a new delivery was waiting');
+
+  // A fresh delivered order (the returned one above is closed).
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  const o4 = a.data;
+  const t4 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o4.id));
+  await req(rider.sock, 'delivery:accept', { taskId: t4.id });
+  for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t4.id, status: st });
+  a = await req(cust.sock, 'replacements:create', { orderId: o4.id, sku: prod.id, productName: prod.name, reason: 'Second unit arrived cracked' });
+  ok(a.ok, 'the customer asks for a replacement of the item', a.error ?? '');
+  const rep = a.data;
+  ok((await req(sellerU.sock, 'replacements:list')).data.some((r) => r.id === rep.id), "the replacement shows in the item's seller's list");
+  ok(!(await req(seller2.sock, 'replacements:list')).data.some((r) => r.id === rep.id), 'not in an unrelated seller list');
+  a = await req(warehouse.sock, 'replacements:setStatus', { id: rep.id, status: 'dispatched' });
+  ok(!a.ok && /can't move from requested to dispatched/i.test(a.error ?? ''), 'a replacement cannot skip steps', a.error ?? '');
+  a = await req(warehouse.sock, 'replacements:setStatus', { id: rep.id, status: 'approved' });
+  ok(a.ok && a.data.status === 'approved', 'the warehouse approves the replacement');
+  sellerNotes = await until(async () => {
+    const n = await noticesOf(sellerU);
+    return n.some((x) => x.entityId === rep.id && x.title === 'Replacement approved') ? n : null;
+  });
+  ok(!!sellerNotes?.some((x) => x.entityId === rep.id && x.title === 'Replacement requested on your item'), 'the seller was told about the replacement request');
+  ok(!!sellerNotes, 'and about its approval');
+
+  a = await req(cust.sock, 'exchanges:create', { orderId: o4.id, fromSku: prod.id, fromName: prod.name, toSku: prod.id, toName: `${prod.name} (other size)`, reason: 'Too small for me' });
+  ok(a.ok, 'the customer asks to exchange the item', a.error ?? '');
+  const exc = a.data;
+  ok((await req(sellerU.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), "the exchange shows in the item's seller's list");
+  ok(!(await req(seller2.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), 'not in an unrelated seller list');
+  ok(!!(await until(async () => (await noticesOf(sellerU)).some((x) => x.entityId === exc.id))), 'the seller was told about the exchange request');
 
   // ---- manual payment confirmation -----------------------------------------------------
   section('Finance confirms mobile-money payments by hand');

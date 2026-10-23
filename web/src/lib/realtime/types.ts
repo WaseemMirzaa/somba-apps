@@ -52,6 +52,59 @@ export interface OrderItem {
   listPriceUsd?: number | null;
   campaignId?: string | null;
   campaignPct?: number | null;
+  /** The listing's seller at order time (a cart may mix sellers; each packs their own lines). */
+  sellerId?: string | null;
+  sellerName?: string | null;
+  /** The line on the seller's side: packing → packed → at the hub, or cancelled by the seller. */
+  fulfilment?: ItemFulfilment;
+  readyAt?: string | null;
+  receivedAt?: string | null;
+  /** Why the seller cancelled this line. */
+  cancelReason?: string | null;
+  /** Money refunded for this line alone (seller cancellation). */
+  refundedUsd?: number;
+  /** Platform commission rate (%) frozen when the order was placed. */
+  commissionPct?: number;
+  /** Commission on this line in USD, frozen when the order was placed. */
+  commissionUsd?: number;
+}
+
+export type ItemFulfilment = "open" | "ready" | "received" | "cancelled";
+
+/**
+ * One seller's package on an order, as the server derives it (`OrdersService.packageStatus`):
+ * all their lines cancelled → cancelled; unpaid non-COD order → pending; every live line at the
+ * hub → the order's delivery status (or "at_hub" before it ships); every live line packed → ready.
+ */
+export type PackageStatus =
+  | "pending"
+  | "to_pack"
+  | "ready"
+  | "at_hub"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered"
+  | "returned"
+  | "cancelled";
+
+/** What `orders:list` / order pushes return to a SELLER: their lines only, their subtotal, their package status. */
+export interface SellerOrderView {
+  id: string;
+  reference: string;
+  status: OrderStatus;
+  packageStatus: PackageStatus;
+  paymentMethod: Order["paymentMethod"];
+  /** Expected delivery day (YYYY-MM-DD): order day + the slowest line's seller-set delivery time. */
+  estimatedDeliveryDate?: string | null;
+  createdAt: string;
+  customerName: string;
+  items: OrderItem[];
+  subtotalUsd: number;
+  totalUsd: number;
+  /** How many sellers share this order (1 = only this seller). */
+  sellerCount: number;
+  /** How many OTHER sellers still have to pack their part (the parcel leaves when this is 0). */
+  otherSellersPacking?: number;
 }
 
 export interface Order {
@@ -70,6 +123,10 @@ export interface Order {
   totalUsd: number;
   zoneId: string | null;
   riderId: string | null;
+  /** Expected delivery day (YYYY-MM-DD): order day + the slowest line's seller-set delivery time. */
+  estimatedDeliveryDate?: string | null;
+  /** Only in the customer's own view, only while shipped / out for delivery: who to call. */
+  rider?: { name: string; phone: string | null } | null;
   shippingAddress: string | null;
   items: OrderItem[];
   createdAt: string;
@@ -101,6 +158,8 @@ export interface Product {
   campaignId?: string | null;
   campaignName?: string | null;
   priceSource?: "base" | "flash" | "campaign";
+  /** Options the shopper picks (JSON text or array from the API): see lib/variants.ts. */
+  variants?: string | { name: string; options: string[] }[] | null;
 }
 
 export interface Category {
@@ -125,6 +184,8 @@ export interface Address {
   postalCode: string | null;
   phone: string | null;
   zoneId: string | null;
+  /** Google Maps pin the customer picked (absent when the address was typed by hand). */
+  geo?: { lat: number; lng: number; placeId?: string; formatted?: string } | null;
   isDefault: boolean;
   createdAt: string;
 }
@@ -161,6 +222,8 @@ export interface AppNotification {
   entityId: string | null;
   read: boolean;
   createdAt: string;
+  /** The page this notice opens in the recipient's portal (sent by the server; same as the push's `link`). */
+  link?: string;
 }
 
 export interface RiderLocation {
@@ -199,9 +262,17 @@ export interface Payout {
   sellerName: string;
   amountUsd: number;
   method: string;
-  status: "requested" | "approved" | "rejected" | "paid";
+  /** One step: requested → paid (or rejected); `sending` while a pawaPay transfer is on its way. */
+  status: "requested" | "sending" | "rejected" | "paid";
   note: string | null;
   createdAt: string;
+  /** Settlement statement totals (absent on payouts issued before statements existed). */
+  statementGrossUsd?: number | null;
+  statementCommissionUsd?: number | null;
+  statementRefundsUsd?: number | null;
+  statementNetUsd?: number | null;
+  openingBalanceUsd?: number | null;
+  closingBalanceUsd?: number | null;
 }
 
 export interface Dispute {
@@ -226,6 +297,22 @@ export interface Seller {
   badge: "gold" | "silver" | "bronze" | "somba_assured";
   rating: number;
   productCount: number;
+  /** Public storefront branding (platform upload URLs) and short description. */
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  description?: string | null;
+  /** KYC filed with the application: visible to the owner and to admins only (never on the public storefront). */
+  legalName?: string | null;
+  phone?: string | null;
+  idNumber?: string | null;
+  rccm?: string | null;
+  taxNumber?: string | null;
+  documentUrls?: string[];
+  termsAcceptedAt?: string | null;
+  kycSubmittedAt?: string | null;
+  /** Why the last moderation decision was taken (shown to the seller) and when. */
+  statusReason?: string | null;
+  statusChangedAt?: string | null;
   createdAt: string;
 }
 

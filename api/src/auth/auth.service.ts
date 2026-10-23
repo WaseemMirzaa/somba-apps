@@ -70,6 +70,12 @@ export class AuthService {
     return this.issue(user);
   }
 
+  /** Sign in with a one-time code sent to the account's verified phone (customers only). */
+  async loginWithPhoneCode(user: User): Promise<AuthResult> {
+    this.assertNotSuspended(user);
+    return this.issue(user);
+  }
+
   async refresh(refreshToken: string): Promise<AuthResult> {
     let payload: JwtPayload;
     try {

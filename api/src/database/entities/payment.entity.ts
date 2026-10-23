@@ -66,6 +66,23 @@ export class Payment {
   @Column({ type: 'varchar', nullable: true })
   failureReason: string | null;
 
+  /** Where a refund went: the customer's wallet, or back to the paying phone (pawaPay). */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  refundTo: 'wallet' | 'phone' | null;
+
+  /** pawaPay refundId of a phone refund. */
+  @Index()
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  refundRef: string | null;
+
+  /** sending (phone refund in flight) | completed | failed (then credited to the wallet). */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  refundStatus: 'sending' | 'completed' | 'failed' | null;
+
+  /** What was actually paid back (lines refunded earlier by a seller are not paid twice). */
+  @Column({ type: 'float', nullable: true })
+  refundedUsd: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

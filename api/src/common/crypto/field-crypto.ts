@@ -51,3 +51,18 @@ export const encryptedColumn = {
   to: (value: string | null | undefined): string | null => encryptField(value),
   from: (value: string | null | undefined): string | null => decryptField(value),
 };
+
+/** Encrypted JSON column: the object is serialised, then AES-256-GCM encrypted (e.g. a precise home location). */
+export const encryptedJsonColumn = {
+  to: (value: unknown): string | null =>
+    value === null || value === undefined ? null : encryptField(JSON.stringify(value)),
+  from: (value: string | null | undefined): unknown => {
+    const plain = decryptField(value);
+    if (plain === null) return null;
+    try {
+      return JSON.parse(plain);
+    } catch {
+      return null;
+    }
+  },
+};

@@ -22,6 +22,9 @@ export type CartItem = {
 
 export type PromoResult = { ok: boolean; reason?: string };
 
+type ServerLine = { productId: string; variant: string; qty: number; priceWhenAdded?: number | null };
+type ServerCart = { lines: ServerLine[]; saved: ServerLine[] };
+
 type ShopContextType = {
   cart: CartItem[];
   wishlist: string[];
@@ -136,6 +139,96 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  // ── Account cart (cart:get / cart:set / cart:updated): the same cart on the website and in the app ──
+  const liveCatalog = useCatalog();
+  const syncedUser = useRef<string | null>(null);
+  const lastSig = useRef("");
+  /** Lines the shopper "saved for later" in the app: the website does not show them but must send them back. */
+  const serverSaved = useRef<ServerLine[]>([]);
+  const customerId = rt.status === "connected" && rt.user?.role === "customer" ? rt.user.id : null;
+
+  const fromServer = useCallback(
+    (lines: ServerLine[] | undefined): CartItem[] =>
+      (lines ?? []).flatMap((l) => {
+        const p = liveCatalog.find((x) => x.id === l.productId);
+        return p
+          ? [{ id: p.id, name: p.name, nameFr: p.nameFr, price: p.price, image: p.image, seller: p.seller, qty: Math.max(1, l.qty), variant: l.variant || "Default" }]
+          : [];
+      }),
+    [liveCatalog],
+  );
+
+  // After sign-in: merge what is in this browser's cart with the account's cart (larger quantity wins).
+  useEffect(() => {
+    if (!hydrated || !customerId || liveCatalog.length === 0 || syncedUser.current === customerId) return;
+    let alive = true;
+    socketClient
+      .request<ServerCart>("cart:get")
+      .then((sc) => {
+        if (!alive) return;
+        syncedUser.current = customerId;
+        serverSaved.current = sc.saved ?? [];
+        const remote = fromServer(sc.lines);
+        setCart((cur) => {
+          const byKey = new Map(cur.map((c) => [`${c.id}|${c.variant}`, c]));
+          for (const r of remote) {
+            const k = `${r.id}|${r.variant}`;
+            const mine = byKey.get(k);
+            if (!mine || r.qty > mine.qty) byKey.set(k, r);
+          }
+          return [...byKey.values()];
+        });
+      })
+      .catch(() => {
+        /* offline: this browser's cart keeps working, the merge runs on the next connection */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [hydrated, customerId, liveCatalog.length, fromServer]);
+
+  // Signed out: the next account starts a fresh merge.
+  useEffect(() => {
+    if (!customerId) {
+      syncedUser.current = null;
+      lastSig.current = "";
+      serverSaved.current = [];
+    }
+  }, [customerId]);
+
+  // Push every change (debounced) once merged.
+  useEffect(() => {
+    if (!hydrated || !customerId || syncedUser.current !== customerId) return;
+    const lines = cart.map((c) => ({ productId: c.id, variant: c.variant, qty: c.qty, priceWhenAdded: c.price }));
+    const sig = JSON.stringify(lines.map((l) => [l.productId, l.variant, l.qty]));
+    if (sig === lastSig.current) return;
+    const t = setTimeout(() => {
+      lastSig.current = sig;
+      socketClient.request("cart:set", { lines, saved: serverSaved.current }).catch(() => {
+        lastSig.current = ""; // retry with the next change
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [hydrated, customerId, cart]);
+
+  // Changes made on another device (the app, another browser).
+  useEffect(() => {
+    if (!customerId) return;
+    const s = socketClient.current;
+    const onUpdate = (sc: ServerCart) => {
+      if (syncedUser.current !== customerId) return;
+      serverSaved.current = sc.saved ?? [];
+      const sig = JSON.stringify((sc.lines ?? []).map((l) => [l.productId, l.variant || "Default", l.qty]));
+      if (sig === lastSig.current) return; // our own push coming back
+      lastSig.current = sig;
+      setCart(fromServer(sc.lines));
+    };
+    s?.on("cart:updated", onUpdate);
+    return () => {
+      s?.off("cart:updated", onUpdate);
+    };
+  }, [customerId, fromServer]);
 
   const addToCart = useCallback((item: Omit<CartItem, "qty"> & { qty?: number }) => {
     setCart((prev) => {
@@ -314,6 +407,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export type CartLine = CartItem & {
   /** Live unit price from the catalogue (falls back to the price saved in the cart). */
   livePrice: number;
+  /** The seller's delivery time for this product, in days (null until the catalogue has it). */
+  deliveryDays: number | null;
   stock: number | null;
   /** The product is no longer live in the catalogue. */
   unavailable: boolean;
@@ -340,6 +435,7 @@ export function useCartLines(): {
       return {
         ...i,
         livePrice: p ? p.price : i.price,
+        deliveryDays: p ? p.deliveryDays : null,
         stock: p ? p.stock : null,
         unavailable: catalogReady && (!p || p.stock <= 0),
         priceInfo: p ? priceView(p) : null,

@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay, localDateTime } from "@/lib/dates";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
@@ -34,7 +35,7 @@ export default function AdminReturnDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={ret.reference}
-        subtitle={`${ret.createdAt.slice(0, 10)} · ${statusLabel} · ${ret.orderReference}`}
+        subtitle={`${localDay(ret.createdAt)} · ${statusLabel} · ${ret.orderReference}`}
         backHref="/admin/returns"
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Retours" : "Returns", href: "/admin/returns" }, { label: ret.reference }]}
         actions={<Badge variant={DISPUTE_STATUS_BADGE[ret.status] ?? "default"}>{statusLabel}</Badge>}
@@ -54,9 +55,9 @@ export default function AdminReturnDetailPage() {
         <DetailGridSection title={fr ? "Retour" : "Return"}>
           <InfoGrid items={[
             { label: fr ? "Référence" : "Reference", value: ret.reference },
-            { label: fr ? "Demandé le" : "Requested", value: ret.createdAt.slice(0, 16).replace("T", " ") },
+            { label: fr ? "Demandé le" : "Requested", value: localDateTime(ret.createdAt) },
             { label: fr ? "Statut" : "Status", value: statusLabel },
-            { label: fr ? "Reçu à l'entrepôt" : "Received at warehouse", value: ret.receivedAt ? ret.receivedAt.slice(0, 16).replace("T", " ") : (fr ? "Pas encore" : "Not yet") },
+            { label: fr ? "Reçu à l'entrepôt" : "Received at warehouse", value: ret.receivedAt ? localDateTime(ret.receivedAt) : (fr ? "Pas encore" : "Not yet") },
             ...(ret.resolution ? [{ label: fr ? "Décision" : "Resolution", value: ret.resolution, full: true }] : []),
           ]} />
         </DetailGridSection>

@@ -16,7 +16,7 @@ import { Ban } from "lucide-react";
 
 const STATUS_FR: Record<string, string> = {
   pending: "En attente",
-  approved: "Approuvé",
+  live: "En ligne",
   rejected: "Rejeté",
   removed: "Bloqué",
   draft: "Brouillon",
@@ -61,7 +61,7 @@ export default function AdminProductModerationDetailPage() {
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={status === "approved" ? "success" : status === "pending" ? "warning" : status === "draft" ? "default" : "danger"}>
+            <Badge variant={status === "live" ? "success" : status === "pending" ? "warning" : status === "draft" ? "default" : "danger"}>
               {fr ? (STATUS_FR[status] ?? status) : status}
             </Badge>
             <ProductStatusActions productId={product.id} status={product.rawStatus} name={product.name} size="md" />

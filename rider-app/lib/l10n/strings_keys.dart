@@ -61,6 +61,11 @@ extension StringsKeys on Strings {
   String collectAt(Object? address) => t('collect_at', {'address': address});
   String deliverTo(Object? address) => t('deliver_to', {'address': address});
   String get addressMissing => t('address_missing');
+  String deliverBy(Object? day) => t('deliver_by', {'day': day});
+  String get navigateCustomer => t('navigate_customer');
+  String get navigatePickup => t('navigate_pickup');
+  String get pinExact => t('pin_exact');
+  String get navFailed => t('nav_failed');
   String get acceptDelivery => t('accept_delivery');
   String attemptN(Object? n) => t('attempt_n', {'n': n});
   String get sellerReady => t('seller_ready');
@@ -120,4 +125,11 @@ extension StringsKeys on Strings {
   String get bgRationaleBody => t('bg_rationale_body');
   String get bgRationaleContinue => t('bg_rationale_continue');
   String get bgChannel => t('bg_channel');
+  String get pushOpen => t('push_open');
+  String zoneLabel(Object? zone) => t('zone_label', {'zone': zone});
+  String get yourZone => t('your_zone');
+  String get homeWarehouse => t('home_warehouse');
+  String get noWarehouse => t('no_warehouse');
+  String myZones(Object? zones) => t('my_zones', {'zones': zones});
+  String warehouseZones(Object? zones) => t('warehouse_zones', {'zones': zones});
 }

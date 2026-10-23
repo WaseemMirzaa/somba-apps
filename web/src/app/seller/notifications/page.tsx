@@ -10,29 +10,26 @@ import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { errMessage } from "@/lib/seller-labels";
+import { ArrowLeftRight, Bell, Megaphone, PackageCheck, RefreshCw, RotateCcw, ShieldAlert, ShieldCheck, LifeBuoy, Truck, Wallet, type LucideIcon } from "lucide-react";
+import { noticeHref } from "@/lib/notice-links";
 
 const READ_STATUS_OPTIONS = [
   { value: "unread", label: "Unread", labelFr: "Non lu" },
   { value: "read", label: "Read", labelFr: "Lu" },
 ];
 
-function hrefFor(type: string, entityId: string | null): string {
-  switch (type) {
-    case "moderation":
-      return entityId ? `/seller/products/${entityId}` : "/seller/products";
-    case "payout":
-      return "/seller/finance/payouts";
-    case "campaign":
-      return entityId ? `/seller/promotions/${entityId}` : "/seller/promotions";
-    case "order":
-    case "delivery":
-      return "/seller/orders";
-    case "support":
-      return "/seller/support";
-    default:
-      return "/seller";
-  }
-}
+const TYPE_ICON: Record<string, LucideIcon> = {
+  order: PackageCheck,
+  delivery: Truck,
+  payout: Wallet,
+  campaign: Megaphone,
+  moderation: ShieldCheck,
+  support: LifeBuoy,
+  return: RotateCcw,
+  dispute: ShieldAlert,
+  exchange: ArrowLeftRight,
+  replacement: RefreshCw,
+};
 
 export default function SellerNotificationsPage() {
   const { notifications, markRead, markAllRead } = useRealtime();
@@ -45,7 +42,7 @@ export default function SellerNotificationsPage() {
     () =>
       [...notifications]
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-        .map((n) => ({ ...n, href: hrefFor(n.type, n.entityId), state: n.read ? "read" : "unread" })),
+        .map((n) => ({ ...n, href: noticeHref(n, "seller"), state: n.read ? "read" : "unread" })),
     [notifications]
   );
 
@@ -104,11 +101,15 @@ export default function SellerNotificationsPage() {
         {
           key: "title",
           label: fr ? "Titre" : "Title",
-          render: (row) => (
-            <Link href={String(row.href)} onClick={() => void read(String(row.id))} className={`font-medium hover:underline ${row.read ? "text-slate-600" : "text-[var(--primary)]"}`}>
-              {String(row.title)}
-            </Link>
-          ),
+          render: (row) => {
+            const Icon = TYPE_ICON[String(row.type)] ?? Bell;
+            return (
+              <Link href={String(row.href)} onClick={() => void read(String(row.id))} className={`inline-flex items-center gap-2 font-medium hover:underline ${row.read ? "text-slate-600" : "text-[var(--primary)]"}`}>
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {String(row.title)}
+              </Link>
+            );
+          },
         },
         { key: "body", label: fr ? "Message" : "Message", render: (row) => <span className="text-slate-600">{String(row.body)}</span> },
         { key: "type", label: "Type", render: (row) => <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge> },

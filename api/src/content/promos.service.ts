@@ -1,10 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FlashSale, Order, Promo } from '../database/entities';
+import { FlashSale, Order, Product, Promo } from '../database/entities';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+
+/** A percent coupon's discount in USD, rounded to the cent (never to whole dollars). */
+export function percentDiscount(subtotalUsd: number, percent: number): number {
+  return Math.round(Number((subtotalUsd * percent).toFixed(6))) / 100;
+}
 
 @Injectable()
 export class PromosService {
@@ -13,6 +18,7 @@ export class PromosService {
     @InjectRepository(FlashSale)
     private readonly flashSales: Repository<FlashSale>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -57,7 +63,7 @@ export class PromosService {
     }
     const discount =
       promo.type === 'percent'
-        ? Math.round(subtotalUsd * (promo.value / 100))
+        ? Math.min(percentDiscount(subtotalUsd, promo.value), subtotalUsd)
         : Math.min(promo.value, subtotalUsd);
     return { ok: true, discount, code: promo.code };
   }
@@ -91,17 +97,45 @@ export class PromosService {
   }
 
   // ---- Flash sales ----
-  listFlashSales(): Promise<FlashSale[]> {
-    return this.flashSales.find({ where: { active: true } });
+  /**
+   * Shoppers: the flagged-active sales. `all` (marketing screens): every sale —
+   * running, scheduled and ended — newest first (by start, else by creation order).
+   */
+  async listFlashSales(all = false): Promise<FlashSale[]> {
+    if (!all) return this.flashSales.find({ where: { active: true } });
+    const rows = await this.flashSales.find();
+    const stamp = (f: FlashSale) => {
+      const t = Date.parse(f.startsAt ?? f.endsAt ?? '');
+      return Number.isFinite(t) ? t : 0;
+    };
+    // Rows come back oldest-first, so reversing first makes ties newest-first.
+    return rows.reverse().sort((a, b) => stamp(b) - stamp(a));
+  }
+
+  /** Stop a flash sale right now (the end time becomes "now"; prices fall back at once). */
+  async endFlashSale(id: string): Promise<FlashSale> {
+    const fs = await this.flashSales.findOne({ where: { id } });
+    if (!fs) throw new NotFoundException('Flash sale not found.');
+    fs.endsAt = new Date().toISOString();
+    const saved = await this.flashSales.save(fs);
+    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'flashsale:updated', saved);
+    return saved;
   }
 
   async createFlashSale(data: Record<string, unknown>): Promise<FlashSale> {
+    const productId = str(data?.productId, 'Product', { max: 64 });
+    const product = await this.products.findOne({ where: { id: productId } });
+    if (!product) throw new BadRequestException('That product does not exist.');
+    const flashPrice = num(data?.flashPrice, 'Flash price', { min: 0.01, max: 1_000_000 });
+    if (!(flashPrice < product.price)) {
+      throw new BadRequestException(`The flash price must be below the normal price ($${product.price.toFixed(2)}).`);
+    }
     const fs = await this.flashSales.save(
       this.flashSales.create({
         title: str(data?.title, 'Title', { max: 150 }),
-        productId: str(data?.productId, 'Product', { max: 64 }),
-        productName: str(data?.productName, 'Product name', { max: 200 }),
-        flashPrice: num(data?.flashPrice, 'Flash price', { min: 0.01, max: 1_000_000 }),
+        productId: product.id,
+        productName: product.name.slice(0, 200),
+        flashPrice,
         discount: num(data?.discount ?? 0, 'Discount', { min: 0, max: 90, int: true }),
         startsAt: optStr(data?.startsAt, 'Start', 40),
         endsAt: optStr(data?.endsAt, 'End', 40),

@@ -14,6 +14,7 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { ProductsService } from '../products/products.service';
+import { sellerUserIdsOf } from '../orders/order-sellers';
 
 @Injectable()
 export class DisputesService {
@@ -54,15 +55,45 @@ export class DisputesService {
         status: 'open',
       }),
     );
-    this.emitter.toUser(customer.id, 'dispute:created', dispute);
-    this.emitter.toRoles(ADMIN_ROLES, 'dispute:created', dispute);
+    const sellerIds = await this.sellersOf(order);
+    this.broadcast('dispute:created', dispute, sellerIds);
     await this.notifications.toRole('admin_support', {
       title: type === 'return' ? 'Return requested' : 'Dispute opened',
       body: `${dispute.reference} · ${order.reference} · ${customer.name}`,
-      type: 'dispute',
+      type,
+      entityId: dispute.id,
+    });
+    // Sellers learn about a problem on their own items as soon as it is raised.
+    await this.notifications.toUsers(sellerIds, {
+      title: type === 'return' ? 'Return requested on your order' : 'Dispute opened on your order',
+      body: `${dispute.reference} · ${order.reference}: ${dispute.reason.slice(0, 140)}`,
+      type,
       entityId: dispute.id,
     });
     return dispute;
+  }
+
+  /** The sellers with lines on the dispute's order (best effort: an unknown order has none). */
+  private async sellersOf(orderOrId: Order | string): Promise<string[]> {
+    try {
+      const order = typeof orderOrId === 'string' ? await this.orders.findOne({ where: { id: orderOrId } }) : orderOrId;
+      if (!order) return [];
+      return await sellerUserIdsOf(order, this.products, this.sellers, { includeCancelled: true });
+    } catch {
+      return [];
+    }
+  }
+
+  /** Live updates: the customer, admins, the sellers on the order and, for returns, the warehouse. */
+  private broadcast(event: 'dispute:created' | 'dispute:updated', dispute: Dispute, sellerIds: string[]): void {
+    this.emitter.toUser(dispute.customerId, event, dispute);
+    this.emitter.toRoles(dispute.type === 'return' ? [...ADMIN_ROLES, 'warehouse_staff'] : ADMIN_ROLES, event, dispute);
+    for (const id of sellerIds) this.emitter.toUser(id, event, dispute);
+  }
+
+  /** Tell the sellers on the order how a request ended. */
+  private async tellSellers(dispute: Dispute, sellerIds: string[], title: string, body: string): Promise<void> {
+    await this.notifications.toUsers(sellerIds, { title, body, type: dispute.type, entityId: dispute.id });
   }
 
   /**
@@ -90,18 +121,19 @@ export class DisputesService {
     if (restock) {
       const order = await this.orders.findOne({ where: { id: dispute.orderId } });
       for (const item of order?.items ?? []) {
-        if (!item.productId.startsWith('ext:')) await this.products.restock(item.productId, item.qty);
+        if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') await this.products.restock(item.productId, item.qty);
       }
     }
     const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
-    this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
+    const sellerIds = await this.sellersOf(saved.orderId);
+    this.broadcast('dispute:updated', saved, sellerIds);
     await this.notifications.toUser(saved.customerId, {
       title: 'Return received',
       body: `${saved.reference}: we received your goods. Your request is being reviewed.`,
-      type: 'dispute',
+      type: 'return',
       entityId: saved.id,
     });
+    await this.tellSellers(saved, sellerIds, 'Returned goods received', `${saved.reference} · ${saved.orderReference}: the warehouse received the returned goods.`);
     return saved;
   }
 
@@ -134,14 +166,16 @@ export class DisputesService {
     if (!claim.affected) throw new BadRequestException('This request was already handled.');
     const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
 
-    this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
+    const sellerIds = await this.sellersOf(saved.orderId);
+    this.broadcast('dispute:updated', saved, sellerIds);
+    const what = saved.type === 'return' ? 'Return' : 'Dispute';
     await this.notifications.toUser(saved.customerId, {
-      title: 'Dispute resolved',
+      title: `${what} resolved`,
       body: `${saved.reference}: ${saved.resolution}`,
-      type: 'dispute',
+      type: saved.type,
       entityId: saved.id,
     });
+    await this.tellSellers(saved, sellerIds, `${what} resolved`, `${saved.reference} · ${saved.orderReference}: ${saved.resolution}`);
     return saved;
   }
 
@@ -156,14 +190,16 @@ export class DisputesService {
       .execute();
     if (!claim.affected) throw new BadRequestException('This request was already handled.');
     const saved = (await this.disputes.findOne({ where: { id: disputeId } }))!;
-    this.emitter.toUser(saved.customerId, 'dispute:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'dispute:updated', saved);
+    const sellerIds = await this.sellersOf(saved.orderId);
+    this.broadcast('dispute:updated', saved, sellerIds);
+    const what = saved.type === 'return' ? 'Return' : 'Dispute';
     await this.notifications.toUser(saved.customerId, {
-      title: 'Dispute closed',
+      title: `${what} closed`,
       body: `${saved.reference}: ${saved.resolution}`,
-      type: 'dispute',
+      type: saved.type,
       entityId: saved.id,
     });
+    await this.tellSellers(saved, sellerIds, `${what} closed`, `${saved.reference} · ${saved.orderReference}: ${saved.resolution}`);
     return saved;
   }
 

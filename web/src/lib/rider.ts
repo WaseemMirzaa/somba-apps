@@ -17,6 +17,10 @@ interface RiderQueueRow {
   orderReference: string;
   status: string;
   zoneId: string | null;
+  /** Zone display name and whether it is one of the rider's preferred zones (the server sorts those first). */
+  zoneName?: string | null;
+  preferred?: boolean;
+  hubId?: string | null;
   codAmountUsd: number;
   address: string | null;
   lat: number | null;
@@ -74,6 +78,19 @@ function addressText(raw: string | null): string {
   return raw;
 }
 
+/** The customer's map pin (if they picked one) from the address JSON. */
+function geoFrom(raw: string | null | undefined): { lat: number; lng: number } | null {
+  if (!raw) return null;
+  try {
+    const g = (JSON.parse(raw) as { geo?: { lat?: unknown; lng?: unknown } })?.geo;
+    const lat = Number(g?.lat);
+    const lng = Number(g?.lng);
+    return g && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  } catch {
+    return null;
+  }
+}
+
 function phoneFrom(raw: string | null | undefined): string | null {
   if (!raw) return null;
   try {
@@ -98,7 +115,10 @@ function toRiderTask(row: RiderQueueRow) {
     address: addressText(row.address ?? o?.shippingAddress ?? null),
     pickupAddress: addressText(row.pickupAddress ?? null),
     phone: phoneFrom(row.address) ?? phoneFrom(o?.shippingAddress),
-    zone: row.zoneId ?? "—",
+    geo: geoFrom(row.address) ?? geoFrom(o?.shippingAddress),
+    zone: row.zoneName ?? row.zoneId ?? "—",
+    zoneId: row.zoneId,
+    preferred: !!row.preferred,
     orderId: row.orderReference,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
     paymentType: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? o?.paymentMethod ?? "—",
@@ -202,3 +222,40 @@ export function useRiderData() {
 }
 
 export type RiderData = ReturnType<typeof useRiderData>;
+
+/** Where the rider works (`rider:assignment`): home warehouse, its zones and the rider's preferred zones. */
+export interface RiderAssignment {
+  hub: { id: string; name: string; city: string; address: string | null } | null;
+  preferredZones: { id: string; name: string }[];
+  hubZones: { id: string; name: string }[];
+}
+
+export function useRiderAssignment() {
+  const rt = useRealtime();
+  const [data, setData] = useState<RiderAssignment | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const ready = rt.status === "connected" && rt.user?.role === "rider";
+
+  // Re-read on every (re)connect: an admin changing the rider's warehouse signs them out and back in.
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    socketClient
+      .request<RiderAssignment>("rider:assignment")
+      .then((d) => {
+        if (!live) return;
+        setData(d);
+        setError(null);
+      })
+      .catch((err) => {
+        if (live) setError(err instanceof Error ? err.message : "Could not load your warehouse.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [ready, nonce]);
+
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  return { data, error, reload };
+}

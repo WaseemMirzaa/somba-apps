@@ -1,13 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import {
   DeliveryTask,
+  Hub,
   Order,
   OrderItem,
   OrderStatus,
+  Payment,
   PaymentMethod,
   Seller,
+  User,
 } from '../database/entities';
 import { ProductsService } from '../products/products.service';
 import type { PricedProduct } from '../products/products.service';
@@ -23,6 +26,10 @@ import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { SettingsService } from '../content/settings.service';
 import { DeliveryService } from '../delivery/delivery.service';
+import { checkVariant, storedVariantGroups } from '../common/variants/variants';
+import { DELIVERY_DAYS, estimatedDeliveryDate } from '../common/delivery/estimate';
+import { linesBySeller, sellerUserId } from './order-sellers';
+import { parseZones, zoneForAddress } from '../common/zones/zone-match';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -50,8 +57,30 @@ export interface CreateOrderInput {
   promoCode?: string;
 }
 
+/** The rider the customer may phone: only while the parcel is on its way. */
+export interface RiderContact {
+  name: string;
+  phone: string | null;
+}
+const RIDER_VISIBLE: readonly string[] = ['shipped', 'out_for_delivery'];
+
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 const ORDER_STATUSES: readonly string[] = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'];
+
+/** The only forward step an operator may take by hand (cancelling goes through `cancel`). */
+const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
+  pending: 'confirmed',
+  confirmed: 'processing',
+  processing: 'shipped',
+  shipped: 'out_for_delivery',
+  out_for_delivery: 'delivered',
+  delivered: 'returned',
+};
+
+/** The single status an order may move to next by hand, or null when it is final (cancelled / returned). */
+export function nextOrderStatus(status: OrderStatus): OrderStatus | null {
+  return NEXT_STATUS[status] ?? null;
+}
 
 @Injectable()
 export class OrdersService {
@@ -68,6 +97,8 @@ export class OrdersService {
     private readonly wallet: WalletService,
     private readonly promos: PromosService,
     private readonly settings: SettingsService,
+    @InjectRepository(Hub) private readonly hubs?: Repository<Hub>,
+    @InjectRepository(User) private readonly users?: Repository<User>,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -78,6 +109,8 @@ export class OrdersService {
     this.emitter.registerFanout(['order:created', 'order:updated'], (event, payload) =>
       this.pushToSellers(event, payload as Order),
     );
+    // The customer (and only the customer) is told who the rider is while the parcel is on its way.
+    this.emitter.registerUserView(['order:created', 'order:updated'], (userId, payload) => this.customerPush(userId, payload));
     // A rider could not deliver: re-open the order for another attempt, or
     // cancel + refund it once the limit is reached.
     this.delivery.registerFailedHandler((task, reason) => this.onDeliveryFailed(task, reason));
@@ -102,12 +135,20 @@ export class OrdersService {
       process.env.ALLOW_CLIENT_PRICED_ITEMS === 'true' ||
       process.env.NODE_ENV !== 'production';
 
+    // A seller may not buy their own listing (inflates sales, reviews and payouts).
+    const buyerKeys = await this.sellerKeys(customer.id);
+
+    // The platform commission in force NOW is frozen on every line (later rate changes never touch this order).
+    const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0));
+
     const items: OrderItem[] = [];
     const stockToReserve: { productId: string; qty: number; name: string }[] = [];
     let subtotal = 0;
     // Seller-campaign discount actually applied on the lines (flash + campaign never stack).
     let campaignDiscount = 0;
     const campaignSales = new Map<string, number>();
+    // Each line's seller-set delivery time; the order's estimate is the slowest one.
+    const lineDays: unknown[] = [];
     for (const line of input.items) {
       const rawQty = Number(line.qty ?? 1);
       if (!Number.isInteger(rawQty) || rawQty < 1 || rawQty > MAX_QTY) {
@@ -122,14 +163,24 @@ export class OrdersService {
       if (product && (product.status !== 'live' || !(product.price > 0))) {
         throw new BadRequestException(`"${product.name}" is not available.`);
       }
+      if (product?.sellerId && buyerKeys.has(product.sellerId)) {
+        throw new BadRequestException('You cannot buy your own listing.');
+      }
 
       let name: string;
       let price: number;
       let productId: string;
+      let variant: string;
       let listPrice: number | null = null;
       let campaignId: string | null = null;
       let campaignPct = 0;
+      let sellerId: string | null = null;
+      let sellerName: string | null = null;
       if (product) {
+        sellerId = product.sellerId ?? null;
+        sellerName = product.sellerName ?? null;
+        // The shopper must have chosen every option the seller defined; stored in its canonical form.
+        variant = checkVariant(storedVariantGroups(product.variants), line.variant, product.name);
         if (product.stock < qty) {
           throw new BadRequestException(
             product.stock > 0
@@ -149,6 +200,7 @@ export class OrdersService {
           campaignSales.set(campaignId, (campaignSales.get(campaignId) ?? 0) + price * qty);
         }
         stockToReserve.push({ productId: product.id, qty, name: product.name });
+        lineDays.push(product.deliveryDays);
       } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
         const p = Number(line.priceUsd);
         if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
@@ -157,6 +209,8 @@ export class OrdersService {
         name = String(line.name).slice(0, 200);
         price = Number(p.toFixed(2));
         productId = `ext:${name}`;
+        variant = String(line.variant ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Default';
+        lineDays.push(DELIVERY_DAYS.fallback);
       } else {
         throw new BadRequestException(
           'Unknown product. Refresh the catalogue and try again.',
@@ -167,16 +221,23 @@ export class OrdersService {
       const item = new OrderItem();
       item.productId = productId;
       item.productName = name;
-      item.variant = line.variant ?? 'Default';
+      item.variant = variant;
       item.qty = qty;
       item.priceUsd = price;
       item.listPriceUsd = listPrice;
       item.campaignId = campaignId;
       item.campaignPct = campaignPct;
+      item.sellerId = sellerId;
+      item.sellerName = sellerName;
+      item.fulfilment = 'open';
+      item.commissionPct = commissionPct;
+      item.commissionUsd = Number(((price * qty * commissionPct) / 100).toFixed(2));
       items.push(item);
     }
 
-    const deliveryFee = await this.resolveDeliveryFee(input.zoneId, input.deliveryFeeUsd, MAX_DELIVERY_FEE);
+    // The zone (and so the fee and the warehouse) follows the delivery address, whatever the app sent.
+    const zoneId = await this.resolveZoneId(input.zoneId, input.shippingAddress);
+    const deliveryFee = await this.resolveDeliveryFee(zoneId, input.deliveryFeeUsd, MAX_DELIVERY_FEE);
 
     let discount = 0;
     let promoCode: string | null = null;
@@ -230,7 +291,8 @@ export class OrdersService {
       promoCode,
       campaignDiscountUsd: Number(campaignDiscount.toFixed(2)),
       totalUsd: total,
-      zoneId: input.zoneId ?? null,
+      zoneId: zoneId ?? null,
+      estimatedDeliveryDate: estimatedDeliveryDate(lineDays),
       shippingAddress: input.shippingAddress ?? null,
       items,
     });
@@ -296,61 +358,223 @@ export class OrdersService {
         status: 'unassigned',
         address: order.shippingAddress,
         zoneId: order.zoneId,
+        hubId: await this.hubForZone(order.zoneId),
         codAmountUsd: order.paymentMethod === 'cod' ? order.totalUsd : 0,
         pickupAddress: await this.pickupFor(order),
         proofCode: String(randomInt(1000, 10000)),
       }),
     );
-    // Riders hear about the new delivery at once (no polling needed in their apps).
-    this.emitter.toRoles([...OPS_ROOMS, 'rider'], 'delivery:updated', task);
+    // Riders of the task's warehouse hear about the new delivery at once (no polling needed in their apps).
+    this.emitTask(task);
     this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
+    await this.announceTask(task);
     await this.notifications.toAdmins({
       title: 'New order',
       body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
       type: 'order',
       entityId: order.id,
     });
+    // Every seller with items on the order is told, persistently, what to pack.
+    try {
+      for (const [sellerId, items] of await this.linesBySeller(order)) {
+        const live = items.filter((i) => i.fulfilment !== 'cancelled');
+        if (!live.length) continue;
+        const n = live.reduce((t, i) => t + i.qty, 0);
+        const subtotal = live.reduce((t, i) => t + i.priceUsd * i.qty, 0);
+        await this.notifications.toUser(await this.sellerUserId(sellerId), {
+          title: 'New order',
+          body: `${order.reference}: ${n} item(s) to pack — $${subtotal.toFixed(2)}`,
+          type: 'order',
+          entityId: order.id,
+        });
+      }
+    } catch {
+      // Best effort: a notification problem must never undo a placed order.
+    }
+  }
+
+  /** A task changed: ops pages, plus the riders who may take it (its warehouse's, or every rider). */
+  private emitTask(task: DeliveryTask): void {
+    this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+    this.emitter.toRiders(task.hubId ?? null, 'delivery:updated', task);
+  }
+
+  /**
+   * Tell riders a delivery is waiting to be accepted: saved notice, live socket and a push to their phones. A task
+   * of a warehouse goes to that warehouse's active riders (and riders not tied to one); otherwise to every rider.
+   */
+  private async announceTask(task: DeliveryTask): Promise<void> {
+    try {
+      const cod = task.codAmountUsd > 0 ? ` · collect $${task.codAmountUsd.toFixed(2)} cash` : '';
+      const notice = {
+        title: 'New delivery available',
+        body: `${task.orderReference}${cod}. Open the app to accept it.`,
+        type: 'task',
+        entityId: task.id,
+        extra: { orderId: task.orderId, view: 'available' },
+      };
+      if (task.hubId && this.users) {
+        const riders = await this.users.find({
+          where: [
+            { role: 'rider', active: true, hubId: task.hubId },
+            { role: 'rider', active: true, hubId: IsNull() },
+          ],
+          select: ['id'],
+        });
+        await this.notifications.toUsers(riders.map((r) => r.id), notice);
+      } else {
+        await this.notifications.toRole('rider', notice);
+      }
+    } catch {
+      // Best effort: the task is already in the riders' queue.
+    }
+  }
+
+  /** The delivery zone of an address: its saved zone when valid, else its commune. Without zones, what was sent. */
+  private async resolveZoneId(sent: string | undefined, shippingAddress: string | undefined): Promise<string | undefined> {
+    const zones = parseZones(await this.settings.get('deliveryZones'));
+    if (!zones.length) return sent;
+    let addr: { commune?: string; city?: string; zone?: string } = {};
+    try {
+      addr = shippingAddress ? (JSON.parse(shippingAddress) as typeof addr) : {};
+    } catch {
+      /* free-text address: only the sent zone can be used */
+    }
+    const zone = zoneForAddress({ zoneId: sent ?? addr.zone, commune: addr.commune, city: addr.city }, zones);
+    return zone?.id ?? sent; // an unknown zone is refused by the fee lookup
+  }
+
+  /** The warehouse that delivers a zone; with none set, the only active warehouse (if there is exactly one). */
+  private async hubForZone(zoneId: string | null): Promise<string | null> {
+    const zone = parseZones(await this.settings.get('deliveryZones')).find((z) => z.id === zoneId);
+    if (zone?.hubId) return zone.hubId;
+    if (!this.hubs) return null;
+    const active = await this.hubs.find({ where: { active: true }, select: ['id'], take: 2 });
+    return active.length === 1 ? active[0].id : null;
+  }
+
+  /** The user account behind a seller id (the store row's owner; demo data may store the user id directly). */
+  private sellerUserId(sellerId: string): Promise<string> {
+    return sellerUserId(sellerId, this.sellers);
+  }
+
+  /** Persisted notification to every seller with live lines on the order. */
+  private async notifySellers(order: Order, title: string, body: string): Promise<void> {
+    try {
+      for (const [sellerId, items] of await this.linesBySeller(order)) {
+        if (items.every((i) => i.fulfilment === 'cancelled')) continue;
+        await this.notifications.toUser(await this.sellerUserId(sellerId), { title, body, type: 'order', entityId: order.id });
+      }
+    } catch {
+      // Best effort.
+    }
   }
 
   /** Send each seller the redacted view (their lines only, first name, no address) of an order. */
   private async pushToSellers(event: string, order: Order): Promise<void> {
     if (!order?.items?.length) return;
-    const bySeller = new Map<string, OrderItem[]>();
-    for (const item of order.items) {
-      if (item.productId.startsWith('ext:')) continue;
-      const p = await this.products.getRaw(item.productId);
-      if (!p?.sellerId) continue;
-      bySeller.set(p.sellerId, [...(bySeller.get(p.sellerId) ?? []), item]);
+    for (const [sellerId, items] of await this.linesBySeller(order)) {
+      const userId = await this.sellerUserId(sellerId); // demo products may store the user id directly
+      this.emitter.toUser(userId, event, OrdersService.sellerView(order, items));
     }
-    for (const [sellerId, items] of bySeller) {
-      const store = await this.sellers.findOne({ where: { id: sellerId } });
-      const userId = store?.userId ?? sellerId; // demo products may store the user id directly
-      const subtotal = Number(items.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
-      this.emitter.toUser(userId, event, {
-        id: order.id,
-        reference: order.reference,
-        status: order.status,
-        paymentMethod: order.paymentMethod,
-        createdAt: order.createdAt,
-        customerName: (order.customerName ?? '').split(' ')[0],
-        items,
-        subtotalUsd: subtotal,
-        totalUsd: subtotal,
-      });
+  }
+
+  /** An order's lines grouped by seller (the snapshot, else the listing's current seller for old lines). */
+  private linesBySeller(order: Order): Promise<Map<string, OrderItem[]>> {
+    return linesBySeller(order, this.products);
+  }
+
+  /**
+   * What a seller sees of an order: THEIR lines only (first name, no address),
+   * their subtotal, and their package's own status — on a multi-seller order the
+   * other sellers' progress is none of their business.
+   */
+  private static sellerView(order: Order, items: OrderItem[]) {
+    const mineIds = new Set(items.map((i) => i.id));
+    const live = items.filter((i) => i.fulfilment !== 'cancelled');
+    const subtotal = Number(live.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
+    return {
+      id: order.id,
+      reference: order.reference,
+      status: order.status,
+      packageStatus: OrdersService.packageStatus(order, items),
+      paymentMethod: order.paymentMethod,
+      estimatedDeliveryDate: order.estimatedDeliveryDate ?? null,
+      createdAt: order.createdAt,
+      customerName: (order.customerName ?? '').split(' ')[0],
+      items,
+      subtotalUsd: subtotal,
+      totalUsd: subtotal,
+      sellerCount: new Set((order.items ?? []).map((i) => i.sellerId ?? i.productId)).size,
+      // How many OTHER sellers still have to pack (no names: their business stays theirs).
+      otherSellersPacking: new Set(
+        (order.items ?? [])
+          .filter((i) => !mineIds.has(i.id) && i.fulfilment === 'open' && !i.productId.startsWith('ext:'))
+          .map((i) => i.sellerId ?? i.productId),
+      ).size,
+    };
+  }
+
+  /**
+   * One seller's package on an order: `cancelled` when all their lines were
+   * cancelled, else the furthest common step of their lines (open → ready →
+   * received), and once the hub has it, the order's own delivery status.
+   */
+  static packageStatus(order: Pick<Order, 'status' | 'paymentMethod'>, items: Pick<OrderItem, 'fulfilment'>[]): string {
+    const live = items.filter((i) => i.fulfilment !== 'cancelled');
+    if (!live.length) return 'cancelled';
+    if (order.status === 'cancelled' || (order.status === 'pending' && !OrdersService.fulfillable(order))) return order.status;
+    if (live.every((i) => i.fulfilment === 'received')) {
+      return ['shipped', 'out_for_delivery', 'delivered', 'returned'].includes(order.status) ? order.status : 'at_hub';
     }
+    if (live.every((i) => i.fulfilment !== 'open')) return 'ready';
+    return 'to_pack';
+  }
+
+  /**
+   * Sellers may pack (or cancel) once the money is in — or right away for cash on
+   * delivery, whose order stays `pending` until the rider collects at the door.
+   */
+  static fulfillable(order: Pick<Order, 'status' | 'paymentMethod'>): boolean {
+    return ['confirmed', 'processing'].includes(order.status) || (order.status === 'pending' && order.paymentMethod === 'cod');
+  }
+
+  /**
+   * The customer's view of orders: while an order is shipped / out for delivery and has a rider, it carries
+   * `rider: { name, phone }` so they can call. Never for other statuses (the field is absent, not null).
+   */
+  async withRiders(orders: Order[]): Promise<(Order & { rider?: RiderContact })[]> {
+    const ids = [...new Set(orders.filter((o) => RIDER_VISIBLE.includes(o.status) && o.riderId).map((o) => o.riderId as string))];
+    if (!ids.length) return orders;
+    const riders = new Map((await this.orders.manager.find(User, { where: { id: In(ids) } })).map((u) => [u.id, u]));
+    return orders.map((o) => {
+      const r = RIDER_VISIBLE.includes(o.status) && o.riderId ? riders.get(o.riderId) : undefined;
+      return r ? Object.assign(Object.create(Object.getPrototypeOf(o)), o, { rider: { name: r.name, phone: r.phone ?? null } }) : o;
+    });
+  }
+
+  /** `toUser` view of order events: the rider's contact only for the order's own customer. */
+  private customerPush(userId: string, payload: unknown): unknown | Promise<unknown> {
+    const o = payload as Order | null;
+    if (!o || o.customerId !== userId || !o.riderId || !RIDER_VISIBLE.includes(o.status)) return payload;
+    return this.withRiders([o]).then(([v]) => v);
+  }
+
+  /** Every id a seller account's listings may carry (the store id, and the user id on demo data). */
+  private async sellerKeys(userId: string): Promise<Set<string>> {
+    const row = await this.sellers.findOne({ where: { userId } });
+    return new Set([userId, ...(row ? [row.id] : [])]);
   }
 
   /** Where the rider collects the parcel: the seller(s)' pickup address, else the hub. */
   private async pickupFor(order: Order): Promise<string> {
     const lines: string[] = [];
     const seen = new Set<string>();
-    for (const item of order.items ?? []) {
-      if (item.productId.startsWith('ext:')) continue;
-      const p = await this.products.get(item.productId);
-      if (!p?.sellerId || seen.has(p.sellerId)) continue;
-      seen.add(p.sellerId);
-      const seller = await this.sellers.findOne({ where: { id: p.sellerId } });
-      lines.push(`${seller?.name ?? p.sellerName ?? 'Seller'} — ${seller?.pickupAddress || 'address not provided, contact the seller'}`);
+    for (const [sellerId, items] of await this.linesBySeller(order)) {
+      if (seen.has(sellerId) || items.every((i) => i.fulfilment === 'cancelled')) continue;
+      seen.add(sellerId);
+      const seller = (await this.sellers.findOne({ where: { id: sellerId } })) ?? (await this.sellers.findOne({ where: { userId: sellerId } }));
+      lines.push(`${seller?.name ?? items[0].sellerName ?? 'Seller'} — ${seller?.pickupAddress || 'address not provided, contact the seller'}`);
     }
     if (lines.length) return lines.join(' | ');
     return (await this.settings.get('hubAddress')) || 'Somba&Teka hub';
@@ -370,22 +594,154 @@ export class OrdersService {
   async sellerReady(user: { id: string }, orderId: string): Promise<DeliveryTask> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
-    const sellerRow = await this.sellers.findOne({ where: { userId: user.id } });
-    const mine = new Set(await this.products.idsBySeller(sellerRow?.id ?? user.id));
-    if (sellerRow?.id && sellerRow.id !== user.id) for (const id of await this.products.idsBySeller(user.id)) mine.add(id);
-    if (!(order.items ?? []).some((i) => mine.has(i.productId))) throw new NotFoundException('Order not found.');
-    if (!['confirmed', 'processing'].includes(order.status)) {
+    const keys = await this.sellerKeys(user.id);
+    const groups = await this.linesBySeller(order);
+    const mine = [...groups].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
+    if (!mine.length) throw new NotFoundException('Order not found.');
+    if (!OrdersService.fulfillable(order)) {
       throw new BadRequestException(`An order that is ${order.status.replace(/_/g, ' ')} cannot be marked ready.`);
     }
-    const task = await this.delivery.markReady(orderId);
-    if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+    const open = mine.filter((i) => i.fulfilment === 'open');
+    if (!open.length && mine.every((i) => i.fulfilment === 'cancelled')) {
+      throw new BadRequestException('You cancelled every item of this order: there is nothing to pack.');
+    }
+    if (open.length) {
+      const now = new Date();
+      await this.orders.manager.update(OrderItem, { id: In(open.map((i) => i.id)) }, { fulfilment: 'ready', readyAt: now });
+    }
+    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+    // The rider/hub is only sent once EVERY seller of the order has packed their part.
+    const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
+    const allReady = live.every((i) => i.fulfilment !== 'open');
+    let task: DeliveryTask | null = null;
+    if (allReady) {
+      task = await this.delivery.markReady(orderId);
+      if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+    } else {
+      task = await this.deliveries.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
+      if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+    }
+    const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
     await this.notifications.toAdmins({
-      title: 'Parcel ready for pickup',
-      body: `${order.reference} is packed and ready.`,
+      title: allReady ? 'Parcel ready for pickup' : 'Seller package ready',
+      body: allReady
+        ? `${order.reference} is packed and ready.`
+        : `${order.reference}: one seller's package is ready, waiting for ${sellersLeft} more seller${sellersLeft > 1 ? 's' : ''}.`,
       type: 'delivery',
       entityId: order.id,
     });
     return task;
+  }
+
+  /**
+   * A seller cannot fulfil their part of an order (out of stock, damaged…): only
+   * THEIR lines are cancelled — restocked, refunded on their own (prepaid → the
+   * customer's wallet; COD → the amount to collect drops) — and the other
+   * sellers' packages carry on. When nothing is left, the whole order is cancelled.
+   */
+  async sellerCancel(user: { id: string }, orderId: string, reasonRaw: string, itemIds?: string[]): Promise<unknown> {
+    const reason = String(reasonRaw ?? '').trim().slice(0, 200);
+    if (reason.length < 3) throw new BadRequestException('Give the customer a reason for the cancellation.');
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    const keys = await this.sellerKeys(user.id);
+    const groups = await this.linesBySeller(order);
+    const mine = [...groups].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
+    if (!mine.length) throw new NotFoundException('Order not found.');
+    if (!OrdersService.fulfillable(order)) {
+      throw new BadRequestException(
+        order.status === 'pending'
+          ? 'Wait until the customer has paid before cancelling.'
+          : `An order that is ${order.status.replace(/_/g, ' ')} can no longer be cancelled by the seller.`,
+      );
+    }
+    const wanted = itemIds?.length ? new Set(itemIds) : null;
+    const targets = mine.filter((i) => (!wanted || wanted.has(i.id)) && (i.fulfilment === 'open' || i.fulfilment === 'ready'));
+    if (!targets.length) throw new BadRequestException('These items were already handed over or cancelled.');
+
+    const everyLine = (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled');
+    if (targets.length === everyLine.length) {
+      // Nothing would be left: cancel the whole order (stock, refund, delivery handled there).
+      const cancelled = await this.cancel({ id: order.customerId, role: 'customer' }, order.id, { allowProcessing: true, bySeller: true }).catch((e: Error) => {
+        throw new BadRequestException(/no longer be cancelled/.test(e.message) ? 'The rider already collected this parcel: contact support to stop it.' : e.message);
+      });
+      await this.orders.manager.update(OrderItem, { id: In(targets.map((i) => i.id)) }, { fulfilment: 'cancelled', cancelReason: reason });
+      for (const i of cancelled.items ?? []) {
+        if (targets.some((t) => t.id === i.id)) Object.assign(i, { fulfilment: 'cancelled', cancelReason: reason });
+      }
+      return OrdersService.sellerView(cancelled, (cancelled.items ?? []).filter((i) => targets.some((t) => t.id === i.id)));
+    }
+
+    // The promo discount is shared across lines pro rata, so a partial refund never exceeds what was paid.
+    const value = targets.reduce((t, i) => t + i.priceUsd * i.qty, 0);
+    const share = order.subtotalUsd > 0 ? value / order.subtotalUsd : 0;
+    const refund = Number((value - (order.discountUsd ?? 0) * share).toFixed(2));
+    const payment = await this.payments.forOrder(order.id);
+    const prepaid = order.paymentMethod !== 'cod' && payment?.status === 'succeeded';
+
+    const done = await this.orders.manager.transaction(async (m) => {
+      // Claim the lines atomically: two concurrent cancels refund once.
+      const claim = await m
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ fulfilment: 'cancelled', cancelReason: reason })
+        .where("id IN (:...ids) AND fulfilment IN ('open','ready')", { ids: targets.map((i) => i.id) })
+        .execute();
+      if ((claim.affected ?? 0) !== targets.length) return false;
+      if (prepaid && refund > 0) {
+        const per = targets.length ? refund / value : 0;
+        for (const i of targets) {
+          await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
+        }
+        await this.wallet.apply(order.customerId, 'refund', refund, `Refund: seller cancelled part of ${order.reference}`, m);
+      }
+      if (order.paymentMethod === 'cod' && refund > 0) {
+        // Less to collect at the door.
+        const tasks = await m.find(DeliveryTask, { where: { orderId: order.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) } });
+        for (const t of tasks) {
+          await m.update(DeliveryTask, { id: t.id }, { codAmountUsd: Math.max(0, Number((t.codAmountUsd - refund).toFixed(2))) });
+        }
+        if (payment && payment.status === 'pending') {
+          await m.update(Payment, { id: payment.id }, { amountUsd: Math.max(0, Number((payment.amountUsd - refund).toFixed(2))) });
+        }
+      }
+      return true;
+    });
+    if (!done) throw new BadRequestException('These items were just updated. Refresh and try again.');
+    for (const i of targets) {
+      if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty);
+    }
+
+    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+    // The remaining sellers may all be packed already: the parcel can go now.
+    const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
+    if (live.length && live.every((i) => i.fulfilment !== 'open')) await this.delivery.markReady(order.id);
+    const pickup = await this.pickupFor(saved);
+    await this.deliveries
+      .createQueryBuilder()
+      .update(DeliveryTask)
+      .set({ pickupAddress: pickup })
+      .where("orderId = :id AND status IN ('unassigned','assigned')", { id: order.id })
+      .execute();
+
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    const names = targets.map((i) => i.productName).join(', ');
+    await this.notifications.toUser(saved.customerId, {
+      title: 'Item cancelled by the seller',
+      body: `${saved.reference}: ${names} was cancelled (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to your wallet.` : ''} The rest of your order continues.`,
+      type: 'order',
+      entityId: saved.id,
+    });
+    await this.notifications.toAdmins({
+      title: 'Seller cancelled items',
+      body: `${saved.reference}: ${names} — ${reason}`,
+      type: 'order',
+      entityId: saved.id,
+    });
+    return OrdersService.sellerView(saved, (saved.items ?? []).filter((i) => mine.some((t) => t.id === i.id)));
   }
 
   /**
@@ -408,13 +764,13 @@ export class OrdersService {
       const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
       const refunded = await this.payments.refundCancelledOrder(saved);
       for (const item of saved.items ?? []) {
-        if (!item.productId.startsWith('ext:')) await this.products.restock(item.productId, item.qty);
+        if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') await this.products.restock(item.productId, item.qty);
       }
       this.emitter.toUser(saved.customerId, 'order:updated', saved);
       this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
       await this.notifications.toUser(saved.customerId, {
         title: 'Order cancelled',
-        body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded ? ' Your payment was refunded to your wallet.' : ''}`,
+        body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded > 0 ? ` $${refunded.toFixed(2)} was refunded to your wallet.` : ''}`,
         type: 'order',
         entityId: saved.id,
       });
@@ -430,6 +786,7 @@ export class OrdersService {
         status: 'unassigned',
         address: task.address,
         zoneId: task.zoneId,
+        hubId: task.hubId,
         codAmountUsd: task.codAmountUsd,
         pickupAddress: task.pickupAddress,
         proofCode: await this.delivery.getProofCode(task.id),
@@ -439,8 +796,9 @@ export class OrdersService {
       }),
     );
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitter.toRoles([...OPS_ROOMS, 'rider'], 'delivery:updated', next);
+    this.emitTask(next);
     this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    await this.announceTask(next);
     await this.notifications.toUser(saved.customerId, {
       title: 'Delivery attempt failed',
       body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}). You can also cancel the order.`,
@@ -469,11 +827,14 @@ export class OrdersService {
     order.status = 'cancelled';
     const saved = await this.orders.save(order);
     for (const item of saved.items ?? []) {
-      if (!item.productId.startsWith('ext:')) {
+      // A line the seller already cancelled was restocked then.
+      if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
         await this.products.restock(item.productId, item.qty);
       }
     }
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    // Sellers saw the order as awaiting payment: the fanout tells them it is gone.
+    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
       body: `${saved.reference} was cancelled: ${payment.failureReason ?? 'payment was not completed'}.`,
@@ -507,6 +868,11 @@ export class OrdersService {
     return fee;
   }
 
+  /**
+   * Operator moves an order ONE step forward (see [nextOrderStatus]); anything else
+   * is refused so a status can never skip steps or rewind. Marking it `delivered`
+   * by hand also closes the open delivery task(s) and collects cash on delivery.
+   */
   async updateStatus(
     orderId: string,
     status: OrderStatus,
@@ -517,20 +883,42 @@ export class OrdersService {
     if (status === 'cancelled') {
       throw new BadRequestException('Use cancel so stock and refunds are handled.');
     }
-    if ((order.status as string) === 'cancelled' || (order.status as string) === 'returned') {
-      throw new BadRequestException(`A ${order.status} order can no longer change.`);
+    const from = order.status;
+    if (nextOrderStatus(from) !== status) {
+      throw new BadRequestException(`Cannot move an order from ${from} to ${status}.`);
     }
-    if (order.status === 'delivered' && status !== 'returned') {
-      throw new BadRequestException('A delivered order can only be marked returned.');
-    }
-    if (order.status === 'pending' && order.paymentMethod !== 'cod') {
+    if (from === 'pending' && order.paymentMethod !== 'cod') {
       const pay = await this.payments.forOrder(order.id);
       if (pay && pay.status === 'pending') {
         throw new BadRequestException('Awaiting payment — this order cannot be fulfilled yet.');
       }
     }
-    order.status = status;
-    const saved = await this.orders.save(order);
+    // Conditional on the status we just read: two operators clicking at once move it one step, not two.
+    const claim = await this.orders
+      .createQueryBuilder()
+      .update(Order)
+      .set({ status })
+      .where('id = :id AND status = :from', { id: order.id, from })
+      .execute();
+    if (!claim.affected) {
+      throw new BadRequestException('This order was just updated. Refresh and try again.');
+    }
+    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+
+    if (status === 'delivered') {
+      // Close the delivery by hand: the open task(s) are delivered, COD is collected.
+      const open = await this.deliveries.find({
+        where: { orderId: saved.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) },
+      });
+      for (const task of open) {
+        task.status = 'delivered';
+        task.deliveredAt = new Date();
+        await this.deliveries.save(task);
+        this.emitTask(task);
+        if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+      }
+      await this.payments.markCollected(saved.id);
+    }
 
     // Everyone who cares about this order hears about it instantly.
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
@@ -548,6 +936,18 @@ export class OrdersService {
   }
 
   /**
+   * An operator cancels an order on the customer's behalf, with a reason. Works
+   * until the rider has collected the parcel; the reason is stored on every live
+   * line and told to the customer (and the sellers). Stock, refund and delivery
+   * tasks are handled by [cancel].
+   */
+  async adminCancel(user: { id: string; role: string }, orderId: string, reasonRaw: string): Promise<Order> {
+    const reason = String(reasonRaw ?? '').trim().slice(0, 200);
+    if (reason.length < 3) throw new BadRequestException('Give a reason for the cancellation (at least 3 characters).');
+    return this.cancel(user, orderId, { allowProcessing: true, reason });
+  }
+
+  /**
    * Customer cancels their own order while it's still cancellable (before it
    * ships). Restocks the items, refunds prepaid orders to the wallet, and voids
    * the delivery task.
@@ -555,6 +955,7 @@ export class OrdersService {
   async cancel(
     user: { id: string; role: string },
     orderId: string,
+    opts: { allowProcessing?: boolean; reason?: string; bySeller?: boolean } = {},
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     // Same answer for "missing" and "not yours" so ids can't be probed.
@@ -564,23 +965,39 @@ export class OrdersService {
 
     // Atomic transition: of two concurrent cancels exactly one wins, so stock is
     // restored and money refunded once.
+    // A rider-assigned order may still be cancelled (seller-side) as long as the parcel was not collected.
+    let cancellable = "('pending','confirmed')";
+    if (opts.allowProcessing && order.status === 'processing') {
+      const collected = await this.deliveries.count({ where: { orderId: order.id, status: In(['picked_up', 'in_transit', 'delivered']) } });
+      if (!collected) cancellable = "('pending','confirmed','processing')";
+    }
     const claim = await this.orders
       .createQueryBuilder()
       .update(Order)
       .set({ status: 'cancelled' })
-      .where("id = :id AND status IN ('pending','confirmed')", { id: order.id })
+      .where(`id = :id AND status IN ${cancellable}`, { id: order.id })
       .execute();
     if (!claim.affected) {
       throw new BadRequestException(`Order can no longer be cancelled (status: ${order.status}).`);
     }
+    // An operator's reason is kept on every line that was still live.
+    if (opts.reason) {
+      await this.orders.manager
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ cancelReason: opts.reason })
+        .where("orderId = :id AND fulfilment <> 'cancelled'", { id: order.id })
+        .execute();
+    }
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
 
     // Was the money actually received? (pending mobile money / COD: no refund due)
-    const wasPaid = await this.payments.refundCancelledOrder(saved);
+    const refundedUsd = await this.payments.refundCancelledOrder(saved);
 
     // Return reserved stock.
     for (const item of saved.items ?? []) {
-      if (!item.productId.startsWith('ext:')) {
+      // A line the seller already cancelled was restocked then.
+      if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
         await this.products.restock(item.productId, item.qty);
       }
     }
@@ -600,10 +1017,18 @@ export class OrdersService {
     this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
-      body: `${saved.reference} was cancelled.${wasPaid ? ' Refund credited to your wallet.' : ''}`,
+      body: `${saved.reference} was cancelled${opts.reason ? ` by Somba&Teka support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
       type: 'order',
       entityId: saved.id,
     });
+    // The sellers who were about to pack it must know to stop (the seller who cancelled it knows).
+    if (!opts.bySeller) {
+      await this.notifySellers(
+        saved,
+        'Order cancelled',
+        `${saved.reference} was cancelled${opts.reason ? ` (${opts.reason})` : user.role.startsWith('admin') ? ' by Somba&Teka' : ' by the customer'}. Do not pack it.`,
+      );
+    }
     return saved;
   }
 
@@ -615,7 +1040,7 @@ export class OrdersService {
   async list(user: { id: string; role: string }, sellerId?: string, paging?: unknown): Promise<unknown[]> {
     const { take, skip } = pageOf(paging);
     if (user.role === 'customer') {
-      return this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take, skip });
+      return this.withRiders(await this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take, skip }));
     }
     if (user.role === 'rider') {
       return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' }, take, skip });
@@ -625,12 +1050,12 @@ export class OrdersService {
       const staff = pageOf(paging, { def: 200 });
       return this.orders.find({ order: { createdAt: 'DESC' }, take: staff.take, skip: staff.skip });
     }
-    if (user.role === 'seller') return this.listForSeller(sellerId ?? user.id, { take: pageOf(paging, { def: 200 }).take, skip });
+    if (user.role === 'seller') return this.listForSeller([...new Set([sellerId ?? user.id, user.id])], { take: pageOf(paging, { def: 200 }).take, skip });
     return [];
   }
 
-  private async listForSeller(sellerId: string, page: { take: number; skip: number }) {
-    const ids = await this.products.idsBySeller(sellerId);
+  private async listForSeller(sellerIds: string[], page: { take: number; skip: number }) {
+    const ids = (await Promise.all(sellerIds.map((id) => this.products.idsBySeller(id)))).flat();
     if (!ids.length) return [];
     const mine = new Set(ids);
     // Page over ORDERS first (joining lines would page over line rows), then load their lines.
@@ -655,21 +1080,7 @@ export class OrdersService {
       .where('o.id IN (:...orderIds)', { orderIds })
       .orderBy('o.createdAt', 'DESC')
       .getMany();
-    return rows.map((o) => {
-      const items = (o.items ?? []).filter((i) => mine.has(i.productId));
-      const subtotal = Number(items.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
-      return {
-        id: o.id,
-        reference: o.reference,
-        status: o.status,
-        paymentMethod: o.paymentMethod,
-        createdAt: o.createdAt,
-        customerName: (o.customerName ?? '').split(' ')[0],
-        items,
-        subtotalUsd: subtotal,
-        totalUsd: subtotal,
-      };
-    });
+    return rows.map((o) => OrdersService.sellerView(o, (o.items ?? []).filter((i) => mine.has(i.productId))));
   }
 
   get(id: string): Promise<Order | null> {

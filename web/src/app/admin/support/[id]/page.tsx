@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay, localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -93,7 +94,7 @@ export default function AdminSupportDetailPage() {
                 return (
                   <div key={i} className={`flex ${staff ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${staff ? "bg-[var(--primary)] text-white" : "bg-slate-100 text-slate-800"}`}>
-                      <p className={`mb-0.5 text-xs ${staff ? "text-white/70" : "text-slate-400"}`}>{m.from} · {m.at.slice(0, 16).replace("T", " ")}</p>
+                      <p className={`mb-0.5 text-xs ${staff ? "text-white/70" : "text-slate-400"}`}>{m.from} · {localDateTime(m.at)}</p>
                       <p className="whitespace-pre-wrap break-words">{m.text}</p>
                     </div>
                   </div>
@@ -130,7 +131,7 @@ export default function AdminSupportDetailPage() {
               {ticket.orderId && (
                 <div className="flex justify-between"><span className="text-slate-500">{fr ? "Commande" : "Order"}</span><Link href={`/admin/orders/${ticket.orderId}`} className="text-[var(--primary)] hover:underline">{fr ? "Voir" : "View"}</Link></div>
               )}
-              <div className="flex justify-between"><span className="text-slate-500">{fr ? "Créé le" : "Created"}</span><span>{ticket.createdAt.slice(0, 10)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">{fr ? "Créé le" : "Created"}</span><span>{localDay(ticket.createdAt)}</span></div>
             </CardContent>
           </Card>
 

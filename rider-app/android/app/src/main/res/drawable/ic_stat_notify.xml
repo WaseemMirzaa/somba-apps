@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for push notifications: a parcel, white on transparent. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2L3,6.5v11L12,22l9,-4.5v-11L12,2zM12,4.24l6.17,3.09L15.6,8.61L9.43,5.53L12,4.24zM12,10.42L5.83,7.33l2.37,-1.18l6.17,3.08L12,10.42zM5,8.96l6,3v7.58l-6,-3V8.96zM13,19.54v-7.58l6,-3v7.58L13,19.54z" />
+</vector>

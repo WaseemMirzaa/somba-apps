@@ -1,5 +1,6 @@
 "use client";
 
+import { mapsLinkTo } from "@/lib/google-maps";
 import { useParams } from "next/navigation";
 import { Phone, Navigation, Store } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -166,7 +167,7 @@ export default function RiderTaskDetailPage() {
         ) : (
           <span />
         )}
-        <a href={mapsUrl(task.address)} target="_blank" rel="noopener noreferrer" className="contents">
+        <a href={task.geo ? mapsLinkTo(task.geo) : mapsUrl(task.address)} target="_blank" rel="noopener noreferrer" className="contents">
           <Button variant="secondary" className="w-full">
             <Navigation className="h-4 w-4" />
             {fr ? "Naviguer" : "Navigate"}

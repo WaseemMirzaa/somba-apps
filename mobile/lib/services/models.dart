@@ -1,3 +1,6 @@
+import 'dart:convert';
+import '../util/delivery_estimate.dart';
+import '../util/variants.dart';
 // Lightweight DTOs mirroring the API payloads (api/src/database/entities).
 
 class BackendUser {
@@ -67,6 +70,12 @@ class ProductDto {
   /// `base` | `flash` | `campaign`: what set [price].
   final String priceSource;
 
+  /// Options the shopper must pick before buying (empty = none).
+  final List<VariantGroup> variants;
+
+  /// The seller's delivery time for this product, in days.
+  final int deliveryDays;
+
   ProductDto({
     required this.id,
     required this.name,
@@ -87,12 +96,16 @@ class ProductDto {
     double? basePrice,
     this.campaignPct = 0,
     this.priceSource = 'base',
+    this.variants = const [],
+    this.deliveryDays = deliveryDaysFallback,
   }) : basePrice = basePrice ?? price;
 
   /// Localised display name (falls back to the English name).
   String displayName(String lang) => lang == 'fr' && nameFr.isNotEmpty ? nameFr : name;
 
   factory ProductDto.fromJson(Map<String, dynamic> j) => ProductDto(
+        variants: readVariants(j['variants']),
+        deliveryDays: deliveryDaysOf(j['deliveryDays']),
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
         nameFr: j['nameFr'] as String? ?? '',
@@ -179,6 +192,14 @@ class CategoryDto {
       );
 }
 
+({double lat, double lng, String? placeId, String? formatted})? _geoFrom(Object? raw) {
+  if (raw is! Map) return null;
+  final lat = (raw['lat'] as num?)?.toDouble();
+  final lng = (raw['lng'] as num?)?.toDouble();
+  if (lat == null || lng == null) return null;
+  return (lat: lat, lng: lng, placeId: raw['placeId'] as String?, formatted: raw['formatted'] as String?);
+}
+
 class AddressDto {
   final String id;
   final String label;
@@ -190,6 +211,9 @@ class AddressDto {
   final String? zoneId;
   final bool isDefault;
 
+  /// Map pin the customer picked (null when the address was typed by hand).
+  final ({double lat, double lng, String? placeId, String? formatted})? geo;
+
   AddressDto({
     required this.id,
     required this.label,
@@ -200,6 +224,7 @@ class AddressDto {
     this.phone,
     this.zoneId,
     this.isDefault = false,
+    this.geo,
   });
 
   factory AddressDto.fromJson(Map<String, dynamic> j) => AddressDto(
@@ -212,7 +237,10 @@ class AddressDto {
         phone: j['phone'] as String?,
         zoneId: j['zoneId'] as String?,
         isDefault: j['isDefault'] as bool? ?? false,
+        geo: _geoFrom(j['geo']),
       );
+
+  bool get hasPin => geo != null;
 
   String get oneLine => [line1, if ((commune ?? '').isNotEmpty) commune, city].join(', ');
 }
@@ -227,6 +255,20 @@ class OrderItemDto {
   /// The normal (undiscounted) unit price; equals [priceUsd] when nothing was discounted.
   final double listPriceUsd;
 
+  /// The seller who packs this line (null on old orders).
+  final String? sellerId;
+  final String? sellerName;
+
+  /// `open` (seller is packing) | `ready` (packed, waiting for pickup) | `received` (at the hub)
+  /// | `cancelled` (the seller could not supply it).
+  final String fulfilment;
+  final DateTime? readyAt;
+  final DateTime? receivedAt;
+  final String? cancelReason;
+
+  /// Money refunded to the wallet for this line (0 when none).
+  final double refundedUsd;
+
   OrderItemDto({
     required this.productId,
     required this.productName,
@@ -234,7 +276,18 @@ class OrderItemDto {
     required this.qty,
     required this.priceUsd,
     double? listPriceUsd,
+    this.sellerId,
+    this.sellerName,
+    this.fulfilment = 'open',
+    this.readyAt,
+    this.receivedAt,
+    this.cancelReason,
+    this.refundedUsd = 0,
   }) : listPriceUsd = listPriceUsd ?? priceUsd;
+
+  bool get isCancelled => fulfilment == 'cancelled';
+
+  static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
 
   factory OrderItemDto.fromJson(Map<String, dynamic> j) => OrderItemDto(
         productId: j['productId'] as String? ?? '',
@@ -243,7 +296,55 @@ class OrderItemDto {
         qty: (j['qty'] as num?)?.toInt() ?? 1,
         priceUsd: (j['priceUsd'] as num?)?.toDouble() ?? 0,
         listPriceUsd: (j['listPriceUsd'] as num?)?.toDouble(),
+        sellerId: j['sellerId'] as String?,
+        sellerName: j['sellerName'] as String?,
+        fulfilment: j['fulfilment'] as String? ?? 'open',
+        readyAt: _date(j['readyAt']),
+        receivedAt: _date(j['receivedAt']),
+        cancelReason: j['cancelReason'] as String?,
+        refundedUsd: (j['refundedUsd'] as num?)?.toDouble() ?? 0,
       );
+}
+
+/// One seller's share of an order, with its own progress.
+class OrderPackage {
+  final String? sellerId;
+  final String? sellerName;
+  final List<OrderItemDto> items;
+
+  /// `cancelled` | `pending` | `to_pack` | `ready` | `at_hub` | `shipped` | `out_for_delivery` | `delivered` | `returned`.
+  final String status;
+
+  const OrderPackage({required this.sellerId, required this.sellerName, required this.items, required this.status});
+}
+
+/// The step of one package, given the order and its lines (mirrors the server's rule).
+String packageStatusOf(OrderDto o, List<OrderItemDto> items) {
+  final live = items.where((i) => !i.isCancelled).toList();
+  if (live.isEmpty || o.status == 'cancelled') return 'cancelled';
+  if (o.status == 'pending' && o.paymentMethod != 'cod') return 'pending';
+  if (live.every((i) => i.fulfilment == 'received')) {
+    return const {'shipped', 'out_for_delivery', 'delivered', 'returned'}.contains(o.status) ? o.status : 'at_hub';
+  }
+  if (live.every((i) => i.fulfilment != 'open')) return 'ready';
+  return 'to_pack';
+}
+
+/// The order's lines grouped by seller (first-seen order), each with its derived status.
+List<OrderPackage> packagesOf(OrderDto o) {
+  final groups = <String, List<OrderItemDto>>{};
+  for (final i in o.items) {
+    groups.putIfAbsent(i.sellerId ?? i.sellerName ?? '', () => []).add(i);
+  }
+  return [
+    for (final g in groups.values)
+      OrderPackage(
+        sellerId: g.first.sellerId,
+        sellerName: g.map((i) => i.sellerName).firstWhere((n) => (n ?? '').isNotEmpty, orElse: () => null),
+        items: g,
+        status: packageStatusOf(o, g),
+      ),
+  ];
 }
 
 class OrderDto {
@@ -263,6 +364,16 @@ class OrderDto {
   /// Campaign savings already deducted from [subtotalUsd] / [totalUsd].
   final double campaignDiscountUsd;
 
+  /// The delivery address as the order stored it (JSON text, sent back only to the order's own customer).
+  final String? shippingRaw;
+
+  /// Chosen delivery window "YYYY-MM-DD HH:MM-HH:MM" (null = as soon as possible).
+  /// Expected delivery day (YYYY-MM-DD), from the sellers' delivery times.
+  final String? estimatedDeliveryDate;
+
+  /// Who to call: the server sends it to the customer only while the order is shipped / out for delivery.
+  final RiderContact? rider;
+
   OrderDto({
     required this.id,
     required this.reference,
@@ -277,9 +388,45 @@ class OrderDto {
     this.createdAt,
     this.items = const [],
     this.campaignDiscountUsd = 0,
+    this.shippingRaw,
+    this.estimatedDeliveryDate,
+    this.rider,
   });
 
+  Map<String, dynamic>? get _shipping {
+    final raw = shippingRaw;
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final m = jsonDecode(raw);
+      return m is Map ? m.map((k, v) => MapEntry(k.toString(), v)) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// "12 Avenue de la Paix, Gombe, Kinshasa" (empty when unknown).
+  String get shippingText {
+    final m = _shipping;
+    if (m == null) return '';
+    return [m['line1'], m['line2'], m['commune'], m['city']].where((e) => e != null && '$e'.trim().isNotEmpty).join(', ');
+  }
+
+  /// The pin the customer chose for this delivery, if any.
+  ({double lat, double lng})? get destination {
+    final g = _shipping?['geo'];
+    if (g is! Map) return null;
+    final lat = (g['lat'] as num?)?.toDouble();
+    final lng = (g['lng'] as num?)?.toDouble();
+    return lat == null || lng == null ? null : (lat: lat, lng: lng);
+  }
+
   int get itemCount => items.fold(0, (s, i) => s + i.qty);
+
+  /// Number of lines the seller(s) cancelled.
+  int get cancelledLineCount => items.where((i) => i.isCancelled).length;
+
+  /// Money already refunded to the wallet for cancelled lines.
+  double get refundedUsd => items.fold(0.0, (s, i) => s + i.refundedUsd);
 
   factory OrderDto.fromJson(Map<String, dynamic> j) => OrderDto(
         id: j['id'] as String,
@@ -293,11 +440,32 @@ class OrderDto {
         promoCode: j['promoCode'] as String?,
         totalUsd: (j['totalUsd'] as num?)?.toDouble() ?? 0,
         campaignDiscountUsd: (j['campaignDiscountUsd'] as num?)?.toDouble() ?? 0,
+        shippingRaw: j['shippingAddress'] as String?,
+        estimatedDeliveryDate: j['estimatedDeliveryDate'] as String?,
+        rider: RiderContact.tryParse(j['rider']),
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         items: ((j['items'] as List?) ?? const [])
             .map((e) => OrderItemDto.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))
             .toList(),
       );
+}
+
+/// The rider's name and phone number (the phone may be missing).
+class RiderContact {
+  final String name;
+  final String? phone;
+  const RiderContact({required this.name, this.phone});
+
+  /// A callable number: digits and a leading "+", no spaces or dashes ("" when there is none).
+  String get dialNumber => (phone ?? '').replaceAll(RegExp(r'[^+\d]'), '');
+
+  static RiderContact? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final name = raw['name'];
+    final phone = raw['phone'];
+    if (name is! String || name.trim().isEmpty) return null;
+    return RiderContact(name: name.trim(), phone: phone is String && phone.trim().isNotEmpty ? phone.trim() : null);
+  }
 }
 
 class NotificationDto {

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
+import { parsePreferredZones } from '../common/zones/hub-scope';
 import { User, UserRole } from '../database/entities';
 
 /** Public-safe projection of a user (never leaks the password hash). */
@@ -18,6 +19,10 @@ export interface PublicUser {
   phoneVerified: boolean;
   avatar: string | null;
   prefs: UserPrefs;
+  /** Home warehouse (riders and warehouse staff; null = not tied to one). */
+  hubId: string | null;
+  /** A rider's preferred zone ids, shown first in their queue. */
+  preferredZones: string[];
 }
 
 /** Notification + privacy + market preferences (customer Settings screen). */
@@ -54,6 +59,20 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.repo.findOne({ where: { id } });
+  }
+
+  findByPhoneHash(hash: string): Promise<User[]> {
+    return this.repo.find({ where: { phoneHash: hash } });
+  }
+
+  /** One-off fill of `phoneHash` for rows saved before the column existed (cheap: only rows still missing it). */
+  async onModuleInit(): Promise<void> {
+    try {
+      const rows = await this.repo.find({ where: { phoneHash: IsNull(), phone: Not(IsNull()) } });
+      for (const u of rows) await this.repo.save(u); // @BeforeUpdate computes the hash
+    } catch {
+      /* schema not ready yet (first boot before migrations): the next start fills it */
+    }
   }
 
   findByEmail(email: string): Promise<User | null> {
@@ -161,6 +180,8 @@ export class UsersService {
       phoneVerified: !!user.phoneVerified,
       avatar: user.avatar ?? null,
       prefs: UsersService.parsePrefs(user.prefs),
+      hubId: user.hubId ?? null,
+      preferredZones: parsePreferredZones(user.preferredZones),
     };
   }
 }

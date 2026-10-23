@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/notification_text.dart';
 import '../l10n/strings.dart';
+import '../services/models.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -60,6 +61,8 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ]),
               ),
+              const SizedBox(height: 12),
+              _WhereIWork(assignment: store.assignment),
               const SizedBox(height: 18),
               Text(store.unreadCount > 0 ? s.notificationsNew(store.unreadCount) : s.notifications, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 10),
@@ -70,7 +73,12 @@ class ProfileScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: SurfaceCard(
-                      onTap: n.read ? null : () => store.markRead(n.id),
+                      // A delivery notice opens the delivery (Available or Active); the rest just mark it read.
+                      onTap: n.type == 'task' || n.type == 'delivery'
+                          ? () => store.openNotice(type: n.type, entityId: n.entityId, notificationId: n.id)
+                          : n.read
+                              ? null
+                              : () => store.markRead(n.id),
                       padding: const EdgeInsets.all(14),
                       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Expanded(
@@ -102,6 +110,43 @@ class ProfileScreen extends StatelessWidget {
           ),
         ]);
       },
+    );
+  }
+}
+
+/// Home warehouse and zones: the rider sees and is told about that warehouse's deliveries, their own zones first.
+class _WhereIWork extends StatelessWidget {
+  final RiderAssignment? assignment;
+  const _WhereIWork({required this.assignment});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    final a = assignment;
+    return SurfaceCard(
+      key: const ValueKey('where-i-work'),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.warehouse_rounded, color: AppColors.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(s.homeWarehouse, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(
+              a == null ? '…' : (a.hasHub ? [a.hubName, a.hubCity].whereType<String>().join(' · ') : s.noWarehouse),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+            ),
+            if (a != null && a.preferredZones.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(s.myZones(a.preferredZones.join(', ')), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            ],
+            if (a != null && a.hubZones.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(s.warehouseZones(a.hubZones.join(', ')), style: const TextStyle(color: AppColors.faint, fontSize: 12)),
+            ],
+          ]),
+        ),
+      ]),
     );
   }
 }

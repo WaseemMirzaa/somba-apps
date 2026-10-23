@@ -11,6 +11,7 @@ import { PageLoader } from "@/components/ui/loader";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { PaymentPending } from "@/components/shop/payment-pending";
 import { OrderLines } from "@/components/shop/order-lines";
+import { OneDeliveryNote } from "@/components/shop/one-delivery-note";
 import { VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -184,6 +185,7 @@ function PaymentContent() {
 
       <DetailSection title={fr ? "Récapitulatif" : "Summary"}>
         <OrderLines lines={lines} />
+        <OneDeliveryNote lines={lines} className="mt-4" />
         <InfoGrid items={[
           { label: fr ? "Livraison à" : "Deliver to", value: `${address.label} — ${[address.line1, address.commune, address.city].filter(Boolean).join(", ")}`, full: true },
           { label: fr ? "Articles" : "Items", value: lines.reduce((s, l) => s + l.qty, 0) },

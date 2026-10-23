@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -8,15 +9,13 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { Modal, ErrorNote } from "@/components/admin/modal";
+import { RefundDialog } from "@/components/admin/refund-dialog";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { useToast } from "@/context/toast-context";
-import { canMoveMoney, errMsg, useRole, type PaymentRow } from "@/lib/admin-live";
-import { socketClient } from "@/lib/realtime/socket-client";
+import { canMoveMoney, useRole, type PaymentRow } from "@/lib/admin-live";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
@@ -26,22 +25,18 @@ const STATUS_OPTIONS = [
 
 export default function AdminRefundsPage() {
   const { t, locale } = useLocale();
-  const { toast } = useToast();
   const rt = useRealtime();
   const role = useRole();
   const fr = locale === "fr";
   const mayRefund = canMoveMoney(role);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [target, setTarget] = useState<PaymentRow | null>(null);
-  const [toWallet, setToWallet] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const rows = useMemo(
     () =>
       (rt.payments as PaymentRow[])
         .filter((p) => !!p.orderId && p.purpose !== "topup" && (p.status === "succeeded" || p.status === "refunded"))
-        .map((p) => ({ ...p, date: p.createdAt.slice(0, 10) })),
+        .map((p) => ({ ...p, date: localDay(p.createdAt) })),
     [rt.payments],
   );
 
@@ -56,21 +51,6 @@ export default function AdminRefundsPage() {
   );
 
   const refundable = rows.filter((r) => r.status === "succeeded").length;
-
-  async function refund() {
-    if (!target?.orderId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await socketClient.request("orders:refund", { orderId: target.orderId, toWallet });
-      toast(fr ? `Commande ${target.orderReference} remboursée` : `Order ${target.orderReference} refunded`, "success");
-      setTarget(null);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -118,11 +98,31 @@ export default function AdminRefundsPage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => (
-                  <Badge variant={row.status === "refunded" ? "default" : "success"}>
-                    {row.status === "refunded" ? (fr ? "Remboursé" : "Refunded") : fr ? "Payé" : "Paid"}
-                  </Badge>
-                ),
+                render: (row) => {
+                  const p = row as unknown as PaymentRow;
+                  const where =
+                    p.refundTo === "phone"
+                      ? p.refundStatus === "sending"
+                        ? fr ? "vers le téléphone · en cours" : "to phone · sending"
+                        : fr ? "vers le téléphone" : "to phone"
+                      : p.refundTo === "wallet"
+                        ? p.refundStatus === "failed"
+                          ? fr ? "portefeuille (échec téléphone)" : "wallet (phone refund failed)"
+                          : fr ? "vers le portefeuille" : "to wallet"
+                        : null;
+                  return (
+                    <div>
+                      <Badge variant={p.status === "refunded" ? "default" : "success"}>
+                        {p.status === "refunded" ? (fr ? "Remboursé" : "Refunded") : fr ? "Payé" : "Paid"}
+                      </Badge>
+                      {p.status === "refunded" && where && (
+                        <p className="mt-1 text-xs text-slate-400">
+                          {p.refundedUsd != null ? `${formatCurrency(p.refundedUsd, locale)} ` : ""}{where}
+                        </p>
+                      )}
+                    </div>
+                  );
+                },
               },
               { key: "date", label: t("date") },
               {
@@ -133,7 +133,7 @@ export default function AdminRefundsPage() {
                   if (p.status === "refunded") return <span className="text-sm text-slate-400">{fr ? "Remboursé" : "Refunded"}</span>;
                   if (!mayRefund) return <span className="text-sm text-slate-400">—</span>;
                   return (
-                    <Button variant="approve" size="sm" className="whitespace-nowrap" onClick={() => { setTarget(p); setToWallet(true); setError(null); }}>
+                    <Button variant="approve" size="sm" className="whitespace-nowrap" onClick={() => setTarget(p)}>
                       {fr ? "Autoriser le remboursement" : "Authorise refund"}
                     </Button>
                   );
@@ -145,34 +145,12 @@ export default function AdminRefundsPage() {
         </CardContent>
       </Card>
 
-      <Modal
-        open={!!target}
-        onClose={() => !busy && setTarget(null)}
-        title={fr ? "Confirmer le remboursement" : "Confirm refund"}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setTarget(null)} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button variant="danger" size="sm" onClick={refund} disabled={busy}>{busy ? "…" : fr ? "Rembourser" : "Refund"}</Button>
-          </>
-        }
-      >
-        {target && (
-          <>
-            <p>
-              {target.orderReference} · {formatCurrency(target.amountUsd, locale)} · {target.method.replace(/_/g, " ")}
-            </p>
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={toWallet} onChange={() => setToWallet(true)} />
-              {fr ? "Vers le portefeuille du client" : "To the customer's wallet"}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={!toWallet} onChange={() => setToWallet(false)} />
-              {fr ? "Vers le moyen de paiement d'origine" : "To the original payment method"}
-            </label>
-            <ErrorNote message={error} />
-          </>
-        )}
-      </Modal>
+      <RefundDialog
+        target={target?.orderId ? { orderId: target.orderId, orderReference: target.orderReference ?? null, amountUsd: target.amountUsd, method: target.method } : null}
+        fr={fr}
+        locale={locale}
+        onClose={() => setTarget(null)}
+      />
     </div>
   );
 }

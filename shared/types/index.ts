@@ -41,7 +41,7 @@ export type FulfillmentModel = "seller_shipped" | "platform_warehouse" | "hybrid
 
 export type SellerBadge = "gold" | "silver" | "bronze" | "somba_assured";
 
-export type ProductStatus = "draft" | "pending" | "approved" | "rejected" | "live";
+export type ProductStatus = "draft" | "pending" | "rejected" | "live" | "removed";
 
 export type OrderStatus =
   | "pending"

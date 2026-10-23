@@ -82,15 +82,15 @@ function buildQueue(products: Product[]) {
     price: p.price,
     discount: p.discount ?? 0,
     description: p.description ?? "",
-    status: (p.status === "live" || p.status === "approved"
-      ? "approved"
+    status: (p.status === "live"
+      ? "live"
       : p.status === "pending"
         ? "pending"
         : p.status === "removed"
           ? "removed"
           : p.status === "draft"
             ? "draft"
-            : "rejected") as "pending" | "approved" | "rejected" | "removed" | "draft",
+            : "rejected") as "pending" | "live" | "rejected" | "removed" | "draft",
     rawStatus: p.status,
     image: p.image ?? "/brand/logo-stack.png",
     rating: p.rating,

@@ -37,7 +37,7 @@ export const flashSales = [
   { id: "FS-02", name: "Fashion Weekend", nameFr: "Week-end mode", start: "2024-06-14", end: "2024-06-16", discount: 30, products: 56, status: "scheduled" },
 ];
 
-export type AdminPayoutStatus = "requested" | "approved" | "rejected" | "paid";
+export type AdminPayoutStatus = "requested" | "sending" | "rejected" | "paid";
 
 export type AdminPayoutEntity = {
   id: string;
@@ -54,7 +54,7 @@ export const adminPayoutEntities: AdminPayoutEntity[] = [
   { id: "PAY-001", sellerId: 3, seller: "TechZone Store", amount: 2450, method: "Bank Transfer", status: "requested", requestedAt: "2024-06-07", bankAccount: "****4521" },
   { id: "PAY-002", sellerId: 4, seller: "HomeEssentials", amount: 890, method: "Bank Transfer", status: "requested", requestedAt: "2024-06-08", bankAccount: "****8832" },
   { id: "PAY-003", sellerId: 3, seller: "TechZone Store", amount: 12000, method: "Bank Transfer", status: "paid", requestedAt: "2024-05-01", bankAccount: "****4521" },
-  { id: "PAY-004", sellerId: 4, seller: "HomeEssentials", amount: 3200, method: "Mobile Money", status: "approved", requestedAt: "2024-06-05", bankAccount: "****8832" },
+  { id: "PAY-004", sellerId: 4, seller: "HomeEssentials", amount: 3200, method: "Mobile Money", status: "sending", requestedAt: "2024-06-05", bankAccount: "****8832" },
   { id: "PAY-005", sellerId: 3, seller: "TechZone Store", amount: 450, method: "Bank Transfer", status: "rejected", requestedAt: "2024-06-03", bankAccount: "****4521" },
 ];
 

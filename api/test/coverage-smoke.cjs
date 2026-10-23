@@ -6,6 +6,7 @@
  *   API_URL=http://localhost:3001 node test/coverage-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { kyc } = require('./kyc.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -53,7 +54,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   const other = await register('other');
   const guest = { sock: await connect() };
   const sellerU = await register('seller', 'seller');
-  const store = (await req(sellerU.sock, 'sellers:register', { name: `Cov Store ${tag}` })).data;
+  const store = (await req(sellerU.sock, 'sellers:register', kyc(`Cov Store ${tag}`))).data;
   await req(admin.sock, 'sellers:setStatus', { id: store.id, status: 'approved' });
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   let a;
@@ -313,6 +314,8 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(adm1.gmvByCategory.every((c) => typeof c.category === 'string' && typeof c.gmv === 'number' && typeof c.orders === 'number'), 'gmvByCategory rows are {category, gmv, orders}');
   ok(Array.isArray(adm1.alerts) && adm1.alerts.every((x) => x.kind && ['info', 'warning', 'critical'].includes(x.severity) && x.count > 0 && x.message), 'alerts are {kind, severity, count, message} with real counts only');
   const refundBase = adm1.refundsUsd;
+  // An undelivered order that is refunded becomes cancelled (and leaves GMV); a DELIVERED one becomes returned. Deliver first.
+  for (const st of ['processing', 'shipped', 'out_for_delivery', 'delivered']) await req(admin.sock, 'orders:updateStatus', { orderId: sale.id, status: st });
   a = await req(admin.sock, 'orders:refund', { orderId: sale.id });
   const adm2 = (await req(admin.sock, 'analytics:admin')).data;
   ok(a.ok && near(adm2.refundsUsd, refundBase + sale.totalUsd), 'a refund shows up in refundsUsd');
@@ -323,7 +326,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   const lowP = (await req(sellerU.sock, 'products:create', { name: `Low stock ${tag}`, price: 9, category: 'Electronics', stock: 3 })).data;
   const outP = (await req(sellerU.sock, 'products:create', { name: `Sold out ${tag}`, price: 9, category: 'Electronics', stock: 0 })).data;
   const pendingSeller = await register('pendsel', 'seller');
-  await req(pendingSeller.sock, 'sellers:register', { name: `Pending Store ${tag}` });
+  await req(pendingSeller.sock, 'sellers:register', kyc(`Pending Store ${tag}`));
   const dispOrder = await deliverFor(cust, prod.id, 1);
   const disp = (await req(cust.sock, 'disputes:open', { orderId: dispOrder.order.id, type: 'dispute', reason: 'Alert check dispute' })).data;
   const al = kinds((await req(admin.sock, 'analytics:admin')).data);
@@ -416,7 +419,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(a.ok && a.data.sellerId === store.id, 'an admin can read any store with sellerId');
   ok(!(await req(admin.sock, 'analytics:seller', { days: 7 })).ok, 'an admin must say which store');
   const emptySeller = await register('nosales', 'seller');
-  const emptyStore = (await req(emptySeller.sock, 'sellers:register', { name: `Empty ${tag}` })).data;
+  const emptyStore = (await req(emptySeller.sock, 'sellers:register', kyc(`Empty ${tag}`))).data;
   a = await req(emptySeller.sock, 'analytics:seller', { days: 14 });
   ok(a.ok && a.data.revenue === 0 && a.data.orders === 0 && a.data.revenueSeries.length === 14 && a.data.health.score === null && a.data.reviews.average === null && a.data.fulfilment.avgHoursToReady === null, 'a store without sales gets zeros / nulls, never invented numbers');
   void emptyStore;

@@ -89,8 +89,8 @@ export default function SellerFinancePage() {
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         {fr
-          ? `Les gains sont acquis à la livraison de la commande, après commission de ${summary.commissionPct} % ; le solde disponible vient du serveur et déduit les versements déjà demandés.`
-          : `Earnings accrue once an order is delivered, minus the ${summary.commissionPct}% commission; the available balance comes from the server and already subtracts payouts you requested.`}
+          ? `Les gains sont acquis à la livraison de la commande, après la commission en vigueur à la date de la commande (${summary.commissionPct} % pour les nouvelles commandes) ; le solde disponible vient du serveur et déduit les versements déjà demandés.`
+          : `Earnings accrue once an order is delivered, minus the commission in force when each order was placed (currently ${summary.commissionPct}% for new orders); the available balance comes from the server and already subtracts payouts you requested.`}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -271,8 +271,8 @@ export default function SellerFinancePage() {
         <CardContent>
           <p className="text-sm text-slate-600">
             {fr
-              ? `La plateforme prélève ${summary.commissionPct} % sur chaque vente livrée (taux unique, fixé par la plateforme). Commission sur vos ventes à ce jour : ${formatCurrency(f.commissionPaid, locale)}.`
-              : `The platform keeps ${summary.commissionPct}% of every delivered sale (one flat rate set by the platform). Commission on your sales so far: ${formatCurrency(f.commissionPaid, locale)}.`}
+              ? `La plateforme prélève ${summary.commissionPct} % sur les nouvelles commandes ; chaque commande garde le taux enregistré à sa création, un changement de taux ne modifie jamais vos commandes passées. Commission sur vos ventes à ce jour : ${formatCurrency(f.commissionPaid, locale)}.`
+              : `The platform keeps ${summary.commissionPct}% on new orders; each order keeps the rate stored when it was placed, so a rate change never alters your past orders. Commission on your sales so far: ${formatCurrency(f.commissionPaid, locale)}.`}
           </p>
         </CardContent>
       </Card>

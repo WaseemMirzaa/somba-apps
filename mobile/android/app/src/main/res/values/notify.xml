@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push notifications: channel shown in the phone's settings and the small icon's tint. -->
+<resources>
+    <string name="notify_channel_name">Somba&amp;Teka</string>
+    <string name="notify_channel_description">Orders, deliveries, payments and offers</string>
+    <color name="notify_accent">#E11428</color>
+</resources>

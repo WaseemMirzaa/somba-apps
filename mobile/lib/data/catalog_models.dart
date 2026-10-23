@@ -1,3 +1,6 @@
+import '../util/delivery_estimate.dart';
+import '../util/variants.dart';
+
 /// View-models for the storefront. They are built from the live API payloads
 /// (see catalog_live.dart) — there is no bundled sample catalogue.
 class Product {
@@ -26,6 +29,12 @@ class Product {
   final String priceSource;
   final int campaignPct;
 
+  /// Options (size, colour…) the shopper must pick before buying.
+  final List<VariantGroup> variants;
+
+  /// The seller's delivery time for this product, in days.
+  final int deliveryDays;
+
   const Product({
     required this.id,
     required this.uuid,
@@ -46,6 +55,8 @@ class Product {
     this.createdAt,
     this.priceSource = 'base',
     this.campaignPct = 0,
+    this.variants = const [],
+    this.deliveryDays = deliveryDaysFallback,
   });
 
   String displayName(String lang) => lang == 'fr' ? nameFr : name;

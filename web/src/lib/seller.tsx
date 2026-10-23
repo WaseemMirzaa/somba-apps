@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useRealtime } from "@/context/realtime-context";
+import { localDay, localDateTime } from "@/lib/dates";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { authApi } from "@/lib/realtime/auth-api";
 import type {
@@ -20,8 +21,24 @@ import type {
   Product,
   Review,
   Seller,
+  SellerOrderView,
   SellerStats,
 } from "@/lib/realtime/types";
+import {
+  applySellerReady,
+  commissionRateOf,
+  countsAsSale,
+  isLiveLine,
+  isPendingWork,
+  lineCommission,
+  lineState,
+  liveCommission,
+  liveQty,
+  normalizeOrder,
+  orderAmount,
+  packageReadyAt,
+  shippingStatusFromPackage,
+} from "@/lib/seller-packages";
 
 /**
  * Live seller data layer. Everything here derives from the signed-in seller's
@@ -45,6 +62,10 @@ const FALLBACK_IMAGE = "/brand/logo-stack.png";
 // ─── Server shapes not (yet) in lib/realtime/types ───────────────────────────
 export type SellerStore = Seller & {
   pickupAddress?: string | null;
+  /** Storefront branding: logo / banner (platform upload URLs) and a short description. */
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  description?: string | null;
   /** The plan stored on the row (may have lapsed). */
   plan?: string | null;
   planExpiresAt?: string | null;
@@ -99,7 +120,10 @@ export interface PayoutAvailability {
   earned: number;
   committed: number;
   available: number;
+  /** The CURRENT rate: it applies to new orders; each past order keeps the rate stored when it was placed. */
   commissionPct: number;
+  /** Commission already deducted from `earned` (sum of the amounts stored on the lines). */
+  commissionUsd?: number;
 }
 
 export type SellerPayout = Payout & {
@@ -166,6 +190,27 @@ export interface Replacement {
   updatedAt: string;
 }
 
+/** Campaign statuses the seller may still edit (an edit sends it back to marketing). */
+export const EDITABLE_CAMPAIGN: readonly string[] = ["draft", "pending", "rejected"];
+
+/** An exchange (swap for another item) on one of this store's products. Read-only: the warehouse processes it. */
+export interface Exchange {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string;
+  customerName: string;
+  fromSku: string;
+  fromName: string;
+  toSku: string;
+  toName: string;
+  priceDiffUsd: number;
+  reason: string | null;
+  status: "requested" | "approved" | "received" | "ready" | "dispatched" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductInput {
   name: string;
   nameFr?: string;
@@ -176,6 +221,8 @@ export interface ProductInput {
   stock: number;
   image?: string;
   description?: string;
+  /** Option types the shopper picks, e.g. [{ name: "Size", options: ["40", "41"] }]; [] removes them. */
+  variants?: { name: string; options: string[] }[];
 }
 
 export type StoreGateState =
@@ -233,7 +280,7 @@ function cityFromAddress(raw: string | null | undefined): string {
 }
 
 const money = (n: number) => Number(n.toFixed(2));
-const dayOf = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+const dayOf = (iso: string) => localDay(iso);
 
 /** Upload one product photo (JPEG/PNG/WebP, ≤ 5 MB) and return its public URL. */
 export async function uploadImage(file: File): Promise<string> {
@@ -311,20 +358,24 @@ interface BuildInput {
   seller: SellerStore | null;
   stats: SellerStats | null;
   products: SellerProductRow[];
-  orders: Order[];
+  /** The server's seller view (own lines + package status); a full Order is accepted as an offline fallback. */
+  orders: (SellerOrderView | Order)[];
   payouts: SellerPayout[];
   disputes: Dispute[];
   reviews: SellerReview[];
   available: PayoutAvailability | null;
   campaigns: Campaign[];
   replacements: Replacement[];
-  readyAt: Record<string, string>;
+  exchanges: Exchange[];
 }
+
+/** A seller order as the portal reads it (the address / rider only exist on a full order). */
+type RawOrder = SellerOrderView & { shippingAddress?: string | null; riderId?: string | null };
 
 function buildSellerData(input: BuildInput) {
   const {
     storeName, seller, stats, products, orders, payouts, disputes, reviews,
-    available, campaigns, replacements, readyAt,
+    available, campaigns, replacements, exchanges,
   } = input;
   const commissionPct = available?.commissionPct ?? DEFAULT_COMMISSION_PCT;
   const rate = commissionPct / 100;
@@ -338,16 +389,17 @@ function buildSellerData(input: BuildInput) {
 
   // Orders of this seller. The server already scopes `orders:list` to the
   // seller's own lines, so no extra filtering is needed here.
-  const sellerOrders = orders.filter((o) => (o.items?.length ?? 0) > 0);
-
-  const countsAsSale = (o: Order) => o.status !== "cancelled" && o.status !== "returned" && o.status !== "pending";
+  // Cancelled lines (fulfilment === "cancelled") never count toward amounts, commission or sales.
+  const sellerOrders: RawOrder[] = orders
+    .filter((o) => (o.items?.length ?? 0) > 0)
+    .map((o) => normalizeOrder(o as unknown as RawOrder));
 
   // Per-product sales from real orders.
   const soldByProduct = new Map<string, { qty: number; revenue: number; orders: number; inFlight: number }>();
   for (const o of sellerOrders) {
     for (const it of o.items ?? []) {
       const cur = soldByProduct.get(it.productId) ?? { qty: 0, revenue: 0, orders: 0, inFlight: 0 };
-      if (countsAsSale(o)) {
+      if (countsAsSale(o) && isLiveLine(it)) {
         cur.qty += it.qty;
         cur.revenue += it.priceUsd * it.qty;
         cur.orders += 1;
@@ -380,7 +432,7 @@ function buildSellerData(input: BuildInput) {
       campaignName: p.campaignName ?? null,
       image: p.image || FALLBACK_IMAGE,
       hasImage: !!p.image,
-      status: p.status, // REAL: live | pending | rejected | draft | approved
+      status: p.status, // REAL: live | pending | rejected | draft | removed
       description: p.description ?? "",
       brand: p.sellerName ?? storeName,
       category: p.category,
@@ -400,14 +452,14 @@ function buildSellerData(input: BuildInput) {
       orders: sale.orders,
       revenue: money(sale.revenue),
       productOrders: sellerOrders
-        .filter((o) => countsAsSale(o) && o.items?.some((it) => it.productId === p.id))
+        .filter((o) => countsAsSale(o) && o.items?.some((it) => it.productId === p.id && isLiveLine(it)))
         .slice(0, 10)
         .map((o) => ({
           orderNumber: o.reference,
           customer: firstNameOnly(o.customerName),
-          quantity: o.items.find((it) => it.productId === p.id)?.qty ?? 1,
+          quantity: o.items.find((it) => it.productId === p.id && isLiveLine(it))?.qty ?? 1,
           amount: o.items
-            .filter((it) => it.productId === p.id)
+            .filter((it) => it.productId === p.id && isLiveLine(it))
             .reduce((s, it) => s + it.priceUsd * it.qty, 0),
           status: o.status,
           date: dayOf(o.createdAt),
@@ -448,25 +500,18 @@ function buildSellerData(input: BuildInput) {
 
   // ── Orders ──
   const sellerOrderList = sellerOrders.map((o) => {
-    const amount = money(
-      (o.items ?? []).reduce((s, it) => s + it.priceUsd * it.qty, 0) || o.totalUsd,
-    );
-    const commission = money(amount * rate);
+    const amount = money(orderAmount(o));
+    // The commission stored on each line when the order was placed (today's rate only as a fallback).
+    const commission = money(liveCommission(o.items ?? [], commissionPct));
     const date = dayOf(o.createdAt);
-    const ready = readyAt[o.id];
-    // Shipping status comes straight from the live order status.
-    let shippingStatus: string;
-    switch (o.status) {
-      case "pending": shippingStatus = "pending"; break;
-      case "confirmed": shippingStatus = ready ? "ready" : "awaiting_pickup"; break;
-      case "processing": shippingStatus = "rider_assigned"; break;
-      case "shipped": shippingStatus = "picked_up"; break;
-      case "out_for_delivery": shippingStatus = "in_transit"; break;
-      case "delivered": shippingStatus = "delivered"; break;
-      default: shippingStatus = o.status; // cancelled | returned
-    }
+    const items = o.items ?? [];
+    // Ready / at-hub state comes from the server (package status + each line's fulfilment), never from local storage.
+    const ready = packageReadyAt(items);
+    const shippingStatus = shippingStatusFromPackage(o.packageStatus);
+    const packageDone = ["ready", "at_hub", "shipped", "out_for_delivery", "delivered"].includes(o.packageStatus);
+    const refunded = money(items.reduce((s, it) => s + (it.refundedUsd ?? 0), 0));
     const paymentStatus =
-      o.status === "cancelled" || o.status === "returned"
+      o.status === "cancelled" || o.status === "returned" || o.packageStatus === "cancelled"
         ? "refunded"
         : o.status === "pending" || (o.paymentMethod === "cod" && o.status !== "delivered")
           ? "pending"
@@ -475,7 +520,7 @@ function buildSellerData(input: BuildInput) {
     const timeline = [
       { time: date, label: "Placed", labelFr: "Commandée", detail: "", detailFr: "", done: true },
       { time: "", label: "Confirmed", labelFr: "Confirmée", detail: "", detailFr: "", done: o.status !== "pending" && o.status !== "cancelled" },
-      { time: ready ? new Date(ready).toISOString().slice(0, 16).replace("T", " ") : "", label: "Package ready (you)", labelFr: "Colis prêt (vous)", detail: "", detailFr: "", done: !!ready || past(["processing", "shipped", "out_for_delivery", "delivered"]) },
+      { time: ready ? localDateTime(ready) : "", label: "Package ready (you)", labelFr: "Colis prêt (vous)", detail: "", detailFr: "", done: packageDone },
       { time: "", label: "Rider assigned", labelFr: "Livreur assigné", detail: "", detailFr: "", done: past(["processing", "shipped", "out_for_delivery", "delivered"]) },
       { time: "", label: "Picked up", labelFr: "Collecté", detail: "", detailFr: "", done: past(["shipped", "out_for_delivery", "delivered"]) },
       { time: "", label: "Out for delivery", labelFr: "En cours de livraison", detail: "", detailFr: "", done: past(["out_for_delivery", "delivered"]) },
@@ -486,19 +531,32 @@ function buildSellerData(input: BuildInput) {
       orderId: o.id,
       customer: firstNameOnly(o.customerName),
       customerCity: cityFromAddress(o.shippingAddress),
-      items: (o.items ?? []).reduce((s, it) => s + it.qty, 0),
+      items: liveQty(items),
       amount,
       paymentMethod: o.paymentMethod,
       orderStatus: o.status,
+      packageStatus: o.packageStatus,
+      sellerCount: o.sellerCount,
+      otherSellersPacking: o.otherSellersPacking,
+      estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
       shippingStatus,
-      readyAt: ready ?? null,
+      readyAt: ready,
       date,
       createdAt: o.createdAt,
       commission,
+      /** The rate stored on the lines when the order was placed: a number, "mixed", or null (older payload). */
+      commissionRate: commissionRateOf(items),
       netEarnings: money(amount - commission),
       paymentStatus,
+      /** Money already refunded to the customer for this seller's cancelled lines. */
+      refunded,
+      /** Paid (or COD in progress) and not cancelled / returned: counts in sales and revenue. */
+      countsAsSale: countsAsSale(o),
+      /** Package still to pack: work waiting for the seller. */
+      needsPacking: isPendingWork(o),
       hasRider: !!o.riderId || ["processing", "shipped", "out_for_delivery", "delivered"].includes(o.status),
-      items_detail: (o.items ?? []).map((it) => ({
+      items_detail: items.map((it) => ({
+        itemId: it.id,
         productId: it.productId,
         name: it.productName,
         sku: `SKU-${shortId(it.productId)}`,
@@ -506,6 +564,13 @@ function buildSellerData(input: BuildInput) {
         price: it.priceUsd,
         variant: it.variant || "",
         image: imageById.get(it.productId) ?? FALLBACK_IMAGE,
+        state: lineState(it),
+        fulfilment: it.fulfilment ?? "open",
+        cancelReason: it.cancelReason ?? null,
+        refundedUsd: it.refundedUsd ?? 0,
+        commissionUsd: lineCommission(it, commissionPct),
+        commissionPct: it.commissionPct ?? null,
+        readyAt: it.readyAt ?? null,
       })),
       timeline,
     };
@@ -548,7 +613,8 @@ function buildSellerData(input: BuildInput) {
 
   // Per-order earnings (delivered = earned; the rest is on its way).
   const sellerPayoutPendingItems: SellerPayoutPendingItem[] = sellerOrderList
-    .filter((o) => o.orderStatus !== "cancelled" && o.orderStatus !== "returned")
+    // Not cancelled / returned, and not an unpaid (non-COD) pending order.
+    .filter((o) => !["cancelled", "returned", "pending"].includes(o.packageStatus))
     .map((o) => {
       const status: SellerPayoutItemStatus =
         o.orderStatus === "delivered"
@@ -605,7 +671,7 @@ function buildSellerData(input: BuildInput) {
     return r;
   };
   for (const o of sellerOrderList) {
-    if (o.orderStatus !== "delivered") continue;
+    if (o.orderStatus !== "delivered" || o.amount <= 0) continue;
     const r = row(o.date.slice(0, 7));
     r.orders += 1;
     r.gross += o.amount;
@@ -628,14 +694,16 @@ function buildSellerData(input: BuildInput) {
 
   // Real revenue by category (sales that count: not pending / cancelled / returned).
   const productById = new Map(products.map((p) => [p.id, p]));
-  const catMap = new Map<string, { category: string; categoryFr: string; gross: number; orders: Set<string> }>();
+  const catMap = new Map<string, { category: string; categoryFr: string; gross: number; commission: number; orders: Set<string> }>();
   for (const o of sellerOrders) {
     if (!countsAsSale(o)) continue;
     for (const it of o.items ?? []) {
+      if (!isLiveLine(it)) continue;
       const prod = productById.get(it.productId);
       const key = prod?.category ?? "—";
-      const cur = catMap.get(key) ?? { category: key, categoryFr: prod?.categoryFr ?? key, gross: 0, orders: new Set<string>() };
+      const cur = catMap.get(key) ?? { category: key, categoryFr: prod?.categoryFr ?? key, gross: 0, commission: 0, orders: new Set<string>() };
       cur.gross += it.priceUsd * it.qty;
+      cur.commission += lineCommission(it, commissionPct);
       cur.orders.add(o.id);
       catMap.set(key, cur);
     }
@@ -645,10 +713,11 @@ function buildSellerData(input: BuildInput) {
       category: c.category,
       categoryFr: c.categoryFr,
       gross: money(c.gross),
-      commission: money(c.gross * rate),
-      net: money(c.gross * (1 - rate)),
+      commission: money(c.commission),
+      net: money(c.gross - c.commission),
       orders: c.orders.size,
-      rate: commissionPct,
+      // Effective rate over the orders counted (each carries the rate stored when it was placed).
+      rate: c.gross > 0 ? Number(((c.commission / c.gross) * 100).toFixed(1)) : commissionPct,
     }))
     .sort((a, b) => b.gross - a.gross);
 
@@ -687,11 +756,14 @@ function buildSellerData(input: BuildInput) {
   const sellerDisputeList = disputes.filter((d) => d.type === "dispute").map(toCase);
 
   // Dashboard stats (live).
-  const pendingOrders = sellerOrderList.filter((o) => o.orderStatus === "pending" || o.orderStatus === "confirmed").length;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayOrders = sellerOrderList.filter((o) => o.date === todayStr);
+  // Pending work = packages still to pack (an unpaid non-COD order is not work yet).
+  const pendingOrders = sellerOrderList.filter((o) => o.needsPacking).length;
+  const todayStr = localDay(new Date());
+  const todayOrders = sellerOrderList.filter(
+    (o) => o.date === todayStr && !["cancelled", "returned", "pending"].includes(o.packageStatus),
+  );
   const liveRevenue = sellerOrderList
-    .filter((o) => o.orderStatus !== "cancelled" && o.orderStatus !== "returned" && o.orderStatus !== "pending")
+    .filter((o) => o.countsAsSale)
     .reduce((s, o) => s + o.amount, 0);
   const revenue = stats?.revenue ?? liveRevenue;
   const productsSold = sellerProductList.reduce((s, p) => s + p.soldCount, 0);
@@ -725,11 +797,14 @@ function buildSellerData(input: BuildInput) {
   };
 
   const paidOut = stats?.paidOut ?? payoutList.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0);
-  const commissionPaid = money(revenue * rate);
+  // Commission on the sales counted: the amounts stored on the order lines, not today's rate.
+  const commissionPaid = money(sellerOrderList.filter((o) => o.countsAsSale).reduce((s, o) => s + o.commission, 0));
+  // Refunds: lines the seller cancelled (refundedUsd), plus orders cancelled / returned as a whole.
   const refundAmount = money(
-    sellerOrderList
-      .filter((o) => o.orderStatus === "cancelled" || o.orderStatus === "returned")
-      .reduce((s, o) => s + o.amount, 0),
+    sellerOrderList.reduce(
+      (s, o) => s + o.refunded + (o.orderStatus === "cancelled" || o.orderStatus === "returned" ? o.amount : 0),
+      0,
+    ),
   );
   const sellerFinanceStats = {
     revenue: money(revenue),
@@ -787,6 +862,22 @@ function buildSellerData(input: BuildInput) {
     date: dayOf(r.createdAt),
   }));
 
+  // Exchanges on this store's items (live, read-only).
+  const sellerExchangeList = exchanges.map((x) => ({
+    id: x.reference,
+    exchangeId: x.id,
+    orderId: x.orderReference,
+    customer: firstNameOnly(x.customerName),
+    fromName: x.fromName,
+    fromSku: x.fromSku,
+    toName: x.toName,
+    toSku: x.toSku,
+    priceDiffUsd: x.priceDiffUsd,
+    reason: x.reason ?? "",
+    status: x.status,
+    date: dayOf(x.createdAt),
+  }));
+
   // Recent activity: the latest real events of this store, newest first.
   const activity: { at: string; kind: "order" | "payout" | "review" | "campaign"; text: string; textFr: string; href: string }[] = [];
   for (const o of sellerOrderList) {
@@ -801,7 +892,7 @@ function buildSellerData(input: BuildInput) {
   for (const p of payouts) {
     const word: Record<string, [string, string]> = {
       requested: ["requested", "demandé"],
-      approved: ["approved", "approuvé"],
+      sending: ["being sent", "en cours d'envoi"],
       paid: ["paid", "versé"],
       rejected: ["rejected", "refusé"],
     };
@@ -867,13 +958,16 @@ function buildSellerData(input: BuildInput) {
       sellerOrderList.find((o) => o.id === id || o.orderId === id),
     getShipment: (id: string) => shipmentList.find((s) => s.id === id),
     getShipmentByOrderId: (orderId: string) => shipmentList.find((s) => s.orderId === orderId),
-    getSellerReturn: (id: string) => sellerReturnList.find((r) => r.id === id),
+    // Links from notifications carry the record id; lists use the reference.
+    getSellerReturn: (id: string) => sellerReturnList.find((r) => r.id === id || r.disputeId === id),
     getPayout: (id: string) => payoutList.find((p) => p.id === id || p.payoutId === id),
     getSellerPayoutItems: () => sellerPayoutPendingItems,
     getPendingPayoutItems: () => sellerPayoutPendingItems.filter((i) => i.status !== "paid_out"),
     getPromotion: (id: string) => promotionList.find((p) => p.id === id || p.reference === id),
     getSellerReplacement: (id: string) =>
       sellerReplacementList.find((r) => r.id === id || r.replacementId === id),
+    sellerExchangeList,
+    getSellerExchange: (id: string) => sellerExchangeList.find((x) => x.id === id || x.exchangeId === id),
   };
 }
 
@@ -884,9 +978,10 @@ export type ShipmentTimelineEvent = ShipmentDetail["timeline"][number];
 // ─── Provider ────────────────────────────────────────────────────────────────
 interface Actions {
   /** sellers:register {name} — creates the store (status pending). */
-  registerStore: (name: string) => Promise<SellerStore>;
-  /** sellers:update {name?, pickupAddress?} */
-  updateStore: (patch: { name?: string; pickupAddress?: string | null }) => Promise<SellerStore>;
+  /** Needs the full KYC payload (`sellers:register` refuses a bare name). */
+  registerStore: (input: Record<string, unknown>) => Promise<SellerStore>;
+  /** sellers:update {name?, pickupAddress?, logoUrl?, bannerUrl?, description?} */
+  updateStore: (patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null }) => Promise<SellerStore>;
   createProduct: (input: ProductInput) => Promise<Product>;
   /** Only send the fields that changed: `price` is the stored LIST price, never the discounted one. */
   updateProduct: (id: string, patch: Partial<ProductInput> & { status?: "live" | "draft" }) => Promise<Product>;
@@ -903,9 +998,24 @@ interface Actions {
     /** The seller's own product ids; omitted / empty = every product of the store. */
     productIds?: string[];
   }) => Promise<Campaign>;
+  /** campaigns:update — edit a draft, pending or rejected campaign (it goes back to marketing for approval). */
+  updateCampaign: (
+    id: string,
+    patch: { name?: string; discount?: number; startDate?: string; endDate?: string; budgetUsd?: number; productIds?: string[] },
+  ) => Promise<Campaign>;
+  /** campaigns:withdraw — stop a campaign that has not ended yet. */
+  withdrawCampaign: (id: string) => Promise<Campaign>;
   requestPayout: (input: { amountUsd: number; method: "bank" | "mobile_money" | "wallet"; account?: string }) => Promise<SellerPayout>;
-  /** orders:sellerReady — only flags the order as ready AFTER the server accepted. */
+  /**
+   * orders:sellerReady — marks this seller's open lines ready (after the server accepted). The delivery
+   * task is only released once EVERY seller of the order is ready, so a null `readyAt` is normal.
+   */
   sellerReady: (orderId: string) => Promise<void>;
+  /**
+   * orders:sellerCancel — cancels only this seller's lines (all open/ready ones, or just `itemIds`).
+   * The customer is refunded for those lines; the order continues with the other sellers.
+   */
+  sellerCancel: (orderId: string, reason: string, itemIds?: string[]) => Promise<SellerOrderView>;
   openTicket: (input: { subject: string; message: string; category?: string; orderId?: string }) => Promise<SupportTicket>;
   replyTicket: (id: string, text: string) => Promise<SupportTicket>;
   /** reviews:reply — publishes (or replaces) the seller's public answer to a review. */
@@ -928,13 +1038,13 @@ interface SellerCtx {
   stats: SellerStats | null;
   reviews: SellerReview[];
   ownProducts: SellerProductRow[] | null;
-  ordersRaw: Order[] | null;
+  ordersRaw: SellerOrderView[] | null;
   available: PayoutAvailability | null;
   campaigns: Campaign[];
   tickets: SupportTicket[];
   replacements: Replacement[];
+  exchanges: Exchange[];
   plans: SellerPlanInfo[] | null;
-  readyAt: Record<string, string>;
   load: SellerLoadState;
   /** Increments (debounced) whenever a push changed something analytics are computed from. */
   liveTick: number;
@@ -957,13 +1067,13 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [stats, setStats] = useState<SellerStats | null>(null);
   const [reviews, setReviews] = useState<SellerReview[]>([]);
   const [ownProducts, setOwnProducts] = useState<SellerProductRow[] | null>(null);
-  const [ordersRaw, setOrdersRaw] = useState<Order[] | null>(null);
+  const [ordersRaw, setOrdersRaw] = useState<SellerOrderView[] | null>(null);
   const [available, setAvailable] = useState<PayoutAvailability | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [replacements, setReplacements] = useState<Replacement[]>([]);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [plans, setPlans] = useState<SellerPlanInfo[] | null>(null);
-  const [readyAt, setReadyAt] = useState<Record<string, string>>({});
   const [liveTick, setLiveTick] = useState(0);
   const productsRef = useRef<SellerProductRow[] | null>(null);
   useEffect(() => {
@@ -971,18 +1081,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   }, [ownProducts]);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Remembered "ready" flags (only ever written after the server accepted).
-  useEffect(() => {
-    if (!userId) return;
-    try {
-      const raw = localStorage.getItem(`somba-seller-ready:${userId}`);
-       
-      if (raw) setReadyAt(JSON.parse(raw) as Record<string, string>);
-    } catch {
-      /* storage unavailable */
-    }
-  }, [userId]);
 
   /** Run one read; remember the server's error text for it (cleared on success). */
   const read = useCallback(async <T,>(key: string, event: string, apply: (v: T) => void, body?: unknown) => {
@@ -1004,7 +1102,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     [read],
   );
   const refreshProducts = useCallback(() => read<SellerProductRow[]>("products", "products:list", setOwnProducts), [read]);
-  const refreshOrders = useCallback(() => read<Order[]>("orders", "orders:list", setOrdersRaw), [read]);
+  const refreshOrders = useCallback(() => read<SellerOrderView[]>("orders", "orders:list", setOrdersRaw), [read]);
   const refreshAvailable = useCallback(() => read<PayoutAvailability>("available", "payouts:available", setAvailable), [read]);
   const refreshStats = useCallback(() => read<SellerStats>("stats", "sellers:stats", setStats), [read]);
   const refreshReviews = useCallback(() => read<SellerReview[]>("reviews", "reviews:seller", (r) => setReviews(r ?? [])), [read]);
@@ -1015,6 +1113,10 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   );
   const refreshReplacements = useCallback(
     () => read<Replacement[]>("replacements", "replacements:list", (r) => setReplacements(r ?? [])),
+    [read],
+  );
+  const refreshExchanges = useCallback(
+    () => read<Exchange[]>("exchanges", "exchanges:list", (x) => setExchanges(x ?? [])),
     [read],
   );
   const refreshPlans = useCallback(() => read<SellerPlanInfo[]>("plans", "sellers:plans", setPlans), [read]);
@@ -1030,11 +1132,12 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       refreshCampaigns(),
       refreshTickets(),
       refreshReplacements(),
+      refreshExchanges(),
       refreshPlans(),
     ]);
     setFirstLoadDone(true);
     setLiveTick((n) => n + 1);
-  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable, refreshStats, refreshReviews, refreshCampaigns, refreshTickets, refreshReplacements, refreshPlans]);
+  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable, refreshStats, refreshReviews, refreshCampaigns, refreshTickets, refreshReplacements, refreshExchanges, refreshPlans]);
 
   // Initial load, and again every time the socket (re)connects and the server
   // says `ready` (isSeller flips false → true): whatever was pushed while we
@@ -1064,11 +1167,14 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
           void refreshStats();
           void refreshAvailable();
         }
-        if (w.cases) void refreshReplacements();
+        if (w.cases) {
+          void refreshReplacements();
+          void refreshExchanges();
+        }
         if (w.analytics) setLiveTick((n) => n + 1);
       }, PUSH_DEBOUNCE_MS);
     },
-    [refreshStats, refreshAvailable, refreshReplacements],
+    [refreshStats, refreshAvailable, refreshReplacements, refreshExchanges],
   );
   const pendingWhat = useRef<{ money?: boolean; analytics?: boolean; cases?: boolean }>({});
   useEffect(
@@ -1084,7 +1190,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     if (!isSeller) return;
     const s = socketClient.current;
     if (!s) return;
-    const onOrder = (o: Order) => {
+    const onOrder = (o: SellerOrderView) => {
       setOrdersRaw((cur) => upsert(cur ?? [], o));
       scheduleFollowUp({ money: true, analytics: true });
     };
@@ -1124,6 +1230,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     const onCampaign = (c: Campaign) => setCampaigns((cur) => upsert(cur, c));
     const onTicket = (t: unknown) => setTickets((cur) => upsert(cur, parseTicket(t)));
     const onReplacement = (r: Replacement) => setReplacements((cur) => upsert(cur, r));
+    const onExchange = (x: Exchange) => setExchanges((cur) => upsert(cur, x));
     s.on("order:created", onOrder);
     s.on("order:updated", onOrder);
     s.on("product:created", onProduct);
@@ -1137,6 +1244,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     s.on("campaign:updated", onCampaign);
     s.on("support:updated", onTicket);
     s.on("replacement:updated", onReplacement);
+    s.on("exchange:updated", onExchange);
     return () => {
       s.off("order:created", onOrder);
       s.off("order:updated", onOrder);
@@ -1151,6 +1259,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       s.off("campaign:updated", onCampaign);
       s.off("support:updated", onTicket);
       s.off("replacement:updated", onReplacement);
+      s.off("exchange:updated", onExchange);
     };
   }, [isSeller, userId, scheduleFollowUp, refreshProducts, refreshReviews]);
 
@@ -1181,8 +1290,8 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       return p;
     };
     return {
-      registerStore: async (name) => {
-        const s = await request<SellerStore>("sellers:register", { name });
+      registerStore: async (input) => {
+        const s = await request<SellerStore>("sellers:register", input);
         setSeller(s);
         setSellerLoaded(true);
         return s;
@@ -1212,22 +1321,41 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         setCampaigns((cur) => upsert(cur, c));
         return c;
       },
+      updateCampaign: async (id, patch) => {
+        const c = await request<Campaign>("campaigns:update", { id, patch });
+        setCampaigns((cur) => upsert(cur, c));
+        return c;
+      },
+      withdrawCampaign: async (id) => {
+        const c = await request<Campaign>("campaigns:withdraw", { id });
+        setCampaigns((cur) => upsert(cur, c));
+        return c;
+      },
       requestPayout: async (input) => {
         const p = await request<SellerPayout>("payouts:request", input);
         void refreshAvailable();
         return p;
       },
       sellerReady: async (orderId) => {
-        const task = await request<{ readyAt?: string | null }>("orders:sellerReady", { orderId });
-        const when = task?.readyAt ? new Date(task.readyAt).toISOString() : new Date().toISOString();
-        setReadyAt((cur) => {
-          const next = { ...cur, [orderId]: when };
-          try {
-            if (userId) localStorage.setItem(`somba-seller-ready:${userId}`, JSON.stringify(next));
-          } catch { /* storage unavailable */ }
-          return next;
-        });
+        await request<{ readyAt?: string | null }>("orders:sellerReady", { orderId });
+        // The task's readyAt stays null until every seller is ready, so the state is NOT taken from it:
+        // flag this seller's lines ready now and let the re-read / next push give the server's truth.
+        const now = new Date().toISOString();
+        setOrdersRaw((cur) => (cur ?? []).map((o) => (o.id === orderId ? applySellerReady(o, now) : o)));
         void refreshOrders();
+      },
+      sellerCancel: async (orderId, reason, itemIds) => {
+        const view = await request<SellerOrderView>("orders:sellerCancel", {
+          orderId,
+          reason,
+          ...(itemIds && itemIds.length > 0 ? { itemIds } : {}),
+        });
+        if (view && view.id) setOrdersRaw((cur) => upsert(cur ?? [], view));
+        // Restocked lines, a smaller order amount and a refund: re-read what depends on them.
+        void refreshOrders();
+        void refreshProducts();
+        scheduleFollowUp({ money: true, analytics: true });
+        return view;
       },
       openTicket: async (input) => {
         const t = parseTicket(await request<unknown>("support:open", input));
@@ -1246,7 +1374,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       },
       uploadImage,
     };
-  }, [refreshProducts, refreshAvailable, refreshOrders, userId]);
+  }, [refreshProducts, refreshAvailable, refreshOrders, scheduleFollowUp]);
 
   const load = useMemo<SellerLoadState>(() => {
     const failed = CORE_KEYS.find((k) => errors[k]);
@@ -1256,9 +1384,9 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo<SellerCtx>(
     () => ({
       seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available,
-      campaigns, tickets, replacements, plans, readyAt, load, liveTick, refresh, actions,
+      campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions,
     }),
-    [seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, plans, readyAt, load, liveTick, refresh, actions],
+    [seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
   );
 
   return <SellerContext.Provider value={value}>{children}</SellerContext.Provider>;
@@ -1337,9 +1465,9 @@ export function useSellerData() {
         available: ctx.available,
         campaigns: ctx.campaigns,
         replacements: ctx.replacements,
-        readyAt: ctx.readyAt,
+        exchanges: ctx.exchanges,
       }),
-    [storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, ctx.replacements, ctx.readyAt, rt.products, rt.orders, rt.payouts, rt.disputes],
+    [storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, ctx.replacements, ctx.exchanges, rt.products, rt.orders, rt.payouts, rt.disputes],
   );
 
   return useMemo(

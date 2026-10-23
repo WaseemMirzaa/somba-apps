@@ -24,6 +24,9 @@ export function OrderLines({ lines }: { lines: CartLine[] }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-slate-900">{fr ? l.nameFr : l.name}</p>
+              {l.seller && (
+                <p className="truncate text-xs text-slate-500">{fr ? "Vendu par" : "Sold by"} {l.seller}</p>
+              )}
               <p className="text-xs text-slate-500">
                 {formatCurrency(l.livePrice, locale)} × {l.qty}
                 {promo && (

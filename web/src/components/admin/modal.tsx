@@ -9,12 +9,15 @@ export function Modal({
   onClose,
   children,
   footer,
+  size = "md",
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** "xl" for wide content such as a statement table. */
+  size?: "md" | "xl";
 }) {
   if (!open) return null;
   return (
@@ -25,7 +28,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl ${size === "xl" ? "max-w-5xl" : "max-w-lg"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">

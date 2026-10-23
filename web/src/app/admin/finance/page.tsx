@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay, localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import Link from "next/link";
 import { DollarSign, Wallet, CreditCard, Percent, Receipt, Banknote, Smartphone, PiggyBank, Tag, Truck } from "lucide-react";
@@ -15,7 +16,8 @@ import { NoAccess, SectionError, SectionLoading } from "@/components/admin/query
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { canMoveMoney, canSeeFinance, errMsg, useRole, type PaymentRow } from "@/lib/admin-live";
+import { canMoveMoney, canSeeFinance, errMsg, useRole, type PaymentCapabilities, type PaymentRow } from "@/lib/admin-live";
+import { NoticeBar } from "@/components/admin/notice-bar";
 import { ageLabel, useSocketQuery, type FinanceStats } from "@/lib/admin-stats";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
@@ -59,6 +61,7 @@ export default function AdminFinancePage() {
   const allowed = canSeeFinance(role);
   const refreshKey = `${rt.payments.length}:${rt.payouts.length}:${rt.orders.length}`;
   const fin = useSocketQuery<FinanceStats>("analytics:finance", undefined, { enabled: allowed, refreshKey });
+  const caps = useSocketQuery<PaymentCapabilities>("payments:provider", undefined, { enabled: allowed });
   const payments = (rt.payments as PaymentRow[]).filter((p) => p.purpose !== "topup");
   const pending = payments.filter((p) => p.status === "pending" && p.method !== "cod");
   const [declineTarget, setDeclineTarget] = useState<PaymentRow | null>(null);
@@ -125,9 +128,29 @@ export default function AdminFinancePage() {
   const refunds30 = (f?.series30 ?? []).reduce((sum, d) => sum + d.refunds, 0);
   const collected30 = (f?.series30 ?? []).reduce((sum, d) => sum + d.revenue, 0);
 
+  const provider = caps.data?.provider ?? null;
+  const providerText =
+    provider === "pawapay"
+      ? fr
+        ? "Mobile money : pawaPay. Les paiements sont confirmés par pawaPay ; remboursements vers le téléphone et versements mobile money disponibles."
+        : "Mobile money: pawaPay. Payments are confirmed by pawaPay; refunds to the phone and mobile-money payouts are available."
+      : provider === "manual"
+        ? fr
+          ? "Mobile money : manuel. Le client paie le numéro marchand et la finance confirme chaque paiement ci-dessous."
+          : "Mobile money: manual. Customers pay the merchant number and finance confirms each payment below."
+        : provider === "sandbox"
+          ? fr
+            ? "Mobile money : bac à sable (test). Aucun argent réel ne circule. Configurez pawaPay pour encaisser réellement."
+            : "Mobile money: sandbox (test). No real money moves. Set up pawaPay to collect for real."
+          : fr
+            ? "Mobile money : désactivé. Les clients ne peuvent pas payer par mobile money."
+            : "Mobile money: off. Customers cannot pay with mobile money.";
+
   return (
     <div className="space-y-6">
       {header}
+
+      {caps.data && <NoticeBar tone={provider === "pawapay" || provider === "manual" ? undefined : "warn"}>{providerText}</NoticeBar>}
 
       {fin.error && <SectionError message={fin.error} onRetry={fin.reload} />}
       {fin.loading && !f && !fin.error && <SectionLoading />}
@@ -137,7 +160,7 @@ export default function AdminFinancePage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             <StatCard title={fr ? "GMV brut (hors annulées)" : "Gross GMV (excl. cancelled)"} value={formatCurrency(f.grossGmvUsd, locale)} icon={DollarSign} trend={`${fr ? "dont livraison" : "incl. delivery"} ${formatCurrency(f.deliveryFeesUsd, locale)}`} />
             <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)"} />
-            <StatCard title={fr ? `Commission gagnée (${f.commissionPct} %)` : `Commission earned (${f.commissionPct}%)`} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)}`} />
+            <StatCard title={fr ? "Commission gagnée" : "Commission earned"} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)} · ${fr ? "taux actuel" : "current rate"} ${f.commissionPct}%`} />
             <StatCard title={fr ? "Remboursements" : "Refunds"} value={formatCurrency(f.refundsUsd, locale)} icon={Receipt} trend={`${f.refundsCount} ${fr ? "paiement(s)" : "payment(s)"}`} />
             <StatCard title={fr ? "Versements payés" : "Payouts paid"} value={formatCurrency(f.payouts.paidUsd, locale)} icon={Wallet} trend={`${f.payouts.paidCount} ${fr ? "versement(s)" : "payout(s)"}`} />
             <StatCard title={fr ? "Versements à payer" : "Payouts owed"} value={formatCurrency(f.payouts.pendingUsd, locale)} icon={PiggyBank} trend={`${f.payouts.requestedCount} ${fr ? "à examiner" : "to review"} · ${f.payouts.pendingCount} ${fr ? "en cours" : "open"}`} />
@@ -150,8 +173,8 @@ export default function AdminFinancePage() {
 
           <p className="text-xs text-slate-500">
             {fr
-              ? `La commission est de ${f.commissionPct} % de la valeur des articles des commandes livrées (la base des versements vendeurs). Les frais des opérateurs mobile money ne sont pas suivis.`
-              : `Commission is ${f.commissionPct}% of the item value of delivered orders (the base seller payouts use). Mobile-money operator fees are not tracked.`}
+              ? `La commission est celle enregistrée sur chaque ligne de commande à sa création (le taux actuel, ${f.commissionPct} %, ne s'applique qu'aux nouvelles commandes) : c'est la base des versements vendeurs. Les frais des opérateurs mobile money ne sont pas suivis.`
+              : `Commission is the amount stored on each order line when it was placed (the current rate, ${f.commissionPct}%, applies to new orders only): the base seller payouts use. Mobile-money operator fees are not tracked.`}
           </p>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -206,7 +229,7 @@ export default function AdminFinancePage() {
                     { key: "status", label: t("status"), render: (row) => (
                       <Badge variant={PAY_STATUS_VARIANT[String(row.status)] ?? "default"}>{fr ? (PAY_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
                     )},
-                    { key: "createdAt", label: t("date"), render: (row) => <span>{String(row.createdAt).slice(0, 10)}</span> },
+                    { key: "createdAt", label: t("date"), render: (row) => <span>{localDay(String(row.createdAt))}</span> },
                   ]}
                   data={payments.slice(0, 15) as unknown as Record<string, unknown>[]}
                 />
@@ -235,7 +258,7 @@ export default function AdminFinancePage() {
               { key: "orderReference", label: fr ? "Objet" : "For", render: (row) => <PaymentSubject row={row as unknown as PaymentRow} fr={fr} /> },
               { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <span>{methodLabel(String(row.method), fr)}</span> },
               { key: "amountUsd", label: t("amount"), render: (row) => formatCurrency(Number(row.amountUsd), locale) },
-              { key: "createdAt", label: t("date"), render: (row) => <span>{String(row.createdAt).slice(0, 16).replace("T", " ")}</span> },
+              { key: "createdAt", label: t("date"), render: (row) => <span>{localDateTime(String(row.createdAt))}</span> },
               {
                 key: "actions",
                 label: t("action"),

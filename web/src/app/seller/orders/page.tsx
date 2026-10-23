@@ -9,12 +9,10 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
 import {
-  ORDER_STATUS_OPTIONS,
-  orderStatusLabel,
-  orderStatusVariant,
+  PACKAGE_STATUS_OPTIONS,
+  packageStatusLabel,
+  packageStatusVariant,
   paymentMethodLabel,
-  shippingStatusLabel,
-  shippingStatusVariant,
 } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 
@@ -30,7 +28,7 @@ export default function SellerOrdersPage() {
         // Privacy: search only on order ID and customer first name — no PII.
         searchFields: ["id", "customer"],
         dateField: "date",
-        statusField: "orderStatus",
+        statusField: "packageStatus",
       }),
     [sellerOrderList, filters]
   );
@@ -38,26 +36,32 @@ export default function SellerOrdersPage() {
   return (
     <SellerListPage
       title={t("orders")}
-      subtitle={fr ? "Commandes contenant vos produits. Marquez « colis prêt » depuis le détail de la commande." : "Orders containing your products. Mark “package ready” from the order detail."}
+      subtitle={fr ? "Commandes contenant vos produits. Marquez « colis prêt » depuis le détail de la commande. Sur une commande partagée, vous ne voyez et ne préparez que vos articles." : "Orders containing your products. Mark “package ready” from the order detail. On a shared order you only see and pack your own items."}
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("orders") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={ORDER_STATUS_OPTIONS}
+          statusOptions={PACKAGE_STATUS_OPTIONS}
           searchPlaceholder={fr ? "ID commande, client…" : "Order ID, customer…"}
         />
       }
       columns={[
         { key: "id", label: fr ? "Commande" : "Order", render: (row) => (
-          <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+          <div>
+            <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+            {(row.sellerCount as number) > 1 && (
+              <p className="text-xs text-slate-500">
+                {fr ? `Commande partagée · ${row.sellerCount} vendeurs` : `Shared order · ${row.sellerCount} sellers`}
+              </p>
+            )}
+          </div>
         )},
         { key: "customer", label: t("customer") },
         { key: "items", label: fr ? "Articles" : "Items" },
         { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
         { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => paymentMethodLabel(String(row.paymentMethod), fr) },
-        { key: "orderStatus", label: fr ? "Statut de commande" : "Order Status", render: (row) => <Badge variant={orderStatusVariant(String(row.orderStatus))}>{orderStatusLabel(String(row.orderStatus), fr)}</Badge> },
-        { key: "shippingStatus", label: fr ? "Expédition" : "Shipping", render: (row) => <Badge variant={shippingStatusVariant(String(row.shippingStatus))}>{shippingStatusLabel(String(row.shippingStatus), fr)}</Badge> },
+        { key: "packageStatus", label: t("status"), render: (row) => <Badge variant={packageStatusVariant(String(row.packageStatus))}>{packageStatusLabel(String(row.packageStatus), fr)}</Badge> },
         { key: "date", label: t("date") },
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={`/seller/orders/${row.id}`} className="text-xs text-[var(--primary)] hover:underline">{t("view")}</Link>

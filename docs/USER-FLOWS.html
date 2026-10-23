@@ -127,6 +127,17 @@ main li { margin-block: 0.2rem; }
 <td>Read from the code on branch <code>claude/somba-api-analysis-4rg0y7</code>, October 2026. Companion to <code>docs/ARCHITECTURE.md</code> (data model, API and gap analysis)</td>
 </tr>
 </tbody></table></div>
+<blockquote>
+<p><strong>Update, 23 October 2026: what changed for each user.</strong></p>
+<ul>
+<li><strong>Customers.</strong> Push notifications work once the Firebase keys are set. Tapping one opens the order, its tracking, the wallet, the return or the ticket; the in-app list does the same. Refund notices say how much was refunded, and a refund can go back to the paying phone (pawaPay).</li>
+<li><strong>Riders</strong> get a push for every new delivery from <em>their</em> warehouse. Tapping it opens <em>Available</em> (or <em>Active</em> once assigned). The queue lists their preferred zones first with zone names, and they cannot take another warehouse's delivery. Profile shows the home warehouse and zones.</li>
+<li><strong>Sellers</strong> are told when a return, dispute, replacement or exchange concerns their items, at every step. They see replacements and exchanges (new <em>Exchanges</em> page), get a bell with desktop alerts and web push, and can edit a campaign that is not approved yet or withdraw one.</li>
+<li><strong>Warehouse staff</strong> see their own warehouse's parcels, riders and batches; the bell and desktop alerts reach them too.</li>
+<li><strong>Admins</strong> have a bell and a notifications page. They tie each zone, rider and employee to a warehouse (Zones, Staff and Roles pages; warehouse detail lists zones and riders). Finance can refund to the wallet or the phone and <em>Send with pawaPay</em> for mobile-money payouts. Payouts are one step (no &ldquo;approved&rdquo;).</li>
+</ul>
+<p>Details: <a href="MOBILE-PUSH.md">MOBILE-PUSH.md</a>, <a href="WAREHOUSE-ZONES.md">WAREHOUSE-ZONES.md</a>, <a href="PAYMENTS-PAWAPAY.md">PAYMENTS-PAWAPAY.md</a>.</p>
+</blockquote>
 <h3 id="how-to-read-the-flowcharts"><a class="anchor" href="#how-to-read-the-flowcharts" aria-hidden="true">#</a>How to read the flowcharts</h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Shape / mark</th>

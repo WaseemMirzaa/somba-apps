@@ -102,7 +102,7 @@ export default function ShopCartPage() {
       )}
 
       {Object.entries(grouped).map(([seller, items]) => (
-        <DetailSection key={seller} title={seller}>
+        <DetailSection key={seller} title={`${fr ? "Vendu par" : "Sold by"} ${seller}`}>
           <div className="space-y-4">
             {items.map((item) => (
               <div key={`${item.id}-${item.variant}`} className="flex gap-4">

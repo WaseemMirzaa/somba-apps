@@ -39,8 +39,8 @@ export class SupportTicket {
   status: TicketStatus;
 
   /** Messages stored as a JSON array [{ from, role, text, at }]. */
-  @Column({ type: 'text', default: '[]' })
-  messages: string;
+  @Column({ type: 'text' })
+  messages: string = '[]';
 
   @CreateDateColumn()
   createdAt: Date;

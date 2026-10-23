@@ -5,6 +5,7 @@ import {
   Hub,
   Order,
   Product,
+  Setting,
   StockTransfer,
   User,
   WarehouseBatch,
@@ -12,6 +13,7 @@ import {
 } from '../database/entities';
 import { WarehouseService } from './warehouse.service';
 import { RiderService } from './rider.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -24,7 +26,9 @@ import { RiderService } from './rider.service';
       Order,
       WarehouseException,
       User,
+      Setting,
     ]),
+    NotificationsModule,
   ],
   providers: [WarehouseService, RiderService],
   exports: [WarehouseService, RiderService],

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRealtime } from "@/context/realtime-context";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
+import { OrderProducts, type OrderProductEntry } from "@/components/shop/order-products";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useMyOrder, orderStatusLabel, orderStatusTitle, canCancelOrder, hasDeliveryCodeStage } from "@/lib/orders";
@@ -17,27 +17,8 @@ import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { isMobileMoneyMethod } from "@/lib/shop-live";
-
-// Order item variants come from the data layer as free-form English tokens
-// (e.g. "Default", "256GB Black"). Translate the known tokens locally.
-const VARIANT_TOKENS_FR: Record<string, string> = {
-  Default: "Par défaut",
-  Black: "Noir",
-  White: "Blanc",
-  Blue: "Bleu",
-  Silver: "Argent",
-  Grey: "Gris",
-  Gray: "Gris",
-  Red: "Rouge",
-  Green: "Vert",
-};
-function localizeVariant(variant: string, fr: boolean) {
-  if (!fr || !variant) return variant;
-  return variant
-    .split(" ")
-    .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
-    .join(" ");
-}
+import { refundedTotal } from "@/lib/shop-packages";
+import { dayLabel } from "@/lib/delivery-estimate";
 
 function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -85,11 +66,15 @@ function OrderDetail() {
   const paymentMethodLabel = (method: string) =>
     fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 
+  // The raw order carries the per-line seller state the detail view model leaves out.
+  const raw = order ? rt.orders.find((o) => o.id === order.id) : undefined;
+  const rawItems = raw?.items ?? [];
+
   function reorder() {
     if (!order) return;
-    order.items.forEach((item) => {
+    order.items.forEach((item, i) => {
       if (item.productId.startsWith("ext:")) return;
-      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: "", variant: item.variant || "Default", qty: item.qty });
+      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: rawItems[i]?.sellerName ?? "", variant: item.variant || "Default", qty: item.qty });
     });
     toast(fr ? "Articles ajoutés au panier" : "Items added to cart");
     router.push("/shop/cart");
@@ -112,8 +97,26 @@ function OrderDetail() {
     return <div className="text-center text-slate-500">{rt.status === "connected" ? (fr ? "Commande introuvable" : "Order not found") : (fr ? "Chargement…" : "Loading…")}</div>;
   }
 
-  const raw = rt.orders.find((o) => o.id === order.id);
   const waitingApproval = order.status === "pending" && isMobileMoneyMethod(raw?.paymentMethod ?? "");
+  const productEntries: OrderProductEntry[] = order.items.map((it, i) => {
+    const r = rawItems[i];
+    return {
+      productId: it.productId,
+      name: it.name,
+      variant: it.variant,
+      qty: it.qty,
+      price: it.price,
+      listPrice: it.listPrice,
+      campaignPct: it.campaignPct,
+      image: it.image,
+      sellerId: r?.sellerId ?? null,
+      sellerName: r?.sellerName ?? null,
+      fulfilment: r?.fulfilment ?? "open",
+      cancelReason: r?.cancelReason ?? null,
+      refundedUsd: r?.refundedUsd ?? 0,
+    };
+  });
+  const refunded = refundedTotal(productEntries);
   const showCode = code && code.orderId === order.id && hasDeliveryCodeStage(order.status);
 
   return (
@@ -159,6 +162,18 @@ function OrderDetail() {
         </div>
       )}
 
+      {order.rider && order.rider.phone && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <div>
+            <p className="text-sm font-medium text-blue-900">{fr ? "Votre livreur" : "Your rider"}: {order.rider.name}</p>
+            <p className="text-xs text-blue-800">{order.rider.phone}</p>
+          </div>
+          <a href={`tel:${order.rider.phone.replace(/[^+\d]/g, "")}`} className="btn-primary inline-block px-4 py-2 text-sm">
+            {fr ? `Appeler ${order.rider.name}` : `Call ${order.rider.name}`}
+          </a>
+        </div>
+      )}
+
       <DetailGrid>
         <DetailGridSection title={fr ? "Commande" : "Order"}>
           <InfoGrid items={[
@@ -166,6 +181,7 @@ function OrderDetail() {
             { label: "Date", value: order.date },
             { label: fr ? "Statut" : "Status", value: orderStatusLabel(order.status, fr) },
             { label: "Total", value: formatCurrency(order.amount, locale) },
+            { label: fr ? "Livraison estimée" : "Estimated delivery", value: dayLabel(order.estimatedDeliveryDate, fr) ?? "—" },
           ]} />
         </DetailGridSection>
 
@@ -193,31 +209,14 @@ function OrderDetail() {
             )}
             <div className="flex justify-between"><dt>{fr ? "Livraison" : "Delivery"}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
             <div className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold"><dt>Total</dt><dd>{formatCurrency(order.amount, locale)}</dd></div>
+            {refunded > 0 && (
+              <div className="flex justify-between text-emerald-700"><dt>{fr ? "Remboursé" : "Refunded"}</dt><dd>-{formatCurrency(refunded, locale)}</dd></div>
+            )}
           </dl>
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Produits" : "Products"} span={3}>
-          {order.items.map((item) => (
-            <div key={item.sku + item.variant} className="mb-4 flex gap-4 last:mb-0">
-              <Link href={`/shop/products/${item.productId}`} className="relative h-16 w-16 overflow-hidden rounded-lg">
-                <Image src={item.image || "/brand/logo-stack.png"} alt={item.name} fill className="object-cover" sizes="64px" />
-              </Link>
-              <div className="flex-1">
-                <Link href={`/shop/products/${item.productId}`} className="font-medium hover:text-[var(--primary)]">{item.name}</Link>
-                <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-medium">{formatCurrency(item.price, locale)}</p>
-                {item.listPrice != null && (
-                  <s className="block text-xs text-slate-500">
-                    <span className="sr-only">{fr ? "Prix normal " : "List price "}</span>{formatCurrency(item.listPrice, locale)}
-                  </s>
-                )}
-                {item.campaignPct > 0 && <p className="text-xs font-semibold text-amber-800">-{item.campaignPct}%</p>}
-                <p className="text-xs">{fr ? "Qté" : "Qty"}: {item.qty}</p>
-              </div>
-            </div>
-          ))}
+          <OrderProducts order={{ status: order.status, paymentMethod: raw?.paymentMethod ?? order.paymentMethodId }} items={productEntries} />
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Suivi de commande" : "Order Tracking"} span={2}>

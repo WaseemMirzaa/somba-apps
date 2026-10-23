@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
+import { AddressMapPicker } from "@/components/shop/address-map-picker";
+import type { AddressGeo, PickedParts } from "@/lib/google-maps";
 
 export default function ShopAddressesPage() {
   const { toast } = useToast();
@@ -14,12 +16,24 @@ export default function ShopAddressesPage() {
   const { addresses, addAddress, updateAddress, removeAddress } = useRealtime();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "", line1: "", city: "", commune: "", country: "France" });
+  const [form, setForm] = useState<{ label: string; line1: string; city: string; commune: string; country: string; geo: AddressGeo | null }>({ label: "", line1: "", city: "", commune: "", country: "France", geo: null });
 
   function resetForm() {
-    setForm({ label: "", line1: "", city: "", commune: "", country: "France" });
+    setForm({ label: "", line1: "", city: "", commune: "", country: "France", geo: null });
     setShowAdd(false);
     setEditingId(null);
+  }
+
+  /** A map pick pre-fills the typed fields (the customer can still edit them) and keeps the pin. */
+  function applyPick(geo: AddressGeo, parts: PickedParts) {
+    setForm((f) => ({
+      ...f,
+      geo,
+      line1: parts.line1 ?? f.line1,
+      city: parts.city ?? f.city,
+      commune: parts.commune ?? f.commune,
+      country: parts.country ?? f.country,
+    }));
   }
 
   async function saveAddress() {
@@ -59,6 +73,7 @@ export default function ShopAddressesPage() {
 
       {(showAdd || editingId !== null) && (
         <div className="card-premium space-y-3 p-6">
+          <AddressMapPicker key={editingId ?? "new"} value={form.geo} onPick={applyPick} fr={fr} />
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
@@ -82,7 +97,7 @@ export default function ShopAddressesPage() {
                 <button
                   onClick={() => {
                     setEditingId(addr.id);
-                    setForm({ label: addr.label, line1: addr.line1, city: addr.city, commune: addr.commune ?? "", country: addr.country ?? "France" });
+                    setForm({ label: addr.label, line1: addr.line1, city: addr.city, commune: addr.commune ?? "", country: addr.country ?? "France", geo: addr.geo ?? null });
                     setShowAdd(false);
                   }}
                   className="text-xs text-[var(--primary)] hover:underline"
@@ -93,6 +108,9 @@ export default function ShopAddressesPage() {
               </div>
             </div>
             <p className="mt-1 text-sm text-slate-600">{addr.line1}, {addr.commune}, {addr.city}, {addr.country}</p>
+            {addr.geo && (
+              <p className="mt-1 text-xs text-emerald-700">📍 {fr ? "Position épinglée sur la carte" : "Pinned on the map"}</p>
+            )}
           </div>
         ))}
       </div>

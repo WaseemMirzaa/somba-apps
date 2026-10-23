@@ -45,6 +45,7 @@ export interface PublicSettings {
   /** Orders and wallet top-ups need a verified phone or email. */
   requireVerifiedForCheckout: boolean;
   deliveryZones: DeliveryZone[];
+  /** Delivery windows offered at checkout ("HH:MM-HH:MM"). */
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -127,7 +128,7 @@ export function zoneLabel(z: DeliveryZone, fr: boolean): string {
 
 /** The full shipping address the server stores (and the rider sees). */
 export function addressToShipping(
-  a: { label: string; line1: string; line2?: string | null; city: string; commune?: string | null; phone?: string | null; zoneId?: string | null },
+  a: { label: string; line1: string; line2?: string | null; geo?: { lat: number; lng: number; placeId?: string } | null; city: string; commune?: string | null; phone?: string | null; zoneId?: string | null },
   zoneId: string | null,
 ): string {
   return JSON.stringify({
@@ -138,6 +139,8 @@ export function addressToShipping(
     commune: a.commune ?? "",
     phone: a.phone ?? "",
     zone: zoneId ?? a.zoneId ?? "",
+    // The pin travels with the order so the rider can navigate to the exact spot.
+    ...(a.geo ? { geo: { lat: a.geo.lat, lng: a.geo.lng, ...(a.geo.placeId ? { placeId: a.geo.placeId } : {}) } } : {}),
   });
 }
 

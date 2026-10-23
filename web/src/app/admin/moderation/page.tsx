@@ -10,7 +10,7 @@ import { EmptyState, SectionError, SectionLoading } from "@/components/admin/que
 import { useAdminData } from "@/lib/admin";
 import { useLocale } from "@/context/locale-context";
 
-const STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
+const STATUS_FR: Record<string, string> = { pending: "En attente", live: "En ligne", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
 const CATEGORY_FR: Record<string, string> = {
   Electronics: "Électronique",
   Fashion: "Mode",
@@ -48,7 +48,7 @@ export default function AdminModerationPage() {
                     <Link href={`/admin/products/${p.id}`} className="font-semibold text-[var(--primary)] hover:underline">{p.name}</Link>
                     <p className="text-sm text-slate-500">{p.seller} · {fr ? (CATEGORY_FR[p.category] ?? p.category) : p.category}</p>
                   </div>
-                  <Badge variant={p.status === "pending" ? "warning" : p.status === "approved" ? "success" : p.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[p.status] ?? p.status) : p.status}</Badge>
+                  <Badge variant={p.status === "pending" ? "warning" : p.status === "live" ? "success" : p.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[p.status] ?? p.status) : p.status}</Badge>
                 </div>
                 {p.status === "pending" && (
                   <div className="mt-3">

@@ -46,8 +46,8 @@ export default function SellerReturnDetailPage() {
       </DetailGrid>
       <p className="text-xs text-slate-500">
         {fr
-          ? "L'inspection et le remboursement sont gérés par l'entrepôt et l'administration ; vous êtes informé par notification."
-          : "Inspection and refund are handled by the warehouse and the administration; you are notified when it is decided."}
+          ? "L'inspection et le remboursement sont gérés par l'entrepôt et l'administration. Vous recevez une notification à l'ouverture du retour, à l'arrivée des articles à l'entrepôt et à la décision."
+          : "Inspection and refund are handled by the warehouse and the administration. You get a notification when the return is opened, when the goods reach the warehouse and when it is decided."}
       </p>
     </div>
   );

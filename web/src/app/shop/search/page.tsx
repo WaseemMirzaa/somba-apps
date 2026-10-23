@@ -1,7 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRealtime } from "@/context/realtime-context";
+import { socketClient } from "@/lib/realtime/socket-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageLoader } from "@/components/ui/loader";
@@ -14,9 +16,27 @@ function SearchResults() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const products = useCatalog();
+  const rt = useRealtime();
+  // Ranked ids from the server (accent- and typo-tolerant); null while unavailable → local filter below.
+  const [server, setServer] = useState<{ q: string; ids: string[] } | null>(null);
+
+  useEffect(() => {
+    if (rt.status !== "connected" || query.trim().length < 2) return;
+    let alive = true;
+    socketClient
+      .request<{ ids: string[] }>("products:search", { q: query, limit: 200 })
+      .then((r) => alive && setServer({ q: query, ids: r.ids }))
+      .catch(() => alive && setServer(null));
+    return () => {
+      alive = false;
+    };
+  }, [query, rt.status]);
 
   const visible = products;
-  const results = query
+  const byId = new Map(visible.map((p) => [p.id, p]));
+  const results = server && server.q === query
+    ? server.ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []))
+    : query
     ? visible.filter(
         (p) =>
           p.name.toLowerCase().includes(query) ||

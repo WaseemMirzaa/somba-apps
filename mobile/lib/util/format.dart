@@ -63,3 +63,9 @@ String compact(num value) {
   if (value >= 1000) return '${s.number(value / 1000, decimals: 1)}${s.isFr ? ' k' : 'k'}';
   return value.toString();
 }
+
+/// "22/10/2026 14:05" (local time).
+String formatDateTime(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(d.day)}/${two(d.month)}/${d.year} ${two(d.hour)}:${two(d.minute)}';
+}

@@ -65,6 +65,33 @@ OrderDto _order(String status) => OrderDto(
       campaignDiscountUsd: 30,
     );
 
+/// Two sellers, one of them cancelled a line (reason + refund): the longest French strings.
+OrderDto _multiSellerOrder() => OrderDto.fromJson({
+      'id': 'o-multi',
+      'reference': 'SOM-1043',
+      'customerName': 'Aline',
+      'status': 'processing',
+      'paymentMethod': 'airtel_money',
+      'subtotalUsd': 60,
+      'deliveryFeeUsd': 3,
+      'totalUsd': 63,
+      'items': [
+        {'productId': 'p1', 'productName': 'Phone', 'qty': 1, 'priceUsd': 20, 'sellerId': 's1', 'sellerName': 'Boutique Kin Électronique Centre', 'fulfilment': 'ready'},
+        {
+          'productId': 'p2',
+          'productName': 'Chargeur rapide universel avec câble',
+          'qty': 1,
+          'priceUsd': 20,
+          'sellerId': 's2',
+          'sellerName': 'Mama Tech',
+          'fulfilment': 'cancelled',
+          'cancelReason': 'Article épuisé chez le vendeur',
+          'refundedUsd': 20,
+        },
+        {'productId': 'p3', 'productName': 'Coque', 'qty': 1, 'priceUsd': 20, 'sellerId': 's2', 'sellerName': 'Mama Tech'},
+      ],
+    });
+
 const _lang = String.fromEnvironment('LAYOUT_LANG', defaultValue: 'fr');
 
 void main() {
@@ -94,7 +121,7 @@ void main() {
     store.orders
       ..clear()
       ..addAll(
-          [_order('pending'), _order('out_for_delivery'), _order('delivered')]);
+          [_order('pending'), _order('out_for_delivery'), _order('delivered'), _multiSellerOrder()]);
     ShopState.instance.cart.clear();
   });
 
@@ -152,6 +179,8 @@ void main() {
         const OrderTrackingScreen(locale: fr, orderId: 'o-out_for_delivery'),
     'order (delivered)': () =>
         const OrderDetailScreen(locale: fr, orderId: 'o-delivered'),
+    'order (multi-seller)': () =>
+        const OrderDetailScreen(locale: fr, orderId: 'o-multi'),
   };
 
   for (final e in screens.entries) {

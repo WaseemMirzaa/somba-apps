@@ -71,7 +71,18 @@ async function run() {
     console.log('• categories present — skipped');
   }
 
-  // 3) Platform settings (insert each missing key; never overwrite).
+  // 3) Hubs (only if none exist). Created before the settings so the default zones can name their warehouse.
+  const hubs = ds.getRepository(Hub);
+  if ((await hubs.count()) === 0) {
+    await hubs.save([
+      hubs.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
+      hubs.create({ name: 'Lubumbashi Hub', city: 'Lubumbashi', country: 'DRC', capacity: 400 }),
+    ]);
+    console.log('✓ created default hubs');
+  }
+  const kinshasaHubId = (await hubs.findOne({ where: { name: 'Kinshasa Hub' } }))?.id ?? null;
+
+  // 4) Platform settings (insert each missing key; never overwrite).
   const settings = ds.getRepository(Setting);
   const defaults: Record<string, string> = {
     fxRate: '2850',
@@ -79,8 +90,8 @@ async function run() {
     codEnabled: 'false', // matches the client scope: no cash on delivery at launch
     // Delivery fee is decided by the SERVER from these zones (edit in Admin → Settings).
     deliveryZones: JSON.stringify([
-      { id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3 },
-      { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5 },
+      { id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3, hubId: kinshasaHubId },
+      { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5, hubId: kinshasaHubId },
     ]),
     commissionPct: '12',
     productModeration: 'true', // new seller listings wait for a moderator
@@ -96,16 +107,6 @@ async function run() {
       await settings.save(settings.create({ key, value }));
       console.log(`✓ setting ${key}=${value}`);
     }
-  }
-
-  // 4) Hubs (only if none exist).
-  const hubs = ds.getRepository(Hub);
-  if ((await hubs.count()) === 0) {
-    await hubs.save([
-      hubs.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
-      hubs.create({ name: 'Lubumbashi Hub', city: 'Lubumbashi', country: 'DRC', capacity: 400 }),
-    ]);
-    console.log('✓ created default hubs');
   }
 
   console.log('\nBootstrap complete.');

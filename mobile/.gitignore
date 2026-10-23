@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Google Maps key for the address picker (see lib/services/maps_config.dart)
+ios/Flutter/Secrets.xcconfig
+
+# Local build values (Maps key etc.), see scripts/set-maps-key.cjs
+dart-defines.local.json

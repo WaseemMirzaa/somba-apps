@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { localDateTime } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ErrorNote } from "@/components/admin/modal";
+import { DataTable } from "@/components/ui/data-table";
+import { ErrorNote, Modal } from "@/components/admin/modal";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
@@ -15,6 +17,7 @@ import { errMsg, useServerList, type FlashSaleServerRow } from "@/lib/admin-live
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
 
+const SALE_STATUS_EN: Record<string, string> = { active: "Active", scheduled: "Scheduled", ended: "Ended" };
 const SALE_STATUS_FR: Record<string, string> = { active: "En cours", scheduled: "Planifiée", ended: "Terminée" };
 
 function saleState(fs: FlashSaleServerRow): "active" | "scheduled" | "ended" {
@@ -23,13 +26,13 @@ function saleState(fs: FlashSaleServerRow): "active" | "scheduled" | "ended" {
   const end = fs.endsAt ? new Date(fs.endsAt).getTime() : null;
   if (end !== null && !Number.isNaN(end) && end < now) return "ended";
   if (start !== null && !Number.isNaN(start) && start > now) return "scheduled";
+  // A sale the server deactivated (ended early) no longer runs.
+  if (fs.active === false) return "ended";
   return "active";
 }
 
 function fmt(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 16).replace("T", " ");
+  return iso ? localDateTime(iso) : "—";
 }
 
 export default function AdminFlashSalesPage() {
@@ -38,6 +41,7 @@ export default function AdminFlashSalesPage() {
   const fr = locale === "fr";
   const rt = useRealtime();
   const { items: sales, reload, error: loadError, loading } = useServerList<FlashSaleServerRow>("flashsales:list", {
+    body: { all: true },
     pushEvents: ["flashsale:updated"],
   });
   const liveProducts = useMemo(() => rt.products.filter((p) => p.status === "live"), [rt.products]);
@@ -45,6 +49,9 @@ export default function AdminFlashSalesPage() {
   const [form, setForm] = useState({ title: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [endTarget, setEndTarget] = useState<FlashSaleServerRow | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   const product = liveProducts.find((p) => p.id === form.productId);
   // Normal price (the server reports `originalPrice` while a sale already runs).
@@ -85,6 +92,22 @@ export default function AdminFlashSalesPage() {
       setError(errMsg(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function endNow() {
+    if (!endTarget) return;
+    setEnding(true);
+    setEndError(null);
+    try {
+      await socketClient.request("flashsales:end", { id: endTarget.id });
+      await reload();
+      toast(fr ? "Vente flash terminée" : "Flash sale ended", "success");
+      setEndTarget(null);
+    } catch (e) {
+      setEndError(errMsg(e));
+    } finally {
+      setEnding(false);
     }
   }
 
@@ -136,25 +159,93 @@ export default function AdminFlashSalesPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {sales.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucune vente flash." : "No flash sales yet."}</p>}
-        {sales.map((fs) => {
-          const st = saleState(fs);
-          return (
-            <Card key={fs.id}>
-              <CardContent className="p-6">
-                <div className="flex justify-between gap-3">
-                  <h3 className="font-semibold">{fs.title}</h3>
-                  <Badge variant={st === "active" ? "success" : st === "scheduled" ? "warning" : "default"}>{fr ? SALE_STATUS_FR[st] : st}</Badge>
-                </div>
-                <p className="mt-2 text-sm text-slate-700">{fs.productName}</p>
-                <p className="mt-1 text-sm text-slate-500">{fmt(fs.startsAt)} → {fmt(fs.endsAt)}</p>
-                <p className="mt-1 text-sm">{formatCurrency(fs.flashPrice, locale)} · {fr ? `${fs.discount} % de remise` : `${fs.discount}% off`}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          <DataTable
+            emptyMessage={loading ? (fr ? "Chargement…" : "Loading…") : fr ? "Aucune vente flash." : "No flash sales yet."}
+            data={sales as unknown as Record<string, unknown>[]}
+            columns={[
+              {
+                key: "title",
+                label: fr ? "Vente flash" : "Flash sale",
+                render: (row) => {
+                  const fs = row as unknown as FlashSaleServerRow;
+                  return (
+                    <div>
+                      <p className="font-semibold text-slate-900">{fs.title}</p>
+                      <p className="text-xs text-slate-500">{fs.productName}</p>
+                    </div>
+                  );
+                },
+              },
+              {
+                key: "startsAt",
+                label: fr ? "Période" : "Window",
+                render: (row) => {
+                  const fs = row as unknown as FlashSaleServerRow;
+                  return <span className="text-xs text-slate-500">{fmt(fs.startsAt)} → {fmt(fs.endsAt)}</span>;
+                },
+              },
+              {
+                key: "flashPrice",
+                label: fr ? "Prix flash" : "Flash price",
+                render: (row) => {
+                  const fs = row as unknown as FlashSaleServerRow;
+                  return <span>{formatCurrency(fs.flashPrice, locale)} · {fr ? `${fs.discount} % de remise` : `${fs.discount}% off`}</span>;
+                },
+              },
+              {
+                key: "status",
+                label: fr ? "Statut" : "Status",
+                render: (row) => {
+                  const st = saleState(row as unknown as FlashSaleServerRow);
+                  return (
+                    <Badge variant={st === "active" ? "success" : st === "scheduled" ? "warning" : "default"}>
+                      {fr ? SALE_STATUS_FR[st] : SALE_STATUS_EN[st]}
+                    </Badge>
+                  );
+                },
+              },
+              {
+                key: "actions",
+                label: "",
+                render: (row) => {
+                  const fs = row as unknown as FlashSaleServerRow;
+                  if (saleState(fs) === "ended") return <span className="text-sm text-slate-400">—</span>;
+                  return (
+                    <Button size="sm" variant="reject" className="whitespace-nowrap" onClick={() => { setEndError(null); setEndTarget(fs); }}>
+                      {fr ? "Terminer maintenant" : "End now"}
+                    </Button>
+                  );
+                },
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
+      <Modal
+        open={!!endTarget}
+        onClose={() => !ending && setEndTarget(null)}
+        title={fr ? "Terminer la vente flash" : "End flash sale"}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setEndTarget(null)} disabled={ending}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="danger" size="sm" onClick={endNow} disabled={ending}>{ending ? "…" : fr ? "Terminer maintenant" : "End now"}</Button>
+          </>
+        }
+      >
+        {endTarget && (
+          <>
+            <p>
+              {fr
+                ? `Terminer « ${endTarget.title} » maintenant ? Le prix normal de ${endTarget.productName} est rétabli immédiatement.`
+                : `End "${endTarget.title}" now? The normal price of ${endTarget.productName} is restored immediately.`}
+            </p>
+            <ErrorNote message={endError} />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

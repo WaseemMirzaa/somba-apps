@@ -1,5 +1,6 @@
 "use client";
 
+import { localDateTime } from "@/lib/dates";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -145,7 +146,7 @@ export default function AdminDashboard() {
           <StatCard title={fr ? "Commandes, 30 derniers jours" : "Orders, last 30 days"} value={formatNumber(s.ordersLast30, locale)} icon={ShoppingCart} trend={`${formatNumber(s.ordersToday, locale)} ${fr ? "aujourd'hui" : "today"} · ${formatCurrency(s.gmvToday, locale)}`} />
           <StatCard title={fr ? "GMV, total" : "GMV, all time"} value={formatCurrency(s.gmv, locale)} icon={TrendingUp} trend={`${fr ? "Panier moyen" : "Avg. order"} ${formatCurrency(s.aov, locale)}`} />
           <StatCard title={fr ? "Encaissé" : "Collected revenue"} value={formatCurrency(s.revenue, locale)} icon={Receipt} trend={`${fr ? "Remboursé" : "Refunded"} ${formatCurrency(s.refundsUsd, locale)}`} />
-          <StatCard title={fr ? `Commission (${s.commissionPct} %)` : `Commission (${s.commissionPct}%)`} value={formatCurrency(s.commissionUsd, locale)} icon={Percent} />
+          <StatCard title="Commission" value={formatCurrency(s.commissionUsd, locale)} icon={Percent} trend={fr ? `Taux actuel ${s.commissionPct} % (nouvelles commandes)` : `Current rate ${s.commissionPct}% (new orders)`} />
           <StatCard title={fr ? "Abonnements vendeurs" : "Seller subscriptions"} value={formatCurrency(s.subscriptionRevenueUsd, locale)} icon={Wallet} />
           <StatCard title={fr ? "Clients" : "Customers"} value={formatNumber(s.customers, locale)} icon={Users} />
           <StatCard title={fr ? "Produits en ligne" : "Live products"} value={formatNumber(s.liveProducts, locale)} icon={Package} trend={`${formatNumber(s.sellers, locale)} ${fr ? "vendeurs" : "sellers"}`} />
@@ -322,7 +323,7 @@ export default function AdminDashboard() {
             ) : (
               audit.items.slice(0, 6).map((item) => (
                 <div key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <p className="text-xs text-slate-400">{item.timestamp ?? (item.createdAt ? item.createdAt.slice(0, 16).replace("T", " ") : "")}</p>
+                  <p className="text-xs text-slate-400">{item.timestamp ?? (item.createdAt ? localDateTime(item.createdAt) : "")}</p>
                   <p className="mt-1 break-words text-sm text-slate-700">{item.actor} · {item.action} · {item.entity}</p>
                 </div>
               ))

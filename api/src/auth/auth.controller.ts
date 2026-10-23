@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { CodeDto, ForgotDto, LoginDto, RefreshDto, RegisterDto, ResetDto, TokenDto } from './dto/auth.dto';
+import { CodeDto, ForgotDto, LoginDto, PhoneDto, PhoneLoginDto, RefreshDto, RegisterDto, ResetDto, TokenDto } from './dto/auth.dto';
 import { VerificationService } from './verification.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -43,6 +43,22 @@ export class AuthController {
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  /** Phone-code login, step 1: text a 6-digit code to a verified customer number (same reply either way). */
+  @Post('phone/login/send')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  sendPhoneLogin(@Body() dto: PhoneDto) {
+    return this.verification.sendLoginCode(dto.phone);
+  }
+
+  /** Phone-code login, step 2: exchange the code for tokens. */
+  @Post('phone/login')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async phoneLogin(@Body() dto: PhoneLoginDto) {
+    return this.auth.loginWithPhoneCode(await this.verification.consumeLoginCode(dto.phone, dto.code));
   }
 
   @Post('refresh')

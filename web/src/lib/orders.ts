@@ -44,6 +44,10 @@ export interface OrderDetail {
   /** From the order's payment record: paid, refunded, failed or pending. */
   paymentStatus: "paid" | "refunded" | "failed" | "pending";
   status: string;
+  /** Expected delivery day (YYYY-MM-DD), from the sellers' delivery times. */
+  estimatedDeliveryDate: string | null;
+  /** Who to call while the parcel is on its way (the server sends it only then). */
+  rider: { name: string; phone: string | null } | null;
   itemsCount: number;
   items: {
     productId: string;
@@ -116,6 +120,8 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     paymentMethod: PAYMENT_LABEL[o.paymentMethod] ?? o.paymentMethod,
     paymentStatus: ended && paymentStatus === "paid" ? "refunded" : paymentStatus,
     status: o.status,
+    estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
+    rider: o.rider ?? null,
     itemsCount: o.items?.reduce((s, i) => s + i.qty, 0) ?? 0,
     items: (o.items ?? []).map((it) => ({
       productId: it.productId,

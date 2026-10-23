@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Star, Eye, EyeOff, MessageSquare, ShieldCheck, Reply } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -191,7 +192,7 @@ export default function AdminReviewsPage() {
                       return (
                         <div>
                           <p className="font-semibold text-slate-900">{productName(r)}</p>
-                          <p className="text-xs text-slate-400">{r.author} · {String(r.createdAt).slice(0, 10)}</p>
+                          <p className="text-xs text-slate-400">{r.author} · {localDay(String(r.createdAt))}</p>
                         </div>
                       );
                     },
@@ -218,7 +219,7 @@ export default function AdminReviewsPage() {
                             <div className="rounded-lg border-l-2 border-[var(--primary)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
                               <p className="font-semibold text-slate-700">
                                 {fr ? "Réponse du vendeur" : "Seller reply"}
-                                {r.sellerReplyAt ? ` · ${String(r.sellerReplyAt).slice(0, 10)}` : ""}
+                                {r.sellerReplyAt ? ` · ${localDay(String(r.sellerReplyAt))}` : ""}
                               </p>
                               <p className="mt-0.5 whitespace-pre-line break-words">{r.sellerReply}</p>
                             </div>

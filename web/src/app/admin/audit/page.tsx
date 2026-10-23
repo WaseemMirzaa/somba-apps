@@ -1,5 +1,6 @@
 "use client";
 
+import { localDateTime } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ export default function AdminAuditPage() {
             <CardContent className="p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="primary">{log.action}</Badge>
-                <span className="text-xs text-slate-400">{log.timestamp ?? (log.createdAt ? log.createdAt.slice(0, 16).replace("T", " ") : "")}</span>
+                <span className="text-xs text-slate-400">{log.timestamp ?? (log.createdAt ? localDateTime(log.createdAt) : "")}</span>
               </div>
               <p className="mt-2 break-words text-sm">
                 <strong>{log.actor}</strong> <span className="text-slate-400">({log.role})</span> · {log.entity}{" "}

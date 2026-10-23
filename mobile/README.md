@@ -113,3 +113,28 @@ French is the default (the market is DR Congo); the language can be switched on 
 ## Push notifications
 
 `lib/services/push_service.dart` registers the device with the API after sign-in when the build contains the Firebase configuration, and does nothing otherwise. See `../docs/MOBILE-PUSH.md` for the manual steps with the client's Firebase project.
+
+
+## Google Maps address picker
+
+On the "Add address" form, **Pin the exact location on the map** opens a full-screen, Uber-style picker
+(`lib/screens/location_picker_screen.dart`):
+- the pin stays fixed in the centre while the map moves under it;
+- the search bar at the top shows Places suggestions and "Use my current location";
+- the bottom card shows the address under the pin, plus an **exact street address** field (number and street).
+  Confirm needs that field to be filled.
+
+The pin (`geo`) is saved encrypted with the address and travels with the order to the rider. With a key configured,
+the form **won't save without a pin** and an exact street address. It is **off until you add a key** (the form then
+shows a notice and works with manual entry only; the street address is still required).
+
+1. In Google Cloud enable **Maps SDK for Android**, **Maps SDK for iOS**, **Places API (New)** and **Geocoding API**
+   (billing on) and create a key.
+2. Give the key to the native SDKs (both files are git-ignored):
+   - iOS: `GOOGLE_MAPS_API_KEY=AIza...` in `ios/Flutter/Secrets.xcconfig`
+   - Android: `GOOGLE_MAPS_API_KEY=AIza...` in `android/local.properties`
+3. Give it to Dart too (place search + reverse geocoding are HTTPS calls from the app):
+   `flutter run --dart-define=GOOGLE_MAPS_API_KEY=AIza...`
+
+If you restrict the key to this app's bundle id / package name, the Dart-side HTTPS calls are rejected; restrict by API
+instead, or use a second key for Places/Geocoding.

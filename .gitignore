@@ -46,5 +46,8 @@ coverage/
 *.sqlite-shm
 
 # user-uploaded files
-api/uploads/
-uploads/
+/api/uploads/
+/uploads/
+
+# Demo recordings: large videos plus notes with local account passwords. Kept on this machine only.
+/recordings/

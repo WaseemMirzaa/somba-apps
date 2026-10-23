@@ -6,10 +6,11 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, LessThan, Repository } from 'typeorm';
-import { Order, Payment } from '../database/entities';
+import { DeliveryTask, Order, Payment } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
 import {
   ADMIN_ROLES,
@@ -18,14 +19,21 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { SettingsService } from '../content/settings.service';
+import { ProductsService } from '../products/products.service';
 import { DEFAULT_LIMIT, pageOf } from '../common/paging';
 import {
+  InitiationUncertainError,
   MOBILE_MONEY_METHODS,
   MOBILE_MONEY_PROVIDER,
   isMobileMoney,
   type MobileMoneyEvent,
   type MobileMoneyProvider,
+  type WebhookRequest,
 } from './mobile-money.provider';
+import { PAWAPAY_CLIENT, PawapayClient, PawapayRejectedError, PawapayUnavailableError } from './pawapay.provider';
+
+/** Called when pawaPay reports on a seller payout (set by PayoutsService, which owns payouts). */
+export type PayoutCallbackHandler = (payoutId: string) => Promise<void>;
 
 /** Called once when an ORDER payment reaches a final state (set by OrdersService). */
 export type OrderPaymentSettledHandler = (
@@ -47,6 +55,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentsService.name);
   private orderSettled: OrderPaymentSettledHandler | null = null;
   private planSettled: PlanPaymentSettledHandler | null = null;
+  private payoutCallback: PayoutCallbackHandler | null = null;
   private readonly manualInFlight = new Set<string>();
   private sweeper: NodeJS.Timeout | null = null;
   private readonly timers = new Set<NodeJS.Timeout>();
@@ -60,6 +69,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly settings: SettingsService,
     @Inject(MOBILE_MONEY_PROVIDER)
     private readonly mobileMoney: MobileMoneyProvider | null,
+    @InjectRepository(DeliveryTask) private readonly deliveries: Repository<DeliveryTask>,
+    private readonly products: ProductsService,
+    @Optional() @Inject(PAWAPAY_CLIENT) private readonly pawapay: PawapayClient | null = null,
   ) {}
 
   onModuleInit() {
@@ -68,8 +80,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         ? `Mobile money provider: ${this.mobileMoney.name}`
         : 'Mobile money provider: none (mobile-money payments are refused)',
     );
-    // Abandoned approvals must not hold stock forever.
-    this.sweeper = setInterval(() => void this.expireStale().catch(() => undefined), 60_000);
+    // Abandoned approvals must not hold stock forever; with an aggregator, missed callbacks are caught up first.
+    this.sweeper = setInterval(
+      () =>
+        void this.reconcilePending()
+          .then(() => this.expireStale())
+          .catch(() => undefined),
+      60_000,
+    );
     this.sweeper.unref();
   }
 
@@ -84,6 +102,15 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   registerPlanSettledHandler(fn: PlanPaymentSettledHandler) {
     this.planSettled = fn;
+  }
+
+  registerPayoutCallbackHandler(fn: PayoutCallbackHandler) {
+    this.payoutCallback = fn;
+  }
+
+  /** Which mobile-money provider is live ('pawapay', 'sandbox', 'manual'), or null. */
+  get providerName(): string | null {
+    return this.mobileMoney?.name ?? null;
   }
 
   /** Which payment methods may be used right now (policy + configuration). */
@@ -292,9 +319,18 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       payment.providerRef = providerRef;
       payment = await this.payments.save(payment);
     } catch (err) {
+      if (err instanceof InitiationUncertainError) {
+        // No answer from the aggregator: the charge may exist. Stay pending; the status check settles it.
+        this.logger.warn(`Mobile money initiate unconfirmed for ${payment.reference}: ${err.message}`);
+        payment.providerRef = err.providerRef;
+        return this.payments.save(payment);
+      }
       this.logger.error(`Mobile money initiate failed for ${payment.reference}: ${(err as Error).message}`);
       payment.status = 'failed';
-      payment.failureReason = 'Could not reach the mobile-money network. Please try again.';
+      payment.failureReason =
+        err instanceof PawapayRejectedError
+          ? `The mobile-money network refused the payment: ${err.message}`
+          : 'Could not reach the mobile-money network. Please try again.';
       return this.payments.save(payment);
     }
     this.maybeAutoConfirmSandbox(payment);
@@ -349,9 +385,63 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Entry point for the aggregator webhook (signature already verified by the provider). */
-  verifyWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): MobileMoneyEvent {
+  async verifyWebhook(
+    rawBody: Buffer,
+    headers: Record<string, string | string[] | undefined>,
+    req?: WebhookRequest,
+  ): Promise<MobileMoneyEvent> {
     if (!this.mobileMoney) throw new Error('Mobile money is not configured.');
-    return this.mobileMoney.parseWebhook(rawBody, headers);
+    return this.mobileMoney.parseWebhook(rawBody, headers, req);
+  }
+
+  /**
+   * pawaPay callback (deposits, refunds and payouts share one URL). The signature is checked when signatures are on,
+   * then the operation's real status is read from pawaPay before anything changes. Returns what it was about.
+   */
+  async handlePawapayCallback(
+    rawBody: Buffer,
+    headers: Record<string, string | string[] | undefined>,
+    req: WebhookRequest,
+  ): Promise<{ kind: string; id: string }> {
+    if (!this.pawapay) throw new Error('pawaPay is not configured.');
+    if (this.pawapay.verifySignatures) await this.pawapay.verifyCallback(rawBody, headers, req);
+    const target = PawapayClient.callbackTarget(rawBody);
+    if (target.kind === 'deposits') {
+      const payment = await this.payments.findOne({ where: { providerRef: target.id } });
+      if (payment) await this.reconcileOne(payment);
+    } else if (target.kind === 'refunds') {
+      await this.reconcileRefund(target.id);
+    } else if (this.payoutCallback) {
+      await this.payoutCallback(target.id);
+    }
+    return target;
+  }
+
+  /** Ask the aggregator about one pending charge and apply its final result (no-op while still in progress). */
+  private async reconcileOne(payment: Payment): Promise<Payment> {
+    if (payment.status !== 'pending' || !this.mobileMoney?.checkStatus || !payment.providerRef) return payment;
+    try {
+      const event = await this.mobileMoney.checkStatus({ reference: payment.reference, providerRef: payment.providerRef });
+      if (!event) return payment;
+      return (await this.settle({ ...event, reference: payment.reference })) ?? payment;
+    } catch (e) {
+      this.logger.warn(`Status check failed for ${payment.reference}: ${(e as Error).message}`);
+      return payment;
+    }
+  }
+
+  /** Catch up on callbacks that never arrived: pending charges older than two minutes, plus phone refunds in flight. */
+  async reconcilePending(): Promise<void> {
+    if (!this.mobileMoney?.checkStatus) return;
+    const cutoff = new Date(Date.now() - 120_000);
+    const pending = await this.payments.find({
+      where: { status: 'pending', method: In([...MOBILE_MONEY_METHODS]), createdAt: LessThan(cutoff) },
+      order: { createdAt: 'ASC' },
+      take: 25,
+    });
+    for (const p of pending) await this.reconcileOne(p);
+    const sending = await this.payments.find({ where: { refundStatus: 'sending' }, take: 25 });
+    for (const p of sending) if (p.refundRef) await this.reconcileRefund(p.refundRef);
   }
 
   /** Move a payment between states ONLY if it is still in one of `from` (atomic). */
@@ -378,8 +468,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    * same transaction as the state change.
    */
   async settle(event: MobileMoneyEvent): Promise<Payment | null> {
-    const payment = await this.payments.findOne({ where: { reference: event.reference } });
+    const payment =
+      (event.reference ? await this.payments.findOne({ where: { reference: event.reference } }) : null) ??
+      (event.providerRef ? await this.payments.findOne({ where: { providerRef: event.providerRef } }) : null);
     if (!payment) return null;
+    event = { ...event, reference: payment.reference };
     if (payment.status === 'succeeded' || payment.status === 'refunded') return payment;
 
     // An amount that doesn't match what we asked for is never accepted as success.
@@ -472,6 +565,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       where: { status: 'pending', method: In([...MOBILE_MONEY_METHODS]), createdAt: LessThan(cutoff) },
     });
     for (const p of stale) {
+      // The aggregator has the last word: a charge it completed is settled, not expired.
+      const checked = await this.reconcileOne(p);
+      if (checked.status !== 'pending') continue;
       await this.settle({ reference: p.reference, outcome: 'failed', reason: 'Timed out waiting for approval.' });
     }
     return stale.length;
@@ -494,29 +590,53 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    * Called when an order is cancelled. If we actually collected money for it
    * (prepaid, not COD), the payment is marked refunded and the wallet credited in
    * ONE transaction; a pending payment is simply abandoned (a late approval is
-   * then credited to the wallet by [settle]). Returns whether a refund was made.
+   * then credited to the wallet by [settle]). Returns the amount credited to the wallet (0 when none).
    */
-  async refundCancelledOrder(order: Order): Promise<boolean> {
+  async refundCancelledOrder(order: Order): Promise<number> {
     const payment = await this.forOrder(order.id);
-    if (!payment) return false;
+    if (!payment) return 0;
     if (payment.status === 'pending') {
       if (isMobileMoney(payment.method)) {
         await this.claim(this.payments.manager, payment.id, ['pending'], 'failed', 'Cancelled by customer.');
         this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
       }
-      return false;
+      return 0;
     }
-    if (payment.status !== 'succeeded' || order.paymentMethod === 'cod') return false;
+    if (payment.status !== 'succeeded' || order.paymentMethod === 'cod') return 0;
+    const due = PaymentsService.outstanding(payment.amountUsd, order);
     const won = await this.payments.manager.transaction(async (m) => {
       if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
-      await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, `Refund for cancelled order ${order.reference}`, m);
+      await m.update(Payment, { id: payment.id }, { refundTo: 'wallet', refundStatus: 'completed', refundedUsd: due });
+      if (due > 0) await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
       return true;
     });
     if (won) this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
-    return won;
+    return won ? due : 0;
   }
 
-  /** Refund an order, to the wallet (instant store credit) or original method. */
+  /**
+   * What is still refundable on an order's payment: lines a seller already
+   * cancelled were refunded on their own, so they are never paid back twice.
+   */
+  static outstanding(amountUsd: number, order: Pick<Order, 'items'>): number {
+    const already = (order.items ?? []).reduce((t, i) => t + (i.refundedUsd ?? 0), 0);
+    return Math.max(0, Number((amountUsd - already).toFixed(2)));
+  }
+
+  /** Phone refunds go back through pawaPay to the number that paid (mobile-money payments only). */
+  canRefundToPhone(payment: Pick<Payment, 'method' | 'providerRef'>): boolean {
+    return !!this.pawapay && this.mobileMoney?.name === 'pawapay' && isMobileMoney(payment.method) && !!payment.providerRef;
+  }
+
+  /**
+   * Refund an order: to the customer's wallet (instant store credit, the default) or, for a pawaPay mobile-money
+   * payment, back to the phone that paid (`toWallet === false`). A phone refund is "sending" until pawaPay confirms
+   * it; if pawaPay fails it, the amount goes to the wallet instead so the customer is never left out.
+   *
+   * A parcel that was never delivered is called off: the order becomes `cancelled`, its stock goes back on the
+   * shelf and any open delivery is voided. A delivered order becomes `returned`. Never pays back more than what is
+   * still outstanding (lines a seller already cancelled were refunded on their own).
+   */
   async refund(orderId: string, toWallet: boolean): Promise<Payment> {
     const payment = await this.payments.findOne({ where: { orderId } });
     if (!payment) throw new NotFoundException('No payment for this order.');
@@ -526,37 +646,146 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (payment.status !== 'succeeded') {
       throw new BadRequestException('Only a completed payment can be refunded.');
     }
+    if (toWallet === false && !this.canRefundToPhone(payment)) {
+      throw new BadRequestException(
+        isMobileMoney(payment.method)
+          ? "Refunds to the phone need pawaPay to be connected. Refund to the customer's wallet."
+          : "Only mobile-money payments can be refunded to a phone. Refund to the customer's wallet.",
+      );
+    }
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (order?.status === 'cancelled') {
       throw new BadRequestException('This order was cancelled and has already been settled.');
     }
+    const due = order ? PaymentsService.outstanding(payment.amountUsd, order) : payment.amountUsd;
+    const toPhone = toWallet === false && due > 0;
+    const refundRef = toPhone ? this.pawapay!.newId() : null;
     // Atomic: of two concurrent refunds exactly one wins.
     const won = await this.payments.manager.transaction(async (m) => {
       if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
-      if (toWallet) {
-        await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, `Refund for ${payment.orderReference}`, m);
+      await m.update(Payment, { id: payment.id }, {
+        refundTo: toPhone ? 'phone' : 'wallet',
+        refundRef,
+        refundStatus: toPhone ? 'sending' : 'completed',
+        refundedUsd: due,
+      });
+      if (!toPhone && due > 0) {
+        await this.wallet.apply(payment.userId, 'refund', due, `Refund for ${payment.orderReference}`, m);
       }
       return true;
     });
     if (!won) throw new BadRequestException('Already refunded.');
-    const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
 
-    // Reflect the refund on the order.
-    if (order) {
-      order.status = 'returned';
-      await this.orders.save(order);
-      this.emitter.toUser(order.customerId, 'order:updated', order);
-      this.emitter.toRoles(ADMIN_ROLES, 'order:updated', order);
+    if (toPhone) {
+      try {
+        await this.pawapay!.refund({ refundId: refundRef!, depositId: payment.providerRef!, amountUsd: due, reference: payment.reference });
+      } catch (e) {
+        if (!(e instanceof PawapayUnavailableError)) {
+          // pawaPay said no: undo, so finance can refund to the wallet instead.
+          await this.payments.update({ id: payment.id }, { status: 'succeeded', refundTo: null, refundRef: null, refundStatus: null, refundedUsd: null });
+          throw new BadRequestException(`pawaPay refused the refund: ${(e as Error).message}`);
+        }
+        // No answer: the refund may exist; the status check settles it.
+        this.logger.warn(`Refund ${refundRef} for ${payment.reference} unconfirmed: ${e.message}`);
+      }
     }
 
+    const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
+    if (order) await this.closeRefundedOrder(order);
     this.publish(saved);
     await this.notifications.toUser(saved.userId, {
       title: 'Refund issued',
-      body: `$${saved.amountUsd.toFixed(2)} for ${saved.orderReference}${toWallet ? ' → wallet' : ''}.`,
+      body: toPhone
+        ? `$${due.toFixed(2)} for ${saved.orderReference} is on its way back to your mobile-money number.`
+        : `$${due.toFixed(2)} for ${saved.orderReference} → wallet.`,
       type: 'payment',
       entityId: orderId,
     });
     return saved;
+  }
+
+  /** A refunded order: delivered → returned; otherwise cancelled, restocked, and its open deliveries voided. */
+  private async closeRefundedOrder(order: Order): Promise<void> {
+    const delivered = order.status === 'delivered' || order.status === 'returned';
+    order.status = delivered ? 'returned' : 'cancelled';
+    await this.orders.save(order);
+    if (!delivered) {
+      // The goods never reached the customer: back on the shelf, and no rider should still go for them.
+      for (const item of order.items ?? []) {
+        // A line a seller already cancelled was restocked then.
+        if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
+          await this.products.restock(item.productId, item.qty);
+        }
+      }
+      const tasks = await this.deliveries.find({
+        where: { orderId: order.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) },
+      });
+      for (const task of tasks) {
+        task.status = 'failed';
+        task.failureReason = 'Refunded';
+        await this.deliveries.save(task);
+        this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'delivery:updated', task);
+        if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+      }
+    }
+    this.emitter.toUser(order.customerId, 'order:updated', order);
+    this.emitter.toRoles(ADMIN_ROLES, 'order:updated', order);
+  }
+
+  /**
+   * Apply pawaPay's final word on a phone refund: completed → done; failed → the amount is credited to the wallet
+   * instead (once), and finance is told.
+   */
+  async reconcileRefund(refundRef: string): Promise<void> {
+    if (!this.pawapay) return;
+    const payment = await this.payments.findOne({ where: { refundRef } });
+    if (!payment || payment.refundStatus !== 'sending') return;
+    let s;
+    try {
+      s = await this.pawapay.check('refunds', refundRef);
+    } catch (e) {
+      this.logger.warn(`Refund status check failed for ${refundRef}: ${(e as Error).message}`);
+      return;
+    }
+    if (!s.found || !s.final) return;
+    const amount = payment.refundedUsd ?? payment.amountUsd;
+    const to = s.succeeded ? 'completed' : 'failed';
+    const won = await this.payments.manager.transaction(async (m) => {
+      const res = await m
+        .createQueryBuilder()
+        .update(Payment)
+        .set({ refundStatus: to, ...(s.succeeded ? {} : { refundTo: 'wallet' }) })
+        .where("id = :id AND refundStatus = 'sending'", { id: payment.id })
+        .execute();
+      if (!res.affected) return false;
+      if (!s.succeeded && amount > 0) {
+        await this.wallet.apply(payment.userId, 'refund', amount, `Refund for ${payment.orderReference} (phone refund failed)`, m);
+      }
+      return true;
+    });
+    if (!won) return;
+    this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
+    if (s.succeeded) {
+      await this.notifications.toUser(payment.userId, {
+        title: 'Refund sent',
+        body: `$${amount.toFixed(2)} for ${payment.orderReference} was sent to your mobile-money number.`,
+        type: 'payment',
+        entityId: payment.orderId ?? payment.id,
+      });
+    } else {
+      await this.notifications.toUser(payment.userId, {
+        title: 'Refund issued',
+        body: `$${amount.toFixed(2)} for ${payment.orderReference} → wallet (the network could not take it back to your phone).`,
+        type: 'payment',
+        entityId: payment.orderId ?? payment.id,
+      });
+      await this.notifications.toRole('admin_finance', {
+        title: 'Phone refund failed',
+        body: `${payment.reference}: pawaPay could not refund $${amount.toFixed(2)}${s.failureMessage ? ` (${s.failureMessage})` : ''}. It was credited to the customer's wallet.`,
+        type: 'payment',
+        entityId: payment.id,
+      });
+    }
   }
 
   async list(user: { id: string; role: string }, paging?: unknown): Promise<Payment[]> {
@@ -571,9 +800,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   /** A payment by reference, visible to its owner and to finance/admin. */
   async status(user: { id: string; role: string }, reference: string): Promise<Payment> {
-    const p = await this.payments.findOne({ where: { reference } });
+    let p = await this.payments.findOne({ where: { reference } });
     const isStaff = user.role === 'admin' || user.role === 'admin_finance';
     if (!p || (p.userId !== user.id && !isStaff)) throw new NotFoundException('Payment not found.');
+    // Waiting on the network: ask it now rather than wait for a callback.
+    if (p.status === 'pending') p = await this.reconcileOne(p);
     return this.view(p);
   }
 

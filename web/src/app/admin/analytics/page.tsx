@@ -97,7 +97,7 @@ export default function AdminAnalyticsPage() {
           <StatCard title={fr ? "Commandes, 30 derniers jours" : "Orders, last 30 days"} value={formatNumber(s.ordersLast30, locale)} icon={ShoppingCart} trend={`${s.ordersToday} ${fr ? "aujourd'hui" : "today"}`} />
           <StatCard title={fr ? "Panier moyen" : "Average order value"} value={formatCurrency(s.aov, locale)} icon={DollarSign} />
           <StatCard title={fr ? "Remboursé" : "Refunded"} value={formatCurrency(s.refundsUsd, locale)} icon={Receipt} />
-          <StatCard title={fr ? `Commission (${s.commissionPct} %)` : `Commission (${s.commissionPct}%)`} value={formatCurrency(s.commissionUsd, locale)} icon={Percent} />
+          <StatCard title="Commission" value={formatCurrency(s.commissionUsd, locale)} icon={Percent} trend={fr ? `Taux actuel ${s.commissionPct} % (nouvelles commandes)` : `Current rate ${s.commissionPct}% (new orders)`} />
           <StatCard title={fr ? "Clients" : "Customers"} value={formatNumber(s.customers, locale)} icon={Users} />
           <StatCard title={fr ? "Vendeurs" : "Sellers"} value={formatNumber(s.sellers, locale)} icon={Users} trend={`${formatNumber(s.liveProducts, locale)} ${fr ? "produits en ligne" : "live products"}`} />
           <StatCard title={fr ? "GMV total" : "GMV all time"} value={formatCurrency(s.gmv, locale)} icon={TrendingUp} trend={`${formatNumber(s.orders, locale)} ${fr ? "commandes" : "orders"}`} />

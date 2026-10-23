@@ -1,5 +1,6 @@
 "use client";
 
+import { localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ export default function AdminBroadcastsPage() {
             { key: "audience", label: "Audience", render: (row) => <Badge variant="primary">{audLabel(String(row.audience))}</Badge> },
             { key: "recipients", label: fr ? "Destinataires" : "Recipients" },
             { key: "sentBy", label: fr ? "Envoyé par" : "Sent by" },
-            { key: "createdAt", label: t("date"), render: (row) => <span className="text-slate-500">{String(row.createdAt).slice(0, 16).replace("T", " ")}</span> },
+            { key: "createdAt", label: t("date"), render: (row) => <span className="text-slate-500">{localDateTime(String(row.createdAt))}</span> },
           ]}
         />
       </div>

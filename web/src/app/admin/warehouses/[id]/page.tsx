@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -13,10 +14,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
 import { HubFormModal } from "@/components/admin/hub-form";
+import { HomeWarehouseDialog } from "@/components/admin/home-warehouse-dialog";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-import { canManageHubs, errMsg, useRole, useServerList } from "@/lib/admin-live";
+import { canManageHubs, errMsg, useRole, useServerList, type StaffRow, type ZoneSetting } from "@/lib/admin-live";
 import { useSocketQuery, type HubRow, type WarehouseStats } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
 
@@ -43,6 +45,24 @@ interface TransferRow {
   createdAt: string;
 }
 
+interface HubRider {
+  id: string;
+  name: string;
+  phone: string | null;
+  hubId: string | null;
+  preferredZones: string[];
+  activeTasks: number;
+}
+
+function parseZones(raw: string | undefined): ZoneSetting[] {
+  try {
+    const v = raw ? (JSON.parse(raw) as ZoneSetting[]) : [];
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
 const TRANSFER_STATUS_FR: Record<string, string> = { requested: "Demandé", in_transit: "En transit", received: "Reçu" };
 
 export default function AdminWarehouseDetailPage() {
@@ -55,6 +75,11 @@ export default function AdminWarehouseDetailPage() {
   const hubs = useServerList<HubRow>("warehouse:hubs", { pushEvents: ["hub:updated"] });
   const wh = useSocketQuery<WarehouseStats>("analytics:warehouse");
   const transfers = useSocketQuery<TransferRow[]>("warehouse:transfers");
+  // Who and what belongs to this warehouse: the zones it delivers, its riders and (super admin) its staff.
+  const settings = useSocketQuery<Record<string, string>>("settings:get");
+  const riders = useSocketQuery<HubRider[]>("warehouse:riders", { hubId: id });
+  const staff = useServerList<StaffRow>("roles:staff", { enabled: role === "admin" });
+  const [editingPerson, setEditingPerson] = useState<StaffRow | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [toggleOpen, setToggleOpen] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -64,6 +89,11 @@ export default function AdminWarehouseDetailPage() {
   const w = wh.data;
   const today = w?.throughput[w.throughput.length - 1];
   const batches30 = w?.byHub.find((h) => h.hubId === id)?.batches30 ?? 0;
+  const zones = useMemo(() => parseZones(settings.data?.deliveryZones), [settings.data]);
+  const hubZones = zones.filter((z) => z.hubId === id);
+  const zoneName = new Map(zones.map((z) => [z.id, fr ? z.nameFr || z.name : z.name]));
+  const hubRiders = (riders.data ?? []).filter((r) => r.hubId === id);
+  const hubStaff = staff.items.filter((u) => u.role === "warehouse_staff" && u.hubId === id);
   const hubTransfers = useMemo(
     () => (transfers.data ?? []).filter((t) => hub && [t.fromHub, t.toHub].some((n) => n.trim().toLowerCase() === hub.name.trim().toLowerCase())),
     [transfers.data, hub],
@@ -154,11 +184,92 @@ export default function AdminWarehouseDetailPage() {
           )}
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Réseau de colis, aujourd'hui (tous hubs)" : "Parcel network today (all hubs)"} span={2}>
+        <DetailGridSection title={fr ? "Zones desservies" : "Zones it delivers"}>
+          {settings.error ? (
+            <SectionError message={settings.error} onRetry={settings.reload} />
+          ) : !settings.data ? (
+            <SectionLoading />
+          ) : hubZones.length === 0 ? (
+            <EmptyState>
+              {fr ? "Aucune zone. Rattachez des zones à cet entrepôt sur la page " : "No zones yet. Tie zones to this warehouse on the "}
+              <Link href="/admin/zones" className="font-semibold text-[var(--primary)] hover:underline">{fr ? "Zones" : "Zones page"}</Link>.
+            </EmptyState>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {hubZones.map((z) => (
+                <li key={z.id} className="flex justify-between gap-3">
+                  <span className="font-medium text-slate-800">{fr ? z.nameFr || z.name : z.name}</span>
+                  <span className="text-slate-500">{z.city} · ${z.feeUsd}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DetailGridSection>
+
+        <DetailGridSection title={fr ? "Livreurs de cet entrepôt" : "Riders at this warehouse"} span={2}>
           <p className="mb-3 text-xs text-slate-500">
             {fr
-              ? "Les colis ne sont pas rattachés à un hub : ces chiffres couvrent tout le réseau."
-              : "Parcels are not assigned to a hub, so these figures cover the whole network."}
+              ? "Ils voient et reçoivent les livraisons des zones de cet entrepôt, leurs zones préférées en premier."
+              : "They see and are told about deliveries in this warehouse's zones, their preferred zones first."}
+          </p>
+          {riders.error ? (
+            <SectionError message={riders.error} onRetry={riders.reload} />
+          ) : !riders.data ? (
+            <SectionLoading />
+          ) : hubRiders.length === 0 ? (
+            <EmptyState>{fr ? "Aucun livreur rattaché. Choisissez l'entrepôt des livreurs sur la page Personnel." : "No riders yet. Set riders' warehouse on the Staff page."}</EmptyState>
+          ) : (
+            <DataTable
+              columns={[
+                { key: "name", label: fr ? "Nom" : "Name" },
+                { key: "phone", label: fr ? "Téléphone" : "Phone", render: (row) => (row.phone ? String(row.phone) : "—") },
+                {
+                  key: "preferredZones",
+                  label: fr ? "Zones préférées" : "Preferred zones",
+                  render: (row) => {
+                    const z = (row.preferredZones as string[]) ?? [];
+                    return z.length ? z.map((x) => zoneName.get(x) ?? x).join(", ") : "—";
+                  },
+                },
+                { key: "activeTasks", label: fr ? "En cours" : "Active jobs" },
+              ]}
+              data={hubRiders as unknown as Record<string, unknown>[]}
+            />
+          )}
+        </DetailGridSection>
+
+        {role === "admin" && (
+          <DetailGridSection title={fr ? "Employés de cet entrepôt" : "Staff at this warehouse"} span={3}>
+            {staff.error ? (
+              <SectionError message={staff.error} onRetry={staff.reload} />
+            ) : staff.loading ? (
+              <SectionLoading />
+            ) : hubStaff.length === 0 ? (
+              <EmptyState>{fr ? "Aucun employé rattaché." : "No staff tied to this warehouse yet."}</EmptyState>
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "name", label: fr ? "Nom" : "Name" },
+                  { key: "email", label: "Email" },
+                  {
+                    key: "actions",
+                    label: "",
+                    render: (row) => (
+                      <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditingPerson(row as unknown as StaffRow)}>
+                        {fr ? "Changer d'entrepôt" : "Change warehouse"}
+                      </button>
+                    ),
+                  },
+                ]}
+                data={hubStaff as unknown as Record<string, unknown>[]}
+              />
+            )}
+          </DetailGridSection>
+        )}
+
+        <DetailGridSection title={fr ? "Réseau de colis, aujourd'hui (tous hubs)" : "Parcel network today (all hubs)"} span={2}>
+          <p className="mb-3 text-xs text-slate-500">
+            {fr ? "Ces chiffres couvrent tout le réseau, tous entrepôts confondus." : "These figures cover the whole network, every warehouse together."}
           </p>
           {wh.error ? (
             <SectionError message={wh.error} onRetry={wh.reload} />
@@ -194,7 +305,7 @@ export default function AdminWarehouseDetailPage() {
                 { key: "sku", label: "SKU", render: (row) => `${row.sku}${row.productName ? ` · ${row.productName}` : ""}` },
                 { key: "qty", label: fr ? "Qté" : "Qty" },
                 { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "received" ? "success" : "info"}>{fr ? TRANSFER_STATUS_FR[String(row.status)] ?? String(row.status) : String(row.status).replace(/_/g, " ")}</Badge> },
-                { key: "createdAt", label: "Date", render: (row) => String(row.createdAt).slice(0, 10) },
+                { key: "createdAt", label: "Date", render: (row) => localDay(String(row.createdAt)) },
               ]}
               data={hubTransfers as unknown as Record<string, unknown>[]}
             />
@@ -219,6 +330,8 @@ export default function AdminWarehouseDetailPage() {
           </NavLinkButton>
         </DetailGridSection>
       </DetailGrid>
+
+      <HomeWarehouseDialog user={editingPerson} hubs={hubs.items} fr={fr} onClose={() => setEditingPerson(null)} onSaved={() => void staff.reload()} />
 
       <HubFormModal
         open={editOpen}

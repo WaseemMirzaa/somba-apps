@@ -6,9 +6,11 @@ import type { ProductStatus } from '../database/entities';
 import { num, oneOf, optStr, price as priceOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { parseVariantGroups } from '../common/variants/variants';
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../common/paging';
 import { bestPrice, campaignCovers, campaignRunning } from './pricing';
 import type { PriceSource } from './pricing';
+import { DELIVERY_DAYS } from '../common/delivery/estimate';
 
 /**
  * A listing as shoppers see (and are charged for) it: `price` is the effective
@@ -23,7 +25,7 @@ export type PricedProduct = Product & {
   campaignName: string | null;
 };
 
-const STATUSES = ['draft', 'pending', 'approved', 'rejected', 'live', 'removed'] as const;
+const STATUSES = ['draft', 'pending', 'rejected', 'live', 'removed'] as const;
 
 /** Fields a SELLER may set on their own listing. */
 export interface ListingInput {
@@ -36,6 +38,10 @@ export interface ListingInput {
   stock?: unknown;
   image?: unknown;
   description?: unknown;
+  /** Option groups [{ name, options[] }] (or their JSON text); empty / null clears them. */
+  variants?: unknown;
+  /** The seller's delivery time for this product, in days (1-30). */
+  deliveryDays?: unknown;
   /** Moderation field — honoured only when `allowStatus` is true (admins). */
   status?: unknown;
 }
@@ -63,6 +69,13 @@ export function cleanListing(
   if (has('stock')) out.stock = num(input.stock, 'Stock', { min: 0, max: 1_000_000, int: true });
   if (has('image')) out.image = optStr(input.image, 'Image', 500);
   if (has('description')) out.description = optStr(input.description, 'Description', 5000);
+  if (has('deliveryDays')) {
+    out.deliveryDays = num(input.deliveryDays, 'Delivery time (days)', { min: DELIVERY_DAYS.min, max: DELIVERY_DAYS.max, int: true });
+  }
+  if (has('variants')) {
+    const groups = parseVariantGroups(input.variants);
+    out.variants = groups.length ? JSON.stringify(groups) : null;
+  }
   if (opts.allowStatus && has('status')) out.status = oneOf<ProductStatus>(input.status, STATUSES, 'Status');
 
   const p = out.price ?? opts.currentPrice;

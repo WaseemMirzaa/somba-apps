@@ -11,6 +11,8 @@ import {
 } from "react";
 import { authApi } from "@/lib/realtime/auth-api";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
+import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
 import type {
   AppNotification,
   BackendUser,
@@ -162,8 +164,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // Assigned below; lets the socket's `unauthorized` handler trigger a token
   // refresh + reconnect without a circular hook dependency.
   const reauthRef = useRef<() => void>(() => {});
+  // The signed-in account, for per-viewer "seen" marks on notices sent to a whole role.
+  const userIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user]);
 
   const logout = useCallback(() => {
+    // Stop web pushes to this browser for the account that is leaving (sent before the socket closes).
+    unregisterWebPush();
     authApi.clear();
     socketClient.disconnect();
     setUser(null);
@@ -264,7 +273,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setOrders(ord);
         fetched.current.orders = ord.length;
         setHasMoreOrders(ord.length >= PAGE_SIZE);
-        setNotifications(notif);
+        setNotifications(withSeen(userIdRef.current, notif));
+        // A browser that turned alerts on keeps getting them for whoever is signed in now.
+        void syncWebPush();
         const del = await socketClient
           .request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE })
           .catch(keep);
@@ -476,6 +487,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const markRead = useCallback(async (id: string) => {
+    rememberSeen(userIdRef.current, id);
     await socketClient.request("notifications:markRead", { id });
     setNotifications((cur) =>
       cur.map((n) => (n.id === id ? { ...n, read: true } : n)),
@@ -483,6 +495,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markAllRead = useCallback(async () => {
+    rememberAllSeen(userIdRef.current);
     await socketClient.request("notifications:markAllRead");
     setNotifications((cur) => cur.map((n) => ({ ...n, read: true })));
   }, []);

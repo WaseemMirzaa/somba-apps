@@ -1,15 +1,28 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
+import '../../widgets/mobile_money.dart';
+import '../../util/zone_match.dart';
+import '../../util/format.dart';
+import '../../services/models.dart';
+import '../../data/market_profiles.dart';
+import '../../services/places_client.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
+import '../../services/maps_config.dart';
+import '../location_picker_screen.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 
-/// Add a delivery address (saved on the server, encrypted at rest).
+/// Add or edit a delivery address (saved on the server, encrypted at rest). With [existing] it edits that address.
 class AddressFormScreen extends StatefulWidget {
   final Locale locale;
-  const AddressFormScreen({super.key, this.locale = const Locale('en')});
+  final AddressDto? existing;
+
+  /// Tests: the picker's Places client and map (the native map cannot run in tests).
+  final PlacesClient? placesClient;
+  final PickerMapBuilder? mapBuilder;
+  const AddressFormScreen({super.key, this.locale = const Locale('en'), this.existing, this.placesClient, this.mapBuilder});
   @override
   State<AddressFormScreen> createState() => _AddressFormScreenState();
 }
@@ -18,16 +31,33 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   final _label = TextEditingController();
   final _phone = TextEditingController();
   final _line1 = TextEditingController();
+  final _landmark = TextEditingController();
   final _commune = TextEditingController();
   final _city = TextEditingController();
   bool _seeded = false;
+  PickedPlace? _pick;
+  bool _pinCleared = false;
   bool _default = false;
   bool _busy = false;
-  String? _lineErr, _cityErr;
+  String? _lineErr, _cityErr, _phoneErr, _pinErr;
+
+  AddressDto? get _existing => widget.existing;
+
+  @override
+  void initState() {
+    super.initState();
+    // The zone line follows what is typed.
+    _commune.addListener(_refresh);
+    _city.addListener(_refresh);
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
-    for (final c in [_label, _phone, _line1, _commune, _city]) {
+    for (final c in [_label, _phone, _line1, _landmark, _commune, _city]) {
       c.dispose();
     }
     super.dispose();
@@ -36,58 +66,231 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_seeded) {
-      _seeded = true;
-      final s = Strings.of(context);
+    if (_seeded) return;
+    _seeded = true;
+    final s = Strings.of(context);
+    final e = _existing;
+    if (e != null) {
+      _label.text = e.label;
+      _phone.text = e.phone ?? '';
+      _line1.text = e.line1;
+      _landmark.text = e.line2 ?? '';
+      _commune.text = e.commune ?? '';
+      _city.text = e.city;
+      _default = e.isDefault;
+    } else {
       _label.text = s.addrLabelDefault;
       _city.text = s.addrCityHint;
+      _phone.text = RealtimeStore.instance.user?.phone ?? '';
     }
   }
 
+  /// The pin to save: the one just picked, else the address's own (when editing).
+  ({double lat, double lng, String? formatted})? get _pin {
+    final p = _pick;
+    if (p != null) return (lat: p.lat, lng: p.lng, formatted: p.formatted);
+    final g = _pinCleared ? null : _existing?.geo;
+    return g == null ? null : (lat: g.lat, lng: g.lng, formatted: g.formatted);
+  }
+
+  Future<void> _openPicker() async {
+    final pin = _pin;
+    final picked = await Navigator.push<PickedPlace>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialPin: pin == null ? null : (lat: pin.lat, lng: pin.lng),
+          initialStreet: _line1.text,
+          client: widget.placesClient,
+          mapBuilder: widget.mapBuilder,
+          locateOnOpen: widget.mapBuilder == null,
+        ),
+      ),
+    );
+    if (picked != null && mounted) _applyPick(picked);
+  }
+
+  /// A map pick pre-fills the typed fields (still editable) and keeps the pin for saving.
+  void _applyPick(PickedPlace p) {
+    setState(() {
+      _pick = p;
+      _pinCleared = false;
+      _lineErr = null;
+      _cityErr = null;
+      _pinErr = null;
+    });
+    if ((p.parts.line1 ?? '').isNotEmpty) _line1.text = p.parts.line1!;
+    if ((p.parts.commune ?? '').isNotEmpty) _commune.text = p.parts.commune!;
+    if ((p.parts.city ?? '').isNotEmpty) _city.text = p.parts.city!;
+  }
+
+  Zone? get _zone => zoneForAddress(commune: _commune.text, city: _city.text, zones: activeZones);
+
   Future<void> _save() async {
     final s = Strings.of(context);
+    final phone = _phone.text.trim();
     setState(() {
-      _lineErr = _line1.text.trim().isEmpty ? s.addrErrStreet : null;
+      // With maps available the exact spot is mandatory: the rider goes to the pin.
+      _pinErr = MapsConfig.enabled && _pin == null ? s.addrPinRequired : null;
+      _lineErr = streetAddressError(_line1.text, s);
       _cityErr = _city.text.trim().isEmpty ? s.addrErrCity : null;
+      _phoneErr = phone.isEmpty ? null : validateMobileNumber(phone, s);
     });
-    if (_lineErr != null || _cityErr != null) return;
-    setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
-    try {
-      await RealtimeStore.instance.addAddress({
-        'label': _label.text.trim().isEmpty ? s.addrLabelDefault : _label.text.trim(),
-        'line1': _line1.text.trim(),
-        if (_commune.text.trim().isNotEmpty) 'commune': _commune.text.trim(),
-        'city': _city.text.trim(),
-        if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
-        if (_default) 'isDefault': true,
-      });
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(s.addrSaved)));
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
+    if (_pinErr != null || _lineErr != null || _cityErr != null || _phoneErr != null) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(_pinErr ?? _lineErr ?? _cityErr ?? _phoneErr!)));
+      return;
     }
+    setState(() => _busy = true);
+    final zone = _zone;
+    final body = <String, dynamic>{
+      'label': _label.text.trim().isEmpty ? s.addrLabelDefault : _label.text.trim(),
+      'line1': _line1.text.trim(),
+      'line2': _landmark.text.trim().isEmpty ? null : _landmark.text.trim(),
+      'commune': _commune.text.trim().isEmpty ? null : _commune.text.trim(),
+      'city': _city.text.trim(),
+      'phone': phone.isEmpty ? null : phone,
+      'zoneId': zone?.id,
+      if (_default) 'isDefault': true,
+      if (_pick != null) 'geo': _pick!.toGeoJson() else if (_pinCleared) 'geo': null,
+    };
+    try {
+      final e = _existing;
+      if (e == null) {
+        await RealtimeStore.instance.addAddress(body);
+      } else {
+        await RealtimeStore.instance.updateAddress(e.id, body);
+      }
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e == null ? s.addrSaved : s.addrUpdated)));
+      Navigator.pop(context);
+    } catch (err) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(err))));
+    }
+  }
+
+  /// Without a Maps key: a notice, and the address is typed by hand. With one: the card that opens the picker.
+  Widget _pinCard(Strings s) {
+    if (!MapsConfig.enabled) {
+      return Container(
+        key: const ValueKey('map-unavailable'),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFDE68A))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.location_off_outlined, size: 20, color: Color(0xFF92400E)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(s.addrMapUnavailable, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF92400E))),
+              const SizedBox(height: 2),
+              Text(s.addrMapTypeBelow, style: const TextStyle(fontSize: 12.5, color: Color(0xFF92400E))),
+            ]),
+          ),
+        ]),
+      );
+    }
+    final pin = _pin;
+    final err = _pinErr;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          key: const ValueKey('pick-location'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: _openPicker,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: err != null ? AppColors.dangerStrong : AppColors.line, width: err != null ? 1.5 : 1),
+            ),
+            child: Row(children: [
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+                child: Icon(pin == null ? Icons.add_location_alt_outlined : Icons.location_on_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(pin == null ? s.addrPinCta : s.addrMapPinnedBadge, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(
+                    pin == null ? s.addrPinCtaHint : (pin.formatted ?? '${pin.lat.toStringAsFixed(5)}, ${pin.lng.toStringAsFixed(5)}'),
+                    key: const ValueKey('pin-summary'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+                  ),
+                ]),
+              ),
+              Text(pin == null ? '' : s.change, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+            ]),
+          ),
+        ),
+      ),
+      if (err != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4),
+          child: Text(err, key: const ValueKey('pin-error'), style: const TextStyle(color: AppColors.dangerStrong, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
+    final zone = _zone;
+    final hasCommune = _commune.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: backAppBar(context, s.addrTitle),
+      appBar: backAppBar(context, _existing == null ? s.addrTitle : s.addrEditTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
+        _pinCard(s),
+        const SizedBox(height: 16),
         AppField(label: s.addrLabel, hint: s.addrLabelHint, icon: Icons.bookmark_outline_rounded, controller: _label),
         const SizedBox(height: 16),
-        AppField(label: s.addrPhone, hint: '+243 81 234 5678', icon: Icons.phone_outlined, keyboard: TextInputType.phone, controller: _phone),
+        AppField(
+            label: s.addrPhone,
+            hint: '+243 81 234 5678',
+            icon: Icons.phone_outlined,
+            keyboard: TextInputType.phone,
+            controller: _phone,
+            error: _phoneErr),
         const SizedBox(height: 16),
         AppField(label: s.addrStreet, hint: s.addrStreetHint, icon: Icons.location_on_outlined, controller: _line1, error: _lineErr),
+        const SizedBox(height: 16),
+        AppField(
+            key: const ValueKey('address-landmark'),
+            label: s.addrLandmark,
+            hint: s.addrLandmarkHint,
+            icon: Icons.signpost_outlined,
+            controller: _landmark),
         const SizedBox(height: 16),
         Row(children: [
           Expanded(child: AppField(label: s.addrCommune, hint: s.addrCommuneHint, controller: _commune)),
           const SizedBox(width: 12),
           Expanded(child: AppField(label: s.addrCity, hint: s.addrCityHint, controller: _city, error: _cityErr)),
         ]),
+        if (hasCommune) ...[
+          const SizedBox(height: 10),
+          Row(key: const ValueKey('address-zone'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(zone != null ? Icons.local_shipping_outlined : Icons.info_outline_rounded,
+                size: 18, color: zone != null ? AppColors.success : const Color(0xFFB45309)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                zone != null ? s.addrZoneOk(zone.deliveryFeeUsd == 0 ? s.free : money(zone.deliveryFeeUsd)) : s.addrZoneNone,
+                style: TextStyle(fontSize: 12.5, height: 1.35, color: zone != null ? AppColors.success : const Color(0xFFB45309), fontWeight: FontWeight.w600),
+              ),
+            ),
+          ]),
+        ],
         const SizedBox(height: 16),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,

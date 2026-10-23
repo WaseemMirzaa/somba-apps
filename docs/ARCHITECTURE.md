@@ -7,6 +7,13 @@
 | **Source of truth** | Branch `claude/somba-api-analysis-4rg0y7`, October 2026. The entity field tables (section 4) and the WebSocket event list (section 7) are **generated from the source code**, not written by hand. |
 | **Status legend** | ✅ implemented and tested · 🟡 partial (works, but incomplete or not production-grade) · ❌ missing · 🧪 mock/demo only |
 
+> **Update, 23 October 2026.** These gaps are closed; the sections below are corrected where they were affected:
+> - **Push end to end.** Every push carries `type`, `entityId`, `notificationId` and `link`, so taps open the right screen in both apps and on the web. The apps read Firebase settings from `--dart-define` or the native files. The seller, admin and warehouse portals get web push, a bell and desktop alerts. Pushes respect the user's push setting, and `devices:test` sends a test. See [MOBILE-PUSH.md](MOBILE-PUSH.md).
+> - **Riders are told about new deliveries.** The notice goes to the riders of the warehouse that serves the zone; zones, riders and staff are tied to warehouses. See [WAREHOUSE-ZONES.md](WAREHOUSE-ZONES.md).
+> - **Sellers are told about returns, disputes, replacements and exchanges on their items**, and can see them. Hub receiving notifies the customer and seller views.
+> - **pawaPay adapter (v2).** Collections, refunds back to the phone and mobile-money payouts, with signed callbacks always confirmed by a status check. Payouts are one step (`approved` removed). Refund notices show the amount actually refunded. See [PAYMENTS-PAWAPAY.md](PAYMENTS-PAWAPAY.md).
+> - **Campaigns** start and end on their dates (a sweeper) and sellers can edit or withdraw them. Replacement and exchange steps are checked on the server. Products no longer have an `approved` status.
+
 ---
 
 ## Contents
@@ -37,7 +44,7 @@ Somba&Teka is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a 
 | Database tables (TypeORM entities) | **33** |
 | Columns across all tables | **335** |
 | Real database foreign keys | **1** (`order_items.orderId → orders.id`); every other relation is a logical reference by id |
-| WebSocket request→ack events | **115** in 33 domains |
+| WebSocket request→ack events | **146** (115 when this was generated; the October 2026 additions are listed at the end of section 7.2) |
 | Server-pushed (live) events | **40** |
 | REST endpoints | **14** (11 auth, 1 upload, 1 payment webhook, health) |
 | Backend roles | **10** (customer, seller, rider, warehouse_staff, admin + 5 admin sub-roles) |
@@ -828,7 +835,9 @@ _Source: `api/src/database/entities/user.entity.ts`_
 | `emailVerified` | boolean |  | false |  |  |
 | `phoneVerified` | boolean |  | false |  |  |
 | `avatar` | varchar(255) | yes |  |  | Public URL of the profile picture (from POST /api/v1/uploads). |
-| `prefs` | text | yes |  |  | JSON: { push, email, sms, personalize, market } — see UsersService.prefs. |
+| `prefs` | text | yes |  |  | JSON: { push, email, sms, personalize, market } — see UsersService.prefs. `push: false` stops every push to the user's devices (notices still arrive in-app). |
+| `hubId` | varchar | yes |  | yes | Riders and warehouse staff: home warehouse (null = every warehouse). See WAREHOUSE-ZONES.md. |
+| `preferredZones` | text | yes |  |  | Riders: JSON list of zone ids shown first in their queue. |
 | `walletBalance` | float |  | 0 |  | Wallet store-credit balance in USD. |
 | `active` | boolean |  | true |  | Rider/warehouse availability toggle. |
 | `tokenVersion` | int |  | 0 |  | Bumped to invalidate all previously issued tokens ("log out everywhere"). Access/refresh tokens carry the version they were minted at; a mismatch is rejected on refresh and on socket connect. |
@@ -1109,13 +1118,17 @@ _Source: `api/src/database/entities/payment.entity.ts`_
 | `orderId` | varchar | yes |  | yes | null for wallet top-ups, which have no order. |
 | `orderReference` | varchar | yes |  |  |  |
 | `purpose` | varchar(10) |  | order |  | Values: order, topup; What the money is for: an order, or a wallet top-up. |
-| `providerRef` | varchar(100) | yes |  |  | The mobile-money aggregator's own transaction id (for reconciliation). |
+| `providerRef` | varchar(100) | yes |  |  | The mobile-money aggregator's id for the charge (pawaPay `depositId`). |
 | `phone` | text | yes |  |  | **AES-256-GCM encrypted at rest**; Subscriber number that approves the charge. Encrypted at rest. |
 | `userId` | varchar |  |  | yes |  |
 | `method` | varchar(20) |  |  |  |  |
 | `amountUsd` | float |  |  |  |  |
 | `status` | varchar(20) |  | pending |  | Values: pending, succeeded, failed, refunded |
 | `failureReason` | varchar | yes |  |  |  |
+| `refundTo` | varchar(10) | yes |  |  | Values: wallet, phone — where a refund went. |
+| `refundRef` | varchar(100) | yes |  | yes | pawaPay `refundId` of a phone refund. |
+| `refundStatus` | varchar(20) | yes |  |  | Values: sending, completed, failed (failed → credited to the wallet). |
+| `refundedUsd` | float | yes |  |  | What was actually paid back. |
 | `createdAt` | datetime |  |  |  | Set on insert |
 | `updatedAt` | datetime |  |  |  | Set on every update |
 
@@ -1143,8 +1156,10 @@ _Source: `api/src/database/entities/payout.entity.ts`_
 | `sellerName` | varchar |  |  |  |  |
 | `amountUsd` | float |  |  |  |  |
 | `method` | varchar(20) |  | bank |  |  |
-| `status` | varchar(20) |  | requested | yes | Values: requested, approved, rejected, paid |
+| `status` | varchar(20) |  | requested | yes | Values: requested, sending (pawaPay transfer on its way), rejected, paid |
 | `note` | varchar | yes |  |  |  |
+| `providerRef` | varchar(100) | yes |  | yes | Transfer reference entered by finance, or the pawaPay `payoutId`. |
+| `receiptRef` | varchar(100) | yes |  |  | Network receipt of a pawaPay payout. |
 | `createdAt` | datetime |  |  |  | Set on insert |
 | `updatedAt` | datetime |  |  |  | Set on every update |
 
@@ -1170,7 +1185,8 @@ _Source: `api/src/database/entities/delivery-task.entity.ts`_
 | `riderId` | varchar | yes |  | yes |  |
 | `status` | varchar(20) |  | unassigned |  | Values: unassigned, assigned, picked_up, in_transit, delivered, failed |
 | `address` | text | yes |  |  | **AES-256-GCM encrypted at rest**; Encrypted at rest — delivery address text. |
-| `zoneId` | varchar | yes |  |  |  |
+| `zoneId` | varchar | yes |  |  | Taken from the shipping address's commune when the order sent none. |
+| `hubId` | varchar | yes |  | yes | The warehouse whose riders deliver it (from the zone's warehouse). |
 | `codAmountUsd` | float |  | 0 |  | COD amount to collect (USD); 0 for prepaid. |
 | `lat` | float | yes |  |  | Live rider position, updated over the socket. |
 | `lng` | float | yes |  |  |  |
@@ -1266,6 +1282,7 @@ _Source: `api/src/database/entities/exchange.entity.ts`_
 | `orderId` | varchar |  |  | yes |  |
 | `orderReference` | varchar |  |  |  |  |
 | `customerId` | varchar | yes |  | yes |  |
+| `sellerId` | varchar | yes |  | yes | The seller whose item is exchanged (they see and are notified about it). |
 | `customerName` | varchar |  |  |  |  |
 | `fromSku` | varchar |  |  |  |  |
 | `fromName` | varchar |  |  |  |  |
@@ -1428,7 +1445,7 @@ stateDiagram-v2
 | Seller (`sellers.status`) | `pending` → `approved` / `rejected`; `approved` ↔ `suspended` | Admin (`sellers:setStatus`); suspension revokes the owner's sessions. Only `approved` stores may list products |
 | Product (`products.status`) | `draft`, `pending`, `approved`, `rejected`, `live`, `removed` | New listings go **straight to `live`** ⚠ (no review queue); delete = `removed`; only admins change status |
 | Dispute / return (`disputes.status`) | `open` → `resolved` (optional refund) / `rejected` | 🔒 atomic; one open request per order; only paid, non-cancelled orders |
-| Payout (`payouts.status`) | `requested` → `paid` / `rejected` (`approved` exists in the enum but is unused) | 🔒 atomic; `paid` = credited to the seller's **in-app wallet** ⚠ |
+| Payout (`payouts.status`) | `requested` → `paid` / `rejected`, one step; `requested` → `sending` → `paid` (or back to `requested`) through pawaPay | 🔒 atomic; wallet payouts credit the in-app wallet, others need a transfer reference or a pawaPay receipt |
 | Exchange | `requested` → `approved` → `received` → `ready` → `dispatched`, or `rejected` | ⚠ not enforced (ops can set any) |
 | Replacement | `requested` → `approved` → `received` → `allocated` → `dispatched`, or `rejected`; `dispatchStatus` follows | ⚠ not enforced |
 | Warehouse exception | `open` → `investigating` → `resolved` / `escalated` | ⚠ not enforced |
@@ -1542,7 +1559,7 @@ sequenceDiagram
   end
 ```
 
-Status: lifecycle, webhook, idempotency, expiry and late-success handling are implemented and tested with the **sandbox** provider (`MM_PROVIDER=sandbox`, development only). **Missing: the adapter for the real aggregator** (contract + credentials needed). Production default `MM_PROVIDER=none` refuses mobile money.
+Status: lifecycle, webhook, idempotency, expiry and late-success handling are implemented and tested with the **sandbox** provider (`MM_PROVIDER=sandbox`, development only). The **pawaPay adapter** (`MM_PROVIDER=pawapay`) is built and unit-tested: deposits, callbacks verified by signature and always confirmed by a status check, missed callbacks caught up, refunds to the phone. It needs the pawaPay token to go live (see PAYMENTS-PAWAPAY.md). Production default `MM_PROVIDER=none` refuses mobile money.
 
 ### F6. Wallet top-up 🟡
 
@@ -1584,7 +1601,7 @@ sequenceDiagram
   API-->>C: order:updated (delivered) + notification
 ```
 
-Missing for a professional operation: **seller fulfilment step** (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), **inbound / receiving / sorting** at the hub (pages exist, not modelled), **proof of delivery** (customer OTP, photo, signature — the web has a `pod` page, mock), **failed-delivery handling** (reason codes, re-attempt scheduling, return to hub, customer contact), **delivery slots**, **zone/shift assignment for riders**, **route optimisation**, **rider cash hand-over ledger** (reconcile exists as a read-only aggregate), **multi-seller orders split into parcels**.
+Missing for a professional operation: **seller fulfilment step** (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), **inbound / receiving / sorting** at the hub (pages exist, not modelled), **proof of delivery** (customer OTP, photo, signature — the web has a `pod` page, mock), **failed-delivery handling** (reason codes, re-attempt scheduling, return to hub, customer contact), **delivery slots**, **shift assignment for riders** (zones and warehouses are assigned: WAREHOUSE-ZONES.md), **route optimisation**, **rider cash hand-over ledger** (reconcile exists as a read-only aggregate), **multi-seller orders split into parcels**.
 
 ### F9. Cash on delivery ✅ (disabled)
 
@@ -1638,7 +1655,7 @@ Customer `exchanges:create` / `replacements:create` against an order → ops pro
 
 ### F16. Notifications ✅ / 🟡
 
-`NotificationsService.toUser / toRole / toAdmins` → row in `notifications` + live `notification:new` → `PushService` sends FCM to the user's `device_tokens` (if Firebase is configured; invalid tokens pruned). Clients: `notifications:list`, `markRead`, `markAllRead`, `devices:register/unregister`. Email/SMS only for verification and reset. The Flutter apps do **not yet include** `firebase_messaging` (push needs the client's Firebase project files). Missing: transactional email/SMS for order milestones, per-category preference enforcement, templates in EN/FR, quiet hours, push deep-link handling in the apps.
+`NotificationsService.toUser / toUsers / toRole / toAdmins` → row in `notifications` + live `notification:new` (with `link`, the page it opens) → `PushService` sends FCM with `{type, entityId, notificationId, link}`, the Android channel `somba_default` and the iOS default sound (if Firebase is configured; invalid tokens pruned). A user with `prefs.push = false` gets no push. Role notices go to that role's **web** devices; phones only get marketing and rider-task pushes. Clients: `notifications:list` (with `link`), `markRead`, `markAllRead`, `devices:register/unregister`, `devices:test`. Both apps open the right screen from a tap (also for a tap that launched the app), and the portals have a bell, desktop alerts and web push. See MOBILE-PUSH.md. Email/SMS only for verification and reset. Missing: transactional email/SMS for order milestones, per-category preference enforcement, push texts in the user's language, quiet hours.
 
 ### F17. Administration and moderation ✅ / 🟡
 
@@ -1660,7 +1677,7 @@ Customers (`customers:list`, `setActive` → kick + revoke), sellers (`sellers:l
 
 See section 2.4 (14 endpoints). All REST errors use NestJS's `{ statusCode, message, error }`.
 
-### 7.2 WebSocket request → ack events (115)
+### 7.2 WebSocket request → ack events (146)
 
 Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, data }` or `{ ok: false, error: "<readable message>" }`. "Public" means guests (no token) may call it. Generated from `api/src/realtime/realtime.gateway.ts`.
 
@@ -1726,7 +1743,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `payouts:list` | Signed-in | `—` | Seller: own; finance: all |
 | `payouts:available` | seller | `—` | Delivered sales older than PAYOUT_CLEARANCE_HOURS minus commission and committed payouts |
 | `payouts:request` | seller | `{ amountUsd: number; method?: string }` | Minimum $10; ≤ available |
-| `payouts:approve` | admin, admin_finance | `{ payoutId: string }` | Atomic requested→paid |
+| `payouts:approve` | admin, admin_finance | `{ payoutId: string; providerRef?: string }` | Atomic requested→paid ("paid by hand"; bank / mobile-money need the transfer reference) |
+| `payouts:send` | admin, admin_finance | `{ payoutId: string }` | Mobile-money payout through pawaPay: requested→sending, then paid (receipt) or back to requested |
 | `payouts:reject` | admin, admin_finance | `{ payoutId: string; note?: string }` |  |
 
 #### `disputes:*`
@@ -1947,6 +1965,26 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `devices:unregister` | Signed-in | `{ token: string }` |  |
 
 
+#### Added in October 2026 (push, warehouses, pawaPay)
+
+| Event | Who may call | Payload | Behaviour / rules |
+|---|---|---|---|
+| `devices:test` | Signed-in | `—` | Saves a "Test notification" for the caller and pushes it; answers `{ pushEnabled, devices }` |
+| `roles:setHub` | admin, admin_operations | `{ userId; hubId: string \| null; preferredZones?: string[] }` | Rider / warehouse staff home warehouse (and a rider's preferred zones, among that warehouse's zones); disconnects the user so they rejoin the right rooms |
+| `rider:assignment` | rider | `—` | `{ hub, preferredZones, hubZones }` |
+| `campaigns:withdraw` | Owning seller | `{ id }` | Ends a campaign that has not ended yet; prices go back to normal |
+| `payouts:send` | admin, admin_finance | `{ payoutId }` | See `payouts:*` |
+| `payments:provider` | admin, admin_finance | `—` | `{ provider, phoneRefunds, pawapayPayouts }` for the finance screens |
+
+Changed:
+
+* `orders:refund {toWallet:false}` refunds a pawaPay mobile-money payment back to the phone.
+* `delivery:list`, `delivery:unassigned`, `warehouse:riders` and `warehouse:buildBatch` are limited to the caller's warehouse (admins may pass `hubId`); `delivery:accept` refuses another warehouse's task.
+* `replacements:list` and `exchanges:list` include a seller's own items.
+* `notifications:list` rows carry `link`.
+
+REST: `POST /api/v1/payments/webhook/pawapay` (pawaPay callbacks for deposits, refunds and payouts).
+
 ### 7.3 Server-pushed events (40)
 
 | Event | Produced by | Delivered to |
@@ -2019,7 +2057,7 @@ flowchart TB
 | No guest checkout | Account mandatory (client decision); browsing works signed-out over the guest socket |
 | Tests | 3 widget tests; 15 live-API tests (`test/live_api_test.dart`) covering register → delete account |
 
-Gaps: push notifications (no `firebase_messaging`), deep links / push-tap navigation, secure token storage, offline cache, image caching of catalogue lists beyond `cached_network_image`, crash reporting, analytics, forced-update check, accessibility review, iOS build configuration, real-device testing.
+Push notifications and push-tap navigation are done (MOBILE-PUSH.md). Gaps: secure token storage, offline cache, image caching of catalogue lists beyond `cached_network_image`, crash reporting, analytics, forced-update check, accessibility review, iOS build configuration, real-device testing.
 
 ### 8.2 Rider app — Flutter (`rider-app/`)
 
@@ -2031,7 +2069,7 @@ Gaps: push notifications (no `firebase_messaging`), deep links / push-tap naviga
 | Permissions | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` (Android) |
 | Tests | 3 widget tests; live-API test (sign in → claim → picked up → in transit → GPS reaches customer → delivered → earnings → forward-only rule) |
 
-Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the `users.active` "availability" comment exists but no rider UI), batches view, cash hand-over, push notifications for new tasks.
+Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the `users.active` "availability" comment exists but no rider UI), batches view, cash hand-over. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)
 
 ### 8.3 Web — Next.js 16 / React 19 (`web/`)
 
@@ -2084,7 +2122,8 @@ The **demo persona picker** on `/login` is shown unless `NEXT_PUBLIC_DEMO_MODE=f
 | `DB_MIGRATIONS_RUN` | — | Run migrations at boot |
 | `UPLOAD_DIR`, `UPLOAD_MAX_BYTES`, `PUBLIC_API_URL` | ./uploads, 5 MB | Uploads |
 | `WEB_URL` | | Links in emails |
-| `MM_PROVIDER` | none | `none` / `sandbox` (dev only) / aggregator adapter |
+| `MM_PROVIDER` | none | `none` / `sandbox` (dev only) / `manual` / `pawapay` |
+| `PAWAPAY_API_TOKEN`, `PAWAPAY_BASE_URL`, `PAWAPAY_CURRENCY`, `PAWAPAY_FX_RATE`, `PAWAPAY_VERIFY_SIGNATURES` | — | pawaPay adapter, see PAYMENTS-PAWAPAY.md |
 | `MM_WEBHOOK_SECRET` | | Webhook HMAC secret |
 | `MM_PENDING_TTL_MIN` | 15 | Mobile-money approval window |
 | `MM_SANDBOX_AUTOCONFIRM_MS` | | Sandbox auto-approve delay |

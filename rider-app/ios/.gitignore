@@ -32,3 +32,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Firebase config is per environment (or use the FIREBASE_* --dart-define values).
+Runner/GoogleService-Info.plist

@@ -43,6 +43,11 @@ export class DeliveryTask {
   @Column({ type: 'varchar', nullable: true })
   zoneId: string | null;
 
+  /** The warehouse whose riders deliver this task (from the zone's warehouse; null = any rider). */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  hubId: string | null;
+
   /** COD amount to collect (USD); 0 for prepaid. */
   @Column({ type: 'float', default: 0 })
   codAmountUsd: number;

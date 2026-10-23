@@ -155,6 +155,14 @@ void main() {
           ('Commande enregistrée', 'Nous avons reçu SOM-1042. Vous recevrez les mises à jour ici en temps réel.'));
       expect(localizeNotification(fr, 'Order update', 'SOM-1 is now out for delivery.').$2, 'SOM-1 est maintenant en cours de livraison.');
       expect(localizeNotification(fr, 'Promo of the week', 'Free delivery!'), ('Promo of the week', 'Free delivery!'));
+      expect(localizeNotification(fr, 'Order cancelled', r'SOM-2 was cancelled. $12.5 was refunded to your wallet.').$2,
+          r'SOM-2 a été annulée. 12.5 $ ont été remboursés sur votre portefeuille.');
+      expect(localizeNotification(fr, 'Refund sent', r'$20.00 for SOM-3 was sent to your mobile-money number.'),
+          ('Remboursement envoyé', r'20.00 $ pour SOM-3 ont été envoyés sur votre numéro mobile money.'));
+      expect(localizeNotification(fr, 'Refund issued', r'$20.00 for SOM-3 is on its way back to your mobile-money number.').$2,
+          r'20.00 $ pour SOM-3 reviennent sur votre numéro mobile money.');
+      expect(localizeNotification(fr, 'Parcel at our warehouse', 'SOM-5 reached the Somba&Teka warehouse and will be on its way soon.'),
+          ('Colis à notre entrepôt', 'SOM-5 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'));
       expect(localizeNotification(const Strings('en'), 'Order placed', 'x'), ('Order placed', 'x'));
       expect(localizeWalletDescription(fr, 'Wallet top-up via airtel_money'), 'Recharge du portefeuille via Airtel Money');
       expect(localizeWalletDescription(fr, 'Refund for SOM-9'), 'Remboursement de SOM-9');

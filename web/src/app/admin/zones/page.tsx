@@ -7,14 +7,14 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { NoticeBar } from "@/components/admin/notice-bar";
-import { MapPin, Package, Layers, Plus } from "lucide-react";
+import { MapPin, Package, Layers, Plus, Warehouse } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { errMsg, type ZoneSetting } from "@/lib/admin-live";
+import { errMsg, useServerList, type ZoneSetting } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSocketQuery, type WarehouseStats } from "@/lib/admin-stats";
+import { useSocketQuery, type HubRow, type WarehouseStats } from "@/lib/admin-stats";
 import { SectionError } from "@/components/admin/query-state";
 
 function slug(s: string): string {
@@ -50,10 +50,12 @@ export default function AdminZonesPage() {
   const [saving, setSaving] = useState(false);
   const [city, setCity] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", nameFr: "", city: "Kinshasa", fee: "3" });
+  const [form, setForm] = useState({ name: "", nameFr: "", city: "Kinshasa", fee: "3", hubId: "" });
   const [feeText, setFeeText] = useState<Record<string, string>>({});
   const wh = useSocketQuery<WarehouseStats>("analytics:warehouse");
   const parcelsByZone = useMemo(() => new Map((wh.data?.byZone ?? []).map((z) => [z.zoneId, z])), [wh.data]);
+  const hubs = useServerList<HubRow>("warehouse:hubs", { pushEvents: ["hub:updated"] });
+  const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +79,7 @@ export default function AdminZonesPage() {
   const filtered = city === "all" ? zones : zones.filter((z) => z.city === city);
   const dirty = JSON.stringify(zones) !== JSON.stringify(saved);
   const parcels30 = (wh.data?.byZone ?? []).reduce((sum, z) => sum + z.parcels, 0);
+  const unlinked = zones.filter((z) => !z.hubId).length;
 
   function addZone() {
     const name = form.name.trim();
@@ -94,8 +97,8 @@ export default function AdminZonesPage() {
       toast(fr ? "Frais invalides" : "Invalid fee", "error");
       return;
     }
-    setZones((z) => [...z, { id, name, nameFr: form.nameFr.trim() || undefined, city: form.city.trim() || "-", feeUsd: fee }]);
-    setForm({ name: "", nameFr: "", city: form.city, fee: "3" });
+    setZones((z) => [...z, { id, name, nameFr: form.nameFr.trim() || undefined, city: form.city.trim() || "-", feeUsd: fee, hubId: form.hubId || null }]);
+    setForm({ name: "", nameFr: "", city: form.city, fee: "3", hubId: form.hubId });
     setShowAdd(false);
   }
 
@@ -117,6 +120,10 @@ export default function AdminZonesPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function setHub(id: string, hubId: string) {
+    setZones((zs) => zs.map((z) => (z.id === id ? { ...z, hubId: hubId || null } : z)));
   }
 
   function setFee(id: string, value: string) {
@@ -156,18 +163,27 @@ export default function AdminZonesPage() {
       )}
       <NoticeBar>
         {fr
-          ? "Les frais par zone sont ceux facturés au paiement. Les colis par zone viennent des livraisons réelles des 30 derniers jours."
-          : "Zone fees are what shoppers are charged at checkout. Parcel counts per zone come from real deliveries over the last 30 days."}
+          ? "Les frais par zone sont ceux facturés au paiement. Chaque zone est livrée par un entrepôt : ses livreurs reçoivent les livraisons de la zone. Les colis par zone viennent des livraisons réelles des 30 derniers jours."
+          : "Zone fees are what shoppers are charged at checkout. Each zone is delivered by one warehouse, and that warehouse's riders get the zone's deliveries. Parcel counts per zone come from real deliveries over the last 30 days."}
       </NoticeBar>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      {loaded && unlinked > 0 && (
+        <NoticeBar tone="warn">
+          {fr
+            ? `${unlinked} zone(s) sans entrepôt : leurs livraisons sont proposées à tous les livreurs. Choisissez un entrepôt puis enregistrez.`
+            : `${unlinked} zone(s) have no warehouse, so their deliveries are offered to every rider. Pick a warehouse, then save.`}
+        </NoticeBar>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-4">
         <StatCard title={fr ? "Zones" : "Zones"} value={zones.length} icon={MapPin} />
+        <StatCard title={fr ? "Sans entrepôt" : "No warehouse"} value={unlinked} icon={Warehouse} />
         <StatCard title={fr ? "Villes" : "Cities"} value={cities.length} icon={Layers} />
         <StatCard title={fr ? "Colis (30 j)" : "Parcels (30 d)"} value={wh.data ? parcels30 : "…"} icon={Package} />
       </div>
 
       {showAdd && (
-        <div className="card-premium grid gap-3 p-5 sm:grid-cols-5">
+        <div className="card-premium grid gap-3 p-5 sm:grid-cols-6">
           <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Nom (ex. Ngaba)" : "Name (e.g. Ngaba)"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Nom FR (optionnel)" : "French name (optional)"} value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })} />
           <input className="input-premium px-4 py-2 text-sm" list="zone-cities" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
@@ -177,6 +193,12 @@ export default function AdminZonesPage() {
             ))}
           </datalist>
           <input className="input-premium px-4 py-2 text-sm" inputMode="decimal" placeholder={fr ? "Frais $" : "Fee $"} value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} />
+          <select className="input-premium px-3 py-2 text-sm" aria-label={fr ? "Entrepôt" : "Warehouse"} value={form.hubId} onChange={(e) => setForm({ ...form, hubId: e.target.value })}>
+            <option value="">{fr ? "Entrepôt…" : "Warehouse…"}</option>
+            {hubs.items.filter((h) => h.active).map((h) => (
+              <option key={h.id} value={h.id}>{h.name}</option>
+            ))}
+          </select>
           <Button size="sm" onClick={addZone}>{fr ? "Ajouter" : "Add"}</Button>
         </div>
       )}
@@ -208,6 +230,27 @@ export default function AdminZonesPage() {
                     onChange={(e) => setFee(String(row.id), e.target.value)}
                   />
                 ),
+              },
+              {
+                key: "hubId",
+                label: fr ? "Entrepôt" : "Warehouse",
+                render: (row) => {
+                  const current = (row as unknown as ZoneSetting).hubId ?? "";
+                  return (
+                    <select
+                      className="input-premium w-44 px-3 py-1 text-sm"
+                      aria-label={fr ? `Entrepôt de ${String(row.name)}` : `Warehouse for ${String(row.name)}`}
+                      value={current}
+                      onChange={(e) => setHub(String(row.id), e.target.value)}
+                    >
+                      <option value="">{fr ? "Aucun (tous les livreurs)" : "None (every rider)"}</option>
+                      {hubs.items.filter((h) => h.active || h.id === current).map((h) => (
+                        <option key={h.id} value={h.id}>{h.name}{h.active ? "" : fr ? " (désactivé)" : " (off)"}</option>
+                      ))}
+                      {current && !hubName.has(current) && hubs.items.length > 0 && <option value={current}>{fr ? "Entrepôt supprimé" : "Removed warehouse"}</option>}
+                    </select>
+                  );
+                },
               },
               {
                 key: "parcels",

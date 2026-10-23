@@ -19,7 +19,7 @@ import type {
 } from '../database/entities';
 import { num, oneOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 
@@ -38,6 +38,7 @@ export class WarehouseService {
     @InjectRepository(WarehouseException)
     private readonly exceptions: Repository<WarehouseException>,
     private readonly emitter: RealtimeEmitter,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
@@ -178,21 +179,39 @@ export class WarehouseService {
     taskIds: string[],
     rider: { id: string; name: string },
   ): Promise<WarehouseBatch> {
+    const assigned: string[] = [];
     for (const id of taskIds) {
       const task = await this.tasks.findOne({ where: { id } });
       if (!task || !['unassigned', 'assigned'].includes(task.status)) continue;
       task.riderId = rider.id;
       task.status = 'assigned';
       await this.tasks.save(task);
+      assigned.push(task.orderReference);
       const order = await this.orders.findOne({ where: { id: task.orderId } });
       if (order) {
         order.riderId = rider.id;
         order.status = 'processing';
         await this.orders.save(order);
         this.emitter.toUser(order.customerId, 'order:updated', order);
+        // Ops pages and (through the order fanout) the sellers on the order follow along.
+        this.emitter.toRoles(OPS_ROOMS, 'order:updated', order);
+        await this.notifications.toUser(order.customerId, {
+          title: 'Rider assigned',
+          body: `${rider.name} is handling ${order.reference}.`,
+          type: 'delivery',
+          entityId: order.id,
+        });
       }
       this.emitter.toUser(rider.id, 'delivery:updated', task);
       this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+    }
+    if (assigned.length) {
+      await this.notifications.toUser(rider.id, {
+        title: assigned.length === 1 ? 'New delivery assigned to you' : `${assigned.length} deliveries assigned to you`,
+        body: `${assigned.slice(0, 5).join(', ')}${assigned.length > 5 ? '…' : ''} — collect them at the warehouse.`,
+        type: 'task',
+        extra: { view: 'active' },
+      });
     }
     const batch = await this.batches.save(
       this.batches.create({

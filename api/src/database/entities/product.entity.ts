@@ -10,7 +10,6 @@ import {
 export type ProductStatus =
   | 'draft'
   | 'pending'
-  | 'approved'
   | 'rejected'
   | 'live'
   | 'removed';
@@ -54,6 +53,10 @@ export class Product {
 
   @Column({ type: 'int', default: 0 })
   stock: number;
+
+  /** Options a shopper picks before buying, as JSON text: [{ name, options[] }] (null = none). See common/variants. */
+  @Column({ type: 'text', nullable: true })
+  variants: string | null;
 
   @Column({ type: 'float', default: 0 })
   rating: number;

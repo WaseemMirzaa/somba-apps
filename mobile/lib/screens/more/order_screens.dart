@@ -6,9 +6,11 @@ import '../../services/models.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../util/delivery_estimate.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import '../payment_pending_screen.dart';
+import 'order_after_sale.dart';
 import 'returns_extra.dart';
 import 'support_extra.dart';
 
@@ -109,41 +111,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               DeliveryCodeCard(orderId: o.id, status: o.status),
               const SizedBox(height: 14),
               Panel(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.orderItems, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  const SizedBox(height: 12),
-                  ...o.items.map((i) {
-                    final p = productByUuid(i.productId);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: SizedBox(
-                            height: 60,
-                            width: 60,
-                            child: p != null
-                                ? ProductImage(product: p, iconSize: 26)
-                                : Container(color: AppColors.background, child: const Icon(Icons.shopping_bag_outlined, color: AppColors.faint)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(i.productName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                          const SizedBox(height: 2),
-                          Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                        ])),
-                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          Text(money(i.priceUsd * i.qty), style: const TextStyle(fontWeight: FontWeight.w800)),
-                          if (i.listPriceUsd > i.priceUsd)
-                            Text(money(i.listPriceUsd * i.qty),
-                                style: const TextStyle(fontSize: 11.5, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
-                        ]),
-                      ]),
-                    );
-                  }),
-                ]),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: _itemsSection(s, o)),
               ),
               const SizedBox(height: 14),
               Panel(
@@ -158,12 +126,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   const SizedBox(height: 8),
                   _row(s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd)),
+                  if (dayLabel(o.estimatedDeliveryDate, s.lang) != null) ...[
+                    const SizedBox(height: 6),
+                    _row(s.estimatedDelivery, dayLabel(o.estimatedDeliveryDate, s.lang)!, key: const ValueKey('order-estimate-row')),
+                  ],
                   if (o.discountUsd > 0) ...[
                     const SizedBox(height: 8),
                     _row(s.promoRow(o.promoCode ?? ''), '- ${money(o.discountUsd)}'),
                   ],
                   const Divider(height: 22),
                   _row(s.total, money(o.totalUsd), bold: true),
+                  if (o.refundedUsd > 0) ...[
+                    const SizedBox(height: 8),
+                    _row(s.orderRefunded, money(o.refundedUsd), valueColor: AppColors.success, key: const ValueKey('order-refunded-row')),
+                  ],
                   const SizedBox(height: 12),
                   Row(children: [
                     Icon(
@@ -209,6 +185,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 ),
               ]),
+              if (o.status == 'delivered') ...[
+                const SizedBox(height: 10),
+                // Stacked full width: "Replace or exchange" does not fit half a phone row (and must survive large text).
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    key: const ValueKey('buy-again'),
+                    onPressed: () => buyAgain(context, o, widget.locale),
+                    icon: const Icon(Icons.replay_rounded, size: 18),
+                    label: Text(s.buyAgain),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('item-issue'),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemIssueScreen(order: o))),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                    label: Text(s.issueOpen),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ReviewPromptCard(order: o, locale: widget.locale),
+              ],
+              if (o.status != 'pending') ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  key: const ValueKey('order-receipt'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderReceiptScreen(order: o))),
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  label: Text(s.receiptTitle),
+                ),
+              ],
             ],
           ),
         );
@@ -226,11 +236,153 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     };
   }
 
-  Widget _row(String l, String v, {bool bold = false}) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(l, style: TextStyle(fontSize: bold ? 15 : 13.5, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, color: bold ? AppColors.ink : AppColors.muted)),
-        Text(v, style: TextStyle(fontSize: bold ? 17 : 13.5, fontWeight: FontWeight.w800, color: bold ? AppColors.primary : AppColors.ink)),
+  Widget _row(String l, String v, {bool bold = false, Color? valueColor, Key? key}) => Row(key: key, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Flexible(child: Text(l, style: TextStyle(fontSize: bold ? 15 : 13.5, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, color: bold ? AppColors.ink : AppColors.muted))),
+        const SizedBox(width: 8),
+        Text(v, style: TextStyle(fontSize: bold ? 17 : 13.5, fontWeight: FontWeight.w800, color: valueColor ?? (bold ? AppColors.primary : AppColors.ink))),
       ]);
+
+  /// The "Items" card content. One seller and nothing cancelled: the plain list with a single
+  /// "Sold by" line. Otherwise one block per seller package, each with its own progress badge.
+  List<Widget> _itemsSection(Strings s, OrderDto o) {
+    final packages = packagesOf(o);
+    final grouped = packages.length > 1 || o.cancelledLineCount > 0;
+    final title = Text(s.orderItems, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15));
+    if (!grouped) {
+      final seller = packages.isEmpty ? null : packages.first.sellerName;
+      return [
+        title,
+        if ((seller ?? '').isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(s.soldBy(seller), key: const ValueKey('order-sold-by'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ],
+        const SizedBox(height: 12),
+        ...o.items.map((i) => _line(s, i)),
+      ];
+    }
+    return [
+      title,
+      const SizedBox(height: 12),
+      for (var n = 0; n < packages.length; n++) ...[
+        if (n > 0) const Divider(height: 20),
+        _packageBlock(s, packages[n], n + 1, packages.length),
+      ],
+    ];
+  }
+
+  Widget _packageBlock(Strings s, OrderPackage pkg, int n, int total) {
+    final seller = pkg.sellerName ?? '';
+    final c = packageStatusColor(pkg.status);
+    return Column(
+      key: ValueKey('order-package-$n'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Text(
+              seller.isEmpty ? s.orderPackageOfPlain(n, total) : s.orderPackageOf(n, total, seller),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.inkSoft),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              key: ValueKey('package-status-$n'),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
+              child: Text(packageStatusLabel(s, pkg.status),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        ...pkg.items.map((i) => _line(s, i)),
+      ],
+    );
+  }
+
+  Widget _line(Strings s, OrderItemDto i) {
+    final p = productByUuid(i.productId);
+    final cancelled = i.isCancelled;
+    final strike = cancelled ? TextDecoration.lineThrough : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(crossAxisAlignment: cancelled ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
+        Opacity(
+          opacity: cancelled ? 0.5 : 1,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 60,
+              width: 60,
+              child: p != null
+                  ? ProductImage(product: p, iconSize: 26)
+                  : Container(color: AppColors.background, child: const Icon(Icons.shopping_bag_outlined, color: AppColors.faint)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(i.productName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, decoration: strike, color: cancelled ? AppColors.muted : AppColors.ink)),
+          const SizedBox(height: 2),
+          if (i.variant.isNotEmpty && i.variant != 'Default')
+            Text(i.variant,
+                key: ValueKey('order-line-variant-${i.productId}'),
+                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          if (cancelled) ...[
+            const SizedBox(height: 4),
+            Text(
+              (i.cancelReason ?? '').trim().isEmpty ? s.lineCancelledPlain : s.lineCancelledReason(i.cancelReason!.trim()),
+              key: ValueKey('cancel-reason-${i.productId}'),
+              style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            if (i.refundedUsd > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(s.lineRefundedWallet(money(i.refundedUsd)),
+                    key: ValueKey('line-refund-${i.productId}'),
+                    style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+          ],
+        ])),
+        const SizedBox(width: 8),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(money(i.priceUsd * i.qty),
+              style: TextStyle(fontWeight: FontWeight.w800, decoration: strike, color: cancelled ? AppColors.muted : AppColors.ink)),
+          if (!cancelled && i.listPriceUsd > i.priceUsd)
+            Text(money(i.listPriceUsd * i.qty), style: const TextStyle(fontSize: 11.5, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
+        ]),
+      ]),
+    );
+  }
 }
+
+/// Badge text for one seller package.
+String packageStatusLabel(Strings s, String status) => switch (status) {
+      'pending' => s.pkgStatusPending,
+      'to_pack' => s.pkgStatusToPack,
+      'ready' => s.pkgStatusReady,
+      'at_hub' => s.pkgStatusAtHub,
+      'shipped' || 'out_for_delivery' => s.pkgStatusOnWay,
+      'delivered' => s.pkgStatusDelivered,
+      'returned' => s.pkgStatusReturned,
+      'cancelled' => s.pkgStatusCancelled,
+      _ => status,
+    };
+
+Color packageStatusColor(String status) => switch (status) {
+      'delivered' => AppColors.success,
+      'cancelled' || 'returned' => AppColors.danger,
+      'ready' || 'at_hub' || 'shipped' || 'out_for_delivery' => AppColors.primary,
+      _ => AppColors.amber,
+    };
 
 /// Tracking — the timeline follows the order status and the rider's position is
 /// the one the rider app streams (`delivery:location`). Nothing is simulated.
@@ -275,13 +427,20 @@ class OrderTrackingScreen extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(
-                      loc != null ? s.trackOnway : (o.status == 'out_for_delivery' ? s.trackHeading : s.trackNotYet),
+                      o.status == 'delivered'
+                          ? s.trackDone
+                          : loc != null
+                              ? s.trackOnway
+                              : (o.status == 'out_for_delivery' ? s.trackHeading : s.trackNotYet),
+                      key: const ValueKey('track-headline'),
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
                     ),
                     Text(
-                      loc != null
-                          ? s.trackLivePos(loc.lat.toStringAsFixed(4), loc.lng.toStringAsFixed(4))
-                          : s.trackLiveHint,
+                      o.status == 'delivered'
+                          ? s.trackDoneHint
+                          : loc != null
+                              ? s.trackLivePos(loc.lat.toStringAsFixed(4), loc.lng.toStringAsFixed(4))
+                              : s.trackLiveHint,
                       style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
                     ),
                   ]),
@@ -289,10 +448,31 @@ class OrderTrackingScreen extends StatelessWidget {
               ]),
             ),
             DeliveryCodeCard(orderId: o.id, status: o.status),
+            if (o.rider != null && o.rider!.dialNumber.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Panel(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(s.trackYourRider, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                  const SizedBox(height: 2),
+                  Text(o.rider!.name, key: const ValueKey('rider-name'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const ValueKey('call-rider'),
+                    onPressed: () => callRider(context, o.rider!),
+                    icon: const Icon(Icons.call_rounded, size: 18),
+                    label: Text(s.trackCallRider(o.rider!.name)),
+                  ),
+                ]),
+              ),
+            ],
             if (loc != null) ...[
               const SizedBox(height: 14),
               Panel(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (riderMapAvailable) ...[
+                    RiderMap(rider: (lat: loc.lat, lng: loc.lng), destination: o.destination),
+                    const SizedBox(height: 10),
+                  ],
                   Text(s.trackRiderPos(loc.lat.toStringAsFixed(5), loc.lng.toStringAsFixed(5)),
                       key: const ValueKey('rider-coords'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   const SizedBox(height: 10),
@@ -311,6 +491,18 @@ class OrderTrackingScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Opens the phone's dialler on the rider's number.
+Future<void> callRider(BuildContext context, RiderContact rider) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final failed = Strings.of(context).trackCallFail;
+  try {
+    final ok = await launchUrl(Uri(scheme: 'tel', path: rider.dialNumber));
+    if (!ok) messenger.showSnackBar(SnackBar(content: Text(failed)));
+  } catch (_) {
+    messenger.showSnackBar(SnackBar(content: Text(failed)));
   }
 }
 

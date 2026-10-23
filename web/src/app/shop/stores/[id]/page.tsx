@@ -10,6 +10,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Product, Seller } from "@/lib/realtime/types";
+import { StoreHeader } from "@/components/shop/store-header";
 
 type Storefront = { seller: Seller & { pickupAddress?: string | null }; products: Product[] };
 
@@ -74,11 +75,9 @@ export default function ShopStoreDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-6 rounded-2xl border border-blue-100 bg-white p-6">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-700">
-          {seller.name[0]}
-        </div>
-        <div>
+      <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white">
+        <StoreHeader name={seller.name} logoUrl={seller.logoUrl} bannerUrl={seller.bannerUrl} />
+        <div className="px-6 pb-6 pt-3">
           <h1 className="text-2xl font-bold">{seller.name}</h1>
           <p className="text-slate-500">
             {seller.rating > 0 ? `⭐ ${seller.rating} · ` : ""}
@@ -89,6 +88,7 @@ export default function ShopStoreDetailPage() {
               {fr ? `Vendeur ${badge.fr}` : `${badge.en} Seller`}
             </span>
           )}
+          {seller.description && <p className="mt-3 max-w-3xl whitespace-pre-line text-sm text-slate-700">{seller.description}</p>}
         </div>
       </div>
 

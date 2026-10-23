@@ -67,7 +67,7 @@ export default function SellerPayoutsPage() {
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex flex-col gap-1">
             <Link href={`/seller/finance/payouts/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">
-              {fr ? "Voir détail" : "View breakdown"}
+              {fr ? "Voir le relevé" : "View statement"}
             </Link>
           </div>
         )},

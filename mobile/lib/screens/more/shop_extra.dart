@@ -83,9 +83,24 @@ class _StoreScreenState extends State<StoreScreen> {
 
   Widget _header(BuildContext context, Strings s, int count, double rating, String badge) {
     final top = MediaQuery.of(context).padding.top;
-    return Container(
+    final banner = _seller?['bannerUrl'] as String?;
+    final logo = _seller?['logoUrl'] as String?;
+    final description = (_seller?['description'] as String?)?.trim() ?? '';
+    final header = Container(
       padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
-      decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
+      decoration: BoxDecoration(
+        gradient: banner == null ? AppColors.brandGradient : null,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        image: banner == null
+            ? null
+            : DecorationImage(
+                image: NetworkImage(banner),
+                fit: BoxFit.cover,
+                // Keeps the white text readable on any banner.
+                colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.38), BlendMode.darken),
+                onError: (_, __) {},
+              ),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleIconButton(icon: Icons.arrow_back_rounded, background: Colors.white.withValues(alpha: 0.2), color: Colors.white, onTap: () => Navigator.maybePop(context)),
@@ -96,7 +111,14 @@ class _StoreScreenState extends State<StoreScreen> {
               height: 62,
               width: 62,
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-              child: Center(child: Text(_initials(s), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')))),
+              clipBehavior: Clip.antiAlias,
+              child: logo == null
+                  ? Center(child: Text(_initials(s), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22, fontFamily: 'PlusJakartaSans')))
+                  : Image.network(logo,
+                      key: const ValueKey('store-logo'),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(
+                          child: Text(_initials(s), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 22))))),
           const SizedBox(width: 14),
           Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -126,6 +148,14 @@ class _StoreScreenState extends State<StoreScreen> {
         ),
       ]),
     );
+    if (description.isEmpty) return header;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      header,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Text(description, key: const ValueKey('store-description'), style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.45)),
+      ),
+    ]);
   }
 
   Widget _stat(String v, String l) => Expanded(

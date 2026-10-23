@@ -7,6 +7,15 @@
 | **Also covers** | Every broken or illogical flow found, with severity, a flowchart of where it breaks and the fix (section 11) |
 | **Source** | Read from the code on branch `claude/somba-api-analysis-4rg0y7`, October 2026. Companion to `docs/ARCHITECTURE.md` (data model, API and gap analysis) |
 
+> **Update, 23 October 2026: what changed for each user.**
+> - **Customers.** Push notifications work once the Firebase keys are set. Tapping one opens the order, its tracking, the wallet, the return or the ticket; the in-app list does the same. Refund notices say how much was refunded, and a refund can go back to the paying phone (pawaPay).
+> - **Riders** get a push for every new delivery from *their* warehouse. Tapping it opens *Available* (or *Active* once assigned). The queue lists their preferred zones first with zone names, and they cannot take another warehouse's delivery. Profile shows the home warehouse and zones.
+> - **Sellers** are told when a return, dispute, replacement or exchange concerns their items, at every step. They see replacements and exchanges (new *Exchanges* page), get a bell with desktop alerts and web push, and can edit a campaign that is not approved yet or withdraw one.
+> - **Warehouse staff** see their own warehouse's parcels, riders and batches; the bell and desktop alerts reach them too.
+> - **Admins** have a bell and a notifications page. They tie each zone, rider and employee to a warehouse (Zones, Staff and Roles pages; warehouse detail lists zones and riders). Finance can refund to the wallet or the phone and *Send with pawaPay* for mobile-money payouts. Payouts are one step (no "approved").
+>
+> Details: [MOBILE-PUSH.md](MOBILE-PUSH.md), [WAREHOUSE-ZONES.md](WAREHOUSE-ZONES.md), [PAYMENTS-PAWAPAY.md](PAYMENTS-PAWAPAY.md).
+
 ### How to read the flowcharts
 
 | Shape / mark | Meaning |
@@ -558,7 +567,7 @@ flowchart TD
 |---|---|---|
 | 1 | Product cards in **Search, Product list, Store page and Wishlist** cannot be opened and their **+** does nothing (only ♥ works) | Product detail is reachable only from Home, Deals and "You may also like" |
 | 2 | **Delete account** succeeds but the app stays on an empty shell instead of returning to Sign in | Confusing end state |
-| 3 | Push notifications are not wired (no Firebase in the app); the Push toggle only saves a preference | Alerts arrive only while the app is open |
+| 3 | ~~Push notifications are not wired~~ **Fixed:** push is wired with tap routing, and the Push toggle stops pushes; needs the Firebase keys (MOBILE-PUSH.md) | — |
 | 4 | The "Prices shown in" choice is not restored at the next launch | Always starts in FC |
 | 5 | Phone and email cannot be verified later if skipped at sign-up | Verified badge stays "not verified" |
 | 6 | Tracking shows the rider position as coordinates, not a map; Track is hidden for confirmed orders | Weak tracking experience |
@@ -1529,6 +1538,8 @@ flowchart TD
 
 **Fix:** connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets or temporarily enable COD.
 
+> **Update (October 2026).** The manual fallback (`MM_PROVIDER=manual`) is in place, and the **pawaPay adapter** is built: set `MM_PROVIDER=pawapay` and the token to take real mobile-money payments, refunds to the phone and payouts. See PAYMENTS-PAWAPAY.md.
+
 #### X-2 🔴 A failed delivery leaves the order in limbo
 
 When a rider taps **Could not deliver**, the delivery task becomes `failed`, but the order keeps its last status (`shipped` or `out for delivery`). Nothing re-attempts, returns the parcel, refunds or tells the customer. The customer can no longer cancel (only pending/confirmed can be cancelled) and cannot open a return (only delivered orders can).
@@ -1630,7 +1641,7 @@ Phone and email verification can be skipped at sign-up and cannot be done later,
 | CM-9 | Track order | Track is hidden for confirmed orders; rider position is shown as coordinates, not a map | 🟡 | Show Track from confirmed; add a map |
 | CM-10 | Support / returns / coupons | Staff replies, return decisions and coupons do not refresh live | 🟡 | Listen to `support:updated`, `dispute:updated`, `promo:updated` |
 | CM-11 | Language | App starts in French, but sign-up always saves English, so the app switches to English after sign-up; many screens are English-only | ⚪ | Send the current locale on register; translate screens |
-| CM-12 | Push toggle | Saves a preference, but the app never registers for push | ⚪ | Add Firebase messaging and `devices:register` |
+| CM-12 | Push toggle | **Fixed:** the app registers for push, the toggle stops pushes server-side, and taps open the right screen. Needs the Firebase keys | ✅ | — |
 | CM-13 | Terms | Terms checkbox is pre-ticked and the text is not a link | ⚪ | Untick by default, link the legal pages |
 
 ```mermaid
@@ -1806,7 +1817,7 @@ Every item in section 11 was worked on. This table says what is fixed, what is o
 
 | ID | Was | Now | Verified |
 |---|---|---|---|
-| X-1 | Nobody could pay in production | `MM_PROVIDER=manual`: the customer pays the merchant number, finance confirms or declines in the admin portal (`payments:confirm` / `payments:decline`). A real aggregator adapter is still open | Browser (web checkout → pending → finance confirms → order confirmed); production-mode check |
+| X-1 | Nobody could pay in production | `MM_PROVIDER=manual`: the customer pays the merchant number, finance confirms or declines in the admin portal (`payments:confirm` / `payments:decline`). The pawaPay adapter is built (needs the token) | Browser (web checkout → pending → finance confirms → order confirmed); production-mode check |
 | X-2 | Failed delivery left the order in limbo | Rider gives a reason → order goes back to `confirmed`, a new attempt is queued, customer is told; after 3 attempts the order is cancelled, stock released, prepaid money refunded. The customer can cancel in between | API suites, browser (rider web), Flutter live test |
 | X-3 | No pickup information | Task carries the seller's pickup address; seller marks "ready"; hub staff scan "received" (`warehouse:receive`); riders are pushed new deliveries | API suites, browser (seller → warehouse → rider) |
 | X-4 | Payouts ended in an in-app wallet | Bank / mobile-money payouts need a destination and finance enters the transfer reference; only "wallet" payouts credit the wallet. Automatic disbursement through a provider is still open | API suites, browser (admin payouts) |
@@ -1820,7 +1831,7 @@ Every item in section 11 was worked on. This table says what is fixed, what is o
 
 | App | Fixed | Still open |
 |---|---|---|
-| Customer app (CM) | CM-1 product cards open from search, lists, stores, wishlist · CM-2 delete account returns to sign-in · CM-3 market and locale restored · CM-4 verify later · CM-5/6 failed top-up reason, check payment, countdown · CM-7 Buy now is its own checkout · CM-8 promo on checkout · CM-9 Track from confirmed + open in maps · CM-10 live support and returns · CM-11 terms unchecked and linked · delivery code card | CM-12 phone push (needs Firebase project files) · several screens English-only |
+| Customer app (CM) | CM-1 product cards open from search, lists, stores, wishlist · CM-2 delete account returns to sign-in · CM-3 market and locale restored · CM-4 verify later · CM-5/6 failed top-up reason, check payment, countdown · CM-7 Buy now is its own checkout · CM-8 promo on checkout · CM-9 Track from confirmed + open in maps · CM-10 live support and returns · CM-11 terms unchecked and linked · delivery code card | CM-12 phone push (wired; needs the Firebase keys) · several screens English-only |
 | Web shop (WS) | WS-1 no fake confirmation, real mobile-money flow · WS-2 returns call the server and list live · WS-3 delete account calls the server · WS-4/5 real cart, saved addresses, zones · WS-6 live ids · WS-7…10 · WS-11 support on the server · WS-12 live bell, sign-out, real profile and wallet top-up · WS-13/14 legal pages, search | `/sell-online/subscribe` is still a demo checkout · tracking has coordinates and a map link, not an embedded map |
 | Seller (SP) | SP-1/2 errors shown, wizard sends every field with real photo upload · SP-3 registration and approval gating · SP-4 browser-only subscription removed · SP-5 edit, delete, pause/resume · SP-6 real available balance and payout destination · SP-7 "package ready" reaches the server · SP-8/9 campaigns, notifications, support, replacements live · SP-11 stock adjust · SP-12/13 | Reviews are read-only (no server reply event) · disputes/replacements lists are limited by the server · conversion/retention/segments widgets are labelled "demo data" |
 | Admin (AD) | AD-1 payouts · AD-2 settings and zones saved · AD-3 broadcasts · AD-4/5 order status, cancel, refund; live refunds and pending-payment queue · AD-6 live disputes and returns with "goods received" · AD-7 staff list, role change, staff creation · AD-8 warehouse staff accounts · AD-9 flash sales, promo codes, CMS, categories, campaign decisions · AD-10 suspend / reinstate · AD-12/13 | Hub directory is still local · finance KPIs, analytics charts and the reviews moderation are labelled "demo data" |

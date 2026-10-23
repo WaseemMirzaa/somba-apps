@@ -103,8 +103,8 @@ export default function SellerPayoutRequestPage() {
       )}
       <p className="text-xs text-slate-500">
         {fr
-          ? `Gains = ventes livrées moins ${sellerPayoutSummary.commissionPct} % de commission.`
-          : `Earned = delivered sales minus ${sellerPayoutSummary.commissionPct}% commission.`}
+          ? `Gains = ventes livrées moins la commission de chaque commande (taux en vigueur à la commande ; ${sellerPayoutSummary.commissionPct} % pour les nouvelles).`
+          : `Earned = delivered sales minus each order's commission (the rate in force when it was placed; ${sellerPayoutSummary.commissionPct}% for new orders).`}
       </p>
 
       <form onSubmit={submit} className="card-premium space-y-4 p-6">
@@ -131,7 +131,7 @@ export default function SellerPayoutRequestPage() {
           </div>
         ) : (
           <p className="text-xs text-slate-500">
-            {fr ? "Le montant sera crédité sur votre portefeuille Somba à l'approbation." : "The amount is credited to your Somba wallet once approved."}
+            {fr ? "Le montant est crédité sur votre portefeuille Somba dès que la finance valide le versement." : "The amount is credited to your Somba wallet as soon as finance pays the payout."}
           </p>
         )}
         {amount !== "" || account !== "" ? (

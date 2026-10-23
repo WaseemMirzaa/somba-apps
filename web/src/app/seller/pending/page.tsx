@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
+import { localDateTime } from "@/lib/dates";
 import { useStoreGate } from "@/lib/seller";
 
 export default function SellerPendingPage() {
@@ -17,6 +18,11 @@ export default function SellerPendingPage() {
       {seller && (
         <p className="mt-1 text-sm font-medium text-slate-700">
           {seller.name} · {fr ? "statut" : "status"}: <span className="uppercase">{state}</span>
+        </p>
+      )}
+      {seller?.kycSubmittedAt && (
+        <p className="mt-1 text-xs text-slate-500">
+          {fr ? "Dossier envoyé le" : "Application sent"} {localDateTime(seller.kycSubmittedAt)}
         </p>
       )}
       <p className="mt-2 text-slate-600">

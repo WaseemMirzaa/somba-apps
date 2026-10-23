@@ -5,7 +5,15 @@ import {
   Index,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { encryptedColumn } from '../../common/crypto/field-crypto';
+import { encryptedColumn, encryptedJsonColumn } from '../../common/crypto/field-crypto';
+
+/** Map pin picked by the customer (Google Maps). Stored encrypted: it is a precise home location. */
+export interface AddressGeo {
+  lat: number;
+  lng: number;
+  placeId?: string;
+  formatted?: string;
+}
 
 /** A customer delivery address. PII fields are encrypted at rest. */
 @Entity('addresses')
@@ -46,6 +54,9 @@ export class Address {
 
   @Column({ type: 'varchar', nullable: true })
   zoneId: string | null;
+
+  @Column({ type: 'text', nullable: true, transformer: encryptedJsonColumn })
+  geo: AddressGeo | null;
 
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;

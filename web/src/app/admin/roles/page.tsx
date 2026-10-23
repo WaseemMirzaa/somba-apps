@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import { SecretBox } from "@/components/admin/copy-box";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote } from "@/components/admin/modal";
+import { HomeWarehouseDialog } from "@/components/admin/home-warehouse-dialog";
+import type { HubRow } from "@/lib/admin-stats";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -50,6 +52,9 @@ export default function AdminRolesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [secret, setSecret] = useState<{ email: string; password: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const hubs = useServerList<HubRow>("warehouse:hubs", { enabled: isSuper, pushEvents: ["hub:updated"] });
+  const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
+  const [placing, setPlacing] = useState<StaffRow | null>(null);
 
   const roleName = (key: string) => {
     const d = defs.find((x) => x.key === key);
@@ -208,9 +213,24 @@ export default function AdminRolesPage() {
                   <Badge variant={row.active ? "success" : "danger"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge>
                 ),
             },
+            {
+              key: "hubId",
+              label: fr ? "Entrepôt" : "Warehouse",
+              render: (row) => {
+                const u = row as unknown as StaffRow;
+                // Only riders and warehouse staff work at a warehouse.
+                if (u.role !== "rider" && u.role !== "warehouse_staff") return <span className="text-slate-300">—</span>;
+                return (
+                  <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setPlacing(u)}>
+                    {u.hubId ? (hubName.get(u.hubId) ?? (fr ? "Entrepôt inconnu" : "Unknown warehouse")) : fr ? "Choisir…" : "Set…"}
+                  </button>
+                );
+              },
+            },
           ]}
         />
       </div>
+      <HomeWarehouseDialog user={placing} hubs={hubs.items} fr={fr} onClose={() => setPlacing(null)} onSaved={() => void reload()} />
     </div>
   );
 }

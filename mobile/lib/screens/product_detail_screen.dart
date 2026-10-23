@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../util/delivery_estimate.dart';
+import '../util/variants.dart';
 import '../data/catalog_live.dart';
 import '../data/catalog_models.dart';
 import '../data/shop_state.dart';
@@ -28,6 +30,21 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _qty = 1;
+  final Map<String, String> _picks = {};
+  String? _pickError;
+
+  /// Checks the size/colour choice; on a gap, flags it and says so. Returns the variant label or null.
+  String? _chosenVariant(Product p, Strings s) {
+    final missing = missingPick(p.variants, _picks);
+    if (missing != null) {
+      setState(() => _pickError = missing.name);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(s.chooseOption(missing.name))));
+      return null;
+    }
+    return variantLabel(p.variants, _picks);
+  }
   late Future<List<QuestionDto>> _questions;
   late Future<List<ReviewDto>> _reviews;
 
@@ -164,6 +181,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             fontSize: 12),
                       ),
                     ],
+                    for (final g in p.variants) ...[
+                      const SizedBox(height: 18),
+                      Text(_picks[g.name] == null ? g.name : '${g.name}: ${_picks[g.name]}',
+                          key: ValueKey('variant-title-${g.name}'),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 14.5, color: _pickError == g.name ? AppColors.danger : AppColors.ink)),
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        for (final o in g.options)
+                          ChoiceChip(
+                            key: ValueKey('variant-${g.name}-$o'),
+                            label: Text(o),
+                            selected: _picks[g.name] == o,
+                            onSelected: (_) => setState(() {
+                              _picks[g.name] = o;
+                              if (_pickError == g.name) _pickError = null;
+                            }),
+                          ),
+                      ]),
+                    ],
                     const SizedBox(height: 22),
                     if (p.inStock)
                       Row(children: [
@@ -172,10 +209,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         QuantityStepper(value: _qty, onChanged: (v) => setState(() => _qty = v.clamp(1, maxQty))),
                       ]),
                     const SizedBox(height: 22),
-                    _infoCard(
-                      Icons.local_shipping_rounded,
-                      s.delivery,
-                      s.pdDeliveryInfo,
+                    // The seller sets the delivery time; the shopper sees it and the date it gives.
+                    KeyedSubtree(
+                      key: const ValueKey('pd-delivery'),
+                      child: _infoCard(
+                        Icons.local_shipping_rounded,
+                        s.pdDeliveryDays(p.deliveryDays, dayLabel(estimateFor([p.deliveryDays]), s.lang)),
+                        s.pdDeliveryInfo,
+                      ),
                     ),
                     if ((p.description ?? '').trim().isNotEmpty) ...[
                       const SizedBox(height: 24),
@@ -456,11 +497,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             onPressed: !canBuy
                 ? null
                 : () {
-                    ShopState.instance.addToCart(p, qty: _qty);
+                    final variant = _chosenVariant(p, s);
+                    if (variant == null) return;
+                    final added = ShopState.instance.addToCart(p, variant: variant, qty: _qty);
                     ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
                       ..showSnackBar(SnackBar(
-                        content: Text(s.addedToCart),
+                        content: Text(added < _qty ? s.cartStockCap(p.stock) : s.addedToCart),
                         action: SnackBarAction(
                             label: s.cart, onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(locale: widget.locale)))),
                       ));
@@ -474,10 +517,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ? null
                 : () {
                     // Buy now = this product only; the saved cart is not touched.
+                    final variant = _chosenVariant(p, s);
+                    if (variant == null) return;
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => CheckoutScreen(locale: widget.locale, lines: [CartItem(product: p, qty: _qty)])));
+                            builder: (_) => CheckoutScreen(locale: widget.locale, lines: [CartItem(product: p, variant: variant, qty: _qty)])));
                   },
             child: Text(canBuy ? '${s.buyNow}  ·  ${money(p.price * _qty)}' : s.pdUnavailable),
           ),

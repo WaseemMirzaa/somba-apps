@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push notifications: channel shown in the phone's settings and the small icon's tint. -->
+<resources>
+    <string name="notify_channel_name">Deliveries</string>
+    <string name="notify_channel_description">New and assigned deliveries</string>
+    <color name="notify_accent">#1A3AA8</color>
+</resources>

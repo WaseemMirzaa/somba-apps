@@ -34,7 +34,7 @@ export default function SellerRevenueAnalyticsPage() {
   const byMethod = useMemo(() => {
     const m = new Map<string, { method: string; revenue: number; orders: number }>();
     for (const o of sellerOrderList) {
-      if (["cancelled", "returned", "pending"].includes(o.orderStatus)) continue;
+      if (!o.countsAsSale) continue;
       const cur = m.get(o.paymentMethod) ?? { method: o.paymentMethod, revenue: 0, orders: 0 };
       cur.revenue += o.amount;
       cur.orders += 1;
@@ -50,7 +50,8 @@ export default function SellerRevenueAnalyticsPage() {
       crumb={fr ? "Revenus" : "Revenue"}
     >
       {(a, { periodLabel }) => {
-        const net = Number((a.revenue * (1 - commissionPct / 100)).toFixed(2));
+        // Net of the commission stored on each order line (today's rate only when the server omits it).
+        const net = Number((a.revenue - (a.commissionUsd ?? (a.revenue * commissionPct) / 100)).toFixed(2));
         const days = [...a.revenueSeries].reverse();
         return (
           <>
@@ -59,7 +60,7 @@ export default function SellerRevenueAnalyticsPage() {
               <StatTile
                 title={fr ? "Net après commission" : "Net after commission"}
                 value={formatCurrency(net, locale)}
-                hint={fr ? `Commission de ${commissionPct} % sur chaque vente livrée` : `${commissionPct}% commission on each delivered sale`}
+                hint={fr ? `Commission au taux de chaque commande (${commissionPct} % pour les nouvelles)` : `Commission at each order's own rate (${commissionPct}% for new orders)`}
                 icon={Wallet}
               />
               <StatTile title={fr ? "Panier moyen" : "Avg. order value"} value={a.orders > 0 ? formatCurrency(a.aov, locale) : "—"} hint={fr ? `${a.orders} commandes` : `${a.orders} orders`} icon={Target} />

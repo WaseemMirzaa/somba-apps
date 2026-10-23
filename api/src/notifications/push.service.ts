@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, type FindOptionsWhere } from 'typeorm';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 import { DeviceToken } from '../database/entities';
@@ -9,9 +9,22 @@ import type { DeviceApp, DevicePlatform } from '../database/entities';
 export interface PushPayload {
   title: string;
   body: string;
-  /** Small string map delivered with the push (deep-link: type + entityId). */
+  /** Small string map delivered with the push (deep-link: type, entityId, notificationId, link). */
   data?: Record<string, string>;
+  /** Web path the notification opens (also the web-push click target). */
+  link?: string;
 }
+
+/** Narrow who receives a push beyond the user / role selector. */
+export interface PushScope {
+  /** Only devices of these apps (e.g. ['web'] for staff alerts). Default: every app. */
+  apps?: DeviceApp[];
+  /** Users who turned push off; their devices are skipped. */
+  skipUserIds?: Set<string>;
+}
+
+/** Android channel created by the apps (MainActivity) so pushes use the app's own sound and importance. */
+export const ANDROID_CHANNEL_ID = 'somba_default';
 
 /** FCM error codes meaning the token is dead and should be forgotten. */
 const DEAD_TOKEN_CODES = new Set([
@@ -107,25 +120,47 @@ export class PushService {
     await this.tokens.delete({ userId });
   }
 
+  /** How many devices a user has registered (for the "send a test push" check). */
+  countForUser(userId: string): Promise<number> {
+    return this.tokens.count({ where: { userId } });
+  }
+
   // ── Delivery ─────────────────────────────────────────────────────────────
   sendToUser(userId: string, payload: PushPayload): Promise<number> {
     return this.deliver({ userId }, payload);
   }
 
-  sendToRole(role: string, payload: PushPayload): Promise<number> {
-    return this.deliver({ role }, payload);
+  /** Several users at once (e.g. every rider of a warehouse). */
+  sendToUsers(userIds: string[], payload: PushPayload, scope: PushScope = {}): Promise<number> {
+    if (!userIds.length) return Promise.resolve(0);
+    return this.deliver({ userId: In(userIds) }, payload, scope);
+  }
+
+  sendToRole(role: string, payload: PushPayload, scope: PushScope = {}): Promise<number> {
+    return this.deliver({ role }, payload, scope);
+  }
+
+  /** Absolute URL for web push when the web app is served over HTTPS (browsers require it). */
+  private static absoluteLink(link?: string): string | undefined {
+    const base = process.env.WEB_URL?.trim().replace(/\/$/, '');
+    if (!link || !base || !base.startsWith('https://')) return undefined;
+    return base + link;
   }
 
   /** Returns the number of devices successfully reached. */
   private async deliver(
-    where: { userId: string } | { role: string },
+    where: FindOptionsWhere<DeviceToken>,
     payload: PushPayload,
+    scope: PushScope = {},
   ): Promise<number> {
     const messaging = this.getMessaging();
     if (!messaging) return 0;
     try {
-      const rows = await this.tokens.find({ where });
+      const filter = scope.apps?.length ? { ...where, app: In(scope.apps) } : where;
+      const rows = (await this.tokens.find({ where: filter })).filter((r) => !scope.skipUserIds?.has(r.userId));
       if (!rows.length) return 0;
+      const data = { ...(payload.data ?? {}), ...(payload.link ? { link: payload.link } : {}) };
+      const webLink = PushService.absoluteLink(payload.link);
       // FCM multicast accepts up to 500 tokens per call.
       let reached = 0;
       for (let i = 0; i < rows.length; i += 500) {
@@ -133,8 +168,10 @@ export class PushService {
         const res = await messaging.sendEachForMulticast({
           tokens: batch.map((r) => r.token),
           notification: { title: payload.title, body: payload.body },
-          data: payload.data,
-          android: { priority: 'high' },
+          data,
+          android: { priority: 'high', notification: { channelId: ANDROID_CHANNEL_ID } },
+          apns: { payload: { aps: { sound: 'default' } } },
+          ...(webLink ? { webpush: { fcmOptions: { link: webLink } } } : {}),
         });
         reached += res.successCount;
         const dead = batch

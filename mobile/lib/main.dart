@@ -6,8 +6,11 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app.dart';
 import 'data/market_profiles.dart';
 import 'data/shop_state.dart';
+import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
 import 'screens/more/auth_screens.dart';
+import 'screens/notice_router.dart';
+import 'services/push_service.dart';
 import 'services/realtime_store.dart';
 import 'theme/app_theme.dart';
 import 'util/format.dart';
@@ -40,11 +43,16 @@ class _SombaAppState extends State<SombaApp> {
   bool _authed = false;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _navigator = GlobalKey<NavigatorState>();
+  StreamSubscription<PushMessage>? _foregroundSub;
 
   @override
   void initState() {
     super.initState();
     Strings.langNotifier.addListener(_onLang);
+    // A tapped notification opens its screen once the user is in and the data is loaded.
+    PushService.instance.pendingTap.addListener(_openPendingTap);
+    RealtimeStore.instance.addListener(_openPendingTap);
+    _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
     // The server can end a session (revoked, suspended, deleted): go back to sign-in.
     RealtimeStore.instance.onSessionEnded = (messageKey) {
       if (!mounted) return;
@@ -68,7 +76,39 @@ class _SombaAppState extends State<SombaApp> {
   @override
   void dispose() {
     Strings.langNotifier.removeListener(_onLang);
+    PushService.instance.pendingTap.removeListener(_openPendingTap);
+    RealtimeStore.instance.removeListener(_openPendingTap);
+    _foregroundSub?.cancel();
     super.dispose();
+  }
+
+  void _openPendingTap() {
+    final store = RealtimeStore.instance;
+    final nav = _navigator.currentState;
+    if (!_authed || !store.hydrated || nav == null || PushService.instance.pendingTap.value == null) return;
+    final m = PushService.instance.takeTap()!;
+    unawaited(openNotice(nav, _locale, type: m.type, entityId: m.entityId, notificationId: m.notificationId));
+  }
+
+  /// A push that arrives while the app is open: a banner with "Open" (the list refreshes on its own).
+  void _showForegroundPush(PushMessage m) {
+    if (!_authed || (m.title ?? '').isEmpty) return;
+    final s = Strings.current;
+    final text = localizeNotification(s, m.title ?? '', m.body ?? '');
+    _messenger.currentState?.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(text.$1, style: const TextStyle(fontWeight: FontWeight.w800)),
+        if (text.$2.isNotEmpty) Text(text.$2, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ]),
+      action: SnackBarAction(
+        label: s.pushOpen,
+        onPressed: () {
+          final nav = _navigator.currentState;
+          if (nav != null) unawaited(openNotice(nav, _locale, type: m.type, entityId: m.entityId, notificationId: m.notificationId));
+        },
+      ),
+    ));
   }
 
   void _onLang() {
@@ -90,6 +130,8 @@ class _SombaAppState extends State<SombaApp> {
     }
     final market = RealtimeStore.instance.prefs['market'];
     marketNotifier.value = market == 'FR' ? MarketProfileId.france : MarketProfileId.drc;
+    // A notification tapped before sign-in opens now (after this frame, once the shell exists).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingTap());
   }
 
   void _setLocale(Locale locale) {

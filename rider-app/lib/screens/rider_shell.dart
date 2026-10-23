@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
+import '../services/rider_focus.dart';
+import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import 'deliveries_screen.dart';
 import 'earnings_screen.dart';
@@ -18,6 +20,27 @@ class RiderShell extends StatefulWidget {
 
 class _RiderShellState extends State<RiderShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    RiderStore.instance.focus.addListener(_onFocus);
+    _onFocus();
+  }
+
+  @override
+  void dispose() {
+    RiderStore.instance.focus.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  /// A tapped notification: show its tab (Deliveries clears the focus once it has picked Active/Available).
+  void _onFocus() {
+    final f = RiderStore.instance.focus.value;
+    if (f == null) return;
+    if (f.tab != _index) setState(() => _index = f.tab);
+    if (f.tab != RiderFocus.deliveriesIndex) RiderStore.instance.focus.value = null;
+  }
 
   @override
   Widget build(BuildContext context) {

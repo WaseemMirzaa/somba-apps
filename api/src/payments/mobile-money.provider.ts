@@ -26,6 +26,30 @@ export interface MobileMoneyEvent {
   providerRef?: string;
   amountUsd?: number;
   reason?: string;
+  /** The network's own transaction id (shown on the payer's receipt). */
+  providerTransactionId?: string;
+}
+
+/** What a signature check needs to know about the webhook request itself. */
+export interface WebhookRequest {
+  method: string;
+  /** Host (and port) the request was sent to. */
+  authority: string;
+  /** Path without the query string. */
+  path: string;
+}
+
+/**
+ * The aggregator did not answer when asked to start a charge: it may or may not exist on their side. The payment
+ * stays pending with [providerRef] and the status check settles it.
+ */
+export class InitiationUncertainError extends Error {
+  constructor(
+    readonly providerRef: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 /**
@@ -39,7 +63,13 @@ export interface MobileMoneyProvider {
   /** Ask the network to prompt the subscriber to approve the charge. */
   initiate(charge: MobileMoneyCharge): Promise<{ providerRef: string }>;
   /** Verify authenticity of a webhook; throws if the signature is bad. */
-  parseWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): MobileMoneyEvent;
+  parseWebhook(
+    rawBody: Buffer,
+    headers: Record<string, string | string[] | undefined>,
+    req?: WebhookRequest,
+  ): MobileMoneyEvent | Promise<MobileMoneyEvent>;
+  /** Ask the aggregator for a charge's final result (null while it is still in progress). Optional. */
+  checkStatus?(payment: { reference: string; providerRef: string | null }): Promise<MobileMoneyEvent | null>;
 }
 
 export const MOBILE_MONEY_PROVIDER = Symbol('MOBILE_MONEY_PROVIDER');
@@ -102,7 +132,10 @@ export class ManualMobileMoneyProvider implements MobileMoneyProvider {
   }
 }
 
-/** `MM_PROVIDER`: `sandbox` (dev default) | `manual` (finance confirms by hand) | `none` (production default → refuse mobile money). */
+/**
+ * `MM_PROVIDER`: `sandbox` (dev default) | `manual` (finance confirms by hand) | `pawapay` (real collections, see
+ * pawapay.provider.ts; built in PaymentsModule) | `none` (production default → refuse mobile money).
+ */
 export function createMobileMoneyProvider(): MobileMoneyProvider | null {
   const prod = process.env.NODE_ENV === 'production';
   const which = (process.env.MM_PROVIDER ?? (prod ? 'none' : 'sandbox')).toLowerCase();

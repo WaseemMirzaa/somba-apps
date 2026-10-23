@@ -6,6 +6,7 @@ import 'auth_service.dart';
 import 'location_reporter.dart';
 import 'models.dart';
 import 'push_service.dart';
+import 'rider_focus.dart';
 import 'socket_service.dart';
 
 enum ConnStatus { disconnected, connecting, connected, error }
@@ -34,6 +35,12 @@ class RiderStore extends ChangeNotifier {
 
   /// Public setting: when true the customer's 4-digit code is needed to deliver.
   bool requireDeliveryCode = false;
+
+  /// Home warehouse and zones (null until loaded, or for an older server).
+  RiderAssignment? assignment;
+
+  /// A tapped notification asks the app to show a tab and task; the shell and Deliveries follow it, then clear it.
+  final ValueNotifier<RiderFocus?> focus = ValueNotifier(null);
 
   VoidCallback? onSessionEnded;
   String? _access;
@@ -106,6 +113,8 @@ class RiderStore extends ChangeNotifier {
     notifications.clear();
     earnings = const EarningsDto();
     requireDeliveryCode = false;
+    assignment = null;
+    focus.value = null;
     notifyListeners();
   }
 
@@ -184,12 +193,13 @@ class RiderStore extends ChangeNotifier {
       // Push: asks for the permission and registers this device (no-op without Firebase).
       unawaited(PushService.instance.start(
         register: registerDevice,
-        onMessage: () => unawaited(refreshNotifications()),
+        onMessage: (_) => unawaited(refreshNotifications()),
       ));
-      // The server does not push brand-new pool items to riders yet, so a slow
-      // safety re-read keeps "Available" fresh without pulling to refresh.
+      // New deliveries arrive as `delivery:updated` pushes to the rider's warehouse
+      // room; this slow re-read is only a safety net for a push missed while the
+      // connection was flaky.
       _poolTimer?.cancel();
-      _poolTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      _poolTimer = Timer.periodic(const Duration(seconds: 120), (_) {
         if (user != null && isConnected) unawaited(refresh());
       });
     });
@@ -277,6 +287,7 @@ class RiderStore extends ChangeNotifier {
           ..clear()
           ..addAll(((await _socket.request('notifications:list')) as List).map((e) => NotificationDto.fromJson(_map(e))));
         await _readSettings();
+        await _readAssignment();
       }
       loaded = true;
       status = ConnStatus.connected;
@@ -285,6 +296,20 @@ class RiderStore extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) debugPrint('refresh failed: $e');
     }
+  }
+
+  Future<void> _readAssignment() async {
+    try {
+      assignment = RiderAssignment.fromJson(_map(await _socket.request('rider:assignment')));
+    } catch (_) {/* older server: no warehouse info */}
+  }
+
+  /// Open what a notification is about (a push tap or the in-app list) and mark it read.
+  void openNotice({required String type, String? entityId, String? view, String? notificationId}) {
+    if (notificationId != null && notifications.any((n) => n.id == notificationId && !n.read)) {
+      markRead(notificationId).catchError((_) {});
+    }
+    focus.value = riderFocusFor(type, entityId: entityId, view: view, isMine: (id) => myTasks.any((t) => t.id == id));
   }
 
   Future<void> _readSettings() async {
@@ -366,8 +391,7 @@ class RiderStore extends ChangeNotifier {
     await _socket.request('notifications:markRead', {'id': id});
     final i = notifications.indexWhere((n) => n.id == id);
     if (i != -1) {
-      final n = notifications[i];
-      notifications[i] = NotificationDto(id: n.id, title: n.title, body: n.body, type: n.type, read: true);
+      notifications[i] = notifications[i].asRead();
       notifyListeners();
     }
   }

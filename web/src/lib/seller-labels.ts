@@ -4,6 +4,8 @@
  * support tickets, replacements). Nothing here is invented: every key is a
  * value the API can actually produce.
  */
+import { packageStatusTone, lineStateTone } from "./seller-packages";
+import type { LineState } from "./seller-packages";
 
 export type BadgeVariant = "default" | "primary" | "success" | "warning" | "danger" | "purple" | "info";
 type Labels = Record<string, { en: string; fr: string; variant: BadgeVariant }>;
@@ -47,11 +49,21 @@ export const ORDER_STATUS_OPTIONS = ORDER_STATUSES.map((value) => ({
   labelFr: ORDER[value].fr,
 }));
 
-// ─── Shipping (derived from the live order status) ───────────────────────────
+// ─── Package status (the seller's own parcel on an order; from the server) ───
+export {
+  PACKAGE_STATUS_OPTIONS,
+  packageStatusLabel,
+  lineStateLabel,
+} from "./seller-packages";
+export const packageStatusVariant = (s: string): BadgeVariant => packageStatusTone(s);
+export const lineStateVariant = (s: LineState): BadgeVariant => lineStateTone(s);
+
+// ─── Shipping (derived from the package status) ───────────────────────────
 const SHIPPING: Labels = {
   pending: { en: "Awaiting confirmation", fr: "En attente de confirmation", variant: "warning" },
   awaiting_pickup: { en: "Awaiting pickup", fr: "En attente d'enlèvement", variant: "info" },
   ready: { en: "Marked ready", fr: "Marqué prêt", variant: "info" },
+  at_hub: { en: "At the hub", fr: "Au hub", variant: "info" },
   rider_assigned: { en: "Rider assigned", fr: "Livreur assigné", variant: "info" },
   picked_up: { en: "Picked up", fr: "Collecté", variant: "info" },
   in_transit: { en: "Out for delivery", fr: "En cours de livraison", variant: "info" },
@@ -73,7 +85,6 @@ const PRODUCT: Labels = {
   pending: { en: "Pending review", fr: "En attente de validation", variant: "warning" },
   rejected: { en: "Rejected", fr: "Rejeté", variant: "danger" },
   draft: { en: "Unavailable (paused)", fr: "Indisponible (en pause)", variant: "default" },
-  approved: { en: "Approved", fr: "Approuvé", variant: "info" },
   removed: { en: "Removed", fr: "Supprimé", variant: "danger" },
 };
 export const productStatusLabel = (s: string, fr: boolean) => pick(PRODUCT, s, fr);
@@ -102,10 +113,10 @@ export function productStatusExplain(s: string, fr: boolean): string | null {
 }
 
 // ─── Payouts (payouts.status) ────────────────────────────────────────────────
-export const PAYOUT_STATUSES = ["requested", "paid", "rejected"] as const;
+export const PAYOUT_STATUSES = ["requested", "sending", "paid", "rejected"] as const;
 const PAYOUT: Labels = {
   requested: { en: "Requested", fr: "Demandé", variant: "warning" },
-  approved: { en: "Approved", fr: "Approuvé", variant: "info" },
+  sending: { en: "Being sent", fr: "Envoi en cours", variant: "info" },
   paid: { en: "Paid", fr: "Payé", variant: "success" },
   rejected: { en: "Rejected", fr: "Rejeté", variant: "danger" },
 };
@@ -197,6 +208,23 @@ const REPLACEMENT: Labels = {
 export const replacementStatusLabelReal = (s: string, fr: boolean) => pick(REPLACEMENT, s, fr);
 export const replacementStatusVariantReal = (s: string) => variantOf(REPLACEMENT, s);
 export const REPLACEMENT_STATUS_OPTIONS = Object.entries(REPLACEMENT).map(([value, v]) => ({
+  value,
+  label: v.en,
+  labelFr: v.fr,
+}));
+
+// ─── Exchanges ───────────────────────────────────────────────────────────────
+const EXCHANGE: Labels = {
+  requested: { en: "Requested", fr: "Demandé", variant: "warning" },
+  approved: { en: "Approved", fr: "Approuvé", variant: "info" },
+  received: { en: "Received at hub", fr: "Reçu au hub", variant: "info" },
+  ready: { en: "Ready to send", fr: "Prêt à l'envoi", variant: "info" },
+  dispatched: { en: "Dispatched", fr: "Expédié", variant: "success" },
+  rejected: { en: "Rejected", fr: "Rejeté", variant: "danger" },
+};
+export const exchangeStatusLabel = (s: string, fr: boolean) => pick(EXCHANGE, s, fr);
+export const exchangeStatusVariant = (s: string) => variantOf(EXCHANGE, s);
+export const EXCHANGE_STATUS_OPTIONS = Object.entries(EXCHANGE).map(([value, v]) => ({
   value,
   label: v.en,
   labelFr: v.fr,

@@ -85,8 +85,8 @@ export default function SellerPayoutPendingPage() {
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         {fr
-          ? `Seules les commandes livrées comptent dans votre solde disponible (commission ${summary.commissionPct} % déduite). Les versements demandés sont prélevés sur ce solde global.`
-          : `Only delivered orders count toward your available balance (${summary.commissionPct}% commission deducted). Payouts you request draw on that overall balance.`}
+          ? `Seules les commandes livrées comptent dans votre solde disponible (commission de chaque commande déduite ; ${summary.commissionPct} % pour les nouvelles commandes). Les versements demandés sont prélevés sur ce solde global.`
+          : `Only delivered orders count toward your available balance (each order's own commission deducted; ${summary.commissionPct}% for new orders). Payouts you request draw on that overall balance.`}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
 import 'screens/rider_shell.dart';
 import 'screens/more/rider_auth.dart';
+import 'services/push_service.dart';
 import 'services/rider_store.dart';
 import 'theme/app_theme.dart';
 
@@ -31,11 +34,16 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   bool _restored = false;
   bool _authed = false;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
+  StreamSubscription<PushMessage>? _foregroundSub;
 
   @override
   void initState() {
     super.initState();
     Strings.langNotifier.addListener(_onLang);
+    // A tapped notification opens its delivery once the rider is in and the queue is loaded.
+    PushService.instance.pendingTap.addListener(_openPendingTap);
+    RiderStore.instance.addListener(_openPendingTap);
+    _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
     RiderStore.instance.onSessionEnded = () {
       if (!mounted) return;
       setState(() => _authed = false);
@@ -54,7 +62,32 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   @override
   void dispose() {
     Strings.langNotifier.removeListener(_onLang);
+    PushService.instance.pendingTap.removeListener(_openPendingTap);
+    RiderStore.instance.removeListener(_openPendingTap);
+    _foregroundSub?.cancel();
     super.dispose();
+  }
+
+  void _openPendingTap() {
+    if (!_authed || !RiderStore.instance.loaded || PushService.instance.pendingTap.value == null) return;
+    _open(PushService.instance.takeTap()!);
+  }
+
+  void _open(PushMessage m) => RiderStore.instance.openNotice(type: m.type, entityId: m.entityId, view: m.data['view'], notificationId: m.notificationId);
+
+  /// A push while the app is open: a banner with "Open" (the lists refresh on their own).
+  void _showForegroundPush(PushMessage m) {
+    if (!_authed || (m.title ?? '').isEmpty) return;
+    final s = Strings.current;
+    final text = localizeNotification(s, m.title ?? '', m.body ?? '');
+    _messenger.currentState?.showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(text.$1, style: const TextStyle(fontWeight: FontWeight.w800)),
+        if (text.$2.isNotEmpty) Text(text.$2, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ]),
+      action: SnackBarAction(label: s.pushOpen, onPressed: () => _open(m)),
+    ));
   }
 
   void _onLang() {

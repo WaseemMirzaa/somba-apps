@@ -31,6 +31,7 @@
     "smoke:flows": "node test/flows-smoke.cjs",
     "smoke:race": "node test/race-smoke.cjs",
     "smoke:coverage": "node test/coverage-smoke.cjs",
+    "smoke:zones": "node test/warehouse-zones-smoke.cjs",
     "check:prod": "node test/prod-check.cjs"
   },
   "dependencies": {

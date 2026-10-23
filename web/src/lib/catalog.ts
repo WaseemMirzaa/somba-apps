@@ -1,4 +1,5 @@
 "use client";
+import { readVariants, type VariantGroup } from "@/lib/variants";
 
 import { useMemo } from "react";
 import { useRealtime } from "@/context/realtime-context";
@@ -31,6 +32,8 @@ export interface ShopProduct {
   campaignPct: number;
   campaignName: string | null;
   priceSource: "base" | "flash" | "campaign";
+  /** Options the shopper must choose (empty = none). */
+  variants: VariantGroup[];
 }
 
 /** What a price tag shows: the price charged, the struck-through price and the badge. */
@@ -94,6 +97,7 @@ export function toShopProduct(p: Product): ShopProduct {
     campaignPct: p.campaignPct ?? 0,
     campaignName: p.campaignName ?? null,
     priceSource: p.priceSource ?? "base",
+    variants: readVariants(p.variants),
   };
 }
 
@@ -164,6 +168,7 @@ export function productDetailFrom(p: ShopProduct) {
     seller: p.seller,
     description: p.description,
     image: p.image,
+    variants: p.variants,
   };
 }
 

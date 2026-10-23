@@ -92,6 +92,25 @@ export class AnalyticsService {
     return Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : FALLBACK_COMMISSION_PCT;
   }
 
+  /**
+   * Commission actually charged: the amount STORED on each order line when it was
+   * placed (never recomputed from today's rate), cancelled lines excluded.
+   */
+  private async storedCommission(): Promise<{ collected: number; delivered: number; open: number }> {
+    const row = await this.items
+      .createQueryBuilder('i')
+      .innerJoin(Order, 'o', 'o.id = i.orderId')
+      .select(
+        "COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM payments p WHERE p.orderId = o.id AND p.purpose = 'order' AND p.status = 'succeeded') THEN i.commissionUsd ELSE 0 END), 0)",
+        'collected',
+      )
+      .addSelect("COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN i.commissionUsd ELSE 0 END), 0)", 'delivered')
+      .addSelect(`COALESCE(SUM(CASE WHEN o.status NOT IN ${DEAD} AND o.status <> 'delivered' THEN i.commissionUsd ELSE 0 END), 0)`, 'open')
+      .where("i.fulfilment <> 'cancelled'")
+      .getRawOne<{ collected: string; delivered: string; open: string }>();
+    return { collected: round2(n(row?.collected)), delivered: round2(n(row?.delivered)), open: round2(n(row?.open)) };
+  }
+
   // ── admin overview ─────────────────────────────────────────────────────────
   async adminStats() {
     const now = new Date();
@@ -100,7 +119,7 @@ export class AnalyticsService {
     const d60 = new Date(startOfUtcDay(now).getTime() - 59 * 86_400_000 - 1);
     const live = "o.status <> 'cancelled'";
 
-    const [agg, byStatusRows, pay, categories, counts, alerts, commissionPct] = await Promise.all([
+    const [agg, byStatusRows, pay, categories, counts, alerts, commissionPct, storedCommission] = await Promise.all([
       this.orders
         .createQueryBuilder('o')
         .select('COUNT(*)', 'total')
@@ -129,6 +148,7 @@ export class AnalyticsService {
       this.adminCounts(),
       this.adminAlerts(),
       this.commissionPct(),
+      this.storedCommission(),
     ]);
 
     const byStatus: Record<string, number> = {};
@@ -148,9 +168,10 @@ export class AnalyticsService {
       liveProducts: counts.liveProducts,
       pendingDisputes: counts.openDisputes,
       pendingPayouts: counts.requestedPayouts,
-      commissionUsd: round2((revenue * commissionPct) / 100),
+      commissionUsd: storedCommission.collected,
       ordersByStatus: byStatus,
       // — additions —
+      // The CURRENT rate (applies to new orders); commissionUsd above is the sum stored on past order lines.
       commissionPct,
       gmvByCategory: categories,
       ordersToday: n(agg?.ordersToday),
@@ -327,13 +348,8 @@ export class AnalyticsService {
         .getRawOne<{ total: string }>(),
     ]);
 
-    // Commission base: item value of delivered orders (earned) and of orders still on their way (expected).
-    const base = await this.items
-      .createQueryBuilder('i')
-      .innerJoin(Order, 'o', 'o.id = i.orderId')
-      .select("COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN i.priceUsd * i.qty ELSE 0 END), 0)", 'delivered')
-      .addSelect(`COALESCE(SUM(CASE WHEN o.status NOT IN ${DEAD} AND o.status <> 'delivered' THEN i.priceUsd * i.qty ELSE 0 END), 0)`, 'open')
-      .getRawOne<{ delivered: string; open: string }>();
+    // Commission earned / expected: the amounts stored on the order lines (rate at order time), not today's rate.
+    const base = await this.storedCommission();
 
     const payoutBy = (st: string) => payoutRows.find((r) => r.status === st);
     const gross = round2(n(orderAgg?.gross));
@@ -358,16 +374,16 @@ export class AnalyticsService {
       deliveryFeesUsd: round2(n(orderAgg?.deliveryFees)),
       promoDiscountsUsd: round2(n(orderAgg?.promoDiscounts)),
       collectedUsd: round2(n(payAgg?.collected)),
-      commissionEarnedUsd: round2((n(base?.delivered) * commissionPct) / 100),
-      commissionExpectedUsd: round2((n(base?.open) * commissionPct) / 100),
+      commissionEarnedUsd: base.delivered,
+      commissionExpectedUsd: base.open,
       subscriptionRevenueUsd: round2(n(payAgg?.plans)),
       refundsUsd: round2(n(payAgg?.refunds)),
       refundsCount: n(payAgg?.refundCount),
       payouts: {
         paidUsd: round2(n(payoutBy('paid')?.amount)),
         paidCount: n(payoutBy('paid')?.n),
-        pendingUsd: round2(n(payoutBy('requested')?.amount) + n(payoutBy('approved')?.amount)),
-        pendingCount: n(payoutBy('requested')?.n) + n(payoutBy('approved')?.n),
+        pendingUsd: round2(n(payoutBy('requested')?.amount) + n(payoutBy('sending')?.amount)),
+        pendingCount: n(payoutBy('requested')?.n) + n(payoutBy('sending')?.n),
         requestedCount: n(payoutBy('requested')?.n),
         rejectedCount: n(payoutBy('rejected')?.n),
       },
@@ -513,7 +529,8 @@ export class AnalyticsService {
       .innerJoin(Order, 'o', 'o.id = i.orderId')
       .innerJoin(Product, 'p', 'p.id = i.productId')
       .where('p.sellerId IN (:...sids)', { sids: ids });
-    if (!opts.includeDead) qb.andWhere(`o.status NOT IN ${DEAD}`);
+    // A line the seller cancelled on a multi-seller order is not a sale.
+    if (!opts.includeDead) qb.andWhere(`o.status NOT IN ${DEAD}`).andWhere("i.fulfilment <> 'cancelled'");
     return qb;
   }
 
@@ -534,10 +551,11 @@ export class AnalyticsService {
         .getRawMany<{ day: string; revenue: string; orders: string; units: string }>(),
       this.sellerLines(ids)
         .select('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'revenue')
+        .addSelect('COALESCE(SUM(i.commissionUsd), 0)', 'commission')
         .addSelect('COUNT(DISTINCT o.id)', 'orders')
         .addSelect('COALESCE(SUM(i.qty), 0)', 'units')
         .andWhere('o.createdAt > :from', { from })
-        .getRawOne<{ revenue: string; orders: string; units: string }>(),
+        .getRawOne<{ revenue: string; commission: string; orders: string; units: string }>(),
       this.sellerLines(ids)
         .select('i.productId', 'productId')
         .addSelect('MAX(i.productName)', 'name')
@@ -609,6 +627,8 @@ export class AnalyticsService {
       from: keys[0],
       to: keys[keys.length - 1],
       revenue,
+      // Commission on that revenue: the amounts stored on the lines when each order was placed.
+      commissionUsd: round2(n(totals?.commission)),
       orders: orderCount,
       units: n(totals?.units),
       aov: orderCount ? round2(revenue / orderCount) : 0,

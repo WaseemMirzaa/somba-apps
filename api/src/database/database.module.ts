@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ENTITIES } from './entities';
+import { MYSQL_UTC_OPTIONS } from './mysql-utc';
 
 /**
  * TypeORM wiring. `DB_TYPE=sqlite` (default) runs anywhere with a local file;
@@ -46,6 +47,7 @@ import { ENTITIES } from './entities';
             migrationsRun,
             synchronize: db.synchronize,
             charset: 'utf8mb4',
+            ...MYSQL_UTC_OPTIONS,
           };
         }
         return {

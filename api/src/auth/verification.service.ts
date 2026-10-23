@@ -12,12 +12,14 @@ import { User, VerificationToken } from '../database/entities';
 import type { VerificationKind } from '../database/entities';
 import { MessagingService } from '../messaging/messaging.service';
 import { UsersService } from '../users/users.service';
+import { normalizePhone, phoneHash } from '../common/phone/phone-hash';
 
 const MIN = 60_000;
 export const TTL: Record<VerificationKind, number> = {
   email: 24 * 60 * MIN,
   phone: 10 * MIN,
   reset: 60 * MIN,
+  login: 10 * MIN,
 };
 export const MAX_OTP_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 30_000;
@@ -64,7 +66,7 @@ export class VerificationService {
       this.tokens.create({
         userId,
         kind,
-        tokenHash: sha(kind === 'phone' ? `${userId}:${secret}` : secret),
+        tokenHash: sha(kind === 'phone' || kind === 'login' ? `${userId}:${secret}` : secret),
         expiresAt: new Date(Date.now() + TTL[kind]),
         usedAt: null,
         attempts: 0,
@@ -130,6 +132,52 @@ export class VerificationService {
     user.phoneVerified = true;
     await this.users.save(user);
     return { verified: true };
+  }
+
+  // ── Phone-code login ──────────────────────────────────────────────────
+  /**
+   * The customer account a verified phone number belongs to, or null. Ambiguous numbers (several verified
+   * accounts) are refused rather than guessed.
+   */
+  async customerForPhone(phone: string): Promise<User | null> {
+    const hash = phoneHash(phone);
+    if (!hash) return null;
+    const rows = await this.users.findByPhoneHash(hash);
+    const usable = rows.filter((u) => u.role === 'customer' && u.active && u.phoneVerified);
+    return usable.length === 1 ? usable[0] : null;
+  }
+
+  /** Always `sent:true` (never reveals whether the number has an account); the code only goes to a real one. */
+  async sendLoginCode(phone: string): Promise<SendResult> {
+    if (!normalizePhone(phone)) throw new BadRequestException('Enter a valid phone number.');
+    const user = await this.customerForPhone(phone);
+    if (!user) return { sent: true };
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    if (!(await this.issue(user.id, 'login', code, true))) {
+      throw new HttpException('Please wait before requesting another code.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    await this.messaging.sendSms(user.phone!, `Your Somba&Teka sign-in code is ${code}. It expires in 10 minutes. Never share it.`);
+    return { sent: true, ...(this.expose ? { devToken: code } : {}) };
+  }
+
+  /** Checks a login code and returns the account it unlocks (one use, 5 attempts, 10 minutes). */
+  async consumeLoginCode(phone: string, code: string): Promise<User> {
+    const fail = () => new BadRequestException('Incorrect or expired code.');
+    const user = await this.customerForPhone(phone);
+    if (!user) throw fail();
+    const row = await this.tokens.findOne({
+      where: { userId: user.id, kind: 'login', usedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+      order: { createdAt: 'DESC' },
+    });
+    if (!row || row.attempts >= MAX_OTP_ATTEMPTS) throw fail();
+    if (row.tokenHash !== sha(`${user.id}:${String(code).trim()}`)) {
+      row.attempts += 1;
+      await this.tokens.save(row);
+      throw fail();
+    }
+    row.usedAt = new Date();
+    await this.tokens.save(row);
+    return user;
   }
 
   // ── Password reset ────────────────────────────────────────────────────

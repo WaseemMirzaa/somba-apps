@@ -10,6 +10,7 @@ import { useLocale } from "@/context/locale-context";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { LoadMore } from "@/components/ui/load-more";
 import { useRealtime } from "@/context/realtime-context";
+import { cancelledCount } from "@/lib/shop-packages";
 
 function OrdersList() {
   const { locale } = useLocale();
@@ -20,6 +21,8 @@ function OrdersList() {
   const statusLabel = (status: string) => orderStatusLabel(status, fr);
 
   // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
+  const cancelledLines = (orderId: string) => cancelledCount(rt.orders.find((o) => o.id === orderId)?.items ?? []);
+
   const paymentMethodLabel = (method: string) =>
     fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 
@@ -44,7 +47,21 @@ function OrdersList() {
           { key: "itemsCount", label: fr ? "Articles" : "Items" },
           { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
           { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => paymentMethodLabel(String(row.paymentMethod)) },
-          { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "cancelled" ? "danger" : row.status === "delivered" ? "success" : "info"}>{statusLabel(String(row.status))}</Badge> },
+          { key: "status", label: fr ? "Statut" : "Status", render: (row) => {
+            const n = row.status === "cancelled" ? 0 : cancelledLines(String(row.id));
+            return (
+              <div className="space-y-1">
+                <Badge variant={row.status === "cancelled" ? "danger" : row.status === "delivered" ? "success" : "info"}>{statusLabel(String(row.status))}</Badge>
+                {n > 0 && (
+                  <p className="text-xs text-red-700">
+                    {fr
+                      ? `${n} ${n === 1 ? "article annulé" : "articles annulés"} par le vendeur`
+                      : `${n} ${n === 1 ? "item" : "items"} cancelled by the seller`}
+                  </p>
+                )}
+              </div>
+            );
+          } },
           { key: "actions", label: fr ? "Actions" : "Actions", render: (row) => (
             <div className="flex gap-2 text-xs">
               <Link href={`/shop/orders/${row.id}`} className="text-[var(--primary)] hover:underline">{fr ? "Voir" : "View"}</Link>

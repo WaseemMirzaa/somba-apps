@@ -27,7 +27,7 @@ export const PORTAL_IMAGES = {
   admin: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1200&auto=format&fit=crop",
   seller: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1200&auto=format&fit=crop",
   warehouse: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1200&auto=format&fit=crop",
-  rider: "https://images.unsplash.com/photo-1607083207634-bd02781bccb9?auto=format&fit=crop&w=1200&q=80",
+  rider: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=1200&q=80",
   shop: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1200&q=80",
 } as const;
 
@@ -372,7 +372,7 @@ export const PLATFORM_MODULES = [
     tag: "Hassle-free",
     tagFr: "Sans tracas",
     icon: "RotateCcw",
-    image: "https://images.unsplash.com/photo-1607083207634-bd02781bccb9?auto=format&fit=crop&w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=1200&q=80",
     trust: [
       { icon: "PackageCheck", label: "Door pickup", labelFr: "Collecte à domicile" },
       { icon: "Headphones", label: "Support tickets", labelFr: "Tickets d'assistance" },

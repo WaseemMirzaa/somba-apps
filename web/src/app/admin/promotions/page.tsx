@@ -1,5 +1,6 @@
 "use client";
 
+import { localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ export default function AdminPromotionsPage() {
   const { toast } = useToast();
   const fr = locale === "fr";
   const { items: campaigns, setItems: setCampaigns, error: campErr, reload: reloadCampaigns, loading: campLoading } = useServerList<CampaignRow>("campaigns:list", { pushEvents: ["campaign:updated"] });
-  const { items: promos, reload: reloadPromos, error: promoErr, loading: promoLoading } = useServerList<PromoRow>("promos:list", { pushEvents: ["promo:updated"] });
+  const { items: promos, setItems: setPromos, reload: reloadPromos, error: promoErr, loading: promoLoading } = useServerList<PromoRow>("promos:list", { pushEvents: ["promo:updated"] });
   const [tab, setTab] = useState("campaigns");
   const [filter, setFilter] = useState("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -63,6 +64,22 @@ export default function AdminPromotionsPage() {
       const updated = await socketClient.request<CampaignRow>("campaigns:setStatus", { id: c.id, status });
       setCampaigns((cur) => cur.map((x) => (x.id === c.id ? { ...x, ...updated } : x)));
       toast(status === "active" ? (fr ? "Campagne approuvée" : "Campaign approved") : fr ? "Campagne rejetée" : "Campaign rejected", "success");
+    } catch (e) {
+      toast(errMsg(e), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function setPromoActive(p: PromoRow, active: boolean) {
+    setBusyId(p.id);
+    try {
+      const updated = await socketClient.request<Partial<PromoRow> | null>("promos:setActive", { id: p.id, active });
+      setPromos((cur) => cur.map((x) => (x.id === p.id ? { ...x, ...(updated && typeof updated === "object" ? updated : {}), active } : x)));
+      toast(
+        active ? (fr ? "Code promo réactivé" : "Promo code resumed") : fr ? "Code promo mis en pause" : "Promo code paused",
+        "success",
+      );
     } catch (e) {
       toast(errMsg(e), "error");
     } finally {
@@ -220,9 +237,26 @@ export default function AdminPromotionsPage() {
                 { key: "value", label: fr ? "Remise" : "Discount", render: (row) => <span>{row.type === "percent" ? `${row.value}%` : formatCurrency(Number(row.value), locale)}</span> },
                 { key: "minOrder", label: fr ? "Min." : "Min order", render: (row) => (Number(row.minOrder) > 0 ? formatCurrency(Number(row.minOrder), locale) : "—") },
                 { key: "maxUses", label: fr ? "Limites" : "Limits", render: (row) => <span className="text-xs text-slate-500">{row.maxUses != null ? `${row.maxUses} ${fr ? "total" : "total"}` : fr ? "illimité" : "unlimited"}{row.perUserLimit != null ? ` · ${row.perUserLimit}/${fr ? "client" : "customer"}` : ""}</span> },
-                { key: "expiresAt", label: fr ? "Expire" : "Expires", render: (row) => <span className="text-xs text-slate-500">{row.expiresAt ? String(row.expiresAt).slice(0, 16).replace("T", " ") : "—"}</span> },
+                { key: "expiresAt", label: fr ? "Expire" : "Expires", render: (row) => <span className="text-xs text-slate-500">{row.expiresAt ? localDateTime(String(row.expiresAt)) : "—"}</span> },
                 { key: "isPublic", label: fr ? "Visibilité" : "Visibility", render: (row) => <Badge variant={row.isPublic ? "info" : "default"}>{row.isPublic ? (fr ? "Public" : "Public") : fr ? "Privé" : "Private"}</Badge> },
-                { key: "active", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.active ? "success" : "default"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge> },
+                { key: "active", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.active ? "success" : "default"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "En pause" : "Paused"}</Badge> },
+                {
+                  key: "actions",
+                  label: "",
+                  render: (row) => {
+                    const p = row as unknown as PromoRow;
+                    return (
+                      <Button
+                        size="sm"
+                        variant={p.active ? "reject" : "approve"}
+                        disabled={busyId === p.id}
+                        onClick={() => setPromoActive(p, !p.active)}
+                      >
+                        {p.active ? (fr ? "Mettre en pause" : "Pause") : fr ? "Reprendre" : "Resume"}
+                      </Button>
+                    );
+                  },
+                },
               ]}
             />
           </div>

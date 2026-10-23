@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { OrderLines } from "@/components/shop/order-lines";
+import { OneDeliveryNote } from "@/components/shop/one-delivery-note";
 import { VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -16,6 +17,9 @@ import { useShop, useCartLines } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
+import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import { AddressMapPicker } from "@/components/shop/address-map-picker";
+import type { AddressGeo, PickedParts } from "@/lib/google-maps";
 import { usePublicSettings, useVerificationStatus, zoneLabel } from "@/lib/shop-live";
 import type { Address } from "@/lib/realtime/types";
 
@@ -36,7 +40,7 @@ function CheckoutContent() {
   const [orderNote, setOrderNote] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "" });
+  const [form, setForm] = useState<{ label: string; line1: string; commune: string; city: string; phone: string; zoneId: string; geo: AddressGeo | null }>({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "", geo: null });
 
   const addresses = rt.addresses;
   // Selected address: the customer's pick, else the default, else the first one.
@@ -59,6 +63,17 @@ function CheckoutContent() {
   const discount = Math.min(promoDiscount, subtotal);
   const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
+  /** A map pick pre-fills the typed fields (still editable) and keeps the pin for the order. */
+  function applyPick(geo: AddressGeo, parts: PickedParts) {
+    setForm((f) => ({
+      ...f,
+      geo,
+      line1: parts.line1 ?? f.line1,
+      city: parts.city ?? f.city,
+      commune: parts.commune ?? f.commune,
+    }));
+  }
+
   async function saveAddress() {
     if (!form.line1.trim() || !form.city.trim()) {
       toast(fr ? "Adresse et ville obligatoires" : "Street address and city are required", "error");
@@ -73,11 +88,12 @@ function CheckoutContent() {
         commune: form.commune.trim() || undefined,
         phone: form.phone.trim() || undefined,
         zoneId: form.zoneId || undefined,
+        ...(form.geo ? { geo: form.geo } : {}),
       });
       setPickedAddress(created.id);
       if (created.zoneId && zones.some((z) => z.id === created.zoneId)) setZoneId(created.zoneId);
       setShowAdd(false);
-      setForm({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "" });
+      setForm({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "", geo: null });
       toast(fr ? "Adresse ajoutée" : "Address added");
     } catch (e) {
       toast((e as Error).message, "error");
@@ -146,6 +162,7 @@ function CheckoutContent() {
 
           {showAdd ? (
             <div className="space-y-3 rounded-xl border border-dashed border-blue-200 p-4">
+              <AddressMapPicker value={form.geo} onPick={applyPick} fr={fr} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse (rue, numéro)" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />
               <div className="grid gap-3 sm:grid-cols-2">
@@ -186,11 +203,17 @@ function CheckoutContent() {
             </select>
           </div>
         )}
+        {/* The sellers set each product's delivery time; the shopper only sees the resulting estimate. */}
+        <div className="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm" data-testid="delivery-estimate">
+          <span className="font-semibold">{fr ? "Livraison estimée :" : "Estimated delivery:"}</span>
+          <span>{dayLabel(estimateFor(lines.map((l) => l.deliveryDays)), fr)}</span>
+        </div>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />
           <span className="text-sm">{fr ? "Livraison colis ouvert" : "Open Box Delivery"}</span>
         </label>
         <textarea className="input-premium mb-4 w-full px-3 py-2 text-sm" placeholder={fr ? "Note pour le livreur (optionnel)" : "Note for the rider (optional)"} value={orderNote} onChange={(e) => setOrderNote(e.target.value)} rows={2} />
+        <OneDeliveryNote lines={lines} />
         <InfoGrid items={[
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),

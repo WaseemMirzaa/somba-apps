@@ -10,6 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
+import { noticeHref } from "@/lib/notice-links";
 
 const READ_STATUS_OPTIONS = [
   { value: "unread", label: "Unread", labelFr: "Non lu" },
@@ -25,6 +26,8 @@ export default function ShopNotificationsPage() {
     () =>
       notifications.map((n) => ({
         ...n,
+        // The order, return or ticket the notice is about (the server's link, as on the phone).
+        href: noticeHref(n, "shop"),
         titleFr: n.title,
         bodyFr: n.body,
         typeFr: n.type,
@@ -97,7 +100,7 @@ export default function ShopNotificationsPage() {
                 render: (row) => (
                   <div>
                     <Link
-                      href={String(row.href ?? "#")}
+                      href={String(row.href)}
                       onClick={() => markRead(String(row.id))}
                       className={`font-medium hover:underline ${row.read ? "text-slate-600" : "text-[var(--primary)]"}`}
                     >

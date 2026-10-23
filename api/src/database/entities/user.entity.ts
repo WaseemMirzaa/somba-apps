@@ -1,4 +1,6 @@
 import {
+  BeforeInsert,
+  BeforeUpdate,
   Column,
   CreateDateColumn,
   Entity,
@@ -7,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { encryptedColumn } from '../../common/crypto/field-crypto';
+import { phoneHash } from '../../common/phone/phone-hash';
 
 export type UserRole =
   | 'customer'
@@ -51,6 +54,17 @@ export class User {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   phone: string | null;
 
+  /** Lookup key for phone-code login (see common/phone/phone-hash.ts); kept in sync with `phone` automatically. */
+  @Index()
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  phoneHash: string | null;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  syncPhoneHash() {
+    this.phoneHash = phoneHash(this.phone);
+  }
+
   /** Encrypted at rest — JSON blob of the default address. */
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   address: string | null;
@@ -79,6 +93,15 @@ export class User {
   /** Rider/warehouse availability toggle. */
   @Column({ type: 'boolean', default: true })
   active: boolean;
+
+  /** Home warehouse of a rider or warehouse staff member (null = not tied to one; sees every warehouse). */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  hubId: string | null;
+
+  /** JSON list of zone ids a rider prefers (their tasks are offered first). */
+  @Column({ type: 'text', nullable: true })
+  preferredZones: string | null;
 
   /**
    * Bumped to invalidate all previously issued tokens ("log out everywhere").

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { missingPick, variantLabel } from "@/lib/variants";
 import { useParams, useRouter } from "next/navigation";
 import { Star, Truck, Share2, ShoppingCart } from "lucide-react";
 import { MobileAppPurchaseCta } from "@/components/shop/mobile-app-purchase-cta";
@@ -19,6 +20,7 @@ import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useSocketEvent, usePublicSettings, useProductReviews, zoneLabel } from "@/lib/shop-live";
+import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
 
 type ProductQuestion = {
   id: string;
@@ -41,6 +43,8 @@ export default function ShopProductDetailPage() {
   const { toast } = useToast();
   const settings = usePublicSettings();
   const [qty, setQty] = useState(1);
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [pickError, setPickError] = useState<string | null>(null);
   const [zonePick, setZonePick] = useState("");
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -124,6 +128,13 @@ export default function ShopProductDetailPage() {
 
   function add(goToCart: boolean) {
     if (!product || !product.inStock) return;
+    const missing = missingPick(product.variants, picks);
+    if (missing) {
+      setPickError(missing.name);
+      toast(fr ? `Choisissez : ${missing.name}` : `Choose a ${missing.name.toLowerCase()}`, "error");
+      return;
+    }
+    setPickError(null);
     addToCart({
       id: product.id,
       name: product.name,
@@ -131,7 +142,7 @@ export default function ShopProductDetailPage() {
       price: product.price,
       image: product.image,
       seller: product.seller,
-      variant: "Default",
+      variant: variantLabel(product.variants, picks),
       qty,
     });
     toast(fr ? "Ajouté au panier" : "Added to cart");
@@ -194,6 +205,33 @@ export default function ShopProductDetailPage() {
                   : (fr ? "En stock" : "In stock")
                 : (fr ? "Rupture de stock" : "Out of stock")}
             </p>
+            {product.variants.map((g) => (
+              <div key={g.name} data-testid={`variant-${g.name}`}>
+                <p className={`mb-1.5 text-sm font-medium ${pickError === g.name ? "text-red-600" : "text-slate-700"}`}>
+                  {g.name}
+                  {picks[g.name] ? `: ${picks[g.name]}` : pickError === g.name ? (fr ? " — à choisir" : " — please choose") : ""}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {g.options.map((o) => {
+                    const on = picks[g.name] === o;
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          setPicks((cur) => ({ ...cur, [g.name]: o }));
+                          if (pickError === g.name) setPickError(null);
+                        }}
+                        className={`min-w-11 rounded-lg border px-3 py-1.5 text-sm font-medium ${on ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-300 text-slate-700 hover:border-[var(--primary)]"}`}
+                      >
+                        {o}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-sm text-slate-600" htmlFor="qty">{fr ? "Quantité" : "Quantity"}</label>
               <select
@@ -245,7 +283,11 @@ export default function ShopProductDetailPage() {
             )}
             <div className="flex items-center gap-2 text-sm">
               <Truck className="h-4 w-4 text-[var(--primary)]" />
-              <span>{fr ? `Livraison en ${product.deliveryDays} jours` : `Delivery in ${product.deliveryDays} days`}</span>
+              <span data-testid="product-delivery-estimate">
+                {fr
+                  ? `Livraison en ${product.deliveryDays} jours · prévue le ${dayLabel(estimateFor([product.deliveryDays]), fr)}`
+                  : `Delivery in ${product.deliveryDays} days · expected ${dayLabel(estimateFor([product.deliveryDays]), fr)}`}
+              </span>
             </div>
             <div className="flex gap-4 text-xs text-slate-600">
               <span>✓ {fr ? `Retours sous ${product.returnWindow} jours` : `${product.returnWindow}-day returns`}</span>

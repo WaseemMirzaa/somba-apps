@@ -123,6 +123,15 @@ class AuthService {
   /// whether an address has an account).
   Future<String?> forgotPassword(String email) async => (await _call('/api/v1/auth/forgot', {'email': email}))['devToken'] as String?;
 
+  /// Phone-code login, step 1. The API answers the same whether or not the number has an account; the dev code
+  /// is included only outside production.
+  Future<String?> sendLoginCode(String phone) async =>
+      (await _call('/api/v1/auth/phone/login/send', {'phone': phone.trim()}))['devToken'] as String?;
+
+  /// Phone-code login, step 2.
+  Future<AuthResult> loginWithCode(String phone, String code) async =>
+      AuthResult.fromJson(await _call('/api/v1/auth/phone/login', {'phone': phone.trim(), 'code': code.trim()}));
+
   Future<void> resetPassword(String token, String password) =>
       _call('/api/v1/auth/reset', {'token': token.trim(), 'password': password});
 

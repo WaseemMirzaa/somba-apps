@@ -35,7 +35,7 @@ import { StatTile } from "@/components/seller/stat-tile";
 import { PlanSummary } from "@/components/seller/plan-summary";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData, useSellerLoad } from "@/lib/seller";
-import { orderStatusLabel, orderStatusVariant } from "@/lib/seller-labels";
+import { packageStatusLabel, packageStatusVariant } from "@/lib/seller-labels";
 import {
   HEALTH_LABELS,
   formatHours,
@@ -92,7 +92,7 @@ export default function SellerDashboard() {
   ];
 
   const series = a?.revenueSeries.map((d) => ({ label: shortDay(d.date, fr), revenue: d.revenue, orders: d.orders })) ?? [];
-  const openShipments = sellerOrderList.filter((o) => !["delivered", "cancelled", "returned"].includes(o.orderStatus)).length;
+  const openShipments = sellerOrderList.filter((o) => !["pending", "delivered", "cancelled", "returned"].includes(o.packageStatus)).length;
 
   return (
     <div className="space-y-6">
@@ -491,7 +491,7 @@ export default function SellerDashboard() {
                 },
                 { key: "customer", label: t("customer") },
                 { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-                { key: "orderStatus", label: t("status"), render: (row) => <Badge variant={orderStatusVariant(String(row.orderStatus))}>{orderStatusLabel(String(row.orderStatus), fr)}</Badge> },
+                { key: "packageStatus", label: t("status"), render: (row) => <Badge variant={packageStatusVariant(String(row.packageStatus))}>{packageStatusLabel(String(row.packageStatus), fr)}</Badge> },
               ]}
               data={sellerOrderList.slice(0, 5) as unknown as Record<string, unknown>[]}
               emptyMessage={fr ? "Aucune commande pour le moment." : "No orders yet."}

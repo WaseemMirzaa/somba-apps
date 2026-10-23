@@ -1,13 +1,18 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Modal, ErrorNote } from "@/components/admin/modal";
+import { useToast } from "@/context/toast-context";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { CampaignEffectTable, campaignApplies } from "@/components/seller/campaign-effect";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
-import { useSellerData } from "@/lib/seller";
-import { campaignStatusLabel, campaignStatusVariant } from "@/lib/seller-labels";
+import { EDITABLE_CAMPAIGN, useSellerData } from "@/lib/seller";
+import { campaignStatusLabel, campaignStatusVariant, errMessage } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 
@@ -15,8 +20,29 @@ export default function SellerPromotionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { getPromotion, sellerProductList, commissionPct, load } = useSellerData();
+  const { getPromotion, sellerProductList, commissionPct, load, withdrawCampaign } = useSellerData();
+  const { toast } = useToast();
   const promo = getPromotion(id);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function withdraw() {
+    if (!promo) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await withdrawCampaign(promo.id);
+      toast(fr ? "Campagne retirée : les prix reviennent à la normale" : "Campaign withdrawn: prices are back to normal");
+      setConfirming(false);
+    } catch (e) {
+      const msg = errMessage(e);
+      setError(msg);
+      toast(msg, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!promo) {
     if (load.error) return <LoadError message={load.error} onRetry={load.retry} />;
@@ -46,8 +72,41 @@ export default function SellerPromotionDetailPage() {
         title={promo.campaign}
         subtitle={`${promo.reference} · ${promo.discount}% ${fr ? "de remise" : "off"}`}
         backHref="/seller/promotions"
-        actions={<Badge variant={campaignStatusVariant(promo.status)}>{campaignStatusLabel(promo.status, fr)}</Badge>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={campaignStatusVariant(promo.status)}>{campaignStatusLabel(promo.status, fr)}</Badge>
+            {EDITABLE_CAMPAIGN.includes(promo.status) && (
+              <Link href={`/seller/promotions/${promo.id}/edit`}>
+                <Button size="sm" variant="secondary">{fr ? "Modifier" : "Edit"}</Button>
+              </Link>
+            )}
+            {promo.status !== "ended" && (
+              <Button size="sm" variant="danger" onClick={() => { setError(null); setConfirming(true); }}>
+                {fr ? "Retirer" : "Withdraw"}
+              </Button>
+            )}
+          </div>
+        }
       />
+
+      <Modal
+        open={confirming}
+        onClose={() => !busy && setConfirming(false)}
+        title={fr ? "Retirer cette campagne ?" : "Withdraw this campaign?"}
+        footer={
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setConfirming(false)} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button size="sm" variant="danger" onClick={() => void withdraw()} disabled={busy}>{busy ? "…" : fr ? "Retirer" : "Withdraw"}</Button>
+          </>
+        }
+      >
+        <p className="text-slate-600">
+          {fr
+            ? "La campagne se termine maintenant. Si elle était en cours, les clients repayent aussitôt le prix normal. Cette action est définitive."
+            : "The campaign ends now. If it was running, shoppers pay the normal price again straight away. This cannot be undone."}
+        </p>
+        <ErrorNote message={error} />
+      </Modal>
 
       <div className={`rounded-xl border px-4 py-3 text-sm ${applies ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`} data-testid="campaign-note">
         {text}

@@ -8,6 +8,7 @@ import { useSellerData } from "@/lib/seller";
 import { productStatusLabel, productStatusVariant } from "@/lib/seller-labels";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
+import { StoreHeader } from "@/components/shop/store-header";
 
 export default function SellerStorefrontPreviewPage() {
   const { locale } = useLocale();
@@ -20,11 +21,12 @@ export default function SellerStorefrontPreviewPage() {
     <div className="space-y-6">
       <PageHeader title={fr ? "Aperçu vitrine" : "Storefront Preview"} backHref="/seller/storefront" />
       <div className="card-premium p-6">
-        <div className="h-32 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600" />
+        <StoreHeader name={sellerStore.name} logoUrl={seller?.logoUrl} bannerUrl={seller?.bannerUrl} />
         <h2 className="mt-4 text-xl font-bold">{sellerStore.name}</h2>
         <p className="text-sm text-slate-500">
           {sellerStore.badge} · {sellerStore.rating > 0 ? `⭐ ${Number(sellerStore.rating).toFixed(1)}` : fr ? "Pas encore noté" : "Not rated yet"} · {live.length} {fr ? "produit(s) en ligne" : "live product(s)"}
         </p>
+        {seller?.description && <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{seller.description}</p>}
         {hidden > 0 && (
           <p className="mt-2 text-xs text-amber-700">
             {fr ? `${hidden} produit(s) non visible(s) par les clients (en attente, en pause ou refusés).` : `${hidden} product(s) are not visible to shoppers (pending, paused or rejected).`}

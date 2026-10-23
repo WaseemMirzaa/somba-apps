@@ -9,6 +9,7 @@ import { useSellerData } from "@/lib/seller";
 import { payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { MissingRecord } from "@/components/seller/data-state";
+import { PayoutStatement } from "@/components/payouts/statement-view";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerPayoutDetailPage() {
@@ -67,10 +68,14 @@ export default function SellerPayoutDetailPage() {
         )}
       </DetailSection>
 
+      <DetailSection title={fr ? "Relevé de règlement" : "Settlement statement"}>
+        <PayoutStatement payoutId={payout.payoutId} />
+      </DetailSection>
+
       <p className="text-xs text-slate-500">
         {fr
-          ? "Les versements sont prélevés sur votre solde global ; ils ne sont pas rattachés à des commandes précises."
-          : "Payouts draw on your overall balance; they are not tied to individual orders."}
+          ? "Un versement est prélevé sur votre solde global ; le relevé liste les ventes réglées pour la première fois par cette demande, la commission enregistrée à leur commande, les remboursements éventuels et le solde reporté. Une demande rejetée libère ses lignes."
+          : "A payout draws on your overall balance; the statement lists the sales this request settles for the first time, the commission stored when each was ordered, any refunds, and the balance carried forward. A rejected request releases its lines."}
       </p>
     </div>
   );

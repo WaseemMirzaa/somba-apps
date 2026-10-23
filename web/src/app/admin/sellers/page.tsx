@@ -1,5 +1,6 @@
 "use client";
 
+import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,7 +34,7 @@ export default function AdminSellersPage() {
   const rt = useRealtime();
   const sellers = useServerList<Seller & { plan?: string }>("sellers:list", { pushEvents: ["seller:updated"] });
   const sellerEntities = useMemo(
-    () => rankSellers(rt.orders, rt.products, sellers.items).map((s) => ({ ...s, storeName: s.name, date: s.createdAt.slice(0, 10), orders: s.orderCount })),
+    () => rankSellers(rt.orders, rt.products, sellers.items).map((s) => ({ ...s, storeName: s.name, date: localDay(s.createdAt), orders: s.orderCount })),
     [rt.orders, rt.products, sellers.items],
   );
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -97,9 +98,16 @@ export default function AdminSellersPage() {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
-                    {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
-                  </Badge>
+                  <div className="min-w-0">
+                    <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
+                      {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
+                    </Badge>
+                    {(row.status === "rejected" || row.status === "suspended") && !!row.statusReason && (
+                      <p className="mt-1 max-w-[14rem] truncate text-xs text-slate-500" title={String(row.statusReason)}>
+                        {String(row.statusReason)}
+                      </p>
+                    )}
+                  </div>
                 ),
               },
               { key: "date", label: t("date") },

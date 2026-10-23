@@ -1,0 +1,103 @@
+/**
+ * Google Maps loader + helpers for the address picker.
+ *
+ * Needs `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (a browser key restricted to your site's HTTP referrers) with these APIs
+ * enabled in Google Cloud: Maps JavaScript API, Places API (New), Geocoding API.
+ * Without the key the picker explains that and the address form keeps working with manual entry.
+ */
+export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+/** Advanced markers need a Map ID; "DEMO_MAP_ID" is Google's development map, replace it with your own style in production. */
+export const MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
+/** Default view when no pin exists yet: Kinshasa (the primary market). */
+export const DEFAULT_CENTER = { lat: -4.3224, lng: 15.307 };
+
+export interface AddressGeo {
+  lat: number;
+  lng: number;
+  placeId?: string;
+  formatted?: string;
+}
+
+/** Address parts a map pick can fill into the form. */
+export interface PickedParts {
+  line1?: string;
+  commune?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  postalCode?: string;
+}
+
+export class MapsError extends Error {
+  constructor(public code: "no-key" | "load-failed" | "auth-failed", message: string) {
+    super(message);
+  }
+}
+
+type GoogleWindow = Window & { google?: typeof google; gm_authFailure?: () => void; __initGoogleMaps?: () => void };
+let loading: Promise<typeof google.maps> | null = null;
+
+export function loadGoogleMaps(): Promise<typeof google.maps> {
+  if (!MAPS_KEY) return Promise.reject(new MapsError("no-key", "No Google Maps API key configured."));
+  if (loading) return loading;
+  const w = window as GoogleWindow;
+  loading = new Promise<typeof google.maps>((resolve, reject) => {
+    if (w.google?.maps?.importLibrary) {
+      resolve(w.google.maps);
+      return;
+    }
+    // Google calls this when the key is rejected (wrong referrer, API not enabled, billing off...).
+    w.gm_authFailure = () => {
+      loading = null;
+      reject(new MapsError("auth-failed", "Google rejected the Maps API key."));
+    };
+    w.__initGoogleMaps = () => resolve(w.google!.maps);
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&loading=async&v=weekly&callback=__initGoogleMaps`;
+    s.async = true;
+    s.onerror = () => {
+      loading = null;
+      reject(new MapsError("load-failed", "Could not load Google Maps."));
+    };
+    document.head.appendChild(s);
+  });
+  return loading;
+}
+
+interface Component {
+  types: string[];
+  long: string;
+}
+
+/** Turn Google address components into the fields our address form uses. */
+export function partsFromComponents(components: Component[]): PickedParts {
+  const get = (...types: string[]) => components.find((c) => types.some((t) => c.types.includes(t)))?.long;
+  const street = [get("street_number"), get("route")].filter(Boolean).join(" ");
+  return {
+    line1: street || get("premise", "establishment", "point_of_interest") || undefined,
+    commune: get("sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_3"),
+    city: get("locality", "postal_town", "administrative_area_level_2"),
+    region: get("administrative_area_level_1"),
+    country: get("country"),
+    postalCode: get("postal_code"),
+  };
+}
+
+/** Reverse-geocode a pin into address parts + a formatted line. */
+export async function reverseGeocode(
+  maps: typeof google.maps,
+  pos: { lat: number; lng: number },
+): Promise<{ parts: PickedParts; formatted?: string; placeId?: string }> {
+  const { Geocoder } = (await maps.importLibrary("geocoding")) as google.maps.GeocodingLibrary;
+  const res = await new Geocoder().geocode({ location: pos });
+  const best = res.results[0];
+  if (!best) return { parts: {} };
+  return {
+    parts: partsFromComponents(best.address_components.map((c) => ({ types: c.types, long: c.long_name }))),
+    formatted: best.formatted_address,
+    placeId: best.place_id,
+  };
+}
+
+export const mapsLinkTo = (geo: { lat: number; lng: number }) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${geo.lat},${geo.lng}`;

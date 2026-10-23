@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { ENTITIES } from './entities';
+import { MYSQL_UTC_OPTIONS } from './mysql-utc';
 
 /**
  * Standalone TypeORM DataSource for the migration CLI (separate from the Nest
@@ -28,6 +29,7 @@ const options: DataSourceOptions =
         entities: ENTITIES,
         migrations: [__dirname + '/migrations/*.{ts,js}'],
         synchronize: false,
+        ...MYSQL_UTC_OPTIONS,
       }
     : {
         type: 'better-sqlite3',

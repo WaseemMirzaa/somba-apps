@@ -21,7 +21,7 @@ export default function SellerCustomerAnalyticsPage() {
   const cities = useMemo(() => {
     const m = new Map<string, { city: string; orders: number; revenue: number }>();
     for (const o of sellerOrderList) {
-      if (["cancelled", "returned", "pending"].includes(o.orderStatus)) continue;
+      if (!o.countsAsSale) continue;
       const city = o.customerCity === "—" ? (fr ? "Non renseignée" : "Not given") : o.customerCity;
       const cur = m.get(city) ?? { city, orders: 0, revenue: 0 };
       cur.orders += 1;

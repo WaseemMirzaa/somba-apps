@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DetailSection } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
+import { MAX_GROUPS, MAX_OPTIONS, readVariants, type VariantGroup } from "@/lib/variants";
+import { DELIVERY_DAYS } from "@/lib/delivery-estimate";
 import { ProductImage } from "@/components/seller/product-image";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -29,8 +31,16 @@ type FormState = {
   price: string;
   originalPrice: string;
   stock: string;
+  /** The seller's delivery time for this product, in days. */
+  deliveryDays: string;
   image: string;
+  /** Option types; `values` is the comma-separated list the seller types. */
+  options: { name: string; values: string }[];
 };
+
+const splitValues = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
+const toGroups = (rows: FormState["options"]): VariantGroup[] =>
+  rows.map((r) => ({ name: r.name.trim(), options: splitValues(r.values) })).filter((g) => g.name || g.options.length);
 
 /**
  * The form is filled with the STORED list price (`basePrice`), never the price
@@ -57,7 +67,9 @@ function initialForm(p?: SellerProductRow | null): FormState {
     price: p ? String(listPriceOf(p)) : "",
     originalPrice: compare ? String(compare) : "",
     stock: p ? String(p.stock) : "",
+    deliveryDays: String(p?.deliveryDays ?? DELIVERY_DAYS.fallback),
     image: p?.image ?? "",
+    options: readVariants(p?.variants).map((g) => ({ name: g.name, values: g.options.join(", ") })),
   };
 }
 
@@ -103,6 +115,22 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const priceNum = Number(form.price);
   const origNum = Number(form.originalPrice);
   const stockNum = Number(form.stock);
+  const daysNum = Number(form.deliveryDays);
+
+  const groups = toGroups(form.options);
+  const optionsError = (() => {
+    const names = new Set<string>();
+    for (const g of groups) {
+      if (!g.name) return fr ? "Donnez un nom à chaque type d'option (ex. Taille)." : "Give each option type a name (e.g. Size).";
+      if (g.options.length === 0) return fr ? `Ajoutez au moins une valeur pour « ${g.name} ».` : `Add at least one value for "${g.name}".`;
+      if (g.options.length > MAX_OPTIONS) return fr ? `${MAX_OPTIONS} valeurs maximum pour « ${g.name} ».` : `At most ${MAX_OPTIONS} values for "${g.name}".`;
+      if (new Set(g.options.map((o) => o.toLowerCase())).size !== g.options.length) return fr ? `« ${g.name} » contient deux fois la même valeur.` : `"${g.name}" has the same value twice.`;
+      if (names.has(g.name.toLowerCase())) return fr ? `« ${g.name} » est en double.` : `"${g.name}" is listed twice.`;
+      if ([g.name, ...g.options].some((x) => x.includes(":") || x.includes("·"))) return fr ? "Les options ne peuvent pas contenir « : » ou « · »." : 'Options cannot contain ":" or "·".';
+      names.add(g.name.toLowerCase());
+    }
+    return "";
+  })();
 
   const errors = {
     title: form.title.trim().length < 2 ? (fr ? "Le titre doit contenir au moins 2 caractères." : "Title must be at least 2 characters.") : form.title.trim().length > 200 ? (fr ? "200 caractères maximum." : "200 characters maximum.") : "",
@@ -116,14 +144,19 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
       form.stock.trim() === "" || !Number.isInteger(stockNum) || stockNum < 0
         ? (fr ? "Le stock doit être un entier supérieur ou égal à 0." : "Stock must be a whole number, 0 or more.")
         : "",
+    deliveryDays:
+      !Number.isInteger(daysNum) || daysNum < DELIVERY_DAYS.min || daysNum > DELIVERY_DAYS.max
+        ? (fr ? `Le délai de livraison doit être un nombre entier de ${DELIVERY_DAYS.min} à ${DELIVERY_DAYS.max} jours.` : `Delivery time must be a whole number of days from ${DELIVERY_DAYS.min} to ${DELIVERY_DAYS.max}.`)
+        : "",
+    options: optionsError,
   };
   const stepValid = [
     !errors.title && !errors.category,
     !uploading,
-    !errors.price && !errors.originalPrice && !errors.stock,
+    !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options,
     true,
   ];
-  const allValid = !errors.title && !errors.category && !errors.price && !errors.originalPrice && !errors.stock && !uploading;
+  const allValid = !errors.title && !errors.category && !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options && !uploading;
 
   const show = (k: keyof typeof errors) => errors[k];
   const fieldErr = (k: keyof typeof errors) =>
@@ -157,8 +190,10 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
       category,
       categoryFr: chosen?.nameFr,
       stock: stockNum,
+      deliveryDays: daysNum,
       image: form.image || undefined,
       description: form.description.trim() || undefined,
+      variants: groups,
     };
     setSubmitting(true);
     setSubmitError(null);
@@ -181,6 +216,8 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           patch.originalPrice = form.originalPrice.trim() ? origNum : null;
         }
         if (stockNum !== Number(before.stock)) patch.stock = stockNum;
+        if (daysNum !== Number(before.deliveryDays)) patch.deliveryDays = daysNum;
+        if (JSON.stringify(groups) !== JSON.stringify(toGroups(before.options))) patch.variants = groups;
         if (Object.keys(patch).length > 0) await updateProduct(product.id, patch);
         toast(fr ? "Modifications enregistrées" : "Changes saved");
         router.push(`/seller/products/${product.id}`);
@@ -351,6 +388,58 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               <input type="number" min="0" step="1" className={input} value={form.stock} onChange={(e) => { set({ stock: e.target.value }); }} />
               {fieldErr("stock")}
             </div>
+            <div>
+              <label className={label} htmlFor="pw-delivery-days">{fr ? "Délai de livraison (jours) *" : "Delivery time (days) *"}</label>
+              <input id="pw-delivery-days" type="number" min={DELIVERY_DAYS.min} max={DELIVERY_DAYS.max} step="1" className={input} value={form.deliveryDays} onChange={(e) => { set({ deliveryDays: e.target.value }); }} />
+              {fieldErr("deliveryDays")}
+              <p className="mt-1 text-xs text-slate-500">
+                {fr ? "Du paiement à la remise au client. Le client voit la date estimée ; il ne la choisit pas." : "From payment to handover. Shoppers see the estimated date; they don't choose it."}
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 rounded-xl border border-[var(--border)] p-4" data-testid="variant-options">
+            <p className="text-sm font-semibold">{fr ? "Options (facultatif)" : "Options (optional)"}</p>
+            <p className="mb-3 text-xs text-slate-500">
+              {fr
+                ? "Ex. Taille : 39, 40, 41 — Couleur : Noir, Blanc. Le client devra choisir avant d'acheter. Le stock est commun à toutes les options."
+                : "E.g. Size: 39, 40, 41 — Colour: Black, White. Shoppers must choose before buying. Stock is shared by all options."}
+            </p>
+            {form.options.map((row, i) => (
+              <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+                <input
+                  className={input}
+                  aria-label={fr ? "Type d'option" : "Option type"}
+                  placeholder={fr ? "Taille" : "Size"}
+                  maxLength={30}
+                  value={row.name}
+                  onChange={(e) => set({ options: form.options.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)) })}
+                />
+                <input
+                  className={input}
+                  aria-label={fr ? "Valeurs, séparées par des virgules" : "Values, comma-separated"}
+                  placeholder={fr ? "39, 40, 41, 42" : "39, 40, 41, 42"}
+                  value={row.values}
+                  onChange={(e) => set({ options: form.options.map((r, j) => (j === i ? { ...r, values: e.target.value } : r)) })}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg px-3 text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => set({ options: form.options.filter((_, j) => j !== i) })}
+                >
+                  {fr ? "Retirer" : "Remove"}
+                </button>
+              </div>
+            ))}
+            {form.options.length < MAX_GROUPS && (
+              <button
+                type="button"
+                className="text-sm font-medium text-[var(--primary)] hover:underline"
+                onClick={() => set({ options: [...form.options, { name: "", values: "" }] })}
+              >
+                {fr ? "+ Ajouter un type d'option" : "+ Add an option type"}
+              </button>
+            )}
+            {fieldErr("options")}
           </div>
           {promo && (
             <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800" data-testid="promo-note">
@@ -380,6 +469,8 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               [fr ? "Prix" : "Price", form.price ? `$${form.price}` : ""],
               [fr ? "Prix barré" : "Compare-at", form.originalPrice ? `$${form.originalPrice}` : ""],
               [fr ? "Stock" : "Stock", form.stock],
+              [fr ? "Délai de livraison" : "Delivery time", form.deliveryDays ? (fr ? `${form.deliveryDays} jours` : `${form.deliveryDays} days`) : ""],
+              ...groups.map((g) => [g.name, g.options.join(", ")]),
             ].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 border-b border-[var(--border)] py-2">
                 <dt className="text-slate-500">{k}</dt>

@@ -84,6 +84,10 @@ export class Order {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   shippingAddress: string | null;
 
+  /** Expected delivery day (YYYY-MM-DD, Kinshasa): order day + the slowest line's seller-set delivery days. */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  estimatedDeliveryDate: string | null;
+
   /** Assigned rider (set when a delivery task is accepted). */
   @Column({ type: 'varchar', nullable: true })
   riderId: string | null;

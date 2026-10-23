@@ -5,6 +5,8 @@ import {
   DeliveryStatus,
   DeliveryTask,
   Order,
+  OrderItem,
+  User,
 } from '../database/entities';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -12,6 +14,7 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { SettingsService } from '../content/settings.service';
 import { pageOf } from '../common/paging';
+import { sameHub, tasksOfHub } from '../common/zones/hub-scope';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 
@@ -52,12 +55,14 @@ export class DeliveryService {
     private readonly emitter: RealtimeEmitter,
     private readonly payments: PaymentsService,
     private readonly settings: SettingsService,
+    @InjectRepository(User) private readonly users?: Repository<User>,
   ) {}
 
-  listUnassigned(paging?: unknown): Promise<DeliveryTask[]> {
+  /** Open tasks; for a warehouse-bound rider or staff member only their warehouse's (and unbound) tasks. */
+  listUnassigned(paging?: unknown, hubId?: string | null): Promise<DeliveryTask[]> {
     const { take, skip } = pageOf(paging);
     return this.tasks.find({
-      where: { status: 'unassigned' },
+      where: tasksOfHub({ status: 'unassigned' }, hubId),
       order: { createdAt: 'ASC' },
       take,
       skip,
@@ -75,9 +80,9 @@ export class DeliveryService {
   }
 
   /** Newest 200 by default (the dispatch desk's view); `limit`/`offset` page further back. */
-  listAll(paging?: unknown): Promise<DeliveryTask[]> {
+  listAll(paging?: unknown, hubId?: string | null): Promise<DeliveryTask[]> {
     const { take, skip } = pageOf(paging, { def: 200 });
-    return this.tasks.find({ order: { updatedAt: 'DESC' }, take, skip });
+    return this.tasks.find({ where: tasksOfHub({}, hubId), order: { updatedAt: 'DESC' }, take, skip });
   }
 
   /**
@@ -92,6 +97,16 @@ export class DeliveryService {
     opts: { reassign?: boolean } = {},
   ): Promise<DeliveryTask> {
     const from = opts.reassign ? ['unassigned', 'assigned'] : ['unassigned'];
+    // A rider takes tasks of their own warehouse only (the dispatch desk may assign across warehouses).
+    if (!opts.reassign && this.users) {
+      const [task, me] = await Promise.all([
+        this.tasks.findOne({ where: { id: taskId }, select: ['id', 'hubId'] }),
+        this.users.findOne({ where: { id: rider.id }, select: ['id', 'hubId'] }),
+      ]);
+      if (task && !sameHub(me?.hubId, task.hubId)) {
+        throw new BadRequestException('This delivery belongs to another warehouse.');
+      }
+    }
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
@@ -111,6 +126,8 @@ export class DeliveryService {
       order.status = 'processing';
       await this.orders.save(order);
       this.emitter.toUser(order.customerId, 'order:updated', order);
+      // Ops pages and (through the order fanout) every seller on the order follow along.
+      this.emitter.toRoles(OPS_ROOMS, 'order:updated', order);
     }
 
     this.emitter.toUser(rider.id, 'delivery:updated', saved);
@@ -123,15 +140,35 @@ export class DeliveryService {
         entityId: order.id,
       });
     }
+    // A rider who took the task themselves already knows; one assigned by the dispatch desk is told.
+    if (opts.reassign) {
+      await this.notifications.toUser(rider.id, {
+        title: 'New delivery assigned to you',
+        body: `${saved.orderReference} is now in your deliveries.`,
+        type: 'task',
+        entityId: saved.id,
+        extra: { orderId: saved.orderId, view: 'active' },
+      });
+    }
     return saved;
   }
 
   /** Ops assign a task to a specific rider (dispatch desk). */
+  /**
+   * The dispatch desk gives a task to a rider. Admins may assign across warehouses; warehouse staff tied to a
+   * warehouse (`staffHubId`) only assign their warehouse's parcels to their warehouse's riders.
+   */
   async assign(
     taskId: string,
-    rider: { id: string; name: string },
+    rider: { id: string; name: string; hubId?: string | null },
+    staffHubId?: string | null,
   ): Promise<DeliveryTask> {
-    return this.accept(taskId, rider, { reassign: true });
+    if (staffHubId) {
+      const task = await this.tasks.findOne({ where: { id: taskId }, select: ['id', 'hubId'] });
+      if (task && !sameHub(staffHubId, task.hubId)) throw new BadRequestException('This delivery belongs to another warehouse.');
+      if (!sameHub(staffHubId, rider.hubId)) throw new BadRequestException('This rider works at another warehouse.');
+    }
+    return this.accept(taskId, { id: rider.id, name: rider.name }, { reassign: true });
   }
 
   /** The assigned rider advances the delivery; the customer order status follows along. */
@@ -251,8 +288,26 @@ export class DeliveryService {
       task.receivedAt = new Date();
       await this.tasks.save(task);
     }
+    // The packed seller packages are now at the hub (a seller still packing stays open).
+    await this.tasks.manager.update(
+      OrderItem,
+      { orderId: task.orderId, fulfilment: 'ready' },
+      { fulfilment: 'received', receivedAt: task.receivedAt },
+    );
     this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
     if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+    // The customer and every seller on the order see the parcel reach the warehouse.
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    if (order) {
+      this.emitter.toUser(order.customerId, 'order:updated', order);
+      this.emitter.toRoles(OPS_ROOMS, 'order:updated', order);
+      await this.notifications.toUser(order.customerId, {
+        title: 'Parcel at our warehouse',
+        body: `${order.reference} reached the Somba&Teka warehouse and will be on its way soon.`,
+        type: 'delivery',
+        entityId: order.id,
+      });
+    }
     return task;
   }
 

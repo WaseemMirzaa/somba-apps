@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, Phone } from "lucide-react";
+import { LogOut, Phone, Warehouse } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
-import { useRiderData } from "@/lib/rider";
+import { useRiderAssignment, useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 
@@ -17,6 +17,7 @@ export default function RiderProfilePage() {
   const router = useRouter();
   const { logout } = useAuth();
   const { riderProfile, getActiveRiderTasks } = useRiderData();
+  const assignment = useRiderAssignment();
   const activeTasks = getActiveRiderTasks();
   const initials = riderProfile.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
@@ -50,6 +51,32 @@ export default function RiderProfilePage() {
           },
           { label: fr ? "Livraisons en cours" : "Active deliveries", value: riderProfile.activeTasks },
         ]} />
+      </DetailSection>
+
+      <DetailSection title={fr ? "Où je travaille" : "Where I work"}>
+        {assignment.error ? (
+          <p className="text-sm text-red-600">{assignment.error}</p>
+        ) : !assignment.data ? (
+          <p className="text-sm text-slate-400">{fr ? "Chargement…" : "Loading…"}</p>
+        ) : (
+          <InfoGrid items={[
+            {
+              label: fr ? "Entrepôt" : "Home warehouse",
+              value: assignment.data.hub ? (
+                <span className="inline-flex items-center gap-1"><Warehouse className="h-3.5 w-3.5 text-emerald-600" />{assignment.data.hub.name} · {assignment.data.hub.city}</span>
+              ) : (fr ? "Aucun — vous voyez les livraisons de tous les entrepôts" : "None — you see every warehouse's deliveries"),
+              full: true,
+            },
+            {
+              label: fr ? "Mes zones" : "My zones",
+              value: assignment.data.preferredZones.length ? assignment.data.preferredZones.map((z) => z.name).join(", ") : "—",
+            },
+            {
+              label: fr ? "Zones de l'entrepôt" : "Warehouse zones",
+              value: assignment.data.hubZones.length ? assignment.data.hubZones.map((z) => z.name).join(", ") : "—",
+            },
+          ]} />
+        )}
       </DetailSection>
 
       <DetailSection title={fr ? "Livraisons en cours" : "Current Deliveries"}>

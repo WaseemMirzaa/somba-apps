@@ -13,7 +13,7 @@ export default function SellerStatementsPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { statements, sellerStore, commissionPct } = useSellerData();
+  const { statements, sellerStore } = useSellerData();
 
   function monthLabel(month: string) {
     const [y, m] = month.split("-").map(Number);
@@ -22,7 +22,7 @@ export default function SellerStatementsPage() {
 
   function csvFor(rows: typeof statements, filename: string) {
     downloadCsv(filename, [
-      ["Month", "Delivered orders", "Gross (USD)", `Commission ${commissionPct}% (USD)`, "Net (USD)", "Paid out (USD)"],
+      ["Month", "Delivered orders", "Gross (USD)", "Commission (USD, rate stored per order)", "Net (USD)", "Paid out (USD)"],
       ...rows.map((r) => [r.month, r.orders, r.gross.toFixed(2), r.commission.toFixed(2), r.net.toFixed(2), r.paidOut.toFixed(2)]),
     ]);
     toast(fr ? "Relevé CSV téléchargé" : "Statement CSV downloaded");
@@ -34,7 +34,7 @@ export default function SellerStatementsPage() {
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Relevés" : "Statements"}
-        subtitle={fr ? "Relevé mensuel calculé à partir de vos commandes livrées et versements payés" : "Monthly statement computed from your delivered orders and paid payouts"}
+        subtitle={fr ? "Relevé mensuel calculé à partir de vos commandes livrées (commission enregistrée à chaque commande) et versements payés ; le détail de chaque versement est dans Versements" : "Monthly statement computed from your delivered orders (commission stored per order) and paid payouts; each payout's own statement is under Payouts"}
         backHref="/seller/finance"
         actions={
           statements.length > 0 ? (

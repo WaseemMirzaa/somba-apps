@@ -5,6 +5,7 @@
  *   API_URL=http://localhost:3001 node test/authz-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { kyc } = require('./kyc.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -58,7 +59,7 @@ const register = async (label, role = 'customer') => {
   // ---- sellers (need an approved store to sell) ----------------------------
   const makeSeller = async (label, approve) => {
     const u = await register(label, 'seller');
-    const reg = await req(u.sock, 'sellers:register', { name: `${label} Store` });
+    const reg = await req(u.sock, 'sellers:register', kyc(`${label} Store`));
     if (approve) await req(admin.sock, 'sellers:setStatus', { id: reg.data.id, status: 'approved' });
     return { ...u, store: reg.data };
   };
@@ -71,7 +72,7 @@ const register = async (label, role = 'customer') => {
   ok(!a.ok && /approv/i.test(a.error ?? ''), 'a pending seller cannot list products', a.error ?? '');
   a = await req(sellerP.sock, 'payouts:request', { amountUsd: 50 });
   ok(!a.ok, 'a pending seller cannot request payouts');
-  a = await req(cust.sock, 'sellers:register', { name: 'Fake Store' });
+  a = await req(cust.sock, 'sellers:register', kyc('Fake Store'));
   ok(!a.ok, 'a customer cannot open a store');
 
   section('Listings are validated (no negative prices / stock) and not mass-assignable');
@@ -163,7 +164,11 @@ const register = async (label, role = 'customer') => {
   a = await req(warehouse.sock, 'orders:updateStatus', { orderId: o1.id, status: 'banana' });
   ok(!a.ok, 'an invalid status is rejected');
   a = await req(warehouse.sock, 'orders:updateStatus', { orderId: o1.id, status: 'processing' });
-  ok(a.ok, 'warehouse staff can advance an order');
+  ok(!a.ok, 'warehouse staff can no longer move an order by hand (admin / operations only)');
+  a = await req(admin.sock, 'orders:updateStatus', { orderId: o1.id, status: 'processing' });
+  ok(a.ok, 'an admin can advance an order one step');
+  a = await req(admin.sock, 'orders:updateStatus', { orderId: o1.id, status: 'delivered' });
+  ok(!a.ok && /Cannot move an order from processing to delivered/.test(a.error ?? ''), 'but not skip steps', a.error ?? '');
 
   // ---- delivery ------------------------------------------------------------
   section('Delivery: only the assigned rider, only forward');
@@ -361,7 +366,7 @@ const register = async (label, role = 'customer') => {
   const meB = (await req(sellerB.sock, 'sellers:mine')).data;
   ok(meB.plan === 'free' && meB.activePlan === 'free' && meB.planExpiresAt === null, 'sellers:update ignores plan / planExpiresAt (no mass assignment)');
   const sus = await makeSeller('selS', true);
-  await req(admin.sock, 'sellers:setStatus', { id: sus.store.id, status: 'suspended' });
+  await req(admin.sock, 'sellers:setStatus', { id: sus.store.id, status: 'suspended', reason: 'Smoke test: policy review' });
   ok(!(await req(sus.sock, 'sellers:subscribe', { plan: 'starter', method: 'airtel_money', phone: PHONE })).ok, 'a suspended store cannot buy a plan');
   a = await req(sellerB.sock, 'sellers:subscribe', { plan: 'starter', method: 'airtel_money', phone: PHONE });
   ok(a.ok && a.data.status === 'pending', 'a store can start a plan payment');

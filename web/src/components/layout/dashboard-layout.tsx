@@ -38,6 +38,7 @@ import { useState, useRef, useCallback, useLayoutEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalSwitcher } from "@/components/layout/portal-switcher";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { getAdminSections, getDepartmentLabel } from "@/lib/admin-access";
@@ -117,6 +118,7 @@ const portalConfigs = {
       { href: "/seller/shipping", label: "shipping", icon: Truck, i18n: true },
       { href: "/seller/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/seller/replacements", label: "replacements", icon: RefreshCw, i18n: true },
+      { href: "/seller/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
       { href: "/seller/promotions", label: "promotions", icon: Megaphone, i18n: true },
       { href: "/seller/reviews", label: "reviews", icon: Star, i18n: true },
       { href: "/seller/finance", label: "finance", icon: Wallet, i18n: true },
@@ -293,6 +295,8 @@ export function DashboardLayout({
           </div>
 
           <div className="flex-1" />
+
+          <NotificationBell portal={portal} fr={locale === "fr"} />
 
           <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-slate-50 p-1">
             <button

@@ -17,7 +17,7 @@ import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
-  { value: "approved", label: "Approved", labelFr: "Approuvé" },
+  { value: "live", label: "Live", labelFr: "En ligne" },
   { value: "rejected", label: "Rejected", labelFr: "Rejeté" },
   { value: "removed", label: "Blocked", labelFr: "Bloqué" },
   { value: "draft", label: "Draft (paused)", labelFr: "Brouillon (en pause)" },
@@ -25,7 +25,7 @@ const STATUS_OPTIONS = [
 
 const STATUS_FR: Record<string, string> = {
   pending: "En attente",
-  approved: "Approuvé",
+  live: "En ligne",
   rejected: "Rejeté",
   removed: "Bloqué",
   draft: "Brouillon",
@@ -115,7 +115,7 @@ export default function AdminProductsPage() {
               {
                 key: "status",
                 label: t("status"),
-                render: (row) => <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : row.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
+                render: (row) => <Badge variant={row.status === "live" ? "success" : row.status === "pending" ? "warning" : row.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>,
               },
               {
                 key: "actions",
