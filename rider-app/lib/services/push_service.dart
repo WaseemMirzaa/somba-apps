@@ -14,6 +14,10 @@ class PushMessage {
   final String? body;
   final Map<String, String> data;
 
+  /// The French wording, when the server put it in the push data (null otherwise).
+  String? get titleFr => _nonEmpty(data['titleFr']);
+  String? get bodyFr => _nonEmpty(data['bodyFr']);
+
   String get type => data['type'] ?? '';
   String? get entityId => _nonEmpty(data['entityId']);
   String? get notificationId => _nonEmpty(data['notificationId']);

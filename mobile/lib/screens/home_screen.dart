@@ -46,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (cms.isEmpty) return [_Banner(_gradients[0], _icons[0], '', s.heroTitle, s.heroSubtitle)];
     return [
       for (var i = 0; i < cms.length; i++)
-        _Banner(_gradients[i % _gradients.length], _icons[i % _icons.length], '', cms[i].title, cms[i].body),
+        _Banner(_gradients[i % _gradients.length], _icons[i % _icons.length], '', cms[i].displayTitle(s.lang), cms[i].displayBody(s.lang)),
     ];
   }
 
@@ -453,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: cat.name))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: cat.name, categoryId: cat.id))),
             child: Column(
               children: [
                 Container(

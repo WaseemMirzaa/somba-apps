@@ -67,6 +67,15 @@ class AppRadius {
   static const BorderRadius pill = BorderRadius.all(Radius.circular(100));
 }
 
+/// Spacing steps for new UI (older screens still carry their own literals).
+class AppSpace {
+  AppSpace._();
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+}
+
 class AppShadow {
   AppShadow._();
   static List<BoxShadow> soft = [

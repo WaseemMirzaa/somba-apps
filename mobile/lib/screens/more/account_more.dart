@@ -84,7 +84,7 @@ class NotificationsScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final n = items[i];
-                    final text = localizeNotification(s, n.title, n.body);
+                    final text = displayNotice(s, title: n.title, body: n.body, titleFr: n.titleFr, bodyFr: n.bodyFr);
                     final (icon, color) = _style(n.type);
                     return GestureDetector(
                       // Same destinations as a push tap: the order, its tracking, the wallet, the return or the ticket.

@@ -25,7 +25,7 @@ Future<void> buyAgain(BuildContext context, OrderDto order, Locale locale) async
   for (final i in order.items.where((i) => !i.isCancelled)) {
     final p = productByUuid(i.productId);
     if (p == null || p.stock <= 0) {
-      missing.add(i.productName);
+      missing.add(i.displayName(s.lang));
       continue;
     }
     added += ShopState.instance.addToCart(p, variant: i.variant, qty: i.qty);
@@ -55,7 +55,7 @@ String receiptText(Strings s, OrderDto o) {
   b.writeln('');
   for (final i in o.items) {
     final cancelled = i.isCancelled ? ' (${s.receiptCancelled})' : '';
-    b.writeln('${i.qty} × ${i.productName}${i.variant == 'Default' ? '' : ' (${i.variant})'} — ${money(i.priceUsd * i.qty)}$cancelled');
+    b.writeln('${i.qty} × ${i.displayName(s.lang)}${i.hasVariant ? ' (${i.displayVariant(s.lang)})' : ''} — ${money(i.priceUsd * i.qty)}$cancelled');
   }
   b
     ..writeln('')
@@ -132,7 +132,7 @@ class ReviewPromptCard extends StatelessWidget {
         const SizedBox(height: 8),
         for (final i in lines)
           Row(children: [
-            Expanded(child: Text(i.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+            Expanded(child: Text(i.displayName(s.lang), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
             TextButton(
               key: ValueKey('review-${i.productId}'),
               onPressed: () {
@@ -253,7 +253,7 @@ class _ItemIssueScreenState extends State<ItemIssueScreen> {
                 key: ValueKey('issue-item-${i.productId}'),
                 contentPadding: EdgeInsets.zero,
                 value: i.productId,
-                title: Text('${i.qty} × ${i.productName}', style: const TextStyle(fontSize: 13.5)),
+                title: Text('${i.qty} × ${i.displayName(s.lang)}', style: const TextStyle(fontSize: 13.5)),
               ),
           ]),
         ),

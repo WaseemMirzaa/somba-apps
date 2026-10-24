@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_actions.dart';
+import '../../widgets/translatable_text.dart' show MachineNote;
 import '../product_detail_screen.dart' show reviewTile;
 import 'catalog_extra.dart';
 
@@ -85,7 +86,10 @@ class _StoreScreenState extends State<StoreScreen> {
     final top = MediaQuery.of(context).padding.top;
     final banner = _seller?['bannerUrl'] as String?;
     final logo = _seller?['logoUrl'] as String?;
-    final description = (_seller?['description'] as String?)?.trim() ?? '';
+    // The store's description in the app language (French falls back to the English text until translated).
+    final description = pickLang(s.lang, _seller?['description'] as String?, _seller?['descriptionFr'] as String?);
+    final shownField = s.lang == 'fr' && (textOrNull(_seller?['descriptionFr']) != null) ? 'descriptionFr' : 'description';
+    final machine = _seller?['machineTranslated'] is List && (_seller!['machineTranslated'] as List).contains(shownField);
     final header = Container(
       padding: EdgeInsets.fromLTRB(20, top + 12, 20, 20),
       decoration: BoxDecoration(
@@ -153,7 +157,10 @@ class _StoreScreenState extends State<StoreScreen> {
       header,
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-        child: Text(description, key: const ValueKey('store-description'), style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.45)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(description, key: const ValueKey('store-description'), style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.45)),
+          if (machine) const MachineNote(key: ValueKey('machine-note-store')),
+        ]),
       ),
     ]);
   }

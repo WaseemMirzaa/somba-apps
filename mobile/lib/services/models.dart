@@ -3,6 +3,30 @@ import '../util/delivery_estimate.dart';
 import '../util/variants.dart';
 // Lightweight DTOs mirroring the API payloads (api/src/database/entities).
 
+/// A non-empty, trimmed text field; null when missing, blank or not a string (old servers omit the new fields).
+String? textOrNull(Object? v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
+
+/// The text in the user's language: [fr] when French is asked and present, else [en], else whichever exists.
+String pickLang(String lang, String? en, String? fr) {
+  final e = (en ?? '').trim();
+  final f = (fr ?? '').trim();
+  if (lang == 'fr') return f.isNotEmpty ? f : e;
+  return e.isNotEmpty ? e : f;
+}
+
+/// Field names the server marked as machine translated (`["nameFr","descriptionFr"]`); empty when absent.
+List<String> _readFieldList(Object? raw) {
+  Object? v = raw;
+  if (raw is String) {
+    try {
+      v = jsonDecode(raw);
+    } catch (_) {
+      return const [];
+    }
+  }
+  return v is List ? v.map((e) => '$e').where((e) => e.isNotEmpty).toList() : const [];
+}
+
 class BackendUser {
   final String id;
   final String email;
@@ -60,6 +84,24 @@ class ProductDto {
   final String? description;
   final DateTime? createdAt;
 
+  /// The French description (null when the server has none, or is an older build).
+  final String? descriptionFr;
+
+  /// The category this listing belongs to (null on older servers, which only send the name).
+  final String? categoryId;
+
+  /// Display labels for the option groups, per language. Display only: [variants] stay the purchase keys.
+  final VariantLabels variantLabels;
+
+  /// The language the seller wrote the listing in (`en` | `fr`).
+  final String sourceLang;
+
+  /// Served fields that came from the machine translator (`nameFr`, `descriptionFr`, `variantLabels`…).
+  final List<String> machineTranslated;
+
+  /// `done` | `pending` | `failed` | `off`.
+  final String translationStatus;
+
   /// The stored listing price (`price` is what is charged: the lowest of the
   /// listing, a running flash sale and a running campaign).
   final double basePrice;
@@ -93,6 +135,12 @@ class ProductDto {
     this.sellerName,
     this.description,
     this.createdAt,
+    this.descriptionFr,
+    this.categoryId,
+    this.variantLabels = const {},
+    this.sourceLang = 'en',
+    this.machineTranslated = const [],
+    this.translationStatus = 'off',
     double? basePrice,
     this.campaignPct = 0,
     this.priceSource = 'base',
@@ -100,42 +148,60 @@ class ProductDto {
     this.deliveryDays = deliveryDaysFallback,
   }) : basePrice = basePrice ?? price;
 
-  /// Localised display name (falls back to the English name).
-  String displayName(String lang) => lang == 'fr' && nameFr.isNotEmpty ? nameFr : name;
+  /// Localised display name (falls back to the other language's name).
+  String displayName(String lang) => pickLang(lang, name, nameFr);
 
-  factory ProductDto.fromJson(Map<String, dynamic> j) => ProductDto(
-        variants: readVariants(j['variants']),
-        deliveryDays: deliveryDaysOf(j['deliveryDays']),
-        id: j['id'] as String,
-        name: j['name'] as String? ?? '',
-        nameFr: j['nameFr'] as String? ?? '',
-        price: (j['price'] as num?)?.toDouble() ?? 0,
-        originalPrice: (j['originalPrice'] as num?)?.toDouble() ??
-            (j['price'] as num?)?.toDouble() ??
-            0,
-        discount: (j['discount'] as num?)?.toInt() ?? 0,
-        category: j['category'] as String? ?? '',
-        categoryFr: j['categoryFr'] as String? ?? '',
-        image: j['image'] as String? ?? '',
-        stock: (j['stock'] as num?)?.toInt() ?? 0,
-        rating: (j['rating'] as num?)?.toDouble() ?? 0,
-        reviews: (j['reviewsCount'] as num?)?.toInt() ??
-            (j['reviews'] as num?)?.toInt() ??
-            0,
-        sellerId: j['sellerId'] as String?,
-        sellerName: j['sellerName'] as String?,
-        description: j['description'] as String?,
-        createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String) : null,
-        basePrice: (j['basePrice'] as num?)?.toDouble(),
-        campaignPct: (j['campaignPct'] as num?)?.toInt() ?? 0,
-        priceSource: j['priceSource'] as String? ?? 'base',
-      );
+  /// The description in [lang] (the other language's text while a translation is missing); empty when none.
+  String displayDescription(String lang) => pickLang(lang, description, descriptionFr);
+
+  factory ProductDto.fromJson(Map<String, dynamic> j) {
+    final variants = readVariants(j['variants']);
+    return ProductDto(
+      variants: variants,
+      variantLabels: readVariantLabels(j['variantLabels'], variants),
+      descriptionFr: textOrNull(j['descriptionFr']),
+      categoryId: textOrNull(j['categoryId']),
+      sourceLang: j['sourceLang'] == 'fr' ? 'fr' : 'en',
+      machineTranslated: _readFieldList(j['machineTranslated']),
+      translationStatus: textOrNull(j['translationStatus']) ?? 'off',
+      deliveryDays: deliveryDaysOf(j['deliveryDays']),
+      id: j['id'] as String,
+      name: j['name'] as String? ?? '',
+      nameFr: j['nameFr'] as String? ?? '',
+      price: (j['price'] as num?)?.toDouble() ?? 0,
+      originalPrice: (j['originalPrice'] as num?)?.toDouble() ?? (j['price'] as num?)?.toDouble() ?? 0,
+      discount: (j['discount'] as num?)?.toInt() ?? 0,
+      category: j['category'] as String? ?? '',
+      categoryFr: j['categoryFr'] as String? ?? '',
+      image: j['image'] as String? ?? '',
+      stock: (j['stock'] as num?)?.toInt() ?? 0,
+      rating: (j['rating'] as num?)?.toDouble() ?? 0,
+      reviews: (j['reviewsCount'] as num?)?.toInt() ?? (j['reviews'] as num?)?.toInt() ?? 0,
+      sellerId: j['sellerId'] as String?,
+      sellerName: j['sellerName'] as String?,
+      description: j['description'] as String?,
+      createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String) : null,
+      basePrice: (j['basePrice'] as num?)?.toDouble(),
+      campaignPct: (j['campaignPct'] as num?)?.toInt() ?? 0,
+      priceSource: j['priceSource'] as String? ?? 'base',
+    );
+  }
 }
 
 class BannerDto {
   final String title;
   final String body;
-  const BannerDto({required this.title, required this.body});
+
+  /// The French wording (empty on older servers).
+  final String titleFr;
+  final String bodyFr;
+  const BannerDto({required this.title, required this.body, this.titleFr = '', this.bodyFr = ''});
+
+  factory BannerDto.fromJson(Map<String, dynamic> j) =>
+      BannerDto(title: (j['title'] ?? '').toString(), body: (j['body'] ?? '').toString(), titleFr: textOrNull(j['titleFr']) ?? '', bodyFr: textOrNull(j['bodyFr']) ?? '');
+
+  String displayTitle(String lang) => pickLang(lang, title, titleFr);
+  String displayBody(String lang) => pickLang(lang, body, bodyFr);
 }
 
 class ReviewDto {
@@ -182,13 +248,21 @@ class CategoryDto {
   final String nameFr;
   final String image;
 
-  CategoryDto({required this.id, required this.name, required this.nameFr, required this.image});
+  /// How many live products the category holds (null on older servers).
+  final int? productCount;
+
+  /// The language the admin wrote the category in (`en` | `fr`).
+  final String sourceLang;
+
+  CategoryDto({required this.id, required this.name, required this.nameFr, required this.image, this.productCount, this.sourceLang = 'en'});
 
   factory CategoryDto.fromJson(Map<String, dynamic> j) => CategoryDto(
         id: j['id'] as String,
         name: j['name'] as String? ?? '',
         nameFr: (j['nameFr'] as String?)?.isNotEmpty == true ? j['nameFr'] as String : (j['name'] as String? ?? ''),
         image: j['image'] as String? ?? '',
+        productCount: (j['productCount'] as num?)?.toInt(),
+        sourceLang: j['sourceLang'] == 'fr' ? 'fr' : 'en',
       );
 }
 
@@ -248,7 +322,15 @@ class AddressDto {
 class OrderItemDto {
   final String productId;
   final String productName;
+
+  /// The name as the order snapshotted it in French (empty on older servers and old orders).
+  final String productNameFr;
+
+  /// The chosen options, canonical ("Size: 42 · Colour: Black"): the purchase key, never translated.
   final String variant;
+
+  /// The same choice worded in French (empty when the server has no snapshot).
+  final String variantFr;
   final int qty;
   final double priceUsd;
 
@@ -272,7 +354,9 @@ class OrderItemDto {
   OrderItemDto({
     required this.productId,
     required this.productName,
+    this.productNameFr = '',
     required this.variant,
+    this.variantFr = '',
     required this.qty,
     required this.priceUsd,
     double? listPriceUsd,
@@ -287,12 +371,23 @@ class OrderItemDto {
 
   bool get isCancelled => fulfilment == 'cancelled';
 
+  /// The line's name in [lang]: the French snapshot when French is asked and present, else the stored name.
+  String displayName(String lang) => pickLang(lang, productName, productNameFr);
+
+  /// True when the line carries a real option choice (not the 'Default' placeholder).
+  bool get hasVariant => variant.isNotEmpty && variant != defaultVariant;
+
+  /// The option choice in [lang] (French snapshot when present, else the canonical text).
+  String displayVariant(String lang) => lang == 'fr' && variantFr.trim().isNotEmpty ? variantFr.trim() : variant;
+
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
 
   factory OrderItemDto.fromJson(Map<String, dynamic> j) => OrderItemDto(
         productId: j['productId'] as String? ?? '',
         productName: j['productName'] as String? ?? '',
+        productNameFr: textOrNull(j['productNameFr']) ?? '',
         variant: j['variant'] as String? ?? 'Default',
+        variantFr: textOrNull(j['variantFr']) ?? '',
         qty: (j['qty'] as num?)?.toInt() ?? 1,
         priceUsd: (j['priceUsd'] as num?)?.toDouble() ?? 0,
         listPriceUsd: (j['listPriceUsd'] as num?)?.toDouble(),
@@ -359,6 +454,10 @@ class OrderDto {
   final String? promoCode;
   final double totalUsd;
   final DateTime? createdAt;
+
+  /// When the server last changed this order. Two copies of one order (a late reply, a live push) are
+  /// ordered by it, so an older copy never replaces a newer one. Null when the server sent none.
+  final DateTime? updatedAt;
   final List<OrderItemDto> items;
 
   /// Campaign savings already deducted from [subtotalUsd] / [totalUsd].
@@ -386,6 +485,7 @@ class OrderDto {
     this.discountUsd = 0,
     this.promoCode,
     this.createdAt,
+    this.updatedAt,
     this.items = const [],
     this.campaignDiscountUsd = 0,
     this.shippingRaw,
@@ -444,6 +544,7 @@ class OrderDto {
         estimatedDeliveryDate: j['estimatedDeliveryDate'] as String?,
         rider: RiderContact.tryParse(j['rider']),
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
+        updatedAt: j['updatedAt'] is String ? DateTime.tryParse(j['updatedAt'] as String)?.toLocal() : null,
         items: ((j['items'] as List?) ?? const [])
             .map((e) => OrderItemDto.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))
             .toList(),
@@ -472,6 +573,10 @@ class NotificationDto {
   final String id;
   final String title;
   final String body;
+
+  /// The server's French wording (null on older servers: the phone's own patterns translate instead).
+  final String? titleFr;
+  final String? bodyFr;
   final String type;
   final bool read;
   final String? entityId;
@@ -481,6 +586,8 @@ class NotificationDto {
     required this.id,
     required this.title,
     required this.body,
+    this.titleFr,
+    this.bodyFr,
     required this.type,
     required this.read,
     this.entityId,
@@ -491,11 +598,16 @@ class NotificationDto {
         id: j['id'] as String,
         title: j['title'] as String? ?? '',
         body: j['body'] as String? ?? '',
+        titleFr: textOrNull(j['titleFr']),
+        bodyFr: textOrNull(j['bodyFr']),
         type: j['type'] as String? ?? 'system',
         read: j['read'] as bool? ?? false,
         entityId: j['entityId'] as String?,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
       );
+
+  NotificationDto asRead() =>
+      NotificationDto(id: id, title: title, body: body, titleFr: titleFr, bodyFr: bodyFr, type: type, read: true, entityId: entityId, createdAt: createdAt);
 }
 
 class WalletTransactionDto {
@@ -505,12 +617,16 @@ class WalletTransactionDto {
   final double balance;
   final String description;
 
+  /// The French wording from the server (null on older servers).
+  final String? descriptionFr;
+
   WalletTransactionDto({
     required this.id,
     required this.type,
     required this.amount,
     required this.balance,
     required this.description,
+    this.descriptionFr,
   });
 
   factory WalletTransactionDto.fromJson(Map<String, dynamic> j) =>
@@ -520,6 +636,22 @@ class WalletTransactionDto {
         amount: (j['amount'] as num?)?.toDouble() ?? 0,
         balance: (j['balance'] as num?)?.toDouble() ?? 0,
         description: j['description'] as String? ?? '',
+        descriptionFr: textOrNull(j['descriptionFr']),
+      );
+}
+
+/// The answer to `translate:text`: the text in the asked language, the language it was written in, and
+/// `same` when it already is in the asked language (nothing to translate).
+class TextTranslation {
+  final String text;
+  final String sourceLang;
+  final bool same;
+  const TextTranslation({required this.text, this.sourceLang = '', this.same = false});
+
+  factory TextTranslation.fromJson(Map<String, dynamic> j) => TextTranslation(
+        text: j['text'] as String? ?? '',
+        sourceLang: j['sourceLang'] as String? ?? '',
+        same: j['same'] == true,
       );
 }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
 import '../services/realtime_store.dart';
+import '../util/variants.dart' show defaultVariant;
 import 'catalog_live.dart';
 import 'catalog_models.dart';
 import 'promos.dart';
@@ -19,6 +20,9 @@ class CartItem {
 
   CartItem({required this.product, this.variant = 'Default', this.qty = 1, double? priceWhenAdded})
       : priceWhenAdded = priceWhenAdded ?? product.price;
+
+  /// The choice worded in the shopper's language. Display only: [variant] stays the canonical purchase key.
+  String variantText(Strings s) => variant == defaultVariant ? s.variant(variant) : product.displayVariant(variant, s.lang);
 
   /// Price now minus price when added (0 when unchanged or unknown).
   double get priceChange {

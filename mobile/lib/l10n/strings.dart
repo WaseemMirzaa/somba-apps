@@ -133,4 +133,21 @@ class Strings {
       return n.toStringAsFixed(decimals);
     }
   }
+
+  /// An exact US-dollar amount with the language's grouping: `$1,202.50` / `1 202,50 $`.
+  ///
+  /// This is for text that QUOTES a dollar figure the server wrote (a notification, a receipt line), which must read
+  /// the same as the server's own French wording (`moneyFr` in the API). Prices on screen go through `money()` in
+  /// `util/format.dart` instead, which follows the market (Congolese francs in DR Congo) and rounds to whole units.
+  ///
+  /// French groups thousands, and sets the symbol off, with a no-break space. The locale data's own thousands
+  /// separator is the narrow U+202F, only ~0.18 em wide: in small bold text it all but disappears and reads as
+  /// `1202,50`, so it is widened to the regular no-break space (U+00A0).
+  String usd(num amount) {
+    try {
+      return NumberFormat.currency(locale: lang, symbol: '\$', decimalDigits: 2).format(amount).replaceAll('\u202f', '\u00a0');
+    } catch (_) {
+      return '\$${amount.toStringAsFixed(2)}';
+    }
+  }
 }

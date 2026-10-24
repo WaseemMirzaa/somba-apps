@@ -326,13 +326,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SizedBox(width: 12),
         Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(i.productName,
+          Text(i.displayName(s.lang),
+              key: ValueKey('order-line-name-${i.productId}'),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, decoration: strike, color: cancelled ? AppColors.muted : AppColors.ink)),
           const SizedBox(height: 2),
-          if (i.variant.isNotEmpty && i.variant != 'Default')
-            Text(i.variant,
+          if (i.hasVariant)
+            Text(i.displayVariant(s.lang),
                 key: ValueKey('order-line-variant-${i.productId}'),
                 style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),

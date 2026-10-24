@@ -102,7 +102,7 @@ class _WalletScreenState extends State<WalletScreen> {
           child: Icon(credit ? Icons.south_west_rounded : Icons.north_east_rounded, size: 20, color: credit ? AppColors.success : AppColors.danger),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(localizeWalletDescription(s, t.description), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+        Expanded(child: Text(localizeWalletDescription(s, t.description, descriptionFr: t.descriptionFr), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
         Text('${credit ? '+' : '−'}${money(t.amount)}',
             style: TextStyle(fontWeight: FontWeight.w800, color: credit ? AppColors.success : AppColors.ink)),
       ]),

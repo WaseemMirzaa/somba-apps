@@ -94,9 +94,10 @@ class _SombaAppState extends State<SombaApp> {
   void _showForegroundPush(PushMessage m) {
     if (!_authed || (m.title ?? '').isEmpty) return;
     final s = Strings.current;
-    final text = localizeNotification(s, m.title ?? '', m.body ?? '');
+    final text = displayNotice(s, title: m.title ?? '', body: m.body ?? '', titleFr: m.titleFr, bodyFr: m.bodyFr);
     _messenger.currentState?.showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
+      persist: false, // a SnackBar with an action stays until dismissed unless told otherwise
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(text.$1, style: const TextStyle(fontWeight: FontWeight.w800)),
         if (text.$2.isNotEmpty) Text(text.$2, maxLines: 2, overflow: TextOverflow.ellipsis),

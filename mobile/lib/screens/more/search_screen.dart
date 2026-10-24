@@ -5,6 +5,7 @@ import '../../data/catalog_live.dart';
 import '../../l10n/strings.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
+import '../../util/text_fold.dart';
 import '../../widgets/product_actions.dart';
 import 'browse.dart';
 import 'shop_extra.dart';
@@ -94,8 +95,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final lang = tr.lang;
     _q.text = _ctrl.text;
     final results = _results();
-    final t = _ctrl.text.trim().toLowerCase();
-    final stores = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
+    final t = foldText(_ctrl.text.trim());
+    final stores = liveSellers().where((s) => t.isEmpty || foldText(s.name).contains(t)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -153,7 +154,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (res != null) {
           setState(() {
             _q.sort = res.sort;
-            _q.category = res.category;
+            _q.takeCategory(res);
             _q.minPrice = res.minPrice;
             _q.maxPrice = res.maxPrice;
             _q.minRating = res.minRating;

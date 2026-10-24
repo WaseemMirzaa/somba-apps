@@ -22,7 +22,13 @@ Product productFromDto(ProductDto d) => Product(
       sellerId: d.sellerId,
       sellerName: d.sellerName,
       description: d.description,
+      descriptionFr: d.descriptionFr,
       createdAt: d.createdAt,
+      categoryId: d.categoryId,
+      variantLabels: d.variantLabels,
+      sourceLang: d.sourceLang,
+      machineTranslated: d.machineTranslated,
+      translationStatus: d.translationStatus,
       priceSource: d.priceSource,
       campaignPct: d.campaignPct,
       variants: d.variants,
@@ -30,7 +36,7 @@ Product productFromDto(ProductDto d) => Product(
     );
 
 Category categoryFromDto(CategoryDto d) =>
-    Category(id: d.id, name: d.name, nameFr: d.nameFr, image: d.image);
+    Category(id: d.id, name: d.name, nameFr: d.nameFr, image: d.image, productCount: d.productCount);
 
 /// The live catalogue, as pushed by the server (empty until the first download).
 List<Product> liveCatalog() => RealtimeStore.instance.products.map(productFromDto).toList();
@@ -38,8 +44,40 @@ List<Product> liveCatalog() => RealtimeStore.instance.products.map(productFromDt
 /// The live categories.
 List<Category> liveCategories() => RealtimeStore.instance.categories.map(categoryFromDto).toList();
 
-/// Count of live products in a category.
-int liveCategoryCount(String name) => RealtimeStore.instance.products.where((p) => p.category == name).length;
+/// True when a listing belongs to the category: by id when both sides carry one (a rename keeps the products),
+/// else by the English name (older servers).
+bool inCategory(ProductDto p, {String? id, String? name}) {
+  final pid = p.categoryId;
+  if (id != null && id.isNotEmpty && pid != null && pid.isNotEmpty) return pid == id;
+  return name != null && p.category == name;
+}
+
+/// Count of live products in a category. Counts the downloaded catalogue (it follows live pushes); before the
+/// first download it falls back to the count the server sent with the category.
+int liveCategoryCount(String name, {String? id, int? serverCount}) {
+  final store = RealtimeStore.instance;
+  if (!store.hydrated && store.products.isEmpty && serverCount != null) return serverCount;
+  return store.products.where((p) => inCategory(p, id: id, name: name)).length;
+}
+
+/// Count for a [Category] row.
+int liveCategoryCountOf(Category c) => liveCategoryCount(c.name, id: c.id, serverCount: c.productCount);
+
+/// The live category a name or id points at, if any (a name is the English key older screens pass around).
+Category? findLiveCategory({String? id, String? name}) {
+  for (final c in RealtimeStore.instance.categories) {
+    if ((id != null && id.isNotEmpty && c.id == id) || (name != null && name.isNotEmpty && c.name == name)) return categoryFromDto(c);
+  }
+  return null;
+}
+
+/// A category's title in [lang]: the localized name of the live category the id/name points at (L16), else the
+/// product's own localized category, else the raw key.
+String categoryTitle({String? id, String? name, required String lang}) {
+  final c = findLiveCategory(id: id, name: name);
+  if (c != null) return c.displayName(lang);
+  return name ?? '';
+}
 
 /// A live product by backend id, if still listed.
 Product? productByUuid(String uuid) {

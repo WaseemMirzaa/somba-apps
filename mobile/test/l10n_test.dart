@@ -156,16 +156,50 @@ void main() {
       expect(localizeNotification(fr, 'Order update', 'SOM-1 is now out for delivery.').$2, 'SOM-1 est maintenant en cours de livraison.');
       expect(localizeNotification(fr, 'Promo of the week', 'Free delivery!'), ('Promo of the week', 'Free delivery!'));
       expect(localizeNotification(fr, 'Order cancelled', r'SOM-2 was cancelled. $12.5 was refunded to your wallet.').$2,
-          r'SOM-2 a été annulée. 12.5 $ ont été remboursés sur votre portefeuille.');
+          'SOM-2 a été annulée. 12,50\u00a0\$ ont été remboursés sur votre portefeuille.');
       expect(localizeNotification(fr, 'Refund sent', r'$20.00 for SOM-3 was sent to your mobile-money number.'),
-          ('Remboursement envoyé', r'20.00 $ pour SOM-3 ont été envoyés sur votre numéro mobile money.'));
+          ('Remboursement envoyé', '20,00\u00a0\$ pour SOM-3 ont été envoyés sur votre numéro mobile money.'));
       expect(localizeNotification(fr, 'Refund issued', r'$20.00 for SOM-3 is on its way back to your mobile-money number.').$2,
-          r'20.00 $ pour SOM-3 reviennent sur votre numéro mobile money.');
+          '20,00\u00a0\$ pour SOM-3 reviennent sur votre numéro mobile money.');
       expect(localizeNotification(fr, 'Parcel at our warehouse', 'SOM-5 reached the Somba&Teka warehouse and will be on its way soon.'),
           ('Colis à notre entrepôt', 'SOM-5 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'));
       expect(localizeNotification(const Strings('en'), 'Order placed', 'x'), ('Order placed', 'x'));
       expect(localizeWalletDescription(fr, 'Wallet top-up via airtel_money'), 'Recharge du portefeuille via Airtel Money');
       expect(localizeWalletDescription(fr, 'Refund for SOM-9'), 'Remboursement de SOM-9');
+    });
+
+    test(r'French fallback amounts: "40,00 $" (comma decimals, no-break spaces, grouped thousands), never "40.00 $"', () {
+      const fr = Strings('fr');
+      const en = Strings('en');
+      // Whatever separator the locale data uses, the screen gets a no-break space (never a narrow U+202F, never a breaking one).
+      final money = RegExp(r'^\d{1,3}(?:\u00a0\d{3})*,\d{2}\u00a0\$$');
+
+      final topUp = localizeNotification(fr, 'Payment received', r'$40.00 added to your wallet.').$2;
+      expect(topUp, '40,00\u00a0\$ ajoutés à votre portefeuille.');
+      expect(topUp, isNot(contains('40.00')));
+
+      // Grouped thousands, and two decimals even when the server wrote fewer.
+      expect(localizeNotification(fr, 'Refund issued', r'$1202.50 for SOM-4 is on its way back to your mobile-money number.').$2,
+          '1\u00a0202,50\u00a0\$ pour SOM-4 reviennent sur votre numéro mobile money.');
+      expect(localizeNotification(fr, 'Refund sent', r'$1234567.8 for SOM-4 was sent to your mobile-money number.').$2,
+          '1\u00a0234\u00a0567,80\u00a0\$ pour SOM-4 ont été envoyés sur votre numéro mobile money.');
+      expect(localizeNotification(fr, 'Order cancelled', r'SOM-2 was cancelled. $7 was refunded to your wallet.').$2,
+          'SOM-2 a été annulée. 7,00\u00a0\$ ont été remboursés sur votre portefeuille.');
+      expect(localizeNotification(fr, 'Delivery attempt failed',
+              r'SOM-6 could not be delivered after 3 attempts (customer unreachable). $48.00 was refunded to your wallet.').$2,
+          'SOM-6 n’a pas pu être livrée après 3 tentatives (customer unreachable). 48,00\u00a0\$ ont été remboursés sur votre portefeuille.');
+      expect(localizeNotification(fr, 'Payment', r'$99.99 for SOM-3 → wallet.').$2, '99,99\u00a0\$ pour SOM-3 → portefeuille.');
+
+      // The formatter itself, the one the fallbacks use.
+      for (final v in [0, 7, 12.5, 40, 999.99, 1202.5, 98765.43, 1234567.8]) {
+        expect(fr.usd(v), matches(money), reason: '$v');
+        expect(fr.usd(v), isNot(contains('\u202f')), reason: '$v');
+      }
+      expect(fr.usd(40), '40,00\u00a0\$');
+      expect(en.usd(1202.5), r'$1,202.50');
+
+      // English (and the server's own wording) is left alone.
+      expect(localizeNotification(en, 'Payment received', r'$40.00 added to your wallet.'), ('Payment received', r'$40.00 added to your wallet.'));
     });
   });
 

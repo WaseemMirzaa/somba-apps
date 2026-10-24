@@ -25,6 +25,7 @@ void addProductToCart(BuildContext context, Product p, Locale locale, {VoidCallb
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
+      persist: false, // auto-dismiss (a SnackBar with an action would otherwise stay until dismissed)
       content: Text(added == 0 ? s.cartStockCap(p.stock) : '${p.displayName(locale.languageCode)} — ${s.addedToCart}'),
       action: SnackBarAction(
         label: s.cart,

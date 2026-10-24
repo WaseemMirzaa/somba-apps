@@ -58,6 +58,7 @@ class _CartScreenState extends State<CartScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
+        persist: false, // auto-dismiss (a SnackBar with an action would otherwise stay until dismissed)
         content: Text(s.cartRemoved(removed.product.displayName(s.lang))),
         action: SnackBarAction(
           label: s.undo,
@@ -300,7 +301,7 @@ class _CartScreenState extends State<CartScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                       const SizedBox(height: 3),
-                      Text(s.variant(item.variant),
+                      Text(item.variantText(s),
                           style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       if ((item.product.sellerName ?? '').isNotEmpty)
                         Text(s.soldBy(item.product.sellerName),

@@ -5,6 +5,7 @@ import '../../l10n/strings.dart';
 import '../../theme/app_theme.dart';
 import '../../services/realtime_store.dart';
 import '../../util/format.dart';
+import '../../util/text_fold.dart';
 import '../../widgets/kit.dart';
 import 'shop_extra.dart';
 
@@ -12,7 +13,10 @@ import 'shop_extra.dart';
 class ProductQuery {
   String text;
   int sort; // 0 relevance · 1 price↑ · 2 price↓ · 3 rating · 4 discount
-  String? category; // null = all
+  String? category; // null = all (the English name older screens pass around)
+
+  /// The category's id; preferred over [category] whenever the listing carries one (a rename keeps its products).
+  String? categoryId;
   double minPrice;
 
   /// Upper price bound; null = no cap (the slider ends at the dearest live listing).
@@ -23,6 +27,7 @@ class ProductQuery {
     this.text = '',
     this.sort = 0,
     this.category,
+    this.categoryId,
     this.minPrice = 0,
     this.maxPrice,
     this.minRating = 0,
@@ -30,11 +35,24 @@ class ProductQuery {
   });
 
   ProductQuery copy() => ProductQuery(
-      text: text, sort: sort, category: category, minPrice: minPrice, maxPrice: maxPrice, minRating: minRating, dealsOnly: dealsOnly);
+      text: text,
+      sort: sort,
+      category: category,
+      categoryId: categoryId,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      minRating: minRating,
+      dealsOnly: dealsOnly);
+
+  /// Takes the category choice of [other] (the filter sheet's result).
+  void takeCategory(ProductQuery other) {
+    category = other.category;
+    categoryId = other.categoryId;
+  }
 
   int get activeCount {
     var n = 0;
-    if (category != null) n++;
+    if (category != null || categoryId != null) n++;
     if (minPrice > 0 || maxPrice != null) n++;
     if (minRating > 0) n++;
     if (dealsOnly) n++;
@@ -43,16 +61,30 @@ class ProductQuery {
   }
 }
 
+/// True when [foldedQuery] (see [foldText]) occurs in the product's name, French name, category, French category,
+/// description or French description. Accents and case do not matter, in either language (L15).
+bool productMatchesText(Product p, String foldedQuery) {
+  if (foldedQuery.isEmpty) return true;
+  for (final field in [p.name, p.nameFr, p.category, p.categoryFr, p.description, p.descriptionFr]) {
+    if (field != null && field.isNotEmpty && foldText(field).contains(foldedQuery)) return true;
+  }
+  return false;
+}
+
+/// True when the product is in the query's category: by id when the listing carries one, else by the English name.
+bool _inQueryCategory(Product p, ProductQuery q) {
+  if (q.category == null && q.categoryId == null) return true;
+  final id = q.categoryId, pid = p.categoryId;
+  if (id != null && id.isNotEmpty && pid != null && pid.isNotEmpty) return pid == id;
+  return q.category != null && p.category == q.category;
+}
+
 /// Runs a query against a product source list.
 List<Product> runQuery(List<Product> src, ProductQuery q) {
-  final t = q.text.trim().toLowerCase();
+  final t = foldText(q.text.trim());
   final list = src.where((p) {
-    final matchesText = t.isEmpty ||
-        p.name.toLowerCase().contains(t) ||
-        p.nameFr.toLowerCase().contains(t) ||
-        p.category.toLowerCase().contains(t);
-    return matchesText &&
-        (q.category == null || p.category == q.category) &&
+    return productMatchesText(p, t) &&
+        _inQueryCategory(p, q) &&
         p.price >= q.minPrice &&
         (q.maxPrice == null || p.price <= q.maxPrice!) &&
         p.rating >= q.minRating &&
@@ -123,8 +155,17 @@ class _FilterSheetState extends State<_FilterSheet> {
               const SizedBox(height: 20),
               _label(s.filterCategory),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                _chip(s.filterAll, q.category == null, () => setState(() => q.category = null)),
-                ...liveCategories().map((c) => _chip(c.displayName(s.lang), q.category == c.name, () => setState(() => q.category = c.name))),
+                _chip(s.filterAll, q.category == null && q.categoryId == null, () => setState(() {
+                  q.category = null;
+                  q.categoryId = null;
+                })),
+                ...liveCategories().map((c) => _chip(
+                    c.displayName(s.lang),
+                    q.categoryId != null ? q.categoryId == c.id : q.category == c.name,
+                    () => setState(() {
+                          q.category = c.name;
+                          q.categoryId = c.id;
+                        }))),
               ]),
               const SizedBox(height: 20),
               Row(children: [
@@ -218,8 +259,8 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
       listenable: RealtimeStore.instance,
       builder: (context, _) {
         final tr = Strings.of(context);
-        final t = _ctrl.text.trim().toLowerCase();
-        final list = liveSellers().where((s) => t.isEmpty || s.name.toLowerCase().contains(t)).toList();
+        final t = foldText(_ctrl.text.trim());
+        final list = liveSellers().where((s) => t.isEmpty || foldText(s.name).contains(t)).toList();
         return Scaffold(
           appBar: backAppBar(context, tr.sellersTitle),
           body: Column(children: [

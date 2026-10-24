@@ -235,7 +235,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         const SizedBox(height: 8),
         if (t.pickupAddress != null) _line(Icons.storefront_rounded, s.collectAt(t.pickupAddress)),
         _line(Icons.location_on_rounded, s.deliverTo(_address(s, t))),
-        if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(t)),
+        if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(s, t)),
         if (t.zoneName != null || t.preferred)
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 4),
@@ -295,7 +295,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             ]),
           ),
         if (t.phone != null) _line(Icons.phone_rounded, t.phone!),
-        if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(t)),
+        if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(s, t)),
         if (t.deliverByText != null) _line(Icons.event_available_rounded, s.deliverBy(t.deliverByText)),
         if (t.isActive && t.pin != null && t.status != 'assigned') _line(Icons.push_pin_rounded, s.pinExact),
         if (t.isActive)
@@ -411,7 +411,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
 
   Widget _attemptPill(Strings s, DeliveryTaskDto t) => Pill(s.attemptN(t.attempts), color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A));
 
-  static String _itemsText(DeliveryTaskDto t) => t.items.map((i) => '${i.qty}× ${i.name}').join(', ');
+  static String _itemsText(Strings s, DeliveryTaskDto t) => t.items.map((i) => i.text(s.lang)).join(', ');
 
   static Color _statusColor(String s) => switch (s) {
         'delivered' => AppColors.success,

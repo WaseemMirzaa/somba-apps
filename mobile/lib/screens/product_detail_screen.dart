@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/product_image.dart';
+import '../widgets/translatable_text.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 import 'more/shop_extra.dart';
@@ -40,7 +41,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       setState(() => _pickError = missing.name);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(s.chooseOption(missing.name))));
+        ..showSnackBar(SnackBar(content: Text(s.chooseOption(p.variantGroupLabel(p.variants.indexOf(missing), s.lang)))));
       return null;
     }
     return variantLabel(p.variants, _picks);
@@ -134,6 +135,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ]),
                     const SizedBox(height: 12),
                     Text(p.displayName(lang), style: Theme.of(context).textTheme.headlineSmall),
+                    if (p.nameIsMachine(lang)) const MachineNote(key: ValueKey('machine-note-name')),
                     const SizedBox(height: 10),
                     if (p.reviews > 0)
                       Row(children: [
@@ -181,26 +183,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             fontSize: 12),
                       ),
                     ],
-                    for (final g in p.variants) ...[
+                    for (var gi = 0; gi < p.variants.length; gi++) ...[
                       const SizedBox(height: 18),
-                      Text(_picks[g.name] == null ? g.name : '${g.name}: ${_picks[g.name]}',
-                          key: ValueKey('variant-title-${g.name}'),
+                      Text(_variantTitle(p, gi, lang),
+                          key: ValueKey('variant-title-${p.variants[gi].name}'),
                           style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 14.5, color: _pickError == g.name ? AppColors.danger : AppColors.ink)),
+                              fontWeight: FontWeight.w700, fontSize: 14.5, color: _pickError == p.variants[gi].name ? AppColors.danger : AppColors.ink)),
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, runSpacing: 8, children: [
-                        for (final o in g.options)
+                        // Chips read in the shopper's language; what is picked (and bought) is the canonical option.
+                        for (var oi = 0; oi < p.variants[gi].options.length; oi++)
                           ChoiceChip(
-                            key: ValueKey('variant-${g.name}-$o'),
-                            label: Text(o),
-                            selected: _picks[g.name] == o,
+                            key: ValueKey('variant-${p.variants[gi].name}-${p.variants[gi].options[oi]}'),
+                            label: Text(p.variantOptionLabel(gi, oi, lang)),
+                            selected: _picks[p.variants[gi].name] == p.variants[gi].options[oi],
                             onSelected: (_) => setState(() {
-                              _picks[g.name] = o;
-                              if (_pickError == g.name) _pickError = null;
+                              _picks[p.variants[gi].name] = p.variants[gi].options[oi];
+                              if (_pickError == p.variants[gi].name) _pickError = null;
                             }),
                           ),
                       ]),
                     ],
+                    if (p.variants.isNotEmpty && p.variantsAreMachine(lang)) const MachineNote(key: ValueKey('machine-note-variants')),
                     const SizedBox(height: 22),
                     if (p.inStock)
                       Row(children: [
@@ -218,11 +222,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         s.pdDeliveryInfo,
                       ),
                     ),
-                    if ((p.description ?? '').trim().isNotEmpty) ...[
+                    if (p.displayDescription(lang).isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Text(s.description, style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Text(p.description!.trim(), style: const TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.inkSoft)),
+                      Text(p.displayDescription(lang),
+                          key: const ValueKey('pd-description'), style: const TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.inkSoft)),
+                      if (p.descriptionIsMachine(lang)) const MachineNote(key: ValueKey('machine-note-description')),
                     ],
                     if ((p.sellerName ?? '').isNotEmpty) ...[
                       const SizedBox(height: 24),
@@ -243,6 +249,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       bottomNavigationBar: _bottomBar(s, p, listed),
     );
+  }
+
+  /// "Colour" until an option is picked, then "Colour: Black" (both in the shopper's language).
+  String _variantTitle(Product p, int gi, String lang) {
+    final g = p.variants[gi];
+    final group = p.variantGroupLabel(gi, lang);
+    final picked = _picks[g.name];
+    final oi = picked == null ? -1 : g.options.indexOf(picked);
+    return oi == -1 ? group : variantPair(group, p.variantOptionLabel(gi, oi, lang));
   }
 
   Widget _stockBadge(Strings s, Product p, bool listed) {
@@ -354,16 +369,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(qa[i].question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                    Expanded(
+                        child: TranslatableText(
+                            kind: 'question', id: qa[i].id, text: qa[i].question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
                   ]),
                   Padding(
                     padding: const EdgeInsets.only(left: 24, top: 4),
-                    child: Text(qa[i].answer ?? s.pdAwaiting,
-                        style: TextStyle(
-                            color: qa[i].answer == null ? AppColors.faint : AppColors.inkSoft,
-                            fontSize: 13,
-                            height: 1.35,
-                            fontStyle: qa[i].answer == null ? FontStyle.italic : FontStyle.normal)),
+                    child: qa[i].answer == null
+                        ? Text(s.pdAwaiting, style: const TextStyle(color: AppColors.faint, fontSize: 13, height: 1.35, fontStyle: FontStyle.italic))
+                        : TranslatableText(
+                            kind: 'answer', id: qa[i].id, text: qa[i].answer!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35)),
                   ),
                 ]),
                 if (i != qa.length - 1) const Divider(height: 22),
@@ -426,7 +441,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _related(Strings s, Product p, String lang) {
-    final items = liveCatalog().where((x) => x.category == p.category && x.uuid != p.uuid).take(6).toList();
+    final items = liveCatalog().where((x) => x.sameCategoryAs(p) && x.uuid != p.uuid).take(6).toList();
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(s.pdYouMayLike, style: Theme.of(context).textTheme.titleMedium),
@@ -503,6 +518,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
                       ..showSnackBar(SnackBar(
+                        persist: false, // auto-dismiss (a SnackBar with an action would otherwise stay until dismissed)
                         content: Text(added < _qty ? s.cartStockCap(p.stock) : s.addedToCart),
                         action: SnackBarAction(
                             label: s.cart, onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CartScreen(locale: widget.locale)))),
@@ -549,7 +565,7 @@ Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxi
         ),
       ]),
       const SizedBox(height: 8),
-      Text(r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+      TranslatableText(kind: 'review', id: r.id, text: r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
       if (r.sellerReply != null)
         Container(
           key: const ValueKey('seller-reply'),
@@ -563,7 +579,8 @@ Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxi
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(s.reviewSellerReply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primary)),
             const SizedBox(height: 3),
-            Text(r.sellerReply!, style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.inkSoft)),
+            TranslatableText(
+                kind: 'review_reply', id: r.id, text: r.sellerReply!, style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.inkSoft)),
           ]),
         ),
     ]);

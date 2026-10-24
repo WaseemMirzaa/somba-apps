@@ -83,9 +83,10 @@ class ProfileScreen extends StatelessWidget {
                       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(localizeNotification(s, n.title, n.body).$1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                            Text(displayNotice(s, title: n.title, body: n.body, titleFr: n.titleFr, bodyFr: n.bodyFr).$1,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
                             const SizedBox(height: 2),
-                            Text(localizeNotification(s, n.title, n.body).$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                            Text(displayNotice(s, title: n.title, body: n.body, titleFr: n.titleFr, bodyFr: n.bodyFr).$2, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
                           ]),
                         ),
                         if (!n.read) Container(margin: const EdgeInsets.only(left: 8, top: 4), height: 8, width: 8, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),

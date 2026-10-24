@@ -604,4 +604,8 @@ const Map<String, (String, String)> kMessages = {
   'orders_cancelled_one': ('1 item cancelled', '1 article annulé'),
   'orders_cancelled_many': ('{n} items cancelled', '{n} articles annulés'),
   'push_open': ('Open', 'Ouvrir'),
+  'translated_auto': ('Translated automatically', 'Traduit automatiquement'),
+  'see_translation': ('See translation', 'Voir la traduction'),
+  'see_original': ('See original', 'Voir l’original'),
+  'translate_same': ('Already in your language.', 'Déjà dans votre langue.'),
 };

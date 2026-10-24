@@ -87,10 +87,13 @@ class Strings {
   String serverError(String raw) => translateServerError(raw, this);
 
   // ---- amounts, per language ----
-  /// A US-dollar amount: `$12.50` / `12,50 $`.
+  /// A US-dollar amount with the language's grouping: `$1,202.50` / `1 202,50 $`.
+  /// French groups thousands (and sets the symbol off) with a no-break space. The locale data's own
+  /// separator for thousands is the narrow U+202F, only ~0.18 em wide: in the small bold pills it all
+  /// but disappears and reads as `1202,50`, so it is widened to the regular no-break space (U+00A0).
   String usd(num amount) {
     try {
-      return NumberFormat.currency(locale: lang, symbol: '\$', decimalDigits: 2).format(amount);
+      return NumberFormat.currency(locale: lang, symbol: '\$', decimalDigits: 2).format(amount).replaceAll('\u202f', '\u00a0');
     } catch (_) {
       return '\$${amount.toStringAsFixed(2)}';
     }

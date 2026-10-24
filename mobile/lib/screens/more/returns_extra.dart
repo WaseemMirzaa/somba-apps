@@ -109,7 +109,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(children: [
-                Expanded(child: Text('${i.qty} × ${i.productName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
+                Expanded(child: Text('${i.qty} × ${i.displayName(s.lang)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13))),
                 Text(money(i.priceUsd * i.qty), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               ]),
             ),

@@ -19,10 +19,17 @@ class BackendUser {
       );
 }
 
+/// A non-empty, trimmed text field; null when missing, blank or not a string (older servers omit the new fields).
+String? textOrNull(Object? v) => v is String && v.trim().isNotEmpty ? v.trim() : null;
+
 class NotificationDto {
   final String id;
   final String title;
   final String body;
+
+  /// The server's French wording (null on older servers: the phone's own patterns translate instead).
+  final String? titleFr;
+  final String? bodyFr;
   final String type;
   final bool read;
 
@@ -30,19 +37,32 @@ class NotificationDto {
   final String? entityId;
   final DateTime? createdAt;
 
-  NotificationDto({required this.id, required this.title, required this.body, required this.type, required this.read, this.entityId, this.createdAt});
+  NotificationDto({
+    required this.id,
+    required this.title,
+    required this.body,
+    this.titleFr,
+    this.bodyFr,
+    required this.type,
+    required this.read,
+    this.entityId,
+    this.createdAt,
+  });
 
   factory NotificationDto.fromJson(Map<String, dynamic> j) => NotificationDto(
         id: j['id'] as String,
         title: j['title'] as String? ?? '',
         body: j['body'] as String? ?? '',
+        titleFr: textOrNull(j['titleFr']),
+        bodyFr: textOrNull(j['bodyFr']),
         type: j['type'] as String? ?? 'system',
         read: j['read'] as bool? ?? false,
         entityId: j['entityId'] is String && (j['entityId'] as String).isNotEmpty ? j['entityId'] as String : null,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
       );
 
-  NotificationDto asRead() => NotificationDto(id: id, title: title, body: body, type: type, read: true, entityId: entityId, createdAt: createdAt);
+  NotificationDto asRead() =>
+      NotificationDto(id: id, title: title, body: body, titleFr: titleFr, bodyFr: bodyFr, type: type, read: true, entityId: entityId, createdAt: createdAt);
 }
 
 /// Where the rider works (`rider:assignment`): home warehouse, the zones it serves and the rider's own zones.
@@ -73,7 +93,16 @@ class RiderAssignment {
 class OrderLine {
   final String name;
   final int qty;
-  const OrderLine(this.name, this.qty);
+
+  /// The name as the order snapshotted it in French (empty on older servers and old orders).
+  final String nameFr;
+  const OrderLine(this.name, this.qty, {this.nameFr = ''});
+
+  /// The product name in the rider's language: French when asked and present, else the stored name.
+  String displayName(String lang) => lang == 'fr' && nameFr.trim().isNotEmpty ? nameFr.trim() : name;
+
+  /// "2× Phone" in [lang].
+  String text(String lang) => '$qty× ${displayName(lang)}';
 }
 
 /// One delivery: the task plus a snapshot of its order (customer, items, payment).
@@ -212,7 +241,8 @@ class DeliveryTaskDto {
       paymentMethod: o['paymentMethod'] as String?,
       totalUsd: (o['totalUsd'] as num?)?.toDouble() ?? 0,
       items: ((o['items'] as List?) ?? const [])
-          .map((e) => OrderLine((e as Map)['productName']?.toString() ?? '', (e['qty'] as num?)?.toInt() ?? 1))
+          .map((e) => OrderLine((e as Map)['productName']?.toString() ?? '', (e['qty'] as num?)?.toInt() ?? 1,
+              nameFr: textOrNull(e['productNameFr']) ?? ''))
           .toList(),
       createdAt: _date(j['createdAt']),
       pickupAddress: _str(j['pickupAddress']),

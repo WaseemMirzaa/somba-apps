@@ -84,16 +84,19 @@ class _CouponsScreenState extends State<CouponsScreen> {
 class ProductListScreen extends StatefulWidget {
   final Locale locale;
   final String? category;
+
+  /// The category's id: the products are matched by it when they carry one, and the title is localized from it.
+  final String? categoryId;
   final String? title;
   final bool dealsOnly;
-  const ProductListScreen({super.key, this.locale = const Locale('en'), this.category, this.title, this.dealsOnly = false});
+  const ProductListScreen({super.key, this.locale = const Locale('en'), this.category, this.categoryId, this.title, this.dealsOnly = false});
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
   final _ctrl = TextEditingController();
-  late final ProductQuery _q = ProductQuery(category: widget.category, dealsOnly: widget.dealsOnly);
+  late final ProductQuery _q = ProductQuery(category: widget.category, categoryId: widget.categoryId, dealsOnly: widget.dealsOnly);
   List<String> _quickSorts(Strings s) => [s.sortPopular, s.sortPriceAsc, s.sortPriceDesc, s.sortTopRated, s.sortDeals];
 
   @override
@@ -112,13 +115,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final sorts = _quickSorts(s);
     _q.text = _ctrl.text;
     final items = runQuery(liveCatalog(), _q);
+    // The category's name in the app language (L16), never the English key.
+    final hasCategory = widget.category != null || widget.categoryId != null;
+    final categoryName = hasCategory ? categoryTitle(id: widget.categoryId, name: widget.category, lang: s.lang) : '';
     return Scaffold(
-      appBar: backAppBar(context, widget.title ?? widget.category ?? s.products),
+      appBar: backAppBar(context, widget.title ?? (categoryName.isNotEmpty ? categoryName : s.products)),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: BrowseSearchField(controller: _ctrl, hint: widget.category != null ? s.searchInCat(widget.category) : s.search, onChanged: (_) => setState(() {})),
+            child: BrowseSearchField(controller: _ctrl, hint: categoryName.isNotEmpty ? s.searchInCat(categoryName) : s.search, onChanged: (_) => setState(() {})),
           ),
           SizedBox(
             height: 40,
@@ -135,7 +141,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       final res = await showFilterSheet(context, _q);
                       if (res != null) {
                         setState(() {
-                          _q.sort = res.sort; _q.category = res.category;
+                          _q.sort = res.sort;
+                          _q.takeCategory(res);
                           _q.minPrice = res.minPrice; _q.maxPrice = res.maxPrice;
                           _q.minRating = res.minRating; _q.dealsOnly = res.dealsOnly;
                         });

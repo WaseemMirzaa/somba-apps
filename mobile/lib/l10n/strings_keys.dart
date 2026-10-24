@@ -591,4 +591,8 @@ extension StringsKeys on Strings {
   String get ordersCancelledOne => t('orders_cancelled_one');
   String ordersCancelledMany(Object? n) => t('orders_cancelled_many', {'n': n});
   String get pushOpen => t('push_open');
+  String get translatedAuto => t('translated_auto');
+  String get seeTranslation => t('see_translation');
+  String get seeOriginal => t('see_original');
+  String get translateSame => t('translate_same');
 }

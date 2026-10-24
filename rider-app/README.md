@@ -12,11 +12,11 @@ accepts tasks from the unassigned pool, advances delivery status, and streams
 GPS — each action pushes live to the customer app and the web dashboards.
 
 Configure the endpoint with `--dart-define` (defaults target the Android
-emulator loopback `10.0.2.2`):
+emulator loopback `10.0.2.2`). `API_URL` is enough: the socket follows it, and
+`SOCKET_URL` is only for a socket hosted elsewhere:
 
 ```bash
-flutter run --dart-define=API_URL=http://localhost:3001 \
-            --dart-define=SOCKET_URL=http://localhost:3001
+flutter run --dart-define=API_URL=http://localhost:3001
 ```
 
 Seeded dev login (`npm run seed` in `api/` only): `rider@somba.app` / `Somba@2026`. Production riders

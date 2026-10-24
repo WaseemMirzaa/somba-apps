@@ -16,13 +16,33 @@ import 'strings.dart';
   return (t, b);
 }
 
-/// A wallet history line ("Wallet top-up via airtel_money") in the user's language.
-String localizeWalletDescription(Strings s, String text) {
+/// What to show for a notice: the server's own French wording ([titleFr] / [bodyFr]) when French is asked and
+/// present, else the phone's patterns above (older servers), else the text as received.
+(String, String) displayNotice(Strings s, {required String title, required String body, String? titleFr, String? bodyFr}) {
+  if (!s.isFr) return (title, body);
+  final fallback = localizeNotification(s, title, body);
+  return (_nonBlank(titleFr) ?? fallback.$1, _nonBlank(bodyFr) ?? fallback.$2);
+}
+
+String? _nonBlank(String? v) => v == null || v.trim().isEmpty ? null : v.trim();
+
+/// A wallet history line ("Wallet top-up via airtel_money") in the user's language. [descriptionFr] is the
+/// server's French wording; it wins in French, and older servers fall back to the patterns.
+String localizeWalletDescription(Strings s, String text, {String? descriptionFr}) {
+  if (s.isFr && _nonBlank(descriptionFr) != null) return descriptionFr!.trim();
   for (final p in _walletLines) {
     final m = p.$1.firstMatch(text);
     if (m != null) return p.$2(s, m);
   }
   return text;
+}
+
+/// A dollar amount the server wrote in English (`1202.50`) as French money (`1 202,50 $`): comma decimals, grouped
+/// thousands and a no-break space before the symbol, like the server's own French wording and the rider app.
+/// Anything that is not a plain number is kept as received.
+String _usdFr(String raw) {
+  final v = double.tryParse(raw);
+  return v == null ? '$raw\u00a0\$' : const Strings('fr').usd(v);
 }
 
 String _method(String m) => const {
@@ -87,23 +107,23 @@ final List<(RegExp, String Function(RegExpMatch))> _bodies = [
   (RegExp(r"^We received (\S+)\. You'll get updates here in real time\.$"), (m) => 'Nous avons reçu ${m[1]}. Vous recevrez les mises à jour ici en temps réel.'),
   (RegExp(r'^(\S+) is now (.+)\.$'), (m) => '${m[1]} est maintenant ${_status(m[2]!)}.'),
   (RegExp(r'^(\S+) was cancelled\. Refund credited to your wallet\.$'), (m) => '${m[1]} a été annulée. Le remboursement a été crédité sur votre portefeuille.'),
-  (RegExp(r'^(\S+) was cancelled\. \$([\d.]+) was refunded to your wallet\.$'), (m) => '${m[1]} a été annulée. ${m[2]} \$ ont été remboursés sur votre portefeuille.'),
+  (RegExp(r'^(\S+) was cancelled\. \$([\d.]+) was refunded to your wallet\.$'), (m) => '${m[1]} a été annulée. ${_usdFr(m[2]!)} ont été remboursés sur votre portefeuille.'),
   (RegExp(r'^(\S+) was cancelled\.$'), (m) => '${m[1]} a été annulée.'),
   (RegExp(r'^(\S+) was cancelled: (.+)\.$'), (m) => '${m[1]} a été annulée : ${translateReason(m[2]!)}.'),
   (RegExp(r'^(.+) is handling (\S+)\.$'), (m) => '${m[1]} s’occupe de ${m[2]}.'),
   (RegExp(r'^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\. You can also cancel the order\.$'),
       (m) => '${m[1]} : ${m[2]}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}). Vous pouvez aussi annuler la commande.'),
   (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\. \$([\d.]+) was refunded to your wallet\.$'),
-      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}). ${m[4]} \$ ont été remboursés sur votre portefeuille.'),
+      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}). ${_usdFr(m[4]!)} ont été remboursés sur votre portefeuille.'),
   (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\.( Your payment was refunded to your wallet\.)?$'),
       (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}).${m[4] != null ? ' Votre paiement a été remboursé sur votre portefeuille.' : ''}'),
-  (RegExp(r'^\$([\d.]+) added to your wallet\.$'), (m) => '${m[1]} \$ ajoutés à votre portefeuille.'),
+  (RegExp(r'^\$([\d.]+) added to your wallet\.$'), (m) => '${_usdFr(m[1]!)} ajoutés à votre portefeuille.'),
   (RegExp(r'^Payment for (\S+) confirmed\.$'), (m) => 'Le paiement de ${m[1]} est confirmé.'),
-  (RegExp(r'^\$([\d.]+) for (\S+)( → wallet)?\.$'), (m) => '${m[1]} \$ pour ${m[2]}${m[3] != null ? ' → portefeuille' : ''}.'),
-  (RegExp(r'^\$([\d.]+) for (\S+) is on its way back to your mobile-money number\.$'), (m) => '${m[1]} \$ pour ${m[2]} reviennent sur votre numéro mobile money.'),
-  (RegExp(r'^\$([\d.]+) for (\S+) was sent to your mobile-money number\.$'), (m) => '${m[1]} \$ pour ${m[2]} ont été envoyés sur votre numéro mobile money.'),
+  (RegExp(r'^\$([\d.]+) for (\S+)( → wallet)?\.$'), (m) => '${_usdFr(m[1]!)} pour ${m[2]}${m[3] != null ? ' → portefeuille' : ''}.'),
+  (RegExp(r'^\$([\d.]+) for (\S+) is on its way back to your mobile-money number\.$'), (m) => '${_usdFr(m[1]!)} pour ${m[2]} reviennent sur votre numéro mobile money.'),
+  (RegExp(r'^\$([\d.]+) for (\S+) was sent to your mobile-money number\.$'), (m) => '${_usdFr(m[1]!)} pour ${m[2]} ont été envoyés sur votre numéro mobile money.'),
   (RegExp(r'^\$([\d.]+) for (\S+) → wallet \(the network could not take it back to your phone\)\.$'),
-      (m) => '${m[1]} \$ pour ${m[2]} → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).'),
+      (m) => '${_usdFr(m[1]!)} pour ${m[2]} → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).'),
   (RegExp(r'^(\S+): we received your goods\. Your request is being reviewed\.$'), (m) => '${m[1]} : nous avons reçu vos articles. Votre demande est en cours d’examen.'),
 ];
 

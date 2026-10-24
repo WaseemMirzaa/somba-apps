@@ -4,6 +4,7 @@ import '../data/catalog_models.dart';
 import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
+import '../util/text_fold.dart';
 import '../widgets/product_image.dart';
 import 'more/catalog_extra.dart';
 import 'more/browse.dart';
@@ -26,7 +27,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     super.dispose();
   }
 
-  void _openCategory(String name) => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: name)));
+  void _openCategory(Category c) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: c.name, categoryId: c.id)));
   void _openStore(Seller s) => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name)));
 
   @override
@@ -37,10 +39,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget _scaffold(BuildContext context) {
     final s = Strings.of(context);
     final lang = s.lang;
-    final t = _ctrl.text.trim().toLowerCase();
+    final t = foldText(_ctrl.text.trim());
     final searching = t.isNotEmpty;
-    final cats = liveCategories().where((c) => !searching || c.name.toLowerCase().contains(t) || c.nameFr.toLowerCase().contains(t)).toList();
-    final stores = liveSellers().where((x) => !searching || x.name.toLowerCase().contains(t)).toList();
+    final cats = liveCategories().where((c) => !searching || foldText(c.name).contains(t) || foldText(c.nameFr).contains(t)).toList();
+    final stores = liveSellers().where((x) => !searching || foldText(x.name).contains(t)).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(s.categories)),
@@ -70,7 +72,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           final cat = cats[i];
           final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           return GestureDetector(
-            onTap: () => _openCategory(cat.name),
+            onTap: () => _openCategory(cat),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -83,7 +85,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 const Spacer(),
                 Text(cat.displayName(lang), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 2),
-                Text(s.itemsCount(liveCategoryCount(cat.name)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                Text(s.itemsCount(liveCategoryCountOf(cat)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
               ]),
             ),
           );
@@ -127,9 +129,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               contentPadding: EdgeInsets.zero,
               leading: Container(height: 42, width: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon(c.name), color: AppColors.primary)),
               title: Text(c.displayName(s.lang), style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(s.itemsCount(liveCategoryCount(c.name))),
+              subtitle: Text(s.itemsCount(liveCategoryCountOf(c))),
               trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
-              onTap: () => _openCategory(c.name),
+              onTap: () => _openCategory(c),
             )),
       ],
       if (stores.isNotEmpty) ...[

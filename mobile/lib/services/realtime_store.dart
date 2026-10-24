@@ -192,6 +192,7 @@ class RealtimeStore extends ChangeNotifier {
     }
     failedTopups.clear();
     wishlistIds.clear();
+    _translations.clear();
     riderLocations.clear();
     walletBalance = 0;
     notifyListeners();
@@ -335,6 +336,12 @@ class RealtimeStore extends ChangeNotifier {
     _socket.on('payment:updated', _upsertPayment);
     _socket.on('product:created', (d) => _upsertProduct(d));
     _socket.on('product:updated', (d) => _upsertProduct(d));
+    // A rename or a finished translation re-sends the whole category list.
+    _socket.on('categories:updated', (d) {
+      if (d is! List) return;
+      _replace(categories, d, CategoryDto.fromJson);
+      notifyListeners();
+    });
     _socket.on('cart:updated', (d) {
       serverCart.value = _map(d);
       notifyListeners();
@@ -396,7 +403,7 @@ class RealtimeStore extends ChangeNotifier {
           ..addAll((d as List)
               .map(_map)
               .where((b) => b['type'] == 'banner' && b['active'] != false)
-              .map((b) => BannerDto(title: (b['title'] ?? '').toString(), body: (b['body'] ?? '').toString())));
+              .map(BannerDto.fromJson));
       }),
     ]);
     // The saved "Prices shown in" choice is only known now (the first read at
@@ -619,16 +626,7 @@ class RealtimeStore extends ChangeNotifier {
     await _socket.request('notifications:markRead', {'id': id});
     final idx = notifications.indexWhere((n) => n.id == id);
     if (idx != -1) {
-      final n = notifications[idx];
-      notifications[idx] = NotificationDto(
-        id: n.id,
-        title: n.title,
-        body: n.body,
-        type: n.type,
-        read: true,
-        entityId: n.entityId,
-        createdAt: n.createdAt,
-      );
+      notifications[idx] = notifications[idx].asRead();
       notifyListeners();
     }
   }
@@ -642,22 +640,17 @@ class RealtimeStore extends ChangeNotifier {
   Future<void> markAllRead() async {
     await _socket.request('notifications:markAllRead');
     for (var i = 0; i < notifications.length; i++) {
-      final n = notifications[i];
-      notifications[i] = NotificationDto(
-        id: n.id,
-        title: n.title,
-        body: n.body,
-        type: n.type,
-        read: true,
-        entityId: n.entityId,
-        createdAt: n.createdAt,
-      );
+      notifications[i] = notifications[i].asRead();
     }
     notifyListeners();
   }
 
+  /// Tests answer [call] (the store front, tickets…) instead of the socket.
+  @visibleForTesting
+  Future<dynamic> Function(String event, [Map<String, dynamic>? body])? debugCallRequest;
+
   /// Raw request→ack call for features that don't need cached state.
-  Future<dynamic> call(String event, [Map<String, dynamic>? body]) => _socket.request(event, body);
+  Future<dynamic> call(String event, [Map<String, dynamic>? body]) => (debugCallRequest ?? _socket.request)(event, body);
 
   Future<List<ReviewDto>> reviewsFor(String productId) async =>
       ((await _socket.request('reviews:list', {'productId': productId})) as List)
@@ -674,6 +667,25 @@ class RealtimeStore extends ChangeNotifier {
 
   Future<void> askQuestion(String productId, String question) =>
       _socket.request('questions:ask', {'productId': productId, 'question': question});
+
+  /// Tests stand in for the server on [translateText] (event + body in, the ack's data out).
+  @visibleForTesting
+  Future<dynamic> Function(String event, [Map<String, dynamic>? body])? debugTranslateRequest;
+
+  final Map<String, TextTranslation> _translations = {};
+
+  /// A review, a seller reply, a question or an answer in language [target] (`translate:text`). The server takes a
+  /// stored id only (never free text) and caches what it translates; the phone keeps the answer for the session.
+  /// [kind] is `review` | `review_reply` | `question` | `answer`; [text] only keys the cache (an edited text asks again).
+  Future<TextTranslation> translateText(String kind, String id, String target, {String text = ''}) async {
+    final key = '$kind|$id|$target|${text.hashCode}';
+    final known = _translations[key];
+    if (known != null) return known;
+    final res = await (debugTranslateRequest ?? _socket.request)('translate:text', {'kind': kind, 'id': id, 'target': target});
+    final t = TextTranslation.fromJson(_map(res));
+    _translations[key] = t;
+    return t;
+  }
 
   // ---- push notifications (FCM) ----
   String? _deviceToken;
@@ -713,16 +725,27 @@ class RealtimeStore extends ChangeNotifier {
   Future<void> resetPassword(String token, String password) => _auth.resetPassword(token, password);
 
   // ---- helpers ----
+  /// Applies one copy of an order (a push, or the reply to a create / cancel). The same order can reach
+  /// the phone out of order — the sandbox payment settles and pushes `order:updated` (confirmed) BEFORE the
+  /// `orders:create` reply (still pending) arrives — so a copy older than the stored one is ignored.
+  /// Without an `updatedAt` on either side the newest arrival wins, as it always did.
   void _upsertOrder(dynamic data) {
     final o = OrderDto.fromJson(_map(data));
     final idx = orders.indexWhere((x) => x.id == o.id);
     if (idx == -1) {
       orders.insert(0, o);
     } else {
+      final stored = orders[idx].updatedAt;
+      final incoming = o.updatedAt;
+      if (stored != null && incoming != null && incoming.isBefore(stored)) return;
       orders[idx] = o;
     }
     notifyListeners();
   }
+
+  /// Tests: deliver an `order:updated` / `order:created` push (the socket is not connected in tests).
+  @visibleForTesting
+  void debugOrderPush(dynamic data) => _upsertOrder(data);
 
   void _upsertPayment(dynamic data) {
     final p = PaymentDto.fromJson(_map(data));
