@@ -54,13 +54,12 @@ class _CouponsScreenState extends State<CouponsScreen> {
                         Text(p.describe(s), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                         if (p.minOrderUsd > 0) Text(s.couponMinOrder(money(p.minOrderUsd)), style: const TextStyle(color: AppColors.faint, fontSize: 11.5)),
                       ])),
-                      TextButton.icon(
+                      TextButton(
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: p.code));
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.couponCopied(p.code))));
                         },
-                        icon: const Icon(Icons.copy_rounded, size: 15),
-                        label: Text(s.copy),
+                        child: Text(s.copy),
                       ),
                     ]),
                   ),
@@ -286,7 +285,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
         const SizedBox(height: 8),
         Text(s.reviewAfterDelivery, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(height: 20),
-        PrimaryButton(_busy ? '…' : s.reviewSubmit, icon: Icons.send_rounded, onPressed: _busy ? null : _submit),
+        PrimaryButton(s.reviewSubmit, busy: _busy, onPressed: _submit),
       ]),
     );
   }

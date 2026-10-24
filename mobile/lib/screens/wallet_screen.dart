@@ -52,12 +52,11 @@ class _WalletScreenState extends State<WalletScreen> {
                 if (secondaryMoney(store.walletBalance) != null)
                   Text(secondaryMoney(store.walletBalance)!, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
                 const SizedBox(height: 16),
-                FilledButton.icon(
+                FilledButton(
                   key: const ValueKey('wallet-topup'),
                   onPressed: _topUp,
                   style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.primary),
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(s.walletTopupBtn),
+                  child: Text(s.walletTopupBtn),
                 ),
               ]),
             ),
@@ -258,7 +257,7 @@ class _TopUpSheetState extends State<_TopUpSheet> {
           FilledButton(
             key: const ValueKey('topup-submit'),
             onPressed: _busy ? null : _submit,
-            child: Text(_busy ? '…' : s.topupSend),
+            child: _busy ? const ButtonSpinner() : Text(s.topupSend),
           ),
         ]),
       ),

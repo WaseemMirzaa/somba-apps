@@ -219,11 +219,10 @@ class AddressBookScreen extends StatelessWidget {
                 );
               }),
               const SizedBox(height: 4),
-              OutlinedButton.icon(
+              OutlinedButton(
                   key: const ValueKey('add-address'),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),
-                  icon: const Icon(Icons.add_location_alt_rounded, size: 20),
-                  label: Text(s.addrAddNew)),
+                  child: Text(s.addrAddNew)),
             ],
           ),
         );

@@ -84,20 +84,18 @@ class OrderReceiptScreen extends StatelessWidget {
           child: SelectableText(text, key: const ValueKey('receipt-text'), style: const TextStyle(fontSize: 13.5, height: 1.5, fontFamily: 'monospace')),
         ),
         const SizedBox(height: 14),
-        FilledButton.icon(
+        FilledButton(
           key: const ValueKey('receipt-share'),
           onPressed: () => SharePlus.instance.share(ShareParams(text: text, subject: '${s.receiptTitle} ${order.reference}')),
-          icon: const Icon(Icons.ios_share_rounded, size: 20),
-          label: Text(s.receiptShare),
+          child: Text(s.receiptShare),
         ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
+        OutlinedButton(
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: text));
             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.receiptCopied)));
           },
-          icon: const Icon(Icons.copy_rounded, size: 18),
-          label: Text(s.receiptCopy),
+          child: Text(s.receiptCopy),
         ),
       ]),
     );
@@ -264,7 +262,7 @@ class _ItemIssueScreenState extends State<ItemIssueScreen> {
         const SizedBox(height: 12),
         AppField(key: const ValueKey('issue-reason'), label: s.issueReasonLabel, hint: s.issueReasonHint, controller: _reason, maxLines: 3),
         const SizedBox(height: 18),
-        FilledButton(key: const ValueKey('issue-submit'), onPressed: _busy ? null : _submit, child: Text(_busy ? '…' : s.issueSubmit)),
+        FilledButton(key: const ValueKey('issue-submit'), onPressed: _busy ? null : _submit, child: _busy ? const ButtonSpinner() : Text(s.issueSubmit)),
       ]),
     );
   }

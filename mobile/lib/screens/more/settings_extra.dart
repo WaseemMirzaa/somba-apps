@@ -222,17 +222,16 @@ class _CustomerEditProfileScreenState extends State<CustomerEditProfileScreen> {
         if (u != null && !u.phoneVerified && (u.phone ?? '').isNotEmpty)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: TextButton(
               key: const ValueKey('verify-phone'),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OtpScreen(phone: u.phone))),
-              icon: const Icon(Icons.sms_outlined, size: 18),
-              label: Text(s.verifyThisPhone),
+              child: Text(s.verifyThisPhone),
             ),
           ),
         const SizedBox(height: 16),
         AppField(label: s.emailLogin, icon: Icons.mail_outline_rounded, initial: u?.email ?? ''),
         const SizedBox(height: 24),
-        PrimaryButton(_busy ? '…' : s.saveChanges, icon: Icons.check_rounded, onPressed: _busy ? null : _save),
+        PrimaryButton(s.saveChanges, busy: _busy, onPressed: _save),
       ]),
     );
   }

@@ -116,12 +116,7 @@ class SectionHeader extends StatelessWidget {
                 textStyle: const TextStyle(
                     fontWeight: FontWeight.w700, fontSize: 13.5),
               ),
-              child: Row(
-                children: [
-                  Text(actionLabel!),
-                  const Icon(Icons.chevron_right_rounded, size: 18),
-                ],
-              ),
+              child: Text(actionLabel!),
             ),
         ],
       ),

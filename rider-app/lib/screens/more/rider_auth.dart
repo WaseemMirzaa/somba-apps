@@ -154,11 +154,7 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                    : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text(s.signIn),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward_rounded, size: 20),
-                      ]),
+                    : Text(s.signIn),
               ),
             ),
             const SizedBox(height: 18),
@@ -270,7 +266,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ],
         if (_msg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_msg!, key: const ValueKey('forgot-msg'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         const SizedBox(height: 22),
-        PrimaryButton(_busy ? '…' : (_sent ? s.saveNewPassword : s.sendResetLink), icon: _sent ? Icons.check_rounded : Icons.send_rounded, onPressed: _busy ? null : (_sent ? _reset : _send)),
+        PrimaryButton(_sent ? s.saveNewPassword : s.sendResetLink, busy: _busy, onPressed: _sent ? _reset : _send),
       ]),
     );
   }

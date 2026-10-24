@@ -331,8 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        AuthButton(s.signIn,
-            icon: Icons.login_rounded, loading: _loading, onPressed: _signIn),
+        AuthButton(s.signIn, loading: _loading, onPressed: _signIn),
         const SizedBox(height: 6),
         TextButton(
           key: const ValueKey('go-phone-login'),
@@ -607,10 +606,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ]),
         ),
         const SizedBox(height: 18),
-        AuthButton(s.registerTitle,
-            icon: Icons.arrow_forward_rounded,
-            loading: _loading,
-            onPressed: _submit),
+        AuthButton(s.registerTitle, loading: _loading, onPressed: _submit),
       ]),
     );
   }
@@ -772,8 +768,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
           ),
         const SizedBox(height: 18),
-        AuthButton(s.verify,
-            icon: Icons.verified_rounded, loading: _busy, onPressed: _verify),
+        AuthButton(s.verify, loading: _busy, onPressed: _verify),
         const SizedBox(height: 10),
         Center(
           child: _seconds > 0
@@ -782,12 +777,11 @@ class _OtpScreenState extends State<OtpScreen> {
                       color: AppColors.muted,
                       fontSize: 13,
                       fontWeight: FontWeight.w600))
-              : TextButton.icon(
+              : TextButton(
                   onPressed: _send,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
                   style:
                       TextButton.styleFrom(foregroundColor: AppColors.primary),
-                  label: Text(s.otpResend,
+                  child: Text(s.otpResend,
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
         ),
@@ -894,16 +888,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   style:
                       const TextStyle(color: AppColors.muted, fontSize: 10.5))),
         const SizedBox(height: 18),
-        AuthButton(s.veContinue,
-            icon: Icons.check_circle_rounded,
-            loading: _busy,
-            onPressed: _check),
+        AuthButton(s.veContinue, loading: _busy, onPressed: _check),
         const SizedBox(height: 6),
-        TextButton.icon(
+        TextButton(
           onPressed: _send,
-          icon: const Icon(Icons.refresh_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: Text(s.veResend,
+          child: Text(s.veResend,
               style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         TextButton(
@@ -1100,8 +1090,7 @@ class _ForgotScreenState extends State<ForgotScreen> {
                 keyboard: TextInputType.emailAddress,
                 error: _err)),
         const SizedBox(height: 20),
-        AuthButton(s.forgotSend,
-            icon: Icons.send_rounded, loading: _busy, onPressed: _send),
+        AuthButton(s.forgotSend, loading: _busy, onPressed: _send),
       ]),
     );
   }
@@ -1190,8 +1179,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 controller: _confirm,
                 error: _confirmErr)),
         const SizedBox(height: 20),
-        AuthButton(s.resetSave,
-            icon: Icons.check_rounded, loading: _busy, onPressed: _save),
+        AuthButton(s.resetSave, loading: _busy, onPressed: _save),
       ]),
     );
   }

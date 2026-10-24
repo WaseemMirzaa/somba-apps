@@ -91,22 +91,37 @@ PreferredSizeWidget backAppBar(BuildContext context, String title, {List<Widget>
   );
 }
 
-/// Full-width primary button.
+/// Full-width primary button. Label only: [icon] stays null on Save / Submit /
+/// Continue-style actions. While [busy] the label becomes a same-height spinner.
 class PrimaryButton extends StatelessWidget {
   final String label;
   final IconData? icon;
   final VoidCallback? onPressed;
-  const PrimaryButton(this.label, {super.key, this.icon, this.onPressed});
+  final bool busy;
+  const PrimaryButton(this.label, {super.key, this.icon, this.onPressed, this.busy = false});
   @override
   Widget build(BuildContext context) => SizedBox(
         width: double.infinity,
         child: FilledButton(
-          onPressed: onPressed ?? () {},
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
-            Text(label),
-          ]),
+          onPressed: busy ? null : (onPressed ?? () {}),
+          child: busy
+              ? const ButtonSpinner()
+              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
+                  Text(label),
+                ]),
         ),
+      );
+}
+
+/// Replaces a button's label while its action runs: label height, in the button's text colour.
+class ButtonSpinner extends StatelessWidget {
+  const ButtonSpinner({super.key});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 22,
+        width: 22,
+        child: CircularProgressIndicator(strokeWidth: 2.4, color: DefaultTextStyle.of(context).style.color),
       );
 }
 

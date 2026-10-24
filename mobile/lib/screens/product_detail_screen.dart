@@ -293,11 +293,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ]),
         ),
         if (p.sellerId != null)
-          OutlinedButton.icon(
+          OutlinedButton(
             onPressed: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: p.sellerId, sellerName: name))),
-            icon: const Icon(Icons.storefront_rounded, size: 18),
-            label: Text(s.pdVisitStore),
+            child: Text(s.pdVisitStore),
           ),
       ]),
     );
@@ -308,14 +307,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       Row(children: [
         Text(s.reviewsTitle, style: Theme.of(context).textTheme.titleMedium),
         const Spacer(),
-        TextButton.icon(
+        TextButton(
           onPressed: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewsScreen(locale: widget.locale, product: p)));
             if (mounted) setState(_reload);
           },
-          icon: const Icon(Icons.rate_review_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: Text(s.pdSeeAllWrite),
+          child: Text(s.pdSeeAllWrite),
         ),
       ]),
       FutureBuilder<List<ReviewDto>>(
@@ -345,11 +343,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(child: Text(s.pdQa, style: Theme.of(context).textTheme.titleMedium)),
-        TextButton.icon(
+        TextButton(
           onPressed: () => _askQuestion(s, p),
-          icon: const Icon(Icons.help_outline_rounded, size: 18),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          label: Text(s.pdAsk),
+          child: Text(s.pdAsk),
         ),
       ]),
       FutureBuilder<List<QuestionDto>>(

@@ -250,7 +250,6 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       bottomNavigationBar: Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
         child: PrimaryButton(s.reviewTitle,
-            icon: Icons.rate_review_rounded,
             onPressed: () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: widget.locale, product: widget.product)));
               if (mounted) setState(() => _future = RealtimeStore.instance.reviewsFor(widget.product.uuid));

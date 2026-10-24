@@ -96,15 +96,14 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   key: const ValueKey('sign-out'),
                   onPressed: () async {
                     await store.logout();
                     onLogout?.call();
                   },
                   style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger)),
-                  icon: const Icon(Icons.logout_rounded, size: 20),
-                  label: Text(s.signOut),
+                  child: Text(s.signOut),
                 ),
               ),
             ]),
