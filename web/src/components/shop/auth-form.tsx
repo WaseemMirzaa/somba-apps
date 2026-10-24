@@ -8,8 +8,14 @@ import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { useRealtime } from "@/context/realtime-context";
 import { authApi } from "@/lib/realtime/auth-api";
+import { authErrorText } from "@/lib/auth-errors";
 
 type AuthMode = "register" | "login" | "otp" | "verify-email" | "forgot" | "reset";
+
+/** A message in both languages, so what is on screen follows the language toggle even if it is flipped afterwards. */
+type Msg = { en: string; fr: string };
+const msg = (en: string, fr: string): Msg => ({ en, fr });
+const msgFromError = (e: unknown): Msg => ({ en: authErrorText(e, false), fr: authErrorText(e, true) });
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const { locale } = useLocale();
@@ -20,9 +26,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Msg | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Msg | null>(null);
   const fr = locale === "fr";
   const verifyRan = useRef(false);
 
@@ -46,24 +52,24 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     setBusy(true);
     authApi
       .verifyEmail(token)
-      .then(() => setNotice(fr ? "E-mail vérifié ✓" : "Email verified ✓"))
-      .catch((e: Error) => setError(e.message))
+      .then(() => setNotice(msg("Email verified ✓", "E-mail vérifié ✓")))
+      .catch((e: unknown) => setError(msgFromError(e)))
       .finally(() => setBusy(false));
-  }, [mode, fr, linkToken]);
+  }, [mode, linkToken]);
 
   async function submit() {
     setError(null);
     // Real backend auth for the customer app.
     if (mode === "login" || mode === "register") {
       if (!email || !password || (mode === "register" && !name)) {
-        setError(fr ? "Veuillez remplir tous les champs." : "Please fill in all fields.");
+        setError(msg("Please fill in all fields.", "Veuillez remplir tous les champs."));
         return;
       }
       setBusy(true);
       try {
         const user =
           mode === "register"
-            ? await realRegister({ email, password, name, role: "customer" })
+            ? await realRegister({ email, password, name, role: "customer", locale })
             : await realLogin(email, password);
         const persona = signInReal(user.role, { name: user.name, email: user.email });
         // Come back to the page that asked for an account (cart, checkout...), else the account page.
@@ -71,10 +77,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
         router.push(user.role === "customer" ? safeNext ?? "/shop/account" : persona.portal || "/shop/account");
       } catch (e) {
-        setError(
-          (e as Error).message ||
-            (fr ? "Échec de la connexion." : "Sign-in failed."),
-        );
+        setError(msgFromError(e));
       } finally {
         setBusy(false);
       }
@@ -83,13 +86,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     setBusy(true);
     try {
       if (mode === "forgot") {
-        if (!email) { setError(fr ? "Saisissez votre e-mail." : "Enter your email."); return; }
+        if (!email) { setError(msg("Enter your email.", "Saisissez votre e-mail.")); return; }
         await authApi.forgotPassword(email);
         // Same message whether or not the account exists (no enumeration).
-        setNotice(fr ? "Si un compte existe, un lien de réinitialisation vient d'être envoyé." : "If an account exists for that email, a reset link is on its way.");
+        setNotice(msg("If an account exists for that email, a reset link is on its way.", "Si un compte existe, un lien de réinitialisation vient d'être envoyé."));
       } else if (mode === "reset") {
         const token = linkToken;
-        if (!token) { setError(fr ? "Lien invalide : ouvrez le lien reçu par e-mail." : "Invalid link — open the link from your email."); return; }
+        if (!token) { setError(msg("Invalid link — open the link from your email.", "Lien invalide : ouvrez le lien reçu par e-mail.")); return; }
         await authApi.resetPassword(token, password);
         router.push("/shop/login");
       } else if (mode === "otp") {
@@ -97,10 +100,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         router.push("/shop/verify-email");
       } else if (mode === "verify-email") {
         if (linkToken) router.push("/shop/account");
-        else { await authApi.sendEmailVerification(); setNotice(fr ? "E-mail de vérification renvoyé." : "Verification email sent."); }
+        else { await authApi.sendEmailVerification(); setNotice(msg("Verification email sent.", "E-mail de vérification renvoyé.")); }
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(msgFromError(e));
     } finally {
       setBusy(false);
     }
@@ -110,9 +113,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     setError(null);
     try {
       await authApi.sendPhoneOtp();
-      setNotice(fr ? "Nouveau code envoyé." : "A new code was sent.");
+      setNotice(msg("A new code was sent.", "Nouveau code envoyé."));
     } catch (e) {
-      setError((e as Error).message);
+      setError(msgFromError(e));
     }
   }
 
@@ -144,8 +147,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         {mode === "verify-email" && (
           <p className="text-sm text-slate-600">{fr ? "Cliquez sur le lien envoyé à votre email." : "Click the link sent to your email."}</p>
         )}
-        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{fr ? error.fr : error.en}</p>}
+        {notice && <p role="status" className="text-sm text-emerald-700">{fr ? notice.fr : notice.en}</p>}
         {mode === "otp" && (
           <button type="button" onClick={resendOtp} className="text-sm text-[var(--primary)]">
             {fr ? "Renvoyer le code" : "Resend code"}

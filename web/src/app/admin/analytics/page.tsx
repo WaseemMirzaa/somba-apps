@@ -16,6 +16,7 @@ import { EmptyState, SectionError, SectionLoading } from "@/components/admin/que
 import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
+import { categoryLabel } from "@/lib/i18n-fields";
 import { useServerList, orderStatusLabel } from "@/lib/admin-live";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { rankSellers, shortDate, useSocketQuery, type AdminStatsFull, type RevenuePoint, type WarehouseStats } from "@/lib/admin-stats";
@@ -155,7 +156,7 @@ export default function AdminAnalyticsPage() {
               <EmptyState>{fr ? "Aucune vente pour le moment." : "No sales yet."}</EmptyState>
             ) : (
               <HorizontalBarChart
-                items={s.gmvByCategory.map((c) => ({ name: `${c.category} · ${c.orders} ${fr ? "cmd" : "orders"}`, gmv: c.gmv }))}
+                items={s.gmvByCategory.map((c) => ({ name: `${categoryLabel(rt.categories, c.category, fr)} · ${c.orders} ${fr ? "cmd" : "orders"}`, gmv: c.gmv }))}
                 valueKey="gmv"
                 labelKey="name"
                 maxBars={10}

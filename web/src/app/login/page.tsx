@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { BRAND } from "@/lib/config";
+import { authErrorText } from "@/lib/auth-errors";
 import { LOGIN_HERO_IMAGE } from "@/lib/product-landing";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth, getPersonaDisplayName, getPersonaDisplaySubRole } from "@/context/auth-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { FullPageLoader } from "@/components/ui/loader";
 import { getHomeForRole } from "@/lib/portal-access";
 import type { UserRole } from "@/lib/portal-access";
@@ -31,10 +33,12 @@ export default function LoginPage() {
   const { login: realLogin } = useRealtime();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [signInError, setSignInError] = useState<string | null>(null);
+  // Kept raw (not as text) so the message follows the language toggle if it is switched after the error.
+  const [signInError, setSignInError] = useState<{ missing: true } | { err: unknown } | null>(null);
   const [signingIn, setSigningIn] = useState(false);
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const fr = locale === "fr";
+  const heroAlt = fr ? LOGIN_HERO_IMAGE.altFr : LOGIN_HERO_IMAGE.alt;
   const router = useRouter();
   const [group, setGroup] = useState("Customer");
 
@@ -54,7 +58,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSignInError(null);
     if (!email || !password) {
-      setSignInError(fr ? "Saisissez votre e-mail et votre mot de passe." : "Enter your email and password.");
+      setSignInError({ missing: true });
       return;
     }
     setSigningIn(true);
@@ -66,7 +70,7 @@ export default function LoginPage() {
       const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
       router.push(user.role === "customer" && safeNext ? safeNext : p.portal || getHomeForRole(p.role as UserRole));
     } catch (err) {
-      setSignInError((err as Error).message);
+      setSignInError({ err });
     } finally {
       setSigningIn(false);
     }
@@ -88,12 +92,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="relative flex min-h-screen flex-col lg:flex-row">
+      <LanguageToggle className="absolute right-4 top-4 z-20" />
       {/* Mobile — compact hero banner */}
       <div className="relative min-h-[11rem] shrink-0 overflow-hidden lg:hidden">
         <Image
           src={LOGIN_HERO_IMAGE.src}
-          alt={LOGIN_HERO_IMAGE.alt}
+          alt={heroAlt}
           fill
           priority
           className="object-cover object-center"
@@ -102,7 +107,7 @@ export default function LoginPage() {
         <div className="login-hero-overlay absolute inset-0" aria-hidden />
         <div className="relative z-10 flex flex-col justify-end p-6 text-white">
           <BrandMark tone="light" full className="mb-2 w-[min(160px,48vw)]" />
-          <p className="text-sm text-white/85">{BRAND.tagline}</p>
+          <p className="text-sm text-white/85">{t("tagline")}</p>
         </div>
       </div>
 
@@ -110,7 +115,7 @@ export default function LoginPage() {
       <div className="relative hidden flex-1 overflow-hidden lg:flex">
         <Image
           src={LOGIN_HERO_IMAGE.src}
-          alt={LOGIN_HERO_IMAGE.alt}
+          alt={heroAlt}
           fill
           priority
           className="object-cover object-center"
@@ -121,7 +126,7 @@ export default function LoginPage() {
           <div>
             <BrandMark tone="light" full className="mb-6" />
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold">{BRAND.fullName}</h1>
-            <p className="mt-2 text-white/85">{BRAND.tagline}</p>
+            <p className="mt-2 text-white/85">{t("tagline")}</p>
           </div>
           {DEMO_MODE && (
           <div className="space-y-3 text-sm text-white/80">
@@ -153,7 +158,13 @@ export default function LoginPage() {
               <form onSubmit={signInWithAccount} className="space-y-3">
                 <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" aria-label={fr ? "E-mail" : "Email"} placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
                 <input className="input-premium w-full px-4 py-3 text-sm" type="password" autoComplete="current-password" aria-label={fr ? "Mot de passe" : "Password"} placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />
-                {signInError && <p role="alert" className="text-sm text-red-600">{signInError}</p>}
+                {signInError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {"missing" in signInError
+                      ? (fr ? "Saisissez votre e-mail et votre mot de passe." : "Enter your email and password.")
+                      : authErrorText(signInError.err, fr)}
+                  </p>
+                )}
                 <Button type="submit" disabled={signingIn} className="w-full">
                   {signingIn ? (fr ? "Veuillez patienter…" : "Please wait…") : (fr ? "Se connecter" : "Sign in")}
                 </Button>

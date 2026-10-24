@@ -10,6 +10,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { noticeHref } from "@/lib/notice-links";
+import { localizedNotice, noticeTypeLabel } from "@/lib/i18n-fields";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -31,11 +32,17 @@ export default function AdminNotificationsPage() {
     () =>
       [...notifications]
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-        .map((n) => ({ ...n, href: noticeHref(n, "admin"), state: n.read ? "read" : "unread", audience: n.userId ? "you" : "team" })),
-    [notifications],
+        .map((n) => ({
+          ...n,
+          ...localizedNotice(n, fr),
+          href: noticeHref(n, "admin"),
+          state: n.read ? "read" : "unread",
+          audience: n.userId ? "you" : "team",
+        })),
+    [notifications, fr],
   );
   const filtered = useMemo(
-    () => applyListFilters(items, filters, { searchFields: ["title", "body", "type", "state"], dateField: "createdAt", statusField: "state" }),
+    () => applyListFilters(items, filters, { searchFields: ["title", "body", "titleFr", "bodyFr", "type", "state"], dateField: "createdAt", statusField: "state" }),
     [items, filters],
   );
   const unread = items.filter((n) => !n.read).length;
@@ -83,7 +90,7 @@ export default function AdminNotificationsPage() {
                   </div>
                 ),
               },
-              { key: "type", label: "Type", render: (row) => <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge> },
+              { key: "type", label: "Type", render: (row) => <Badge variant="info">{noticeTypeLabel(String(row.type), fr)}</Badge> },
               {
                 key: "audience",
                 label: fr ? "Pour" : "For",

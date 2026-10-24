@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { authApi } from "@/lib/realtime/auth-api";
+import { authApi, AuthApiError } from "@/lib/realtime/auth-api";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
 import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
@@ -67,6 +67,7 @@ interface RealtimeValue {
     name: string;
     role?: string;
     phone?: string;
+    locale?: "en" | "fr";
   }) => Promise<BackendUser>;
   logout: () => void;
 
@@ -94,7 +95,7 @@ interface RealtimeValue {
   topUpWallet: (amountUsd: number, method?: string) => Promise<void>;
   refundOrder: (orderId: string, toWallet?: boolean) => Promise<void>;
   createProduct: (input: {
-    name: string;
+    name?: string;
     nameFr?: string;
     price: number;
     category: string;
@@ -166,8 +167,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const reauthRef = useRef<() => void>(() => {});
   // The signed-in account, for per-viewer "seen" marks on notices sent to a whole role.
   const userIdRef = useRef<string | undefined>(undefined);
+  const userRoleRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     userIdRef.current = user?.id;
+    userRoleRef.current = user?.role;
   }, [user]);
 
   const logout = useCallback(() => {
@@ -222,6 +225,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("product:updated", (p: Product) =>
       setProducts((cur) => upsert(cur, p)),
     );
+    // The category list is pushed whole (a rename, a new translation, a product count change).
+    s.on("categories:updated", (c: Category[]) => {
+      if (Array.isArray(c)) setCategories(c);
+    });
     s.on("addresses:updated", (a: Address[]) => setAddresses(a));
     s.on("wallet:updated", (w: { balance: number }) =>
       setWalletBalance(w.balance),
@@ -276,9 +283,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setNotifications(withSeen(userIdRef.current, notif));
         // A browser that turned alerts on keeps getting them for whoever is signed in now.
         void syncWebPush();
-        const del = await socketClient
-          .request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE })
-          .catch(keep);
+        // Delivery tasks are listed for riders and staff only: the server answers anyone else "Not allowed.", which
+        // would show up as a permanent error banner on a customer's orders page.
+        const role = userRoleRef.current;
+        const mayListDeliveries = !role || role === "rider" || role === "warehouse_staff" || role.startsWith("admin");
+        const del = mayListDeliveries
+          ? await socketClient.request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE }).catch(keep)
+          : [];
         setDeliveries(del);
         fetched.current.deliveries = del.length;
         setHasMoreDeliveries(del.length >= PAGE_SIZE);
@@ -358,14 +369,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       logout();
       return;
     }
-    try {
-      const result = await authApi.refresh(refresh);
-      authApi.saveTokens(result);
-      await connectWith(result.accessToken, result.user);
-    } catch {
-      authApi.clear();
-      setError("Session expired. Please sign in again.");
-      logout();
+    // Only a refresh the server refused ends the session; a rate limit or a network blip is retried first.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const result = await authApi.refresh(refresh);
+        authApi.saveTokens(result);
+        await connectWith(result.accessToken, result.user);
+        return;
+      } catch (e) {
+        const transient = e instanceof AuthApiError && (e.status === 0 || e.status === 429 || e.status >= 500);
+        if (transient && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
+          continue;
+        }
+        authApi.clear();
+        setError("Session expired. Please sign in again.");
+        logout();
+        return;
+      }
     }
   }, [connectWith, logout]);
 
@@ -391,6 +412,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       name: string;
       role?: string;
       phone?: string;
+      locale?: "en" | "fr";
     }) => {
       setError(null);
       const result = await authApi.register(input);
@@ -412,13 +434,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         await connectGuest();
         return;
       }
-      try {
-        const result = await authApi.refresh(refresh);
-        authApi.saveTokens(result);
-        await connectWith(result.accessToken, result.user);
-      } catch {
-        authApi.clear();
-        await connectGuest();
+      // A refresh the server refused (revoked / expired token) ends the session. One it could not answer (rate limit,
+      // network blip) must not: retry a few times, and keep the stored tokens so the next load can restore the session.
+      const transient = (e: unknown) => e instanceof AuthApiError && (e.status === 0 || e.status === 429 || e.status >= 500);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const result = await authApi.refresh(refresh);
+          authApi.saveTokens(result);
+          await connectWith(result.accessToken, result.user);
+          return;
+        } catch (e) {
+          if (transient(e) && attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
+            continue;
+          }
+          if (!transient(e)) authApi.clear();
+          await connectGuest();
+          return;
+        }
       }
     })();
   }, [connectWith, connectGuest]);

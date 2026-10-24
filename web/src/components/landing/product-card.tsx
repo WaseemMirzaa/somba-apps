@@ -8,6 +8,7 @@ import { priceView } from "@/lib/catalog";
 import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
 import { cn } from "@/lib/utils";
+import { daysLabel, pickText } from "@/lib/i18n-fields";
 
 interface ProductCardProps {
   product: {
@@ -20,6 +21,7 @@ interface ProductCardProps {
     basePrice?: number;
     campaignPct?: number;
     campaignName?: string | null;
+    campaignNameFr?: string | null;
     priceSource?: "base" | "flash" | "campaign";
     rating: number;
     reviews: number;
@@ -71,7 +73,7 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
           {view.source !== "base" && (
             <span className="absolute bottom-3 left-3 max-w-[85%] truncate rounded-lg bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              {view.source === "flash" ? (fr ? "Vente flash" : "Flash sale") : view.campaignName ?? (fr ? "Promotion" : "Campaign")}
+              {view.source === "flash" ? (fr ? "Vente flash" : "Flash sale") : (view.campaignName ? pickText(fr, view.campaignName, view.campaignNameFr) : null) ?? (fr ? "Promotion" : "Campaign")}
             </span>
           )}
         </div>
@@ -109,7 +111,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {product.deliveryDays ? (
             <p className="mt-2 text-xs font-medium text-emerald-700">
-              {fr ? `Livraison en ${product.deliveryDays}j` : `Delivery in ${product.deliveryDays} days`}
+              {fr ? `Livraison en ${product.deliveryDays}j` : `Delivery in ${daysLabel(product.deliveryDays, false)}`}
             </p>
           ) : null}
         </div>

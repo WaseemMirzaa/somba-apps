@@ -231,7 +231,9 @@ export interface InventoryRow {
   sku: string;
   productId: string;
   name: string;
+  nameFr?: string | null;
   category: string;
+  categoryFr?: string | null;
   stock: number;
   status: "ok" | "low" | "out" | string;
 }
@@ -265,6 +267,30 @@ export const EXCEPTION_TYPE: Record<string, L> = {
   address_issue: { en: "Address issue", fr: "Problème d'adresse" },
   lost: { en: "Lost", fr: "Perdu" },
   other: { en: "Other", fr: "Autre" },
+};
+
+/** Where the dispatch of a replacement stands (`dispatchStatus`). */
+export const DISPATCH_STATUS: Record<string, L> = {
+  pending: { en: "Pending", fr: "En attente" },
+  dispatched: { en: "Dispatched", fr: "Expédié" },
+  delivered: { en: "Delivered", fr: "Livré" },
+};
+
+/** Where a delivery task stands (`delivery_tasks.status`). */
+export const DELIVERY_TASK_STATUS: Record<string, L> = {
+  unassigned: { en: "Unassigned", fr: "Non assignée" },
+  assigned: { en: "Assigned", fr: "Assignée" },
+  picked_up: { en: "Picked up", fr: "Collectée" },
+  in_transit: { en: "On the way", fr: "En route" },
+  delivered: { en: "Delivered", fr: "Livrée" },
+  failed: { en: "Failed", fr: "Échouée" },
+};
+
+/** Stock level of an inventory row (`status` is ok / low / out). */
+export const STOCK_STATUS: Record<string, L> = {
+  ok: { en: "In stock", fr: "En stock" },
+  low: { en: "Low", fr: "Faible" },
+  out: { en: "Out of stock", fr: "Rupture" },
 };
 
 export const SEVERITY: Record<string, L> = {

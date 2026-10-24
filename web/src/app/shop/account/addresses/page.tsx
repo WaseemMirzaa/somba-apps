@@ -8,6 +8,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
 import type { AddressGeo, PickedParts } from "@/lib/google-maps";
+import { addressCountryCode, addressLine } from "@/lib/countries";
 
 export default function ShopAddressesPage() {
   const { toast } = useToast();
@@ -16,10 +17,10 @@ export default function ShopAddressesPage() {
   const { addresses, addAddress, updateAddress, removeAddress } = useRealtime();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ label: string; line1: string; city: string; commune: string; country: string; geo: AddressGeo | null }>({ label: "", line1: "", city: "", commune: "", country: "France", geo: null });
+  const [form, setForm] = useState<{ label: string; line1: string; city: string; commune: string; country: string; geo: AddressGeo | null }>({ label: "", line1: "", city: "", commune: "", country: "", geo: null });
 
   function resetForm() {
-    setForm({ label: "", line1: "", city: "", commune: "", country: "France", geo: null });
+    setForm({ label: "", line1: "", city: "", commune: "", country: "", geo: null });
     setShowAdd(false);
     setEditingId(null);
   }
@@ -42,11 +43,13 @@ export default function ShopAddressesPage() {
       return;
     }
     try {
+      // The country comes from a map pick only. It is never defaulted: an address without one simply has none.
+      const country = form.country.trim();
       if (editingId !== null) {
-        await updateAddress(editingId, { ...form });
+        await updateAddress(editingId, { ...form, country: country || null });
         toast(fr ? "Adresse mise à jour" : "Address updated");
       } else {
-        await addAddress({ ...form, label: form.label || (fr ? "Nouvelle" : "New") });
+        await addAddress({ ...form, country: country || undefined, label: form.label || (fr ? "Nouvelle" : "New") });
         toast(fr ? "Adresse ajoutée" : "Address added");
       }
       resetForm();
@@ -59,7 +62,7 @@ export default function ShopAddressesPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={fr ? "Adresses" : "Addresses"}
-        subtitle={fr ? "Adresses de livraison en France et à l'international" : "France & global delivery addresses"}
+        subtitle={fr ? "Les adresses où nous livrons vos commandes" : "The addresses we deliver your orders to"}
         backHref="/shop/account"
         breadcrumbs={[{ label: fr ? "Mon compte" : "Account", href: "/shop/account" }, { label: fr ? "Adresses" : "Addresses" }]}
         actions={<Button size="sm" onClick={() => { resetForm(); setShowAdd(true); }}>{fr ? "Ajouter une adresse" : "Add Address"}</Button>}
@@ -97,7 +100,7 @@ export default function ShopAddressesPage() {
                 <button
                   onClick={() => {
                     setEditingId(addr.id);
-                    setForm({ label: addr.label, line1: addr.line1, city: addr.city, commune: addr.commune ?? "", country: addr.country ?? "France", geo: addr.geo ?? null });
+                    setForm({ label: addr.label, line1: addr.line1, city: addr.city, commune: addr.commune ?? "", country: addressCountryCode(addr) ?? "", geo: addr.geo ?? null });
                     setShowAdd(false);
                   }}
                   className="text-xs text-[var(--primary)] hover:underline"
@@ -107,7 +110,7 @@ export default function ShopAddressesPage() {
                 <button onClick={async () => { await removeAddress(addr.id); toast(fr ? "Adresse supprimée" : "Address removed"); }} className="text-xs text-red-500 hover:underline">{fr ? "Supprimer" : "Delete"}</button>
               </div>
             </div>
-            <p className="mt-1 text-sm text-slate-600">{addr.line1}, {addr.commune}, {addr.city}, {addr.country}</p>
+            <p className="mt-1 text-sm text-slate-600">{addressLine(addr, fr)}</p>
             {addr.geo && (
               <p className="mt-1 text-xs text-emerald-700">📍 {fr ? "Position épinglée sur la carte" : "Pinned on the map"}</p>
             )}

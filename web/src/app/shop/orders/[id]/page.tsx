@@ -74,7 +74,7 @@ function OrderDetail() {
     if (!order) return;
     order.items.forEach((item, i) => {
       if (item.productId.startsWith("ext:")) return;
-      addToCart({ id: String(item.productId), name: item.name, nameFr: item.name, price: item.price, image: item.image, seller: rawItems[i]?.sellerName ?? "", variant: item.variant || "Default", qty: item.qty });
+      addToCart({ id: String(item.productId), name: item.name, nameFr: item.nameFr, price: item.price, image: item.image, seller: rawItems[i]?.sellerName ?? "", variant: item.variant || "Default", qty: item.qty });
     });
     toast(fr ? "Articles ajoutés au panier" : "Items added to cart");
     router.push("/shop/cart");
@@ -103,7 +103,9 @@ function OrderDetail() {
     return {
       productId: it.productId,
       name: it.name,
+      nameFr: it.nameFr,
       variant: it.variant,
+      variantFr: it.variantFr,
       qty: it.qty,
       price: it.price,
       listPrice: it.listPrice,

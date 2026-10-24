@@ -13,15 +13,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
-import { errMsg } from "@/lib/admin-live";
-
-const ORDER_STATUS_FR: Record<string, string> = {
-  delivered: "Livrée",
-  processing: "En traitement",
-  cancelled: "Annulée",
-  pending: "En attente",
-  shipped: "Expédiée",
-};
+import { errMsg, orderStatusLabel } from "@/lib/admin-live";
 
 export default function AdminCustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -109,7 +101,7 @@ export default function AdminCustomerDetailPage() {
             )},
             { key: "date", label: t("date") },
             { key: "amount", label: t("amount"), render: (row) => formatCurrency(row.amount as number, locale) },
-            { key: "status", label: t("status"), render: (row) => <Badge>{fr ? (ORDER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge> },
+            { key: "status", label: t("status"), render: (row) => <Badge>{orderStatusLabel(String(row.status), fr)}</Badge> },
           ]}
           data={customerOrders as unknown as Record<string, unknown>[]}
           rowAction={(row) => (

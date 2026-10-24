@@ -15,6 +15,8 @@ import { useSellerData, useSellerPlan, type SellerProductRow } from "@/lib/selle
 import { errMessage } from "@/lib/seller-labels";
 import type { Product } from "@/lib/realtime/types";
 import { formatCurrency } from "@/lib/utils";
+import { autoTranslateHint, daysLabel, fieldOrigin, ownText, pickText, titleRequiredMessage, type Lang } from "@/lib/i18n-fields";
+import { TranslationBadge } from "@/components/seller/translation-badge";
 
 const STEPS = [
   { en: "Basic Info", fr: "Infos de base" },
@@ -26,8 +28,12 @@ const STEPS = [
 type FormState = {
   title: string;
   titleFr: string;
+  /** The language the seller started typing the title in: the listing's source language when both are filled in. */
+  firstLang: Lang | null;
+  /** The category row id (`name:<English name>` for an old listing whose category is no longer in the list). */
   category: string;
   description: string;
+  descriptionFr: string;
   price: string;
   originalPrice: string;
   stock: string;
@@ -57,13 +63,21 @@ function compareAtOf(p: SellerProductRow): number | null {
   return p.originalPrice && p.originalPrice > list ? p.originalPrice : null;
 }
 
-function initialForm(p?: SellerProductRow | null): FormState {
+/** The category value a listing points at: its category id, else the row with the same English name. */
+function categoryValueOf(p: Pick<Product, "categoryId" | "category">, list: { id: string; name: string }[]): string {
+  return p.categoryId ?? list.find((c) => c.name === p.category)?.id ?? `name:${p.category}`;
+}
+
+function initialForm(p: SellerProductRow | null | undefined, categoryValue: string): FormState {
   const compare = p ? compareAtOf(p) : null;
   return {
-    title: p?.name ?? "",
-    titleFr: p?.nameFr ?? "",
-    category: p?.category ?? "",
-    description: p?.description ?? "",
+    // Only what is really written (or translated) in each language: the API's fallback copy is shown as empty.
+    title: p ? ownText(p, "name", "en") : "",
+    titleFr: p ? ownText(p, "name", "fr") : "",
+    firstLang: p ? (p.sourceLang === "fr" ? "fr" : "en") : null,
+    category: categoryValue,
+    description: p ? ownText(p, "description", "en") : "",
+    descriptionFr: p ? ownText(p, "description", "fr") : "",
     price: p ? String(listPriceOf(p)) : "",
     originalPrice: compare ? String(compare) : "",
     stock: p ? String(p.stock) : "",
@@ -73,10 +87,16 @@ function initialForm(p?: SellerProductRow | null): FormState {
   };
 }
 
+/** The validated fields, and the step each one lives on. */
+type FieldKey = "title" | "category" | "price" | "originalPrice" | "stock" | "deliveryDays" | "options";
+const FIELD_STEP: Record<FieldKey, number> = { title: 0, category: 0, price: 2, originalPrice: 2, stock: 2, deliveryDays: 2, options: 2 };
+const FIELD_KEYS = Object.keys(FIELD_STEP) as FieldKey[];
+
 /**
  * Product form shared by "create" and "edit". It only collects what the server
  * stores: name (EN/FR), category, description, price, compare-at price, stock
- * and one photo. Everything is validated before the Next / Submit buttons enable.
+ * and one photo. Everything is validated before a step can be left; a field's error is only SHOWN once the seller
+ * has touched the field (left it) or tried to go to the next step, so a step that has just opened is never red.
  */
 export function ProductWizard({ product }: { product?: SellerProductRow | null }) {
   const router = useRouter();
@@ -88,28 +108,47 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const fr = locale === "fr";
   const editing = !!product;
 
+  // Options are the category rows (value = id): renaming or translating a category never detaches its products.
   const categoryOptions = useMemo(() => {
-    const base = categories.map((c) => ({ name: c.name, nameFr: c.nameFr ?? c.name }));
-    if (product?.category && !base.some((c) => c.name === product.category)) {
-      base.push({ name: product.category, nameFr: product.categoryFr ?? product.category });
+    const base = categories.map((c) => ({ value: c.id, name: c.name, nameFr: pickText(true, c.name, c.nameFr) }));
+    if (product?.category) {
+      const v = categoryValueOf(product, categories);
+      if (!base.some((c) => c.value === v)) base.push({ value: v, name: product.category, nameFr: pickText(true, product.category, product.categoryFr) });
     }
     return base;
   }, [categories, product]);
 
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<FormState>(() => {
-    const f = initialForm(product);
-    if (!f.category) f.category = "";
-    return f;
-  });
+  const [descTab, setDescTab] = useState<Lang>("en");
+  // What the seller saw when the form opened: an edit sends only what differs from it, even if a push (a sale, a
+  // finished translation) changes the listing while the form is open.
+  const [initial] = useState<FormState>(() => initialForm(product, product ? categoryValueOf(product, categories) : ""));
+  const [form, setForm] = useState<FormState>(initial);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [created, setCreated] = useState<Product | null>(null);
+  // Which fields the seller has left, and which steps they tried to leave: errors show only for those.
+  const [touched, setTouched] = useState<Partial<Record<FieldKey, true>>>({});
+  const [tried, setTried] = useState<Record<number, true>>({});
+  const touch = (k: FieldKey) => setTouched((t) => (t[k] ? t : { ...t, [k]: true }));
+  // The title is one rule over two inputs (either language will do): tabbing from one to the other is not "leaving" it.
+  const touchTitle = (e: React.FocusEvent<HTMLInputElement>, other: string) => {
+    if ((e.relatedTarget as HTMLElement | null)?.id !== other) touch("title");
+  };
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const category = form.category || categoryOptions[0]?.name || "";
+  // A legacy `name:<English name>` value (the category list had not arrived yet) is mapped to its row once it has.
+  const resolveCategory = (value: string): string => {
+    if (value && categoryOptions.some((o) => o.value === value)) return value;
+    if (value.startsWith("name:")) {
+      const hit = categoryOptions.find((o) => o.name === value.slice("name:".length));
+      if (hit) return hit.value;
+    }
+    return value || categoryOptions[0]?.value || "";
+  };
+  const category = resolveCategory(form.category);
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
   const priceNum = Number(form.price);
@@ -132,8 +171,21 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
     return "";
   })();
 
+  const titleEn = form.title.trim();
+  const titleFr = form.titleFr.trim();
+  const descEn = form.description.trim();
+  const descFr = form.descriptionFr.trim();
+
   const errors = {
-    title: form.title.trim().length < 2 ? (fr ? "Le titre doit contenir au moins 2 caractères." : "Title must be at least 2 characters.") : form.title.trim().length > 200 ? (fr ? "200 caractères maximum." : "200 characters maximum.") : "",
+    // C-I1: a title in English or in French (either one is enough).
+    title:
+      !titleEn && !titleFr
+        ? titleRequiredMessage(fr)
+        : [titleEn, titleFr].some((t) => t && t.length < 2)
+          ? (fr ? "Un titre doit contenir au moins 2 caractères." : "A title must be at least 2 characters.")
+          : [titleEn, titleFr].some((t) => t.length > 200)
+            ? (fr ? "200 caractères maximum." : "200 characters maximum.")
+            : "",
     category: category ? "" : fr ? "Choisissez une catégorie." : "Pick a category.",
     price: !(priceNum > 0) || priceNum > 1_000_000 ? (fr ? "Le prix doit être supérieur à 0." : "Price must be greater than 0.") : "",
     originalPrice:
@@ -158,9 +210,10 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   ];
   const allValid = !errors.title && !errors.category && !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options && !uploading;
 
-  const show = (k: keyof typeof errors) => errors[k];
-  const fieldErr = (k: keyof typeof errors) =>
-    show(k) ? <p className="mt-1 text-xs text-red-600">{show(k)}</p> : null;
+  /** The error of a field, or "" while it is untouched and its step has not been attempted. */
+  const show = (k: FieldKey) => (touched[k] || tried[FIELD_STEP[k]] ? errors[k] : "");
+  const fieldErr = (k: FieldKey) =>
+    show(k) ? <p role="alert" className="mt-1 text-xs text-red-600">{show(k)}</p> : null;
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -181,35 +234,31 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
 
   async function submit() {
     if (!allValid || submitting) return;
-    const chosen = categoryOptions.find((c) => c.name === category);
-    const payload = {
-      name: form.title.trim(),
-      nameFr: form.titleFr.trim() || undefined,
-      price: priceNum,
-      originalPrice: form.originalPrice.trim() ? origNum : undefined,
-      category,
-      categoryFr: chosen?.nameFr,
-      stock: stockNum,
-      deliveryDays: daysNum,
-      image: form.image || undefined,
-      description: form.description.trim() || undefined,
-      variants: groups,
-    };
+    const chosen = categoryOptions.find((c) => c.value === category);
+    const categoryId = category.startsWith("name:") ? undefined : category;
     setSubmitting(true);
     setSubmitError(null);
     try {
       if (editing && product) {
         // Send ONLY what the seller changed. In particular the price fields are left out unless
-        // edited, so a promotional price can never be saved back as the list price.
-        const before = initialForm(product);
+        // edited, so a promotional price can never be saved back as the list price, and a machine
+        // translation the seller did not touch is never turned into "written by you".
+        const before = initial;
         const patch: Record<string, unknown> = {};
-        if (form.title.trim() !== before.title) patch.name = payload.name;
-        if (form.titleFr.trim() !== before.titleFr) patch.nameFr = form.titleFr.trim();
-        if (category !== before.category) {
-          patch.category = category;
-          patch.categoryFr = chosen?.nameFr;
+        if (titleEn !== before.title.trim()) patch.name = titleEn;
+        if (titleFr !== before.titleFr.trim()) patch.nameFr = titleFr;
+        // The title the listing was written in was cleared while the other language has one: the platform makes the
+        // other language the original, but only text the seller sends counts as theirs, so the title they can see
+        // there (possibly an automatic translation) is sent along.
+        const source: Lang = product.sourceLang === "fr" ? "fr" : "en";
+        if (source === "en" && patch.name === "" && titleFr) patch.nameFr = titleFr;
+        if (source === "fr" && patch.nameFr === "" && titleEn) patch.name = titleEn;
+        if (descEn !== before.description.trim()) patch.description = descEn;
+        if (descFr !== before.descriptionFr.trim()) patch.descriptionFr = descFr;
+        if (category !== resolveCategory(before.category)) {
+          patch.category = chosen?.name ?? category;
+          if (categoryId) patch.categoryId = categoryId;
         }
-        if (form.description.trim() !== before.description.trim()) patch.description = form.description.trim();
         if (form.image !== before.image) patch.image = form.image;
         if (priceNum !== Number(before.price)) patch.price = priceNum;
         if (form.originalPrice.trim() !== before.originalPrice.trim()) {
@@ -222,6 +271,23 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
         toast(fr ? "Modifications enregistrées" : "Changes saved");
         router.push(`/seller/products/${product.id}`);
       } else {
+        // A language the seller left empty is not sent at all: the platform translates it from the other one.
+        const sourceLang: Lang = titleEn && !titleFr ? "en" : titleFr && !titleEn ? "fr" : (form.firstLang ?? (fr ? "fr" : "en"));
+        const payload = {
+          ...(titleEn ? { name: titleEn } : {}),
+          ...(titleFr ? { nameFr: titleFr } : {}),
+          ...(descEn ? { description: descEn } : {}),
+          ...(descFr ? { descriptionFr: descFr } : {}),
+          sourceLang,
+          price: priceNum,
+          originalPrice: form.originalPrice.trim() ? origNum : undefined,
+          category: chosen?.name ?? category,
+          ...(categoryId ? { categoryId } : {}),
+          stock: stockNum,
+          deliveryDays: daysNum,
+          image: form.image || undefined,
+          variants: groups,
+        };
         const res = await createProduct(payload);
         setCreated(res);
       }
@@ -232,6 +298,17 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** "Next": a step that is not valid yet says why (inline and as a toast) instead of leaving a dead button. */
+  function goNext() {
+    if (stepValid[step]) {
+      setStep(step + 1);
+      return;
+    }
+    setTried((t) => ({ ...t, [step]: true }));
+    const why = FIELD_KEYS.filter((k) => FIELD_STEP[k] === step).map((k) => errors[k]).find(Boolean);
+    if (why) toast(why, "error");
   }
 
   if (created) {
@@ -250,6 +327,11 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               ? "Soumis pour validation : un modérateur va l'approuver. Il n'est pas encore visible par les clients."
               : "Submitted for review — a moderator will approve it. Shoppers cannot see it yet."}
         </p>
+        {(!titleEn || !titleFr) && (
+          <p className="text-xs text-slate-500">
+            {fr ? "L'autre langue est traduite automatiquement : vous pourrez la relire et la corriger sur la fiche produit." : "The other language is being translated automatically: you can review and correct it on the product page."}
+          </p>
+        )}
         <div className="flex flex-wrap justify-center gap-3 pt-2 text-sm">
           <Link href={`/seller/products/${created.id}`} className="btn-primary rounded-lg px-4 py-2 font-medium">
             {fr ? "Voir le produit" : "View product"}
@@ -315,27 +397,84 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
         <DetailSection title={fr ? "Étape 1 : Informations de base" : "Step 1: Basic Information"}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={label}>{fr ? "Titre du produit (EN) *" : "Product title (EN) *"}</label>
-              <input className={input} value={form.title} onChange={(e) => { set({ title: e.target.value }); }} maxLength={200} />
-              {fieldErr("title")}
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <label className="block text-xs font-medium text-slate-600" htmlFor="pw-title-en">{fr ? "Titre du produit (EN)" : "Product title (EN)"}</label>
+                {editing && product && <TranslationBadge fr={fr} origin={fieldOrigin(product, "name", "en", form.title, ownText(product, "name", product.sourceLang === "fr" ? "fr" : "en"))} />}
+              </div>
+              <input
+                id="pw-title-en"
+                className={input}
+                value={form.title}
+                aria-invalid={!!show("title")}
+                onChange={(e) => set({ title: e.target.value, ...(e.target.value && !titleEn && !titleFr && !form.firstLang ? { firstLang: "en" as const } : {}) })}
+                onBlur={(e) => touchTitle(e, "pw-title-fr")}
+                maxLength={200}
+              />
             </div>
             <div>
-              <label className={label}>{fr ? "Titre du produit (FR)" : "Product title (FR)"}</label>
-              <input className={input} value={form.titleFr} onChange={(e) => set({ titleFr: e.target.value })} maxLength={200} />
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <label className="block text-xs font-medium text-slate-600" htmlFor="pw-title-fr">{fr ? "Titre du produit (FR)" : "Product title (FR)"}</label>
+                {editing && product && <TranslationBadge fr={fr} origin={fieldOrigin(product, "name", "fr", form.titleFr, ownText(product, "name", product.sourceLang === "fr" ? "fr" : "en"))} />}
+              </div>
+              <input
+                id="pw-title-fr"
+                className={input}
+                value={form.titleFr}
+                aria-invalid={!!show("title")}
+                onChange={(e) => set({ titleFr: e.target.value, ...(e.target.value && !titleEn && !titleFr && !form.firstLang ? { firstLang: "fr" as const } : {}) })}
+                onBlur={(e) => touchTitle(e, "pw-title-en")}
+                maxLength={200}
+              />
             </div>
-            <div>
+            <div className="sm:col-span-2">
+              {fieldErr("title") ?? <p className="text-xs text-slate-500">{fr ? "Un titre dans au moins une langue. " : "A title in at least one language. "}{autoTranslateHint(fr)}</p>}
+            </div>
+            <div className="sm:col-span-2">
               <label className={label}>{fr ? "Catégorie *" : "Category *"}</label>
-              <select className={input} value={category} onChange={(e) => { set({ category: e.target.value }); }} disabled={categoryOptions.length === 0}>
+              <select className={input} value={category} onChange={(e) => { set({ category: e.target.value }); touch("category"); }} onBlur={() => touch("category")} disabled={categoryOptions.length === 0}>
                 {categoryOptions.length === 0 && <option value="">{fr ? "Catégories indisponibles" : "Categories unavailable"}</option>}
                 {categoryOptions.map((c) => (
-                  <option key={c.name} value={c.name}>{fr ? c.nameFr : c.name}</option>
+                  <option key={c.value} value={c.value}>{fr ? c.nameFr : c.name}</option>
                 ))}
               </select>
               {fieldErr("category")}
             </div>
             <div className="sm:col-span-2">
-              <label className={label}>{fr ? "Description" : "Description"}</label>
-              <textarea className={input} rows={4} maxLength={5000} value={form.description} onChange={(e) => set({ description: e.target.value })} />
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <label className="block text-xs font-medium text-slate-600" htmlFor="pw-description">{fr ? "Description" : "Description"}</label>
+                <div className="flex items-center gap-2">
+                  {editing && product && (
+                    <TranslationBadge
+                      fr={fr}
+                      origin={fieldOrigin(product, "description", descTab, descTab === "en" ? form.description : form.descriptionFr, ownText(product, "description", product.sourceLang === "fr" ? "fr" : "en"))}
+                    />
+                  )}
+                  <div role="tablist" aria-label={fr ? "Langue de la description" : "Description language"} className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs">
+                    {(["en", "fr"] as const).map((l) => (
+                      <button
+                        key={l}
+                        type="button"
+                        role="tab"
+                        aria-selected={descTab === l}
+                        onClick={() => setDescTab(l)}
+                        className={`rounded-md px-2.5 py-1 font-semibold ${descTab === l ? "bg-[var(--primary)] text-white" : "text-slate-600"}`}
+                      >
+                        {l.toUpperCase()}
+                        {(l === "en" ? descEn : descFr) ? " •" : ""}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <textarea
+                id="pw-description"
+                className={input}
+                rows={4}
+                maxLength={5000}
+                value={descTab === "en" ? form.description : form.descriptionFr}
+                onChange={(e) => set(descTab === "en" ? { description: e.target.value } : { descriptionFr: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-slate-500">{autoTranslateHint(fr)}</p>
             </div>
           </div>
         </DetailSection>
@@ -374,23 +513,23 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className={label}>{fr ? "Prix (USD) *" : "Price (USD) *"}</label>
-              <input type="number" min="0" step="0.01" className={input} value={form.price} onChange={(e) => { set({ price: e.target.value }); }} />
+              <input type="number" min="0" step="0.01" className={input} value={form.price} onChange={(e) => { set({ price: e.target.value }); }} onBlur={() => touch("price")} />
               {fieldErr("price")}
             </div>
             <div>
               <label className={label}>{fr ? "Prix barré / comparé (USD)" : "Compare-at price (USD)"}</label>
-              <input type="number" min="0" step="0.01" className={input} value={form.originalPrice} onChange={(e) => { set({ originalPrice: e.target.value }); }} />
+              <input type="number" min="0" step="0.01" className={input} value={form.originalPrice} onChange={(e) => { set({ originalPrice: e.target.value }); }} onBlur={() => touch("originalPrice")} />
               {fieldErr("originalPrice")}
               <p className="mt-1 text-xs text-slate-500">{fr ? "Le badge de remise est calculé automatiquement." : "The discount badge is calculated automatically."}</p>
             </div>
             <div>
               <label className={label}>{fr ? "Quantité en stock *" : "Stock quantity *"}</label>
-              <input type="number" min="0" step="1" className={input} value={form.stock} onChange={(e) => { set({ stock: e.target.value }); }} />
+              <input type="number" min="0" step="1" className={input} value={form.stock} onChange={(e) => { set({ stock: e.target.value }); }} onBlur={() => touch("stock")} />
               {fieldErr("stock")}
             </div>
             <div>
               <label className={label} htmlFor="pw-delivery-days">{fr ? "Délai de livraison (jours) *" : "Delivery time (days) *"}</label>
-              <input id="pw-delivery-days" type="number" min={DELIVERY_DAYS.min} max={DELIVERY_DAYS.max} step="1" className={input} value={form.deliveryDays} onChange={(e) => { set({ deliveryDays: e.target.value }); }} />
+              <input id="pw-delivery-days" type="number" min={DELIVERY_DAYS.min} max={DELIVERY_DAYS.max} step="1" className={input} value={form.deliveryDays} onChange={(e) => { set({ deliveryDays: e.target.value }); }} onBlur={() => touch("deliveryDays")} />
               {fieldErr("deliveryDays")}
               <p className="mt-1 text-xs text-slate-500">
                 {fr ? "Du paiement à la remise au client. Le client voit la date estimée ; il ne la choisit pas." : "From payment to handover. Shoppers see the estimated date; they don't choose it."}
@@ -403,6 +542,8 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               {fr
                 ? "Ex. Taille : 39, 40, 41 — Couleur : Noir, Blanc. Le client devra choisir avant d'acheter. Le stock est commun à toutes les options."
                 : "E.g. Size: 39, 40, 41 — Colour: Black, White. Shoppers must choose before buying. Stock is shared by all options."}
+              {" "}
+              {fr ? "Les noms et valeurs sont traduits automatiquement pour les clients." : "Names and values are translated automatically for shoppers."}
             </p>
             {form.options.map((row, i) => (
               <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
@@ -413,6 +554,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
                   maxLength={30}
                   value={row.name}
                   onChange={(e) => set({ options: form.options.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)) })}
+                  onBlur={() => touch("options")}
                 />
                 <input
                   className={input}
@@ -420,6 +562,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
                   placeholder={fr ? "39, 40, 41, 42" : "39, 40, 41, 42"}
                   value={row.values}
                   onChange={(e) => set({ options: form.options.map((r, j) => (j === i ? { ...r, values: e.target.value } : r)) })}
+                  onBlur={() => touch("options")}
                 />
                 <button
                   type="button"
@@ -445,8 +588,8 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
             <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800" data-testid="promo-note">
               {promo.priceSource === "campaign"
                 ? fr
-                  ? `La campagne « ${promo.campaignName ?? ""} » (-${promo.campaignPct} %) fait payer ${formatCurrency(promo.price, locale)} aux clients en ce moment. Le prix ci-dessus est votre prix catalogue : il n'est pas modifié par la campagne.`
-                  : `Campaign “${promo.campaignName ?? ""}” (-${promo.campaignPct}%) currently makes shoppers pay ${formatCurrency(promo.price, locale)}. The price above is your list price: the campaign does not change it.`
+                  ? `La campagne « ${pickText(true, promo.campaignName, promo.campaignNameFr)} » (-${promo.campaignPct} %) fait payer ${formatCurrency(promo.price, locale)} aux clients en ce moment. Le prix ci-dessus est votre prix catalogue : il n'est pas modifié par la campagne.`
+                  : `Campaign “${pickText(false, promo.campaignName, promo.campaignNameFr)}” (-${promo.campaignPct}%) currently makes shoppers pay ${formatCurrency(promo.price, locale)}. The price above is your list price: the campaign does not change it.`
                 : fr
                   ? `Une vente flash fait payer ${formatCurrency(promo.price, locale)} aux clients en ce moment. Le prix ci-dessus est votre prix catalogue.`
                   : `A flash sale currently makes shoppers pay ${formatCurrency(promo.price, locale)}. The price above is your list price.`}
@@ -462,14 +605,15 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
         <DetailSection title={fr ? "Étape 4 : Vérification et envoi" : "Step 4: Review & submit"}>
           <dl className="space-y-2 text-sm">
             {[
-              [fr ? "Titre (EN)" : "Title (EN)", form.title],
-              [fr ? "Titre (FR)" : "Title (FR)", form.titleFr],
-              [fr ? "Catégorie" : "Category", category],
-              [fr ? "Description" : "Description", form.description],
-              [fr ? "Prix" : "Price", form.price ? `$${form.price}` : ""],
-              [fr ? "Prix barré" : "Compare-at", form.originalPrice ? `$${form.originalPrice}` : ""],
+              [fr ? "Titre (EN)" : "Title (EN)", titleEn || (fr ? "(sera traduit automatiquement)" : "(will be translated automatically)")],
+              [fr ? "Titre (FR)" : "Title (FR)", titleFr || (fr ? "(sera traduit automatiquement)" : "(will be translated automatically)")],
+              [fr ? "Catégorie" : "Category", (() => { const c = categoryOptions.find((o) => o.value === category); return c ? (fr ? c.nameFr : c.name) : ""; })()],
+              [fr ? "Description (EN)" : "Description (EN)", descEn || (descFr ? (fr ? "(sera traduite automatiquement)" : "(will be translated automatically)") : "")],
+              [fr ? "Description (FR)" : "Description (FR)", descFr || (descEn ? (fr ? "(sera traduite automatiquement)" : "(will be translated automatically)") : "")],
+              [fr ? "Prix" : "Price", form.price ? formatCurrency(priceNum, locale) : ""],
+              [fr ? "Prix barré" : "Compare-at", form.originalPrice ? formatCurrency(origNum, locale) : ""],
               [fr ? "Stock" : "Stock", form.stock],
-              [fr ? "Délai de livraison" : "Delivery time", form.deliveryDays ? (fr ? `${form.deliveryDays} jours` : `${form.deliveryDays} days`) : ""],
+              [fr ? "Délai de livraison" : "Delivery time", form.deliveryDays ? daysLabel(Number(form.deliveryDays), fr) : ""],
               ...groups.map((g) => [g.name, g.options.join(", ")]),
             ].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 border-b border-[var(--border)] py-2">
@@ -505,7 +649,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
       <div className="flex flex-wrap gap-3">
         {step > 0 && <Button variant="secondary" onClick={() => setStep(step - 1)} disabled={submitting}>{fr ? "Retour" : "Back"}</Button>}
         {step < STEPS.length - 1 ? (
-          <Button onClick={() => { if (stepValid[step]) setStep(step + 1); }} disabled={!stepValid[step]}>
+          <Button onClick={goNext} disabled={step === 1 && !stepValid[1]}>
             {fr ? "Étape suivante" : "Next Step"}
           </Button>
         ) : (

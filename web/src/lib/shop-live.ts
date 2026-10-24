@@ -392,6 +392,13 @@ export interface PublicSellerPlan {
   popular?: boolean;
 }
 
+/** A plan id ("free", "pro"…) as its name in the viewer's language; an id with no plan row is shown as it is. */
+export function planLabel(plans: PublicSellerPlan[] | null, id: string | null | undefined, fr: boolean): string {
+  const key = id || "free";
+  const p = plans?.find((x) => x.id === key);
+  return p ? (fr && p.nameFr ? p.nameFr : p.name) : key;
+}
+
 export function useSellerPlans() {
   const rt = useRealtime();
   const [plans, setPlans] = useState<PublicSellerPlan[] | null>(null);

@@ -33,6 +33,7 @@ import { useWarehouseData } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import {
   BATCH_STATUS,
+  EXCEPTION_TYPE,
   batchTaskIds,
   pick,
   shortDate,
@@ -97,7 +98,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
       })),
     ...openExceptions.slice(0, 4).map((e) => ({
       id: `e-${e.id}`,
-      title: `${e.reference} · ${e.type.replace(/_/g, " ")}`,
+      title: `${e.reference} · ${pick(EXCEPTION_TYPE[e.type], fr, e.type.replace(/_/g, " "))}`,
       detail: e.notes.slice(0, 90),
       href: `/exceptions/${e.id}`,
       priority: e.severity === "high" ? ("danger" as const) : ("warning" as const),
@@ -231,7 +232,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
               columns={[
                 {
                   key: "reference",
-                  label: "Batch",
+                  label: fr ? "Lot" : "Batch",
                   render: (row) => (
                     <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">
                       {String(row.reference)}

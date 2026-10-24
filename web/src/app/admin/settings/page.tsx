@@ -11,6 +11,7 @@ import { useMarket } from "@/context/market-context";
 import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { PlansEditor } from "@/components/admin/plans-editor";
+import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
 import { errMsg, type ZoneSetting } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 
@@ -247,6 +248,8 @@ export default function AdminSettingsPage() {
             <h3 className="font-semibold">{fr ? "Formules d'abonnement vendeur" : "Seller subscription plans"}</h3>
             <PlansEditor saved={saved.sellerPlans} onSaved={(all) => { setSaved(all); setDraft((d) => ({ ...d, sellerPlans: all.sellerPlans ?? d.sellerPlans })); }} />
           </div>
+
+          <TranslationsStatusPanel />
 
           <div className="card-premium space-y-3 p-6">
             <h3 className="font-semibold">{fr ? "Profil de marché (cet appareil uniquement)" : "Market profile (this browser only)"}</h3>

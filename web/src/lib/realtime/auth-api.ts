@@ -6,24 +6,39 @@ const API_URL =
 const ACCESS_KEY = "somba.accessToken";
 const REFRESH_KEY = "somba.refreshToken";
 
+/** An error from the credential endpoints, with the HTTP status (0 when the server could not be reached). */
+export class AuthApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function post<T>(
   path: string,
   body: unknown,
   accessToken?: string | null,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify(body ?? {}),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch (e) {
+    throw new AuthApiError((e as Error).message || "Cannot reach the server.", 0);
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     // Nest validation errors arrive as an array of messages.
     const msg = Array.isArray(json?.message) ? json.message.join(" ") : json?.message;
-    throw new Error(msg ?? `Request failed (${res.status})`);
+    throw new AuthApiError(msg ?? `Request failed (${res.status})`, res.status);
   }
   return json as T;
 }
@@ -42,6 +57,8 @@ export const authApi = {
     name: string;
     role?: string;
     phone?: string;
+    /** The language the person is reading the site in: stored on the account (SMS, push and e-mail follow it). */
+    locale?: "en" | "fr";
   }): Promise<AuthResult> {
     return post<AuthResult>("/api/v1/auth/register", input);
   },

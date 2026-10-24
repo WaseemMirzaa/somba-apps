@@ -9,6 +9,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useWarehouseData } from "@/lib/warehouse";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
+import { pickText } from "@/lib/i18n-fields";
 
 const STATUS_OPTIONS = [
   { value: "ok", label: "In stock", labelFr: "En stock" },
@@ -25,7 +26,7 @@ export default function WarehouseInventoryPage() {
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
-    () => applyListFilters(inventory, filters, { searchFields: ["sku", "name", "category"], statusField: "status" }),
+    () => applyListFilters(inventory, filters, { searchFields: ["sku", "name", "nameFr", "category", "categoryFr"], statusField: "status" }),
     [inventory, filters],
   );
 
@@ -50,8 +51,8 @@ export default function WarehouseInventoryPage() {
         { key: "sku", label: "SKU", render: (row) => (
           <Link href={ops(`/inventory/${encodeURIComponent(String(row.sku))}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.sku)}</Link>
         )},
-        { key: "name", label: fr ? "Produit" : "Product" },
-        { key: "category", label: fr ? "Catégorie" : "Category" },
+        { key: "name", label: fr ? "Produit" : "Product", render: (row) => pickText(fr, row.name as string, row.nameFr as string | null) },
+        { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => pickText(fr, row.category as string, row.categoryFr as string | null) },
         { key: "stock", label: fr ? "Stock" : "Stock" },
         { key: "status", label: t("status"), render: (row) => {
           const s = String(row.status);

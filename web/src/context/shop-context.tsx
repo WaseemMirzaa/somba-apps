@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo, u
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useCatalog, priceView, type PriceView } from "@/lib/catalog";
+import { localizeVariantText } from "@/lib/i18n-fields";
 
 /**
  * A cart line. `id` IS the live backend product id, so checkout can send
@@ -414,6 +415,9 @@ export type CartLine = CartItem & {
   unavailable: boolean;
   /** Struck-through price / badge for the live price (null when the product left the catalogue). */
   priceInfo: PriceView | null;
+  /** The chosen options as the shopper reads them in each language (`variant` stays the purchase key). */
+  variantEn: string;
+  variantFr: string;
 };
 
 /** Cart lines enriched with the live catalogue (price, stock, availability). */
@@ -434,6 +438,11 @@ export function useCartLines(): {
       const p = byId.get(i.id);
       return {
         ...i,
+        // The live catalogue wins: a translation that arrived after the item was added shows up here.
+        name: p?.name ?? i.name,
+        nameFr: p?.nameFr ?? i.nameFr,
+        variantEn: p ? localizeVariantText(i.variant, p.variants, p.variantLabels, false) : i.variant,
+        variantFr: p ? localizeVariantText(i.variant, p.variants, p.variantLabels, true) : i.variant,
         livePrice: p ? p.price : i.price,
         deliveryDays: p ? p.deliveryDays : null,
         stock: p ? p.stock : null,

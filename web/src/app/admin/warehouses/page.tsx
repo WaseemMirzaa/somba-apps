@@ -20,6 +20,7 @@ import { useLocale } from "@/context/locale-context";
 import { canManageHubs, errMsg, useRole, useServerList } from "@/lib/admin-live";
 import type { HubRow } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { countryName } from "@/lib/countries";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
@@ -127,7 +128,7 @@ export default function AdminWarehousesPage() {
                     <Link href={`/admin/warehouses/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
                   )},
                   { key: "city", label: fr ? "Ville" : "City" },
-                  { key: "country", label: fr ? "Pays" : "Country", render: (row) => String(row.country ?? "—") },
+                  { key: "country", label: fr ? "Pays" : "Country", render: (row) => countryName(row.country as string | null, fr, true) || "—" },
                   { key: "address", label: fr ? "Adresse" : "Address", render: (row) => String(row.address ?? "—") },
                   { key: "capacity", label: fr ? "Capacité" : "Capacity", render: (row) => Number(row.capacity).toLocaleString() },
                   { key: "status", label: fr ? "Statut" : "Status", render: (row) => (

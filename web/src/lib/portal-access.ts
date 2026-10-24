@@ -60,7 +60,7 @@ export function getVisiblePortals(role: UserRole): PortalLink[] {
     case "guest":
     case "customer":
       return [
-        { href: "/", label: "Shop" },
+        { href: "/", label: "Shop", i18nKey: "footerShop" },
         { href: "/shop/account", label: "Account", i18nKey: "myAccount" },
       ];
     case "seller":

@@ -1,5 +1,6 @@
 "use client";
 
+import { supportCategoryLabel } from "@/lib/i18n-fields";
 import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -61,7 +62,7 @@ export default function AdminSupportPage() {
               )},
               { key: "subject", label: fr ? "Sujet" : "Subject" },
               { key: "userName", label: fr ? "Demandeur" : "Requester" },
-              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => <span className="capitalize">{String(row.category)}</span> },
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => <span>{supportCategoryLabel(String(row.category), fr)}</span> },
               { key: "status", label: t("status"), render: (row) => (
                 <Badge variant={SUPPORT_STATUS_BADGE[String(row.status)] ?? "default"}>
                   {SUPPORT_STATUS_LABEL[String(row.status)]?.[fr ? "fr" : "en"] ?? String(row.status)}

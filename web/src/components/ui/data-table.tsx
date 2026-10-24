@@ -1,3 +1,7 @@
+"use client";
+
+import { useLocale } from "@/context/locale-context";
+
 export type DataTableColumn = {
   key: string;
   label: string;
@@ -26,6 +30,7 @@ export function DataTable({
    */
   rowAction?: (row: Record<string, unknown>) => React.ReactNode;
 }) {
+  const { locale } = useLocale();
   const primaryCol = columns.find((col) => col.primary) ?? columns[0];
   // "action"/"actions" columns get a full-width footer on mobile instead of a label/value row.
   const actionCol = columns.find(
@@ -107,7 +112,7 @@ export function DataTable({
 
       {data.length === 0 && (
         <p className="px-5 py-8 text-center text-sm text-slate-400">
-          {emptyMessage ?? "No records found"}
+          {emptyMessage ?? (locale === "fr" ? "Aucun enregistrement." : "No records found")}
         </p>
       )}
     </div>

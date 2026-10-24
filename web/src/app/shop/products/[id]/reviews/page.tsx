@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Star, ThumbsUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { TranslatableText } from "@/components/shop/translatable-text";
 import { useProduct } from "@/lib/catalog";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -140,14 +141,16 @@ export default function ProductReviewsPage() {
               </div>
               <span className="ml-auto text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</span>
             </div>
-            <p className="mt-3 text-sm text-slate-700">{r.text}</p>
+            <div className="mt-3">
+              <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="text-sm text-slate-700" />
+            </div>
             {r.sellerReply && (
               <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
                 <p className="text-xs font-semibold text-slate-700">
                   {fr ? "Réponse du vendeur" : "Seller reply"}
                   {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
                 </p>
-                <p className="mt-1 text-slate-600">{r.sellerReply}</p>
+                <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-1 text-slate-600" />
               </div>
             )}
             <button

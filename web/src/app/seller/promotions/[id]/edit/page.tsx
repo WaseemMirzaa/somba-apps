@@ -32,7 +32,8 @@ export default function SellerPromotionEditPage() {
       key={promo.id}
       initial={{
         id: promo.id,
-        name: promo.campaign,
+        name: promo.campaignEn,
+        nameFr: promo.campaignFr,
         discount: promo.discount,
         startDate: promo.startDate === "—" ? null : promo.startDate,
         endDate: promo.endDate === "—" ? null : promo.endDate,

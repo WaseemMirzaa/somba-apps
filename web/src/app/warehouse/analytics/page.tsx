@@ -13,7 +13,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { useWarehouseData } from "@/lib/warehouse";
+import { riderName, useWarehouseData } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
@@ -54,14 +54,14 @@ export default function WarehouseAnalyticsPage() {
     const m = new Map<string, { id: string; name: string; delivered: number; failed: number; open: number }>();
     for (const p of parcels) {
       if (!p.riderId) continue;
-      const r = m.get(p.riderId) ?? { id: p.riderId, name: p.rider, delivered: 0, failed: 0, open: 0 };
+      const r = m.get(p.riderId) ?? { id: p.riderId, name: riderName(p.rider, fr), delivered: 0, failed: 0, open: 0 };
       if (p.status === "delivered") r.delivered += 1;
       else if (p.status === "exception") r.failed += 1;
       else r.open += 1;
       m.set(p.riderId, r);
     }
     return [...m.values()].sort((a, b) => b.delivered - a.delivered);
-  }, [parcels]);
+  }, [parcels, fr]);
 
   // Exceptions: real counts, real resolution time (created -> last update of resolved ones).
   const exc = useMemo(() => {

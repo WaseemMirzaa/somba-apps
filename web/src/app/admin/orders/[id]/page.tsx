@@ -1,5 +1,6 @@
 "use client";
 
+import { paymentMethodLabel } from "@/lib/seller-labels";
 import { localDay, localDateTime } from "@/lib/dates";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -27,6 +28,7 @@ import {
   useServerList,
   type PaymentRow,
 } from "@/lib/admin-live";
+import { DELIVERY_TASK_STATUS, pick } from "@/lib/warehouse-live";
 import {
   PACKAGE_STATUS_BADGE,
   PACKAGE_STATUS_LABEL,
@@ -39,6 +41,7 @@ import { useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { dayLabel } from "@/lib/delivery-estimate";
 import { useLocale } from "@/context/locale-context";
+import { localized, variantDisplay } from "@/lib/i18n-fields";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const PAYMENT_STATUS_FR: Record<string, string> = {
@@ -277,7 +280,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Méthode" : "Method", value: payment?.method ?? live.paymentMethod },
+            { label: fr ? "Méthode" : "Method", value: paymentMethodLabel(payment?.method ?? live.paymentMethod, fr) },
             { label: fr ? "Référence paiement" : "Payment reference", value: payment?.reference ?? "—" },
             { label: fr ? "Statut" : "Status", value: payment ? (fr ? (PAYMENT_STATUS_FR[payment.status] ?? payment.status) : payment.status) : (fr ? "Aucun paiement enregistré" : "No payment recorded") },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(payment?.amountUsd ?? order.amount, locale) },
@@ -286,7 +289,7 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
-            { label: fr ? "Livraison" : "Delivery task", value: task ? task.status.replace(/_/g, " ") : "—" },
+            { label: fr ? "Livraison" : "Delivery task", value: task ? pick(DELIVERY_TASK_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
             { label: fr ? "Livreur assigné" : "Rider assigned", value: live.riderId ? (fr ? "Oui" : "Yes") : "—" },
             { label: fr ? "Zone" : "Zone", value: live.zoneId ?? "—" },
             { label: fr ? "COD à encaisser" : "COD to collect", value: task && task.codAmountUsd > 0 ? formatCurrency(task.codAmountUsd, locale) : "—" },
@@ -342,7 +345,7 @@ export default function AdminOrderDetailPage() {
                       <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
                         <div className="min-w-0">
                           <span className={cancelled ? "text-slate-400 line-through" : "text-slate-800"}>
-                            {item.productName}{item.variant ? ` · ${item.variant}` : ""} × {item.qty}
+                            {localized(item, "productName", fr)}{item.variant ? ` · ${variantDisplay(item.variant, fr ? item.variantFr : null, fr)}` : ""} × {item.qty}
                           </span>
                           {cancelled && (
                             <p className="text-xs text-red-600">
@@ -375,8 +378,8 @@ export default function AdminOrderDetailPage() {
             {live.items.map((item) => (
               <div key={item.id} className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--border)] p-4">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/admin/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{item.productName}</Link>
-                  {item.variant && <p className="text-xs text-slate-500">{fr ? "Variante" : "Variant"}: {item.variant}</p>}
+                  <Link href={`/admin/products/${item.productId}`} className="font-medium text-[var(--primary)] hover:underline">{localized(item, "productName", fr)}</Link>
+                  {item.variant && <p className="text-xs text-slate-500">{fr ? "Variante" : "Variant"}: {variantDisplay(item.variant, fr ? item.variantFr : null, fr)}</p>}
                   {item.campaignPct ? <p className="text-xs text-emerald-600">{fr ? `Campagne -${item.campaignPct}%` : `Campaign -${item.campaignPct}%`}</p> : null}
                 </div>
                 <div className="text-right">

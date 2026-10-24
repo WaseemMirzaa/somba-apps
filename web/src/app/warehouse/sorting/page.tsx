@@ -8,7 +8,7 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { STAGE_LABEL, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
+import { STAGE_LABEL, riderName, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
 import { shortDate } from "@/lib/warehouse-live";
 import { useOpsPath, useOpsBase } from "@/lib/ops-path";
 
@@ -69,7 +69,7 @@ export default function WarehouseSortingPage() {
         { key: "customer", label: t("customer") },
         { key: "zone", label: t("zone") },
         { key: "receivedAt", label: fr ? "Reçu le" : "Received", render: (row) => shortDate(row.receivedAt ? String(row.receivedAt) : null, locale) },
-        { key: "rider", label: fr ? "Livreur" : "Rider" },
+        { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => riderName(String(row.rider ?? ""), fr) },
         { key: "status", label: t("status"), render: (row) => {
           const s = String(row.status) as ParcelStage;
           return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;

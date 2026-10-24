@@ -4,6 +4,7 @@ import { BRAND } from "./config";
 export const LOGIN_HERO_IMAGE = {
   src: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=2400&q=80",
   alt: "Customer paying at a retail checkout — online marketplace shopping and e-commerce",
+  altFr: "Cliente qui règle ses achats en caisse — shopping en ligne sur une marketplace",
   credit: "Unsplash",
   creditUrl: "https://unsplash.com/photos/0cfed4f6a45d",
 } as const;

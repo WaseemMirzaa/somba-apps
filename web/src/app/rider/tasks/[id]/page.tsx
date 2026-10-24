@@ -13,27 +13,9 @@ import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/r
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
 import { useRiderData } from "@/lib/rider";
 import { formatCurrency } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/seller-labels";
+import { variantDisplay } from "@/lib/i18n-fields";
 import { useLocale } from "@/context/locale-context";
-
-const VARIANT_TOKENS_FR: Record<string, string> = {
-  Default: "Standard",
-  Black: "Noir",
-  White: "Blanc",
-  Blue: "Bleu",
-  Silver: "Argent",
-  Grey: "Gris",
-  Gray: "Gris",
-  Red: "Rouge",
-  Green: "Vert",
-};
-
-const localizeVariant = (variant: string, fr: boolean) =>
-  !fr || !variant
-    ? variant
-    : variant
-        .split(" ")
-        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
-        .join(" ");
 
 export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -106,7 +88,7 @@ export default function RiderTaskDetailPage() {
         <InfoGrid
           items={[
             { label: fr ? "N° commande" : "Order ID", value: task.orderId },
-            { label: fr ? "Paiement" : "Payment", value: task.paymentType },
+            { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? paymentMethodLabel(task.paymentMethod, fr) : task.paymentType },
             { label: fr ? "Montant" : "Amount", value: task.amount ? formatCurrency(task.amount, locale) : "—" },
             { label: fr ? "Articles" : "Items", value: task.items },
             { label: fr ? "Tentatives" : "Attempts", value: task.attempts },
@@ -141,9 +123,9 @@ export default function RiderTaskDetailPage() {
             {task.products.map((item, i) => (
               <div key={`${item.sku}-${i}`} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">{item.name}</p>
+                  <p className="font-medium text-slate-900">{fr ? item.nameFr : item.name}</p>
                   <p className="text-xs text-slate-500">
-                    SKU: {item.sku} · {localizeVariant(item.variant, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
+                    SKU: {item.sku} · {variantDisplay(item.variant, fr ? item.variantFr : null, fr)} · {fr ? "Qté" : "Qty"} {item.qty}
                   </p>
                 </div>
               </div>

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useCatalog } from "@/lib/catalog";
+import { matchesSearch } from "@/lib/i18n-fields";
 import { useLocale } from "@/context/locale-context";
 
 /** Live catalogue suggestions: every link opens a real product. */
@@ -12,9 +13,8 @@ export function SearchAutocomplete({ query, onSelect }: { query: string; onSelec
   const catalog = useCatalog();
   const suggestions = useMemo(() => {
     if (!query || query.trim().length < 2) return [];
-    const q = query.trim().toLowerCase();
     return catalog
-      .filter((p) => p.name.toLowerCase().includes(q) || p.nameFr.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+      .filter((p) => matchesSearch(query, [p.name, p.nameFr, p.category, p.categoryFr]))
       .slice(0, 5);
   }, [query, catalog]);
 

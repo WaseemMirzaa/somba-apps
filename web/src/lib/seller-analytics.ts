@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSellerLiveTick } from "@/lib/seller";
+import { useSellerLiveTick, type SellerProductRow } from "@/lib/seller";
+import { pickText } from "@/lib/i18n-fields";
 
 /**
  * Real store analytics: the server's `analytics:seller` (see docs/ANALYTICS-API.md §5).
@@ -46,6 +47,21 @@ export interface SellerAnalytics {
     components: { key: string; score: number; weight: number; value: number }[];
   };
   funnel: { views: number; orders: number; conversionPct: number };
+}
+
+/**
+ * The server's top-products rows carry the English name only. The seller's own listing has both languages, so the
+ * name is read from it (by id) in the viewer's language; a product that is no longer listed keeps the server's name.
+ */
+export function localizedTopProducts(
+  top: SellerAnalytics["topProducts"],
+  getRawProduct: (id: string) => SellerProductRow | undefined,
+  fr: boolean,
+): SellerAnalytics["topProducts"] {
+  return top.map((p) => {
+    const raw = getRawProduct(p.productId);
+    return raw ? { ...p, name: pickText(fr, raw.name, raw.nameFr) || p.name } : p;
+  });
 }
 
 export type AnalyticsDays = 7 | 30 | 90;

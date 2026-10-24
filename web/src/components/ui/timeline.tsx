@@ -65,6 +65,7 @@ const TIMELINE_LABELS_FR: Record<string, string> = {
   "Rider Assigned": "Livreur assigné",
   "Rider handover at hub": "Transfert au livreur au hub",
   "Seller approved": "Vendeur approuvé",
+  "Seller ready": "Vendeur prêt",
   "Seller notified": "Vendeur notifié",
   "Shift approved": "Service approuvé",
   "Shift started": "Service commencé",
@@ -73,6 +74,14 @@ const TIMELINE_LABELS_FR: Record<string, string> = {
   "Warehouse inspection": "Inspection à l'entrepôt",
   "Warehouse": "Entrepôt",
 };
+
+/** "Failed: <reason>" (the reason is what the rider typed) keeps the reason and translates the lead word. */
+function timelineLabel(label: string, fr: boolean): string {
+  if (!fr) return label;
+  if (TIMELINE_LABELS_FR[label]) return TIMELINE_LABELS_FR[label];
+  const failed = /^Failed(?:: (.+))?$/.exec(label);
+  return failed ? (failed[1] ? `Échec : ${failed[1]}` : "Échec") : label;
+}
 
 export function ActivityTimeline({
   events,
@@ -97,7 +106,7 @@ export function ActivityTimeline({
             )}
           </div>
           <div className="flex-1 pt-0">
-            <p className="text-sm font-medium text-slate-900">{fr ? (TIMELINE_LABELS_FR[event.label] ?? event.label) : event.label}</p>
+            <p className="text-sm font-medium text-slate-900">{timelineLabel(event.label, fr)}</p>
             {event.detail && (
               <p className="text-xs text-slate-500">{fr ? (event.detailFr ?? event.detail) : event.detail}</p>
             )}

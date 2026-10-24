@@ -110,6 +110,13 @@ const PAYMENT_LABEL: Record<string, string> = {
   wallet: "Wallet",
 };
 
+/** The rider column as built by `buildParcels` ("Unassigned" / "Rider ab12cd" / a name), in the viewer's language. */
+export function riderName(rider: string, fr: boolean): string {
+  if (!fr) return rider;
+  if (rider === "Unassigned") return "Non assigné";
+  return rider.startsWith("Rider ") ? `Livreur ${rider.slice(6)}` : rider;
+}
+
 export function shortId(id: string) {
   return id.replace(/-/g, "").slice(0, 6).toUpperCase();
 }
@@ -142,7 +149,11 @@ export interface ParcelItem {
   productId: string;
   sku: string;
   name: string;
+  /** French name snapshotted on the order line (equals `name` when there is none). */
+  nameFr: string;
   variant: string;
+  /** French options snapshotted on the order line. */
+  variantFr: string | null;
   qty: number;
 }
 
@@ -174,6 +185,8 @@ export interface Parcel {
   riderId: string | null;
   rider: string;
   paymentLabel: string;
+  /** The raw method id (cod, wallet…): pages turn it into a label in the viewer's language. */
+  paymentMethod: string;
   codAmountUsd: number;
   totalUsd: number;
   items: ParcelItem[];
@@ -206,7 +219,9 @@ export function buildParcels(
       productId: it.productId,
       sku: `SKU-${shortId(it.productId)}`,
       name: it.productName,
+      nameFr: it.productNameFr?.trim() || it.productName,
       variant: it.variant || "Default",
+      variantFr: it.variantFr?.trim() || null,
       qty: it.qty,
     }));
     const firstProduct = o?.items?.[0] ? productById.get(o.items[0].productId) : undefined;
@@ -239,6 +254,7 @@ export function buildParcels(
       riderId: t.riderId,
       rider,
       paymentLabel: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? "—",
+      paymentMethod: o?.paymentMethod ?? "",
       codAmountUsd: t.codAmountUsd,
       totalUsd: o?.totalUsd ?? 0,
       items,

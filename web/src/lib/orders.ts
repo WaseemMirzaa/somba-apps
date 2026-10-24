@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useCatalog } from "@/lib/catalog";
+import { pickText } from "@/lib/i18n-fields";
 import type { Dispute, Order, Payment } from "@/lib/realtime/types";
 
 const STATUS_FLOW = [
@@ -52,8 +53,12 @@ export interface OrderDetail {
   items: {
     productId: string;
     name: string;
+    /** French name snapshotted on the order line (equals `name` when there is none). */
+    nameFr: string;
     sku: string;
     variant: string;
+    /** French options snapshotted on the order line (null when there is none). */
+    variantFr: string | null;
     qty: number;
     price: number;
     /** Normal price when a campaign or flash sale lowered the charged price. */
@@ -126,8 +131,10 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     items: (o.items ?? []).map((it) => ({
       productId: it.productId,
       name: it.productName,
+      nameFr: pickText(true, it.productName, it.productNameFr),
       sku: `SKU-${it.productId.slice(0, 6)}`,
       variant: it.variant,
+      variantFr: it.variantFr?.trim() ? it.variantFr : null,
       qty: it.qty,
       price: it.priceUsd,
       listPrice: it.listPriceUsd != null && it.listPriceUsd > it.priceUsd ? it.listPriceUsd : null,

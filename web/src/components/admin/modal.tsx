@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 
 /** Minimal inline modal (no window.prompt / confirm). */
 export function Modal({
@@ -19,6 +20,7 @@ export function Modal({
   /** "xl" for wide content such as a statement table. */
   size?: "md" | "xl";
 }) {
+  const { locale } = useLocale();
   if (!open) return null;
   return (
     <div
@@ -33,7 +35,7 @@ export function Modal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Close">
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label={locale === "fr" ? "Fermer" : "Close"}>
             <X className="h-4 w-4" />
           </button>
         </div>

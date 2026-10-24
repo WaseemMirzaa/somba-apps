@@ -1,18 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProductCard } from "@/components/landing/product-card";
 import { PageHeader } from "@/components/ui/page-header";
-import { useCatalog } from "@/lib/catalog";
+import { PageLoader } from "@/components/ui/loader";
+import { useCatalog, useShopCategories } from "@/lib/catalog";
 import { useShop } from "@/context/shop-context";
 import { useLocale } from "@/context/locale-context";
 
-export default function ShopProductsPage() {
+/** Category filter values: the category row id, or `name:<English name>` for a product the server sent without one. */
+const BY_NAME = "name:";
+
+function ProductsList() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const products = useCatalog();
+  const shopCategories = useShopCategories();
+  // `?category=<id>` comes from the category tiles.
+  const wanted = useSearchParams().get("category") ?? "all";
   const [sort, setSort] = useState("popularity");
-  const [category, setCategory] = useState("all");
+  const [picked, setPicked] = useState<string | null>(null);
   const [brand, setBrand] = useState("all");
   const [minRating, setMinRating] = useState(0);
   const [minDiscount, setMinDiscount] = useState(0);
@@ -22,14 +30,26 @@ export default function ShopProductsPage() {
   const topPrice = Math.max(10, Math.ceil(Math.max(0, ...products.map((p) => p.price)) / 50) * 50);
   const priceMax = priceCap ?? topPrice;
   const brands = ["all", ...new Set(products.map((p) => p.seller))];
-  const categories = ["all", ...new Set(products.map((p) => p.category))];
-  const categoryFrMap = new Map(products.map((p) => [p.category, p.categoryFr]));
-  const categoryLabel = (c: string) =>
-    c === "all" ? (fr ? "Toutes les catégories" : "All categories") : fr ? (categoryFrMap.get(c) ?? c) : c;
+  // Labels come from the categories list (translated by the platform), not from the products' own copies (L17).
+  const categoryOptions = useMemo(() => {
+    const known = new Set(shopCategories.map((c) => c.uuid));
+    const options = shopCategories.map((c) => ({ value: c.uuid, label: fr ? c.nameFr : c.name }));
+    const orphans = new Map<string, string>();
+    for (const p of products) {
+      if (!p.categoryId || !known.has(p.categoryId)) orphans.set(`${BY_NAME}${p.category}`, fr ? p.categoryFr : p.category);
+    }
+    for (const [value, label] of orphans) options.push({ value, label });
+    return options;
+  }, [shopCategories, products, fr]);
+  const category = picked ?? (categoryOptions.some((o) => o.value === wanted) ? wanted : "all");
+  const categoryLabel = (value: string) =>
+    value === "all" ? (fr ? "Toutes les catégories" : "All categories") : (categoryOptions.find((o) => o.value === value)?.label ?? value);
+  const categories = ["all", ...categoryOptions.map((o) => o.value)];
 
   const sorted = useMemo(() => {
     let list = [...products];
-    if (category !== "all") list = list.filter((p) => p.category === category);
+    if (category.startsWith(BY_NAME)) list = list.filter((p) => p.category === category.slice(BY_NAME.length));
+    else if (category !== "all") list = list.filter((p) => p.categoryId === category);
     if (brand !== "all") list = list.filter((p) => p.seller === brand);
     if (minRating > 0) list = list.filter((p) => p.rating >= minRating);
     if (minDiscount > 0) list = list.filter((p) => p.discount >= minDiscount);
@@ -66,7 +86,7 @@ export default function ShopProductsPage() {
           <option value="rating">{fr ? "Note" : "Rating"}</option>
           <option value="discount">{fr ? "Remise %" : "Discount %"}</option>
         </select>
-        <select className="input-premium px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select className="input-premium px-3 py-2 text-sm" value={category} onChange={(e) => setPicked(e.target.value)}>
           {categories.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
         </select>
         <select className="input-premium px-3 py-2 text-sm" value={brand} onChange={(e) => setBrand(e.target.value)}>
@@ -92,5 +112,13 @@ export default function ShopProductsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function ShopProductsPage() {
+  return (
+    <Suspense fallback={<PageLoader className="py-12" />}>
+      <ProductsList />
+    </Suspense>
   );
 }

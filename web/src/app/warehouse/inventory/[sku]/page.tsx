@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { useWarehouseData } from "@/lib/warehouse";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
+import { STOCK_STATUS, pick } from "@/lib/warehouse-live";
+import { pickText } from "@/lib/i18n-fields";
 
 export default function WarehouseInventoryDetailPage() {
   const { sku } = useParams<{ sku: string }>();
@@ -31,7 +33,7 @@ export default function WarehouseInventoryDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={item.name}
+        title={pickText(fr, item.name, item.nameFr)}
         subtitle={`SKU: ${item.sku}`}
         backHref={listHref}
         breadcrumbs={[
@@ -39,15 +41,15 @@ export default function WarehouseInventoryDetailPage() {
           { label: fr ? "Inventaire" : "Inventory", href: listHref },
           { label: item.sku },
         ]}
-        actions={<Badge variant={item.status === "ok" ? "success" : item.status === "low" ? "warning" : "danger"}>{item.status}</Badge>}
+        actions={<Badge variant={item.status === "ok" ? "success" : item.status === "low" ? "warning" : "danger"}>{pick(STOCK_STATUS[item.status], fr, item.status)}</Badge>}
       />
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Aperçu" : "Overview"} span={2}>
           <InfoGrid items={[
             { label: "SKU", value: item.sku },
-            { label: fr ? "Produit" : "Product", value: item.name },
-            { label: fr ? "Catégorie" : "Category", value: item.category },
+            { label: fr ? "Produit" : "Product", value: pickText(fr, item.name, item.nameFr) },
+            { label: fr ? "Catégorie" : "Category", value: pickText(fr, item.category, item.categoryFr) },
             { label: fr ? "Stock disponible" : "Available stock", value: item.stock },
           ]} />
         </DetailGridSection>

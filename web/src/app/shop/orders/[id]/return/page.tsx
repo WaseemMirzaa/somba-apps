@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { variantDisplay } from "@/components/shop/order-products";
 import { useMyOrder, disputeStageLabel, type DisputeRow } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -130,8 +131,8 @@ function ReturnWizard() {
                 className="h-4 w-4 rounded border-slate-300 text-[var(--primary)]"
               />
               <div className="flex-1">
-                <p className="font-medium text-slate-900">{item.name}</p>
-                <p className="text-xs text-slate-500">{fr ? "Qté" : "Qty"}: {item.qty}</p>
+                <p className="font-medium text-slate-900">{fr ? item.nameFr : item.name}</p>
+                <p className="text-xs text-slate-500">{variantDisplay(item.variant, fr ? item.variantFr : null, fr)} · {fr ? "Qté" : "Qty"}: {item.qty}</p>
               </div>
             </label>
           ))}
@@ -167,7 +168,7 @@ function ReturnWizard() {
           <h3 className="font-semibold text-slate-900">{fr ? "Confirmer le retour" : "Confirm return"}</h3>
           <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
             <p><strong>{fr ? "Commande" : "Order"}:</strong> {order.reference}</p>
-            <p><strong>{fr ? "Articles" : "Items"}:</strong> {selected.map((i) => `${i.name} x${i.qty}`).join(", ")}</p>
+            <p><strong>{fr ? "Articles" : "Items"}:</strong> {selected.map((i) => `${fr ? i.nameFr : i.name} x${i.qty}`).join(", ")}</p>
             <p><strong>{fr ? "Motif" : "Reason"}:</strong> {fr ? (reasons.find((r) => r.en === reason)?.fr ?? reason) : reason}</p>
             <p><strong>{fr ? "Mode de remboursement" : "Refund method"}:</strong> {fr ? "Paiement d'origine" : "Original payment"} ({fr && order.paymentMethod === "Card" ? "Carte" : formatPaymentMethod(order.paymentMethod, locale)})</p>
             <p className="mt-2 text-xs text-slate-500">{fr ? "Adresse" : "Address"}: {order.customerAddress}</p>

@@ -5,6 +5,8 @@
  * enabled in Google Cloud: Maps JavaScript API, Places API (New), Geocoding API.
  * Without the key the picker explains that and the address form keeps working with manual entry.
  */
+import { countryFromGoogle } from "@/lib/countries";
+
 export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 /** Advanced markers need a Map ID; "DEMO_MAP_ID" is Google's development map, replace it with your own style in production. */
 export const MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
@@ -67,6 +69,14 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
 interface Component {
   types: string[];
   long: string;
+  /** Google's short form: for the country component this is the ISO code ("CD"). */
+  short?: string;
+}
+
+/** The country of a pick, stored as its ISO code ("CD"); see `countryFromGoogle`. */
+function pickedCountry(components: Component[]): string | undefined {
+  const c = components.find((x) => x.types.includes("country"));
+  return c ? countryFromGoogle(c.long, c.short) : undefined;
 }
 
 /** Turn Google address components into the fields our address form uses. */
@@ -78,7 +88,7 @@ export function partsFromComponents(components: Component[]): PickedParts {
     commune: get("sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_3"),
     city: get("locality", "postal_town", "administrative_area_level_2"),
     region: get("administrative_area_level_1"),
-    country: get("country"),
+    country: pickedCountry(components),
     postalCode: get("postal_code"),
   };
 }
@@ -93,7 +103,7 @@ export async function reverseGeocode(
   const best = res.results[0];
   if (!best) return { parts: {} };
   return {
-    parts: partsFromComponents(best.address_components.map((c) => ({ types: c.types, long: c.long_name }))),
+    parts: partsFromComponents(best.address_components.map((c) => ({ types: c.types, long: c.long_name, short: c.short_name }))),
     formatted: best.formatted_address,
     placeId: best.place_id,
   };

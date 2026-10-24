@@ -11,6 +11,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { noticeHref } from "@/lib/notice-links";
+import { noticeTypeLabel, pickText } from "@/lib/i18n-fields";
 
 const READ_STATUS_OPTIONS = [
   { value: "unread", label: "Unread", labelFr: "Non lu" },
@@ -28,9 +29,12 @@ export default function ShopNotificationsPage() {
         ...n,
         // The order, return or ticket the notice is about (the server's link, as on the phone).
         href: noticeHref(n, "shop"),
-        titleFr: n.title,
-        bodyFr: n.body,
-        typeFr: n.type,
+        // The server computes the French text (titleFr / bodyFr); an old server sends none and the English shows.
+        title: pickText(false, n.title, n.titleFr),
+        body: pickText(false, n.body, n.bodyFr),
+        titleFr: pickText(true, n.title, n.titleFr),
+        bodyFr: pickText(true, n.body, n.bodyFr),
+        typeFr: noticeTypeLabel(n.type, true),
       })),
     [notifications],
   );
@@ -117,9 +121,7 @@ export default function ShopNotificationsPage() {
                 label: locale === "fr" ? "Type" : "Type",
                 render: (row) => (
                   <Badge variant="info">
-                    {locale === "fr" && row.typeFr
-                      ? String(row.typeFr)
-                      : String(row.type).replace(/_/g, " ")}
+                    {noticeTypeLabel(String(row.type), locale === "fr")}
                   </Badge>
                 ),
               },

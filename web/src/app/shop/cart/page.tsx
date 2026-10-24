@@ -1,5 +1,6 @@
 "use client";
 
+import { pickText } from "@/lib/i18n-fields";
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,27 +13,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
 import { formatCurrency } from "@/lib/utils";
-
-// Variant strings come from the shop/cart data layer as free-form English tokens
-// (e.g. "256GB Black", "White", "Default"). Translate the known tokens locally.
-const VARIANT_TOKENS_FR: Record<string, string> = {
-  Default: "Par défaut",
-  Black: "Noir",
-  White: "Blanc",
-  Blue: "Bleu",
-  Silver: "Argent",
-  Grey: "Gris",
-  Gray: "Gris",
-  Red: "Rouge",
-  Green: "Vert",
-};
-function localizeVariant(variant: string, fr: boolean) {
-  if (!fr || !variant) return variant;
-  return variant
-    .split(" ")
-    .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
-    .join(" ");
-}
+import { variantDisplay } from "@/components/shop/order-products";
 
 function qtyOptions(qty: number, stock: number | null): number[] {
   const max = Math.max(1, Math.min(10, stock ?? 10));
@@ -113,7 +94,7 @@ export default function ShopCartPage() {
                   <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
                     {fr ? item.nameFr : item.name}
                   </Link>
-                  <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)}</p>
+                  <p className="text-xs text-slate-500">{variantDisplay(item.variant, fr ? item.variantFr : item.variantEn, fr)}</p>
                   {item.unavailable && (
                     <p className="text-xs font-medium text-red-600">{fr ? "Indisponible" : "Unavailable"}</p>
                   )}
@@ -122,7 +103,7 @@ export default function ShopCartPage() {
                   )}
                   {item.priceInfo && item.priceInfo.source !== "base" && item.priceInfo.was != null && (
                     <p className="mt-0.5 text-xs font-semibold text-amber-800">
-                      {item.priceInfo.source === "flash" ? (fr ? "Vente flash" : "Flash sale") : item.priceInfo.campaignName ?? (fr ? "Promotion" : "Campaign")}
+                      {item.priceInfo.source === "flash" ? (fr ? "Vente flash" : "Flash sale") : (item.priceInfo.campaignName ? pickText(fr, item.priceInfo.campaignName, item.priceInfo.campaignNameFr) : null) ?? (fr ? "Promotion" : "Campaign")}
                       {" · -"}{item.priceInfo.pct}%
                     </p>
                   )}
@@ -201,7 +182,7 @@ export default function ShopCartPage() {
             <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
             {zones.map((z) => (
               <option key={z.id} value={z.id}>
-                {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : `$${z.feeUsd.toFixed(2)}`})
+                {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : formatCurrency(z.feeUsd, locale)})
               </option>
             ))}
           </select>

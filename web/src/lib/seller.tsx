@@ -10,6 +10,10 @@ import {
   useState,
 } from "react";
 import { useRealtime } from "@/context/realtime-context";
+import { useLocale } from "@/context/locale-context";
+import { frInForm, pickText, variantDisplay } from "@/lib/i18n-fields";
+import { campaignStatusLabel } from "@/lib/seller-labels";
+import { formatCurrency } from "@/lib/utils";
 import { localDay, localDateTime } from "@/lib/dates";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { authApi } from "@/lib/realtime/auth-api";
@@ -80,6 +84,7 @@ export type SellerProductRow = Product & {
   campaignPct?: number;
   campaignId?: string | null;
   campaignName?: string | null;
+  campaignNameFr?: string | null;
   priceSource?: "base" | "flash" | "campaign";
 };
 
@@ -183,6 +188,8 @@ export interface Replacement {
   customerName: string;
   sku: string;
   productName: string;
+  /** French name of the product when the server snapshots one (absent otherwise: the English name shows). */
+  productNameFr?: string | null;
   reason: string | null;
   condition: string | null;
   status: "requested" | "approved" | "received" | "allocated" | "dispatched" | "rejected";
@@ -202,8 +209,10 @@ export interface Exchange {
   customerName: string;
   fromSku: string;
   fromName: string;
+  fromNameFr?: string | null;
   toSku: string;
   toName: string;
+  toNameFr?: string | null;
   priceDiffUsd: number;
   reason: string | null;
   status: "requested" | "approved" | "received" | "ready" | "dispatched" | "rejected";
@@ -212,15 +221,20 @@ export interface Exchange {
 }
 
 export interface ProductInput {
-  name: string;
+  /** English title. At least one of `name` / `nameFr` is required (C-I1); never send an empty one. */
+  name?: string;
   nameFr?: string;
   price: number;
   originalPrice?: number | null;
+  /** The category's English name (kept for old servers) and its id (what the product really points at). */
   category: string;
-  categoryFr?: string;
+  categoryId?: string;
   stock: number;
   image?: string;
   description?: string;
+  descriptionFr?: string;
+  /** The language the seller wrote the listing in (matters when both titles are sent). */
+  sourceLang?: "en" | "fr";
   /** Option types the shopper picks, e.g. [{ name: "Size", options: ["40", "41"] }]; [] removes them. */
   variants?: { name: string; options: string[] }[];
 }
@@ -367,6 +381,8 @@ interface BuildInput {
   campaigns: Campaign[];
   replacements: Replacement[];
   exchanges: Exchange[];
+  /** The portal is read in French: names, options and other bilingual text are picked for this language. */
+  fr: boolean;
 }
 
 /** A seller order as the portal reads it (the address / rider only exist on a full order). */
@@ -375,7 +391,7 @@ type RawOrder = SellerOrderView & { shippingAddress?: string | null; riderId?: s
 function buildSellerData(input: BuildInput) {
   const {
     storeName, seller, stats, products, orders, payouts, disputes, reviews,
-    available, campaigns, replacements, exchanges,
+    available, campaigns, replacements, exchanges, fr,
   } = input;
   const commissionPct = available?.commissionPct ?? DEFAULT_COMMISSION_PCT;
   const rate = commissionPct / 100;
@@ -422,21 +438,28 @@ function buildSellerData(input: BuildInput) {
     return {
       id: p.id,
       sku: `SKU-${shortId(p.id)}`,
-      name: p.name,
-      nameFr: p.nameFr ?? p.name,
+      // `name` is the title in the portal's language (the other one when that language is empty).
+      name: pickText(fr, p.name, p.nameFr),
+      nameFr: pickText(true, p.name, p.nameFr),
+      nameEn: pickText(false, p.name, p.nameFr),
       price: listPrice,
       originalPrice: compareAt,
       effectivePrice: p.price,
       priceSource,
       campaignPct: p.campaignPct ?? 0,
-      campaignName: p.campaignName ?? null,
+      campaignName: pickText(fr, p.campaignName, p.campaignNameFr) || null,
       image: p.image || FALLBACK_IMAGE,
       hasImage: !!p.image,
       status: p.status, // REAL: live | pending | rejected | draft | removed
-      description: p.description ?? "",
+      description: pickText(fr, p.description, p.descriptionFr),
+      descriptionFr: pickText(true, p.description, p.descriptionFr),
       brand: p.sellerName ?? storeName,
       category: p.category,
-      categoryFr: p.categoryFr ?? p.category,
+      categoryFr: pickText(true, p.category, p.categoryFr),
+      categoryId: p.categoryId ?? null,
+      sourceLang: p.sourceLang ?? "en",
+      machineTranslated: p.machineTranslated ?? [],
+      translationStatus: p.translationStatus ?? "done",
       stock: p.stock,
       reserved: sale.inFlight,
       sold: sale.qty,
@@ -558,11 +581,12 @@ function buildSellerData(input: BuildInput) {
       items_detail: items.map((it) => ({
         itemId: it.id,
         productId: it.productId,
-        name: it.productName,
+        // The line's name / options in the portal's language (snapshotted on the order in both).
+        name: pickText(fr, it.productName, it.productNameFr),
         sku: `SKU-${shortId(it.productId)}`,
         qty: it.qty,
         price: it.priceUsd,
-        variant: it.variant || "",
+        variant: variantDisplay(it.variant, fr ? it.variantFr : null, fr) || "",
         image: imageById.get(it.productId) ?? FALLBACK_IMAGE,
         state: lineState(it),
         fulfilment: it.fulfilment ?? "open",
@@ -729,9 +753,10 @@ function buildSellerData(input: BuildInput) {
       reviewId: r.id,
       customer: r.author,
       productId: r.productId,
-      product: r.productName ?? mine.find((p) => p.id === r.productId)?.name ?? "—",
+      product: pickText(fr, r.productName, r.productNameFr) || (() => { const m = mine.find((p) => p.id === r.productId); return m ? pickText(fr, m.name, m.nameFr) : "—"; })(),
       rating: r.rating,
       review: r.text,
+      sourceLang: r.sourceLang ?? null,
       reply: r.sellerReply ?? null,
       repliedAt: r.sellerReplyAt ?? null,
       date: dayOf(r.createdAt),
@@ -833,7 +858,10 @@ function buildSellerData(input: BuildInput) {
   const promotionList = campaigns.map((c) => ({
     id: c.id,
     reference: c.reference,
-    campaign: c.name,
+    campaign: pickText(fr, c.name, c.nameFr),
+    // Both languages, so the campaign form can show what the seller wrote (and what was translated).
+    campaignEn: pickText(false, c.name, c.nameFr),
+    campaignFr: frInForm(c.name, c.nameFr),
     products: c.productCount,
     productIds: c.productIds ?? [],
     discount: c.discount,
@@ -848,6 +876,12 @@ function buildSellerData(input: BuildInput) {
     roi: c.budgetUsd > 0 ? Number((c.revenueUsd / c.budgetUsd).toFixed(2)) : 0,
   }));
 
+  // Replacements and exchanges keep the product's name as it was when they were opened, in one language. When the
+  // server sends no French copy, the seller's own listing with the same SKU gives the name in the portal's language.
+  const nameBySku = new Map(sellerProductList.map((p) => [p.sku, p.name]));
+  const snapshotName = (sku: string, snap: string, snapFr?: string | null): string =>
+    snapFr?.trim() ? pickText(fr, snap, snapFr) : (nameBySku.get(sku) ?? snap);
+
   // Replacements (live, read-only).
   const sellerReplacementList = replacements.map((r) => ({
     id: r.reference,
@@ -855,7 +889,7 @@ function buildSellerData(input: BuildInput) {
     orderId: r.orderReference,
     customer: firstNameOnly(r.customerName),
     sku: r.sku,
-    productName: r.productName,
+    productName: snapshotName(r.sku, r.productName, r.productNameFr),
     reason: r.reason ?? "",
     condition: r.condition ?? "",
     status: r.status,
@@ -868,9 +902,9 @@ function buildSellerData(input: BuildInput) {
     exchangeId: x.id,
     orderId: x.orderReference,
     customer: firstNameOnly(x.customerName),
-    fromName: x.fromName,
+    fromName: snapshotName(x.fromSku, x.fromName, x.fromNameFr),
     fromSku: x.fromSku,
-    toName: x.toName,
+    toName: snapshotName(x.toSku, x.toName, x.toNameFr),
     toSku: x.toSku,
     priceDiffUsd: x.priceDiffUsd,
     reason: x.reason ?? "",
@@ -885,7 +919,7 @@ function buildSellerData(input: BuildInput) {
       at: o.createdAt,
       kind: "order",
       text: `New order ${o.id} — $${o.amount.toFixed(2)}`,
-      textFr: `Nouvelle commande ${o.id} — ${o.amount.toFixed(2)} $`,
+      textFr: `Nouvelle commande ${o.id} — ${formatCurrency(o.amount, "fr")}`,
       href: `/seller/orders/${o.id}`,
     });
   }
@@ -901,12 +935,13 @@ function buildSellerData(input: BuildInput) {
       at: p.createdAt,
       kind: "payout",
       text: `Payout ${p.reference} ${en} — $${p.amountUsd.toFixed(2)}`,
-      textFr: `Paiement ${p.reference} ${frw} — ${p.amountUsd.toFixed(2)} $`,
+      textFr: `Paiement ${p.reference} ${frw} — ${formatCurrency(p.amountUsd, "fr")}`,
       href: `/seller/finance/payouts/${p.id}`,
     });
   }
   for (const r of reviews) {
-    const name = r.productName ?? mine.find((p) => p.id === r.productId)?.name ?? "—";
+    const m = mine.find((p) => p.id === r.productId);
+    const name = pickText(fr, r.productName, r.productNameFr) || (m ? pickText(fr, m.name, m.nameFr) : "—");
     activity.push({
       at: r.createdAt,
       kind: "review",
@@ -919,8 +954,8 @@ function buildSellerData(input: BuildInput) {
     activity.push({
       at: c.updatedAt || c.createdAt,
       kind: "campaign",
-      text: `Campaign ${c.name}: ${c.status}`,
-      textFr: `Campagne ${c.name} : ${c.status}`,
+      text: `Campaign ${pickText(false, c.name, c.nameFr)}: ${campaignStatusLabel(c.status, false)}`,
+      textFr: `Campagne ${pickText(true, c.name, c.nameFr)} : ${campaignStatusLabel(c.status, true)}`,
       href: `/seller/promotions/${c.id}`,
     });
   }
@@ -981,16 +1016,20 @@ interface Actions {
   /** Needs the full KYC payload (`sellers:register` refuses a bare name). */
   registerStore: (input: Record<string, unknown>) => Promise<SellerStore>;
   /** sellers:update {name?, pickupAddress?, logoUrl?, bannerUrl?, description?} */
-  updateStore: (patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null }) => Promise<SellerStore>;
+  updateStore: (patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null }) => Promise<SellerStore>;
   createProduct: (input: ProductInput) => Promise<Product>;
   /** Only send the fields that changed: `price` is the stored LIST price, never the discounted one. */
   updateProduct: (id: string, patch: Partial<ProductInput> & { status?: "live" | "draft" }) => Promise<Product>;
+  /** products:retranslate — asks the platform to translate this listing again (after a failure). */
+  retranslateProduct: (id: string) => Promise<void>;
   pauseProduct: (id: string) => Promise<Product>;
   publishProduct: (id: string) => Promise<Product>;
   deleteProduct: (id: string) => Promise<void>;
   adjustStock: (id: string, stock: number) => Promise<Product>;
   createCampaign: (input: {
-    name: string;
+    /** A name in English or French (at least one); a language left out is translated automatically. */
+    name?: string;
+    nameFr?: string;
     discount?: number;
     startDate?: string;
     endDate?: string;
@@ -1001,7 +1040,7 @@ interface Actions {
   /** campaigns:update — edit a draft, pending or rejected campaign (it goes back to marketing for approval). */
   updateCampaign: (
     id: string,
-    patch: { name?: string; discount?: number; startDate?: string; endDate?: string; budgetUsd?: number; productIds?: string[] },
+    patch: { name?: string; nameFr?: string; discount?: number; startDate?: string; endDate?: string; budgetUsd?: number; productIds?: string[] },
   ) => Promise<Campaign>;
   /** campaigns:withdraw — stop a campaign that has not ended yet. */
   withdrawCampaign: (id: string) => Promise<Campaign>;
@@ -1305,6 +1344,11 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         afterProductWrite(await request<SellerProductRow>("products:create", input)),
       updateProduct: async (id, patch) =>
         afterProductWrite(await request<SellerProductRow>("products:update", { id, patch })),
+      retranslateProduct: async (id) => {
+        await request("products:retranslate", { id });
+        // The translation arrives later as a `product:updated` push; re-read now so the badge shows "Translating…".
+        void refreshProducts();
+      },
       pauseProduct: async (id) =>
         afterProductWrite(await request<SellerProductRow>("products:update", { id, patch: { status: "draft" } })),
       publishProduct: async (id) =>
@@ -1369,7 +1413,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       },
       replyReview: async (reviewId, text) => {
         const saved = await request<SellerReview>("reviews:reply", { reviewId, text });
-        setReviews((cur) => cur.map((x) => (x.id === saved.id ? { ...x, ...saved, productName: x.productName } : x)));
+        setReviews((cur) => cur.map((x) => (x.id === saved.id ? { ...x, ...saved, productName: x.productName, productNameFr: x.productNameFr } : x)));
         return saved;
       },
       uploadImage,
@@ -1449,11 +1493,14 @@ export function useSellerPlan() {
 export function useSellerData() {
   const rt = useRealtime();
   const ctx = useSellerCtx();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const storeName = ctx.seller?.name ?? rt.user?.name ?? "My Store";
 
   const data = useMemo(
     () =>
       buildSellerData({
+        fr,
         storeName,
         seller: ctx.seller,
         stats: ctx.stats,
@@ -1467,7 +1514,7 @@ export function useSellerData() {
         replacements: ctx.replacements,
         exchanges: ctx.exchanges,
       }),
-    [storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, ctx.replacements, ctx.exchanges, rt.products, rt.orders, rt.payouts, rt.disputes],
+    [fr, storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, ctx.replacements, ctx.exchanges, rt.products, rt.orders, rt.payouts, rt.disputes],
   );
 
   return useMemo(

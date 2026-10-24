@@ -37,7 +37,7 @@ interface RiderQueueRow {
     paymentMethod: string;
     totalUsd: number;
     shippingAddress: string | null;
-    items: { productId: string; productName: string; variant: string; qty: number; priceUsd: number }[];
+    items: { productId: string; productName: string; productNameFr?: string | null; variant: string; variantFr?: string | null; qty: number; priceUsd: number }[];
   } | null;
 }
 
@@ -122,6 +122,8 @@ function toRiderTask(row: RiderQueueRow) {
     orderId: row.orderReference,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
     paymentType: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? o?.paymentMethod ?? "—",
+    /** The raw method id (cod, wallet…): pages turn it into a label in the rider's language. */
+    paymentMethod: o?.paymentMethod ?? "",
     items: items.reduce((s, it) => s + it.qty, 0),
     attempts: row.attempts ?? 1,
     failureReason: row.failureReason ?? null,
@@ -131,8 +133,10 @@ function toRiderTask(row: RiderQueueRow) {
     products: items.map((it) => ({
       productId: it.productId,
       name: it.productName,
+      nameFr: it.productNameFr?.trim() || it.productName,
       sku: `SKU-${it.productId.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
       variant: it.variant || "Default",
+      variantFr: it.variantFr?.trim() || null,
       qty: it.qty,
     })),
     timeline: [

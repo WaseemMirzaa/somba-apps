@@ -1,5 +1,6 @@
 "use client";
 
+import { supportCategoryLabel } from "@/lib/i18n-fields";
 import { localDay, localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import Link from "next/link";
@@ -78,7 +79,7 @@ export default function AdminSupportDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={ticket.reference}
-        subtitle={`${ticket.category} · ${ticket.subject}`}
+        subtitle={`${supportCategoryLabel(ticket.category, fr)} · ${ticket.subject}`}
         backHref="/admin/support"
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Support" : "Support", href: "/admin/support" }, { label: ticket.reference }]}
         actions={<Badge variant={SUPPORT_STATUS_BADGE[ticket.status] ?? "default"}>{SUPPORT_STATUS_LABEL[ticket.status]?.[fr ? "fr" : "en"] ?? ticket.status}</Badge>}
@@ -127,7 +128,7 @@ export default function AdminSupportDetailPage() {
             <CardContent className="space-y-3 p-5 text-sm">
               <p className="font-semibold text-slate-900">{fr ? "Détails du ticket" : "Ticket details"}</p>
               <div className="flex justify-between"><span className="text-slate-500">{fr ? "Demandeur" : "Raised by"}</span><Link href={`/admin/customers/${ticket.userId}`} className="font-medium text-[var(--primary)] hover:underline">{ticket.userName}</Link></div>
-              <div className="flex justify-between"><span className="text-slate-500">{fr ? "Catégorie" : "Category"}</span><span className="capitalize">{ticket.category}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">{fr ? "Catégorie" : "Category"}</span><span>{supportCategoryLabel(ticket.category, fr)}</span></div>
               {ticket.orderId && (
                 <div className="flex justify-between"><span className="text-slate-500">{fr ? "Commande" : "Order"}</span><Link href={`/admin/orders/${ticket.orderId}`} className="text-[var(--primary)] hover:underline">{fr ? "Voir" : "View"}</Link></div>
               )}

@@ -8,7 +8,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { AssignParcelButton } from "@/components/warehouse/assign-parcel-button";
-import { STAGE_LABEL, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
+import { STAGE_LABEL, riderName, stageVariant, useWarehouseData, type Parcel, type ParcelStage } from "@/lib/warehouse";
 import { BATCH_STATUS, batchTaskIds, pick, shortDate, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
@@ -106,7 +106,7 @@ export default function WarehouseBatchDetailPage() {
               { key: "orderId", label: fr ? "ID commande" : "Order ID" },
               { key: "customer", label: t("customer") },
               { key: "customerAddress", label: fr ? "Adresse" : "Address" },
-              { key: "rider", label: fr ? "Livreur" : "Rider" },
+              { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => riderName(String(row.rider ?? ""), fr) },
               { key: "status", label: t("status"), render: (row) => {
                 const s = String(row.status) as ParcelStage;
                 return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;

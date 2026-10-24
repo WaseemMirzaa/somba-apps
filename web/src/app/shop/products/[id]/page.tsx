@@ -21,6 +21,8 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useSocketEvent, usePublicSettings, useProductReviews, zoneLabel } from "@/lib/shop-live";
 import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
+import { TranslatableText } from "@/components/shop/translatable-text";
 
 type ProductQuestion = {
   id: string;
@@ -121,7 +123,14 @@ export default function ShopProductDetailPage() {
   const priceInfo = priceView(product);
   const name = fr ? product.nameFr : product.name;
   const category = fr ? product.categoryFr : product.category;
-  const related = catalog.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  const description = fr ? product.descriptionFr : product.description;
+  // Option labels in the shopper's language; the canonical names/values stay the picks (and the cart's variant label).
+  const groups = labeledGroups(product.variants, product.variantLabels, fr);
+  const lang = langOf(fr);
+  const machineText = isMachineText(product, "name", lang) || (!!description && isMachineText(product, "description", lang));
+  const related = catalog
+    .filter((p) => p.id !== product.id && (product.categoryId && p.categoryId ? p.categoryId === product.categoryId : p.category === product.category))
+    .slice(0, 4);
   const maxQty = Math.max(1, Math.min(10, product.stock));
   const inCart = cart.filter((c) => c.id === product.id).reduce((s, c) => s + c.qty, 0);
   const zone = settings.deliveryZones.find((z) => z.id === zonePick);
@@ -131,7 +140,8 @@ export default function ShopProductDetailPage() {
     const missing = missingPick(product.variants, picks);
     if (missing) {
       setPickError(missing.name);
-      toast(fr ? `Choisissez : ${missing.name}` : `Choose a ${missing.name.toLowerCase()}`, "error");
+      const shownName = groups.find((g) => g.name === missing.name)?.label ?? missing.name;
+      toast(fr ? `Choisissez : ${shownName}` : `Choose a ${shownName.toLowerCase()}`, "error");
       return;
     }
     setPickError(null);
@@ -192,7 +202,7 @@ export default function ShopProductDetailPage() {
               <p className="mt-1 inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
                 {priceInfo.source === "flash"
                   ? (fr ? "Vente flash" : "Flash sale")
-                  : priceInfo.campaignName ?? (fr ? "Promotion en cours" : "Campaign price")}
+                  : (priceInfo.campaignName ? pickText(fr, priceInfo.campaignName, priceInfo.campaignNameFr) : null) ?? (fr ? "Promotion en cours" : "Campaign price")}
               </p>
             )}
           </div>
@@ -205,27 +215,27 @@ export default function ShopProductDetailPage() {
                   : (fr ? "En stock" : "In stock")
                 : (fr ? "Rupture de stock" : "Out of stock")}
             </p>
-            {product.variants.map((g) => (
+            {groups.map((g) => (
               <div key={g.name} data-testid={`variant-${g.name}`}>
                 <p className={`mb-1.5 text-sm font-medium ${pickError === g.name ? "text-red-600" : "text-slate-700"}`}>
-                  {g.name}
-                  {picks[g.name] ? `: ${picks[g.name]}` : pickError === g.name ? (fr ? " — à choisir" : " — please choose") : ""}
+                  {g.label}
+                  {picks[g.name] ? `: ${g.options.find((o) => o.value === picks[g.name])?.label ?? picks[g.name]}` : pickError === g.name ? (fr ? " — à choisir" : " — please choose") : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {g.options.map((o) => {
-                    const on = picks[g.name] === o;
+                    const on = picks[g.name] === o.value;
                     return (
                       <button
-                        key={o}
+                        key={o.value}
                         type="button"
                         aria-pressed={on}
                         onClick={() => {
-                          setPicks((cur) => ({ ...cur, [g.name]: o }));
+                          setPicks((cur) => ({ ...cur, [g.name]: o.value }));
                           if (pickError === g.name) setPickError(null);
                         }}
                         className={`min-w-11 rounded-lg border px-3 py-1.5 text-sm font-medium ${on ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-300 text-slate-700 hover:border-[var(--primary)]"}`}
                       >
-                        {o}
+                        {o.label}
                       </button>
                     );
                   })}
@@ -276,7 +286,7 @@ export default function ShopProductDetailPage() {
                 </select>
                 {zone && (
                   <p className="text-xs text-emerald-700">
-                    {zoneLabel(zone, fr)}: {zone.feeUsd === 0 ? (fr ? "livraison gratuite" : "free delivery") : `$${zone.feeUsd.toFixed(2)}`}
+                    {zoneLabel(zone, fr)}: {zone.feeUsd === 0 ? (fr ? "livraison gratuite" : "free delivery") : formatCurrency(zone.feeUsd, locale)}
                   </p>
                 )}
               </>
@@ -285,8 +295,8 @@ export default function ShopProductDetailPage() {
               <Truck className="h-4 w-4 text-[var(--primary)]" />
               <span data-testid="product-delivery-estimate">
                 {fr
-                  ? `Livraison en ${product.deliveryDays} jours · prévue le ${dayLabel(estimateFor([product.deliveryDays]), fr)}`
-                  : `Delivery in ${product.deliveryDays} days · expected ${dayLabel(estimateFor([product.deliveryDays]), fr)}`}
+                  ? `Livraison en ${daysLabel(product.deliveryDays, true)} · prévue le ${dayLabel(estimateFor([product.deliveryDays]), fr)}`
+                  : `Delivery in ${daysLabel(product.deliveryDays, false)} · expected ${dayLabel(estimateFor([product.deliveryDays]), fr)}`}
               </span>
             </div>
             <div className="flex gap-4 text-xs text-slate-600">
@@ -324,8 +334,13 @@ export default function ShopProductDetailPage() {
       <DetailGrid>
         <DetailGridSection title="Description" span={2}>
           <p className="whitespace-pre-line text-sm text-slate-600">
-            {product.description || (fr ? "Aucune description fournie par le vendeur." : "The seller has not added a description yet.")}
+            {description || (fr ? "Aucune description fournie par le vendeur." : "The seller has not added a description yet.")}
           </p>
+          {machineText && (
+            <p className="mt-2 text-xs text-slate-500" data-testid="machine-note">
+              {fr ? "Traduit automatiquement" : "Translated automatically"}
+            </p>
+          )}
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Informations sur le vendeur" : "Seller Information"}>
@@ -336,7 +351,7 @@ export default function ShopProductDetailPage() {
                 ? <Link href={`/shop/stores/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link>
                 : product.seller,
             },
-            { label: fr ? "Délai de livraison" : "Delivery time", value: fr ? `${product.deliveryDays} jours` : `${product.deliveryDays} days` },
+            { label: fr ? "Délai de livraison" : "Delivery time", value: daysLabel(product.deliveryDays, fr) },
           ]} />
         </DetailGridSection>
 
@@ -362,7 +377,7 @@ export default function ShopProductDetailPage() {
                     <span className="font-medium">{r.author}</span>
                     <span className="text-amber-500">{"★".repeat(r.rating)}</span>
                   </div>
-                  <p className="mt-1 text-sm text-slate-600">{r.text}</p>
+                  <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="mt-1 text-sm text-slate-600" />
                   <p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</p>
                   {r.sellerReply && (
                     <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
@@ -370,7 +385,7 @@ export default function ShopProductDetailPage() {
                         {fr ? "Réponse du vendeur" : "Seller reply"}
                         {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
                       </p>
-                      <p className="mt-1 text-slate-600">{r.sellerReply}</p>
+                      <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-1 text-slate-600" />
                     </div>
                   )}
                 </div>
@@ -398,14 +413,19 @@ export default function ShopProductDetailPage() {
             <div className="grid gap-4 md:grid-cols-2">
               {questions.map((q) => (
                 <div key={q.id} className="rounded-lg border border-[var(--border)] p-4">
-                  <p className="font-medium text-slate-900">{fr ? "Q :" : "Q:"} {q.question}</p>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <div className="font-medium text-slate-900">
+                    <TranslatableText kind="question" id={q.id} text={q.question} />
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">
                     {q.answer ? (
-                      <>{fr ? "R :" : "A:"} {q.answer} {q.answeredBy && <span className="text-slate-400">— {q.answeredBy}</span>}</>
+                      <>
+                        <TranslatableText kind="answer" id={q.id} text={q.answer} />
+                        {q.answeredBy && <p className="text-slate-400">— {q.answeredBy}</p>}
+                      </>
                     ) : (
                       <span className="text-slate-400">{fr ? "En attente de la réponse du vendeur." : "Waiting for the seller's answer."}</span>
                     )}
-                  </p>
+                  </div>
                 </div>
               ))}
             </div>

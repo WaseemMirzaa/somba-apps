@@ -17,6 +17,7 @@ import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency } from "@/lib/utils";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { planLabel, useSellerPlans } from "@/lib/shop-live";
 import { SellerStatusActions } from "@/components/admin/status-actions";
 
 const STATUS_OPTIONS = [
@@ -31,6 +32,7 @@ const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approv
 export default function AdminSellersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { plans } = useSellerPlans();
   const rt = useRealtime();
   const sellers = useServerList<Seller & { plan?: string }>("sellers:list", { pushEvents: ["seller:updated"] });
   const sellerEntities = useMemo(
@@ -83,7 +85,7 @@ export default function AdminSellersPage() {
                 ),
               },
               { key: "productCount", label: fr ? "Produits" : "Products" },
-              { key: "plan", label: fr ? "Formule" : "Plan", render: (row) => String(row.plan ?? "free") },
+              { key: "plan", label: fr ? "Formule" : "Plan", render: (row) => planLabel(plans, row.plan as string | undefined, fr) },
               {
                 key: "orders",
                 label: fr ? "Commandes" : "Orders",

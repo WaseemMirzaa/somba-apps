@@ -13,7 +13,7 @@ import { useLocale } from "@/context/locale-context";
 import { useAdminData } from "@/lib/admin";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
-import { adminBreadcrumb, categoryLabel } from "@/lib/admin-i18n";
+import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending", labelFr: "En attente" },
@@ -40,7 +40,8 @@ export default function AdminProductsPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(moderationQueue, filters, {
-        searchFields: ["id", "name", "seller", "category"],
+        // Both languages of the title and the category, whatever language the admin reads the portal in.
+        searchFields: ["id", "name", "seller", "category", (r) => r.raw.name, (r) => r.raw.nameFr ?? "", (r) => r.raw.categoryFr ?? ""],
         statusField: "status",
       }),
     [moderationQueue, filters]
@@ -105,7 +106,7 @@ export default function AdminProductsPage() {
               {
                 key: "category",
                 label: fr ? "Catégorie" : "Category",
-                render: (row) => categoryLabel(String(row.category), fr),
+                render: (row) => String(row.category),
               },
               {
                 key: "price",

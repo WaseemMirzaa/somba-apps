@@ -36,6 +36,18 @@ const ROLE_NAMES_FR: Record<string, string> = {
   rider: "Livreur",
 };
 
+/** The server describes each role's scope in English only; known descriptions are shown in French. */
+const ROLE_SCOPE_FR: Record<string, string> = {
+  "Full access": "Accès total",
+  "Orders, fulfilment, riders": "Commandes, logistique, livreurs",
+  "Payments, payouts, refunds": "Paiements, versements, remboursements",
+  "Tickets, disputes": "Tickets, litiges",
+  "Promos, CMS, broadcasts": "Promotions, CMS, diffusions",
+  "Sellers, products, reviews": "Vendeurs, produits, avis",
+  "Hubs, parcels, inventory": "Hubs, colis, inventaire",
+  "Deliveries, GPS, earnings": "Livraisons, GPS, gains",
+};
+
 const CREATABLE = ["rider", "warehouse_staff", "admin_operations", "admin_finance", "admin_support", "admin_marketing", "admin_moderation"];
 
 export default function AdminRolesPage() {
@@ -142,7 +154,7 @@ export default function AdminRolesPage() {
           <Card key={d.key}>
             <CardContent className="p-5">
               <h3 className="font-semibold text-slate-900">{roleName(d.key)}</h3>
-              <p className="mt-1 text-xs text-slate-500">{d.scope}</p>
+              <p className="mt-1 text-xs text-slate-500">{fr ? (ROLE_SCOPE_FR[d.scope] ?? d.scope) : d.scope}</p>
               <Badge variant="default" className="mt-3">{staff.filter((u) => u.role === d.key).length} {fr ? "compte(s)" : "account(s)"}</Badge>
             </CardContent>
           </Card>

@@ -8,6 +8,7 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useMyDisputes, disputeStageLabel } from "@/lib/orders";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
+import { formatCurrency } from "@/lib/utils";
 
 function ReturnStatus() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +40,7 @@ function ReturnStatus() {
           ...(ret.receivedAt ? [{ label: fr ? "Colis reçu le" : "Goods received", value: new Date(ret.receivedAt).toLocaleString() }] : []),
           { label: fr ? "Raison" : "Reason", value: ret.reason, full: true },
           ...(ret.resolution ? [{ label: fr ? "Décision" : "Decision", value: ret.resolution, full: true }] : []),
-          ...(order ? [{ label: fr ? "Montant de la commande" : "Order total", value: `$${order.totalUsd.toFixed(2)}` }] : []),
+          ...(order ? [{ label: fr ? "Montant de la commande" : "Order total", value: formatCurrency(order.totalUsd, locale) }] : []),
         ]} />
         <Link href={`/shop/orders/${ret.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">
           {fr ? "Voir la commande →" : "View order →"}

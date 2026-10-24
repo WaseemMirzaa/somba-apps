@@ -197,7 +197,7 @@ function CheckoutContent() {
               <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
               {zones.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : `$${z.feeUsd.toFixed(2)}`})
+                  {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : formatCurrency(z.feeUsd, locale)})
                 </option>
               ))}
             </select>

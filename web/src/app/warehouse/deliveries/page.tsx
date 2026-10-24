@@ -10,7 +10,7 @@ import { OpsError } from "@/components/warehouse/ops-state";
 import { LoadMore } from "@/components/ui/load-more";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
-import { STAGE_LABEL, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
+import { STAGE_LABEL, riderName, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
 import { shortDate } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 
@@ -48,7 +48,7 @@ export default function WarehouseDeliveriesPage() {
               { key: "orderId", label: fr ? "Commande" : "Order" },
               { key: "customer", label: fr ? "Client" : "Customer" },
               { key: "customerAddress", label: fr ? "Adresse" : "Address" },
-              { key: "rider", label: fr ? "Livreur" : "Rider" },
+              { key: "rider", label: fr ? "Livreur" : "Rider", render: (row) => riderName(String(row.rider ?? ""), fr) },
               { key: "attempts", label: fr ? "Tentatives" : "Attempts" },
               { key: "status", label: fr ? "Statut" : "Status", render: (row) => {
                 const st = String(row.status) as ParcelStage;

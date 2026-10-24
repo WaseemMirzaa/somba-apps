@@ -9,6 +9,7 @@ import { useToast } from "@/context/toast-context";
 import { noticeHref, type NoticePortal } from "@/lib/notice-links";
 import { enableAlerts, notificationPermission, notificationsSupported, webPushActive, webPushConfigured } from "@/lib/web-push";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { localizedNotice } from "@/lib/i18n-fields";
 import type { AppNotification } from "@/lib/realtime/types";
 
 const ALL_PAGE: Record<NoticePortal, string> = {
@@ -44,13 +45,14 @@ function useTabAlerts(portal: NoticePortal, fr: boolean) {
     if (!sock) return;
     const onNew = (n: AppNotification) => {
       const href = noticeHref(n, portal);
+      const text = localizedNotice(n, fr);
       if (document.visibilityState === "visible") {
-        toast(n.title, "info");
+        toast(text.title, "info");
         return;
       }
       if (notificationPermission() !== "granted" || webPushActive()) return;
       try {
-        const alert = new Notification(n.title, { body: n.body, tag: n.id, icon: "/logo.svg" });
+        const alert = new Notification(text.title, { body: text.body, tag: n.id, icon: "/logo.svg" });
         alert.onclick = () => {
           window.focus();
           router.push(href);
@@ -179,7 +181,9 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
             <p className="px-4 py-8 text-center text-sm text-slate-400">{fr ? "Aucune notification" : "No notifications yet"}</p>
           ) : (
             <ul className="max-h-[60vh] divide-y divide-[var(--border)] overflow-y-auto">
-              {latest.map((n) => (
+              {latest.map((n) => {
+                const text = localizedNotice(n, fr);
+                return (
                 <li key={n.id}>
                   <Link
                     href={noticeHref(n, portal)}
@@ -191,13 +195,14 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
                   >
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-[var(--primary)]"}`} />
                     <span className="min-w-0 flex-1">
-                      <span className={`block truncate text-sm ${n.read ? "text-slate-600" : "font-semibold text-slate-900"}`}>{n.title}</span>
-                      <span className="line-clamp-2 block text-xs text-slate-500">{n.body}</span>
+                      <span className={`block truncate text-sm ${n.read ? "text-slate-600" : "font-semibold text-slate-900"}`}>{text.title}</span>
+                      <span className="line-clamp-2 block text-xs text-slate-500">{text.body}</span>
                       <span className="mt-0.5 block text-[11px] text-slate-400">{ago(n.createdAt, fr)}</span>
                     </span>
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           <div className="flex items-center border-t border-[var(--border)]">

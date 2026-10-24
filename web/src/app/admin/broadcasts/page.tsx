@@ -16,6 +16,7 @@ import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { errMsg, useServerList, type BroadcastServerRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { autoTranslateHint, localized } from "@/lib/i18n-fields";
 
 // The server targets a role room; "all" only reaches customers in practice, so it is not offered.
 const AUDIENCES: { id: string; label: string; labelFr: string }[] = [
@@ -34,7 +35,9 @@ export default function AdminBroadcastsPage() {
   });
   const [audience, setAudience] = useState("customer");
   const [title, setTitle] = useState("");
+  const [titleFr, setTitleFr] = useState("");
   const [body, setBody] = useState("");
+  const [bodyFr, setBodyFr] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,21 +48,26 @@ export default function AdminBroadcastsPage() {
   };
 
   async function send() {
-    if (!title.trim() || !body.trim()) {
-      setError(fr ? "Titre et message requis." : "Title and message are required.");
+    if ((!title.trim() && !titleFr.trim()) || (!body.trim() && !bodyFr.trim())) {
+      setError(fr ? "Un titre et un message sont requis (en anglais ou en français)." : "A title and a message are required (in English or French).");
       return;
     }
     setSending(true);
     setError(null);
     try {
       const sent = await socketClient.request<BroadcastServerRow>("broadcasts:send", {
-        title: title.trim(),
-        body: body.trim(),
+        // A language left empty is not sent: the platform translates it, and each recipient gets theirs in their language.
+        ...(title.trim() ? { title: title.trim() } : {}),
+        ...(body.trim() ? { body: body.trim() } : {}),
+        ...(titleFr.trim() ? { titleFr: titleFr.trim() } : {}),
+        ...(bodyFr.trim() ? { bodyFr: bodyFr.trim() } : {}),
         audience,
       });
       setItems((cur) => (cur.some((b) => b.id === sent.id) ? cur : [sent, ...cur]));
       setTitle("");
+      setTitleFr("");
       setBody("");
+      setBodyFr("");
       toast(
         fr
           ? `Diffusion envoyée à ${sent.recipients} destinataire(s)`
@@ -107,8 +115,13 @@ export default function AdminBroadcastsPage() {
             ))}
           </select>
         </div>
-        <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Titre" : "Title"} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder="Message" value={body} onChange={(e) => setBody(e.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Titre (EN)" : "Title (EN)"} aria-label={fr ? "Titre (EN)" : "Title (EN)"} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Titre (FR)" : "Title (FR)"} aria-label={fr ? "Titre (FR)" : "Title (FR)"} value={titleFr} onChange={(e) => setTitleFr(e.target.value)} />
+          <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder="Message (EN)" aria-label="Message (EN)" value={body} onChange={(e) => setBody(e.target.value)} />
+          <textarea className="input-premium w-full px-4 py-2 text-sm" rows={3} placeholder={fr ? "Message (FR)" : "Message (FR)"} aria-label={fr ? "Message (FR)" : "Message (FR)"} value={bodyFr} onChange={(e) => setBodyFr(e.target.value)} />
+        </div>
+        <p className="text-xs text-slate-500">{autoTranslateHint(fr)}</p>
         <ErrorNote message={error} />
         <Button onClick={send} disabled={sending}>
           <Send className="h-4 w-4" />
@@ -128,8 +141,8 @@ export default function AdminBroadcastsPage() {
                 const b = row as unknown as BroadcastServerRow;
                 return (
                   <div>
-                    <p className="font-semibold text-slate-900">{b.title}</p>
-                    <p className="line-clamp-1 text-xs text-slate-400">{b.body}</p>
+                    <p className="font-semibold text-slate-900">{localized(b, "title", fr)}</p>
+                    <p className="line-clamp-1 text-xs text-slate-400">{localized(b, "body", fr)}</p>
                   </div>
                 );
               },

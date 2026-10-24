@@ -9,6 +9,7 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/seller/product-image";
+import { TranslationsPanel } from "@/components/seller/translations-panel";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useSellerData } from "@/lib/seller";
 import {
@@ -28,8 +29,10 @@ export default function SellerProductDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerProductFull, pauseProduct, publishProduct, deleteProduct, productsLoaded, load } = useSellerData();
+  const { getSellerProductFull, getRawProduct, pauseProduct, publishProduct, deleteProduct, productsLoaded, load } = useSellerData();
   const product = getSellerProductFull(id);
+  // The server row as served (both languages, where each comes from) for the translations panel.
+  const raw = getRawProduct(id);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -128,10 +131,15 @@ export default function SellerProductDetailPage() {
               { label: fr ? "ID produit" : "Product ID", value: product.id },
               { label: "SKU", value: product.sku },
               { label: fr ? "Catégorie" : "Category", value: fr ? product.categoryFr : product.category },
-              { label: fr ? "Titre (FR)" : "Title (FR)", value: product.nameFr },
               { label: fr ? "Description" : "Description", value: product.description || "—", full: true },
             ]} />
           </DetailGridSection>
+
+          {raw && (
+            <DetailGridSection title={fr ? "Traductions" : "Translations"} span={3}>
+              <TranslationsPanel product={raw} />
+            </DetailGridSection>
+          )}
 
           <DetailGridSection title={fr ? "Stock" : "Stock"}>
             <InfoGrid columns={3} items={[

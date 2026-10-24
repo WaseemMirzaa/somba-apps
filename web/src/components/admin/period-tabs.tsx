@@ -1,14 +1,16 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/context/locale-context";
 
 export const PERIOD_DAYS = [7, 30, 90] as const;
 export type PeriodDays = (typeof PERIOD_DAYS)[number];
 
 /** 7 / 30 / 90 day switch; the number is sent to the server as `days`. */
 export function PeriodTabs({ value, onChange }: { value: PeriodDays; onChange: (d: PeriodDays) => void }) {
+  const { locale } = useLocale();
   return (
-    <div className="inline-flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label="Period">
+    <div className="inline-flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label={locale === "fr" ? "Période" : "Period"}>
       {PERIOD_DAYS.map((d) => (
         <button
           key={d}

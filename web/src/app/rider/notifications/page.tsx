@@ -12,6 +12,7 @@ import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { errorMessage } from "@/lib/warehouse-live";
+import { localizedNotice, noticeTypeLabel } from "@/lib/i18n-fields";
 
 const READ_STATUS_OPTIONS = [
   { value: "unread", label: "Unread", labelFr: "Non lu" },
@@ -24,12 +25,12 @@ export default function RiderNotificationsPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const items = rt.notifications;
+  const items = useMemo(() => rt.notifications.map((n) => ({ ...n, ...localizedNotice(n, fr) })), [rt.notifications, fr]);
 
   const filtered = useMemo(
     () =>
       applyListFilters(items, filters, {
-        searchFields: ["title", "body", "type"],
+        searchFields: ["title", "body", "titleFr", "bodyFr", "type"],
         statusField: (n) => (n.read ? "read" : "unread"),
       }),
     [items, filters],
@@ -100,7 +101,7 @@ export default function RiderNotificationsPage() {
                     )}
                     <p className="mt-0.5 text-sm text-slate-500">{n.body}</p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {new Date(n.createdAt).toLocaleString(locale)} · {n.type.replace(/_/g, " ")}
+                      {new Date(n.createdAt).toLocaleString(locale)} · {noticeTypeLabel(n.type, fr)}
                     </p>
                   </div>
                   {n.read ? (

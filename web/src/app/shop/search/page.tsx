@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/landing/product-card";
 import { PageLoader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
 import { useCatalog } from "@/lib/catalog";
+import { matchesSearch } from "@/lib/i18n-fields";
 
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -37,12 +38,9 @@ function SearchResults() {
   const results = server && server.q === query
     ? server.ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []))
     : query
-    ? visible.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.nameFr.toLowerCase().includes(query) ||
-          p.category.toLowerCase().includes(query) ||
-          p.seller.toLowerCase().includes(query)
+    ? // Same rules as the server: accents and case ignored; both languages of the name, category and description.
+      visible.filter((p) =>
+        matchesSearch(query, [p.name, p.nameFr, p.category, p.categoryFr, p.description, p.descriptionFr, p.seller]),
       )
     : visible;
 
@@ -52,7 +50,7 @@ function SearchResults() {
         title={t("searchResults")}
         subtitle={query ? (fr ? `"${query}" — ${results.length} résultats` : `"${query}" — ${results.length} results`) : (fr ? `${results.length} produits` : `${results.length} products`)}
         breadcrumbs={[
-          { label: "Shop", href: "/" },
+          { label: locale === "fr" ? "Boutique" : "Shop", href: "/" },
           { label: t("searchResults") },
         ]}
       />

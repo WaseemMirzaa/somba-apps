@@ -123,7 +123,7 @@ export function AddressMapPicker({
           show(loc);
           report(
             { ...loc, placeId: place.id, formatted: place.formattedAddress ?? undefined },
-            partsFromComponents((place.addressComponents ?? []).map((c) => ({ types: c.types, long: c.longText ?? "" }))),
+            partsFromComponents((place.addressComponents ?? []).map((c) => ({ types: c.types, long: c.longText ?? "", short: c.shortText ?? "" }))),
           );
         };
         // `gmp-select` is the current event; `gmp-placeselect` is the older name some versions still emit.

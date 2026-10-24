@@ -9,6 +9,7 @@ export const BRAND = {
   legalAddress: "8 Rue de la Paix, 75002 Paris, France",
   supportEmail: "support@somba.com",
   copyright: "© 2026 Somba Commerce SAS. All rights reserved.",
+  copyrightFr: "© 2026 Somba Commerce SAS. Tous droits réservés.",
 } as const;
 
 export const MARKET = {

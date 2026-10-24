@@ -46,8 +46,10 @@ export interface PaymentCapabilities {
 export interface FlashSaleServerRow {
   id: string;
   title: string;
+  titleFr?: string | null;
   productId: string;
   productName: string;
+  productNameFr?: string | null;
   flashPrice: number;
   discount: number;
   startsAt: string | null;
@@ -92,7 +94,9 @@ export interface CmsServerRow {
   id: string;
   key: string;
   title: string;
+  titleFr?: string | null;
   body: string;
+  bodyFr?: string | null;
   type: string;
   active: boolean;
   updatedAt?: string;
@@ -100,7 +104,9 @@ export interface CmsServerRow {
 export interface BroadcastServerRow {
   id: string;
   title: string;
+  titleFr?: string | null;
   body: string;
+  bodyFr?: string | null;
   audience: string;
   sentBy: string;
   recipients: number;

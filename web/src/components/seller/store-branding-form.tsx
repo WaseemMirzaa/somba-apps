@@ -8,6 +8,7 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { uploadImage, useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
+import { autoTranslateHint, frInForm } from "@/lib/i18n-fields";
 
 const DESC_MIN = 10;
 const DESC_MAX = 1000;
@@ -92,6 +93,8 @@ export function StoreBrandingForm() {
   const [logo, setLogo] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [descriptionFr, setDescriptionFr] = useState("");
+  const [tab, setTab] = useState<"en" | "fr">("en");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,21 +104,30 @@ export function StoreBrandingForm() {
     setLogo(seller.logoUrl ?? null);
     setBanner(seller.bannerUrl ?? null);
     setDescription(seller.description ?? "");
+    setDescriptionFr(frInForm(seller.description, seller.descriptionFr));
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [seller]);
 
   const desc = description.trim();
-  const descOk = desc === "" || (desc.length >= DESC_MIN && desc.length <= DESC_MAX);
-  const dirty =
-    !!seller &&
-    (logo !== (seller.logoUrl ?? null) || banner !== (seller.bannerUrl ?? null) || desc !== (seller.description ?? ""));
+  const descFr = descriptionFr.trim();
+  const rangeOk = (v: string) => v === "" || (v.length >= DESC_MIN && v.length <= DESC_MAX);
+  const descOk = rangeOk(desc) && rangeOk(descFr);
+  const enChanged = !!seller && desc !== (seller.description ?? "");
+  const frChanged = !!seller && descFr !== frInForm(seller.description, seller.descriptionFr);
+  const dirty = !!seller && (logo !== (seller.logoUrl ?? null) || banner !== (seller.bannerUrl ?? null) || enChanged || frChanged);
 
   async function save() {
     if (!descOk || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await updateStore({ logoUrl: logo, bannerUrl: banner, description: desc === "" ? null : desc });
+      // Only the language the seller edited is sent: an untouched machine translation must not become "written by you".
+      await updateStore({
+        logoUrl: logo,
+        bannerUrl: banner,
+        ...(enChanged ? { description: desc === "" ? null : desc } : {}),
+        ...(frChanged ? { descriptionFr: descFr === "" ? null : descFr } : {}),
+      });
       toast(fr ? "Vitrine enregistrée" : "Storefront saved");
     } catch (e) {
       const msg = errMessage(e);
@@ -145,21 +157,37 @@ export function StoreBrandingForm() {
         onChange={setBanner}
       />
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="store-description">
-          {fr ? "Description de la boutique" : "Store description"}
-        </label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="block text-xs font-medium text-slate-600" htmlFor="store-description">
+            {fr ? "Description de la boutique" : "Store description"}
+          </label>
+          <div role="tablist" aria-label={fr ? "Langue de la description" : "Description language"} className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs">
+            {(["en", "fr"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                role="tab"
+                aria-selected={tab === l}
+                onClick={() => setTab(l)}
+                className={`rounded-md px-2.5 py-1 font-semibold ${tab === l ? "bg-[var(--primary)] text-white" : "text-slate-600"}`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
         <textarea
           id="store-description"
           className="input-premium w-full px-4 py-2 text-sm"
           rows={4}
           maxLength={DESC_MAX}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          value={tab === "en" ? description : descriptionFr}
+          onChange={(e) => (tab === "en" ? setDescription(e.target.value) : setDescriptionFr(e.target.value))}
           placeholder={fr ? "Ce que vous vendez, vos délais, ce qui vous distingue…" : "What you sell, your lead times, what makes you different…"}
         />
         <p className={`mt-1 text-xs ${descOk ? "text-slate-500" : "text-red-600"}`}>
           {descOk
-            ? `${desc.length}/${DESC_MAX}`
+            ? `${(tab === "en" ? desc : descFr).length}/${DESC_MAX} · ${autoTranslateHint(fr)}`
             : fr
               ? `${DESC_MIN} à ${DESC_MAX} caractères, ou laissez vide.`
               : `${DESC_MIN} to ${DESC_MAX} characters, or leave empty.`}
@@ -172,3 +200,4 @@ export function StoreBrandingForm() {
     </div>
   );
 }
+

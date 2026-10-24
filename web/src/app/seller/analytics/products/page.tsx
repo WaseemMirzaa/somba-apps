@@ -11,13 +11,14 @@ import { EmptyState } from "@/components/seller/data-state";
 import { StatTile } from "@/components/seller/stat-tile";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
+import { localizedTopProducts } from "@/lib/seller-analytics";
 import { productStatusLabel, productStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 
 export default function SellerProductAnalyticsPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { sellerProductList, categoryRevenue } = useSellerData();
+  const { sellerProductList, categoryRevenue, getRawProduct } = useSellerData();
   const live = sellerProductList.filter((p) => p.status === "live").length;
 
   return (
@@ -51,7 +52,7 @@ export default function SellerProductAnalyticsPage() {
                   <EmptyState>{fr ? "Aucune vente sur cette période." : "No sales in this period."}</EmptyState>
                 ) : (
                   <HorizontalBarChart
-                    items={a.topProducts.map((p) => ({ name: p.name, units: p.units }))}
+                    items={localizedTopProducts(a.topProducts, getRawProduct, fr).map((p) => ({ name: p.name, units: p.units }))}
                     valueKey="units"
                     labelKey="name"
                     maxBars={10}

@@ -10,6 +10,7 @@ import { useRealtime } from "@/context/realtime-context";
 import type { CampaignRow } from "@/lib/admin-live";
 import type { Product } from "@/lib/realtime/types";
 import { formatCurrency } from "@/lib/utils";
+import { pickText } from "@/lib/i18n-fields";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -107,7 +108,7 @@ export function CampaignDetailModal({
   const fr = locale === "fr";
   if (!campaign) return null;
   return (
-    <Modal open onClose={onClose} title={(fr ? campaign.nameFr || campaign.name : campaign.name) ?? ""} footer={footer ?? <Button variant="secondary" size="sm" onClick={onClose}>{fr ? "Fermer" : "Close"}</Button>}>
+    <Modal open onClose={onClose} title={pickText(fr, campaign.name, campaign.nameFr)} footer={footer ?? <Button variant="secondary" size="sm" onClick={onClose}>{fr ? "Fermer" : "Close"}</Button>}>
       <CampaignDetailBody campaign={campaign} />
     </Modal>
   );
@@ -181,7 +182,7 @@ export function CampaignDetailBody({ campaign: c }: { campaign: CampaignRow }) {
               const after = Number((base * (1 - c.discount / 100)).toFixed(2));
               return (
                 <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span className="min-w-0 truncate text-slate-800">{p.name}</span>
+                  <span className="min-w-0 truncate text-slate-800">{pickText(fr, p.name, p.nameFr)}</span>
                   <span className="shrink-0 text-xs">
                     <span className="text-slate-400 line-through">{formatCurrency(base, locale)}</span>{" "}
                     <span className="font-semibold text-slate-900">{formatCurrency(after, locale)}</span>

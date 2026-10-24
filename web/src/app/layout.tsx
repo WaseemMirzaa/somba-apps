@@ -10,6 +10,7 @@ import { WarehouseStaffProvider } from "@/context/warehouse-staff-context";
 import { MarketProvider } from "@/context/market-context";
 import { ReviewsProvider } from "@/context/reviews-context";
 import { RealtimeProvider } from "@/context/realtime-context";
+import { LocaleAccountSync } from "@/components/layout/locale-account-sync";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -45,7 +46,10 @@ export default function RootLayout({
                   <WarehouseAdminProvider>
                     <ReviewsProvider>
                       <ShopProvider>
-                        <ToastProvider>{children}</ToastProvider>
+                        <ToastProvider>
+                          <LocaleAccountSync />
+                          {children}
+                        </ToastProvider>
                       </ShopProvider>
                     </ReviewsProvider>
                   </WarehouseAdminProvider>

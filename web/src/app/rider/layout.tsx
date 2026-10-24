@@ -59,7 +59,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>
             <RiderBell />
-            <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label="Logout">
+            <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label={t("logout")}>
               <LogOut className="h-4 w-4" />
             </button>
           </div>

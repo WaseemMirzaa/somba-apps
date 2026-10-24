@@ -22,8 +22,11 @@ import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { pickText, productNameFor } from "@/lib/i18n-fields";
+import { planLabel, useSellerPlans } from "@/lib/shop-live";
 import { Ban } from "lucide-react";
 
+const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu", rejected: "Rejeté" };
 const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", pending: "En attente", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
 
 type SellerFull = Seller & { pickupAddress?: string | null; plan?: string; planExpiresAt?: string | null };
@@ -37,6 +40,7 @@ export default function AdminSellerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { plans } = useSellerPlans();
   const rt = useRealtime();
   const [days, setDays] = useState<PeriodDays>(30);
   // One store with its KYC; re-read whenever a moderation decision / resubmission / edit is pushed.
@@ -92,7 +96,7 @@ export default function AdminSellerDetailPage() {
         breadcrumbs={[adminBreadcrumb(locale), { label: t("sellers"), href: "/admin/sellers" }, { label: seller.name }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={seller.status === "approved" ? "success" : seller.status === "pending" ? "warning" : "danger"}>{seller.status}</Badge>
+            <Badge variant={seller.status === "approved" ? "success" : seller.status === "pending" ? "warning" : "danger"}>{fr ? (SELLER_STATUS_FR[seller.status] ?? seller.status) : seller.status}</Badge>
             <SellerStatusActions sellerId={seller.id} status={seller.status} name={seller.name} size="md" />
           </div>
         }
@@ -112,14 +116,14 @@ export default function AdminSellerDetailPage() {
             { label: fr ? "Adresse d'enlèvement" : "Pickup address", value: seller.pickupAddress || "—", full: true },
             { label: fr ? "Badge" : "Badge", value: seller.badge.replace(/_/g, " ") },
             { label: fr ? "Note moyenne" : "Rating", value: seller.rating > 0 ? `★ ${Number(seller.rating).toFixed(1)}` : "—" },
-            { label: fr ? "Formule" : "Plan", value: `${seller.plan ?? "free"}${seller.planExpiresAt ? ` · ${fr ? "jusqu'au" : "until"} ${localDay(String(seller.planExpiresAt))}` : ""}` },
+            { label: fr ? "Formule" : "Plan", value: `${planLabel(plans, seller.plan, fr)}${seller.planExpiresAt ? ` · ${fr ? "jusqu'au" : "until"} ${localDay(String(seller.planExpiresAt))}` : ""}` },
             { label: fr ? "Produits" : "Products", value: sellerProducts.length },
           ]} />
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Décision de modération" : "Moderation decision"}>
           <InfoGrid items={[
-            { label: fr ? "Statut" : "Status", value: <Badge variant={seller.status === "approved" ? "success" : seller.status === "pending" ? "warning" : "danger"}>{seller.status}</Badge> },
+            { label: fr ? "Statut" : "Status", value: <Badge variant={seller.status === "approved" ? "success" : seller.status === "pending" ? "warning" : "danger"}>{fr ? (SELLER_STATUS_FR[seller.status] ?? seller.status) : seller.status}</Badge> },
             { label: fr ? "Modifié le" : "Changed", value: seller.statusChangedAt ? localDateTime(seller.statusChangedAt) : "—" },
             { label: fr ? "Motif communiqué au vendeur" : "Reason shown to the seller", value: seller.statusReason || "—", full: true },
           ]} />
@@ -202,7 +206,7 @@ export default function AdminSellerDetailPage() {
                   <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100 text-sm">
                     {st.topProducts.map((p) => (
                       <li key={p.productId} className="flex items-center justify-between gap-3 px-3 py-2">
-                        <Link href={`/admin/products/${p.productId}`} className="min-w-0 truncate text-[var(--primary)] hover:underline">{p.name}</Link>
+                        <Link href={`/admin/products/${p.productId}`} className="min-w-0 truncate text-[var(--primary)] hover:underline">{productNameFor(rt.products, p.productId, p.name, fr)}</Link>
                         <span className="shrink-0 text-xs text-slate-500">{p.units} {fr ? "unités" : "units"} · {formatCurrency(p.revenue, locale)}</span>
                       </li>
                     ))}
@@ -222,7 +226,7 @@ export default function AdminSellerDetailPage() {
             emptyMessage={fr ? "Aucun produit pour ce vendeur" : "No products for this seller"}
             columns={[
               { key: "name", label: fr ? "Produit" : "Product", render: (row) => (
-                <Link href={`/admin/products/${row.id}`} className="text-[var(--primary)] hover:underline">{String(row.name)}</Link>
+                <Link href={`/admin/products/${row.id}`} className="text-[var(--primary)] hover:underline">{pickText(fr, String(row.name), row.nameFr as string | null)}</Link>
               )},
               { key: "stock", label: "Stock" },
               { key: "price", label: fr ? "Prix" : "Price", render: (row) => formatCurrency(row.price as number, locale) },

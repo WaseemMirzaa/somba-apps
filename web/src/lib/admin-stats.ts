@@ -130,6 +130,7 @@ export interface ReviewRow {
   id: string;
   productId: string;
   productName?: string;
+  productNameFr?: string;
   userId?: string;
   author: string;
   rating: number;

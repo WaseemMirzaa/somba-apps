@@ -9,8 +9,9 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { ExceptionForm } from "@/components/warehouse/exception-form";
-import { STAGE_LABEL, stageVariant, useWarehouseData } from "@/lib/warehouse";
+import { STAGE_LABEL, riderName, stageVariant, useWarehouseData } from "@/lib/warehouse";
 import { shortDate } from "@/lib/warehouse-live";
+import { paymentMethodLabel } from "@/lib/seller-labels";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
@@ -98,7 +99,7 @@ export default function WarehouseDeliveryDetailPage() {
 
         <DetailGridSection title={fr ? "Livreur" : "Rider"}>
           <InfoGrid items={[
-            { label: fr ? "Nom" : "Name", value: delivery.rider },
+            { label: fr ? "Nom" : "Name", value: riderName(delivery.rider, fr) },
             { label: fr ? "Téléphone" : "Phone", value: rider?.phone ?? "—" },
             { label: fr ? "Tentatives" : "Attempts", value: delivery.attempts },
             { label: fr ? "Dernier échec" : "Last failure", value: delivery.failureReason ?? "—" },
@@ -109,7 +110,7 @@ export default function WarehouseDeliveryDetailPage() {
           <InfoGrid items={[
             { label: fr ? "N° commande" : "Order ID", value: delivery.orderId },
             { label: fr ? "Articles" : "Items", value: delivery.itemsCount },
-            { label: fr ? "Paiement" : "Payment", value: delivery.paymentLabel },
+            { label: fr ? "Paiement" : "Payment", value: delivery.paymentMethod ? paymentMethodLabel(delivery.paymentMethod, fr) : delivery.paymentLabel },
             { label: fr ? "Statut" : "Status", value: <Badge variant={stageVariant(delivery.status)}>{fr ? stage.fr : stage.en}</Badge> },
             { label: fr ? "Mis à jour" : "Updated", value: shortDate(delivery.updatedAt, locale) },
           ]} />

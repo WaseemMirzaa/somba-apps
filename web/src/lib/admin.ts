@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
+import { useLocale } from "@/context/locale-context";
+import { pickText } from "@/lib/i18n-fields";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errMsg } from "@/lib/admin-live";
 import type { Order, Product } from "@/lib/realtime/types";
@@ -72,16 +74,18 @@ function buildOrders(orders: Order[], products: Product[]) {
   });
 }
 
-function buildQueue(products: Product[]) {
+function buildQueue(products: Product[], fr: boolean) {
   return products.map((p) => ({
     id: p.id,
-    name: p.name,
+    // Shown in the admin's language (the other one when that language is empty); `raw` keeps both as served.
+    name: pickText(fr, p.name, p.nameFr),
     sellerId: p.sellerId ?? "",
     seller: p.sellerName ?? "—",
-    category: p.category,
+    category: pickText(fr, p.category, p.categoryFr),
     price: p.price,
     discount: p.discount ?? 0,
-    description: p.description ?? "",
+    description: pickText(fr, p.description, p.descriptionFr),
+    raw: p,
     status: (p.status === "live"
       ? "live"
       : p.status === "pending"
@@ -100,6 +104,8 @@ function buildQueue(products: Product[]) {
 
 export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}) {
   const rt = useRealtime();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const wantCustomers = !!want.customers;
   const wantFraud = !!want.fraud;
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -147,7 +153,7 @@ export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}
   }, [rt.status, isAdmin, refresh]);
 
   const orderEntities = useMemo(() => buildOrders(rt.orders, rt.products), [rt.orders, rt.products]);
-  const moderationQueue = useMemo(() => buildQueue(rt.products), [rt.products]);
+  const moderationQueue = useMemo(() => buildQueue(rt.products, fr), [rt.products, fr]);
   const customerEntities = useMemo(
     () =>
       customers.map((c) => ({

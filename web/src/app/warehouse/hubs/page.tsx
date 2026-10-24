@@ -6,6 +6,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useOpsBase } from "@/lib/ops-path";
+import { countryName } from "@/lib/countries";
 import { useOpsQuery, type HubRow } from "@/lib/warehouse-live";
 
 /** Hub records are read-only here; hubs are set up by the platform admin. */
@@ -35,7 +36,7 @@ export default function WarehouseHubPage() {
             columns={[
               { key: "name", label: fr ? "Nom" : "Name" },
               { key: "city", label: fr ? "Ville" : "City" },
-              { key: "country", label: fr ? "Pays" : "Country", render: (row) => String(row.country ?? "—") },
+              { key: "country", label: fr ? "Pays" : "Country", render: (row) => countryName(row.country as string | null, fr, true) || "—" },
               { key: "address", label: fr ? "Adresse" : "Address", render: (row) => String(row.address ?? "—") },
               { key: "active", label: fr ? "Statut" : "Status", render: (row) => (
                 <Badge variant={row.active === false ? "warning" : "success"}>{row.active === false ? (fr ? "Inactif" : "Inactive") : (fr ? "Actif" : "Active")}</Badge>

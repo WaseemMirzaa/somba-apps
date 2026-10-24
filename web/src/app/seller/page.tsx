@@ -41,6 +41,7 @@ import {
   formatHours,
   healthValue,
   shortDay,
+  localizedTopProducts,
   useSellerAnalytics,
   type AnalyticsDays,
 } from "@/lib/seller-analytics";
@@ -76,6 +77,7 @@ export default function SellerDashboard() {
     sellerFinanceStats,
     categoryRevenue,
     recentActivity,
+    getRawProduct,
   } = useSellerData();
   const load = useSellerLoad();
   const an = useSellerAnalytics(days);
@@ -403,7 +405,7 @@ export default function SellerDashboard() {
               <EmptyState>{a ? (fr ? "Aucune vente sur cette période." : "No sales in this period.") : fr ? "Chargement…" : "Loading…"}</EmptyState>
             ) : (
               <HorizontalBarChart
-                items={a.topProducts.map((p) => ({ name: p.name, sold: p.units }))}
+                items={localizedTopProducts(a.topProducts, getRawProduct, fr).map((p) => ({ name: p.name, sold: p.units }))}
                 valueKey="sold"
                 labelKey="name"
                 formatValue={(v) => (fr ? `${v} vendus` : `${v} sold`)}

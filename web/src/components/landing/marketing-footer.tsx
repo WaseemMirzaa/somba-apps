@@ -87,7 +87,7 @@ export function MarketingFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 sm:flex-row">
-          <p className="text-sm">{BRAND.copyright}</p>
+          <p className="text-sm">{fr ? BRAND.copyrightFr : BRAND.copyright}</p>
           <nav aria-label={fr ? "Mentions légales" : "Legal"} className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
             {LEGAL_LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="hover:text-white">{fr ? l.labelFr : l.label}</Link>

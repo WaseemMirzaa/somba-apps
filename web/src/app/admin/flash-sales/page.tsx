@@ -16,6 +16,7 @@ import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { errMsg, useServerList, type FlashSaleServerRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
+import { autoTranslateHint, localized, pickText } from "@/lib/i18n-fields";
 
 const SALE_STATUS_EN: Record<string, string> = { active: "Active", scheduled: "Scheduled", ended: "Ended" };
 const SALE_STATUS_FR: Record<string, string> = { active: "En cours", scheduled: "Planifiée", ended: "Terminée" };
@@ -46,7 +47,7 @@ export default function AdminFlashSalesPage() {
   });
   const liveProducts = useMemo(() => rt.products.filter((p) => p.status === "live"), [rt.products]);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ title: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
+  const [form, setForm] = useState({ title: "", titleFr: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endTarget, setEndTarget] = useState<FlashSaleServerRow | null>(null);
@@ -60,8 +61,8 @@ export default function AdminFlashSalesPage() {
   const discount = basePrice && flash > 0 && flash < basePrice ? Math.round((1 - flash / basePrice) * 100) : 0;
 
   async function save() {
-    if (!form.title.trim() || !product) {
-      setError(fr ? "Titre et produit requis." : "Title and product are required.");
+    if ((!form.title.trim() && !form.titleFr.trim()) || !product) {
+      setError(fr ? "Un titre (anglais ou français) et un produit sont requis." : "A title (English or French) and a product are required.");
       return;
     }
     if (!(flash > 0)) {
@@ -76,7 +77,9 @@ export default function AdminFlashSalesPage() {
     setError(null);
     try {
       await socketClient.request("flashsales:create", {
-        title: form.title.trim(),
+        // A language left empty is not sent: the platform translates it from the other one.
+        ...(form.title.trim() ? { title: form.title.trim() } : {}),
+        ...(form.titleFr.trim() ? { titleFr: form.titleFr.trim() } : {}),
         productId: product.id,
         productName: product.name,
         flashPrice: flash,
@@ -86,7 +89,7 @@ export default function AdminFlashSalesPage() {
       });
       await reload();
       setShowCreate(false);
-      setForm({ title: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
+      setForm({ title: "", titleFr: "", productId: "", flashPrice: "", startsAt: "", endsAt: "" });
       toast(fr ? "Vente flash créée" : "Flash sale created", "success");
     } catch (e) {
       setError(errMsg(e));
@@ -126,14 +129,18 @@ export default function AdminFlashSalesPage() {
       {showCreate && (
         <Card>
           <CardContent className="space-y-4 p-6">
-            <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Titre de la vente" : "Sale title"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Titre de la vente (EN)" : "Sale title (EN)"} aria-label={fr ? "Titre de la vente (EN)" : "Sale title (EN)"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Titre de la vente (FR)" : "Sale title (FR)"} aria-label={fr ? "Titre de la vente (FR)" : "Sale title (FR)"} value={form.titleFr} onChange={(e) => setForm({ ...form, titleFr: e.target.value })} />
+              <p className="text-xs text-slate-500 sm:col-span-2">{autoTranslateHint(fr)}</p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-slate-500">{fr ? "Produit" : "Product"}</label>
                 <select className="input-premium mt-1 w-full px-4 py-2.5 text-sm" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
                   <option value="">{fr ? "Choisir un produit…" : "Choose a product…"}</option>
                   {liveProducts.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.originalPrice ?? p.price, locale)}</option>
+                    <option key={p.id} value={p.id}>{pickText(fr, p.name, p.nameFr)} — {formatCurrency(p.originalPrice ?? p.price, locale)}</option>
                   ))}
                 </select>
               </div>
@@ -172,8 +179,8 @@ export default function AdminFlashSalesPage() {
                   const fs = row as unknown as FlashSaleServerRow;
                   return (
                     <div>
-                      <p className="font-semibold text-slate-900">{fs.title}</p>
-                      <p className="text-xs text-slate-500">{fs.productName}</p>
+                      <p className="font-semibold text-slate-900">{localized(fs, "title", fr)}</p>
+                      <p className="text-xs text-slate-500">{localized(fs, "productName", fr)}</p>
                     </div>
                   );
                 },
@@ -239,8 +246,8 @@ export default function AdminFlashSalesPage() {
           <>
             <p>
               {fr
-                ? `Terminer « ${endTarget.title} » maintenant ? Le prix normal de ${endTarget.productName} est rétabli immédiatement.`
-                : `End "${endTarget.title}" now? The normal price of ${endTarget.productName} is restored immediately.`}
+                ? `Terminer « ${localized(endTarget, "title", true)} » maintenant ? Le prix normal de ${localized(endTarget, "productName", true)} est rétabli immédiatement.`
+                : `End "${localized(endTarget, "title", false)}" now? The normal price of ${localized(endTarget, "productName", false)} is restored immediately.`}
             </p>
             <ErrorNote message={endError} />
           </>

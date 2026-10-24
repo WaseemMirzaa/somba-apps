@@ -11,6 +11,7 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Product, Seller } from "@/lib/realtime/types";
 import { StoreHeader } from "@/components/shop/store-header";
+import { localized } from "@/lib/i18n-fields";
 
 type Storefront = { seller: Seller & { pickupAddress?: string | null }; products: Product[] };
 
@@ -88,7 +89,9 @@ export default function ShopStoreDetailPage() {
               {fr ? `Vendeur ${badge.fr}` : `${badge.en} Seller`}
             </span>
           )}
-          {seller.description && <p className="mt-3 max-w-3xl whitespace-pre-line text-sm text-slate-700">{seller.description}</p>}
+          {localized(seller, "description", fr) && (
+            <p className="mt-3 max-w-3xl whitespace-pre-line text-sm text-slate-700">{localized(seller, "description", fr)}</p>
+          )}
         </div>
       </div>
 

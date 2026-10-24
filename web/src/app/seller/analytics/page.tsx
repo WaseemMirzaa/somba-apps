@@ -9,12 +9,14 @@ import { AnalyticsPage } from "@/components/seller/analytics-shell";
 import { EmptyState } from "@/components/seller/data-state";
 import { StatTile } from "@/components/seller/stat-tile";
 import { useLocale } from "@/context/locale-context";
-import { shortDay } from "@/lib/seller-analytics";
+import { localizedTopProducts, shortDay } from "@/lib/seller-analytics";
+import { useSellerData } from "@/lib/seller";
 import { formatCurrency } from "@/lib/utils";
 
 export default function SellerAnalyticsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const { getRawProduct } = useSellerData();
 
   const reportLinks = [
     { href: "/seller/analytics/products", label: fr ? "Analytique produits" : "Product Analytics", sub: fr ? "Meilleures ventes · Catalogue · Catégories" : "Best sellers · Catalogue · Categories", icon: Package },
@@ -61,7 +63,7 @@ export default function SellerAnalyticsPage() {
                   <EmptyState>{fr ? "Aucune vente sur cette période." : "No sales in this period."}</EmptyState>
                 ) : (
                   <HorizontalBarChart
-                    items={a.topProducts.map((p) => ({ name: p.name, units: p.units }))}
+                    items={localizedTopProducts(a.topProducts, getRawProduct, fr).map((p) => ({ name: p.name, units: p.units }))}
                     valueKey="units"
                     labelKey="name"
                     maxBars={8}

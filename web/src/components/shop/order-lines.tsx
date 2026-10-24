@@ -1,8 +1,10 @@
 "use client";
 
+import { pickText } from "@/lib/i18n-fields";
 import Image from "next/image";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
+import { variantDisplay } from "@/components/shop/order-products";
 import type { CartLine } from "@/context/shop-context";
 
 /**
@@ -24,6 +26,9 @@ export function OrderLines({ lines }: { lines: CartLine[] }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-slate-900">{fr ? l.nameFr : l.name}</p>
+              {l.variant && l.variant !== "Default" && (
+                <p className="truncate text-xs text-slate-500">{variantDisplay(l.variant, fr ? l.variantFr : l.variantEn, fr)}</p>
+              )}
               {l.seller && (
                 <p className="truncate text-xs text-slate-500">{fr ? "Vendu par" : "Sold by"} {l.seller}</p>
               )}
@@ -38,7 +43,7 @@ export function OrderLines({ lines }: { lines: CartLine[] }) {
                     </s>
                     {" · "}
                     <span className="font-semibold text-amber-800">
-                      -{info.pct}%{info.source === "flash" ? (fr ? " vente flash" : " flash sale") : info.campaignName ? ` ${info.campaignName}` : ""}
+                      -{info.pct}%{info.source === "flash" ? (fr ? " vente flash" : " flash sale") : info.campaignName ? ` ${pickText(fr, info.campaignName, info.campaignNameFr)}` : ""}
                     </span>
                   </>
                 )}

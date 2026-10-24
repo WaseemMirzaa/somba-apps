@@ -12,31 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { AssignParcelButton } from "@/components/warehouse/assign-parcel-button";
 import { ExceptionForm } from "@/components/warehouse/exception-form";
 import { useReceiveParcel } from "@/components/warehouse/use-receive";
-import { STAGE_LABEL, stageVariant, useWarehouseData } from "@/lib/warehouse";
-import { shortDate, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
+import { STAGE_LABEL, riderName, stageVariant, useWarehouseData } from "@/lib/warehouse";
+import { EXCEPTION_STATUS, EXCEPTION_TYPE, pick, shortDate, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
-
-const VARIANT_TOKENS_FR: Record<string, string> = {
-  Default: "Standard",
-  Black: "Noir",
-  White: "Blanc",
-  Blue: "Bleu",
-  Silver: "Argent",
-  Grey: "Gris",
-  Gray: "Gris",
-  Red: "Rouge",
-  Green: "Vert",
-};
-
-const localizeVariant = (variant: string, fr: boolean) =>
-  !fr || !variant
-    ? variant
-    : variant
-        .split(" ")
-        .map((tok) => VARIANT_TOKENS_FR[tok] ?? tok.replace(/GB$/i, " Go").replace(/TB$/i, " To"))
-        .join(" ");
+import { paymentMethodLabel } from "@/lib/seller-labels";
+import { variantDisplay } from "@/lib/i18n-fields";
 
 /**
  * Live parcel detail, shared by /parcels/:id and /aged/:id.
@@ -141,7 +123,7 @@ export function ParcelDetail({ variant }: { variant: "parcel" | "aged" }) {
           <InfoGrid items={[
             { label: fr ? "Vendeur" : "Seller", value: parcel.seller },
             { label: fr ? "Adresse de collecte" : "Pickup address", value: parcel.pickupAddress, full: true },
-            { label: fr ? "Livreur" : "Rider", value: parcel.rider },
+            { label: fr ? "Livreur" : "Rider", value: riderName(parcel.rider, fr) },
           ]} />
         </DetailGridSection>
 
@@ -158,7 +140,7 @@ export function ParcelDetail({ variant }: { variant: "parcel" | "aged" }) {
               ) : "—",
             },
             { label: fr ? "Adresse de livraison" : "Delivery address", value: parcel.customerAddress, full: true },
-            { label: fr ? "Paiement" : "Payment", value: parcel.paymentLabel },
+            { label: fr ? "Paiement" : "Payment", value: parcel.paymentMethod ? paymentMethodLabel(parcel.paymentMethod, fr) : parcel.paymentLabel },
             ...(parcel.codAmountUsd > 0 ? [{ label: fr ? "COD à encaisser" : "COD to collect", value: formatCurrency(parcel.codAmountUsd, locale) }] : []),
           ]} />
         </DetailGridSection>
@@ -171,7 +153,7 @@ export function ParcelDetail({ variant }: { variant: "parcel" | "aged" }) {
               {linked.map((e) => (
                 <li key={e.id}>
                   <Link href={ops(`/exceptions/${e.id}`)} className="text-[var(--primary)] hover:underline">{e.reference}</Link>{" "}
-                  <span className="text-slate-500">· {e.type.replace(/_/g, " ")} · {e.status}</span>
+                  <span className="text-slate-500">· {pick(EXCEPTION_TYPE[e.type], fr, e.type.replace(/_/g, " "))} · {pick(EXCEPTION_STATUS[e.status], fr, e.status)}</span>
                 </li>
               ))}
             </ul>
@@ -204,8 +186,8 @@ export function ParcelDetail({ variant }: { variant: "parcel" | "aged" }) {
               {parcel.items.map((item, i) => (
                 <div key={`${item.productId}-${i}`} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3">
                   <div className="flex-1">
-                    <p className="font-medium text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-500">SKU: {item.sku} · {localizeVariant(item.variant, fr)}</p>
+                    <p className="font-medium text-slate-900">{fr ? item.nameFr : item.name}</p>
+                    <p className="text-xs text-slate-500">SKU: {item.sku} · {variantDisplay(item.variant, fr ? item.variantFr : null, fr)}</p>
                   </div>
                   <span className="text-sm font-medium">{fr ? "Qté" : "Qty"}: {item.qty}</span>
                 </div>

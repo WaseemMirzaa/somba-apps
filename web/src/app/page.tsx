@@ -31,6 +31,7 @@ import { PortalExplorer } from "@/components/landing/portal-explorer";
 import { PortalOverviewCards } from "@/components/landing/portal-premium";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
+import { CategoryImage } from "@/components/shop/category-image";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -174,7 +175,7 @@ export default function HomePage() {
               {categories.slice(0, 5).map((c) => (
                 <Link
                   key={c.id}
-                  href={`/shop/search?q=${encodeURIComponent(c.name)}`}
+                  href={`/shop/products?category=${encodeURIComponent(c.uuid)}`}
                   className="rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-[var(--primary-tint)] hover:text-[var(--primary)]"
                 >
                   {fr ? c.nameFr : c.name}
@@ -306,21 +307,20 @@ export default function HomePage() {
           </div>
           <div className="cat-rail mt-8">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/shop/search?q=${encodeURIComponent(cat.name)}`} className="cat-tile group">
+              <Link key={cat.id} href={`/shop/products?category=${encodeURIComponent(cat.uuid)}`} className="cat-tile group">
                 <div className="relative aspect-[5/4] overflow-hidden">
-                  <Image
-                    src={cat.image || "/brand/logo-stack.png"}
+                  <CategoryImage
+                    src={cat.image}
                     alt={fr ? cat.nameFr : cat.name}
-                    fill
-                    sizes="160px"
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    placeholder="plain"
+                    className="transition-transform duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/75 via-slate-900/10 to-transparent" />
                   <span className="absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-base shadow-sm">
                     {cat.icon}
                   </span>
                 </div>
-                <p className="px-3 py-2.5 text-sm font-bold text-slate-900 group-hover:text-[var(--primary)]">
+                <p className="line-clamp-2 break-words px-3 py-2.5 text-sm font-bold leading-snug text-slate-900 group-hover:text-[var(--primary)]">
                   {fr ? cat.nameFr : cat.name}
                 </p>
               </Link>

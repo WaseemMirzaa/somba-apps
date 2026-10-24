@@ -7,7 +7,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { StatusButtons } from "@/components/warehouse/status-buttons";
-import { REPLACEMENT_NEXT, REPLACEMENT_STATUS, pick, shortDate, useOpsQuery, type ReplacementRow } from "@/lib/warehouse-live";
+import { DISPATCH_STATUS, REPLACEMENT_NEXT, REPLACEMENT_STATUS, pick, shortDate, useOpsQuery, type ReplacementRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
 
@@ -93,7 +93,7 @@ export default function WarehouseReplacementDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Produit" : "Product", value: rep.productName },
             { label: "SKU", value: rep.sku },
-            { label: fr ? "Expédition" : "Dispatch", value: rep.dispatchStatus ?? "—" },
+            { label: fr ? "Expédition" : "Dispatch", value: rep.dispatchStatus ? pick(DISPATCH_STATUS[rep.dispatchStatus], fr, rep.dispatchStatus) : "—" },
           ]} />
         </DetailGridSection>
 

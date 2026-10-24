@@ -44,7 +44,11 @@ export interface OrderItem {
   id: string;
   productId: string;
   productName: string;
+  /** The line's name in French, snapshotted when the order was placed (absent on an old server). */
+  productNameFr?: string | null;
   variant: string;
+  /** The chosen options in French (`variant` stays the canonical purchase key). */
+  variantFr?: string | null;
   qty: number;
   /** Unit price actually charged (after flash sale / campaign). */
   priceUsd: number;
@@ -133,16 +137,22 @@ export interface Order {
   updatedAt: string;
 }
 
+export type TranslationState = "done" | "pending" | "failed" | "off";
+
 export interface Product {
   id: string;
   name: string;
   nameFr: string | null;
   description: string | null;
+  /** French description (null when there is none, absent on an old server). */
+  descriptionFr?: string | null;
   price: number;
   originalPrice: number | null;
   discount: number;
   category: string;
   categoryFr: string | null;
+  /** The category row the product belongs to (filters compare ids, not names). */
+  categoryId?: string | null;
   image: string | null;
   stock: number;
   rating: number;
@@ -157,9 +167,18 @@ export interface Product {
   campaignPct?: number;
   campaignId?: string | null;
   campaignName?: string | null;
+  /** The campaign's name in French (additive; `campaignName` is English). */
+  campaignNameFr?: string | null;
   priceSource?: "base" | "flash" | "campaign";
   /** Options the shopper picks (JSON text or array from the API): see lib/variants.ts. */
   variants?: string | { name: string; options: string[] }[] | null;
+  /** Display labels of the option groups per language, index-aligned with `variants` (never used as purchase keys). */
+  variantLabels?: { en: { name: string; options: string[] }[]; fr: { name: string; options: string[] }[] } | null;
+  /** Language the seller wrote the listing in. */
+  sourceLang?: "en" | "fr";
+  /** Served field names that came from the machine translator, e.g. ["nameFr","descriptionFr"]. */
+  machineTranslated?: string[];
+  translationStatus?: TranslationState;
 }
 
 export interface Category {
@@ -169,6 +188,11 @@ export interface Category {
   icon: string | null;
   image: string | null;
   sortOrder: number;
+  sourceLang?: "en" | "fr";
+  /** Live products in this category. */
+  productCount?: number;
+  /** Listings (live or not, never removed) that point at it: the server refuses to delete a category that has any. */
+  usedBy?: number;
 }
 
 export interface Address {
@@ -218,6 +242,9 @@ export interface AppNotification {
   role: string | null;
   title: string;
   body: string;
+  /** French title / body computed by the server (absent on an old server: the English text is shown). */
+  titleFr?: string | null;
+  bodyFr?: string | null;
   type: string;
   entityId: string | null;
   read: boolean;
@@ -240,6 +267,8 @@ export interface WalletTransaction {
   amount: number;
   balance: number;
   description: string;
+  /** French wording of the description (the server writes both). */
+  descriptionFr?: string | null;
   createdAt: string;
 }
 
@@ -301,6 +330,7 @@ export interface Seller {
   logoUrl?: string | null;
   bannerUrl?: string | null;
   description?: string | null;
+  descriptionFr?: string | null;
   /** KYC filed with the application: visible to the owner and to admins only (never on the public storefront). */
   legalName?: string | null;
   phone?: string | null;
@@ -328,6 +358,7 @@ export interface Review {
   id: string;
   productId: string;
   productName?: string;
+  productNameFr?: string;
   userId: string;
   author: string;
   rating: number;
@@ -337,6 +368,8 @@ export interface Review {
   /** The seller's public answer to this review. */
   sellerReply?: string | null;
   sellerReplyAt?: string | null;
+  /** Detected language of the review text (absent on an old server). */
+  sourceLang?: "en" | "fr" | null;
 }
 
 /** Standard ack envelope returned by every request→ack socket handler. */

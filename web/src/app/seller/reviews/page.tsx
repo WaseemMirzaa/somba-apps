@@ -12,6 +12,8 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
+import { matchesSearch } from "@/lib/i18n-fields";
+import { TranslatableText } from "@/components/shop/translatable-text";
 
 type Row = ReturnType<typeof useSellerData>["sellerReviewList"][number];
 
@@ -122,11 +124,8 @@ export default function SellerReviewsPage() {
   const [onlyUnreplied, setOnlyUnreplied] = useState(false);
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
     return sellerReviewList.filter(
-      (r) =>
-        (!onlyUnreplied || !r.reply) &&
-        (!needle || `${r.customer} ${r.product} ${r.review}`.toLowerCase().includes(needle)),
+      (r) => (!onlyUnreplied || !r.reply) && matchesSearch(q, [r.customer, r.product, r.review]),
     );
   }, [sellerReviewList, q, onlyUnreplied]);
 
@@ -180,7 +179,9 @@ export default function SellerReviewsPage() {
                   {!r.reply && <Badge variant="warning">{fr ? "Sans réponse" : "No reply"}</Badge>}
                 </div>
               </div>
-              <p className="mt-3 whitespace-pre-line break-words text-sm text-slate-700">{r.review}</p>
+              <div className="mt-3">
+                <TranslatableText kind="review" id={r.reviewId} text={r.review} sourceLang={r.sourceLang} className="whitespace-pre-line break-words text-sm text-slate-700" />
+              </div>
               <ReplyBox key={r.reviewId} row={r} onSave={replyReview} />
             </li>
           ))}

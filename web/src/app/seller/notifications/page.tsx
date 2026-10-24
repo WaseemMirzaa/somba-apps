@@ -12,6 +12,7 @@ import { useToast } from "@/context/toast-context";
 import { errMessage } from "@/lib/seller-labels";
 import { ArrowLeftRight, Bell, Megaphone, PackageCheck, RefreshCw, RotateCcw, ShieldAlert, ShieldCheck, LifeBuoy, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { noticeHref } from "@/lib/notice-links";
+import { localizedNotice, noticeTypeLabel } from "@/lib/i18n-fields";
 
 const READ_STATUS_OPTIONS = [
   { value: "unread", label: "Unread", labelFr: "Non lu" },
@@ -42,14 +43,14 @@ export default function SellerNotificationsPage() {
     () =>
       [...notifications]
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-        .map((n) => ({ ...n, href: noticeHref(n, "seller"), state: n.read ? "read" : "unread" })),
-    [notifications]
+        .map((n) => ({ ...n, ...localizedNotice(n, fr), href: noticeHref(n, "seller"), state: n.read ? "read" : "unread" })),
+    [notifications, fr]
   );
 
   const filtered = useMemo(
     () =>
       applyListFilters(items, filters, {
-        searchFields: ["title", "body", "type", "state"],
+        searchFields: ["title", "body", "titleFr", "bodyFr", "type", "state"],
         dateField: "createdAt",
         statusField: "state",
       }),
@@ -112,7 +113,7 @@ export default function SellerNotificationsPage() {
           },
         },
         { key: "body", label: fr ? "Message" : "Message", render: (row) => <span className="text-slate-600">{String(row.body)}</span> },
-        { key: "type", label: "Type", render: (row) => <Badge variant="info">{String(row.type).replace(/_/g, " ")}</Badge> },
+        { key: "type", label: "Type", render: (row) => <Badge variant="info">{noticeTypeLabel(String(row.type), fr)}</Badge> },
         { key: "createdAt", label: t("date"), render: (row) => new Date(String(row.createdAt)).toLocaleString(locale) },
         {
           key: "read",

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { KycForm, EMPTY_KYC, kycPayload, type KycValues } from "@/components/seller/kyc-form";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -12,6 +13,7 @@ import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Seller } from "@/lib/realtime/types";
 import { errMessage } from "@/lib/seller-labels";
+import { authErrorText } from "@/lib/auth-errors";
 
 export default function SellerRegisterPage() {
   const { locale } = useLocale();
@@ -31,7 +33,8 @@ export default function SellerRegisterPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [accountError, setAccountError] = useState<string | null>(null);
+  // Kept in both languages so it follows the language toggle if that is switched after the error.
+  const [accountError, setAccountError] = useState<{ en: string; fr: string } | null>(null);
 
   // A seller that already has a store goes straight to the portal (the gate
   // then sends it to the right page for its approval state).
@@ -59,7 +62,10 @@ export default function SellerRegisterPage() {
   function precheck(): boolean {
     if (rt.user) return true;
     if (!email.trim() || password.length < 8 || fullName.trim().length < 2) {
-      setAccountError(fr ? "Renseignez votre nom, un e-mail et un mot de passe d'au moins 8 caractères." : "Enter your name, an email and a password of at least 8 characters.");
+      setAccountError({
+        en: "Enter your name, an email and a password of at least 8 characters.",
+        fr: "Renseignez votre nom, un e-mail et un mot de passe d'au moins 8 caractères.",
+      });
       return false;
     }
     setAccountError(null);
@@ -71,12 +77,11 @@ export default function SellerRegisterPage() {
     setError(null);
     if (!rt.user) {
       try {
-        const user = await rt.register({ email: email.trim(), password, name: fullName.trim(), role: "seller" });
+        const user = await rt.register({ email: email.trim(), password, name: fullName.trim(), role: "seller", locale });
         signInReal(user.role, { name: user.name, email: user.email });
       } catch (err) {
-        const msg = errMessage(err);
-        setAccountError(msg);
-        toast(msg, "error");
+        setAccountError({ en: authErrorText(err, false), fr: authErrorText(err, true) });
+        toast(authErrorText(err, fr), "error");
         setBusy(false);
         return;
       }
@@ -122,7 +127,7 @@ export default function SellerRegisterPage() {
           <input id="sr-pw" type="password" className="input-premium w-full px-4 py-2 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         </div>
       </div>
-      {accountError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{accountError}</p>}
+      {accountError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{fr ? accountError.fr : accountError.en}</p>}
     </>
   );
 
@@ -145,6 +150,9 @@ export default function SellerRegisterPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-4 py-8">
+      <div className="flex justify-end">
+        <LanguageToggle />
+      </div>
       <PageHeader
         title={fr ? "Inscription vendeur" : "Seller Registration"}
         subtitle={fr ? "Ouvrez votre boutique — la modération vérifie vos informations avant l'approbation" : "Open your store — moderation checks your details before approving"}

@@ -6,19 +6,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProductStatusActions } from "@/components/admin/status-actions";
+import { BilingualProductText } from "@/components/admin/bilingual-product-text";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useAdminData } from "@/lib/admin";
 import { useLocale } from "@/context/locale-context";
 
 const STATUS_FR: Record<string, string> = { pending: "En attente", live: "En ligne", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
-const CATEGORY_FR: Record<string, string> = {
-  Electronics: "Électronique",
-  Fashion: "Mode",
-  "Home & Living": "Maison & Décoration",
-  Beauty: "Beauté",
-  Grocery: "Épicerie",
-};
-
 export default function AdminModerationPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
@@ -46,12 +39,13 @@ export default function AdminModerationPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <Link href={`/admin/products/${p.id}`} className="font-semibold text-[var(--primary)] hover:underline">{p.name}</Link>
-                    <p className="text-sm text-slate-500">{p.seller} · {fr ? (CATEGORY_FR[p.category] ?? p.category) : p.category}</p>
+                    <p className="text-sm text-slate-500">{p.seller} · {p.category}</p>
                   </div>
                   <Badge variant={p.status === "pending" ? "warning" : p.status === "live" ? "success" : p.status === "draft" ? "default" : "danger"}>{fr ? (STATUS_FR[p.status] ?? p.status) : p.status}</Badge>
                 </div>
                 {p.status === "pending" && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3">
+                    <BilingualProductText product={p.raw} compact />
                     <ProductStatusActions productId={p.id} status="pending" name={p.name} />
                   </div>
                 )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { paymentMethodLabel } from "@/lib/seller-labels";
 import { localDay } from "@/lib/dates";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -94,7 +95,7 @@ export default function AdminRefundsPage() {
                 ),
               },
               { key: "amountUsd", label: t("amount"), render: (row) => <span className="font-semibold text-slate-900">{formatCurrency(row.amountUsd as number, locale)}</span> },
-              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <Badge variant="info">{String(row.method).replace(/_/g, " ")}</Badge> },
+              { key: "method", label: fr ? "Méthode" : "Method", render: (row) => <Badge variant="info">{paymentMethodLabel(String(row.method), fr)}</Badge> },
               {
                 key: "status",
                 label: t("status"),

@@ -26,6 +26,8 @@ import { useRealtime } from "@/context/realtime-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { localized } from "@/lib/i18n-fields";
+import { formatCurrency } from "@/lib/utils";
 import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
 import type { BackendUser, Payment } from "@/lib/realtime/types";
 
@@ -66,7 +68,7 @@ function ProfileCard() {
     try {
       const saved = await socketClient.request<BackendUser>("me:update", { name: name.trim(), phone: phone.trim() || null, locale: lang });
       setShown((cur) => ({ ...cur, ...saved }));
-      setLocale(lang);
+      setLocale(lang, { skipAccount: true }); // already saved on the account just above
       setEditing(false);
       toast(fr ? "Profil mis à jour" : "Profile updated");
     } catch (e) {
@@ -162,7 +164,7 @@ function WalletCard() {
         <div className="rounded-xl bg-emerald-50 p-3"><Wallet className="h-5 w-5 text-emerald-600" /></div>
         <div className="flex-1">
           <p className="text-sm text-slate-500">{fr ? "Portefeuille Somba" : "Somba wallet"}</p>
-          <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">${rt.walletBalance.toFixed(2)}</p>
+          <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{formatCurrency(rt.walletBalance, locale)}</p>
         </div>
         <Button size="sm" onClick={() => setOpen((v) => !v)}>{fr ? "Recharger" : "Top up"}</Button>
       </div>
@@ -201,8 +203,8 @@ function WalletCard() {
         <ul className="divide-y divide-[var(--border)] text-sm">
           {recent.map((t) => (
             <li key={t.id} className="flex justify-between py-2">
-              <span className="truncate text-slate-600">{t.description}</span>
-              <span className={t.type === "debit" ? "text-red-600" : "text-emerald-600"}>{t.type === "debit" ? "-" : "+"}${Math.abs(t.amount).toFixed(2)}</span>
+              <span className="truncate text-slate-600">{localized(t, "description", fr)}</span>
+              <span className={t.type === "debit" ? "text-red-600" : "text-emerald-600"}>{t.type === "debit" ? "-" : "+"}{formatCurrency(Math.abs(t.amount), locale)}</span>
             </li>
           ))}
         </ul>

@@ -12,6 +12,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { ProductStatusActions } from "@/components/admin/status-actions";
+import { BilingualProductText } from "@/components/admin/bilingual-product-text";
+import { pickText } from "@/lib/i18n-fields";
 import { Ban } from "lucide-react";
 
 const STATUS_FR: Record<string, string> = {
@@ -21,15 +23,6 @@ const STATUS_FR: Record<string, string> = {
   removed: "Bloqué",
   draft: "Brouillon",
 };
-
-const CATEGORY_FR: Record<string, string> = {
-  Electronics: "Électronique",
-  Fashion: "Mode",
-  "Home & Living": "Maison & Décoration",
-  Beauty: "Beauté",
-  Grocery: "Épicerie",
-};
-
 
 export default function AdminProductModerationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -92,11 +85,19 @@ export default function AdminProductModerationDetailPage() {
             ]} />
           </DetailSection>
 
+          <DetailSection title={fr ? "Titre et description (EN / FR)" : "Title and description (EN / FR)"}>
+            <BilingualProductText product={product.raw} />
+            <p className="mt-3 text-xs text-slate-500">
+              {fr
+                ? "Les textes traduits automatiquement sont signalés : relisez les deux langues avant d'approuver."
+                : "Automatically translated texts are flagged: read both languages before you approve."}
+            </p>
+          </DetailSection>
+
           <DetailSection title={fr ? "Informations produit" : "Product Information"}>
             <InfoGrid items={[
-              { label: fr ? "Titre" : "Title", value: product.name, full: true },
-              { label: fr ? "Description" : "Description", value: product.description || "—", full: true },
-              { label: fr ? "Catégorie" : "Category", value: fr ? (CATEGORY_FR[product.category] ?? product.category) : product.category },
+              { label: fr ? "Catégorie (EN)" : "Category (EN)", value: pickText(false, product.raw.category, product.raw.categoryFr) },
+              { label: fr ? "Catégorie (FR)" : "Category (FR)", value: pickText(true, product.raw.category, product.raw.categoryFr) },
             ]} />
           </DetailSection>
 

@@ -72,7 +72,7 @@ function PaymentContent() {
       {
         id: "wallet",
         label: fr ? "Portefeuille Somba" : "Somba wallet",
-        hint: `${fr ? "Solde" : "Balance"}: $${balance.toFixed(2)}${walletEnough ? "" : fr ? " — insuffisant" : " — not enough"}`,
+        hint: `${fr ? "Solde" : "Balance"}: ${formatCurrency(balance, locale)}${walletEnough ? "" : fr ? " — insuffisant" : " — not enough"}`,
         disabled: !walletEnough,
       },
       ...MOBILE_MONEY_METHODS.map((m) => ({ id: m.id, label: m.label })),
@@ -81,7 +81,7 @@ function PaymentContent() {
       list.push({ id: "cod", label: fr ? "Paiement à la livraison" : "Cash on delivery" });
     }
     return list;
-  }, [fr, balance, walletEnough, settings.codEnabled]);
+  }, [fr, locale, balance, walletEnough, settings.codEnabled]);
 
   const handleConfirmed = useCallback(
     (order: Order) => {

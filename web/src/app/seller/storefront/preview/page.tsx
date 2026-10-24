@@ -9,6 +9,7 @@ import { productStatusLabel, productStatusVariant } from "@/lib/seller-labels";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
 import { StoreHeader } from "@/components/shop/store-header";
+import { localized } from "@/lib/i18n-fields";
 
 export default function SellerStorefrontPreviewPage() {
   const { locale } = useLocale();
@@ -26,7 +27,9 @@ export default function SellerStorefrontPreviewPage() {
         <p className="text-sm text-slate-500">
           {sellerStore.badge} · {sellerStore.rating > 0 ? `⭐ ${Number(sellerStore.rating).toFixed(1)}` : fr ? "Pas encore noté" : "Not rated yet"} · {live.length} {fr ? "produit(s) en ligne" : "live product(s)"}
         </p>
-        {seller?.description && <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{seller.description}</p>}
+        {localized(seller, "description", fr) && (
+          <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{localized(seller, "description", fr)}</p>
+        )}
         {hidden > 0 && (
           <p className="mt-2 text-xs text-amber-700">
             {fr ? `${hidden} produit(s) non visible(s) par les clients (en attente, en pause ou refusés).` : `${hidden} product(s) are not visible to shoppers (pending, paused or rejected).`}

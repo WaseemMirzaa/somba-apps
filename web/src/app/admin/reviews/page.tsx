@@ -17,6 +17,8 @@ import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { errMsg } from "@/lib/admin-live";
 import type { ReviewRow } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { matchesSearch, pickText } from "@/lib/i18n-fields";
+import { TranslatableText } from "@/components/shop/translatable-text";
 
 const PAGE = 100;
 
@@ -103,7 +105,7 @@ export default function AdminReviewsPage() {
     try {
       const updated = await socketClient.request<ReviewRow>("reviews:setStatus", { reviewId: r.id, status });
       setRows((cur) => {
-        const merged = cur.map((x) => (x.id === r.id ? { ...x, ...updated, productName: x.productName } : x));
+        const merged = cur.map((x) => (x.id === r.id ? { ...x, ...updated, productName: x.productName, productNameFr: x.productNameFr } : x));
         return tab !== "all" && updated.status !== tab ? merged.filter((x) => x.id !== r.id) : merged;
       });
       toast(
@@ -120,14 +122,16 @@ export default function AdminReviewsPage() {
   }
 
   const productName = useCallback(
-    (r: ReviewRow) => r.productName || rt.products.find((p) => p.id === r.productId)?.name || r.productId.slice(0, 8),
-    [rt.products],
+    (r: ReviewRow) => {
+      const p = rt.products.find((x) => x.id === r.productId);
+      return pickText(fr, r.productName, r.productNameFr) || (p ? pickText(fr, p.name, p.nameFr) : "") || r.productId.slice(0, 8);
+    },
+    [rt.products, fr],
   );
 
   const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => `${productName(r)} ${r.author} ${r.text} ${r.sellerReply ?? ""}`.toLowerCase().includes(q));
+    if (!query.trim()) return rows;
+    return rows.filter((r) => matchesSearch(query, [productName(r), r.author, r.text, r.sellerReply]));
   }, [rows, query, productName]);
 
   const hidden = rows.filter((r) => r.status === "hidden").length;
@@ -214,14 +218,14 @@ export default function AdminReviewsPage() {
                       const r = row as unknown as ReviewRow;
                       return (
                         <div className="max-w-md space-y-2">
-                          <p className="whitespace-pre-line break-words text-slate-700">{r.text}</p>
+                          <TranslatableText kind="review" id={r.id} text={r.text} className="whitespace-pre-line break-words text-slate-700" />
                           {r.sellerReply && (
                             <div className="rounded-lg border-l-2 border-[var(--primary)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
                               <p className="font-semibold text-slate-700">
                                 {fr ? "Réponse du vendeur" : "Seller reply"}
                                 {r.sellerReplyAt ? ` · ${localDay(String(r.sellerReplyAt))}` : ""}
                               </p>
-                              <p className="mt-0.5 whitespace-pre-line break-words">{r.sellerReply}</p>
+                              <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-0.5 whitespace-pre-line break-words" />
                             </div>
                           )}
                         </div>

@@ -37,12 +37,14 @@ import { DailyBarChart } from "@/components/admin/series-charts";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useRealtime } from "@/context/realtime-context";
+import { categoryLabel } from "@/lib/i18n-fields";
 import { useLocale } from "@/context/locale-context";
 import { ORDER_STATUS_BADGE, orderStatusLabel, useServerList } from "@/lib/admin-live";
 import { rankSellers, useSocketQuery, type AdminStatsFull, type RevenuePoint } from "@/lib/admin-stats";
 import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
+const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu", rejected: "Rejeté" };
 const SEVERITY_VARIANT = { critical: "danger", warning: "warning", info: "info" } as const;
 const SEVERITY_LABEL = {
   critical: { en: "Critical", fr: "Critique" },
@@ -126,8 +128,8 @@ export default function AdminDashboard() {
         subtitle={
           s
             ? fr
-              ? `${formatNumber(s.orders, locale)} commandes · ${formatNumber(s.customers, locale)} clients · ${formatNumber(s.sellers, locale)} vendeurs`
-              : `${formatNumber(s.orders, locale)} orders · ${formatNumber(s.customers, locale)} customers · ${formatNumber(s.sellers, locale)} sellers`
+              ? `${formatNumber(s.orders, locale)} commande${s.orders > 1 ? "s" : ""} · ${formatNumber(s.customers, locale)} client${s.customers > 1 ? "s" : ""} · ${formatNumber(s.sellers, locale)} vendeur${s.sellers > 1 ? "s" : ""}`
+              : `${formatNumber(s.orders, locale)} order${s.orders === 1 ? "" : "s"} · ${formatNumber(s.customers, locale)} customer${s.customers === 1 ? "" : "s"} · ${formatNumber(s.sellers, locale)} seller${s.sellers === 1 ? "" : "s"}`
             : fr ? "Chargement des indicateurs…" : "Loading figures…"
         }
         actions={
@@ -149,7 +151,7 @@ export default function AdminDashboard() {
           <StatCard title="Commission" value={formatCurrency(s.commissionUsd, locale)} icon={Percent} trend={fr ? `Taux actuel ${s.commissionPct} % (nouvelles commandes)` : `Current rate ${s.commissionPct}% (new orders)`} />
           <StatCard title={fr ? "Abonnements vendeurs" : "Seller subscriptions"} value={formatCurrency(s.subscriptionRevenueUsd, locale)} icon={Wallet} />
           <StatCard title={fr ? "Clients" : "Customers"} value={formatNumber(s.customers, locale)} icon={Users} />
-          <StatCard title={fr ? "Produits en ligne" : "Live products"} value={formatNumber(s.liveProducts, locale)} icon={Package} trend={`${formatNumber(s.sellers, locale)} ${fr ? "vendeurs" : "sellers"}`} />
+          <StatCard title={fr ? "Produits en ligne" : "Live products"} value={formatNumber(s.liveProducts, locale)} icon={Package} trend={`${formatNumber(s.sellers, locale)} ${fr ? (s.sellers > 1 ? "vendeurs" : "vendeur") : s.sellers === 1 ? "seller" : "sellers"}`} />
         </div>
       )}
 
@@ -236,7 +238,7 @@ export default function AdminDashboard() {
               <EmptyState>{fr ? "Aucune vente pour le moment." : "No sales yet."}</EmptyState>
             ) : (
               <HorizontalBarChart
-                items={s.gmvByCategory.map((c) => ({ name: `${c.category} · ${c.orders} ${fr ? "cmd" : "orders"}`, gmv: c.gmv }))}
+                items={s.gmvByCategory.map((c) => ({ name: `${categoryLabel(rt.categories, c.category, fr)} · ${c.orders} ${fr ? "cmd" : "orders"}`, gmv: c.gmv }))}
                 valueKey="gmv"
                 labelKey="name"
                 maxBars={8}
@@ -415,7 +417,7 @@ export default function AdminDashboard() {
                     label: t("status"),
                     render: (row) => (
                       <Badge variant={row.status === "approved" ? "success" : row.status === "pending" ? "warning" : "danger"}>
-                        {String(row.status)}
+                        {fr ? (SELLER_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
                       </Badge>
                     ),
                   },

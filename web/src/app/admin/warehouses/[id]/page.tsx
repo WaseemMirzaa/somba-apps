@@ -21,6 +21,7 @@ import { useLocale } from "@/context/locale-context";
 import { canManageHubs, errMsg, useRole, useServerList, type StaffRow, type ZoneSetting } from "@/lib/admin-live";
 import { useSocketQuery, type HubRow, type WarehouseStats } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { countryName } from "@/lib/countries";
 
 const FULFILLMENT_LINKS = [
   { href: "/admin/fulfillment/inbound", label: "Inbound Queue", labelFr: "File d'attente entrante" },
@@ -132,7 +133,7 @@ export default function AdminWarehouseDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={hub.name}
-        subtitle={`${hub.city}${hub.country ? `, ${hub.country}` : ""}`}
+        subtitle={[hub.city, countryName(hub.country, fr)].filter(Boolean).join(", ")}
         backHref="/admin/warehouses"
         breadcrumbs={[
           { label: "Admin", href: "/admin" },
@@ -161,7 +162,7 @@ export default function AdminWarehouseDetailPage() {
           <InfoGrid
             items={[
               { label: fr ? "Ville" : "City", value: hub.city },
-              { label: fr ? "Pays" : "Country", value: hub.country ?? "—" },
+              { label: fr ? "Pays" : "Country", value: countryName(hub.country, fr) || "—" },
               { label: fr ? "Adresse" : "Address", value: hub.address ?? "—", full: true },
               { label: fr ? "Capacité (colis)" : "Capacity (parcels)", value: hub.capacity.toLocaleString() },
               { label: fr ? "Statut" : "Status", value: hub.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive" },

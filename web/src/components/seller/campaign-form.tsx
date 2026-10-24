@@ -11,6 +11,7 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
+import { autoTranslateHint } from "@/lib/i18n-fields";
 
 const MAX_PRODUCTS = 200;
 
@@ -18,6 +19,8 @@ const MAX_PRODUCTS = 200;
 export interface CampaignFormInitial {
   id: string;
   name: string;
+  /** French name, when there is one. */
+  nameFr?: string;
   discount: number;
   startDate: string | null;
   endDate: string | null;
@@ -38,6 +41,7 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
   const editing = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? "",
+    nameFr: initial?.nameFr ?? "",
     discount: initial ? String(initial.discount) : "",
     start: initial?.startDate ?? "",
     end: initial?.endDate ?? "",
@@ -56,7 +60,7 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
 
   const discount = form.discount === "" ? 0 : Number(form.discount);
   const problems: string[] = [];
-  if (form.name.trim().length < 2) problems.push(fr ? "Saisissez un nom de campagne." : "Enter a campaign name.");
+  if (form.name.trim().length < 2 && form.nameFr.trim().length < 2) problems.push(fr ? "Saisissez un nom de campagne (en anglais ou en français)." : "Enter a campaign name (in English or French).");
   if (!Number.isFinite(discount) || discount <= 0 || discount > 90) problems.push(fr ? "La remise doit être comprise entre 1 et 90 %." : "Discount must be between 1 and 90%.");
   if (form.start && form.end && form.end < form.start) problems.push(fr ? "La date de fin précède la date de début." : "The end date is before the start date.");
   if (scope === "selected" && picked.length === 0) problems.push(fr ? "Choisissez au moins un produit." : "Pick at least one product.");
@@ -70,19 +74,26 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
     setError(null);
     try {
       const fields = {
-        name: form.name.trim(),
         discount,
         startDate: form.start || undefined,
         endDate: form.end || undefined,
         budgetUsd: form.budget ? Number(form.budget) : undefined,
       };
+      const nameEn = form.name.trim();
+      const nameFr = form.nameFr.trim();
       if (initial) {
+        // Only a name that changed is sent: an automatic translation is not turned into typed text ("" clears it).
+        const names = {
+          ...(nameEn !== initial.name.trim() ? { name: nameEn } : {}),
+          ...(nameFr !== (initial.nameFr ?? "").trim() ? { nameFr } : {}),
+        };
         // An empty list means "the whole store" on the server.
-        await updateCampaign(initial.id, { ...fields, budgetUsd: form.budget ? Number(form.budget) : 0, productIds: scope === "selected" ? picked : [] });
+        await updateCampaign(initial.id, { ...fields, ...names, budgetUsd: form.budget ? Number(form.budget) : 0, productIds: scope === "selected" ? picked : [] });
         toast(fr ? "Modifications envoyées pour approbation" : "Changes sent for approval");
         router.push(`/seller/promotions/${initial.id}`);
       } else {
-        await createCampaign({ ...fields, productIds: scope === "selected" ? picked : undefined });
+        // A language left empty is not sent: the platform translates it from the other one.
+        await createCampaign({ ...fields, ...(nameEn ? { name: nameEn } : {}), ...(nameFr ? { nameFr } : {}), productIds: scope === "selected" ? picked : undefined });
         toast(fr ? "Campagne soumise pour approbation" : "Campaign submitted for approval");
         router.push("/seller/promotions");
       }
@@ -110,8 +121,12 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
 
       <DetailSection title={fr ? "Détails de la campagne" : "Campaign Details"}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-xs text-slate-500">{fr ? "Nom de la campagne" : "Campaign name"}
+          <label className="text-xs text-slate-500">{fr ? "Nom de la campagne (EN)" : "Campaign name (EN)"}
             <input className={`${field} mt-1 w-full`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={150} />
+          </label>
+          <label className="text-xs text-slate-500">{fr ? "Nom de la campagne (FR)" : "Campaign name (FR)"}
+            <input className={`${field} mt-1 w-full`} value={form.nameFr} onChange={(e) => setForm({ ...form, nameFr: e.target.value })} maxLength={150} />
+            <span className="mt-1 block">{autoTranslateHint(fr)}</span>
           </label>
           <label className="text-xs text-slate-500">{fr ? "Remise % (1-90)" : "Discount % (1-90)"}
             <input className={`${field} mt-1 w-full`} type="number" min="1" max="90" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} />
