@@ -10,6 +10,21 @@ function make() {
       rows.filter((r) => Object.entries(where).every(([k, v]) => (r as never)[k] === v)),
     create: (x: Partial<Row>) => ({ ...x }) as Row,
     save: async (r: Row) => { if (!rows.includes(r)) rows.push(r); return r; },
+    createQueryBuilder: () => {
+      const params: { userIds?: string[]; role?: string } = {};
+      const qb = {
+        leftJoin: () => qb,
+        select: () => qb,
+        addSelect: () => qb,
+        where: (_sql: string, p: typeof params) => (Object.assign(params, p), qb),
+        andWhere: () => qb,
+        getRawMany: async () =>
+          rows
+            .filter((r) => (!params.userIds || params.userIds.includes(r.userId)) && (!params.role || r.role === params.role))
+            .map((r) => ({ token: r.token, userId: r.userId, locale: null })),
+      };
+      return qb;
+    },
     delete: async (w: { token?: string | { _value: string[] }; userId?: string }) => {
       const dead = typeof w.token === 'string' ? [w.token] : w.token?._value;
       for (let i = rows.length - 1; i >= 0; i--) {

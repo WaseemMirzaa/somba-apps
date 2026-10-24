@@ -11,6 +11,14 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { campaignWindow } from '../products/pricing';
+import { TranslationService } from '../translation/translation.service';
+import type { TranslationStatus } from '../translation/translation.service';
+import { planWrite } from '../translation/translatable';
+import type { WritePlan, WriteState } from '../translation/translatable';
+import { isLocale } from '../translation/translator.provider';
+
+/** A campaign as clients receive it: `name` / `nameFr`, and the store name joined in (never stored: it went stale). */
+export type ServedCampaign = Campaign & { nameFr: string; sellerName: string | null; machineTranslated: string[]; translationStatus: TranslationStatus };
 
 /** How often campaigns are started and ended on their dates (CAMPAIGN_SWEEP_MS, 0 turns it off). */
 const SWEEP_MS = Number(process.env.CAMPAIGN_SWEEP_MS ?? 5 * 60_000);
@@ -31,7 +39,39 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
     private readonly products: ProductsService,
-  ) {}
+    private readonly translations: TranslationService,
+  ) {
+    // A machine finished a campaign's other language: tell the admins and the owning seller.
+    this.translations.registerRepublisher('campaign', async (id) => {
+      const c = await this.campaigns.findOne({ where: { id } });
+      if (c) await this.publish(c, null, { prices: false });
+    });
+  }
+
+  /** Campaigns as served: both names, the store name joined, translation state. */
+  async present(rows: Campaign[]): Promise<ServedCampaign[]> {
+    if (!rows.length) return [];
+    const ids = [...new Set(rows.map((r) => r.sellerId).filter((x): x is string => !!x))];
+    const [texts, stores] = await Promise.all([
+      this.translations.present('campaign', rows),
+      ids.length ? this.sellers.find({ where: [{ id: In(ids) }, { userId: In(ids) }], select: { id: true, userId: true, name: true } }) : Promise.resolve([] as Seller[]),
+    ]);
+    const nameOf = new Map<string, string>();
+    for (const st of stores) {
+      nameOf.set(st.id, st.name);
+      if (st.userId) nameOf.set(st.userId, st.name);
+    }
+    return rows.map((r) => {
+      const t = texts.get(r.id)!;
+      return Object.assign(Object.create(Object.getPrototypeOf(r)), r, {
+        name: t.texts.name ?? r.name,
+        nameFr: t.texts.nameFr ?? r.name,
+        sellerName: r.sellerId ? (nameOf.get(r.sellerId) ?? null) : null,
+        machineTranslated: t.machineTranslated,
+        translationStatus: t.translationStatus,
+      }) as ServedCampaign;
+    });
+  }
 
   onModuleInit(): void {
     if (SWEEP_MS > 0) {
@@ -67,22 +107,24 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       if (!claim.affected) continue;
       moved++;
       const saved = (await this.campaigns.findOne({ where: { id: c.id } }))!;
+      const shown = (await this.present([saved]))[0];
       await this.publish(saved, {
         title: next === 'ended' ? 'Campaign ended' : 'Campaign started',
-        body: next === 'ended' ? `"${saved.name}" reached its end date; prices are back to normal.` : `"${saved.name}" is now live.`,
+        body: next === 'ended' ? `"${shown.name}" reached its end date; prices are back to normal.` : `"${shown.name}" is now live.`,
       });
     }
     return moved;
   }
 
   /** Push a campaign change to admins and the owning seller, refresh prices, and optionally notify the seller. */
-  private async publish(saved: Campaign, notice: { title: string; body: string } | null): Promise<void> {
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', saved);
+  private async publish(saved: Campaign, notice: { title: string; body: string } | null, opts: { prices?: boolean } = {}): Promise<void> {
+    const shown = (await this.present([saved]))[0];
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
     // Prices move when a campaign starts or stops discounting: refresh shoppers' screens.
-    void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
+    if (opts.prices !== false) void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
     const userId = await this.ownerUserId(saved);
     if (!userId) return;
-    this.emitter.toUser(userId, 'campaign:updated', saved);
+    this.emitter.toUser(userId, 'campaign:updated', shown);
     if (notice) await this.notifications.toUser(userId, { ...notice, type: 'campaign', entityId: saved.id });
   }
 
@@ -94,7 +136,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The seller stops their own campaign at any point; marketing is told. */
-  async withdraw(user: { id: string; role: string }, id: string): Promise<Campaign> {
+  async withdraw(user: { id: string; role: string }, id: string): Promise<ServedCampaign> {
     const campaign = await this.campaigns.findOne({ where: { id } });
     if (!campaign || !(await this.owns(user, campaign))) throw new NotFoundException('Campaign not found.');
     if (campaign.status === 'ended') throw new BadRequestException('This campaign has already ended.');
@@ -105,8 +147,9 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       .where('id = :id AND status = :from', { id, from: campaign.status })
       .execute();
     if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
-    const saved = (await this.campaigns.findOne({ where: { id } }))!;
-    await this.publish(saved, null);
+    const row = (await this.campaigns.findOne({ where: { id } }))!;
+    await this.publish(row, null);
+    const saved = (await this.present([row]))[0];
     await this.notifications.toRole('admin_marketing', {
       title: 'Campaign withdrawn',
       body: `${saved.sellerName ?? 'A seller'} withdrew "${saved.name}".`,
@@ -117,18 +160,20 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Seller sees their own campaigns; ops/admin see everything. */
-  async list(user: { id: string; role: string }): Promise<Campaign[]> {
+  async list(user: { id: string; role: string }): Promise<ServedCampaign[]> {
     if (user.role === 'seller') {
       const seller = await this.sellers.findOne({ where: { userId: user.id } });
       const sellerId = seller?.id ?? user.id;
-      return this.campaigns.find({
-        where: [{ sellerId }, { sellerId: user.id }],
-        order: { createdAt: 'DESC' },
-        take: 200,
-      });
+      return this.present(
+        await this.campaigns.find({
+          where: [{ sellerId }, { sellerId: user.id }],
+          order: { createdAt: 'DESC' },
+          take: 200,
+        }),
+      );
     }
     if (user.role.startsWith('admin')) {
-      return this.campaigns.find({ order: { createdAt: 'DESC' }, take: 200 });
+      return this.present(await this.campaigns.find({ order: { createdAt: 'DESC' }, take: 200 }));
     }
     return [];
   }
@@ -142,8 +187,9 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
   async create(
     user: { id: string; name: string; role?: string },
     input: {
-      name: string;
+      name?: string;
       nameFr?: string;
+      sourceLang?: string;
       discount?: number;
       productCount?: number;
       budgetUsd?: number;
@@ -151,40 +197,59 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       endDate?: string;
       productIds?: string[];
     },
-  ): Promise<Campaign> {
+  ): Promise<ServedCampaign> {
     const seller = await this.sellers.findOne({ where: { userId: user.id } });
     const fields = CampaignsService.clean(input, false);
+    const plan = planWrite({
+      type: 'campaign',
+      create: true,
+      state: null,
+      input: CampaignsService.words(input),
+      clientSourceLang: input.sourceLang,
+      missingTitle: 'Enter a campaign name in English or French.',
+    });
     const sellerId = seller?.id ?? user.id;
     if (input.productIds !== undefined) {
       fields.productIds = await this.checkProducts(input.productIds, user.role ?? '', sellerId, user.id);
       fields.productCount = (fields.productIds as string[]).length || fields.productCount;
     }
-    const campaign = await this.campaigns.save(
-      this.campaigns.create({
-        reference: `CMP-${Date.now().toString().slice(-8)}`,
-        sellerId,
-        sellerName: seller?.name ?? user.name,
-        ...fields,
-        status: 'pending',
-      }),
-    );
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', campaign);
-    if (seller?.userId) this.emitter.toUser(seller.userId, 'campaign:updated', campaign);
+    const campaign = await this.campaigns.manager.transaction(async (m) => {
+      const row = await m.save(
+        m.create(Campaign, {
+          reference: `CMP-${Date.now().toString().slice(-8)}`,
+          sellerId,
+          ...(fields as Partial<Campaign>),
+          name: plan.base.name ?? '',
+          sourceLang: plan.sourceLang,
+          status: 'pending',
+        }),
+      );
+      await this.translations.applyPlan(m, 'campaign', row.id, plan, { name: row.name });
+      return row;
+    });
+    await this.translations.enqueue('campaign', campaign.id);
+    const shown = (await this.present([campaign]))[0];
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
+    if (seller?.userId) this.emitter.toUser(seller.userId, 'campaign:updated', shown);
     await this.notifications.toRole('admin_marketing', {
       title: 'New campaign request',
-      body: `${campaign.name} · ${campaign.discount}% off`,
+      body: `${shown.name} · ${campaign.discount}% off`,
       type: 'campaign',
       entityId: campaign.id,
     });
-    return campaign;
+    return shown;
   }
 
-  /** Validated, whitelisted campaign fields. */
+  /** `name` / `nameFr` as sent: undefined = untouched, null = cleared. */
+  private static words(input: Record<string, unknown>) {
+    const w = (k: string, label: string) => (input[k] === undefined ? undefined : input[k] === null || input[k] === '' ? null : str(input[k], label, { max: 150 }));
+    return { name: { en: w('name', 'Campaign name'), fr: w('nameFr', 'French name') } };
+  }
+
+  /** Validated, whitelisted campaign fields (the words go through {@link words} and the planner). */
   private static clean(input: Record<string, unknown>, partial: boolean) {
     const out: Record<string, unknown> = {};
     const has = (k: string) => input[k] !== undefined;
-    if (!partial || has('name')) out.name = str(input.name, 'Campaign name', { max: 150 });
-    if (has('nameFr')) out.nameFr = optStr(input.nameFr, 'French name', 150);
     if (!partial || has('discount')) out.discount = num(input.discount ?? 0, 'Discount', { min: 0, max: 90 });
     if (!partial || has('productCount')) out.productCount = num(input.productCount ?? 0, 'Products', { min: 0, max: 100000, int: true });
     if (!partial || has('budgetUsd')) out.budgetUsd = num(input.budgetUsd ?? 0, 'Budget', { min: 0, max: 1_000_000 });
@@ -218,13 +283,14 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     return ids;
   }
 
-  async setStatus(id: string, status: CampaignStatus): Promise<Campaign> {
+  async setStatus(id: string, status: CampaignStatus): Promise<ServedCampaign> {
     const campaign = await this.campaigns.findOne({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found.');
     campaign.status = status;
     const saved = await this.campaigns.save(campaign);
-    await this.publish(saved, { title: `Campaign ${status}`, body: `"${saved.name}" is now ${status}.` });
-    return saved;
+    const shown = (await this.present([saved]))[0];
+    await this.publish(saved, { title: `Campaign ${status}`, body: `"${shown.name}" is now ${status}.` });
+    return shown;
   }
 
   /** Sellers may edit their OWN campaign until it is approved; admins any. */
@@ -232,7 +298,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     user: { id: string; role: string },
     id: string,
     patch: Record<string, unknown>,
-  ): Promise<Campaign> {
+  ): Promise<ServedCampaign> {
     const campaign = await this.campaigns.findOne({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found.');
     const admin = user.role.startsWith('admin');
@@ -247,14 +313,33 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       fields.productIds = await this.checkProducts(patch.productIds, user.role, campaign.sellerId ?? user.id, user.id);
       fields.productCount = (fields.productIds as string[]).length || (fields.productCount as number | undefined) || campaign.productCount;
     }
+    const input = CampaignsService.words(patch ?? {});
+    let plan: WritePlan | null = null;
+    if (input.name.en !== undefined || input.name.fr !== undefined) {
+      const rows = (await this.translations.rowsFor('campaign', [id])).get(id) ?? [];
+      const state: WriteState = {
+        sourceLang: isLocale(campaign.sourceLang) ? campaign.sourceLang : 'en',
+        base: { name: campaign.name },
+        authors: { name: Object.fromEntries(rows.filter((r) => r.origin === 'author' && r.field === 'name').map((r) => [r.locale, r.value])) },
+      };
+      plan = planWrite({ type: 'campaign', create: false, state, input, missingTitle: 'Enter a campaign name in English or French.' });
+      if (typeof plan.base.name === 'string') fields.name = plan.base.name;
+      fields.sourceLang = plan.sourceLang;
+    }
     Object.assign(campaign, fields);
     if (!admin) campaign.status = 'pending'; // an edit needs re-approval
-    const saved = await this.campaigns.save(campaign);
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', saved);
+    const saved = await this.campaigns.manager.transaction(async (m) => {
+      const row = await m.save(campaign);
+      if (plan) await this.translations.applyPlan(m, 'campaign', row.id, plan, { name: row.name });
+      return row;
+    });
+    if (plan?.touched || plan?.flipped) await this.translations.enqueue('campaign', saved.id);
+    const shown = (await this.present([saved]))[0];
+    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
     if (admin) void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
     // The seller's own screens follow their edit (and an admin's edit of their campaign).
     const owner = await this.ownerUserId(saved);
-    if (owner) this.emitter.toUser(owner, 'campaign:updated', saved);
-    return saved;
+    if (owner) this.emitter.toUser(owner, 'campaign:updated', shown);
+    return shown;
   }
 }

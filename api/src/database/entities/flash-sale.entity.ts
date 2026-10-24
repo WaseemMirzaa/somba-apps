@@ -8,11 +8,12 @@ export class FlashSale {
   @Column({ type: 'varchar' })
   title: string;
 
-  @Column({ type: 'varchar' })
-  productId: string;
+  /** Language `title` was written in; the other language is a `translations` row. */
+  @Column({ type: 'varchar', length: 5, default: 'en' })
+  sourceLang: string;
 
   @Column({ type: 'varchar' })
-  productName: string;
+  productId: string;
 
   @Column({ type: 'float' })
   flashPrice: number;

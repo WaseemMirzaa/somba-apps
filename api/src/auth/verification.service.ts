@@ -26,6 +26,18 @@ const RESEND_COOLDOWN_MS = 30_000;
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
+/** The text messages, in the account's language (plain GSM characters, so one SMS stays one SMS). */
+export const smsText = {
+  verify: (code: string, locale?: string | null) =>
+    locale === 'fr'
+      ? `Votre code de vérification Somba&Teka est ${code}. Il expire dans 10 minutes.`
+      : `Your Somba&Teka verification code is ${code}. It expires in 10 minutes.`,
+  signIn: (code: string, locale?: string | null) =>
+    locale === 'fr'
+      ? `Votre code de connexion Somba&Teka est ${code}. Il expire dans 10 minutes. Ne le partagez jamais.`
+      : `Your Somba&Teka sign-in code is ${code}. It expires in 10 minutes. Never share it.`,
+};
+
 /** What the API returns; `devToken` is only ever present outside production. */
 export interface SendResult {
   sent: boolean;
@@ -107,10 +119,7 @@ export class VerificationService {
     if (!(await this.issue(user.id, 'phone', code, true))) {
       throw new HttpException('Please wait before requesting another code.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const sent = await this.messaging.sendSms(
-      user.phone,
-      `Your Somba&Teka verification code is ${code}. It expires in 10 minutes.`,
-    );
+    const sent = await this.messaging.sendSms(user.phone, smsText.verify(code, user.locale));
     return { sent, ...(this.expose ? { devToken: code } : {}) };
   }
 
@@ -156,7 +165,7 @@ export class VerificationService {
     if (!(await this.issue(user.id, 'login', code, true))) {
       throw new HttpException('Please wait before requesting another code.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    await this.messaging.sendSms(user.phone!, `Your Somba&Teka sign-in code is ${code}. It expires in 10 minutes. Never share it.`);
+    await this.messaging.sendSms(user.phone!, smsText.signIn(code, user.locale));
     return { sent: true, ...(this.expose ? { devToken: code } : {}) };
   }
 

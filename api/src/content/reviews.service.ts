@@ -8,6 +8,7 @@ import { pageOf } from '../common/paging';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ProductsService } from '../products/products.service';
 
 /** Staff who may answer a review on a seller's behalf (the same people who moderate reviews). */
 const REPLY_STAFF = ['admin', 'admin_operations', 'admin_moderation'];
@@ -23,6 +24,7 @@ export class ReviewsService {
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     private readonly emitter: RealtimeEmitter,
     private readonly notifications: NotificationsService,
+    private readonly productsSvc: ProductsService,
   ) {}
 
   /** Public list: hidden (moderated) reviews are left out unless a moderator asks for them. */
@@ -41,10 +43,8 @@ export class ReviewsService {
     if (filter.status) where.status = filter.status;
     if (filter.productId) where.productId = filter.productId;
     const rows = await this.reviews.find({ where: where as never, order: { createdAt: 'DESC' }, take, skip });
-    const names = new Map(
-      (rows.length ? await this.products.find({ where: { id: In([...new Set(rows.map((r) => r.productId))]) }, select: { id: true, name: true } }) : []).map((p) => [p.id, p.name]),
-    );
-    return rows.map((r) => Object.assign(r, { productName: names.get(r.productId) ?? '' }));
+    const names = await this.productsSvc.names(rows.map((r) => r.productId));
+    return rows.map((r) => Object.assign(r, { productName: names.get(r.productId)?.name ?? '', productNameFr: names.get(r.productId)?.nameFr ?? '' }));
   }
 
   /** Mark a review helpful (increments the counter). */
@@ -62,19 +62,19 @@ export class ReviewsService {
     const { take, skip } = pageOf(paging);
     const owned = await this.products.find({
       where: { sellerId: In(Array.isArray(sellerId) ? sellerId : [sellerId]) },
-      select: { id: true, name: true },
+      select: { id: true },
     });
     if (owned.length === 0) return [];
-    const byId = new Map(owned.map((p) => [p.id, p.name]));
     const rows = await this.reviews.find({
       where: { productId: In(owned.map((p) => p.id)), status: 'visible' },
       order: { createdAt: 'DESC' },
       take,
       skip,
     });
-    // Attach the product name so the seller UI needn't re-join client-side.
+    // Attach the product name (both languages) so the seller UI needn't re-join client-side.
+    const names = await this.productsSvc.names(rows.map((r) => r.productId));
     return rows.map((r) =>
-      Object.assign(r, { productName: byId.get(r.productId) ?? '' }),
+      Object.assign(r, { productName: names.get(r.productId)?.name ?? '', productNameFr: names.get(r.productId)?.nameFr ?? '' }),
     );
   }
 
@@ -131,7 +131,7 @@ export class ReviewsService {
     product.rating = n ? Number(Number(agg?.avg ?? 0).toFixed(2)) : 0;
     product.reviewsCount = n;
     await this.products.save(product);
-    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'product:updated', product);
+    await this.productsSvc.publishUpdated([product], ['customer', ...ADMIN_ROLES]);
   }
 
   /** Moderators hide / restore a review. Hidden reviews drop out of public lists and the product rating. */

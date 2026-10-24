@@ -53,6 +53,10 @@ export type {
 export { WishlistItem } from './wishlist-item.entity';
 export { DeviceToken } from './device-token.entity';
 export { VerificationToken } from './verification-token.entity';
+export { Translation } from './translation.entity';
+export type { TranslationEntityType, TranslationOrigin } from './translation.entity';
+export { TranslationJob } from './translation-job.entity';
+export type { TranslationJobStatus } from './translation-job.entity';
 export type { VerificationKind } from './verification-token.entity';
 export type { DevicePlatform, DeviceApp } from './device-token.entity';
 
@@ -93,6 +97,8 @@ import { WarehouseException } from './warehouse-exception.entity';
 import { WishlistItem } from './wishlist-item.entity';
 import { DeviceToken } from './device-token.entity';
 import { VerificationToken } from './verification-token.entity';
+import { Translation } from './translation.entity';
+import { TranslationJob } from './translation-job.entity';
 
 export const ENTITIES = [
   User,
@@ -131,4 +137,6 @@ export const ENTITIES = [
   DeviceToken,
   VerificationToken,
   ProductView,
+  Translation,
+  TranslationJob,
 ];

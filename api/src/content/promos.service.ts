@@ -5,6 +5,19 @@ import { FlashSale, Order, Product, Promo } from '../database/entities';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ProductsService } from '../products/products.service';
+import { TranslationService } from '../translation/translation.service';
+import type { TranslationStatus } from '../translation/translation.service';
+import { planWrite } from '../translation/translatable';
+
+/** A flash sale as clients receive it: title and product name in both languages (the product name is joined, never stored). */
+export type ServedFlashSale = FlashSale & {
+  titleFr: string;
+  productName: string;
+  productNameFr: string;
+  machineTranslated: string[];
+  translationStatus: TranslationStatus;
+};
 
 /** A percent coupon's discount in USD, rounded to the cent (never to whole dollars). */
 export function percentDiscount(subtotalUsd: number, percent: number): number {
@@ -20,7 +33,15 @@ export class PromosService {
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly emitter: RealtimeEmitter,
-  ) {}
+    private readonly productsSvc?: ProductsService,
+    private readonly translations?: TranslationService,
+  ) {
+    // A machine finished a flash sale's other language: tell the same rooms as any flash-sale change.
+    this.translations?.registerRepublisher('flash_sale', async (id) => {
+      const fs = await this.flashSales.findOne({ where: { id } });
+      if (fs) this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'flashsale:updated', (await this.presentFlash([fs]))[0]);
+    });
+  }
 
   /** Admins see every code; shoppers only active, public, unexpired ones (no internals). */
   async list(admin: boolean): Promise<Partial<Promo>[]> {
@@ -97,32 +118,53 @@ export class PromosService {
   }
 
   // ---- Flash sales ----
+  /** Flash sales as served: `title` / `titleFr`, and `productName` / `productNameFr` joined from the product. */
+  async presentFlash(rows: FlashSale[]): Promise<ServedFlashSale[]> {
+    if (!rows.length) return [];
+    const [texts, names] = await Promise.all([
+      this.translations ? this.translations.present('flash_sale', rows) : Promise.resolve(new Map()),
+      this.productsSvc ? this.productsSvc.names(rows.map((r) => r.productId)) : Promise.resolve(new Map<string, { name: string; nameFr: string }>()),
+    ]);
+    return rows.map((r) => {
+      const t = texts.get(r.id);
+      const n = names.get(r.productId);
+      return Object.assign(Object.create(Object.getPrototypeOf(r)), r, {
+        title: t?.texts.title ?? r.title,
+        titleFr: t?.texts.titleFr ?? r.title,
+        productName: n?.name ?? '',
+        productNameFr: n?.nameFr ?? n?.name ?? '',
+        machineTranslated: t?.machineTranslated ?? [],
+        translationStatus: t?.translationStatus ?? 'done',
+      }) as ServedFlashSale;
+    });
+  }
+
   /**
    * Shoppers: the flagged-active sales. `all` (marketing screens): every sale —
    * running, scheduled and ended — newest first (by start, else by creation order).
    */
-  async listFlashSales(all = false): Promise<FlashSale[]> {
-    if (!all) return this.flashSales.find({ where: { active: true } });
+  async listFlashSales(all = false): Promise<ServedFlashSale[]> {
+    if (!all) return this.presentFlash(await this.flashSales.find({ where: { active: true } }));
     const rows = await this.flashSales.find();
     const stamp = (f: FlashSale) => {
       const t = Date.parse(f.startsAt ?? f.endsAt ?? '');
       return Number.isFinite(t) ? t : 0;
     };
     // Rows come back oldest-first, so reversing first makes ties newest-first.
-    return rows.reverse().sort((a, b) => stamp(b) - stamp(a));
+    return this.presentFlash(rows.reverse().sort((a, b) => stamp(b) - stamp(a)));
   }
 
   /** Stop a flash sale right now (the end time becomes "now"; prices fall back at once). */
-  async endFlashSale(id: string): Promise<FlashSale> {
+  async endFlashSale(id: string): Promise<ServedFlashSale> {
     const fs = await this.flashSales.findOne({ where: { id } });
     if (!fs) throw new NotFoundException('Flash sale not found.');
     fs.endsAt = new Date().toISOString();
-    const saved = await this.flashSales.save(fs);
+    const saved = (await this.presentFlash([await this.flashSales.save(fs)]))[0];
     this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'flashsale:updated', saved);
     return saved;
   }
 
-  async createFlashSale(data: Record<string, unknown>): Promise<FlashSale> {
+  async createFlashSale(data: Record<string, unknown>): Promise<ServedFlashSale> {
     const productId = str(data?.productId, 'Product', { max: 64 });
     const product = await this.products.findOne({ where: { id: productId } });
     if (!product) throw new BadRequestException('That product does not exist.');
@@ -130,19 +172,29 @@ export class PromosService {
     if (!(flashPrice < product.price)) {
       throw new BadRequestException(`The flash price must be below the normal price ($${product.price.toFixed(2)}).`);
     }
-    const fs = await this.flashSales.save(
-      this.flashSales.create({
-        title: str(data?.title, 'Title', { max: 150 }),
-        productId: product.id,
-        productName: product.name.slice(0, 200),
-        flashPrice,
-        discount: num(data?.discount ?? 0, 'Discount', { min: 0, max: 90, int: true }),
-        startsAt: optStr(data?.startsAt, 'Start', 40),
-        endsAt: optStr(data?.endsAt, 'End', 40),
-        active: data?.active === undefined ? true : !!data.active,
-      }),
-    );
-    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'flashsale:updated', fs);
-    return fs;
+    const word = (k: string, label: string) => (data?.[k] === undefined ? undefined : data[k] === null || data[k] === '' ? null : str(data[k], label, { max: 150 }));
+    const plan = planWrite({
+      type: 'flash_sale',
+      create: true,
+      state: null,
+      input: { title: { en: word('title', 'Title'), fr: word('titleFr', 'French title') } },
+      clientSourceLang: data?.sourceLang,
+      missingTitle: 'Enter a title in English or French.',
+    });
+    const fields = {
+      discount: num(data?.discount ?? 0, 'Discount', { min: 0, max: 90, int: true }),
+      startsAt: optStr(data?.startsAt, 'Start', 40),
+      endsAt: optStr(data?.endsAt, 'End', 40),
+      active: data?.active === undefined ? true : !!data.active,
+    };
+    const fs = await this.flashSales.manager.transaction(async (m) => {
+      const row = await m.save(m.create(FlashSale, { ...fields, title: plan.base.title ?? '', sourceLang: plan.sourceLang, productId: product.id, flashPrice }));
+      if (this.translations) await this.translations.applyPlan(m, 'flash_sale', row.id, plan, { title: row.title });
+      return row;
+    });
+    await this.translations?.enqueue('flash_sale', fs.id);
+    const served = (await this.presentFlash([fs]))[0];
+    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'flashsale:updated', served);
+    return served;
   }
 }

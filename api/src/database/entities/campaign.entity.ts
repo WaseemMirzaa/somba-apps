@@ -33,14 +33,12 @@ export class Campaign {
   @Column({ type: 'varchar', nullable: true })
   sellerId: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
-  sellerName: string | null;
-
   @Column({ type: 'varchar' })
   name: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  nameFr: string | null;
+  /** Language `name` was written in; the other language is a `translations` row. */
+  @Column({ type: 'varchar', length: 5, default: 'en' })
+  sourceLang: string;
 
   /** Percentage discount applied to the promoted products. */
   @Column({ type: 'int', default: 0 })

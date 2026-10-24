@@ -26,6 +26,9 @@ export class Notification {
   @Column({ type: 'text' })
   body: string;
 
+  // An authored French version (a marketing broadcast) is a `translations` row (entityType 'notification',
+  // field title / body, locale fr, origin author); server notices are translated on read (notifications/localize.ts).
+
   /** Free-form category: order, payout, dispute, delivery, system… */
   @Column({ type: 'varchar', default: 'system' })
   type: string;

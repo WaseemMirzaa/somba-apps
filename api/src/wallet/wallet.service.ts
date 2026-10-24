@@ -7,10 +7,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { User, WalletTransaction } from '../database/entities';
 import type { WalletTxType } from '../database/entities/wallet-transaction.entity';
+import { localizeWalletDescription } from '../notifications/localize';
+import { paymentMethodLabel } from '../common/payment-method';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 
 /** Transaction types that ADD to the balance; the rest subtract. */
 const CREDIT_TYPES: WalletTxType[] = ['credit', 'cashback', 'refund', 'topup'];
+
+/** A history line as clients receive it: the stored English text and its French version. */
+export type WalletTxView = WalletTransaction & { descriptionFr: string };
+
+const view = (tx: WalletTransaction): WalletTxView => ({
+  ...tx,
+  descriptionFr: localizeWalletDescription(tx.description, 'fr'),
+});
 
 @Injectable()
 export class WalletService {
@@ -27,12 +37,13 @@ export class WalletService {
     return user.walletBalance;
   }
 
-  list(userId: string): Promise<WalletTransaction[]> {
-    return this.txs.find({
+  async list(userId: string): Promise<WalletTxView[]> {
+    const rows = await this.txs.find({
       where: { userId },
       order: { createdAt: 'DESC' },
       take: 100,
     });
+    return rows.map(view);
   }
 
   /**
@@ -73,13 +84,13 @@ export class WalletService {
 
     const { tx, balance } = manager ? await run(manager) : await this.users.manager.transaction(run);
     this.emitter.toUser(userId, 'wallet:updated', { balance });
-    this.emitter.toUser(userId, 'wallet:transaction', tx);
+    this.emitter.toUser(userId, 'wallet:transaction', view(tx));
     return tx;
   }
 
   topUp(userId: string, amount: number, method = 'card'): Promise<WalletTransaction> {
     if (amount <= 0) throw new BadRequestException('Top-up must be positive.');
-    return this.apply(userId, 'topup', amount, `Wallet top-up via ${method}`);
+    return this.apply(userId, 'topup', amount, `Wallet top-up via ${paymentMethodLabel(method)}`);
   }
 
   debit(userId: string, amount: number, description: string) {

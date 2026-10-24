@@ -23,6 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ContentModule } from '../content/content.module';
 import { ProductsModule } from '../products/products.module';
+import { CatalogModule } from '../catalog/catalog.module';
 import { SellersService } from './sellers.service';
 import { AnalyticsService } from './analytics.service';
 import { AuditService } from './audit.service';
@@ -57,6 +58,7 @@ import { RolesService } from './roles.service';
     PaymentsModule,
     ContentModule,
     ProductsModule,
+    CatalogModule,
     UsersModule,
   ],
   providers: [

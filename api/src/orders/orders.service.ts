@@ -26,9 +26,11 @@ import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { SettingsService } from '../content/settings.service';
 import { DeliveryService } from '../delivery/delivery.service';
-import { checkVariant, storedVariantGroups } from '../common/variants/variants';
+import { checkVariant, hasNoOptions, localizeVariantLabel, storedVariantGroups } from '../common/variants/variants';
+import { TranslationService } from '../translation/translation.service';
 import { DELIVERY_DAYS, estimatedDeliveryDate } from '../common/delivery/estimate';
 import { linesBySeller, sellerUserId } from './order-sellers';
+import { paymentMethodLabel } from '../common/payment-method';
 import { parseZones, zoneForAddress } from '../common/zones/zone-match';
 
 /**
@@ -99,6 +101,7 @@ export class OrdersService {
     private readonly settings: SettingsService,
     @InjectRepository(Hub) private readonly hubs?: Repository<Hub>,
     @InjectRepository(User) private readonly users?: Repository<User>,
+    private readonly translations?: TranslationService,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -142,6 +145,8 @@ export class OrdersService {
     const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0));
 
     const items: OrderItem[] = [];
+    // The French name / option label each line carries, written next to the order as a snapshot (plan §2.1).
+    const frSnapshots: ({ name?: string; variant?: string } | undefined)[] = [];
     const stockToReserve: { productId: string; qty: number; name: string }[] = [];
     let subtotal = 0;
     // Seller-campaign discount actually applied on the lines (flash + campaign never stack).
@@ -189,6 +194,10 @@ export class OrdersService {
           );
         }
         name = product.name;
+        // A French that is just the English fallback (translation still pending) is not frozen into the order.
+        const settled = product.translationStatus === 'done' || product.nameFr !== product.name;
+        const variantFr = localizeVariantLabel(variant, storedVariantGroups(product.variants), product.variantLabels.fr);
+        frSnapshots.push({ name: settled ? product.nameFr : undefined, variant: variantFr !== variant || product.translationStatus === 'done' ? variantFr : undefined });
         price = product.price; // effective: the lowest of normal / flash / campaign price
         productId = product.id;
         const priced = product as PricedProduct;
@@ -206,6 +215,7 @@ export class OrdersService {
         if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
           throw new BadRequestException('Invalid item price.');
         }
+        frSnapshots.push(undefined);
         name = String(line.name).slice(0, 200);
         price = Number(p.toFixed(2));
         productId = `ext:${name}`;
@@ -298,7 +308,21 @@ export class OrdersService {
     });
     let saved: Order;
     try {
-      saved = await this.orders.save(order);
+      // The order and its other-language names are one transaction: a line never exists without its snapshot.
+      saved = await this.orders.manager.transaction(async (m) => {
+        const row = await m.save(order);
+        const rows: { entityId: string; field: string; locale: string; value: string }[] = [];
+        // `orders.create` copied the lines into entities of its own: the saved ones (with ids) are on the row.
+        (row.items ?? items).forEach((item, i) => {
+          const snap = frSnapshots[i];
+          if (snap?.name) rows.push({ entityId: item.id, field: 'productName', locale: 'fr', value: snap.name });
+          if (snap?.variant && !hasNoOptions(item.variant)) rows.push({ entityId: item.id, field: 'variant', locale: 'fr', value: snap.variant });
+          item.productNameFr = snap?.name ?? item.productName;
+          item.variantFr = hasNoOptions(item.variant) ? null : (snap?.variant ?? item.variant); // no options -> null, never "Default"
+        });
+        await this.translations?.snapshot(m, rows);
+        return row;
+      });
     } catch (err) {
       await release();
       throw err;
@@ -332,7 +356,7 @@ export class OrdersService {
       // Not fulfillable yet: ops hear about it only once the money is in.
       await this.notifications.toUser(customer.id, {
         title: 'Approve your payment',
-        body: `Approve the ${payment.method.replace(/_/g, ' ')} request on your phone to confirm ${saved.reference}.`,
+        body: `Approve the ${paymentMethodLabel(payment.method)} request on your phone to confirm ${saved.reference}.`,
         type: 'order',
         entityId: saved.id,
       });

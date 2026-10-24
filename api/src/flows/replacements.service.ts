@@ -10,8 +10,12 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { REPLACEMENT_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
+import { AfterSaleNames } from './after-sale-names';
 
 const OPS_ROLES = [...ADMIN_ROLES, 'warehouse_staff'];
+
+/** A replacement as clients receive it: the stored fields plus the item's name in French (null when it cannot be told). `reason` / `condition` are the customer's own words and are never translated. */
+export type ReplacementView = Replacement & { productNameFr: string | null };
 
 /** Like-for-like replacements of defective/returned items. */
 @Injectable()
@@ -24,27 +28,36 @@ export class ReplacementsService {
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
     private readonly products: ProductsService,
+    private readonly names: AfterSaleNames,
   ) {}
 
-  async list(user: { id: string; role: string }): Promise<Replacement[]> {
+  /** Rows with the French name of their item, looked up for all of them at once. */
+  private async serve(rows: Replacement[]): Promise<ReplacementView[]> {
+    const fr = await this.names.frenchNames(rows.map((r) => ({ orderId: r.orderId, sku: r.sku, name: r.productName })));
+    return rows.map((r, i) => ({ ...r, productNameFr: fr[i] }));
+  }
+
+  async list(user: { id: string; role: string }): Promise<ReplacementView[]> {
     // Ops (admin roles, warehouse) see all; a seller sees requests about their items (and any they filed);
     // everyone else only their own.
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
-      return this.replacements.find({ order: { createdAt: 'DESC' }, take: 200 });
+      return this.serve(await this.replacements.find({ order: { createdAt: 'DESC' }, take: 200 }));
     }
     if (user.role === 'seller') {
       const keys = await sellerKeys(user.id, this.sellers);
-      return this.replacements.find({
-        where: [{ sellerId: In(keys) }, { customerId: user.id }],
-        order: { createdAt: 'DESC' },
-        take: 500,
-      });
+      return this.serve(
+        await this.replacements.find({
+          where: [{ sellerId: In(keys) }, { customerId: user.id }],
+          order: { createdAt: 'DESC' },
+          take: 500,
+        }),
+      );
     }
-    return this.replacements.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take: 500 });
+    return this.serve(await this.replacements.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take: 500 }));
   }
 
   /** The seller account behind a replacement (null when the item's seller is unknown). */
-  private async sellerUserOf(rep: Replacement): Promise<string | null> {
+  private async sellerUserOf(rep: Pick<Replacement, 'sellerId'>): Promise<string | null> {
     if (!rep.sellerId) return null;
     const store = await this.sellers.findOne({ where: { id: rep.sellerId } });
     return store?.userId ?? rep.sellerId;
@@ -59,7 +72,7 @@ export class ReplacementsService {
       reason?: string;
       condition?: string;
     },
-  ): Promise<Replacement> {
+  ): Promise<ReplacementView> {
     const order = await this.orders.findOne({ where: { id: String(input?.orderId ?? '') } });
     const ops = actor.role.startsWith('admin') || actor.role === 'warehouse_staff';
     // Customers may only file for their own DELIVERED orders; ops for any.
@@ -70,7 +83,7 @@ export class ReplacementsService {
       throw new BadRequestException('Say which item needs replacing.');
     }
     const seller = await sellerForItem(order, String(input.sku).trim(), this.products, this.sellers);
-    const rep = await this.replacements.save(
+    const saved = await this.replacements.save(
       this.replacements.create({
         reference: `REP-${Date.now().toString().slice(-8)}`,
         sellerId: seller?.sellerId ?? null,
@@ -86,6 +99,7 @@ export class ReplacementsService {
         dispatchStatus: 'pending',
       }),
     );
+    const [rep] = await this.serve([saved]);
     this.emitter.toRoles(OPS_ROLES, 'replacement:updated', rep);
     this.emitter.toUser(order.customerId, 'replacement:updated', rep);
     await this.notifications.toRole('warehouse_staff', {
@@ -106,7 +120,7 @@ export class ReplacementsService {
     return rep;
   }
 
-  async setStatus(id: string, status: ReplacementStatus): Promise<Replacement> {
+  async setStatus(id: string, status: ReplacementStatus): Promise<ReplacementView> {
     const rep = await this.replacements.findOne({ where: { id } });
     if (!rep) throw new NotFoundException('Replacement not found.');
     assertStep(REPLACEMENT_NEXT, rep.status, status);
@@ -121,7 +135,7 @@ export class ReplacementsService {
       .where('id = :id AND status = :from', { id, from: rep.status })
       .execute();
     if (!claim.affected) throw new BadRequestException('This replacement was just updated by someone else. Refresh and try again.');
-    const saved = (await this.replacements.findOne({ where: { id } }))!;
+    const [saved] = await this.serve([(await this.replacements.findOne({ where: { id } }))!]);
     this.emitter.toRoles(OPS_ROLES, 'replacement:updated', saved);
     const sellerUser = await this.sellerUserOf(saved);
     if (sellerUser) {

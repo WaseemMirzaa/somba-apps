@@ -39,6 +39,15 @@ export class OrderItem {
   @Column({ type: 'varchar', default: 'Default' })
   variant: string;
 
+  /**
+   * Served, never stored on the row: the line's name / option label in French, filled when an order is loaded
+   * (`OrderItemTranslationSubscriber`) from the `translations` snapshot, else the current product translation.
+   */
+  productNameFr?: string;
+
+  /** The option label in French. `null` for a product without options (its canonical variant is "Default"): there is nothing to show. */
+  variantFr?: string | null;
+
   @Column({ type: 'int', default: 1 })
   qty: number;
 

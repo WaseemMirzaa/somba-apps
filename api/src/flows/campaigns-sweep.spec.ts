@@ -1,6 +1,6 @@
 import { CampaignsService } from './campaigns.service';
 
-type Row = { id: string; name: string; status: string; startDate: string | null; endDate: string | null; sellerId: string | null; discount: number; sellerName: string | null };
+type Row = { id: string; name: string; status: string; startDate: string | null; endDate: string | null; sellerId: string | null; discount: number };
 
 function make(rows: Row[]) {
   const notices: { userId: string; title: string }[] = [];
@@ -25,6 +25,7 @@ function make(rows: Row[]) {
     },
   };
   const sellers = {
+    find: async () => [],
     findOne: async ({ where }: { where: { id?: string; userId?: string } }) =>
       where.id === 's1' || where.userId === 'u1' ? { id: 's1', userId: 'u1' } : null,
   };
@@ -34,11 +35,17 @@ function make(rows: Row[]) {
   };
   const emitter = { toRoles: () => undefined, toUser: () => undefined };
   const products = { broadcastCampaignPrices: jest.fn(async () => undefined) };
-  const svc = new CampaignsService(repo as never, sellers as never, {} as never, notifications as never, emitter as never, products as never);
+  // Translations: every campaign reads as "done", with its stored name in both languages.
+  const translations = {
+    registerRepublisher: () => undefined,
+    present: async (_type: string, rs: Row[]) =>
+      new Map(rs.map((r) => [r.id, { texts: { name: r.name, nameFr: r.name }, variantLabels: null, machineTranslated: [], translationStatus: 'done' }])),
+  };
+  const svc = new CampaignsService(repo as never, sellers as never, {} as never, notifications as never, emitter as never, products as never, translations as never);
   return { svc, notices, roleNotices, products };
 }
 
-const base = { name: 'Promo', sellerId: 's1', discount: 10, sellerName: 'Shop' };
+const base = { name: 'Promo', sellerId: 's1', discount: 10 };
 
 describe('CampaignsService dates and withdraw', () => {
   it('ends campaigns past their end date and starts scheduled ones', async () => {

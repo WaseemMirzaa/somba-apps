@@ -14,6 +14,7 @@ import { VerificationService } from './verification.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsersService } from '../users/users.service';
+import { REFRESH_THROTTLE_LIMIT, THROTTLE_WINDOW_MS } from './throttle';
 
 /**
  * The ONLY REST surface in the app. These are one-shot calls (never polled):
@@ -61,8 +62,10 @@ export class AuthController {
     return this.auth.loginWithPhoneCode(await this.verification.consumeLoginCode(dto.phone, dto.code));
   }
 
+  /** Trade a refresh token for new tokens. Own, higher limit: page reloads call it (see {@link REFRESH_THROTTLE_LIMIT}). */
   @Post('refresh')
   @HttpCode(200)
+  @Throttle({ default: { limit: REFRESH_THROTTLE_LIMIT, ttl: THROTTLE_WINDOW_MS } })
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
   }

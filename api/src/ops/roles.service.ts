@@ -11,16 +11,24 @@ import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
+/** What `roles:defs` serves for one role: the English text and its French (`scopeFr`) for the admin roles page. */
+export interface RoleDef {
+  key: string;
+  label: string;
+  scope: string;
+  scopeFr: string;
+}
+
 /** Static sub-admin role/department catalogue used by the admin roles page. */
-export const ROLE_DEFS = [
-  { key: 'admin', label: 'Super Admin', scope: 'Full access' },
-  { key: 'admin_operations', label: 'Operations', scope: 'Orders, fulfilment, riders' },
-  { key: 'admin_finance', label: 'Finance', scope: 'Payments, payouts, refunds' },
-  { key: 'admin_support', label: 'Support', scope: 'Tickets, disputes' },
-  { key: 'admin_marketing', label: 'Marketing', scope: 'Promos, CMS, broadcasts' },
-  { key: 'admin_moderation', label: 'Moderation', scope: 'Sellers, products, reviews' },
-  { key: 'warehouse_staff', label: 'Warehouse', scope: 'Hubs, parcels, inventory' },
-  { key: 'rider', label: 'Rider', scope: 'Deliveries, GPS, earnings' },
+export const ROLE_DEFS: RoleDef[] = [
+  { key: 'admin', label: 'Super Admin', scope: 'Full access', scopeFr: 'Accès complet' },
+  { key: 'admin_operations', label: 'Operations', scope: 'Orders, fulfilment, riders', scopeFr: 'Commandes, préparation, livreurs' },
+  { key: 'admin_finance', label: 'Finance', scope: 'Payments, payouts, refunds', scopeFr: 'Paiements, versements, remboursements' },
+  { key: 'admin_support', label: 'Support', scope: 'Tickets, disputes', scopeFr: 'Tickets d’assistance, litiges' },
+  { key: 'admin_marketing', label: 'Marketing', scope: 'Promos, CMS, broadcasts', scopeFr: 'Promotions, contenu (CMS), diffusions' },
+  { key: 'admin_moderation', label: 'Moderation', scope: 'Sellers, products, reviews', scopeFr: 'Vendeurs, produits, avis' },
+  { key: 'warehouse_staff', label: 'Warehouse', scope: 'Hubs, parcels, inventory', scopeFr: 'Entrepôts, colis, inventaire' },
+  { key: 'rider', label: 'Rider', scope: 'Deliveries, GPS, earnings', scopeFr: 'Livraisons, GPS, gains' },
 ];
 
 @Injectable()

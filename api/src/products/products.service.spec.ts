@@ -2,7 +2,7 @@ import { ProductsService } from './products.service';
 import type { Campaign, FlashSale, Product } from '../database/entities';
 
 const product = (over: Partial<Product> = {}): Product =>
-  ({ id: 'p1', name: 'Phone', price: 200, originalPrice: null, discount: 0, status: 'live', sellerId: 's1', stock: 5, ...over }) as Product;
+  ({ id: 'p1', name: 'Phone', sourceLang: 'en', categoryId: 'c1', price: 200, originalPrice: null, discount: 0, status: 'live', sellerId: 's1', stock: 5, ...over }) as Product;
 
 const campaign = (over: Partial<Campaign> = {}): Campaign =>
   ({ id: 'c1', name: 'Spring', sellerId: 's1', discount: 25, status: 'active', startDate: null, endDate: null, productIds: [], ...over }) as Campaign;
@@ -13,7 +13,14 @@ function service(opts: { products?: Product[]; campaigns?: Campaign[]; flash?: P
   const flash = { find: async () => opts.flash ?? [] };
   const campaigns = { find: async () => opts.campaigns ?? [] };
   const emitter = { registerFanout: () => undefined, toRoles: () => undefined, toUser: () => undefined };
-  return new ProductsService(repo as never, flash as never, {} as never, campaigns as never, {} as never, emitter as never);
+  const sellers = { find: async () => [{ id: 's1', userId: null, name: 'Shop' }], findOne: async () => null };
+  const categories = { names: async () => new Map([['c1', { name: 'Phones', nameFr: 'Téléphones' }]]) };
+  const translations = {
+    registerRepublisher: () => undefined,
+    present: async (type: string, rs: { id: string; name?: string }[]) =>
+      new Map(rs.map((r) => [r.id, { texts: type === 'product' ? { name: r.name, nameFr: r.name, description: null, descriptionFr: null } : { name: r.name, nameFr: r.name }, variantLabels: null, machineTranslated: [], translationStatus: 'done' }])),
+  };
+  return new ProductsService(repo as never, flash as never, sellers as never, campaigns as never, {} as never, emitter as never, categories as never, translations as never);
 }
 
 describe('ProductsService effective price', () => {

@@ -15,6 +15,7 @@ import {
   WishlistItem,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProductsModule } from '../products/products.module';
 import { ReviewsService } from './reviews.service';
 import { SupportService } from './support.service';
 import { PromosService } from './promos.service';
@@ -39,6 +40,7 @@ import { WishlistService } from './wishlist.service';
       Hub,
     ]),
     NotificationsModule,
+    ProductsModule,
   ],
   providers: [
     ReviewsService,

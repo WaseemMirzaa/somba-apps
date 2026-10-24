@@ -14,9 +14,13 @@ function make(over: { product?: Record<string, unknown>; settings?: Record<strin
       return o;
     },
     create: (o: unknown) => o,
-    manager: { find: async (_e: unknown, q: { where: { id: { _value?: string[] } } }) => (q ? [rider] : []) },
+    // The order and its translation snapshot are saved in one transaction; the fake runs it with the same save.
+    manager: {
+      find: async (_e: unknown, q: { where: { id: { _value?: string[] } } }) => (q ? [rider] : []),
+      transaction: async (fn: (m: unknown) => unknown) => fn({ save: orders.save }),
+    },
   };
-  const product = { id: 'p1', name: 'Sneaker', status: 'live', price: 10, stock: 5, sellerId: 's1', variants: JSON.stringify([{ name: 'Size', options: ['41', '42'] }]), ...over.product };
+  const product = { id: 'p1', name: 'Sneaker', nameFr: 'Basket', translationStatus: 'done', variantLabels: { en: [], fr: [] }, status: 'live', price: 10, stock: 5, sellerId: 's1', variants: JSON.stringify([{ name: 'Size', options: ['41', '42'] }]), ...over.product };
   const emitter = { registerFanout: () => undefined, registerUserView: (_e: string[], fn: (u: string, p: unknown) => unknown) => (registered.view = fn), toUser: () => undefined, toRoles: () => undefined };
   const noop = { registerOrderSettledHandler: () => undefined, registerFailedHandler: () => undefined, assertMethodAllowed: async () => undefined };
   const products = { get: async () => product, findLiveByName: async () => null, reserve: async () => (calls.reserve++, true), restock: async () => undefined };

@@ -3,10 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../app.module';
-import { Category, Hub, Setting, User } from './entities';
+import { Category, Hub, Setting, Translation, User } from './entities';
 import { UsersService } from '../users/users.service';
 import { seedCategories } from './seed-catalog';
 import { DEFAULT_SELLER_PLANS } from '../content/plans';
+import { sourceHash } from '../translation/translatable';
 
 /**
  * Production bootstrap — SAFE to run on a live database, any number of times.
@@ -55,16 +56,31 @@ async function run() {
   // 2) Categories (only if the table is empty).
   const cats = ds.getRepository(Category);
   if ((await cats.count()) === 0) {
+    const translations = ds.getRepository(Translation);
     for (const [i, c] of seedCategories.entries()) {
-      await cats.save(
+      const cat = await cats.save(
         cats.create({
           name: c.name,
-          nameFr: c.nameFr ?? null,
           icon: c.icon ?? null,
           image: c.image ?? null,
           sortOrder: i,
         }),
       );
+      // The French name is a translations row written by a person (an author row), not a column.
+      if (c.nameFr?.trim()) {
+        await translations.save(
+          translations.create({
+            entityType: 'category',
+            entityId: cat.id,
+            field: 'name',
+            locale: 'fr',
+            value: c.nameFr.trim(),
+            origin: 'author',
+            sourceLang: 'en',
+            sourceHash: sourceHash('en', cat.name),
+          }),
+        );
+      }
     }
     console.log(`✓ created ${seedCategories.length} categories`);
   } else {

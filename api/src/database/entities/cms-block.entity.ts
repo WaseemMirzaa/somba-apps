@@ -21,6 +21,10 @@ export class CmsBlock {
   @Column({ type: 'text' })
   body: string;
 
+  /** Language `title` / `body` were written in. */
+  @Column({ type: 'varchar', length: 5, default: 'en' })
+  sourceLang: string;
+
   @Column({ type: 'varchar', default: 'banner' })
   type: string;
 

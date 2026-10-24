@@ -21,6 +21,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { SettingsService } from '../content/settings.service';
 import { ProductsService } from '../products/products.service';
 import { DEFAULT_LIMIT, pageOf } from '../common/paging';
+import { paymentMethodLabel } from '../common/payment-method';
 import {
   InitiationUncertainError,
   MOBILE_MONEY_METHODS,
@@ -199,7 +200,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     this.emitter.toRoles(FINANCE_ROLES, 'payment:created', this.view(payment));
     await this.notifications.toRole('admin_finance', {
       title: 'Payment',
-      body: `${payment.reference} · ${order.paymentMethod} · $${order.totalUsd.toFixed(2)} · ${payment.status}`,
+      body: `${payment.reference} · ${paymentMethodLabel(order.paymentMethod)} · $${order.totalUsd.toFixed(2)} · ${payment.status}`,
       type: 'payment',
       entityId: order.id,
     });
@@ -516,7 +517,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     const won = await this.payments.manager.transaction(async (m) => {
       if (payment.purpose === 'topup') {
         if (!(await this.claim(m, payment.id, ['pending', 'failed'], 'succeeded', null))) return false;
-        await this.wallet.apply(payment.userId, 'topup', payment.amountUsd, `Wallet top-up via ${payment.method}`, m);
+        await this.wallet.apply(payment.userId, 'topup', payment.amountUsd, `Wallet top-up via ${paymentMethodLabel(payment.method)}`, m);
         return true;
       }
       if (await this.claim(m, payment.id, ['pending'], 'succeeded', null)) {

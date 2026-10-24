@@ -23,6 +23,14 @@ describe('search ranking', () => {
   it('a name match outranks a description match', () => {
     expect(score(blender, 'blender')).toBeGreaterThan(score({ ...speaker, description: 'works with a blender' }, 'blender'));
   });
+  it('scores the French description too, with a small weight', () => {
+    const shoe = { id: '3', name: 'Running Shoe', nameFr: 'Chaussure de course', category: 'Sports', description: 'light', descriptionFr: 'légère et confortable' };
+    expect(score(shoe, 'confortable')).toBeGreaterThan(0);
+    expect(score(shoe, 'legere')).toBeGreaterThan(0); // accents fold
+    expect(score(shoe, 'chaussure')).toBeGreaterThan(score(shoe, 'confortable')); // a title match still outranks a description match
+    expect(score({ ...shoe, descriptionFr: null }, 'confortable')).toBe(0);
+  });
+
   it('typos still find the product', () => {
     expect(score(speaker, 'bluetoth')).toBeGreaterThan(0);
   });

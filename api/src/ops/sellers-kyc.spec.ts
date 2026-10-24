@@ -34,6 +34,11 @@ function setup(seed: { sellers?: Record<string, unknown>[]; products?: Record<st
   const productRepo = {
     find: async ({ where }: any) => products.filter((p) => matches(p, where)),
     save: async (x: any) => x,
+    // `productCount` is counted from live listings (grouped by seller id).
+    createQueryBuilder: () => {
+      const qb: any = { select: () => qb, addSelect: () => qb, where: () => qb, groupBy: () => qb, getRawMany: async () => [] };
+      return qb;
+    },
   };
   const emitted: [string, string][] = [];
   const notified: any[] = [];
@@ -41,6 +46,8 @@ function setup(seed: { sellers?: Record<string, unknown>[]; products?: Record<st
     toRoles: (_r: unknown, ev: string, payload: any) => emitted.push([ev, payload?.id]),
     toUser: (_u: unknown, ev: string, payload: any) => emitted.push([ev, payload?.id]),
   };
+  // Listings are re-published composed by ProductsService; here we only record that they were.
+  const productsSvc = { publishUpdated: async (rows: any[]) => rows.forEach((p) => emitted.push(['product:updated', p.id])) };
   const notifications = {
     toRole: async (role: string, n: any) => notified.push({ role, ...n }),
     toUser: async (userId: string, n: any) => notified.push({ userId, ...n }),
@@ -55,7 +62,7 @@ function setup(seed: { sellers?: Record<string, unknown>[]; products?: Record<st
     emitter as never,
     { registerPlanSettledHandler: () => undefined } as never,
     {} as never,
-    {} as never,
+    productsSvc as never,
   );
   return { svc, sellers, products, emitted, notified };
 }

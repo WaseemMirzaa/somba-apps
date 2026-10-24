@@ -32,7 +32,7 @@ describe('PayoutsService (stored commission, statements, batch approval)', () =>
       emitter as never,
       ds.getRepository(PayoutStatementLine),
     );
-    await ds.getRepository(Product).insert({ id: 'p1', name: 'Phone', price: 100, category: 'tech', sellerId: SELLER.id });
+    await ds.getRepository(Product).insert({ id: 'p1', name: 'Phone', price: 100, sellerId: SELLER.id });
     jest.clearAllMocks();
   });
   afterEach(async () => ds.destroy());

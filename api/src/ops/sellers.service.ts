@@ -10,8 +10,12 @@ import { activePlanId, extendExpiry, parsePlans } from '../content/plans';
 import type { SellerPlan } from '../content/plans';
 import { pageOf } from '../common/paging';
 import { ProductsService } from '../products/products.service';
+import { TranslationService } from '../translation/translation.service';
+import { planWrite } from '../translation/translatable';
+import type { WritePlan, WriteState } from '../translation/translatable';
+import { isLocale } from '../translation/translator.provider';
 import { parseJsonList, sellerView } from '../database/entities/seller.entity';
-import type { SellerStatus } from '../database/entities/seller.entity';
+import type { SellerStatus, SellerView } from '../database/entities/seller.entity';
 import { normalizePhone } from '../common/phone/phone-hash';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import {
@@ -138,9 +142,53 @@ export class SellersService {
     private readonly payments: PaymentsService,
     private readonly settings: SettingsService,
     private readonly productsSvc: ProductsService,
+    private readonly translations?: TranslationService,
   ) {
     // A seller-plan payment (wallet now, or mobile money once confirmed) switches the plan on.
     this.payments.registerPlanSettledHandler((payment) => this.activatePlan(payment));
+    // A machine finished the store description's other language: tell the owner and the admins.
+    this.translations?.registerRepublisher('seller', async (id) => {
+      const seller = await this.sellers.findOne({ where: { id } });
+      if (!seller) return;
+      this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(seller));
+      if (seller.userId) this.emitter.toUser(seller.userId, 'seller:updated', await this.withPlanState(seller));
+    });
+  }
+
+  /**
+   * What the apps add to a stored store (plan §2.2): `descriptionFr` composed from translations, `productCount`
+   * counted from live listings (never stored: it went stale), and where machine translation stands.
+   */
+  async present<T extends Seller | SellerView>(sellers: T[]): Promise<(T & { descriptionFr: string | null; productCount: number; machineTranslated: string[]; translationStatus: string })[]> {
+    if (!sellers.length) return [];
+    const keys = sellers.flatMap((s) => [s.id, ...(s.userId ? [s.userId] : [])]);
+    const [texts, counts] = await Promise.all([
+      this.translations ? this.translations.present('seller', sellers as unknown as { id: string; sourceLang: string }[]) : Promise.resolve(new Map()),
+      this.products
+        .createQueryBuilder('p')
+        .select('p.sellerId', 'sellerId')
+        .addSelect('COUNT(*)', 'n')
+        .where("p.status = 'live' AND p.sellerId IN (:...keys)", { keys })
+        .groupBy('p.sellerId')
+        .getRawMany<{ sellerId: string; n: string }>(),
+    ]);
+    const live = new Map(counts.map((c) => [c.sellerId, Number(c.n)]));
+    return sellers.map((s) => {
+      const t = texts.get(s.id);
+      return {
+        ...s,
+        description: t?.texts.description ?? s.description ?? null,
+        descriptionFr: t?.texts.descriptionFr ?? s.description ?? null,
+        productCount: (live.get(s.id) ?? 0) + (s.userId ? (live.get(s.userId) ?? 0) : 0),
+        machineTranslated: t?.machineTranslated ?? [],
+        translationStatus: t?.translationStatus ?? 'done',
+      };
+    });
+  }
+
+  /** The admin view of one store (KYC parsed), composed. */
+  private async adminView(seller: Seller) {
+    return (await this.present([sellerView(seller)]))[0];
   }
 
   /** Admin list: includes KYC and the last decision reason (documentUrls parsed). */
@@ -152,7 +200,7 @@ export class SellersService {
       take,
       skip,
     });
-    return rows.map((r) => sellerView(r));
+    return this.present(rows.map((r) => sellerView(r)));
   }
 
   /** Admin: one store with its KYC. */
@@ -169,8 +217,8 @@ export class SellersService {
   }
 
   /** The seller as the apps see it: plus the plan that is actually in force right now. */
-  withPlanState(seller: Seller) {
-    return { ...sellerView(seller), activePlan: activePlanId(seller) };
+  async withPlanState(seller: Seller) {
+    return { ...(await this.adminView(seller)), activePlan: activePlanId(seller) };
   }
 
   /**
@@ -199,7 +247,7 @@ export class SellersService {
       status: payment.status === 'succeeded' ? ('active' as const) : ('pending' as const),
       plan,
       payment,
-      seller: this.withPlanState(fresh),
+      seller: await this.withPlanState(fresh),
     };
   }
 
@@ -214,9 +262,9 @@ export class SellersService {
     seller.plan = payment.subject;
     seller.planExpiresAt = extendExpiry(renewing ? seller.planExpiresAt : null, months);
     const saved = await this.sellers.save(seller);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', sellerView(saved));
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
     if (saved.userId) {
-      this.emitter.toUser(saved.userId, 'seller:updated', this.withPlanState(saved));
+      this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
       await this.notifications.toUser(saved.userId, {
         title: 'Plan activated',
         body: `Your ${plan?.name ?? payment.subject} plan is active until ${saved.planExpiresAt?.toISOString().slice(0, 10)}.`,
@@ -251,8 +299,8 @@ export class SellersService {
         kycSubmittedAt: now,
       }),
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', sellerView(seller));
-    this.emitter.toUser(user.id, 'seller:updated', this.withPlanState(seller));
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(seller));
+    this.emitter.toUser(user.id, 'seller:updated', await this.withPlanState(seller));
     await this.notifications.toRole('admin_moderation', {
       title: 'New seller application',
       body: seller.name,
@@ -297,8 +345,8 @@ export class SellersService {
       kycSubmittedAt: now,
     });
     const saved = await this.sellers.save(seller);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', sellerView(saved));
-    this.emitter.toUser(userId, 'seller:updated', this.withPlanState(saved));
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    this.emitter.toUser(userId, 'seller:updated', await this.withPlanState(saved));
     await this.notifications.toRole('admin_moderation', {
       title: 'Seller resubmitted',
       body: saved.name,
@@ -308,10 +356,10 @@ export class SellersService {
     return this.withPlanState(saved);
   }
 
-  /** A seller edits their own store profile (name). */
+  /** A seller edits their own store profile (name, pickup address, branding, description in either language). */
   async updateProfile(
     userId: string,
-    patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null },
+    patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
   ) {
     const seller = await this.byUser(userId);
     if (!seller) throw new NotFoundException('Store not found.');
@@ -321,12 +369,30 @@ export class SellersService {
     }
     if (patch.logoUrl !== undefined) seller.logoUrl = uploadedImageUrl(patch.logoUrl, 'Logo');
     if (patch.bannerUrl !== undefined) seller.bannerUrl = uploadedImageUrl(patch.bannerUrl, 'Banner');
-    if (patch.description !== undefined) {
-      seller.description = patch.description === null || patch.description.trim() === '' ? null : str(patch.description, 'Description', { min: 10, max: 1000 });
+    // The store description is written in either language; the other one is an author row or filled by a machine.
+    const text = (v: string | null | undefined, label: string) =>
+      v === undefined ? undefined : v === null || v.trim() === '' ? null : str(v, label, { min: 10, max: 1000 });
+    const input = { description: { en: text(patch.description, 'Description'), fr: text(patch.descriptionFr, 'French description') } };
+    const touchesText = input.description.en !== undefined || input.description.fr !== undefined;
+    let plan: WritePlan | null = null;
+    if (touchesText) {
+      const rows = this.translations ? ((await this.translations.rowsFor('seller', [seller.id])).get(seller.id) ?? []) : [];
+      const state: WriteState = {
+        sourceLang: isLocale(seller.sourceLang) ? seller.sourceLang : 'en',
+        base: { description: seller.description },
+        authors: { description: Object.fromEntries(rows.filter((r) => r.origin === 'author' && r.field === 'description').map((r) => [r.locale, r.value])) },
+      };
+      plan = planWrite({ type: 'seller', create: false, state, input });
+      if ('description' in plan.base) seller.description = plan.base.description;
     }
-    const saved = await this.sellers.save(seller);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', sellerView(saved));
-    if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', this.withPlanState(saved));
+    const saved = await this.sellers.manager.transaction(async (m) => {
+      const row = await m.save(seller);
+      if (plan && this.translations) await this.translations.applyPlan(m, 'seller', row.id, plan, { description: row.description });
+      return row;
+    });
+    if (plan?.touched) await this.translations?.enqueue('seller', saved.id);
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
     return this.withPlanState(saved);
   }
 
@@ -363,22 +429,22 @@ export class SellersService {
     for (const p of live) {
       p.status = 'draft';
       await this.products.save(p);
-      this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'product:updated', p);
     }
+    await this.productsSvc.publishUpdated(live);
     // Reinstated: bring back the listings the suspension took down, unless the seller changed them since.
     if (toRestore.length) {
       const candidates = await this.products.find({ where: { id: In(toRestore) } });
-      for (const p of candidates) {
-        if (p.status !== 'draft' || !p.sellerId || !ownerIds.includes(p.sellerId)) continue;
+      const restored = candidates.filter((p) => p.status === 'draft' && p.sellerId && ownerIds.includes(p.sellerId));
+      for (const p of restored) {
         p.status = 'live';
         await this.products.save(p);
-        this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'product:updated', p);
       }
+      await this.productsSvc.publishUpdated(restored);
     }
 
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', sellerView(saved));
+    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
     if (saved.userId) {
-      this.emitter.toUser(saved.userId, 'seller:updated', this.withPlanState(saved));
+      this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
       await this.notifications.toUser(saved.userId, {
         title: `Store ${status}`,
         body: `Your store "${saved.name}" is now ${status}.${reason ? ` Reason: ${reason}` : ''}`,
@@ -397,7 +463,7 @@ export class SellersService {
     // Through ProductsService so shoppers see the same effective (campaign / flash) prices they are charged.
     const products = await this.productsSvc.list({ sellerId: id, status: 'live', limit: 500 });
     // Owner id, pickup address, plan expiry and everything KYC / moderation stay private.
-    const publicSeller: Record<string, unknown> = { ...seller };
+    const publicSeller: Record<string, unknown> = { ...(await this.present([seller]))[0] };
     for (const k of PRIVATE_SELLER_KEYS) delete publicSeller[k];
     // The plan in force is public (a "Pro seller" badge); the expiry date is not.
     return { seller: { ...publicSeller, plan: activePlanId(seller) }, products };

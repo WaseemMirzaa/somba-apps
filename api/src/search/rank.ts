@@ -39,6 +39,7 @@ export interface Searchable {
   categoryFr?: string | null;
   sellerName?: string | null;
   description?: string | null;
+  descriptionFr?: string | null;
   rating?: number;
   reviewsCount?: number;
 }
@@ -55,7 +56,7 @@ export function score(p: Searchable, query: string): number {
     [words(p.nameFr), 8],
     [[...words(p.category), ...words(p.categoryFr)], 5],
     [words(p.sellerName), 4],
-    [words(p.description), 1],
+    [[...words(p.description), ...words(p.descriptionFr)], 1],
   ];
   let total = 0;
   for (const w of q) {

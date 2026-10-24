@@ -1,14 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
-import { DeviceToken } from '../database/entities';
+import { DeviceToken, User } from '../database/entities';
 import type { DeviceApp, DevicePlatform } from '../database/entities';
 
 export interface PushPayload {
   title: string;
   body: string;
+  /** The same notice in French, sent instead of title/body to devices whose owner's language is French. */
+  fr?: { title: string; body: string };
   /** Small string map delivered with the push (deep-link: type, entityId, notificationId, link). */
   data?: Record<string, string>;
   /** Web path the notification opens (also the web-push click target). */
@@ -25,6 +27,16 @@ export interface PushScope {
 
 /** Android channel created by the apps (MainActivity) so pushes use the app's own sound and importance. */
 export const ANDROID_CHANNEL_ID = 'somba_default';
+
+/** Who a push goes to: these users, or every device of a role. */
+type Audience = { userIds: string[] } | { role: string };
+
+/** A device token with the language of the account that owns it. */
+interface Device {
+  token: string;
+  userId: string;
+  locale: string | null;
+}
 
 /** FCM error codes meaning the token is dead and should be forgotten. */
 const DEAD_TOKEN_CODES = new Set([
@@ -127,17 +139,31 @@ export class PushService {
 
   // ── Delivery ─────────────────────────────────────────────────────────────
   sendToUser(userId: string, payload: PushPayload): Promise<number> {
-    return this.deliver({ userId }, payload);
+    return this.deliver({ userIds: [userId] }, payload);
   }
 
   /** Several users at once (e.g. every rider of a warehouse). */
   sendToUsers(userIds: string[], payload: PushPayload, scope: PushScope = {}): Promise<number> {
     if (!userIds.length) return Promise.resolve(0);
-    return this.deliver({ userId: In(userIds) }, payload, scope);
+    return this.deliver({ userIds }, payload, scope);
   }
 
   sendToRole(role: string, payload: PushPayload, scope: PushScope = {}): Promise<number> {
     return this.deliver({ role }, payload, scope);
+  }
+
+  /** The audience's devices with their owners' language: one query joining device tokens to users. */
+  private devices(audience: Audience, scope: PushScope): Promise<Device[]> {
+    const qb = this.tokens
+      .createQueryBuilder('d')
+      .leftJoin(User, 'u', 'u.id = d.userId')
+      .select('d.token', 'token')
+      .addSelect('d.userId', 'userId')
+      .addSelect('u.locale', 'locale');
+    if ('role' in audience) qb.where('d.role = :role', { role: audience.role });
+    else qb.where('d.userId IN (:...userIds)', { userIds: audience.userIds });
+    if (scope.apps?.length) qb.andWhere('d.app IN (:...apps)', { apps: scope.apps });
+    return qb.getRawMany<Device>();
   }
 
   /** Absolute URL for web push when the web app is served over HTTPS (browsers require it). */
@@ -147,42 +173,45 @@ export class PushService {
     return base + link;
   }
 
-  /** Returns the number of devices successfully reached. */
-  private async deliver(
-    where: FindOptionsWhere<DeviceToken>,
-    payload: PushPayload,
-    scope: PushScope = {},
-  ): Promise<number> {
+  /**
+   * Returns the number of devices successfully reached. A notice that comes with a French version is sent once per
+   * language (one multicast each), so a role broadcast reads right on every device; without one, in a single go.
+   */
+  private async deliver(audience: Audience, payload: PushPayload, scope: PushScope = {}): Promise<number> {
     const messaging = this.getMessaging();
     if (!messaging) return 0;
     try {
-      const filter = scope.apps?.length ? { ...where, app: In(scope.apps) } : where;
-      const rows = (await this.tokens.find({ where: filter })).filter((r) => !scope.skipUserIds?.has(r.userId));
+      const rows = (await this.devices(audience, scope)).filter((r) => !scope.skipUserIds?.has(r.userId));
       if (!rows.length) return 0;
       const data = { ...(payload.data ?? {}), ...(payload.link ? { link: payload.link } : {}) };
       const webLink = PushService.absoluteLink(payload.link);
-      // FCM multicast accepts up to 500 tokens per call.
+      const inFrench = (r: Device) => !!payload.fr && r.locale === 'fr';
+      const groups = [
+        { tokens: rows.filter((r) => !inFrench(r)).map((r) => r.token), text: payload },
+        { tokens: rows.filter(inFrench).map((r) => r.token), text: payload.fr ?? payload },
+      ];
       let reached = 0;
-      for (let i = 0; i < rows.length; i += 500) {
-        const batch = rows.slice(i, i + 500);
-        const res = await messaging.sendEachForMulticast({
-          tokens: batch.map((r) => r.token),
-          notification: { title: payload.title, body: payload.body },
-          data,
-          android: { priority: 'high', notification: { channelId: ANDROID_CHANNEL_ID } },
-          apns: { payload: { aps: { sound: 'default' } } },
-          ...(webLink ? { webpush: { fcmOptions: { link: webLink } } } : {}),
-        });
-        reached += res.successCount;
-        const dead = batch
-          .filter((_, idx) => {
+      for (const { tokens, text } of groups) {
+        // FCM multicast accepts up to 500 tokens per call.
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch = tokens.slice(i, i + 500);
+          const res = await messaging.sendEachForMulticast({
+            tokens: batch,
+            notification: { title: text.title, body: text.body },
+            data,
+            android: { priority: 'high', notification: { channelId: ANDROID_CHANNEL_ID } },
+            apns: { payload: { aps: { sound: 'default' } } },
+            ...(webLink ? { webpush: { fcmOptions: { link: webLink } } } : {}),
+          });
+          reached += res.successCount;
+          const dead = batch.filter((_, idx) => {
             const code = res.responses[idx]?.error?.code;
             return !!code && DEAD_TOKEN_CODES.has(code);
-          })
-          .map((r) => r.token);
-        if (dead.length) {
-          await this.tokens.delete({ token: In(dead) });
-          this.logger.log(`Pruned ${dead.length} dead device token(s)`);
+          });
+          if (dead.length) {
+            await this.tokens.delete({ token: In(dead) });
+            this.logger.log(`Pruned ${dead.length} dead device token(s)`);
+          }
         }
       }
       return reached;

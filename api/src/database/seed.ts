@@ -20,15 +20,19 @@ import {
   Seller,
   Hub,
   Setting,
+  Translation,
+  TranslationJob,
   User,
   WalletTransaction,
   WarehouseException,
 } from './entities';
+import type { TranslationEntityType } from './entities';
 import { UsersService } from '../users/users.service';
 import { OrdersService } from '../orders/orders.service';
 import type { UserRole } from './entities';
 import { seedCategories, seedProducts } from './seed-catalog';
 import { DEFAULT_SELLER_PLANS } from '../content/plans';
+import { sourceHash } from '../translation/translatable';
 
 /** Every demo account shares one password so the prototype is easy to drive. */
 const DEMO_PASSWORD = 'Somba@2026';
@@ -48,8 +52,11 @@ const DEMO_USERS: {
   { email: 'rider@somba.app', name: 'Jean Rider', role: 'rider', phone: '+243 900 000 009' },
 ];
 
-/** Map the storefront catalog (web/src/lib/mock-data) onto Product entities. */
-const CATALOG: Partial<Product>[] = seedProducts.map((p) => ({
+/**
+ * Map the storefront catalog (web/src/lib/mock-data) onto Product entities. The French name is not a column: it is
+ * written as a `translations` author row (a person typed it), and the category is linked by id once it exists.
+ */
+const CATALOG: (Partial<Product> & { nameFr: string | null; categoryName: string })[] = seedProducts.map((p) => ({
   name: p.name,
   nameFr: p.nameFr ?? null,
   price: p.price,
@@ -58,8 +65,7 @@ const CATALOG: Partial<Product>[] = seedProducts.map((p) => ({
   rating: p.rating ?? 0,
   reviewsCount: p.reviews ?? 0,
   image: p.image ?? null,
-  category: p.category,
-  categoryFr: p.categoryFr ?? null,
+  categoryName: p.category,
   stock: p.stock ?? 0,
   deliveryDays: p.deliveryDays ?? 3,
 }));
@@ -90,6 +96,8 @@ async function run() {
   await wipe(CmsBlock);
   await wipe(Setting);
   await wipe(Review);
+  await wipe(Translation);
+  await wipe(TranslationJob);
   await wipe(Campaign);
   await wipe(Replacement);
   await wipe(Exchange);
@@ -144,38 +152,48 @@ async function run() {
       status: 'approved',
       badge: 'somba_assured',
       rating: 4.6,
-      productCount: CATALOG.length,
       pickupAddress: '14 Avenue du Commerce, Gombe, Kinshasa',
     }),
   );
 
-  const productRepo = ds.getRepository(Product);
-  const createdProducts: Product[] = [];
-  for (const p of CATALOG) {
-    createdProducts.push(
-      await productRepo.save(
-        productRepo.create({
-          ...p,
-          status: 'live',
-          sellerId: seller.id,
-          sellerName: seller.name,
-        }),
-      ),
+  // A French text a person typed is an author row; the English text stays in the record's own column.
+  const trRepo = ds.getRepository(Translation);
+  const authorFr = async (entityType: TranslationEntityType, entityId: string, field: string, source: string, fr: string | null | undefined) => {
+    if (!fr?.trim()) return;
+    await trRepo.save(
+      trRepo.create({ entityType, entityId, field, locale: 'fr', value: fr.trim(), origin: 'author', sourceLang: 'en', sourceHash: sourceHash('en', source) }),
     );
-  }
+  };
 
   console.log('Seeding categories…');
   const catRepo = ds.getRepository(Category);
+  const categoryIds = new Map<string, string>();
   for (const [i, c] of seedCategories.entries()) {
-    await catRepo.save(
+    const cat = await catRepo.save(
       catRepo.create({
         name: c.name,
-        nameFr: c.nameFr ?? null,
         icon: c.icon ?? null,
         image: c.image ?? null,
         sortOrder: i,
       }),
     );
+    categoryIds.set(c.name, cat.id);
+    await authorFr('category', cat.id, 'name', cat.name, c.nameFr);
+  }
+
+  const productRepo = ds.getRepository(Product);
+  const createdProducts: Product[] = [];
+  for (const { nameFr, categoryName, ...p } of CATALOG) {
+    const product = await productRepo.save(
+      productRepo.create({
+        ...p,
+        categoryId: categoryIds.get(categoryName) ?? null,
+        status: 'live',
+        sellerId: seller.id,
+      }),
+    );
+    createdProducts.push(product);
+    await authorFr('product', product.id, 'name', product.name, nameFr);
   }
 
   console.log('Seeding promos, CMS, settings…');
@@ -185,10 +203,14 @@ async function run() {
     promoRepo.create({ code: 'SAVE20', type: 'fixed', value: 20, minOrder: 100, description: '$20 off orders over $100', active: true }),
   ]);
   const cmsRepo = ds.getRepository(CmsBlock);
-  await cmsRepo.save([
+  const blocks = await cmsRepo.save([
     cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa & Paris.', type: 'banner', active: true }),
     cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
   ]);
+  await authorFr('cms_block', blocks[0].id, 'title', blocks[0].title, 'Somba&Teka — achetez tout');
+  await authorFr('cms_block', blocks[0].id, 'body', blocks[0].body, 'Livraison rapide à Kinshasa et à Paris.');
+  await authorFr('cms_block', blocks[1].id, 'title', blocks[1].title, 'Livraison gratuite dès 50\u00A0$');
+  await authorFr('cms_block', blocks[1].id, 'body', blocks[1].body, 'Utilisez SOMBA10 pour 10 % de réduction.');
   const hubRepo = ds.getRepository(Hub);
   const [kinshasaHub, , parisHub] = await hubRepo.save([
     hubRepo.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
@@ -300,13 +322,11 @@ async function run() {
   // ── Marketing campaigns, replacements, exchanges, exceptions ────────────────
   console.log('Seeding campaigns / replacements / exchanges / exceptions…');
   const campaignRepo = ds.getRepository(Campaign);
-  await campaignRepo.save([
+  const campaigns = await campaignRepo.save([
     campaignRepo.create({
       reference: 'CMP-0001',
       sellerId: seller.id,
-      sellerName: seller.name,
       name: 'Kinshasa Electronics Week',
-      nameFr: "Semaine électronique Kinshasa",
       discount: 20,
       productCount: Math.min(4, CATALOG.length),
       budgetUsd: 500,
@@ -321,9 +341,7 @@ async function run() {
     campaignRepo.create({
       reference: 'CMP-0002',
       sellerId: seller.id,
-      sellerName: seller.name,
       name: 'Weekend Flash',
-      nameFr: 'Flash du week-end',
       discount: 30,
       productCount: 2,
       budgetUsd: 200,
@@ -332,6 +350,9 @@ async function run() {
       status: 'pending',
     }),
   ]);
+
+  await authorFr('campaign', campaigns[0].id, 'name', campaigns[0].name, 'Semaine électronique Kinshasa');
+  await authorFr('campaign', campaigns[1].id, 'name', campaigns[1].name, 'Flash du week-end');
 
   const allOrders = await orderRepo.find({ order: { createdAt: 'DESC' } });
   const firstOrder = allOrders[0];

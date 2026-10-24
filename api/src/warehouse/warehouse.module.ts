@@ -14,6 +14,7 @@ import {
 import { WarehouseService } from './warehouse.service';
 import { RiderService } from './rider.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Setting,
     ]),
     NotificationsModule,
+    ProductsModule,
   ],
   providers: [WarehouseService, RiderService],
   exports: [WarehouseService, RiderService],

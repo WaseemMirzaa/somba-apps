@@ -3,13 +3,15 @@ import { OrdersService } from './orders.service';
 /** The platform commission in force at order time is frozen on every line (A-B15). */
 function make(settings: Record<string, string>, product: Record<string, unknown> | null) {
   const saved: { items: Record<string, unknown>[] }[] = [];
-  const orders = {
+  const orders: Record<string, unknown> = {
     create: (o: unknown) => o,
     save: (o: { items: Record<string, unknown>[] }) => {
       saved.push(o);
       return Promise.resolve(o);
     },
   };
+  // The order and its translation snapshot are saved in one transaction; the fake runs it with the same save.
+  orders.manager = { transaction: (fn: (m: unknown) => unknown) => fn({ save: orders.save }) };
   const products = { get: () => Promise.resolve(product), findLiveByName: () => Promise.resolve(null), reserve: () => Promise.resolve(true), restock: () => Promise.resolve() };
   const emitter = { registerFanout: () => undefined, registerUserView: () => undefined };
   const delivery = { registerFailedHandler: () => undefined };
@@ -25,7 +27,7 @@ function make(settings: Record<string, string>, product: Record<string, unknown>
   return { svc, saved };
 }
 
-const live = { id: 'p1', name: 'Phone', status: 'live', price: 19.99, stock: 50, sellerId: 's1', variants: null };
+const live = { id: 'p1', name: 'Phone', nameFr: 'Téléphone', translationStatus: 'done', variantLabels: { en: [], fr: [] }, status: 'live', price: 19.99, stock: 50, sellerId: 's1', variants: null };
 const customer = { id: 'c1', name: 'Cust' };
 
 describe('OrdersService.create: commission snapshot', () => {

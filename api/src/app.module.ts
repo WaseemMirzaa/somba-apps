@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { GLOBAL_THROTTLE_LIMIT, THROTTLE_WINDOW_MS } from './auth/throttle';
 import { AppController } from './app.controller';
 import configuration from './config/configuration';
 import { CryptoModule } from './common/crypto/crypto.module';
@@ -27,6 +28,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { CartModule } from './cart/cart.module';
 import { SearchModule } from './search/search.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { TranslationModule } from './translation/translation.module';
 
 @Module({
   imports: [
@@ -34,11 +36,12 @@ import { RealtimeModule } from './realtime/realtime.module';
       isGlobal: true,
       load: [configuration],
     }),
-    // Rate-limit the REST auth endpoints (30 requests / minute / IP).
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 30 }]),
+    // Rate-limit the REST auth endpoints (30 requests / minute / IP); /auth/refresh has its own higher limit.
+    ThrottlerModule.forRoot([{ ttl: THROTTLE_WINDOW_MS, limit: GLOBAL_THROTTLE_LIMIT }]),
     CryptoModule,
     RealtimeCoreModule,
     DatabaseModule,
+    TranslationModule,
     UsersModule,
     AuthModule,
     ProductsModule,

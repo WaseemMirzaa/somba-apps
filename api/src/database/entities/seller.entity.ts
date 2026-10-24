@@ -29,9 +29,6 @@ export class Seller {
   @Column({ type: 'float', default: 0 })
   rating: number;
 
-  @Column({ type: 'int', default: 0 })
-  productCount: number;
-
   /** Where riders collect this seller's parcels (encrypted at rest). */
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   pickupAddress: string | null;
@@ -45,6 +42,10 @@ export class Seller {
 
   @Column({ type: 'text', nullable: true })
   description: string | null;
+
+  /** Language the store description was written in. */
+  @Column({ type: 'varchar', length: 5, default: 'en' })
+  sourceLang: string;
 
   /** Subscription plan id (see the `sellerPlans` setting). 'free' = no paid plan. */
   @Column({ type: 'varchar', length: 30, default: 'free' })

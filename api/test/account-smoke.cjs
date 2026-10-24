@@ -255,6 +255,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   a = await req(s, 'orders:create', { items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', zoneId: 'gombe', deliveryFeeUsd: 5, paymentPhone: PHONE });
   ok(a.ok && a.data.status === 'pending', 'mobile-money order starts PENDING (not paid yet)', a.error ?? '');
   const mm1 = a.data;
+  const approveNotice = await until(async () => (await req(s, 'notifications:list')).data.find((n) => n.title === 'Approve your payment' && n.body.includes(mm1.reference)));
+  ok(approveNotice && approveNotice.body === `Approve the Orange Money request on your phone to confirm ${mm1.reference}.`, 'the approve-your-payment notice names the method "Orange Money", not the raw id', approveNotice?.body);
+  ok(approveNotice && approveNotice.bodyFr === `Validez la demande Orange Money sur votre téléphone pour confirmer ${mm1.reference}.`, 'and its French version names it too', approveNotice?.bodyFr);
   let pay = await payOf(mm1.id);
   ok(pay && pay.status === 'pending' && pay.purpose === 'order' && pay.providerRef?.startsWith('sbx_'), 'payment is pending with a provider reference');
   ok(pay && !pay.phone.includes('81 234') && pay.phone.includes('…'), 'subscriber number is masked in payment records');
@@ -296,6 +299,10 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await webhook(body(topRef, { amountUsd: 25 })); // replay
   await sleep(2200); // sandbox auto-confirm timer also fires — must not double-credit
   ok((await balance()) === bal0 + 25, 'replayed webhook + sandbox timer do NOT double-credit');
+  const topupTx = (await req(s, 'wallet:transactions')).data.find((t) => String(t.description).startsWith('Wallet top-up via'));
+  ok(topupTx && topupTx.description === 'Wallet top-up via Orange Money' && topupTx.descriptionFr === 'Recharge du portefeuille via Orange Money', 'the wallet line names the method ("Orange Money") in English and French', JSON.stringify(topupTx));
+  const creditedNotice = (await req(s, 'notifications:list')).data.find((n) => n.title === 'Payment received' && n.body === '$25.00 added to your wallet.');
+  ok(creditedNotice && creditedNotice.bodyFr === '25,00\u00A0$ ajoutés à votre portefeuille.', 'the French amount is "25,00 $" (comma decimals, non-breaking space)', JSON.stringify(creditedNotice?.bodyFr));
   w = await webhook(body('PAY-DOESNOTEXIST'));
   ok(w.status === 200, 'webhook for an unknown reference is acknowledged, not an error');
   a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'stripe_card', phone: PHONE });
@@ -399,6 +406,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
   ok(r.status === 200, 'reactivated customer can log in again');
   at = r.json.accessToken;
+  const refreshAgain = r.json.refreshToken;
+
+  console.log('\n— Rate limits: refresh is generous (page reloads), login stays strict');
+  const refreshCodes = [];
+  for (let i = 0; i < 35; i++) {
+    const res = await fetch(API + '/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: refreshAgain }) });
+    refreshCodes.push(res.status);
+  }
+  ok(refreshCodes.every((c) => c === 200), '35 refreshes inside a minute all succeed (more than the 30/min default)', JSON.stringify(refreshCodes.filter((c) => c !== 200)));
 
   console.log('\n— Account deletion');
   s.close(); s = await connect(at);
@@ -410,6 +426,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(r.status === 401, 'deleted account cannot log in');
   r = await rest('POST', '/api/v1/auth/register', { email, password: pw, name: 'Reborn' });
   ok(r.status === 201, 'the email address is free to register again');
+
+  console.log('\n— Login is still limited to 30 a minute per address (run last: it uses the quota up)');
+  const loginCodes = [];
+  for (let i = 0; i < 34; i++) {
+    const res = await fetch(API + '/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `nobody${i}@smoke.test`, password: 'Wrong-Pass-2026' }) });
+    loginCodes.push(res.status);
+  }
+  ok(loginCodes.includes(429), 'sign-in attempts past the limit get 429', JSON.stringify(loginCodes));
+  ok(loginCodes.indexOf(429) <= 30, 'and the limit is no higher than 30 a minute', `first 429 at call ${loginCodes.indexOf(429) + 1}`);
 
   admin.close();
   console.log(`\n${fails.length ? '❌' : '🎉'} ${pass} passed, ${fails.length} failed`);

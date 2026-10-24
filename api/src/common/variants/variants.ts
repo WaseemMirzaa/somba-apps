@@ -13,6 +13,9 @@ export interface VariantGroup {
 export const MAX_GROUPS = 2;
 export const MAX_OPTIONS = 20;
 export const DEFAULT_VARIANT = 'Default';
+
+/** True for the label of a product without options ("Default", or nothing): there is no option to show or translate. */
+export const hasNoOptions = (variant: string | null | undefined): boolean => !variant || variant.trim() === '' || variant === DEFAULT_VARIANT;
 const SEP = ' · ';
 
 const clean = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -81,4 +84,27 @@ export function checkVariant(groups: VariantGroup[], label: unknown, productName
     out.push({ name: g.name, value: match });
   }
   return variantLabel(out);
+}
+
+/**
+ * A canonical option label ("Size: 42 · Colour: Black") shown in another language, using option groups that are
+ * index-aligned with the canonical ones (`variantLabels`). Anything that cannot be matched stays as it is, so the
+ * result is always safe to display; the canonical label stays the purchase key.
+ */
+export function localizeVariantLabel(label: string, canonical: VariantGroup[], localized: VariantGroup[]): string {
+  if (!label || label === DEFAULT_VARIANT || !canonical.length || canonical.length !== localized.length) return label;
+  return label
+    .split(SEP)
+    .map((part) => {
+      const i = part.indexOf(':');
+      if (i <= 0) return part;
+      const gName = part.slice(0, i).trim();
+      const value = part.slice(i + 1).trim();
+      const gi = canonical.findIndex((g) => g.name.toLowerCase() === gName.toLowerCase());
+      if (gi < 0) return part;
+      const oi = canonical[gi].options.findIndex((o) => o.toLowerCase() === value.toLowerCase());
+      if (oi < 0 || localized[gi].options.length !== canonical[gi].options.length) return part;
+      return `${localized[gi].name}: ${localized[gi].options[oi]}`;
+    })
+    .join(SEP);
 }

@@ -52,7 +52,7 @@ npm run smoke                 # end-to-end realtime test (server must be running
 |--------|------|---------|
 | POST | `/api/v1/auth/register` | Create account → `{user, accessToken, refreshToken}` |
 | POST | `/api/v1/auth/login` | Exchange credentials for tokens |
-| POST | `/api/v1/auth/refresh` | Rotate access token (rejected if the session was revoked) |
+| POST | `/api/v1/auth/refresh` | Rotate access token (rejected if the session was revoked). Own limit of 300 a minute per IP (page reloads call it); sign-in, sign-up and the code endpoints keep the strict ones (30 or fewer a minute) |
 | POST | `/api/v1/auth/logout-all` | Revoke every token for the user (Bearer token) |
 | GET | `/api/v1/auth/me` | Current user (Bearer token) |
 | POST | `/api/v1/auth/email/send` · `/email/verify` | Email verification link (token) |
@@ -162,6 +162,21 @@ Optional integrations (all no-ops when unset): `FIREBASE_SERVICE_ACCOUNT_JSON` /
 `GOOGLE_APPLICATION_CREDENTIALS` (push), `SMTP_HOST/PORT/USER/PASS` + `MAIL_FROM` (email),
 `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM` (SMS), `WEB_URL`, `PUBLIC_API_URL`, `UPLOAD_DIR`,
 `UPLOAD_MAX_BYTES`, `WS_RATE_*`, `MAX_DELIVERY_FEE_USD`, `ALLOW_CLIENT_PRICED_ITEMS`.
+
+### Languages (EN / FR)
+
+Texts are authored in one language (`sourceLang`) in the record's own columns; every other language is a row in
+`translations` (author = typed by a person and never overwritten, machine = Google, snapshot = copied at order time).
+Machine translation runs from a queue (`translation_jobs`, retried every 60 s with backoff) so a save never waits for it.
+Settings: `TRANSLATE_PROVIDER` (`google` | `fake` | `off`), `GOOGLE_TRANSLATE_API_KEY` or the Firebase service account,
+`TRANSLATE_DAILY_CHAR_LIMIT`. Plan and rules: [`docs/MULTILINGUAL-PLAN.md`](../docs/MULTILINGUAL-PLAN.md).
+
+* `npm run translate:backfill -- --dry-run` counts the characters and the estimated cost of everything missing a
+  language; without `--dry-run` it queues and translates it. Admins see the queue with `translation:status` / `translation:retry`.
+* Existing database kept in shape by `synchronize` (no migrations table): **before** the first boot of this version run
+  `DB_DATABASE=<name> npm run i18n:migrate-synced-db -- --dry-run`, then without `--dry-run` (it refuses to run unless
+  `DB_DATABASE` is given on the command line). Migration-managed databases get the same moves from `1792940000000-Translations`.
+* `npm run smoke:i18n` (run the API with `TRANSLATE_PROVIDER=fake`) is the end-to-end check.
 
 ## Payments, money and security notes
 

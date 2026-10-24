@@ -14,8 +14,9 @@ import { oneOf, str } from '../common/validate';
 import { pageOf } from '../common/paging';
 import { activePlanId } from '../content/plans';
 import { clampDays } from '../ops/analytics.util';
-import { cleanListing } from '../products/products.service';
+import { cleanListing, materialTextChange } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
+import { TranslationService } from '../translation/translation.service';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
@@ -152,6 +153,7 @@ export class RealtimeGateway
     private readonly campaigns: CampaignsService,
     private readonly replacements: ReplacementsService,
     private readonly exchanges: ExchangesService,
+    private readonly translations: TranslationService,
     private readonly emitter: RealtimeEmitter,
     private readonly throttle: WsThrottleInterceptor,
   ) {}
@@ -271,21 +273,24 @@ export class RealtimeGateway
   @SubscribeMessage('products:list')
   async productsList(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { category?: string; status?: string; limit?: number; offset?: number },
+    @MessageBody() body: { category?: string; categoryId?: string; status?: string; limit?: number; offset?: number },
   ) {
     // Admins may filter by any status; everyone else only ever sees LIVE listings
     // (plus a seller's own drafts), whatever they ask for. The filtering happens in
-    // the query, and `limit` / `offset` page the result (default 500).
+    // the query, and `limit` / `offset` page the result (default 500). The category
+    // filter takes an id, or a name in either language (older apps send the English name).
     const user = client.data.user;
     const role = user?.role ?? 'guest';
     const { take, skip } = pageOf(body);
-    if (this.isAdmin(role)) return ok(await this.products.list({ category: body?.category, status: body?.status, limit: take, offset: skip }));
+    const category = typeof body?.category === 'string' ? body.category : undefined;
+    const categoryId = typeof body?.categoryId === 'string' ? body.categoryId : undefined;
+    if (this.isAdmin(role)) return ok(await this.products.list({ category, categoryId, status: body?.status, limit: take, offset: skip }));
     let ownerIds: string[] | undefined;
     if (role === 'seller') {
       const mine = await this.sellersSvc.byUser(user!.id);
       ownerIds = [user!.id, ...(mine ? [mine.id] : [])];
     }
-    return ok(await this.products.list({ category: body?.category, liveOnly: true, ownerIds, limit: take, offset: skip }));
+    return ok(await this.products.list({ category, categoryId, liveOnly: true, ownerIds, limit: take, offset: skip }));
   }
 
   @SubscribeMessage('products:get')
@@ -321,14 +326,18 @@ export class RealtimeGateway
     @ConnectedSocket() client: AuthedSocket,
     @MessageBody()
     body: {
-      name: string;
+      name?: string;
       nameFr?: string;
+      description?: string;
+      descriptionFr?: string;
       price: number;
-      category: string;
+      category?: string;
+      categoryId?: string;
       stock?: number;
       image?: string;
-      description?: string;
       variants?: { name: string; options: string[] }[];
+      variantLabels?: { en?: { name: string; options: string[] }[]; fr?: { name: string; options: string[] }[] };
+      sourceLang?: 'en' | 'fr';
     },
   ) {
     try {
@@ -353,19 +362,16 @@ export class RealtimeGateway
           return fail(`Your ${plan.name} plan allows ${plan.maxProducts} listings. Upgrade your plan to add more.`);
         }
       }
-      const data = cleanListing(body as ListingInput, { partial: false, allowStatus: false });
-      const product = await this.products.create({
-        ...data,
-        stock: data.stock ?? 0,
+      const clean = cleanListing(body as ListingInput, { partial: false, allowStatus: false });
+      const product = await this.products.create(clean, {
         // New listings from sellers wait for a moderator unless moderation is switched off.
         status: user.role === 'seller' && (await this.settings.get('productModeration')) !== 'false' ? 'pending' : 'live',
         sellerId: seller?.id ?? user.id,
-        sellerName: seller?.name ?? user.name,
       });
       if (product.status === 'pending') {
         await this.notifications.toAdmins({
           title: 'Product awaiting review',
-          body: `${product.name} from ${product.sellerName ?? 'a seller'} needs moderation.`,
+          body: `${product.name} from ${product.sellerName ?? seller?.name ?? user.name} needs moderation.`,
           type: 'moderation',
           entityId: product.id,
         });
@@ -384,7 +390,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       // The stored row (not the promotional price) is what edits are validated against.
-      const existing = await this.products.getRaw(body.id);
+      const existing = await this.products.get(body.id);
       if (!existing) return fail('Product not found.');
       const seller = await this.sellersSvc.byUser(user.id);
       const isOwner =
@@ -396,11 +402,11 @@ export class RealtimeGateway
       if (!user.role.startsWith('admin') && seller?.status !== 'approved' && existing.sellerId !== user.id) {
         return fail('Your store is not active.');
       }
-      // Whitelisted + range-checked; only admins may change moderation status.
-      const patch = cleanListing(body.patch as ListingInput, {
+      // Whitelisted + range-checked; only admins may change moderation status. `basePrice` is the stored price.
+      const clean = cleanListing(body.patch as ListingInput, {
         partial: true,
         allowStatus: this.isAdmin(user.role),
-        currentPrice: existing.price,
+        currentPrice: existing.basePrice,
       });
       // A seller may pause a live listing or resume a paused one; everything else
       // (approving, rejecting, un-removing) is a moderator's decision.
@@ -409,23 +415,23 @@ export class RealtimeGateway
         const pause = wanted === 'draft' && existing.status === 'live';
         const resume = wanted === 'live' && existing.status === 'draft';
         if (!pause && !resume) return fail('Only a moderator can change this listing\'s status.');
-        patch.status = wanted as typeof existing.status;
+        clean.columns.status = wanted as typeof existing.status;
       }
       // A live listing edited by its seller goes back to moderation when the change is material
-      // (what the shopper reads or sees, or a price swing of more than 30%). Admin edits are exempt.
+      // (what the shopper reads or sees, in either language, or a price swing of more than 30%).
+      // Admin edits are exempt, and so is anything a machine writes later (it never reaches this code).
       let requeue = false;
       if (user.role === 'seller' && existing.status === 'live' && (await this.settings.get('productModeration')) !== 'false') {
-        const changed = (['name', 'nameFr', 'description', 'image', 'category', 'variants'] as const).some(
-          (k) => patch[k] !== undefined && (patch[k] ?? null) !== (existing[k] ?? null),
-        );
-        const bigPriceMove =
-          patch.price !== undefined && existing.price > 0 && Math.abs(patch.price - existing.price) / existing.price > 0.3;
+        const categoryId = clean.category ? await this.categories.resolveRef(clean.category) : undefined;
+        const changed = materialTextChange(existing, clean, categoryId);
+        const price = clean.columns.price;
+        const bigPriceMove = price !== undefined && existing.basePrice > 0 && Math.abs(price - existing.basePrice) / existing.basePrice > 0.3;
         if (changed || bigPriceMove) {
-          patch.status = 'pending';
+          clean.columns.status = 'pending';
           requeue = true;
         }
       }
-      const updated = await this.products.update(body.id, patch);
+      const updated = await this.products.update(body.id, clean);
       if (requeue) {
         await this.notifications.toUser(user.id, {
           title: 'Changes under review',
@@ -440,18 +446,83 @@ export class RealtimeGateway
           entityId: existing.id,
         });
       }
-      if (this.isAdmin(user.role) && patch.status && patch.status !== existing.status && existing.sellerId) {
+      if (this.isAdmin(user.role) && clean.columns.status && clean.columns.status !== existing.status && existing.sellerId) {
         const owner = await this.sellersSvc.get(existing.sellerId);
         if (owner?.userId) {
           await this.notifications.toUser(owner.userId, {
-            title: patch.status === 'live' ? 'Product approved' : patch.status === 'rejected' ? 'Product rejected' : 'Product updated',
-            body: `${existing.name} is now ${patch.status}.`,
+            title: clean.columns.status === 'live' ? 'Product approved' : clean.columns.status === 'rejected' ? 'Product rejected' : 'Product updated',
+            body: `${existing.name} is now ${clean.columns.status}.`,
             type: 'moderation',
             entityId: existing.id,
           });
         }
       }
       return ok(updated);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The owning seller (or an admin) asks for a fresh machine translation; text they wrote themselves is kept. */
+  @SubscribeMessage('products:retranslate')
+  async productsRetranslate(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const existing = await this.products.getRaw(String(body?.id ?? ''));
+      if (!existing) return fail('Product not found.');
+      const seller = await this.sellersSvc.byUser(user.id);
+      const isOwner = existing.sellerId === user.id || (seller != null && existing.sellerId === seller.id);
+      if (!isOwner && !this.isAdmin(user.role)) return fail('You can only retranslate your own products.');
+      if (!this.translations.enabled) return fail('Automatic translation is not available right now.');
+      return ok(await this.products.retranslate(existing.id));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ---- Translations (admin status, on-demand text) ----------------------
+  /** Queue state of machine translation: counts by state, today's characters, the jobs that failed. */
+  @SubscribeMessage('translation:status')
+  async translationStatus(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.translations.status());
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Re-queue one record (`entityType` + `entityId`), or every failed job when none is given. */
+  @SubscribeMessage('translation:retry')
+  async translationRetry(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { entityType?: string; entityId?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      return ok(await this.translations.retry(body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * A stored review / seller reply / question / answer in the other language. Takes a record id ONLY (never free
+   * text, so a leaked client key cannot run up the translation bill); open to everyone who can read the text. // C-I5
+   */
+  @SubscribeMessage('translate:text')
+  async translateText(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { kind?: string; id?: string; target?: string },
+  ) {
+    try {
+      const staff = this.can(client.data.user?.role ?? 'guest', 'moderate');
+      return ok(await this.translations.translateStored(body?.kind, body?.id, body?.target, { staff }));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1553,7 +1624,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       const seller = await this.sellersSvc.byUser(user.id);
-      return ok(seller ? this.sellersSvc.withPlanState(seller) : null);
+      return ok(seller ? await this.sellersSvc.withPlanState(seller) : null);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2323,7 +2394,7 @@ export class RealtimeGateway
   @SubscribeMessage('sellers:update')
   async sellersUpdate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null },
+    @MessageBody() body: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
   ) {
     try {
       const user = this.requireUser(client);
@@ -2335,6 +2406,7 @@ export class RealtimeGateway
           logoUrl: body?.logoUrl,
           bannerUrl: body?.bannerUrl,
           description: body?.description,
+          descriptionFr: body?.descriptionFr,
         }),
       );
     } catch (e) {

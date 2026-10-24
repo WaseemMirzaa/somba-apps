@@ -4,6 +4,7 @@ import {
   Campaign,
   Exchange,
   Order,
+  OrderItem,
   Product,
   Replacement,
   Seller,
@@ -13,6 +14,7 @@ import { ProductsModule } from '../products/products.module';
 import { CampaignsService } from './campaigns.service';
 import { ReplacementsService } from './replacements.service';
 import { ExchangesService } from './exchanges.service';
+import { AfterSaleNames } from './after-sale-names';
 
 /**
  * Cross-cutting commerce flows that don't belong to a single existing domain:
@@ -20,11 +22,11 @@ import { ExchangesService } from './exchanges.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Campaign, Replacement, Exchange, Order, Seller, Product]),
+    TypeOrmModule.forFeature([Campaign, Replacement, Exchange, Order, OrderItem, Seller, Product]),
     NotificationsModule,
     ProductsModule,
   ],
-  providers: [CampaignsService, ReplacementsService, ExchangesService],
+  providers: [CampaignsService, ReplacementsService, ExchangesService, AfterSaleNames],
   exports: [CampaignsService, ReplacementsService, ExchangesService],
 })
 export class FlowsModule {}

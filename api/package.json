@@ -32,7 +32,11 @@
     "smoke:race": "node test/race-smoke.cjs",
     "smoke:coverage": "node test/coverage-smoke.cjs",
     "smoke:zones": "node test/warehouse-zones-smoke.cjs",
-    "check:prod": "node test/prod-check.cjs"
+    "check:prod": "node test/prod-check.cjs",
+    "i18n:migrate-synced-db": "node scripts/i18n-migrate-synced-db.cjs",
+    "translate:backfill": "ts-node -r tsconfig-paths/register src/translation/backfill.ts",
+    "translate:backfill:prod": "node dist/translation/backfill.js",
+    "smoke:i18n": "node test/i18n-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

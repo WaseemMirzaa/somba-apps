@@ -16,6 +16,10 @@ export class Broadcast {
   @Column({ type: 'text' })
   body: string;
 
+  /** Language `title` / `body` were written in. */
+  @Column({ type: 'varchar', length: 5, default: 'en' })
+  sourceLang: string;
+
   /** Target audience role, or 'all'. */
   @Column({ type: 'varchar', default: 'customer' })
   audience: string;

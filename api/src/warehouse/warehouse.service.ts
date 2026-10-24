@@ -19,6 +19,7 @@ import type {
 } from '../database/entities';
 import { num, oneOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { ProductsService } from '../products/products.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 
 const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
@@ -39,6 +40,7 @@ export class WarehouseService {
     private readonly exceptions: Repository<WarehouseException>,
     private readonly emitter: RealtimeEmitter,
     private readonly notifications: NotificationsService,
+    private readonly productsSvc: ProductsService,
   ) {}
 
   // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
@@ -159,11 +161,14 @@ export class WarehouseService {
   async inventory(paging?: unknown) {
     const { take, skip } = pageOf(paging);
     const products = await this.products.find({ order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
+    const served = await this.productsSvc.describe(products);
     return products.map((p) => ({
       sku: `SKU-${p.id.slice(0, 6)}`,
       productId: p.id,
-      name: p.name,
-      category: p.category,
+      name: served.get(p.id)?.name ?? p.name,
+      nameFr: served.get(p.id)?.nameFr ?? p.name,
+      category: served.get(p.id)?.category ?? '',
+      categoryFr: served.get(p.id)?.categoryFr ?? '',
       stock: p.stock,
       status: p.stock === 0 ? 'out' : p.stock < 10 ? 'low' : 'ok',
     }));

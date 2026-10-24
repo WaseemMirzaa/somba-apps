@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Product } from '../database/entities';
+import { ProductsModule } from '../products/products.module';
 import { SearchGateway } from './search.gateway';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product])],
+  imports: [ProductsModule],
   providers: [SearchGateway],
 })
 export class SearchModule {}

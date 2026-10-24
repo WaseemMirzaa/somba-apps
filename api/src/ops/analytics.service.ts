@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import {
+  Category,
   DeliveryTask,
   Dispute,
   Hub,
@@ -17,6 +18,8 @@ import {
   WarehouseBatch,
 } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
+import { CategoriesService } from '../catalog/categories.service';
+import { ProductsService } from '../products/products.service';
 import {
   AdminAlert,
   clampDays,
@@ -68,6 +71,8 @@ export class AnalyticsService {
     @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
     @InjectRepository(WarehouseBatch) private readonly batches: Repository<WarehouseBatch>,
     private readonly settings: SettingsService,
+    private readonly categoriesSvc: CategoriesService,
+    private readonly productsSvc: ProductsService,
   ) {}
 
   // ── dialect helpers ────────────────────────────────────────────────────────
@@ -200,20 +205,26 @@ export class AnalyticsService {
   }
 
   /** Item value per product category on orders that were not cancelled. */
-  private async gmvByCategory(): Promise<{ category: string; gmv: number; orders: number }[]> {
+  private async gmvByCategory(): Promise<{ category: string; categoryFr: string; categoryId: string | null; gmv: number; orders: number }[]> {
+    // Grouped by the category row (not a copied name), so a renamed category stays one bucket; names are composed after.
     const rows = await this.items
       .createQueryBuilder('i')
       .innerJoin(Order, 'o', 'o.id = i.orderId')
       .leftJoin(Product, 'p', 'p.id = i.productId')
-      .select("COALESCE(p.category, 'Other')", 'category')
+      .leftJoin(Category, 'c', 'c.id = p.categoryId')
+      .select('c.id', 'categoryId')
       .addSelect('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'gmv')
       .addSelect('COUNT(DISTINCT o.id)', 'orders')
       .where("o.status <> 'cancelled'")
-      .groupBy('category')
+      .groupBy('c.id')
       .orderBy('gmv', 'DESC')
       .limit(50)
-      .getRawMany<{ category: string; gmv: string; orders: string }>();
-    return rows.map((r) => ({ category: r.category, gmv: round2(n(r.gmv)), orders: n(r.orders) }));
+      .getRawMany<{ categoryId: string | null; gmv: string; orders: string }>();
+    const names = await this.categoriesSvc.names(rows.map((r) => r.categoryId).filter((x): x is string => !!x));
+    return rows.map((r) => {
+      const nm = r.categoryId ? names.get(r.categoryId) : undefined;
+      return { category: nm?.name ?? 'Other', categoryFr: nm?.nameFr ?? 'Autres', categoryId: r.categoryId, gmv: round2(n(r.gmv)), orders: n(r.orders) };
+    });
   }
 
   /** Things that need a human, from real data. Only non-empty ones are returned, most severe first. */
@@ -608,6 +619,7 @@ export class AnalyticsService {
         .getRawOne<{ views: string }>(),
     ]);
 
+    const topNames = await this.topProductNames(top);
     const revenue = round2(n(totals?.revenue));
     const orderCount = n(totals?.orders);
     const customers = n(lifetime?.customers);
@@ -633,7 +645,10 @@ export class AnalyticsService {
       units: n(totals?.units),
       aov: orderCount ? round2(revenue / orderCount) : 0,
       revenueSeries: fillDays(keys, seriesRows, { revenue: 0, orders: 0, units: 0 }),
-      topProducts: top.map((t) => ({ productId: t.productId, name: t.name, units: n(t.units), revenue: round2(n(t.revenue)) })),
+      topProducts: top.map((t) => {
+        const nm = topNames.get(t.productId);
+        return { productId: t.productId, name: nm?.name ?? t.name, nameFr: nm?.nameFr ?? t.name, units: n(t.units), revenue: round2(n(t.revenue)) };
+      }),
       customers: {
         total: customers,
         repeat,
@@ -663,6 +678,15 @@ export class AnalyticsService {
       // Product-detail views by shoppers (see product_views) against orders placed in the same window.
       funnel: { views, orders: placed, conversionPct: views > 0 ? pct(placed, views) : 0 },
     };
+  }
+
+  /**
+   * `name` / `nameFr` of the best sellers, from the listings' composed titles in one batched lookup (never one per
+   * row), so both languages describe the same product. (Only listings that still exist are counted, so there is
+   * always a title; the order-line name stays as the fallback.)
+   */
+  private topProductNames(rows: { productId: string }[]): Promise<Map<string, { name: string; nameFr: string }>> {
+    return this.productsSvc.names(rows.map((r) => r.productId));
   }
 
   /** One row per buyer of the seller's products: how many orders, first and last order time. */
