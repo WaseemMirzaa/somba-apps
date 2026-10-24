@@ -105,7 +105,7 @@ main li { margin-block: 0.2rem; }
     <div class="sub">System architecture · Oct 2026</div>
     <details id="toc" open>
       <summary>Contents</summary>
-      <nav aria-label="Contents"><ol><li><a href="#1-executive-summary">1. Executive summary</a><ol><li><a href="#11-the-system-in-numbers">1.1 The system in numbers</a></li><li><a href="#12-maturity-by-module">1.2 Maturity by module</a></li><li><a href="#13-top-priorities-before-launch">1.3 Top priorities before launch</a></li></ol></li><li><a href="#2-system-architecture">2. System architecture</a><ol><li><a href="#21-context-diagram">2.1 Context diagram</a></li><li><a href="#22-deployment-topology">2.2 Deployment topology</a></li><li><a href="#23-backend-module-architecture">2.3 Backend module architecture</a></li><li><a href="#24-communication-protocol">2.4 Communication protocol</a></li><li><a href="#25-security-architecture">2.5 Security architecture</a></li></ol></li><li><a href="#3-data-model--erd">3. Data model — ERD</a><ol><li><a href="#31-overview-all-33-tables-and-their-relationships">3.1 Overview (all 33 tables and their relationships)</a></li><li><a href="#32-identity-accounts--messaging">3.2 Identity, accounts &amp; messaging</a></li><li><a href="#33-catalogue-sellers--marketing">3.3 Catalogue, sellers &amp; marketing</a></li><li><a href="#34-orders-payments--money">3.4 Orders, payments &amp; money</a></li><li><a href="#35-fulfilment--warehouse">3.5 Fulfilment &amp; warehouse</a></li><li><a href="#36-after-sales-support--trust">3.6 After-sales, support &amp; trust</a></li><li><a href="#37-content--communication">3.7 Content &amp; communication</a></li></ol></li><li><a href="#4-data-dictionary--every-table-and-field">4. Data dictionary — every table and field</a><ol><li><a href="#identity-accounts--messaging">Identity, accounts &amp; messaging</a></li><li><a href="#catalogue-sellers--marketing">Catalogue, sellers &amp; marketing</a></li><li><a href="#orders-payments--money">Orders, payments &amp; money</a></li><li><a href="#fulfilment--warehouse">Fulfilment &amp; warehouse</a></li><li><a href="#after-sales-support--trust">After-sales, support &amp; trust</a></li><li><a href="#content--communication">Content &amp; communication</a></li></ol></li><li><a href="#5-state-machines">5. State machines</a><ol><li><a href="#51-order-ordersstatus">5.1 Order (orders.status)</a></li><li><a href="#52-payment-paymentsstatus">5.2 Payment (payments.status)</a></li><li><a href="#53-delivery-task-delivery_tasksstatus--forward-only">5.3 Delivery task (delivery_tasks.status) 🔒 forward-only</a></li><li><a href="#54-other-lifecycles">5.4 Other lifecycles</a></li></ol></li><li><a href="#6-business-flows">6. Business flows</a></li><li><a href="#7-api-reference">7. API reference</a><ol><li><a href="#71-rest">7.1 REST</a></li><li><a href="#72-websocket-request--ack-events-115">7.2 WebSocket request → ack events (146)</a></li><li><a href="#73-server-pushed-events-40">7.3 Server-pushed events (40)</a></li></ol></li><li><a href="#8-client-applications">8. Client applications</a><ol><li><a href="#81-customer-app--flutter-mobile">8.1 Customer app — Flutter (mobile/)</a></li><li><a href="#82-rider-app--flutter-rider-app">8.2 Rider app — Flutter (rider-app/)</a></li><li><a href="#83-web--nextjs-16--react-19-web">8.3 Web — Next.js 16 / React 19 (web/)</a></li><li><a href="#84-shared-package-shared">8.4 Shared package (shared/)</a></li></ol></li><li><a href="#9-configuration-environments-cicd-and-testing">9. Configuration, environments, CI/CD and testing</a><ol><li><a href="#91-environment-variables-api">9.1 Environment variables (API)</a></li><li><a href="#92-database-lifecycle">9.2 Database lifecycle</a></li><li><a href="#93-ci-github-actions">9.3 CI (GitHub Actions)</a></li></ol></li><li><a href="#10-gap-analysis--what-a-professional-marketplace-still-needs">10. Gap analysis — what a professional marketplace still needs</a><ol><li><a href="#101-data-model-and-database">10.1 Data model and database</a></li><li><a href="#102-payments-and-finance">10.2 Payments and finance</a></li><li><a href="#103-catalogue-search-and-merchandising">10.3 Catalogue, search and merchandising</a></li><li><a href="#104-orders-fulfilment-and-delivery">10.4 Orders, fulfilment and delivery</a></li><li><a href="#105-after-sales-and-support">10.5 After-sales and support</a></li><li><a href="#106-identity-security-and-compliance">10.6 Identity, security and compliance</a></li><li><a href="#107-notifications-and-communication">10.7 Notifications and communication</a></li><li><a href="#108-platform-operations-and-scale">10.8 Platform, operations and scale</a></li><li><a href="#109-client-applications">10.9 Client applications</a></li><li><a href="#1010-proposed-target-data-model-additions">10.10 Proposed target data model (additions)</a></li></ol></li><li><a href="#11-recommendations-and-roadmap">11. Recommendations and roadmap</a><ol><li><a href="#111-phase-0--launch-blockers--35-weeks-can-run-in-parallel">11.1 Phase 0 — launch blockers (≈ 3–5 weeks, can run in parallel)</a></li><li><a href="#112-phase-1--professional-parity--610-weeks">11.2 Phase 1 — professional parity (≈ 6–10 weeks)</a></li><li><a href="#113-phase-2--scale-and-growth">11.3 Phase 2 — scale and growth</a></li><li><a href="#114-decisions-needed-from-the-client">11.4 Decisions needed from the client</a></li></ol></li><li><a href="#12-appendix">12. Appendix</a><ol><li><a href="#121-repository-map">12.1 Repository map</a></li><li><a href="#122-glossary">12.2 Glossary</a></li></ol></li></ol></nav>
+      <nav aria-label="Contents"><ol><li><a href="#1-executive-summary">1. Executive summary</a><ol><li><a href="#11-the-system-in-numbers">1.1 The system in numbers</a></li><li><a href="#12-maturity-by-module">1.2 Maturity by module</a></li><li><a href="#13-top-priorities-before-launch">1.3 Top priorities before launch</a></li></ol></li><li><a href="#2-system-architecture">2. System architecture</a><ol><li><a href="#21-context-diagram">2.1 Context diagram</a></li><li><a href="#22-deployment-topology">2.2 Deployment topology</a></li><li><a href="#23-backend-module-architecture">2.3 Backend module architecture</a></li><li><a href="#24-communication-protocol">2.4 Communication protocol</a></li><li><a href="#25-security-architecture">2.5 Security architecture</a></li></ol></li><li><a href="#3-data-model--erd">3. Data model — ERD</a><ol><li><a href="#31-overview-all-38-tables-and-their-relationships">3.1 Overview (all 38 tables and their relationships)</a></li><li><a href="#32-identity-accounts--messaging">3.2 Identity, accounts &amp; messaging</a></li><li><a href="#33-catalogue-sellers--marketing">3.3 Catalogue, sellers &amp; marketing</a></li><li><a href="#34-orders-payments--money">3.4 Orders, payments &amp; money</a></li><li><a href="#35-fulfilment--warehouse">3.5 Fulfilment &amp; warehouse</a></li><li><a href="#36-after-sales-support--trust">3.6 After-sales, support &amp; trust</a></li><li><a href="#37-content--communication">3.7 Content &amp; communication</a></li></ol></li><li><a href="#4-data-dictionary--every-table-and-field">4. Data dictionary — every table and field</a><ol><li><a href="#identity-accounts--messaging">Identity, accounts &amp; messaging</a></li><li><a href="#catalogue-sellers--marketing">Catalogue, sellers &amp; marketing</a></li><li><a href="#orders-payments--money">Orders, payments &amp; money</a></li><li><a href="#fulfilment--warehouse">Fulfilment &amp; warehouse</a></li><li><a href="#after-sales-support--trust">After-sales, support &amp; trust</a></li><li><a href="#content--communication">Content &amp; communication</a></li></ol></li><li><a href="#5-state-machines">5. State machines</a><ol><li><a href="#51-order-ordersstatus">5.1 Order (orders.status)</a></li><li><a href="#52-payment-paymentsstatus">5.2 Payment (payments.status)</a></li><li><a href="#53-delivery-task-delivery_tasksstatus--forward-only">5.3 Delivery task (delivery_tasks.status) 🔒 forward-only</a></li><li><a href="#54-other-lifecycles">5.4 Other lifecycles</a></li></ol></li><li><a href="#6-business-flows">6. Business flows</a></li><li><a href="#7-api-reference">7. API reference</a><ol><li><a href="#71-rest">7.1 REST</a></li><li><a href="#72-websocket-request--ack-events-115">7.2 WebSocket request → ack events (146)</a></li><li><a href="#73-server-pushed-events-40">7.3 Server-pushed events (40)</a></li></ol></li><li><a href="#8-client-applications">8. Client applications</a><ol><li><a href="#81-customer-app--flutter-mobile">8.1 Customer app — Flutter (mobile/)</a></li><li><a href="#82-rider-app--flutter-rider-app">8.2 Rider app — Flutter (rider-app/)</a></li><li><a href="#83-web--nextjs-16--react-19-web">8.3 Web — Next.js 16 / React 19 (web/)</a></li><li><a href="#84-shared-package-shared">8.4 Shared package (shared/)</a></li></ol></li><li><a href="#9-configuration-environments-cicd-and-testing">9. Configuration, environments, CI/CD and testing</a><ol><li><a href="#91-environment-variables-api">9.1 Environment variables (API)</a></li><li><a href="#92-database-lifecycle">9.2 Database lifecycle</a></li><li><a href="#93-ci-github-actions">9.3 CI (GitHub Actions)</a></li></ol></li><li><a href="#10-gap-analysis--what-a-professional-marketplace-still-needs">10. Gap analysis — what a professional marketplace still needs</a><ol><li><a href="#101-data-model-and-database">10.1 Data model and database</a></li><li><a href="#102-payments-and-finance">10.2 Payments and finance</a></li><li><a href="#103-catalogue-search-and-merchandising">10.3 Catalogue, search and merchandising</a></li><li><a href="#104-orders-fulfilment-and-delivery">10.4 Orders, fulfilment and delivery</a></li><li><a href="#105-after-sales-and-support">10.5 After-sales and support</a></li><li><a href="#106-identity-security-and-compliance">10.6 Identity, security and compliance</a></li><li><a href="#107-notifications-and-communication">10.7 Notifications and communication</a></li><li><a href="#108-platform-operations-and-scale">10.8 Platform, operations and scale</a></li><li><a href="#109-client-applications">10.9 Client applications</a></li><li><a href="#1010-proposed-target-data-model-additions">10.10 Proposed target data model (additions)</a></li></ol></li><li><a href="#11-recommendations-and-roadmap">11. Recommendations and roadmap</a><ol><li><a href="#111-phase-0--launch-blockers--35-weeks-can-run-in-parallel">11.1 Phase 0 — launch blockers (≈ 3–5 weeks, can run in parallel)</a></li><li><a href="#112-phase-1--professional-parity--610-weeks">11.2 Phase 1 — professional parity (≈ 6–10 weeks)</a></li><li><a href="#113-phase-2--scale-and-growth">11.3 Phase 2 — scale and growth</a></li><li><a href="#114-decisions-needed-from-the-client">11.4 Decisions needed from the client</a></li></ol></li><li><a href="#12-appendix">12. Appendix</a><ol><li><a href="#121-repository-map">12.1 Repository map</a></li><li><a href="#122-glossary">12.2 Glossary</a></li></ol></li></ol></nav>
     </details>
   </aside>
   <main>
@@ -332,7 +332,7 @@ main li { margin-block: 0.2rem; }
     NGINX["nginx&lt;br/&gt;TLS · WebSocket upgrade · rate limits"]
     API["NestJS API :3001&lt;br/&gt;REST (auth, uploads, webhook)&lt;br/&gt;Socket.IO gateway (everything else)"]
     NEXT["Next.js server :3000"]
-    DB[("MySQL 8&lt;br/&gt;33 tables")]
+    DB[("MySQL 8&lt;br/&gt;38 tables")]
     FS[("Uploads volume&lt;br/&gt;/uploads")]
   end
   subgraph External["External services (optional / pending)"]
@@ -719,7 +719,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 </tbody></table></div>
 <h2 id="3-data-model--erd"><a class="anchor" href="#3-data-model--erd" aria-hidden="true">#</a>3. Data model — ERD</h2>
-<h3 id="31-overview-all-33-tables-and-their-relationships"><a class="anchor" href="#31-overview-all-33-tables-and-their-relationships" aria-hidden="true">#</a>3.1 Overview (all 33 tables and their relationships)</h3>
+<h3 id="31-overview-all-38-tables-and-their-relationships"><a class="anchor" href="#31-overview-all-38-tables-and-their-relationships" aria-hidden="true">#</a>3.1 Overview (all 38 tables and their relationships)</h3>
 <p>All relations except <code>orders → order_items</code> are <strong>logical</strong> (an id column, no database foreign key). The labels show the referencing column.</p>
 <div class="diagram"><pre class="mermaid">erDiagram
     User ||--o{ Address : "userId"
@@ -767,9 +767,10 @@ main li { margin-block: 0.2rem; }
 <ul>
 <li><code>Setting.deliveryZones</code> is a JSON list <code>{ id, name, nameFr, city, feeUsd }</code>; <code>orders.zoneId</code>, <code>addresses.zoneId</code> and <code>delivery_tasks.zoneId</code> refer to those ids (there is no zones table).</li>
 <li><code>products.sellerId</code> normally holds <code>sellers.id</code> but falls back to the user id for demo stores; <code>payouts.sellerId</code> holds the <strong>user</strong> id; <code>campaigns.sellerId</code> holds <code>sellers.id</code> or the user id. This inconsistency is listed in section 10.</li>
-<li><code>products.category</code> stores the category <strong>name</strong> (string), not <code>categories.id</code>.</li>
+<li><code>products.categoryId</code> is a real foreign key to <code>categories.id</code> (ON DELETE RESTRICT); the category name a product shows is joined, so renaming a category never orphans its products.</li>
 <li><code>order_items.productId</code> is either a product id or <code>ext:&lt;name&gt;</code> for an external snapshot line (development only).</li>
-<li>Names such as <code>customerName</code>, <code>sellerName</code>, <code>productName</code>, <code>orderReference</code> are <strong>denormalised snapshots</strong> so lists render without joins.</li>
+<li><strong>Languages (EN / FR) are rows, not columns.</strong> A translatable record keeps its authored text in its own columns in its own language (<code>sourceLang</code>); every other language is a row in <code>translations</code> (entity type, id, field, locale, value, origin <code>author</code> | <code>machine</code> | <code>snapshot</code>). Google Cloud Translation fills missing languages through the <code>translation_jobs</code> queue; text a person typed is never overwritten. The API composes the familiar <code>name</code> / <code>nameFr</code>, <code>description</code> / <code>descriptionFr</code>, <code>variantLabels</code>, <code>titleFr</code>… fields, so clients are unchanged. See <code>docs/MULTILINGUAL-PLAN.md</code>.</li>
+<li><strong>Intentional snapshots</strong> (historical records that must not change when the source does): <code>orders.customerName</code>; <code>order_items.productName</code>, <code>sellerName</code> (plus the other language as a <code>translations</code> snapshot row); <code>payments.orderReference</code>; <code>payouts.sellerName</code>; <code>payout_statement_lines.*</code>; <code>orderReference</code> / <code>customerName</code> / <code>productName</code> on disputes, exchanges, replacements, delivery tasks and warehouse exceptions; <code>support_tickets.userName</code>; <code>warehouse_batches.riderName</code>; <code>stock_transfers.productName</code>. Live copies that used to go stale (<code>products.sellerName</code>, <code>campaigns.sellerName</code>, <code>flash_sales.productName</code>, <code>sellers.productCount</code>, <code>products.categoryFr</code>) were removed and are joined or counted on read.</li>
 </ul>
 <p>The domain diagrams below show every column (PK = primary key, UK = unique, FK = logical reference).</p>
 <h3 id="32-identity-accounts--messaging"><a class="anchor" href="#32-identity-accounts--messaging" aria-hidden="true">#</a>3.2 Identity, accounts &amp; messaging</h3>
@@ -1820,6 +1821,22 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
+<td><code>description</code></td>
+<td>text</td>
+<td>yes</td>
+<td></td>
+<td></td>
+<td>Store description in its authored language.</td>
+</tr>
+<tr>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
+<td></td>
+<td>en</td>
+<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
+</tr>
+<tr>
 <td><code>userId</code></td>
 <td>varchar</td>
 <td>yes</td>
@@ -1846,14 +1863,6 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td><code>rating</code></td>
 <td>float</td>
-<td></td>
-<td>0</td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>productCount</code></td>
-<td>int</td>
 <td></td>
 <td>0</td>
 <td></td>
@@ -1895,12 +1904,12 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
-<td><code>nameFr</code></td>
-<td>varchar</td>
-<td>yes</td>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
 <td></td>
+<td>en</td>
 <td></td>
-<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
 </tr>
 <tr>
 <td><code>icon</code></td>
@@ -1954,20 +1963,20 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
-<td><code>nameFr</code></td>
-<td>varchar</td>
-<td>yes</td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
 <td><code>description</code></td>
 <td>text</td>
 <td>yes</td>
 <td></td>
 <td></td>
 <td></td>
+</tr>
+<tr>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
+<td></td>
+<td>en</td>
+<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
 </tr>
 <tr>
 <td><code>price</code></td>
@@ -1994,20 +2003,12 @@ main li { margin-block: 0.2rem; }
 <td>Percentage discount shown on cards.</td>
 </tr>
 <tr>
-<td><code>category</code></td>
-<td>varchar</td>
-<td></td>
-<td></td>
+<td><code>categoryId</code></td>
+<td>varchar(36)</td>
 <td>yes</td>
 <td></td>
-</tr>
-<tr>
-<td><code>categoryFr</code></td>
-<td>varchar</td>
 <td>yes</td>
-<td></td>
-<td></td>
-<td></td>
+<td>FK → categories.id (ON DELETE RESTRICT). The served category / categoryFr names are joined.</td>
 </tr>
 <tr>
 <td><code>image</code></td>
@@ -2059,14 +2060,6 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td><code>sellerId</code></td>
-<td>varchar</td>
-<td>yes</td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>sellerName</code></td>
 <td>varchar</td>
 <td>yes</td>
 <td></td>
@@ -2303,15 +2296,15 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
-<td><code>productId</code></td>
-<td>varchar</td>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
 <td></td>
+<td>en</td>
 <td></td>
-<td></td>
-<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
 </tr>
 <tr>
-<td><code>productName</code></td>
+<td><code>productId</code></td>
 <td>varchar</td>
 <td></td>
 <td></td>
@@ -2394,14 +2387,6 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
-<td><code>sellerName</code></td>
-<td>varchar</td>
-<td>yes</td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
 <td><code>name</code></td>
 <td>varchar</td>
 <td></td>
@@ -2410,12 +2395,12 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
-<td><code>nameFr</code></td>
-<td>varchar</td>
-<td>yes</td>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
 <td></td>
+<td>en</td>
 <td></td>
-<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
 </tr>
 <tr>
 <td><code>discount</code></td>
@@ -4172,6 +4157,14 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
+<td></td>
+<td>en</td>
+<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
+</tr>
+<tr>
 <td><code>type</code></td>
 <td>varchar</td>
 <td></td>
@@ -4231,6 +4224,14 @@ main li { margin-block: 0.2rem; }
 <td></td>
 </tr>
 <tr>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
+<td></td>
+<td>en</td>
+<td></td>
+<td>Language the authored text is written in; other languages live in translations.</td>
+</tr>
+<tr>
 <td><code>audience</code></td>
 <td>varchar</td>
 <td></td>
@@ -4263,6 +4264,174 @@ main li { margin-block: 0.2rem; }
 <td>Set on insert</td>
 </tr>
 </tbody></table></div>
+<h4 id="translations--translation"><a class="anchor" href="#translations--translation" aria-hidden="true">#</a><code>translations</code> — Translation</h4>
+<p><em>Source: <code>api/src/database/entities/translation.entity.ts</code></em></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>DB type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Index</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td></td>
+<td></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>entityType</code></td>
+<td>varchar(24)</td>
+<td></td>
+<td></td>
+<td>UK (with entityId, field, locale)</td>
+<td>product, category, seller, campaign, flash_sale, cms_block, broadcast, order_item, notification, review, review_reply, question, answer</td>
+</tr>
+<tr>
+<td><code>entityId</code></td>
+<td>varchar(36)</td>
+<td></td>
+<td></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>field</code></td>
+<td>varchar(32)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>name, description, variants, title, body, text, productName, variant…</td>
+</tr>
+<tr>
+<td><code>locale</code></td>
+<td>varchar(5)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>en, fr (more languages need no schema change)</td>
+</tr>
+<tr>
+<td><code>value</code></td>
+<td>text</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>origin</code></td>
+<td>varchar(10)</td>
+<td></td>
+<td></td>
+<td></td>
+<td>author (typed by a person, never overwritten) / machine (Google) / snapshot (copied at order time)</td>
+</tr>
+<tr>
+<td><code>sourceLang</code></td>
+<td>varchar(5)</td>
+<td>yes</td>
+<td></td>
+<td></td>
+<td>Language the value was translated from (detected for reviews / Q&amp;A)</td>
+</tr>
+<tr>
+<td><code>sourceHash</code></td>
+<td>varchar(40)</td>
+<td>yes</td>
+<td></td>
+<td>yes (with locale)</td>
+<td>sha1 of the source text: marks stale machine rows and lets identical strings reuse one Google call</td>
+</tr>
+<tr>
+<td><code>createdAt / updatedAt</code></td>
+<td>datetime(6)</td>
+<td></td>
+<td>now</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="translation_jobs--translationjob"><a class="anchor" href="#translation_jobs--translationjob" aria-hidden="true">#</a><code>translation_jobs</code> — TranslationJob</h4>
+<p><em>Source: <code>api/src/database/entities/translation-job.entity.ts</code></em></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>DB type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Index</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td></td>
+<td></td>
+<td>PK</td>
+<td></td>
+</tr>
+<tr>
+<td><code>entityType / entityId</code></td>
+<td>varchar</td>
+<td></td>
+<td></td>
+<td>UK</td>
+<td>The record whose missing languages are queued</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>varchar(10)</td>
+<td></td>
+<td>pending</td>
+<td>yes (with nextAttemptAt)</td>
+<td>pending / done / failed</td>
+</tr>
+<tr>
+<td><code>attempts</code></td>
+<td>int</td>
+<td></td>
+<td>0</td>
+<td></td>
+<td>Backoff 1 m, 5 m, 30 m, 2 h, 12 h; failed after 6</td>
+</tr>
+<tr>
+<td><code>nextAttemptAt</code></td>
+<td>datetime</td>
+<td>yes</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lastError</code></td>
+<td>varchar(300)</td>
+<td>yes</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>updatedAt</code></td>
+<td>datetime(6)</td>
+<td></td>
+<td>now</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="5-state-machines"><a class="anchor" href="#5-state-machines" aria-hidden="true">#</a>5. State machines</h2>
 <p>Where a transition is <strong>enforced atomically</strong> by the server it is marked 🔒. Transitions that the server does not yet restrict (any → any by an authorised role) are flagged ⚠ and listed in section 10.</p>
 <h3 id="51-order-ordersstatus"><a class="anchor" href="#51-order-ordersstatus" aria-hidden="true">#</a>5.1 Order (<code>orders.status</code>)</h3>
@@ -5921,6 +6090,21 @@ main li { margin-block: 0.2rem; }
 <td><code>FIREBASE_SERVICE_ACCOUNT_JSON</code> or <code>GOOGLE_APPLICATION_CREDENTIALS</code></td>
 <td></td>
 <td>Push (optional)</td>
+</tr>
+<tr>
+<td><code>TRANSLATE_PROVIDER</code></td>
+<td>google when a credential exists, else off</td>
+<td>google / fake (tests) / off</td>
+</tr>
+<tr>
+<td><code>GOOGLE_TRANSLATE_API_KEY</code></td>
+<td></td>
+<td>Optional server-only key; otherwise the Firebase service account&#x27;s OAuth token is used (needs Cloud Translation API enabled and the Cloud Translation API User role)</td>
+</tr>
+<tr>
+<td><code>TRANSLATE_DAILY_CHAR_LIMIT</code></td>
+<td>300000</td>
+<td>Daily Google character budget (over it, jobs wait for the next day)</td>
 </tr>
 </tbody></table></div>
 <p><strong>Admin-editable settings</strong> (<code>settings</code> table): <code>fxRate</code> (CDF per USD), <code>codEnabled</code>, <code>codCapUsd</code>, <code>deliveryZones</code>, <code>commissionPct</code>.</p>

@@ -45,7 +45,7 @@ Added:
 | Field | Meaning |
 |---|---|
 | `commissionPct` | The `commissionPct` setting (default 12). `commissionUsd = revenue * commissionPct / 100` |
-| `gmvByCategory` | `[{category, gmv, orders}]`, item value (`price*qty`) per product category on non-cancelled orders, biggest first (max 50); lines without a catalogue product count as `"Other"` |
+| `gmvByCategory` | `[{category, categoryFr, categoryId, gmv, orders}]` (`categoryFr` = the category's French name), item value (`price*qty`) per product category on non-cancelled orders, biggest first (max 50); lines without a catalogue product count as `"Other"` |
 | `ordersToday`, `gmvToday` | non-cancelled orders created since 00:00 UTC |
 | `ordersLast30`, `gmvLast30` | last 30 UTC days including today |
 | `gmvPrev30`, `gmvPrevPeriod` | the 30 days before that (the two names are the same number) |
@@ -133,7 +133,7 @@ Roles:
   "sellerId": "...", "days": 30, "from": "2026-09-18", "to": "2026-10-17",
   "revenue": 4821, "orders": 5, "units": 9, "aov": 964.2,
   "revenueSeries": [ { "date": "2026-10-17", "revenue": 4821, "orders": 5, "units": 9 } ],   // `days` rows
-  "topProducts": [ { "productId": "...", "name": "...", "units": 5, "revenue": 1745 } ],
+  "topProducts": [ { "productId": "...", "name": "...", "nameFr": "...", "units": 5, "revenue": 1745 } ],
   "customers": {
     "total": 12,               // distinct buyers, whole store life
     "repeat": 3,               // of them with more than one order

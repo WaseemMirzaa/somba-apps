@@ -108,7 +108,7 @@ flowchart LR
     NGINX["nginx<br/>TLS · WebSocket upgrade · rate limits"]
     API["NestJS API :3001<br/>REST (auth, uploads, webhook)<br/>Socket.IO gateway (everything else)"]
     NEXT["Next.js server :3000"]
-    DB[("MySQL 8<br/>33 tables")]
+    DB[("MySQL 8<br/>38 tables")]
     FS[("Uploads volume<br/>/uploads")]
   end
   subgraph External["External services (optional / pending)"]
@@ -296,7 +296,7 @@ sequenceDiagram
 
 ## 3. Data model — ERD
 
-### 3.1 Overview (all 33 tables and their relationships)
+### 3.1 Overview (all 38 tables and their relationships)
 
 All relations except `orders → order_items` are **logical** (an id column, no database foreign key). The labels show the referencing column.
 
@@ -349,9 +349,10 @@ Notes on the model:
 
 * `Setting.deliveryZones` is a JSON list `{ id, name, nameFr, city, feeUsd }`; `orders.zoneId`, `addresses.zoneId` and `delivery_tasks.zoneId` refer to those ids (there is no zones table).
 * `products.sellerId` normally holds `sellers.id` but falls back to the user id for demo stores; `payouts.sellerId` holds the **user** id; `campaigns.sellerId` holds `sellers.id` or the user id. This inconsistency is listed in section 10.
-* `products.category` stores the category **name** (string), not `categories.id`.
+* `products.categoryId` is a real foreign key to `categories.id` (ON DELETE RESTRICT); the category name a product shows is joined, so renaming a category never orphans its products.
 * `order_items.productId` is either a product id or `ext:<name>` for an external snapshot line (development only).
-* Names such as `customerName`, `sellerName`, `productName`, `orderReference` are **denormalised snapshots** so lists render without joins.
+* **Languages (EN / FR) are rows, not columns.** A translatable record keeps its authored text in its own columns in its own language (`sourceLang`); every other language is a row in `translations` (entity type, id, field, locale, value, origin `author` | `machine` | `snapshot`). Google Cloud Translation fills missing languages through the `translation_jobs` queue; text a person typed is never overwritten. The API composes the familiar `name` / `nameFr`, `description` / `descriptionFr`, `variantLabels`, `titleFr`… fields, so clients are unchanged. See `docs/MULTILINGUAL-PLAN.md`.
+* **Intentional snapshots** (historical records that must not change when the source does): `orders.customerName`; `order_items.productName`, `sellerName` (plus the other language as a `translations` snapshot row); `payments.orderReference`; `payouts.sellerName`; `payout_statement_lines.*`; `orderReference` / `customerName` / `productName` on disputes, exchanges, replacements, delivery tasks and warehouse exceptions; `support_tickets.userName`; `warehouse_batches.riderName`; `stock_transfers.productName`. Live copies that used to go stale (`products.sellerName`, `campaigns.sellerName`, `flash_sales.productName`, `sellers.productCount`, `products.categoryFr`) were removed and are joined or counted on read.
 
 The domain diagrams below show every column (PK = primary key, UK = unique, FK = logical reference).
 
@@ -930,11 +931,12 @@ _Source: `api/src/database/entities/seller.entity.ts`_
 |---|---|---|---|---|---|
 | `id` | uuid |  |  | PK |  |
 | `name` | varchar |  |  |  |  |
+| `description` | text | yes |  |  | Store description in its authored language. |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `userId` | varchar | yes |  |  | Owning user account (nullable for seed-only demo stores). |
 | `status` | varchar(20) |  | pending |  | Values: pending, approved, rejected, suspended |
 | `badge` | varchar(20) |  | bronze |  | Values: gold, silver, bronze, somba_assured |
 | `rating` | float |  | 0 |  |  |
-| `productCount` | int |  | 0 |  |  |
 | `createdAt` | datetime |  |  |  | Set on insert |
 
 #### `categories` — Category  
@@ -944,7 +946,7 @@ _Source: `api/src/database/entities/category.entity.ts`_
 |---|---|---|---|---|---|
 | `id` | uuid |  |  | PK |  |
 | `name` | varchar |  |  |  |  |
-| `nameFr` | varchar | yes |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `icon` | varchar | yes |  |  |  |
 | `image` | varchar | yes |  |  |  |
 | `sortOrder` | int |  | 0 |  |  |
@@ -956,13 +958,12 @@ _Source: `api/src/database/entities/product.entity.ts`_
 |---|---|---|---|---|---|
 | `id` | uuid |  |  | PK |  |
 | `name` | varchar |  |  |  |  |
-| `nameFr` | varchar | yes |  |  |  |
 | `description` | text | yes |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `price` | float |  |  |  | Price in USD. |
 | `originalPrice` | float | yes |  |  | Pre-discount reference price (for the struck-through UI price). |
 | `discount` | int |  | 0 |  | Percentage discount shown on cards. |
-| `category` | varchar |  |  | yes |  |
-| `categoryFr` | varchar | yes |  |  |  |
+| `categoryId` | varchar(36) | yes |  | yes | FK → categories.id (ON DELETE RESTRICT). The served `category` / `categoryFr` names are joined. |
 | `image` | varchar | yes |  |  |  |
 | `stock` | int |  | 0 |  |  |
 | `rating` | float |  | 0 |  |  |
@@ -970,7 +971,6 @@ _Source: `api/src/database/entities/product.entity.ts`_
 | `deliveryDays` | int |  | 3 |  | Estimated delivery time in days. |
 | `status` | varchar(20) |  | live | yes | Values: draft, pending, approved, rejected, live, removed |
 | `sellerId` | varchar | yes |  |  |  |
-| `sellerName` | varchar | yes |  |  |  |
 | `createdAt` | datetime |  |  |  | Set on insert |
 | `updatedAt` | datetime |  |  |  | Set on every update |
 
@@ -1020,8 +1020,8 @@ _Source: `api/src/database/entities/flash-sale.entity.ts`_
 |---|---|---|---|---|---|
 | `id` | uuid |  |  | PK |  |
 | `title` | varchar |  |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `productId` | varchar |  |  |  |  |
-| `productName` | varchar |  |  |  |  |
 | `flashPrice` | float |  |  |  |  |
 | `discount` | int |  | 0 |  |  |
 | `startsAt` | varchar | yes |  |  |  |
@@ -1036,9 +1036,8 @@ _Source: `api/src/database/entities/campaign.entity.ts`_
 | `id` | uuid |  |  | PK |  |
 | `reference` | varchar(24) |  |  | unique |  |
 | `sellerId` | varchar | yes |  | yes |  |
-| `sellerName` | varchar | yes |  |  |  |
 | `name` | varchar |  |  |  |  |
-| `nameFr` | varchar | yes |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `discount` | int |  | 0 |  | Percentage discount applied to the promoted products. |
 | `productCount` | int |  | 0 |  | Number of products included in the campaign. |
 | `budgetUsd` | float |  | 0 |  |  |
@@ -1357,6 +1356,7 @@ _Source: `api/src/database/entities/cms-block.entity.ts`_
 | `key` | varchar |  |  | unique |  |
 | `title` | varchar |  |  |  |  |
 | `body` | text |  |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `type` | varchar |  | banner |  |  |
 | `active` | boolean |  | true |  |  |
 | `updatedAt` | datetime |  |  |  | Set on every update |
@@ -1369,12 +1369,42 @@ _Source: `api/src/database/entities/broadcast.entity.ts`_
 | `id` | uuid |  |  | PK |  |
 | `title` | varchar |  |  |  |  |
 | `body` | text |  |  |  |  |
+| `sourceLang` | varchar(5) |  | en |  | Language the authored text is written in; other languages live in `translations`. |
 | `audience` | varchar |  | customer |  | Target audience role, or 'all'. |
 | `sentBy` | varchar |  |  |  |  |
 | `recipients` | int |  | 0 |  |  |
 | `createdAt` | datetime |  |  |  | Set on insert |
 
 ---
+
+#### `translations` — Translation  
+_Source: `api/src/database/entities/translation.entity.ts`_
+
+| Field | DB type | Null | Default | Index | Notes |
+|---|---|---|---|---|---|
+| `id` | uuid |  |  | PK |  |
+| `entityType` | varchar(24) |  |  | UK (with entityId, field, locale) | product, category, seller, campaign, flash_sale, cms_block, broadcast, order_item, notification, review, review_reply, question, answer |
+| `entityId` | varchar(36) |  |  | yes |  |
+| `field` | varchar(32) |  |  |  | name, description, variants, title, body, text, productName, variant… |
+| `locale` | varchar(5) |  |  |  | en, fr (more languages need no schema change) |
+| `value` | text |  |  |  |  |
+| `origin` | varchar(10) |  |  |  | author (typed by a person, never overwritten) / machine (Google) / snapshot (copied at order time) |
+| `sourceLang` | varchar(5) | yes |  |  | Language the value was translated from (detected for reviews / Q&A) |
+| `sourceHash` | varchar(40) | yes |  | yes (with locale) | sha1 of the source text: marks stale machine rows and lets identical strings reuse one Google call |
+| `createdAt / updatedAt` | datetime(6) |  | now |  |  |
+
+#### `translation_jobs` — TranslationJob  
+_Source: `api/src/database/entities/translation-job.entity.ts`_
+
+| Field | DB type | Null | Default | Index | Notes |
+|---|---|---|---|---|---|
+| `id` | uuid |  |  | PK |  |
+| `entityType / entityId` | varchar |  |  | UK | The record whose missing languages are queued |
+| `status` | varchar(10) |  | pending | yes (with nextAttemptAt) | pending / done / failed |
+| `attempts` | int |  | 0 |  | Backoff 1 m, 5 m, 30 m, 2 h, 12 h; failed after 6 |
+| `nextAttemptAt` | datetime | yes |  |  |  |
+| `lastError` | varchar(300) | yes |  |  |  |
+| `updatedAt` | datetime(6) |  | now |  |  |
 
 ## 5. State machines
 
@@ -2134,6 +2164,9 @@ The **demo persona picker** on `/login` is shown unless `NEXT_PUBLIC_DEMO_MODE=f
 | `SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM` | | Email (optional) |
 | `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM` | | SMS (optional) |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS` | | Push (optional) |
+| `TRANSLATE_PROVIDER` | google when a credential exists, else off | google / fake (tests) / off |
+| `GOOGLE_TRANSLATE_API_KEY` |  | Optional server-only key; otherwise the Firebase service account's OAuth token is used (needs Cloud Translation API enabled and the Cloud Translation API User role) |
+| `TRANSLATE_DAILY_CHAR_LIMIT` | 300000 | Daily Google character budget (over it, jobs wait for the next day) |
 
 **Admin-editable settings** (`settings` table): `fxRate` (CDF per USD), `codEnabled`, `codCapUsd`, `deliveryZones`, `commissionPct`.
 

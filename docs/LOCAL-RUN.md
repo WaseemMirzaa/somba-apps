@@ -33,7 +33,7 @@ Payment providers: `MM_PROVIDER=sandbox` (development: payments stay pending unt
 | `npm run smoke:race` | Concurrency: last unit of stock, double cancel / refund / payout / confirmation, two riders on one task, wallet double-spend | 24 |
 | `npm run check:prod` | Production-mode defaults (incl. verification policy) and manual payment (run against `NODE_ENV=production`) | 17 |
 
-All of them pass on MySQL (migrations only; run them one after another with a pause — the REST auth endpoints are throttled to 30 requests a minute per IP, so back-to-back suites can hit a 429). On SQLite they pass too, except that the race suite is flaky there: in one run the 4-simultaneous-payout-approvals check failed with a SQLite "cannot start a transaction within a transaction" error, and it passed 24/24 on the rerun. SQLite cannot run concurrent transactions, so treat the race suite as meaningful on MySQL only.
+All of them pass on MySQL (migrations only; run them one after another with a pause — login, register and the phone-code endpoints are throttled to 30 requests a minute per IP, so back-to-back suites can hit a 429; token refresh has its own 300-a-minute limit). On SQLite they pass too, except that the race suite is flaky there: in one run the 4-simultaneous-payout-approvals check failed with a SQLite "cannot start a transaction within a transaction" error, and it passed 24/24 on the rerun. SQLite cannot run concurrent transactions, so treat the race suite as meaningful on MySQL only.
 
 ## 3. Web app
 

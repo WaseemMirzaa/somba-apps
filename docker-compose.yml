@@ -47,6 +47,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       DB_DATABASE: somba
       FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      # Product translation (EN <-> FR). With no key, the Firebase service account above is used.
+      TRANSLATE_PROVIDER: ${TRANSLATE_PROVIDER:-}
+      GOOGLE_TRANSLATE_API_KEY: ${GOOGLE_TRANSLATE_API_KEY:-}
+      TRANSLATE_DAILY_CHAR_LIMIT: ${TRANSLATE_DAILY_CHAR_LIMIT:-300000}
     ports:
       - '3001:3001'
 
