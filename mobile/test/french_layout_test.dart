@@ -1,5 +1,6 @@
 // French texts are longer than English ones: render the main screens in French
 // on a small phone (360 x 740) and fail on any layout overflow or exception.
+// Each screen is also held to the button rules (no icon on a label button, one filled button).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,6 +24,8 @@ import 'package:lipcart/theme/app_theme.dart';
 import 'package:lipcart/widgets/verify_prompt.dart';
 import 'package:lipcart/data/catalog_live.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'button_rules.dart';
 
 ProductDto _product() => ProductDto(
       id: 'p1',
@@ -136,6 +139,8 @@ void main() {
     FlutterError.onError = (d) {
       if (d.exceptionAsString().contains('overflowed')) {
         overflows.add(d.exceptionAsString().split('\n').first);
+      } else if (d.exception is TestFailure) {
+        previous?.call(d); // a failed expect(): hand it to the test framework, or the test hangs
       }
     };
     addTearDown(() => FlutterError.onError = previous);
@@ -155,6 +160,7 @@ void main() {
       home: screen,
     ));
     await tester.pump(const Duration(milliseconds: 600));
+    expectButtonRules(tester);
   }
 
   const fr = Locale('fr');
@@ -202,6 +208,7 @@ void main() {
       await tester.tap(find.byIcon(_navIcon(label)));
       await tester.pump(const Duration(milliseconds: 500));
       expect(overflows, isEmpty, reason: label);
+      expectButtonRules(tester);
     }
   });
 
@@ -229,6 +236,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byKey(const ValueKey('verify-prompt')), findsOneWidget);
     expect(overflows, isEmpty);
+    expectButtonRules(tester);
   });
 }
 

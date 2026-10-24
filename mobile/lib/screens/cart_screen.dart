@@ -350,20 +350,18 @@ class _CartScreenState extends State<CartScreen> {
                                   color: item.priceChange < 0 ? AppColors.success : AppColors.danger, fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       Row(children: [
-                        TextButton.icon(
+                        TextButton(
                           key: ValueKey('save-later-${item.product.id}'),
                           style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
                           onPressed: () => _saveForLater(i),
-                          icon: const Icon(Icons.bookmark_add_outlined, size: 17),
-                          label: Text(s.cartSaveLater, style: const TextStyle(fontSize: 12.5)),
+                          child: Text(s.cartSaveLater, style: const TextStyle(fontSize: 12.5)),
                         ),
                         const SizedBox(width: 14),
-                        TextButton.icon(
+                        TextButton(
                           key: ValueKey('remove-${item.product.id}'),
                           style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact, foregroundColor: AppColors.muted),
                           onPressed: () => _remove(i),
-                          icon: const Icon(Icons.delete_outline_rounded, size: 17),
-                          label: Text(s.cartRemove, style: const TextStyle(fontSize: 12.5)),
+                          child: Text(s.cartRemove, style: const TextStyle(fontSize: 12.5)),
                         ),
                       ]),
                     ],
@@ -437,16 +435,12 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(height: 10),
           _row(s.total, money(total), bold: true),
           const SizedBox(height: 14),
-          FilledButton(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => CheckoutScreen(locale: widget.locale))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('${s.checkout}  ·  ${money(total)}'),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward_rounded, size: 20),
-              ],
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => CheckoutScreen(locale: widget.locale))),
+              child: Text('${s.checkout}  ·  ${money(total)}'),
             ),
           ),
         ],

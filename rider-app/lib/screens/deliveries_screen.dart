@@ -63,9 +63,9 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
 
   /// status -> (next status, strings key of the button, icon)
   static const _next = {
-    'assigned': ('picked_up', 'act_picked_up', Icons.inventory_2_rounded),
-    'picked_up': ('in_transit', 'act_in_transit', Icons.two_wheeler_rounded),
-    'in_transit': ('delivered', 'act_delivered', Icons.check_circle_rounded),
+    'assigned': ('picked_up', 'act_picked_up'),
+    'picked_up': ('in_transit', 'act_in_transit'),
+    'in_transit': ('delivered', 'act_delivered'),
   };
 
 
@@ -175,7 +175,8 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
                           itemCount: rows.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (_, i) => _tab == 1 ? _poolCard(s, rows[i]) : _taskCard(s, rows[i]),
+                          itemBuilder: (_, i) =>
+                              _tab == 1 ? _poolCard(s, rows[i], alone: rows.length == 1) : _taskCard(s, rows[i], alone: rows.length == 1),
                         ),
             ),
           ),
@@ -224,7 +225,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     ]);
   }
 
-  Widget _poolCard(Strings s, DeliveryTaskDto t) {
+  /// A card's main action, label only. Filled only when the card is [alone] on
+  /// the list, so the screen never shows more than one filled button.
+  Widget _cardAction({required Key key, required bool alone, required VoidCallback? onPressed, required String label}) => SizedBox(
+        width: double.infinity,
+        child: alone
+            ? FilledButton(key: key, onPressed: onPressed, child: Text(label))
+            : OutlinedButton(key: key, onPressed: onPressed, child: Text(label)),
+      );
+
+  Widget _poolCard(Strings s, DeliveryTaskDto t, {required bool alone}) {
     return SurfaceCard(
       key: ValueKey('pool-${t.orderReference}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -247,20 +257,17 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
           ),
         if (t.attempts > 1) Padding(padding: const EdgeInsets.only(top: 2, bottom: 4), child: Wrap(children: [_attemptPill(s, t)])),
         const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: ValueKey('accept-${t.orderReference}'),
-            onPressed: _busy ? null : () => _run(() => store.accept(t.id)),
-            icon: const Icon(Icons.add_task_rounded, size: 20),
-            label: Text(s.acceptDelivery),
-          ),
+        _cardAction(
+          key: ValueKey('accept-${t.orderReference}'),
+          alone: alone,
+          onPressed: _busy ? null : () => _run(() => store.accept(t.id)),
+          label: s.acceptDelivery,
         ),
       ]),
     );
   }
 
-  Widget _taskCard(Strings s, DeliveryTaskDto t) {
+  Widget _taskCard(Strings s, DeliveryTaskDto t, {required bool alone}) {
     final next = _next[t.status];
     return SurfaceCard(
       key: ValueKey('task-${t.orderReference}'),
@@ -303,11 +310,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              child: OutlinedButton(
                 key: ValueKey('navigate-${t.orderReference}'),
                 onPressed: () => _navigate(s, t),
-                icon: const Icon(Icons.navigation_rounded, size: 20),
-                label: Text(_toPickup(t) ? s.navigatePickup : s.navigateCustomer),
+                child: Text(_toPickup(t) ? s.navigatePickup : s.navigateCustomer),
               ),
             ),
           ),
@@ -327,14 +333,11 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         if (t.status == 'in_transit') _gpsRow(s),
         if (next != null) ...[
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              key: ValueKey('next-${t.orderReference}'),
-              onPressed: _busy ? null : () => _advance(t, next.$1),
-              icon: Icon(next.$3, size: 20),
-              label: Text(s.t(next.$2)),
-            ),
+          _cardAction(
+            key: ValueKey('next-${t.orderReference}'),
+            alone: alone,
+            onPressed: _busy ? null : () => _advance(t, next.$1),
+            label: s.t(next.$2),
           ),
           if (t.isActive)
             Align(

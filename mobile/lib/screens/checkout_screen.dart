@@ -10,6 +10,7 @@ import '../util/format.dart';
 import '../util/zone_match.dart';
 import '../util/delivery_estimate.dart';
 import '../widgets/mobile_money.dart';
+import '../widgets/kit.dart';
 import '../widgets/verify_prompt.dart';
 import 'order_success_screen.dart';
 import 'payment_pending_screen.dart';
@@ -200,6 +201,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     } catch (e) {
       if (isVerificationError(e) && mounted) {
+        // The request is over: no spinner behind the prompt while the shopper decides.
+        setState(() => _placing = false);
         retryAfterVerify = await ensureVerified(context, forTopUp: false, force: true);
       } else {
         _toast(Strings.current.errorText(e));
@@ -448,7 +451,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: FilledButton(
           key: const ValueKey('place-order'),
           onPressed: _placing || _lines.isEmpty ? null : () => _placeOrder(deliveryFee),
-          child: Text(_placing ? '…' : '${s.placeOrder}  ·  ${money(total)}'),
+          child: _placing ? const ButtonSpinner() : Text('${s.placeOrder}  ·  ${money(total)}'),
         ),
       ),
     );

@@ -300,9 +300,10 @@ class _SellersDirectoryScreenState extends State<SellersDirectoryScreen> {
           const SizedBox(height: 2),
           Text(s.productCount == 1 ? tr.productOne(1) : tr.productMany(s.productCount), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
         ])),
-        FilledButton(
+        // Outlined: one per row, so a filled button would repeat down the list.
+        OutlinedButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: s.id, sellerName: s.name))),
-          style: FilledButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 16)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 16)),
           child: Text(tr.visit),
         ),
       ]),

@@ -303,7 +303,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         FilledButton(
           key: const ValueKey('save-address'),
           onPressed: _busy ? null : _save,
-          child: Text(_busy ? '…' : s.addrSave),
+          child: _busy ? const ButtonSpinner() : Text(s.addrSave),
         ),
       ]),
     );
@@ -449,7 +449,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
                   ),
                 ))),
             const SizedBox(height: 4),
-            PrimaryButton(s.ticketNew, icon: Icons.add_rounded, onPressed: _newTicket),
+            PrimaryButton(s.ticketNew, onPressed: _newTicket),
           ]);
         },
       ),
@@ -474,7 +474,6 @@ class HelpScreen extends StatelessWidget {
       appBar: backAppBar(context, s.help),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         PrimaryButton(s.contactSupport,
-            icon: Icons.support_agent_rounded,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
         SectionHeader(s.faqs, padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(
@@ -494,11 +493,10 @@ class HelpScreen extends StatelessWidget {
               ],
             ])),
         const SizedBox(height: 16),
-        TextButton.icon(
+        TextButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountDeleteScreen())),
           style: TextButton.styleFrom(foregroundColor: AppColors.accentDark),
-          icon: const Icon(Icons.delete_outline_rounded, size: 18),
-          label: Text(s.deleteMyAccount),
+          child: Text(s.deleteMyAccount),
         ),
       ]),
     );
@@ -585,7 +583,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
               key: const ValueKey('delete-account'),
               style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
               onPressed: _busy ? null : _delete,
-              child: Text(_busy ? '…' : s.delaccBtn),
+              child: _busy ? const ButtonSpinner() : Text(s.delaccBtn),
             )),
         const SizedBox(height: 10),
         SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: Text(s.delaccKeep))),

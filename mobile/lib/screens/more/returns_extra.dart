@@ -141,7 +141,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
         const SizedBox(height: 12),
         Text(s.returnRefundNote, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
         const SizedBox(height: 16),
-        PrimaryButton(_busy ? '…' : s.returnSubmit, icon: Icons.assignment_return_rounded, onPressed: _busy ? null : _submit),
+        PrimaryButton(s.returnSubmit, busy: _busy, onPressed: _submit),
       ]),
     );
   }

@@ -17,6 +17,7 @@ Future<bool> ensureVerified(BuildContext context, {required bool forTopUp, bool 
   if (!force && !store.needsVerification) return true;
   final s = Strings.of(context);
   final phone = store.user?.phone;
+  final hasPhone = (phone ?? '').isNotEmpty;
   final choice = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -26,8 +27,12 @@ Future<bool> ensureVerified(BuildContext context, {required bool forTopUp, bool 
       content: Text(forTopUp ? s.verifyBodyTopup : s.verifyBodyOrder),
       actionsOverflowDirection: VerticalDirection.down,
       actions: [
-        if ((phone ?? '').isNotEmpty) FilledButton(key: const ValueKey('verify-phone-btn'), onPressed: () => Navigator.pop(ctx, 'phone'), child: Text(s.verifyPhoneBtn)),
-        FilledButton.tonal(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: Text(s.verifyEmailBtn)),
+        if (hasPhone) FilledButton(key: const ValueKey('verify-phone-btn'), onPressed: () => Navigator.pop(ctx, 'phone'), child: Text(s.verifyPhoneBtn)),
+        // One filled button per dialog: email is the primary only when there is no phone to verify.
+        if (hasPhone)
+          OutlinedButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: Text(s.verifyEmailBtn))
+        else
+          FilledButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: Text(s.verifyEmailBtn)),
         TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.verifyLater)),
       ],
     ),

@@ -7,6 +7,7 @@ import '../services/models.dart';
 import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
+import '../widgets/kit.dart';
 import 'order_success_screen.dart';
 
 /// Shown after a mobile-money order is placed. The order stays `pending` until
@@ -161,13 +162,10 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.tonalIcon(
+                    child: FilledButton.tonal(
                       key: const ValueKey('check-payment'),
                       onPressed: _checking || payment == null ? null : () => _check(payment),
-                      icon: _checking
-                          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.refresh_rounded, size: 20),
-                      label: Text(s.ppCheck),
+                      child: _checking ? const ButtonSpinner() : Text(s.ppCheck),
                     ),
                   ),
                   TextButton(

@@ -87,10 +87,9 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(locale: widget.locale, orderId: widget.orderId))),
-                  icon: const Icon(Icons.local_shipping_rounded, size: 20),
-                  label: Text(s.trackOrder),
+                  child: Text(s.trackOrder),
                 ),
               ),
               const SizedBox(height: 12),

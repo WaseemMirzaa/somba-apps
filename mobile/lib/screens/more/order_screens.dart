@@ -161,27 +161,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Row(children: [
                 if (cancellable)
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       key: const ValueKey('cancel-order'),
                       onPressed: _busy ? null : () => _cancel(o),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      label: Text(s.cancelOrder),
+                      child: Text(s.cancelOrder),
                     ),
                   )
                 else if (o.status == 'delivered')
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale, order: o))),
-                      icon: const Icon(Icons.assignment_return_rounded, size: 18),
-                      label: Text(s.orderReturn),
+                      child: Text(s.orderReturn),
                     ),
                   ),
                 if (cancellable || o.status == 'delivered') const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: OutlinedButton(
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: widget.locale))),
-                    icon: const Icon(Icons.headset_mic_rounded, size: 18),
-                    label: Text(s.orderHelp),
+                    child: Text(s.orderHelp),
                   ),
                 ),
               ]),
@@ -190,21 +187,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 // Stacked full width: "Replace or exchange" does not fit half a phone row (and must survive large text).
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.tonalIcon(
+                  child: FilledButton.tonal(
                     key: const ValueKey('buy-again'),
                     onPressed: () => buyAgain(context, o, widget.locale),
-                    icon: const Icon(Icons.replay_rounded, size: 18),
-                    label: Text(s.buyAgain),
+                    child: Text(s.buyAgain),
                   ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: OutlinedButton(
                     key: const ValueKey('item-issue'),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemIssueScreen(order: o))),
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                    label: Text(s.issueOpen),
+                    child: Text(s.issueOpen),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -212,11 +207,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
               if (o.status != 'pending') ...[
                 const SizedBox(height: 10),
-                TextButton.icon(
+                TextButton(
                   key: const ValueKey('order-receipt'),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderReceiptScreen(order: o))),
-                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                  label: Text(s.receiptTitle),
+                  child: Text(s.receiptTitle),
                 ),
               ],
             ],
@@ -457,11 +451,10 @@ class OrderTrackingScreen extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(o.rider!.name, key: const ValueKey('rider-name'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                   const SizedBox(height: 10),
-                  OutlinedButton.icon(
+                  OutlinedButton(
                     key: const ValueKey('call-rider'),
                     onPressed: () => callRider(context, o.rider!),
-                    icon: const Icon(Icons.call_rounded, size: 18),
-                    label: Text(s.trackCallRider(o.rider!.name)),
+                    child: Text(s.trackCallRider(o.rider!.name)),
                   ),
                 ]),
               ),
@@ -477,11 +470,10 @@ class OrderTrackingScreen extends StatelessWidget {
                   Text(s.trackRiderPos(loc.lat.toStringAsFixed(5), loc.lng.toStringAsFixed(5)),
                       key: const ValueKey('rider-coords'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   const SizedBox(height: 10),
-                  OutlinedButton.icon(
+                  OutlinedButton(
                     key: const ValueKey('open-maps'),
                     onPressed: () => openInMaps(context, loc.lat, loc.lng),
-                    icon: const Icon(Icons.map_rounded, size: 18),
-                    label: Text(s.trackOpenMaps),
+                    child: Text(s.trackOpenMaps),
                   ),
                 ]),
               ),

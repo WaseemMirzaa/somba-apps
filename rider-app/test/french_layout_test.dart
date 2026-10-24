@@ -1,5 +1,6 @@
 // French texts are longer: render the rider screens in French on a small phone
 // (360 x 740, with the app's real fonts) and fail on any layout overflow.
+// Each screen is also held to the button rules (no icon on a label button, one filled button).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -14,6 +15,8 @@ import 'package:somba_rider/screens/rider_shell.dart';
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
+
+import 'button_rules.dart';
 
 const _lang = String.fromEnvironment('LAYOUT_LANG', defaultValue: 'fr');
 
@@ -74,6 +77,8 @@ void main() {
     FlutterError.onError = (d) {
       if (d.exceptionAsString().contains('overflowed')) {
         overflows.add(d.exceptionAsString().split('\n').first);
+      } else if (d.exception is TestFailure) {
+        previous?.call(d); // a failed expect(): hand it to the test framework, or the test hangs
       }
     };
     addTearDown(() => FlutterError.onError = previous);
@@ -88,6 +93,7 @@ void main() {
       home: screen,
     ));
     await tester.pump(const Duration(milliseconds: 600));
+    expectButtonRules(tester);
   }
 
   const loc = Locale(_lang);
@@ -105,6 +111,7 @@ void main() {
       await tester.tap(find.byKey(ValueKey('tab-$i')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(overflows, isEmpty, reason: 'tab $i');
+      expectButtonRules(tester);
     }
   });
 
@@ -119,6 +126,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(overflows, isEmpty, reason: '$icon');
+      expectButtonRules(tester);
     }
   });
 
@@ -129,5 +137,6 @@ void main() {
     await tester.tap(find.text('go'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(overflows, isEmpty);
+    expectButtonRules(tester);
   });
 }
