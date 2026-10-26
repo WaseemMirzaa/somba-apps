@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'feature_hooks.dart';
+import 'models.dart' show pickLang;
 import 'realtime_store.dart';
 
 Map<String, dynamic> _asMap(dynamic d) => (d as Map).map((k, v) => MapEntry(k.toString(), v));
@@ -31,6 +32,7 @@ class ChatConversation {
     this.storeLogo,
     this.productId,
     this.productName,
+    this.productNameFr,
     this.productImage,
     this.orderId,
     this.orderReference,
@@ -50,12 +52,21 @@ class ChatConversation {
   final String? storeLogo;
   final String? productId;
   final String? productName;
+
+  /// The product's French name (the server sends it next to [productName]; older servers do not).
+  final String? productNameFr;
   final String? productImage;
   final String? orderId;
   final String? orderReference;
   final DateTime? lastMessageAt;
   final String lastMessagePreview;
   final int unread;
+
+  /// The product's name in [lang]: French when asked and present, else the other language. Null without a product.
+  String? displayProductName(String lang) {
+    final name = pickLang(lang, productName, productNameFr);
+    return name.isEmpty ? null : name;
+  }
 
   bool get hasContext => (productId ?? '').isNotEmpty || (orderId ?? '').isNotEmpty;
 
@@ -69,6 +80,7 @@ class ChatConversation {
         storeLogo: _str(j['storeLogo']),
         productId: _str(j['productId']),
         productName: _str(j['productName']),
+        productNameFr: _str(j['productNameFr']),
         productImage: _str(j['productImage']),
         orderId: _str(j['orderId']),
         orderReference: _str(j['orderReference']),
@@ -87,6 +99,7 @@ class ChatConversation {
         storeLogo: storeLogo,
         productId: productId,
         productName: productName,
+        productNameFr: productNameFr,
         productImage: productImage,
         orderId: orderId,
         orderReference: orderReference,

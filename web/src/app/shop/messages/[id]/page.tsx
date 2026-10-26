@@ -9,6 +9,7 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { PhotoPicker } from "@/components/shop/photo-picker";
 import { useChatThread, type ChatMessage } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
+import { localized } from "@/lib/i18n-fields";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 
@@ -108,7 +109,7 @@ function Thread() {
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader
         title={conversation.storeName}
-        subtitle={[conversation.productName, conversation.orderReference].filter(Boolean).join(" · ") || (fr ? "Conversation avec le vendeur" : "Conversation with the seller")}
+        subtitle={[conversation.productName ? localized(conversation, "productName", fr) : null, conversation.orderReference].filter(Boolean).join(" · ") || (fr ? "Conversation avec le vendeur" : "Conversation with the seller")}
         backHref="/shop/messages"
         actions={
           <div className="flex gap-3 text-sm">

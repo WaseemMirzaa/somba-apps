@@ -248,6 +248,8 @@ export interface ChatConversationRow {
   storeLogo: string | null;
   productId: string | null;
   productName: string | null;
+  /** The product's French name (`localized(c, "productName", fr)` picks the viewer's language). */
+  productNameFr?: string | null;
   productImage: string | null;
   orderId: string | null;
   orderReference: string | null;

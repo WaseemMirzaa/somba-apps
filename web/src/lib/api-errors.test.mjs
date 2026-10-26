@@ -21,6 +21,16 @@ test("sentences with numbers and names map to French", () => {
   assert.match(localizeApiError('Only 3 of "Shoe" (Size: 42) left in stock.', "fr"), /Il ne reste que 3/);
 });
 
+test("the refund cap's sentences are French on every refund path (C-refund)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Nothing is left to refund on this order."), "Il ne reste rien à rembourser sur cette commande.");
+  assert.equal(fr("Already refunded."), "Déjà remboursé.");
+  assert.equal(fr("That is more than what is left to refund on this order ($23.00)."), "C'est plus que ce qu'il reste à rembourser sur cette commande ($23.00).");
+  assert.equal(fr("Only a completed payment can be refunded."), "Seul un paiement abouti peut être remboursé.");
+  assert.match(fr("pawaPay refused the refund: Deposit not completed"), /^pawaPay a refusé le remboursement : Deposit not completed$/);
+  assert.equal(localizeApiError("Nothing is left to refund on this order.", "en"), "Nothing is left to refund on this order.");
+});
+
 test("a bilingual sentence keeps the French half; unknown sentences pass through", () => {
   const v = "Acme is on vacation until 12 Nov 2026 and is not taking new orders. / Acme est en vacances jusqu’au 12 nov. 2026 et ne prend pas de nouvelles commandes.";
   assert.match(localizeApiError(v, "fr"), /^Acme est en vacances/);

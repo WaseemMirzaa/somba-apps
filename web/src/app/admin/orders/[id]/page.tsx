@@ -1,6 +1,7 @@
 "use client";
 
-import { paymentMethodLabel } from "@/lib/seller-labels";
+import { paymentMethodLabel } from "@/lib/payment-methods";
+import { refundFigures, refundNote } from "@/lib/refunds";
 import { localDay, localDateTime } from "@/lib/dates";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -113,8 +114,11 @@ export default function AdminOrderDetailPage() {
   const nextStatuses = nextOrderStatuses(order.status);
   const canCancel = canAdminCancel(order.status);
   const mayRefund = canMoveMoney(role);
-  const paymentRefunded = payment?.status === "refunded";
-  const canRefund = mayRefund && !!payment && payment.status === "succeeded";
+  // What is left to refund: every refund path (returns and seller cancellations too) counts, and the server refuses any more.
+  const refundState = payment ? refundFigures(payment as PaymentRow) : null;
+  const paymentRefunded = refundState?.state === "full";
+  const canRefund = mayRefund && !!payment && payment.status === "succeeded" && (refundState?.refundableUsd ?? 0) >= 0.01;
+  const refundLimit = payment ? refundNote(payment as PaymentRow, fr, (n) => formatCurrency(n, locale)) : null;
 
   // Lines from older orders carry no seller snapshot: fall back to the product's owner.
   const owner = new Map(rt.products.map((p) => [p.id, p]));
@@ -188,7 +192,7 @@ export default function AdminOrderDetailPage() {
   return (
     <div className="space-y-6">
       <RefundDialog
-        target={refundOpen && live && payment ? { orderId: live.id, orderReference: payment.orderReference ?? order.id, amountUsd: payment.amountUsd, method: payment.method } : null}
+        target={refundOpen && live && payment ? { orderId: live.id, orderReference: payment.orderReference ?? order.id, amountUsd: payment.amountUsd, method: payment.method, status: payment.status, refundedUsd: (payment as PaymentRow).refundedUsd, refundableUsd: (payment as PaymentRow).refundableUsd } : null}
         fr={fr}
         locale={locale}
         onClose={() => setRefundOpen(false)}
@@ -242,7 +246,7 @@ export default function AdminOrderDetailPage() {
                 )}
                 {canRefund && (
                   <Button size="sm" variant="reject" onClick={() => setRefundOpen(true)}>
-                    {fr ? "Rembourser" : "Refund"}
+                    {fr ? "Rembourser" : "Refund"}{refundState && refundState.state === "partial" ? ` ${formatCurrency(refundState.refundableUsd, locale)}` : ""}
                   </Button>
                 )}
                 {paymentRefunded && <Badge variant="default">{fr ? "Paiement déjà remboursé" : "Payment already refunded"}</Badge>}
@@ -256,6 +260,9 @@ export default function AdminOrderDetailPage() {
                     ? "Remboursement vers le portefeuille du client, ou vers le téléphone qui a payé quand pawaPay est connecté."
                     : "Refund to the customer's wallet, or to the phone that paid when pawaPay is connected."}
                 </p>
+              )}
+              {refundLimit && payment?.status !== "pending" && (
+                <p className="text-xs text-amber-700" data-testid="refund-limit">{refundLimit}</p>
               )}
               {actionError && <ErrorNote message={actionError} />}
             </div>
@@ -285,6 +292,12 @@ export default function AdminOrderDetailPage() {
             { label: fr ? "Référence paiement" : "Payment reference", value: payment?.reference ?? "—" },
             { label: fr ? "Statut" : "Status", value: payment ? (fr ? (PAYMENT_STATUS_FR[payment.status] ?? payment.status) : payment.status) : (fr ? "Aucun paiement enregistré" : "No payment recorded") },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(payment?.amountUsd ?? order.amount, locale) },
+            ...(refundState && refundState.refundedUsd > 0
+              ? [
+                  { label: fr ? "Déjà remboursé" : "Already refunded", value: formatCurrency(refundState.refundedUsd, locale) },
+                  { label: fr ? "Reste à rembourser" : "Left to refund", value: formatCurrency(refundState.refundableUsd, locale) },
+                ]
+              : []),
           ]} />
         </DetailGridSection>
 

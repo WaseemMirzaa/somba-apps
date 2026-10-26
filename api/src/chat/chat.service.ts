@@ -44,6 +44,8 @@ export interface ConversationView {
   storeLogo: string | null;
   productId: string | null;
   productName: string | null;
+  /** The product's French name (null without a product). The header chip shows the viewer's language and falls back to `productName`. */
+  productNameFr: string | null;
   productImage: string | null;
   orderId: string | null;
   orderReference: string | null;
@@ -133,11 +135,14 @@ export class ChatService {
     const pids = [...new Set(rows.map((c) => c.productId).filter((x): x is string => !!x))];
     const oids = [...new Set(rows.map((c) => c.orderId).filter((x): x is string => !!x))];
     const prods = new Map((pids.length ? await this.products.find({ where: { id: In(pids) } }) : []).map((p) => [p.id, p]));
+    // Both languages of each product's name (a product written in French has its English from the translator).
+    const shown = this.translations && prods.size ? await this.translations.present('product', [...prods.values()]) : new Map();
     const ords = new Map((oids.length ? await this.orders.find({ where: { id: In(oids) } }) : []).map((o) => [o.id, o]));
     return rows.map((c) => {
       const side = sideFor(c);
       const store = stores.get(c.sellerId);
       const p = c.productId ? prods.get(c.productId) : undefined;
+      const names = p ? shown.get(p.id)?.texts : undefined;
       return {
         id: c.id,
         side,
@@ -147,7 +152,8 @@ export class ChatService {
         storeName: store?.name ?? 'Store',
         storeLogo: store?.logoUrl ?? null,
         productId: c.productId,
-        productName: p?.name ?? null,
+        productName: names?.name || p?.name || null,
+        productNameFr: names?.nameFr || p?.name || null,
         productImage: p?.image ?? null,
         orderId: c.orderId,
         orderReference: c.orderId ? (ords.get(c.orderId)?.reference ?? null) : null,

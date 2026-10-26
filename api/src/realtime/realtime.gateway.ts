@@ -919,6 +919,20 @@ export class RealtimeGateway
     }
   }
 
+  /** The refund ledger (every refund of every payment, newest first): admin / finance only. `{ limit?, offset? }`. */
+  @SubscribeMessage('payments:refunds')
+  async paymentsRefunds(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body?: { limit?: number; offset?: number },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.payments.refundLog(user, body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('orders:refund')
   async ordersRefund(
     @ConnectedSocket() client: AuthedSocket,
@@ -931,8 +945,8 @@ export class RealtimeGateway
       if (!canRefund) return fail('Only admin/finance can issue refunds.');
       const toWallet = body?.toWallet !== false;
       const payment = await this.orders.refund(String(body?.orderId ?? ''), toWallet);
-      const amount = payment.refundedUsd ?? payment.amountUsd;
-      await this.audit.record({ actor: user.name, role: user.role, action: 'orders:refund', entity: 'order', entityId: String(body.orderId), detail: `${payment.orderReference ?? ''} $${amount.toFixed(2)} to ${payment.refundTo === 'phone' ? 'phone (pawaPay)' : 'wallet'}` });
+      const { amountUsd: amount, refundTo } = payment.refund; // what THIS refund paid back (payment.refundedUsd is the running total)
+      await this.audit.record({ actor: user.name, role: user.role, action: 'orders:refund', entity: 'order', entityId: String(body.orderId), detail: `${payment.orderReference ?? ''} $${amount.toFixed(2)} to ${refundTo === 'phone' ? 'phone (pawaPay)' : 'wallet'}` });
       return ok(payment);
     } catch (e) {
       return fail((e as Error).message);

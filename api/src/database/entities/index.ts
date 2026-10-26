@@ -14,6 +14,8 @@ export { DELIVERY_KINDS } from './delivery-task.entity';
 export { WalletTransaction } from './wallet-transaction.entity';
 export { Payment } from './payment.entity';
 export type { PaymentStatus, PaymentPurpose } from './payment.entity';
+export { PaymentRefund } from './payment-refund.entity';
+export type { RefundKind, RefundStatus } from './payment-refund.entity';
 export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
 export { PayoutStatementLine } from './payout-statement-line.entity';
@@ -97,6 +99,7 @@ import { Notification } from './notification.entity';
 import { DeliveryTask } from './delivery-task.entity';
 import { WalletTransaction } from './wallet-transaction.entity';
 import { Payment } from './payment.entity';
+import { PaymentRefund } from './payment-refund.entity';
 import { Payout } from './payout.entity';
 import { PayoutStatementLine } from './payout-statement-line.entity';
 import { Dispute } from './dispute.entity';
@@ -154,6 +157,7 @@ export const ENTITIES = [
   DeliveryTask,
   WalletTransaction,
   Payment,
+  PaymentRefund,
   Payout,
   PayoutStatementLine,
   Dispute,

@@ -43,7 +43,7 @@ void main() {
 
   group('inbox', () {
     void twoThreads() => server.handlers['chat:list'] = (_) => [
-          convJson(id: 'a', unread: 2, productId: 'p1', productName: 'Running shoes', preview: 'It is in stock', at: '2026-10-24T09:30:00Z'),
+          convJson(id: 'a', unread: 2, productId: 'p1', productName: 'Running shoes', productNameFr: 'Baskets de running', preview: 'It is in stock', at: '2026-10-24T09:30:00Z'),
           convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042', preview: 'Your parcel left today', at: '2026-10-20T09:30:00Z'),
         ];
 
@@ -109,7 +109,7 @@ void main() {
       twoThreads();
       await open(tester, const ChatInboxScreen(locale: Locale('fr')), lang: 'fr');
       expect(find.text('Mes messages'), findsOneWidget);
-      expect(find.text('À propos de : Running shoes'), findsOneWidget);
+      expect(find.text('À propos de : Baskets de running'), findsOneWidget); // the product in French, not the English name
       expect(find.text('Commande SOM-1042'), findsOneWidget);
     });
 

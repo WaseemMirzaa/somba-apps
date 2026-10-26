@@ -46,10 +46,6 @@ function OrderDetail() {
     return m ? (fr ? m.fr : m.en) : status;
   };
 
-  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
-  const paymentMethodLabel = (method: string) =>
-    fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
-
   // The raw order carries the per-line seller state the detail view model leaves out.
   const raw = order ? rt.orders.find((o) => o.id === order.id) : undefined;
   const rawItems = raw?.items ?? [];
@@ -190,7 +186,7 @@ function OrderDetail() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Moyen" : "Method", value: paymentMethodLabel(order.paymentMethod) },
+            { label: fr ? "Moyen" : "Method", value: formatPaymentMethod(order.paymentMethodId ?? order.paymentMethod, locale) },
             { label: fr ? "Statut" : "Status", value: paymentStatusLabel(order.paymentStatus) },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(order.amount, locale) },
           ]} />

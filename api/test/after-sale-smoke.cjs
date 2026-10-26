@@ -236,6 +236,27 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   const tx = (await req(cust.sock, 'wallet:transactions')).data;
   ok(tx.some((t) => /returned items/.test(t.description) && t.descriptionFr?.includes('articles retournés')), 'the wallet line says what it was for, in French too');
 
+  section('Refund record (C-refund): the return refund is on the payment, in the ledger and in finance');
+  const payO1 = (await sql('SELECT id, reference, amountUsd, status, refundedUsd FROM payments WHERE orderId = ?', [o1.id]))[0];
+  ok(Math.abs(Number(payO1.refundedUsd) - expected) < 0.01 && payO1.status === 'succeeded', 'the payment carries the running total of its refunds and stays open for the rest', JSON.stringify(payO1));
+  const ledO1 = await sql('SELECT amountUsd, refundTo, kind, status, disputeId, disputeReference FROM payment_refunds WHERE paymentId = ?', [payO1.id]);
+  ok(ledO1.length === 1 && Math.abs(ledO1[0].amountUsd - expected) < 0.01 && ledO1[0].kind === 'return' && ledO1[0].refundTo === 'wallet' && ledO1[0].status === 'completed', 'the refund ledger has one row: the return, to the wallet', JSON.stringify(ledO1));
+  ok(ledO1[0] && ledO1[0].disputeId === r1.id && ledO1[0].disputeReference === closed.reference, 'and it names which return it was', JSON.stringify(ledO1[0]));
+  const listedO1 = (await req(admin.sock, 'payments:list')).data.find((p) => p.id === payO1.id);
+  ok(!!listedO1 && Math.abs(listedO1.refundedUsd - expected) < 0.01 && Math.abs(listedO1.refundableUsd - (payO1.amountUsd - expected)) < 0.01, 'the admin payment list shows what is refunded and what is left', JSON.stringify(listedO1 && [listedO1.refundedUsd, listedO1.refundableUsd]));
+  const refundLog = await req(admin.sock, 'payments:refunds');
+  ok(refundLog.ok && refundLog.data.some((r) => r.paymentId === payO1.id && r.disputeReference === closed.reference && r.paymentReference === payO1.reference && Math.abs(r.amountUsd - expected) < 0.01), 'the admin Refunds page can list it (amount, method, date, which return)', refundLog.error ?? '');
+  ok(!(await req(cust.sock, 'payments:refunds')).ok && !(await req(agent.sock, 'payments:refunds')).ok, 'only admin and finance read the refund ledger');
+  const finO1 = await req(admin.sock, 'analytics:finance');
+  ok(finO1.ok && finO1.data.refundsUsd >= expected - 0.01 && finO1.data.refundsCount >= 1, 'finance counts the return refund (Refunds is no longer $0)', finO1.ok ? JSON.stringify([finO1.data.refundsUsd, finO1.data.refundsCount]) : finO1.error);
+  const dupO1 = await req(admin.sock, 'orders:refund', { orderId: o1.id, toWallet: true });
+  const balDup = await balance(cust);
+  ok(dupO1.ok && Math.abs(dupO1.data.refund.amountUsd - (payO1.amountUsd - expected)) < 0.01, 'an admin refund of that order pays only what is left, never the $40 again', dupO1.ok ? String(dupO1.data.refund.amountUsd) : dupO1.error);
+  ok(Math.abs(balDup - (refundBefore + payO1.amountUsd)) < 0.01, 'the customer got back exactly what was paid, in total', `${refundBefore} -> ${balDup} (paid ${payO1.amountUsd})`);
+  const again = await req(admin.sock, 'orders:refund', { orderId: o1.id, toWallet: true });
+  ok(!again.ok && /Already refunded/.test(again.error ?? ''), 'a second refund of it is refused', again.error ?? '');
+  ok((await sql('SELECT ROUND(SUM(amountUsd), 2) AS t FROM payment_refunds WHERE paymentId = ?', [payO1.id]))[0].t == payO1.amountUsd, 'the refunds add up to exactly the amount paid');
+
   section('Returns: the warehouse grades the goods');
   const item = closed.items[0];
   ok(!(await req(cust.sock, 'returns:grade', { id: r1.id, grades: [{ itemId: item.id, condition: 'resellable' }] })).ok, 'a customer cannot grade');
@@ -603,7 +624,7 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(await hasNotice(agent, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'a support agent gets the new-ticket notice');
   ok(await hasNotice(finance, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'so does every other admin role (finance)');
   ok(await hasNotice(admin, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'and the super admin');
-  ok(!(await req(cust.sock, 'support:open', { subject: 'Order that is not mine', message: 'hello there', orderId: o1.id.replace(/.$/, '0') })).ok, 'an order that does not exist is refused');
+  ok(!(await req(cust.sock, 'support:open', { subject: 'Order that is not mine', message: 'hello there', orderId: o1.id.replace(/.$/, (c) => (c === '0' ? '1' : '0')) })).ok, 'an order that does not exist is refused');
   ok(!(await req(other.sock, 'support:open', { subject: 'Order that is not mine', message: 'hello there', orderId: supO.id })).ok, "and so is someone else's order");
   a = await req(cust.sock, 'support:open', { subject: 'Bad photo', message: 'hello there', attachments: ['https://evil.example/a.png'] });
   ok(!a.ok, 'a photo that is not an upload is refused');

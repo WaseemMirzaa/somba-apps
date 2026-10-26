@@ -44,6 +44,28 @@ describe('geo gateway', () => {
     expect((await gw.create(as('a1', 'admin'), { parentId: await id('CD-HK-LUB'), level: 'commune', name: 'Zed' })).ok).toBe(true);
   });
 
+  it('geo:get names the area an order was placed for, with its chain, for anyone signed in (bug 4: admin order page)', async () => {
+    const gombe = await id('CD-KN-GOM');
+    const got = await gw.getArea(as('a1', 'admin'), { id: gombe });
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    expect(got.data.area).toMatchObject({ id: gombe, code: 'CD-KN-GOM', name: 'Gombe', level: 'commune' });
+    expect(got.data.chain.map((a) => a.level)).toEqual(['country', 'province', 'city', 'district', 'commune']);
+    expect(got.data.chain.at(-1)!.id).toBe(gombe);
+    // by code, and the English name of a province differs from the French one
+    const nk = await gw.getArea(as('c1', 'customer'), { code: 'CD-NK' });
+    expect(nk.ok && nk.data.area).toMatchObject({ name: 'Nord-Kivu', nameEn: 'North Kivu' });
+    // an area an admin switched off is still named (the order keeps it) ...
+    await w.geo.update({ id: gombe, active: false });
+    const hidden = await gw.getArea(as('s1', 'seller'), { id: gombe });
+    expect(hidden.ok && hidden.data.area).toMatchObject({ code: 'CD-KN-GOM', active: false });
+    // ... but a guest (a read-only socket) is not signed in, and an unknown id is an error
+    expect(await gw.getArea(GUEST, { id: gombe })).toEqual({ ok: false, error: 'Sign in to continue.' });
+    expect(await gw.getArea({ data: {} } as never, { id: gombe })).toEqual({ ok: false, error: 'Sign in to continue.' });
+    expect(await gw.getArea(as('a1', 'admin'), { id: 'nope' })).toEqual({ ok: false, error: 'Area not found.' });
+    expect(await gw.getArea(as('a1', 'admin'), { code: 'CD-XX' })).toEqual({ ok: false, error: 'Area not found.' });
+  });
+
   it('a rider reads their own warehouse coverage (and no other), a manager too, an operator and a customer cannot', async () => {
     const rider = await mkUser('rider', L.id);
     const mine = await gw.hubCoverage(as(rider.id, 'rider'), { hubId: L.id });

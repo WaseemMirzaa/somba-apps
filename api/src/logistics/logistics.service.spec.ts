@@ -11,6 +11,9 @@ import { RolesService } from '../ops/roles.service';
 import { RiderService } from '../warehouse/rider.service';
 import { AuthService } from '../auth/auth.service';
 import { geoWorld } from '../testing/geo-world';
+import { testTranslations } from '../testing/test-db';
+import { OrderItemTranslationSubscriber } from '../translation/order-item-translation.subscriber';
+import type { TranslationService } from '../translation/translation.service';
 
 /**
  * The whole journey on a real (in-memory SQLite) schema: routing, the three legs, scanning in, hub scoping, tiers,
@@ -988,6 +991,76 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       const done = await runs.receive(staff(limete, 'operator'), { runId: run.id });
       expect(done.receivedCount).toBe(1);
       expect((await tasksOf(order.id)).some((t) => t.kind === 'return_to_seller' && t.fromHubId === limete.id)).toBe(true);
+    });
+  });
+
+  // The desk, the rider portal and the apps read the cargo of a leg in the viewer's language: the leg carries both names.
+  describe('French names on the legs (the cargo of a task)', () => {
+    let tr: TranslationService;
+    beforeEach(() => {
+      tr = testTranslations(ds);
+      new OrderItemTranslationSubscriber(ds, tr); // registers itself on the data source, like TranslationModule does
+    });
+    const cargo = (t: DeliveryTask) => JSON.parse(t.itemsJson as string) as { orderItemId?: string; name: string; nameFr?: string; qty: number }[];
+    const snapshotFr = (line: OrderItem, value: string) => tr.snapshot(ds.manager, [{ entityId: line.id, field: 'productName', locale: 'fr', value }]);
+
+    it('a new pickup stores the French name next to the base name', async () => {
+      const order = await mkOrder([sellerG]);
+      await snapshotFr(order.items[0], 'Chose');
+      const [pickup] = await logistics.planOrder(order);
+      expect(cargo(pickup)).toEqual([expect.objectContaining({ orderItemId: order.items[0].id, name: 'Thing', nameFr: 'Chose', qty: 1 })]);
+      expect((await logistics.view(pickup)).items[0]).toMatchObject({ name: 'Thing', nameFr: 'Chose' });
+    });
+
+    it('lines placed unsaved (as checkout passes them) are read back for their French name', async () => {
+      const order = await mkOrder([sellerG]);
+      await snapshotFr(order.items[0], 'Chose');
+      const unsaved = { ...order, items: order.items.map((i) => ({ ...i, productNameFr: undefined })) } as Order;
+      const [pickup] = await logistics.planOrder(unsaved);
+      expect(cargo(pickup)[0].nameFr).toBe('Chose');
+    });
+
+    it('a leg made before the fix (no nameFr in its cargo) is served with the order line\'s French name', async () => {
+      const { order } = await place([sellerG]);
+      const [pickup] = await tasksOf(order.id);
+      await snapshotFr(order.items[0], 'Chose');
+      await ds.getRepository(DeliveryTask).update({ id: pickup.id }, { itemsJson: JSON.stringify([{ orderItemId: order.items[0].id, productId: order.items[0].productId, name: 'Thing', qty: 1 }]) });
+      const old = (await ds.getRepository(DeliveryTask).findOne({ where: { id: pickup.id } }))!;
+      expect(cargo(old)[0].nameFr).toBeUndefined(); // as stored
+      expect((await logistics.view(old)).items[0]).toMatchObject({ name: 'Thing', nameFr: 'Chose' });
+      expect((await logistics.viewMany([old], 'seller'))[0].items[0].nameFr).toBe('Chose');
+    });
+
+    it('a name carried without ids is matched by its name; one nothing can name keeps the base name', async () => {
+      const { order } = await place([sellerG]);
+      const [pickup] = await tasksOf(order.id);
+      await snapshotFr(order.items[0], 'Chose');
+      await ds.getRepository(DeliveryTask).update({ id: pickup.id }, { itemsJson: JSON.stringify([{ name: 'Thing', qty: 2 }, { name: 'Unknown gadget', qty: 1 }]) });
+      const items = (await logistics.view((await ds.getRepository(DeliveryTask).findOne({ where: { id: pickup.id } }))!)).items;
+      expect(items[0]).toMatchObject({ name: 'Thing', nameFr: 'Chose', qty: 2 });
+      expect(items[1].name).toBe('Unknown gadget');
+      expect(items[1].nameFr).toBeUndefined();
+    });
+
+    it('a broken or empty cargo is no cargo, not an error', async () => {
+      const { order } = await place([sellerG]);
+      const [pickup] = await tasksOf(order.id);
+      for (const itemsJson of [null, '', 'not json', '{"a":1}']) {
+        await ds.getRepository(DeliveryTask).update({ id: pickup.id }, { itemsJson });
+        expect((await logistics.view((await ds.getRepository(DeliveryTask).findOne({ where: { id: pickup.id } }))!)).items).toEqual([]);
+      }
+    });
+
+    it('the legs of a return and of a replacement carry it too', async () => {
+      const { order } = await place([sellerG]);
+      await ds.getRepository(Order).update({ id: order.id }, { status: 'delivered' });
+      await snapshotFr(order.items[0], 'Chose');
+      const ret = await logistics.createReturnPickup({ disputeId: 'dfr', orderId: order.id });
+      expect(cargo(ret)[0]).toMatchObject({ name: 'Thing', nameFr: 'Chose' });
+      await ds.getRepository('Replacement').save({ reference: 'REP-FR', orderId: order.id, orderReference: order.reference, customerId: 'cust1', customerName: 'M', sellerId: sellerG.id, sku: 'S', productName: 'Thing', qty: 1, status: 'approved' } as never);
+      const rep = (await ds.getRepository('Replacement').findOne({ where: { reference: 'REP-FR' } })) as { id: string };
+      const leg = await logistics.createReplacementDelivery({ replacementId: rep.id, orderId: order.id });
+      expect(cargo(leg)[0]).toMatchObject({ name: 'Thing', nameFr: 'Chose' });
     });
   });
 

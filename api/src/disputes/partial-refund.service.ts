@@ -2,9 +2,11 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Opt
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, OrderItem, Payment } from '../database/entities';
+import type { PaymentRefund } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayUnavailableError } from '../payments/pawapay.provider';
 import { PaymentsService } from '../payments/payments.service';
+import { NOTHING_LEFT_TO_REFUND, recordRefund, refundTooMuch, refundableUsd, revertRefund } from '../payments/refund-ledger';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 
@@ -20,6 +22,8 @@ export interface PartialRefundInput {
   memo: string;
   /** Which order lines the money belongs to (their `refundedUsd` grows). Omitted: spread over what is left on every line. */
   lines?: { orderItemId: string; usd: number }[];
+  /** Which request this refund belongs to, for the ledger: a return's refund (`return`) or an admin's dispute decision (`dispute`). */
+  source?: { kind: 'return' | 'dispute'; disputeId: string; disputeReference: string };
 }
 
 export interface PartialRefundResult {
@@ -27,13 +31,16 @@ export interface PartialRefundResult {
   /** Where the money really went. */
   to: 'wallet' | 'phone';
   payment: Payment;
+  /** The ledger row this refund wrote. */
+  refund: PaymentRefund;
 }
 
 /**
  * Pays back PART of an order: the items a customer returned, or an amount an admin decided on. The existing
  * `PaymentsService.refund` pays back everything still outstanding and closes the order; this one keeps the order and
- * the payment open and writes the amount on the order lines (`order_items.refundedUsd`), which is also what
- * `PaymentsService.outstanding` reads, so a later full refund can never pay the same money twice.
+ * the payment open, writes the amount on the order lines (`order_items.refundedUsd`) and records it in the refund
+ * ledger (`payment_refunds`, with the running total `payments.refundedUsd`) like every refund, so a later full refund
+ * can never pay the same money twice and the admin Refunds page and the finance figures count it.
  */
 @Injectable()
 export class PartialRefundService {
@@ -53,8 +60,8 @@ export class PartialRefundService {
   /** What is still refundable on the order's payment. */
   async outstanding(orderId: string): Promise<number> {
     const [payment, order] = await Promise.all([this.paymentsSvc.forOrder(orderId), this.orders.findOne({ where: { id: orderId } })]);
-    if (!payment || !order || payment.status !== 'succeeded') return 0;
-    return PaymentsService.outstanding(payment.amountUsd, order);
+    if (!payment || !order) return 0;
+    return refundableUsd(payment, order.items);
   }
 
   /** The money a set of units is worth: price x qty, less the promo discount's share (the promo is spread over lines pro rata). */
@@ -73,42 +80,33 @@ export class PartialRefundService {
     if (payment.status !== 'succeeded') throw new BadRequestException('Only a completed payment can be refunded.');
     const order = await this.orders.findOne({ where: { id: input.orderId } });
     if (!order) throw new NotFoundException('Order not found.');
-    // C-R3: never pay back more than is left on the payment (lines a seller cancelled or an earlier return already refunded are out).
-    const left = PaymentsService.outstanding(payment.amountUsd, order);
-    if (amount > left + 0.009) {
-      throw new BadRequestException(`That is more than what is left to refund on this order ($${left.toFixed(2)}).`);
-    }
+    // C-refund (service): never pay back more than is left on the payment (what a seller cancelled and earlier returns
+    // already took is out); the clear sentence says how much is left. recordRefund checks it again in the transaction.
+    const left = refundableUsd(payment, order.items);
+    if (left < 0.01) throw new BadRequestException(NOTHING_LEFT_TO_REFUND);
+    if (amount > left + 0.009) throw new BadRequestException(refundTooMuch(left));
     const toPhone = input.toWallet === false && this.paymentsSvc.canRefundToPhone(payment) && !payment.refundRef;
     const refundRef = toPhone ? this.pawapay!.newId() : null;
     const spread = this.attribute(order, amount, input.lines);
-    const closes = left - amount < 0.01;
 
-    const won = await this.payments.manager.transaction(async (m) => {
-      // Of two refunds racing for the same money, the payment row serialises them: the second re-reads what is left.
-      const lock = m.connection.options.type === 'mysql' ? ({ mode: 'pessimistic_write' } as const) : undefined; // SQLite already serialises writers
-      const locked = await m.findOne(Payment, { where: { id: payment.id }, lock });
-      if (!locked || locked.status !== 'succeeded') return false;
-      const items = await m.find(OrderItem, { where: { orderId: order.id } });
-      if (amount > PaymentsService.outstanding(locked.amountUsd, { items }) + 0.009) return false;
-      const guard = await m
-        .createQueryBuilder()
-        .update(Payment)
-        .set({
-          updatedAt: new Date(),
-          ...(closes ? { status: 'refunded' as const } : {}),
-          ...(toPhone ? { refundTo: 'phone' as const, refundRef, refundStatus: 'sending' as const, refundedUsd: amount } : {}),
-          ...(!toPhone && closes ? { refundTo: 'wallet' as const, refundStatus: 'completed' as const, refundedUsd: amount } : {}),
-        })
-        .where("id = :id AND status = 'succeeded'", { id: payment.id })
-        .execute();
-      if (!guard.affected) return false;
+    // Of two refunds racing for the same money, the payment row serialises them: the second is refused with what is left.
+    const entry = await this.payments.manager.transaction(async (m) => {
+      const { entry: recorded } = await recordRefund(m, {
+        payment,
+        amountUsd: amount,
+        to: toPhone ? 'phone' : 'wallet',
+        kind: input.source?.kind ?? 'dispute',
+        memo: input.memo,
+        refundRef,
+        disputeId: input.source?.disputeId,
+        disputeReference: input.source?.disputeReference,
+      });
       for (const [id, usd] of spread) {
         await m.createQueryBuilder().update(OrderItem).set({ refundedUsd: () => `ROUND(refundedUsd + ${usd}, 2)` }).where('id = :id', { id }).execute();
       }
       if (!toPhone) await this.wallet.apply(payment.userId, 'refund', amount, input.memo, m);
-      return true;
+      return recorded;
     });
-    if (!won) throw new BadRequestException('That money was just refunded. Refresh and try again.');
 
     if (toPhone) {
       try {
@@ -117,7 +115,7 @@ export class PartialRefundService {
         if (!(e instanceof PawapayUnavailableError)) {
           // pawaPay said no: undo, so the money can go to the wallet instead.
           await this.payments.manager.transaction(async (m) => {
-            await m.update(Payment, { id: payment.id }, { status: 'succeeded', refundTo: null, refundRef: null, refundStatus: null, refundedUsd: null });
+            await revertRefund(m, entry);
             for (const [id, usd] of spread) {
               await m.createQueryBuilder().update(OrderItem).set({ refundedUsd: () => `ROUND(refundedUsd - ${usd}, 2)` }).where('id = :id', { id }).execute();
             }
@@ -131,7 +129,7 @@ export class PartialRefundService {
     }
 
     const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
-    const view = { ...saved, phone: saved.phone ? `${saved.phone.slice(0, 4)}…${saved.phone.slice(-2)}` : null };
+    const view = { ...saved, phone: saved.phone ? `${saved.phone.slice(0, 4)}…${saved.phone.slice(-2)}` : null, refundableUsd: refundableUsd(saved) };
     this.emitter.toUser(saved.userId, 'payment:updated', view);
     this.emitter.toRoles(FINANCE_ROLES, 'payment:updated', view);
     const fresh = await this.orders.findOne({ where: { id: order.id } });
@@ -147,7 +145,7 @@ export class PartialRefundService {
       type: 'payment',
       entityId: input.orderId,
     });
-    return { refundedUsd: amount, to: toPhone ? 'phone' : 'wallet', payment: saved };
+    return { refundedUsd: amount, to: toPhone ? 'phone' : 'wallet', payment: saved, refund: entry };
   }
 
   /** The line each part of the money belongs to: as given, else spread over what is still refundable on each line. */

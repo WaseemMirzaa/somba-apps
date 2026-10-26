@@ -116,6 +116,8 @@ export interface TxnRow {
   kind: "sale" | "refund" | "payout";
   reference: string;
   description: string;
+  /** The same line with the product's French name (sales and refunds). Pages show the viewer's language: `localized(row, "description", fr)`. */
+  descriptionFr?: string;
   grossUsd: number;
   commissionUsd: number;
   amountUsd: number;

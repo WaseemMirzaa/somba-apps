@@ -6,6 +6,8 @@ import type { Seller } from '../database/entities';
 import { commerceWorld } from '../testing/commerce-db';
 import type { World } from '../testing/commerce-db';
 import { pdfText } from '../testing/pdf-text';
+import { testTranslations } from '../testing/test-db';
+import { OrderItemTranslationSubscriber } from '../translation/order-item-translation.subscriber';
 
 const H = 3_600_000;
 
@@ -296,6 +298,55 @@ describe('transactions', () => {
     const csv = (await w.finance.transactions(owner, { format: 'csv' })) as { csv: string };
     expect(csv.csv.split('\r\n')[0]).toBe('﻿Date,Kind,Reference,Description,Sales USD,Commission USD,Amount USD,Status');
     expect(csv.csv.split('\r\n').filter(Boolean)).toHaveLength(5);
+  });
+});
+
+describe('transactions name the product in the viewer\'s language (bug 2)', () => {
+  type Row = { kind: string; description: string; descriptionFr?: string; line?: unknown };
+  const ledger = async (input: Record<string, unknown> = {}) => (await w.finance.transactions(owner, input)) as unknown as { items: Row[] };
+  let tr: ReturnType<typeof testTranslations>;
+  beforeEach(() => {
+    tr = testTranslations(w.ds);
+    new OrderItemTranslationSubscriber(w.ds, tr); // registers itself, like TranslationModule does
+  });
+  const snap = (itemId: string, field: 'productName' | 'variant', value: string) => tr.snapshot(w.ds.manager, [{ entityId: itemId, field, locale: 'fr', value }]);
+
+  it('a sale and a refund carry the French description next to the English one', async () => {
+    const a = await sale({ hoursAgo: 200, price: 20, qty: 2, name: 'Running shoes' });
+    const b = await sale({ hoursAgo: 100, price: 10, status: 'returned', name: 'Blue T-shirt' });
+    await snap(a.item.id, 'productName', 'Baskets de running');
+    await snap(b.item.id, 'productName', 'T-shirt bleu');
+    const r = await ledger();
+    const by = Object.fromEntries(r.items.map((e) => [e.kind, e]));
+    expect(by.sale).toMatchObject({ description: '2 × Running shoes', descriptionFr: '2 × Baskets de running' });
+    expect(by.refund).toMatchObject({ description: '1 × Blue T-shirt', descriptionFr: '1 × T-shirt bleu' });
+    expect('line' in by.sale).toBe(false); // the helper field stays on the server
+  });
+
+  it('the option label is French too; a payout has no product to name', async () => {
+    const a = await sale({ hoursAgo: 200, price: 20, name: 'Hat' });
+    await w.ds.getRepository(OrderItem).update({ id: a.item.id }, { variant: 'Colour: Blue' });
+    await snap(a.item.id, 'productName', 'Chapeau');
+    await snap(a.item.id, 'variant', 'Couleur : Bleu');
+    await payoutWith('requested', [a.item], { amountUsd: 8 });
+    const r = await ledger();
+    expect(r.items.find((e) => e.kind === 'sale')).toMatchObject({ description: '1 × Hat (Colour: Blue)', descriptionFr: '1 × Chapeau (Couleur : Bleu)' });
+    expect(r.items.find((e) => e.kind === 'payout')!.descriptionFr).toBeUndefined();
+  });
+
+  it('a product with no French name is named by its base name (the page shows it in both languages)', async () => {
+    await sale({ hoursAgo: 200, price: 20, name: 'Lamp' });
+    expect((await ledger()).items[0]).toMatchObject({ description: '1 × Lamp', descriptionFr: '1 × Lamp' });
+  });
+
+  it('the French CSV uses the French description; the English one is unchanged', async () => {
+    const a = await sale({ hoursAgo: 200, price: 20, name: 'Running shoes' });
+    await snap(a.item.id, 'productName', 'Baskets de running');
+    const fr = (await w.finance.transactions(owner, { format: 'csv', locale: 'fr' })) as { csv: string };
+    expect(fr.csv).toContain('1 × Baskets de running');
+    expect(fr.csv).not.toContain('Running shoes');
+    const en = (await w.finance.transactions(owner, { format: 'csv' })) as { csv: string };
+    expect(en.csv).toContain('1 × Running shoes');
   });
 });
 

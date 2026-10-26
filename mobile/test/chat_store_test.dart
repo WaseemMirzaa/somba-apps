@@ -29,6 +29,17 @@ void main() {
       expect(c.hasContext, isTrue);
     });
 
+    test('the product is named in the reader\'s language, falling back to the other one', () {
+      final both = ChatConversation.fromJson(convJson(productId: 'p1', productName: 'Running shoes', productNameFr: 'Baskets de running'));
+      expect(both.displayProductName('en'), 'Running shoes');
+      expect(both.displayProductName('fr'), 'Baskets de running');
+      final englishOnly = ChatConversation.fromJson(convJson(productId: 'p1', productName: 'Running shoes'));
+      expect(englishOnly.displayProductName('fr'), 'Running shoes', reason: 'an older server sends no French name');
+      final frenchOnly = ChatConversation.fromJson(convJson(productId: 'p1', productNameFr: 'Baskets de running'));
+      expect(frenchOnly.displayProductName('en'), 'Baskets de running');
+      expect(ChatConversation.fromJson(convJson()).displayProductName('fr'), isNull, reason: 'no product, no name');
+    });
+
     test('a bare conversation (every optional field missing) still parses', () {
       final c = ChatConversation.fromJson({'id': 'c1'});
       expect(c.storeName, '');

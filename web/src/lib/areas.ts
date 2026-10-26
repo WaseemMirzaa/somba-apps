@@ -100,23 +100,8 @@ export const LEVEL_LABEL: Record<AreaLevel, L> = {
 
 export const levelLabel = (level: AreaLevel, fr: boolean) => (fr ? LEVEL_LABEL[level].fr : LEVEL_LABEL[level].en);
 
-/** An area's name in the reader's language: English falls back to the French (official) name. */
-export function areaName(a: Pick<Area, "name" | "nameEn"> | null | undefined, fr: boolean): string {
-  if (!a) return "";
-  return fr ? a.name : a.nameEn || a.name;
-}
-
-/** The chain as one line, most specific first: "Limete, Mont-Amba, Kinshasa". Countries are left out. */
-export function chainText(chain: AreaChain | null | undefined, fr: boolean, opts: { skipLevels?: AreaLevel[]; max?: number } = {}): string {
-  const skip = new Set<AreaLevel>(["country", ...(opts.skipLevels ?? [])]);
-  const names: string[] = [];
-  for (const a of [...(chain ?? [])].reverse()) {
-    if (skip.has(a.level)) continue;
-    const n = areaName(a, fr);
-    if (n && names[names.length - 1] !== n) names.push(n);
-  }
-  return names.slice(0, opts.max ?? names.length).join(", ");
-}
+export { areaName, chainText, deliveryAreaText, type QuotedArea } from "@/lib/area-names";
+import { areaName } from "@/lib/area-names";
 
 /** What goes in the address text fields: Google's spelling, so the server's matching and the display agree. */
 export const googleText = (a: Area | null | undefined, fr: boolean): string => (a ? (fr ? a.googleName : a.googleNameEn || a.googleName) || a.name : "");
@@ -139,6 +124,7 @@ export const isHidden = (a: Area) => a.active === false;
 // ───────────────────────────── requests + cache ─────────────────────────────
 
 const childCache = new Map<string, Promise<Area[]>>();
+const areaCache = new Map<string, Promise<AreaChain>>();
 const communeCache = new Map<string, Promise<CommuneRow[]>>();
 let treeCache: Promise<AreaNode | null> | null = null;
 let servedCitiesCache: Promise<Area[] | null> | null = null;
@@ -152,6 +138,7 @@ export function invalidateGeo(): void {
   invalidateTimer = setTimeout(() => {
     invalidateTimer = null;
     childCache.clear();
+    areaCache.clear();
     communeCache.clear();
     treeCache = null;
     servedCitiesCache = null;
@@ -197,6 +184,41 @@ export function geoChildren(parentId: string | null): Promise<Area[]> {
     p.catch(() => childCache.delete(key));
   }
   return p;
+}
+
+/** One area by id with its ancestors (country first), hidden areas included (`geo:get`). Cached until the geography changes. */
+export function geoAreaChain(id: string): Promise<AreaChain> {
+  let p = areaCache.get(id);
+  if (!p) {
+    p = socketClient.request<{ chain?: AreaChain }>("geo:get", { id }).then((r) => (Array.isArray(r?.chain) ? r.chain : []));
+    areaCache.set(id, p);
+    p.catch(() => areaCache.delete(id));
+  }
+  return p;
+}
+
+/**
+ * The area an order was placed for, from its stored `destinationAreaId`, with its ancestors. `chain` is null while it
+ * loads (or when there is no id, or the server could not name it): the caller then falls back to the quote.
+ */
+export function useStoredAreaChain(areaId: string | null | undefined): { chain: AreaChain | null; loading: boolean } {
+  const version = useGeoVersion();
+  const rt = useRealtime();
+  const [state, setState] = useState<{ key: string; chain: AreaChain | null } | null>(null);
+  const connected = rt.status === "connected";
+  const key = `${areaId ?? ""}:${version}`;
+  useEffect(() => {
+    if (!areaId || !connected) return;
+    let alive = true;
+    geoAreaChain(areaId)
+      .then((chain) => alive && setState({ key, chain: chain.length ? chain : null }))
+      .catch(() => alive && setState({ key, chain: null }));
+    return () => {
+      alive = false;
+    };
+  }, [areaId, connected, key]);
+  const settled = !!areaId && state?.key === key;
+  return { chain: settled ? state.chain : null, loading: !!areaId && !settled };
 }
 
 /** How the communes of a city are read: the one-call events, or (an old server) one call per district. */

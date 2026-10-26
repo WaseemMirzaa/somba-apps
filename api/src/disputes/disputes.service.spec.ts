@@ -10,9 +10,9 @@ let emitter: ReturnType<typeof recordingEmitter>;
 let notices: { to: string; title: string; body: string; type?: string; entityId?: string }[];
 let settingsMap: Record<string, string | null>;
 let restocks: { id: string; qty: number; opts: unknown }[];
-let refundCalls: { orderId: string; amountUsd: number; toWallet: boolean; lines?: { orderItemId: string; usd: number }[] }[];
+let refundCalls: { orderId: string; amountUsd: number; toWallet: boolean; memo?: string; lines?: { orderItemId: string; usd: number }[]; source?: { kind: string; disputeId: string; disputeReference: string } }[];
 let outstanding: number;
-let fullRefunds: { orderId: string; toWallet: boolean }[];
+let fullRefunds: { orderId: string; toWallet: boolean; source?: unknown }[];
 let pickups: unknown[];
 let pickupAnswer: { id: string } | null;
 let replacementsMade: unknown[];
@@ -67,7 +67,7 @@ beforeEach(async () => {
   };
   const notifications = { toUser: record('user:'), toUsers: record('user:'), toRole: record('role:') };
   const payments = {
-    refund: async (orderId: string, toWallet: boolean) => (fullRefunds.push({ orderId, toWallet }), { refundedUsd: outstanding }),
+    refund: async (orderId: string, toWallet: boolean, source?: unknown) => (fullRefunds.push({ orderId, toWallet, source }), { refund: { amountUsd: outstanding } }),
   };
   const refunds = {
     outstanding: async () => outstanding,
@@ -333,6 +333,8 @@ describe('goods back, grading and the refund', () => {
     expect(refundCalls).toHaveLength(1);
     expect(refundCalls[0]).toMatchObject({ orderId: o.id, amountUsd: 40, toWallet: true });
     expect(refundCalls[0].lines).toEqual([{ orderItemId: o.items[0].id, usd: 40 }]);
+    // the ledger row says WHICH return it paid (the admin Refunds page shows it)
+    expect(refundCalls[0].source).toEqual({ kind: 'return', disputeId: d.id, disputeReference: d.reference });
     expect(done).toMatchObject({ status: 'resolved', outcome: 'return_refund', refundUsd: 40, stage: 'closed' });
     expect(done.receivedAt).toBeTruthy();
     expect(titles('user:c1')).toContain('Return received');
@@ -466,7 +468,7 @@ describe('disputes: the thread and support’s decision', () => {
     await expect(svc.decide(admin, d.id, { outcome: 'refund_partial', amountUsd: 0 }, true)).rejects.toThrow('Enter the amount');
     await expect(svc.decide(admin, d.id, { outcome: 'banana' }, true)).rejects.toThrow('Outcome must be one of');
     const done = await svc.decide(admin, d.id, { outcome: 'refund_partial', amountUsd: 7.5, reason: 'The charger was missing' }, true);
-    expect(refundCalls).toEqual([{ orderId: o.id, amountUsd: 7.5, toWallet: true, memo: `Refund for ${o.reference} (dispute)` }]);
+    expect(refundCalls).toEqual([{ orderId: o.id, amountUsd: 7.5, toWallet: true, memo: `Refund for ${o.reference} (dispute)`, source: { kind: 'dispute', disputeId: d.id, disputeReference: d.reference } }]);
     expect(done).toMatchObject({ status: 'resolved', outcome: 'refund_partial', refundUsd: 7.5, resolution: 'The charger was missing', stage: 'closed' });
     expect(titles('user:c1')).toContain('Dispute resolved');
     expect(titles('user:su1')).toContain('Dispute resolved');
@@ -477,7 +479,7 @@ describe('disputes: the thread and support’s decision', () => {
     const a = await dispute();
     outstanding = 33;
     const full = await svc.decide(admin, a.d.id, { outcome: 'refund_full' }, true);
-    expect(fullRefunds).toEqual([{ orderId: a.o.id, toWallet: true }]);
+    expect(fullRefunds).toEqual([{ orderId: a.o.id, toWallet: true, source: { kind: 'dispute', disputeId: a.d.id, disputeReference: a.d.reference } }]);
     expect(full).toMatchObject({ outcome: 'refund_full', refundUsd: 33, resolution: 'Refunded to wallet' });
 
     const b = await dispute();

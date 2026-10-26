@@ -64,6 +64,8 @@ export interface ChatConversation {
   storeLogo: string | null;
   productId: string | null;
   productName: string | null;
+  /** The product's French name: the header chip shows the viewer's language (`localized(c, "productName", fr)`). */
+  productNameFr?: string | null;
   productImage: string | null;
   orderId: string | null;
   orderReference: string | null;

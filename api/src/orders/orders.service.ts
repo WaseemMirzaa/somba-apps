@@ -21,6 +21,7 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
+import { recordRefund } from '../payments/refund-ledger';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { CouponsService } from '../content/coupons.service';
@@ -781,11 +782,13 @@ export class OrdersService {
         .where("id IN (:...ids) AND fulfilment IN ('open','ready')", { ids: targets.map((i) => i.id) })
         .execute();
       if ((claim.affected ?? 0) !== targets.length) return false;
-      if (prepaid && refund > 0) {
+      if (prepaid && payment && refund > 0) {
         const per = targets.length ? refund / value : 0;
         for (const i of targets) {
           await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
         }
+        // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
+        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: 'seller_cancel', memo: `Refund: seller cancelled part of ${order.reference}` });
         await this.wallet.apply(order.customerId, 'refund', refund, `Refund: seller cancelled part of ${order.reference}`, m);
       }
       if (order.paymentMethod === 'cod' && refund > 0) {
@@ -1163,7 +1166,7 @@ export class OrdersService {
     return this.orders.findOne({ where: { id } });
   }
 
-  /** Admin/finance refund; delegates to the payments service. */
+  /** Admin/finance refund; delegates to the payments service (which caps it and records it in the refund ledger). */
   refund(orderId: string, toWallet: boolean) {
     return this.payments.refund(orderId, toWallet);
   }

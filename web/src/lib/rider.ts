@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 import { isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 
 /**
@@ -33,13 +34,6 @@ export interface RiderEarnings {
 }
 
 export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
-
-const PAYMENT_LABEL: Record<string, string> = {
-  cod: "Cash on Delivery",
-  stripe_card: "Card (prepaid)",
-  airtel_money: "Mobile Money",
-  wallet: "Wallet (prepaid)",
-};
 
 /** The order the legs are shown in: what meets the customer first, then warehouse runs. */
 export const RIDER_KIND_ORDER: LegKind[] = ["delivery", "replacement_delivery", "return_pickup", "pickup", "transfer", "return_transfer", "return_to_seller"];
@@ -115,7 +109,7 @@ function toRiderTask(row: RiderQueueRow) {
     orderId: row.orderReference,
     orderUuid: row.orderId,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
-    paymentType: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? o?.paymentMethod ?? "—",
+    paymentType: paymentMethodLabel(o?.paymentMethod, false),
     /** The raw method id (cod, wallet…): pages turn it into a label in the rider's language. */
     paymentMethod: o?.paymentMethod ?? "",
     items: legItems.length ? legItems.reduce((s, it) => s + it.qty, 0) : items.reduce((s, it) => s + it.qty, 0),

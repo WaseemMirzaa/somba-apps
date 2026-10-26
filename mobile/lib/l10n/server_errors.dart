@@ -135,6 +135,7 @@ final Map<String, String> _exactFr = {
   'Amount must be greater than zero.': 'Le montant doit être supérieur à zéro.',
   'Amount must be a positive number.': 'Le montant doit être un nombre positif.',
   'Already refunded.': 'Déjà remboursé.',
+  'Nothing is left to refund on this order.': 'Il ne reste rien à rembourser sur cette commande.',
   'Only a completed payment can be refunded.': 'Seul un paiement abouti peut être remboursé.',
   // promos, reviews, questions, support
   'That code already exists.': 'Ce code existe déjà.',
@@ -200,6 +201,7 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   ...kServerPatternsAreas,
   (RegExp(r'^"(.+)" just sold out or has too little stock left\.$'), (m) => '« ${m[1]} » est épuisé ou n’a plus assez de stock.'),
   (RegExp(r'^"(.+)" is not available\.$'), (m) => '« ${m[1]} » n’est pas disponible.'),
+  (RegExp(r'^That is more than what is left to refund on this order \(\$([\d.,]+)\)\.$'), (m) => 'C’est plus que ce qu’il reste à rembourser sur cette commande (${m[1]} \$).'),
   (RegExp(r'^Insufficient wallet balance \(\$([\d.,]+) < \$([\d.,]+)\)\.$'),
       (m) => 'Solde du portefeuille insuffisant (${m[1]} \$ sur ${m[2]} \$ nécessaires).'),
   (RegExp(r'^Order can no longer be cancelled \(status: (\w+)\)\.$'), (m) => 'Cette commande ne peut plus être annulée (statut : ${_status(m[1]!)}).'),

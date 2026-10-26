@@ -133,6 +133,14 @@ void main() {
       expect(translateServerError('Order not found.', en), 'Order not found.', reason: 'English stays as the server wrote it');
     });
 
+    test('the refund cap sentences are French on every refund path', () {
+      expect(translateServerError('Nothing is left to refund on this order.', fr), 'Il ne reste rien à rembourser sur cette commande.');
+      expect(translateServerError('Already refunded.', fr), 'Déjà remboursé.');
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', fr), contains('23.00'));
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', fr), startsWith('C’est plus que ce qu’il reste'));
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', en), contains('more than what is left'));
+    });
+
     test('every mapped message has a French text', () {
       for (final m in knownServerErrors) {
         expect(translateServerError(m, fr), isNot(equals(m)), reason: m);

@@ -3,14 +3,14 @@ import type { OnModuleDestroy } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type { EntitySubscriberInterface, InsertEvent, UpdateEvent } from 'typeorm';
-import { Order, Payment, Payout } from '../database/entities';
+import { Order, Payment, PaymentRefund, Payout } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { financeVersion } from './finance-version';
 
 const ROOMS = ['admin', 'admin_finance'];
 
 /**
- * Tells the finance screens that the numbers behind them moved: whenever an order, a payment or a payout is saved
+ * Tells the finance screens that the numbers behind them moved: whenever an order, a payment, a refund or a payout is saved
  * (by any service, including their conditional UPDATEs), `finance:changed { version, updatedAt }` goes to admin and
  * admin_finance, at most once per debounce window. The web refreshes `analytics:finance` when the version differs
  * from the one it shows. Nothing is emitted when nobody could be listening.
@@ -44,7 +44,7 @@ export class FinanceChangeSubscriber implements EntitySubscriberInterface, OnMod
   }
 
   private touch(target: unknown): void {
-    if (target !== Order && target !== Payment && target !== Payout) return;
+    if (target !== Order && target !== Payment && target !== PaymentRefund && target !== Payout) return;
     if (this.timer || this.debounceMs <= 0) return;
     this.timer = setTimeout(() => {
       this.timer = null;

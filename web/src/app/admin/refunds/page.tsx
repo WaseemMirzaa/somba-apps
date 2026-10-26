@@ -1,6 +1,6 @@
 "use client";
 
-import { paymentMethodLabel } from "@/lib/seller-labels";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 import { localDay } from "@/lib/dates";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -16,11 +16,14 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { canMoveMoney, useRole, type PaymentRow } from "@/lib/admin-live";
+import { canMoveMoney, useFinanceVersion, useRole, type PaymentRow } from "@/lib/admin-live";
+import { useSocketQuery } from "@/lib/admin-stats";
 import { formatCurrency } from "@/lib/utils";
+import { refundDestination, refundFigures, refundNote, refundReason, refundsByPayment, type RefundEntry } from "@/lib/refunds";
 
 const STATUS_OPTIONS = [
-  { value: "succeeded", label: "Paid (refundable)", labelFr: "Payé (remboursable)" },
+  { value: "succeeded", label: "Paid (not refunded)", labelFr: "Payé (non remboursé)" },
+  { value: "partial", label: "Partly refunded", labelFr: "Remboursé en partie" },
   { value: "refunded", label: "Refunded", labelFr: "Remboursé" },
 ];
 
@@ -32,12 +35,20 @@ export default function AdminRefundsPage() {
   const mayRefund = canMoveMoney(role);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [target, setTarget] = useState<PaymentRow | null>(null);
+  // Every refund, whatever path made it (a return's refund leaves the payment itself "succeeded"): the server's ledger.
+  const refundKey = useFinanceVersion(mayRefund);
+  const ledger = useSocketQuery<RefundEntry[]>("payments:refunds", undefined, { enabled: mayRefund, refreshKey: refundKey });
+  const entriesOf = useMemo(() => refundsByPayment(ledger.data), [ledger.data]);
 
   const rows = useMemo(
     () =>
       (rt.payments as PaymentRow[])
         .filter((p) => !!p.orderId && p.purpose !== "topup" && (p.status === "succeeded" || p.status === "refunded"))
-        .map((p) => ({ ...p, date: localDay(p.createdAt) })),
+        .map((p) => {
+          const f = refundFigures(p);
+          // The status filter reads this: "succeeded" = untouched, "partial" = part of it went back, "refunded" = all of it.
+          return { ...p, date: localDay(p.createdAt), shown: f.state === "full" ? "refunded" : f.state === "partial" ? "partial" : "succeeded" };
+        }),
     [rt.payments],
   );
 
@@ -46,12 +57,13 @@ export default function AdminRefundsPage() {
       applyListFilters(rows, filters, {
         searchFields: ["reference", "orderReference", "method"],
         dateField: "date",
-        statusField: "status",
+        statusField: "shown",
       }),
     [rows, filters],
   );
 
-  const refundable = rows.filter((r) => r.status === "succeeded").length;
+  const refundable = rows.filter((r) => refundFigures(r).refundableUsd >= 0.01).length;
+  const money = (n: number) => formatCurrency(n, locale);
 
   return (
     <div className="space-y-6">
@@ -59,8 +71,8 @@ export default function AdminRefundsPage() {
         title={fr ? "Remboursements" : "Refunds"}
         subtitle={
           fr
-            ? "Paiements réels : remboursez une commande payée, ou consultez les remboursements déjà faits"
-            : "Live payments: refund a paid order, or review refunds already issued"
+            ? "Paiements réels : remboursez ce qu'il reste d'une commande payée, ou consultez tous les remboursements déjà faits (retours compris)"
+            : "Live payments: refund what is left of a paid order, or review every refund already issued (returns included)"
         }
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Remboursements" : "Refunds" }]}
       />
@@ -79,7 +91,7 @@ export default function AdminRefundsPage() {
       <Card>
         <CardContent className="p-0">
           <div className="border-b border-[var(--border)] px-5 py-3 text-sm text-slate-500">
-            {fr ? `${refundable} paiement(s) remboursable(s)` : `${refundable} refundable payment(s)`}
+            {fr ? `${refundable} paiement(s) encore remboursable(s)` : `${refundable} payment(s) still refundable`}
           </div>
           <DataTable
             emptyMessage={fr ? "Aucun paiement" : "No payments yet"}
@@ -101,25 +113,29 @@ export default function AdminRefundsPage() {
                 label: t("status"),
                 render: (row) => {
                   const p = row as unknown as PaymentRow;
-                  const where =
-                    p.refundTo === "phone"
-                      ? p.refundStatus === "sending"
-                        ? fr ? "vers le téléphone · en cours" : "to phone · sending"
-                        : fr ? "vers le téléphone" : "to phone"
-                      : p.refundTo === "wallet"
-                        ? p.refundStatus === "failed"
-                          ? fr ? "portefeuille (échec téléphone)" : "wallet (phone refund failed)"
-                          : fr ? "vers le portefeuille" : "to wallet"
-                        : null;
+                  const f = refundFigures(p);
+                  const entries = entriesOf.get(p.id) ?? [];
                   return (
                     <div>
-                      <Badge variant={p.status === "refunded" ? "default" : "success"}>
-                        {p.status === "refunded" ? (fr ? "Remboursé" : "Refunded") : fr ? "Payé" : "Paid"}
+                      <Badge variant={f.state === "full" ? "default" : f.state === "partial" ? "warning" : "success"}>
+                        {f.state === "full" ? (fr ? "Remboursé" : "Refunded") : f.state === "partial" ? (fr ? "Remboursé en partie" : "Partly refunded") : fr ? "Payé" : "Paid"}
                       </Badge>
-                      {p.status === "refunded" && where && (
-                        <p className="mt-1 text-xs text-slate-400">
-                          {p.refundedUsd != null ? `${formatCurrency(p.refundedUsd, locale)} ` : ""}{where}
+                      {f.refundedUsd > 0 && (
+                        <p className="mt-1 text-xs font-medium text-slate-600" data-testid="refund-total">
+                          {fr ? "Remboursé" : "Refunded"} {money(f.refundedUsd)} {fr ? "sur" : "of"} {money(p.amountUsd)}
+                          {f.state === "partial" ? ` · ${fr ? "reste" : "left"} ${money(f.refundableUsd)}` : ""}
                         </p>
+                      )}
+                      {entries.length > 0 ? (
+                        <ul className="mt-1 space-y-0.5 text-xs text-slate-500" data-testid="refund-entries">
+                          {entries.map((e) => (
+                            <li key={e.id}>
+                              <span className="font-medium text-slate-700">−{money(e.amountUsd)}</span> {refundDestination(e, fr)} · {refundReason(e, fr)} · {localDay(e.createdAt)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        f.refundedUsd > 0 && !ledger.loading && p.refundTo && <p className="mt-1 text-xs text-slate-400">{refundDestination({ refundTo: p.refundTo, status: p.refundStatus === "sending" ? "sending" : p.refundStatus === "failed" ? "failed" : "completed" }, fr)}</p>
                       )}
                     </div>
                   );
@@ -131,12 +147,27 @@ export default function AdminRefundsPage() {
                 label: t("action"),
                 render: (row) => {
                   const p = row as unknown as PaymentRow;
-                  if (p.status === "refunded") return <span className="text-sm text-slate-400">{fr ? "Remboursé" : "Refunded"}</span>;
+                  const f = refundFigures(p);
+                  const note = refundNote(p, fr, money);
                   if (!mayRefund) return <span className="text-sm text-slate-400">—</span>;
+                  // Limited to what is left; off, with the reason, when nothing is.
                   return (
-                    <Button variant="approve" size="sm" className="whitespace-nowrap" onClick={() => setTarget(p)}>
-                      {fr ? "Autoriser le remboursement" : "Authorise refund"}
-                    </Button>
+                    <div className="max-w-[16rem]">
+                      <Button
+                        variant="approve"
+                        size="sm"
+                        className="whitespace-nowrap"
+                        disabled={f.refundableUsd < 0.01}
+                        title={note ?? undefined}
+                        onClick={() => setTarget(p)}
+                      >
+                        {fr ? "Autoriser le remboursement" : "Authorise refund"}
+                      </Button>
+                      {f.refundableUsd >= 0.01 && f.state === "partial" && (
+                        <p className="mt-1 text-xs text-amber-700">{fr ? `Jusqu'à ${money(f.refundableUsd)} (le reste a déjà été remboursé).` : `Up to ${money(f.refundableUsd)} (the rest was already refunded).`}</p>
+                      )}
+                      {f.refundableUsd < 0.01 && note && <p className="mt-1 text-xs text-slate-500" data-testid="refund-blocked">{note}</p>}
+                    </div>
                   );
                 },
               },
@@ -147,7 +178,7 @@ export default function AdminRefundsPage() {
       </Card>
 
       <RefundDialog
-        target={target?.orderId ? { orderId: target.orderId, orderReference: target.orderReference ?? null, amountUsd: target.amountUsd, method: target.method } : null}
+        target={target?.orderId ? { orderId: target.orderId, orderReference: target.orderReference ?? null, amountUsd: target.amountUsd, method: target.method, status: target.status, refundedUsd: target.refundedUsd, refundableUsd: target.refundableUsd } : null}
         fr={fr}
         locale={locale}
         onClose={() => setTarget(null)}

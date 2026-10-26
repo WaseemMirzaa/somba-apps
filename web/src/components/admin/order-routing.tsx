@@ -10,7 +10,7 @@ import { SectionError } from "@/components/admin/query-state";
 import { StepList } from "@/components/shop/step-list";
 import { hopRouteSteps } from "@/lib/order-journey";
 import { runBadgeText } from "@/lib/warehouse-runs";
-import { areaName, chainText } from "@/lib/areas";
+import { deliveryAreaText, useStoredAreaChain } from "@/lib/areas";
 import type { TrackingLegView } from "@/lib/realtime/types";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -82,6 +82,8 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
   const riders = useServerList<RiderRow>("warehouse:riders");
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  // The area the order was placed for. The quote below re-resolves the pin on today's data and can name the neighbour.
+  const storedArea = useStoredAreaChain(order.destinationAreaId);
 
   const hubById = hubs.byId;
   const sellerName = useMemo(() => new Map(sellers.map((s) => [s.id, s.name])), [sellers]);
@@ -185,7 +187,7 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
           },
           {
             label: fr ? "Zone de livraison" : "Delivery area",
-            value: quote?.destinationAreaChain?.length ? chainText(quote.destinationAreaChain, fr, { skipLevels: ["district"] }) : quote?.destinationArea ? areaName(quote.destinationArea, fr) : "—",
+            value: storedArea.loading ? "…" : deliveryAreaText(storedArea.chain, quote, fr),
           },
           {
             label: fr ? "Entrepôts d'origine (par vendeur)" : "Origin warehouses (per seller)",

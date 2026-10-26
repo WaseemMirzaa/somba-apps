@@ -28,6 +28,18 @@ test("localized reads <key> / <key>Fr", () => {
   assert.equal(localized(null, "x", true), "");
 });
 
+test("the seller ledger and the chat header chip pick the viewer's language (bugs 2 and 5)", () => {
+  const txn = { description: "1 × Lightweight running shoes", descriptionFr: "1 × Baskets de running légères" };
+  assert.equal(localized(txn, "description", true), "1 × Baskets de running légères");
+  assert.equal(localized(txn, "description", false), "1 × Lightweight running shoes");
+  const chat = { productName: "Dyson V15 Vacuum", productNameFr: "Aspirateur Dyson V15" };
+  assert.equal(localized(chat, "productName", true), "Aspirateur Dyson V15");
+  assert.equal(localized(chat, "productName", false), "Dyson V15 Vacuum");
+  // a row from before the fix has no French field: the base name is shown, never nothing
+  assert.equal(localized({ description: "1 × Lamp" }, "description", true), "1 × Lamp");
+  assert.equal(localized({ productName: "Lamp", productNameFr: null }, "productName", true), "Lamp");
+});
+
 test("localizedNotice uses titleFr / bodyFr and falls back to English", () => {
   const n = { title: "New order", body: "ORD-1", titleFr: "Nouvelle commande" };
   assert.deepEqual(localizedNotice(n, true), { title: "Nouvelle commande", body: "ORD-1" });

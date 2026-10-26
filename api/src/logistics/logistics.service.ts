@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 import { In, IsNull, Not, Repository } from 'typeorm';
@@ -42,6 +42,8 @@ import {
 } from './leg-rules';
 import { tierAllows } from './tiers';
 import { pushOrderToOps } from './hub-scope';
+import { frenchLineNames } from '../translation/line-names';
+import { TranslationService } from '../translation/translation.service';
 
 const NO_SELLER = '_none';
 /** A leg is tried this many times before it needs a human (orders cancel after the same number of delivery attempts). */
@@ -57,6 +59,22 @@ export interface TaskEndpoint {
   lng: number | null;
   city?: string | null;
   phone?: string | null;
+}
+
+/**
+ * One line of what a leg carries (`delivery_tasks.itemsJson`). `name` is the product's name as the order snapshotted
+ * it; `nameFr` its French name, so a warehouse desk or a rider reading French sees French. Legs created before
+ * `nameFr` existed have none: `viewMany` fills it in when it serves them.
+ */
+export interface CargoLine {
+  orderItemId?: string;
+  productId?: string;
+  name: string;
+  nameFr?: string | null;
+  qty: number;
+  variant?: string | null;
+  sellerId?: string | null;
+  [k: string]: unknown;
 }
 
 /** What clients receive for a task (never contains the handover code). */
@@ -96,7 +114,7 @@ export interface TaskView {
   to: TaskEndpoint | null;
   fromHub: TaskEndpoint | null;
   toHub: TaskEndpoint | null;
-  items: unknown[];
+  items: CargoLine[];
   /** True on legs where the rider also collects the old unit (replacement / exchange). */
   collectOld: boolean;
   /** Does finishing this leg need the customer's 4-digit code? (Only a delivery to the customer, and only while `requireDeliveryCode` is on.) */
@@ -156,6 +174,7 @@ export class LogisticsService {
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
     private readonly settings?: SettingsService,
+    @Optional() private readonly translations?: TranslationService,
   ) {}
 
   // ── listeners (after-sale and others follow the legs) ────────────────────────
@@ -209,6 +228,39 @@ export class LogisticsService {
       .save(this.audits.create({ actor: actor.name, role: actor.role, action, entity: 'delivery', entityId: task.id, detail: detail ?? `${task.orderReference} ${task.kind}` }))
       .then((log) => this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log))
       .catch(() => undefined);
+  }
+
+  /** A line of an order as a leg carries it. */
+  private static cargoLine(i: Pick<OrderItem, 'id' | 'productId' | 'productName' | 'qty'>, nameFr?: string | null): CargoLine {
+    return { orderItemId: i.id, productId: i.productId, name: i.productName, ...(nameFr?.trim() ? { nameFr: nameFr.trim() } : {}), qty: i.qty };
+  }
+
+  /** What a task carries, parsed from `itemsJson` (a broken value is no cargo). */
+  private static cargoOf(t: Pick<DeliveryTask, 'itemsJson'>): CargoLine[] {
+    try {
+      const v = t.itemsJson ? (JSON.parse(t.itemsJson) as unknown) : [];
+      return Array.isArray(v) ? (v.filter((x) => x && typeof x === 'object') as CargoLine[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Legs made before `nameFr` was kept have only the English name. Serve the French one anyway: the order's own line
+   * (matched by its id, else by product, else by name) knows it from the snapshot taken at checkout. A line nothing can
+   * name keeps its base name, which clients show in both languages.
+   */
+  private static withFrenchNames(items: CargoLine[], order: Order | undefined): CargoLine[] {
+    const lines = order?.items ?? [];
+    return items.map((it) => {
+      if (typeof it.nameFr === 'string' && it.nameFr.trim()) return it;
+      const line =
+        (it.orderItemId ? lines.find((l) => l.id === it.orderItemId) : undefined) ??
+        (it.productId ? lines.find((l) => l.productId === it.productId) : undefined) ??
+        lines.find((l) => l.productName === it.name);
+      const nameFr = line?.productNameFr?.trim();
+      return nameFr ? { ...it, nameFr } : it;
+    });
   }
 
   // ── views ────────────────────────────────────────────────────────────────────
@@ -284,12 +336,7 @@ export class LogisticsService {
           to = sellerEp(t);
           break;
       }
-      let items: unknown[] = [];
-      try {
-        items = t.itemsJson ? (JSON.parse(t.itemsJson) as unknown[]) : [];
-      } catch {
-        items = [];
-      }
+      const items = LogisticsService.withFrenchNames(LogisticsService.cargoOf(t), orders.get(t.orderId));
       const base: TaskView = {
         id: t.id,
         orderId: t.orderId,
@@ -529,6 +576,8 @@ export class LogisticsService {
     const created: DeliveryTask[] = [];
     const originIds: string[] = [];
     const originBySeller: Record<string, string> = {};
+    // The cargo carries each product's French name too (the order may have been passed in unsaved lines: read them back).
+    const frNames = await frenchLineNames(this.items.manager, [...groups.values()].flatMap((ls) => ls.map((i) => i.id)));
     for (const [key, lines] of groups) {
       const seller = key === NO_SELLER ? null : await this.sellerRow(key);
       const origin = await this.routing.originFor(seller, destination, hubs, full.originBySeller?.[key]);
@@ -547,7 +596,7 @@ export class LogisticsService {
           sellerId: key === NO_SELLER ? null : key,
           pickupAddress: pickupText,
           address: await this.hubAddressText(origin.id),
-          itemsJson: JSON.stringify(lines.map((i) => ({ orderItemId: i.id, productId: i.productId, name: i.productName, qty: i.qty }))),
+          itemsJson: JSON.stringify(lines.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))),
         }),
       );
     }
@@ -758,15 +807,15 @@ export class LogisticsService {
 
   // ── returns ──────────────────────────────────────────────────────────────────
   /** The returned lines of an order, resolved from ids; no ids = every live line. */
-  private resolveReturnItems(order: Order, items?: ReturnItemInput[]): { orderItemId: string; productId: string; name: string; qty: number; sellerId: string | null }[] {
+  private resolveReturnItems(order: Order, items?: ReturnItemInput[]): (CargoLine & { orderItemId: string; productId: string; sellerId: string | null })[] {
     const live = (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled');
     const want: ReturnItemInput[] = items?.length ? items : live.map((i) => ({ orderItemId: i.id, qty: i.qty }));
-    const out: { orderItemId: string; productId: string; name: string; qty: number; sellerId: string | null }[] = [];
+    const out: (CargoLine & { orderItemId: string; productId: string; sellerId: string | null })[] = [];
     for (const w of want) {
       const line = live.find((i) => (w.orderItemId && i.id === w.orderItemId) || (!w.orderItemId && w.productId && i.productId === w.productId));
       if (!line) throw new BadRequestException('One of the returned items is not on this order.');
       const qty = Math.min(line.qty, Math.max(1, Math.floor(Number(w.qty ?? line.qty))));
-      out.push({ orderItemId: line.id, productId: line.productId, name: line.productName, qty, sellerId: line.sellerId ?? null });
+      out.push({ ...LogisticsService.cargoLine(line, line.productNameFr), orderItemId: line.id, productId: line.productId, qty, sellerId: line.sellerId ?? null });
     }
     return out;
   }
@@ -872,6 +921,7 @@ export class LogisticsService {
     const origin = await this.routing.originFor(seller, destination, hubs, order.originBySeller?.[subject.sellerId ?? '']);
     const qty = subject.qty ?? 1;
     const name = rep ? rep.productName : (exc as Exchange).toName;
+    const nameFr = await this.replacementNameFr(order, rep, exc);
     const task = await this.make({
       kind: 'pickup',
       orderId: order.id,
@@ -882,10 +932,23 @@ export class LogisticsService {
       ...key,
       pickupAddress: seller ? `${seller.name} — ${seller.pickupAddress || 'address not provided, contact the seller'}` : await this.hubAddressText(origin.id),
       address: await this.hubAddressText(origin.id),
-      itemsJson: JSON.stringify([{ name, qty, variant: rep ? rep.variant : (exc as Exchange).toVariant }]),
+      itemsJson: JSON.stringify([{ name, ...(nameFr ? { nameFr } : {}), qty, variant: rep ? rep.variant : (exc as Exchange).toVariant }]),
     });
     await this.announce(task);
     return task;
+  }
+
+  /** The French name of what a replacement (the order's own line again) or an exchange (another product) sends. */
+  private async replacementNameFr(order: Order, rep: Replacement | null, exc: Exchange | null): Promise<string | null> {
+    if (rep) return order.items?.find((i) => i.productName === rep.productName)?.productNameFr?.trim() || null;
+    if (!exc || !this.translations) return null;
+    try {
+      const product = await this.products.findOne({ where: { sku: exc.toSku, ...(exc.sellerId ? { sellerId: exc.sellerId } : {}) } });
+      if (!product) return null;
+      return (await this.translations.present('product', [product])).get(product.id)?.texts.nameFr?.trim() || null;
+    } catch {
+      return null; // decoration: a leg is never held up by a translation
+    }
   }
 
   // ── assigning, scanning out, rider progress ──────────────────────────────────

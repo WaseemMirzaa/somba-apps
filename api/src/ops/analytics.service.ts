@@ -9,6 +9,7 @@ import {
   Order,
   OrderItem,
   Payment,
+  PaymentRefund,
   Payout,
   Product,
   ProductView,
@@ -305,7 +306,7 @@ export class AnalyticsService {
     const { keys, from } = lastDays(30);
     const commissionPct = await this.commissionPct();
 
-    const [orderAgg, payAgg, payoutRows, seriesGmv, seriesPay, receivableRows, codRow, wallets] = await Promise.all([
+    const [orderAgg, payAgg, refundAgg, payoutRows, seriesGmv, seriesPay, seriesRefunds, receivableRows, codRow, wallets] = await Promise.all([
       // Merchandise value of delivered vs still-open orders (the commission base: item prices, no delivery fee).
       this.orders
         .createQueryBuilder('o')
@@ -316,9 +317,14 @@ export class AnalyticsService {
       this.payments
         .createQueryBuilder('p')
         .select("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'collected')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN 1 ELSE 0 END), 0)", 'refundCount')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'plan' THEN p.amountUsd ELSE 0 END), 0)", 'plans')
+        .getRawOne<Record<string, string>>(),
+      // C-refund: refunds are what the ledger recorded, whatever path made them (a return's refund leaves the payment `succeeded`).
+      this.ds
+        .getRepository(PaymentRefund)
+        .createQueryBuilder('r')
+        .select('COALESCE(SUM(r.amountUsd), 0)', 'refunds')
+        .addSelect('COUNT(DISTINCT r.paymentId)', 'refundCount')
         .getRawOne<Record<string, string>>(),
       this.payouts
         .createQueryBuilder('x')
@@ -339,10 +345,17 @@ export class AnalyticsService {
         .createQueryBuilder('p')
         .select(AnalyticsService.day('p.createdAt'), 'day')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'revenue')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
         .where('p.createdAt > :from', { from })
         .groupBy('day')
-        .getRawMany<{ day: string; revenue: string; refunds: string }>(),
+        .getRawMany<{ day: string; revenue: string }>(),
+      this.ds
+        .getRepository(PaymentRefund)
+        .createQueryBuilder('r')
+        .select(AnalyticsService.day('r.createdAt'), 'day')
+        .addSelect('COALESCE(SUM(r.amountUsd), 0)', 'refunds')
+        .where('r.createdAt > :from', { from })
+        .groupBy('day')
+        .getRawMany<{ day: string; refunds: string }>(),
       // Mobile-money charges waiting for the subscriber / for finance to confirm.
       this.payments
         .createQueryBuilder('p')
@@ -379,7 +392,8 @@ export class AnalyticsService {
       keys,
       mergeByDay([
         seriesGmv.map((r) => ({ day: r.day, gmv: n(r.gmv), orders: n(r.orders) })),
-        seriesPay.map((r) => ({ day: r.day, revenue: n(r.revenue), refunds: n(r.refunds) })),
+        seriesPay.map((r) => ({ day: r.day, revenue: n(r.revenue) })),
+        seriesRefunds.map((r) => ({ day: r.day, refunds: n(r.refunds) })),
       ]),
       { gmv: 0, orders: 0, revenue: 0, refunds: 0 },
     );
@@ -394,8 +408,8 @@ export class AnalyticsService {
       commissionEarnedUsd: base.delivered,
       commissionExpectedUsd: base.open,
       subscriptionRevenueUsd: round2(n(payAgg?.plans)),
-      refundsUsd: round2(n(payAgg?.refunds)),
-      refundsCount: n(payAgg?.refundCount),
+      refundsUsd: round2(n(refundAgg?.refunds)),
+      refundsCount: n(refundAgg?.refundCount),
       payouts: {
         paidUsd: round2(n(payoutBy('paid')?.amount)),
         paidCount: n(payoutBy('paid')?.n),

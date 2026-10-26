@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useConversations } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
+import { localized } from "@/lib/i18n-fields";
 
 function ago(iso: string | null, fr: boolean): string {
   if (!iso) return "";
@@ -53,7 +54,7 @@ function Inbox() {
                   <span className="shrink-0 text-xs text-slate-500">{ago(c.lastMessageAt, fr)}</span>
                 </p>
                 <p className="truncate text-xs text-slate-500">
-                  {c.productName ? `${c.productName} · ` : ""}{c.orderReference ? `${c.orderReference} · ` : ""}{c.lastMessagePreview ?? ""}
+                  {c.productName ? `${localized(c, "productName", fr)} · ` : ""}{c.orderReference ? `${c.orderReference} · ` : ""}{c.lastMessagePreview ?? ""}
                 </p>
               </div>
               {c.unread > 0 && (

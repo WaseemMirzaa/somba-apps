@@ -344,10 +344,7 @@ export function legRoute(t: Pick<TaskView, "from" | "to">, fr: boolean): string 
   return `${endpointName(t.from, fr)} → ${endpointName(t.to, fr)}`;
 }
 
-/** Lines of a leg's cargo as text ("2 × Sony headphones, 1 × MacBook"). */
-export function legItemsText(items: LegItem[] | undefined, fr: boolean): string {
-  return (items ?? []).map((i) => `${i.qty} × ${fr && i.nameFr ? i.nameFr : i.name}`).join(", ") || "—";
-}
+export { legItemName, legItemsText } from "@/lib/leg-items";
 
 /** Customer-facing journey: ordered stages of an order built from its legs (order flow only). */
 export function orderJourney(legs: TaskView[]): TaskView[] {

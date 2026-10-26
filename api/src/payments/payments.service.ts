@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, LessThan, Repository } from 'typeorm';
-import { DeliveryTask, Order, Payment } from '../database/entities';
+import { DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
+import type { RefundKind } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
 import {
   ADMIN_ROLES,
@@ -33,6 +34,20 @@ import {
   type WebhookRequest,
 } from './mobile-money.provider';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayRejectedError, PawapayUnavailableError } from './pawapay.provider';
+import { NOTHING_LEFT_TO_REFUND, recordParkedPayment, recordRefund, refundableUsd, revertRefund } from './refund-ledger';
+
+/** Why a refund is made, when it is not the plain order refund of finance (`orders:refund`). */
+export interface RefundSource {
+  kind?: Extract<RefundKind, 'admin' | 'dispute'>;
+  disputeId?: string;
+  disputeReference?: string;
+}
+
+/** The payment after a refund, with the ledger row this refund wrote (its `amountUsd` is what THIS refund paid back). */
+export type RefundResult = Payment & { refund: PaymentRefund };
+
+/** A payment as clients see it: the phone masked, and what can still be refunded on it. */
+export type PaymentView = Payment & { refundableUsd: number };
 
 /** Called when pawaPay reports on a seller payout (set by PayoutsService, which owns payouts). */
 export type PayoutCallbackHandler = (payoutId: string) => Promise<void>;
@@ -527,13 +542,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       }
       // Late success on a payment we already failed: park the money in the wallet.
       if (!(await this.claim(m, payment.id, ['failed'], 'refunded'))) return false;
-      await this.wallet.apply(
-        payment.userId,
-        'refund',
-        payment.amountUsd,
-        `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`,
-        m,
-      );
+      const memo = `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`;
+      await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, memo, m);
+      await recordParkedPayment(m, payment, memo); // C-refund: recorded like every refund
       return true;
     });
     const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
@@ -605,11 +616,17 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return 0;
     }
     if (payment.status !== 'succeeded' || order.paymentMethod === 'cod') return 0;
-    const due = PaymentsService.outstanding(payment.amountUsd, order);
+    // C-refund: only what is left on the payment goes back (lines a seller or a return already refunded are out).
+    const due = refundableUsd(payment, order.items);
     const won = await this.payments.manager.transaction(async (m) => {
-      if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
-      await m.update(Payment, { id: payment.id }, { refundTo: 'wallet', refundStatus: 'completed', refundedUsd: due });
-      if (due > 0) await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
+      if (due < 0.01) return this.claim(m, payment.id, ['succeeded'], 'refunded'); // nothing left to pay back: the payment is just closed
+      try {
+        await recordRefund(m, { payment, amountUsd: due, to: 'wallet', kind: 'cancellation', memo: `Refund for cancelled order ${order.reference}` });
+      } catch (e) {
+        if (e instanceof BadRequestException) return false; // a concurrent cancel refunded it first: exactly one wins
+        throw e;
+      }
+      await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
       return true;
     });
     if (won) this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
@@ -617,8 +634,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * What is still refundable on an order's payment: lines a seller already
-   * cancelled were refunded on their own, so they are never paid back twice.
+   * What is still refundable on an order's payment by its lines alone: lines a seller already cancelled were refunded
+   * on their own, so they are never paid back twice. (`refundableUsd` in refund-ledger.ts also counts the payment's own
+   * running total of refunds, which is what every refund path is capped by.)
    */
   static outstanding(amountUsd: number, order: Pick<Order, 'items'>): number {
     const already = (order.items ?? []).reduce((t, i) => t + (i.refundedUsd ?? 0), 0);
@@ -637,9 +655,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    *
    * A parcel that was never delivered is called off: the order becomes `cancelled`, its stock goes back on the
    * shelf and any open delivery is voided. A delivered order becomes `returned`. Never pays back more than what is
-   * still outstanding (lines a seller already cancelled were refunded on their own).
+   * still left on the payment (C-refund: lines a seller cancelled and items already returned were refunded on their
+   * own); the refund is recorded in the ledger like every other, `result.refund` being this one.
    */
-  async refund(orderId: string, toWallet: boolean): Promise<Payment> {
+  async refund(orderId: string, toWallet: boolean, source: RefundSource = {}): Promise<RefundResult> {
     const payment = await this.payments.findOne({ where: { orderId } });
     if (!payment) throw new NotFoundException('No payment for this order.');
     if (payment.status === 'refunded') {
@@ -659,24 +678,26 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (order?.status === 'cancelled') {
       throw new BadRequestException('This order was cancelled and has already been settled.');
     }
-    const due = order ? PaymentsService.outstanding(payment.amountUsd, order) : payment.amountUsd;
-    const toPhone = toWallet === false && due > 0;
+    // C-refund (service): refuse with the real figure; recordRefund checks it again in the database, in the transaction.
+    const due = refundableUsd(payment, order?.items);
+    if (due < 0.01) throw new BadRequestException(NOTHING_LEFT_TO_REFUND);
+    const toPhone = toWallet === false;
     const refundRef = toPhone ? this.pawapay!.newId() : null;
     // Atomic: of two concurrent refunds exactly one wins.
-    const won = await this.payments.manager.transaction(async (m) => {
-      if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return false;
-      await m.update(Payment, { id: payment.id }, {
-        refundTo: toPhone ? 'phone' : 'wallet',
+    const entry = await this.payments.manager.transaction(async (m) => {
+      const { entry: recorded } = await recordRefund(m, {
+        payment,
+        amountUsd: due,
+        to: toPhone ? 'phone' : 'wallet',
+        kind: source.kind ?? 'admin',
+        memo: `Refund for ${payment.orderReference}`,
         refundRef,
-        refundStatus: toPhone ? 'sending' : 'completed',
-        refundedUsd: due,
+        disputeId: source.disputeId,
+        disputeReference: source.disputeReference,
       });
-      if (!toPhone && due > 0) {
-        await this.wallet.apply(payment.userId, 'refund', due, `Refund for ${payment.orderReference}`, m);
-      }
-      return true;
+      if (!toPhone) await this.wallet.apply(payment.userId, 'refund', due, `Refund for ${payment.orderReference}`, m);
+      return recorded;
     });
-    if (!won) throw new BadRequestException('Already refunded.');
 
     if (toPhone) {
       try {
@@ -684,7 +705,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       } catch (e) {
         if (!(e instanceof PawapayUnavailableError)) {
           // pawaPay said no: undo, so finance can refund to the wallet instead.
-          await this.payments.update({ id: payment.id }, { status: 'succeeded', refundTo: null, refundRef: null, refundStatus: null, refundedUsd: null });
+          await this.payments.manager.transaction((m) => revertRefund(m, entry));
           throw new BadRequestException(`pawaPay refused the refund: ${(e as Error).message}`);
         }
         // No answer: the refund may exist; the status check settles it.
@@ -703,7 +724,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       type: 'payment',
       entityId: orderId,
     });
-    return saved;
+    return { ...saved, refund: entry };
   }
 
   /** A refunded order: delivered → returned; otherwise cancelled, restocked, and its open deliveries voided. */
@@ -752,7 +773,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (!s.found || !s.final) return;
-    const amount = payment.refundedUsd ?? payment.amountUsd;
+    // This phone refund's own amount (the payment's `refundedUsd` is the running total of all its refunds).
+    const entry = await this.payments.manager.findOne(PaymentRefund, { where: { refundRef } });
+    const amount = entry?.amountUsd ?? payment.refundedUsd ?? payment.amountUsd;
     const to = s.succeeded ? 'completed' : 'failed';
     const won = await this.payments.manager.transaction(async (m) => {
       const res = await m
@@ -762,6 +785,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         .where("id = :id AND refundStatus = 'sending'", { id: payment.id })
         .execute();
       if (!res.affected) return false;
+      // The ledger follows pawaPay's word: a failed phone refund is a wallet refund (the money is still the customer's).
+      if (entry) await m.update(PaymentRefund, { id: entry.id }, { status: to, ...(s.succeeded ? {} : { refundTo: 'wallet' as const }) });
       if (!s.succeeded && amount > 0) {
         await this.wallet.apply(payment.userId, 'refund', amount, `Refund for ${payment.orderReference} (phone refund failed)`, m);
       }
@@ -792,7 +817,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async list(user: { id: string; role: string }, paging?: unknown): Promise<Payment[]> {
+  async list(user: { id: string; role: string }, paging?: unknown): Promise<PaymentView[]> {
     // Only finance/admin see every payment; everyone else just their own.
     const all = user.role === 'admin' || user.role === 'admin_finance';
     const { take, skip } = pageOf(paging, { def: all ? 200 : DEFAULT_LIMIT });
@@ -803,7 +828,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** A payment by reference, visible to its owner and to finance/admin. */
-  async status(user: { id: string; role: string }, reference: string): Promise<Payment> {
+  async status(user: { id: string; role: string }, reference: string): Promise<PaymentView> {
     let p = await this.payments.findOne({ where: { reference } });
     const isStaff = user.role === 'admin' || user.role === 'admin_finance';
     if (!p || (p.userId !== user.id && !isStaff)) throw new NotFoundException('Payment not found.');
@@ -812,9 +837,23 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.view(p);
   }
 
-  /** Never push a full subscriber number to dashboards/sockets. */
-  private view(p: Payment): Payment {
-    return { ...p, phone: mask(p.phone) };
+  /** Never push a full subscriber number to dashboards/sockets. `refundableUsd` is what finance may still refund on it. */
+  private view(p: Payment): PaymentView {
+    return { ...p, phone: mask(p.phone), refundableUsd: refundableUsd(p) };
+  }
+
+  /**
+   * The refund ledger, newest first, for the admin Refunds page (admin / finance only): every refund of every payment
+   * with its amount, where it went, when, and which return or dispute it belongs to.
+   */
+  async refundLog(user: { id: string; role: string }, paging?: unknown): Promise<(PaymentRefund & { paymentReference: string | null; method: string | null })[]> {
+    if (user.role !== 'admin' && user.role !== 'admin_finance') throw new BadRequestException('Only admin/finance can see refunds.');
+    const { take, skip } = pageOf(paging, { def: 500, max: 1000 });
+    const rows = await this.payments.manager.find(PaymentRefund, { order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
+    const ids = [...new Set(rows.map((r) => r.paymentId))];
+    const owners = ids.length ? await this.payments.find({ where: { id: In(ids) }, select: ['id', 'reference', 'method'] }) : [];
+    const by = new Map(owners.map((p) => [p.id, p]));
+    return rows.map((r) => ({ ...r, paymentReference: by.get(r.paymentId)?.reference ?? null, method: by.get(r.paymentId)?.method ?? null }));
   }
 
   private publish(saved: Payment) {

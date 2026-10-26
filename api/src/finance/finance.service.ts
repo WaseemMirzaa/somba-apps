@@ -14,6 +14,7 @@ import type { InvoiceLine } from './commission-invoice';
 import { csvWords } from './csv-labels';
 import type { CsvWords } from './csv-labels';
 import { asLocale } from '../common/locale';
+import { frenchLineNames } from '../translation/line-names';
 import { EARNING_STATES, OPEN_ORDER_STATUSES, dateInput, fixed2, lastMonths, lineState, monthRange, round2, toCsv } from './finance.util';
 import type { EarningState } from './finance.util';
 
@@ -386,7 +387,22 @@ export class FinanceService {
     if (to) payQb.andWhere('x.createdAt <= :toDate', { toDate: to });
     const payoutRows = seller.userId ? await payQb.orderBy('x.createdAt', 'DESC').take(MAX).getMany() : [];
 
-    type Entry = { id: string; at: Date; kind: 'sale' | 'refund' | 'payout'; reference: string; description: string; grossUsd: number; commissionUsd: number; amountUsd: number; status: string; counts: boolean };
+    type Entry = {
+      id: string;
+      at: Date;
+      kind: 'sale' | 'refund' | 'payout';
+      reference: string;
+      description: string;
+      /** The same line in French (sales and refunds: the product's French name and option label); clients show the viewer's language. */
+      descriptionFr?: string;
+      /** What the description is made of, to write it again in French. */
+      line?: { qty: number; name: string; variant: string };
+      grossUsd: number;
+      commissionUsd: number;
+      amountUsd: number;
+      status: string;
+      counts: boolean;
+    };
     const entries: Entry[] = [];
     for (const r of lineRows) {
       const gross = lineGross({ priceUsd: num(r.priceUsd), qty: num(r.qty), couponDiscountUsd: num(r.couponUsd) });
@@ -398,6 +414,7 @@ export class FinanceService {
         kind: refund ? 'refund' : 'sale',
         reference: String(r.orderReference),
         description: `${num(r.qty)} × ${r.productName}${String(r.variant) === 'Default' ? '' : ` (${r.variant})`}`,
+        line: { qty: num(r.qty), name: String(r.productName), variant: String(r.variant) },
         grossUsd: refund ? -gross : gross,
         commissionUsd: refund ? -commission : commission,
         amountUsd: round2(refund ? -(gross - commission) : gross - commission),
@@ -420,6 +437,15 @@ export class FinanceService {
       });
     }
     entries.sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id));
+    // The ledger is read as raw rows, so the French names of the lines are looked up here, for the rows served only.
+    const served = input.format === 'csv' ? entries : entries.slice(skip, skip + take);
+    const names = await frenchLineNames(this.items.manager, served.filter((e) => e.line).map((e) => e.id));
+    for (const e of served) {
+      if (!e.line) continue;
+      const fr = names.get(e.id);
+      const variant = e.line.variant === 'Default' ? '' : ` (${fr?.variantFr ?? e.line.variant})`;
+      e.descriptionFr = `${e.line.qty} × ${fr?.nameFr ?? e.line.name}${variant}`;
+    }
     const sum = (f: (e: Entry) => boolean) => round2(entries.filter(f).reduce((t, e) => t + e.amountUsd, 0));
     const totals = {
       salesUsd: sum((e) => e.kind === 'sale'),
@@ -428,16 +454,17 @@ export class FinanceService {
       netUsd: sum(() => true),
     };
     if (input.format === 'csv') {
-      const w = csvWords(asLocale(input.locale) ?? 'en');
+      const lang = asLocale(input.locale) ?? 'en';
+      const w = csvWords(lang);
       return {
         filename: 'transactions.csv',
         csv: toCsv([
           [w.t('h.date'), w.t('h.kind'), w.t('h.reference'), w.t('h.description'), w.t('h.sales'), w.t('h.commission'), w.t('h.amount'), w.t('h.status')],
-          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
+          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, lang === 'fr' ? (e.descriptionFr ?? e.description) : e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
         ]),
       };
     }
-    return { total: entries.length, limit: take, offset: skip, totals, items: entries.slice(skip, skip + take) };
+    return { total: entries.length, limit: take, offset: skip, totals, items: served.map(({ line, ...entry }) => (void line, entry)) };
   }
 
   // ---- tax documents -------------------------------------------------------------------

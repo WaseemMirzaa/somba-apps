@@ -13,6 +13,7 @@ import {
   Order,
   OrderItem,
   Payment,
+  PaymentRefund,
   Product,
   Promo,
   Replacement,
@@ -36,6 +37,8 @@ import {
  *  - `transfer_runs` (and with it the `TR-nnnn` reference counter, which counts the rows that exist) and `warehouse_batches`
  *    (both list `delivery_tasks`) go before the tasks;
  *  - `hub_lanes` (warehouse-to-warehouse links by hub id: the lanes page would list raw ids) and `hub_coverage` go before the hubs.
+ * The refund ledger (`payment_refunds`) goes with the payments it records: a re-seed must not leave refunds of orders that
+ * no longer exist (the finance Refunds figure counts them).
  * The DRC geography (`geo_areas`) is reference data: it stays.
  */
 export const SEED_WIPE_ORDER = [
@@ -43,6 +46,7 @@ export const SEED_WIPE_ORDER = [
   TransferRun,
   WarehouseBatch,
   DeliveryTask,
+  PaymentRefund,
   Payment,
   Order,
   Address,

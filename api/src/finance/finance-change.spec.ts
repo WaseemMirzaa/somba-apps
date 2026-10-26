@@ -1,4 +1,4 @@
-import { Order, Payout } from '../database/entities';
+import { Order, PaymentRefund, Payout } from '../database/entities';
 import { commerceWorld } from '../testing/commerce-db';
 import type { World } from '../testing/commerce-db';
 import { FinanceChangeSubscriber } from './finance-change.subscriber';
@@ -50,6 +50,23 @@ describe('finance:changed', () => {
     await orders.update({ id: o.id }, { status: 'returned' });
     await wait(120);
     expect(events()).toHaveLength(2);
+  });
+
+  it('a refund moves the figures: the version changes and the finance screens are told (a return refund leaves the payment untouched otherwise)', async () => {
+    const refunds = w.ds.getRepository(PaymentRefund);
+    const before = await financeVersion(w.ds.manager);
+    await refunds.save(refunds.create({ paymentId: 'p1', userId: 'u1', amountUsd: 40, refundTo: 'wallet', kind: 'return' }));
+    await wait(120);
+    expect(events()).toHaveLength(1);
+    const after = await financeVersion(w.ds.manager);
+    expect(after.version).not.toBe(before.version);
+    expect(events()[0].payload).toEqual(after);
+    // a phone refund that pawaPay settles later is an update of the same row
+    const row = await refunds.findOneByOrFail({ paymentId: 'p1' });
+    await refunds.update({ id: row.id }, { status: 'failed' });
+    await wait(120);
+    expect(events()).toHaveLength(2);
+    expect((await financeVersion(w.ds.manager)).version).not.toBe(after.version);
   });
 
   it('is silent for tables the finance figures do not depend on', async () => {

@@ -155,6 +155,7 @@ add("Give the customer a reason for refusing", "Donnez au client la raison du re
 add("Returns are approved or refused with returns:decide", "Les retours sont approuvés ou refusés par le support.");
 add("Use decide for disputes", "Les litiges sont tranchés par le support.");
 add("Enter the amount to refund", "Saisissez le montant à rembourser.");
+add("Nothing is left to refund on this order", "Il ne reste rien à rembourser sur cette commande.");
 add("There is nothing left to refund for these items", "Il n'y a plus rien à rembourser pour ces articles.");
 add("That money was just refunded. Refresh and try again", "Cet argent vient d'être remboursé. Actualisez et réessayez.");
 add("Only admin or finance can issue a refund", "Seuls l'administrateur ou la finance peuvent émettre un remboursement.");

@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LoadError, SectionLoader } from "@/components/seller/data-state";
 import { FinancePager } from "@/components/seller/finance-pager";
 import { useLocale } from "@/context/locale-context";
+import { localized } from "@/lib/i18n-fields";
 import { useToast } from "@/context/toast-context";
 import { localDay } from "@/lib/dates";
 import { sellerRequest } from "@/lib/seller-api";
@@ -35,7 +36,7 @@ export default function SellerTransactionsPage() {
   // The server filters by date; kind and the search box narrow the page that is on screen.
   const rows = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
-    return (page?.items ?? []).filter((r) => (!filters.status || r.kind === filters.status) && (!q || `${r.reference} ${r.description}`.toLowerCase().includes(q)));
+    return (page?.items ?? []).filter((r) => (!filters.status || r.kind === filters.status) && (!q || `${r.reference} ${r.description} ${r.descriptionFr ?? ""}`.toLowerCase().includes(q)));
   }, [page, filters.search, filters.status]);
 
   async function exportCsv() {
@@ -106,7 +107,7 @@ export default function SellerTransactionsPage() {
               columns={[
                 { key: "at", label: t("date"), render: (row) => localDay(row.at as string) },
                 { key: "reference", label: fr ? "Référence" : "Reference" },
-                { key: "description", label: fr ? "Détail" : "Description" },
+                { key: "description", label: fr ? "Détail" : "Description", render: (row) => localized(row, "description", fr) },
                 { key: "kind", label: "Type", render: (row) => <Badge variant={txnKindVariant(String(row.kind))}>{txnKindLabel(String(row.kind), fr)}</Badge> },
                 { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => (row.kind === "payout" ? "—" : money(row.grossUsd as number)) },
                 { key: "commissionUsd", label: "Commission", render: (row) => (row.kind === "payout" ? "—" : money(row.commissionUsd as number)) },

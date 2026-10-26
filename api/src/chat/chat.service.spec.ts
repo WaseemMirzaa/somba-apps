@@ -11,6 +11,8 @@ let chat: ChatService;
 let emitter: ReturnType<typeof recordingEmitter>;
 let notices: { to: string; title: string; body: string; type?: string }[];
 let translate: jest.Mock;
+/** What the translation service answers for a product's name: [English, French] by product id (none: the stored name in both). */
+let productNames: Record<string, [string, string]>;
 
 async function user(name: string, role: User['role'] = 'customer'): Promise<User> {
   const repo = ds.getRepository(User);
@@ -38,6 +40,7 @@ beforeEach(async () => {
   emitter = recordingEmitter();
   notices = [];
   translate = jest.fn(async () => ({ text: '[fr] hello', sourceLang: 'en', same: false }));
+  productNames = {};
   const dir = new TeamDirectory(ds.getRepository(SellerTeamMember), ds.getRepository(Seller));
   const ctx = new SellerContextService(ds.getRepository(Seller), ds.getRepository(SellerTeamMember), ds.getRepository(User), { get: async () => null } as never);
   chat = new ChatService(
@@ -52,7 +55,11 @@ beforeEach(async () => {
     emitter as never,
     dir,
     ctx,
-    { translateStored: translate } as never,
+    {
+      translateStored: translate,
+      present: async (_type: string, rows: { id: string; name: string }[]) =>
+        new Map(rows.map((r) => [r.id, { texts: { name: productNames[r.id]?.[0] ?? r.name, nameFr: productNames[r.id]?.[1] ?? r.name } }])),
+    } as never,
   );
 });
 afterEach(() => ds.destroy());
@@ -66,6 +73,25 @@ describe('chat: starting a conversation', () => {
     expect(r.conversation).toMatchObject({ side: 'buyer', productId: product.id, productName: 'Phone', storeName: 'Shop', lastMessagePreview: 'Is it new?', unread: 0 });
     const row = await ds.getRepository(Conversation).findOneByOrFail({ id: r.conversation.id });
     expect(row).toMatchObject({ buyerUnread: 0, sellerUnread: 1, contextKey: `p:${product.id}` });
+  });
+
+  it('names the product in both languages, so the French header chip is French (bug 5)', async () => {
+    const { seller, product } = await shop();
+    productNames[product.id] = ['Phone', 'Téléphone'];
+    const buyer = await user('buyer');
+    const r = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'Bonjour' });
+    expect(r.conversation).toMatchObject({ productName: 'Phone', productNameFr: 'Téléphone' });
+    const listed = await chat.list(caller(await ds.getRepository(User).findOneByOrFail({ id: seller.userId! })), { as: 'seller' });
+    expect(listed[0]).toMatchObject({ productName: 'Phone', productNameFr: 'Téléphone' });
+  });
+
+  it('a product with no French name is named by its stored name in both fields; no product, no names', async () => {
+    const { seller, product } = await shop();
+    const buyer = await user('buyer');
+    const withProduct = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'hi' });
+    expect(withProduct.conversation).toMatchObject({ productName: 'Phone', productNameFr: 'Phone' });
+    const general = await chat.start(caller(buyer), { sellerId: seller.id, text: 'a general question' });
+    expect(general.conversation).toMatchObject({ productId: null, productName: null, productNameFr: null });
   });
 
   it('reuses the thread for the same context and opens another for a different one', async () => {

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Review } from "@/lib/realtime/types";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 /** Subscribe to a server push on the CURRENT socket (re-binds after reconnect/login). */
 export function useSocketEvent<T = unknown>(event: string, handler: (payload: T) => void) {
@@ -180,15 +181,7 @@ export function isMobileMoneyMethod(m: string): boolean {
 }
 
 export function paymentMethodName(m: string, fr: boolean): string {
-  const map: Record<string, string> = {
-    wallet: fr ? "Portefeuille Somba" : "Somba wallet",
-    cod: fr ? "Paiement à la livraison" : "Cash on delivery",
-    airtel_money: "Airtel Money",
-    orange_money: "Orange Money",
-    vodacom_mpesa: "Vodacom M-Pesa",
-    stripe_card: fr ? "Carte" : "Card",
-  };
-  return map[m] ?? m;
+  return paymentMethodLabel(m, fr);
 }
 
 // ---------------------------------------------------------------------------

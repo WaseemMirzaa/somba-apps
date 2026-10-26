@@ -24,7 +24,7 @@ String? chatContextLine(Strings s, ChatConversation c) {
     final ref = c.orderReference;
     return ref == null ? s.chatCtxOrderPlain : s.chatCtxOrder(ref);
   }
-  final name = c.productName;
+  final name = c.displayProductName(s.lang);
   if ((c.productId ?? '').isNotEmpty) return name == null ? null : s.chatCtxProduct(name);
   return null;
 }

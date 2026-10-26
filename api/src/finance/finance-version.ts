@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
 import type { EntityManager } from 'typeorm';
-import { Order, Payment, Payout } from '../database/entities';
+import { Order, Payment, PaymentRefund, Payout } from '../database/entities';
 
 /**
- * A cheap fingerprint of everything the admin finance figures are computed from: for orders, payments and payouts,
+ * A cheap fingerprint of everything the admin finance figures are computed from: for orders, payments, refunds and payouts,
  * how many rows each status holds and when the table last changed. Three small grouped queries on indexed columns, no
  * scan of the rows' content. Two reads with the same `version` mean nothing relevant changed in between, so a screen
  * can skip a re-render. (The per-status counts matter where timestamps have a one-second resolution.)
@@ -11,7 +11,7 @@ import { Order, Payment, Payout } from '../database/entities';
 export async function financeVersion(m: EntityManager): Promise<{ version: string; updatedAt: string }> {
   const parts: string[] = [];
   let latest = 0;
-  for (const entity of [Order, Payment, Payout]) {
+  for (const entity of [Order, Payment, PaymentRefund, Payout]) {
     const rows = await m
       .createQueryBuilder(entity, 't')
       .select('t.status', 'status')

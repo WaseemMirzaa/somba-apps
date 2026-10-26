@@ -7,6 +7,7 @@ import { useCatalog } from "@/lib/catalog";
 import { pickText } from "@/lib/i18n-fields";
 import type { Dispute, Order, Payment } from "@/lib/realtime/types";
 import { stageText } from "@/lib/after-sale";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 const STATUS_FLOW = [
   "pending",
@@ -16,15 +17,6 @@ const STATUS_FLOW = [
   "out_for_delivery",
   "delivered",
 ] as const;
-
-const PAYMENT_LABEL: Record<string, string> = {
-  cod: "COD",
-  stripe_card: "Card",
-  airtel_money: "Airtel Money",
-  orange_money: "Orange Money",
-  vodacom_mpesa: "Vodacom M-Pesa",
-  wallet: "Wallet",
-};
 
 export interface OrderDetail {
   id: string;
@@ -124,7 +116,8 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     discount: o.discountUsd ?? 0,
     campaignDiscount: o.campaignDiscountUsd ?? 0,
     paymentMethodId: o.paymentMethod,
-    paymentMethod: PAYMENT_LABEL[o.paymentMethod] ?? o.paymentMethod,
+    /** English label; pages print `paymentMethodId` through `paymentMethodLabel(id, fr)` for the viewer's language. */
+    paymentMethod: paymentMethodLabel(o.paymentMethod, false),
     paymentStatus: ended && paymentStatus === "paid" ? "refunded" : paymentStatus,
     status: o.status,
     estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,

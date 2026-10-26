@@ -9,6 +9,8 @@ import {
   HubLane,
   Order,
   OrderItem,
+  Payment,
+  PaymentRefund,
   Product,
   TransferRun,
   WarehouseBatch,
@@ -71,6 +73,16 @@ describe('seed wipe', () => {
     expect(await count(TransferRun)).toBe(2);
     await wipeSeededData(ds);
     for (const e of [HubLane, TransferRun, WarehouseBatch, HubCoverage, DeliveryTask, Hub, OrderItem, Order, Product, Category]) expect(await count(e)).toBe(0);
+  });
+
+  it('clears the refund ledger with the payments (a re-seeded demo must not count the refunds of orders that are gone)', async () => {
+    const { order } = await useTheDemo();
+    const pay = await ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: 'PAY-1', orderId: order.id, orderReference: 'SOM-1', userId: 'c1', method: 'stripe_card', amountUsd: 10, status: 'succeeded', refundedUsd: 4 }));
+    await ds.getRepository(PaymentRefund).save(ds.getRepository(PaymentRefund).create({ paymentId: pay.id, orderId: order.id, userId: 'c1', amountUsd: 4, refundTo: 'wallet', kind: 'return' }));
+    expect(await count(PaymentRefund)).toBe(1);
+    await wipeSeededData(ds);
+    expect(await count(PaymentRefund)).toBe(0);
+    expect(await count(Payment)).toBe(0);
   });
 
   it('runs are numbered again from TR-0001 after a re-seed (the reference counts the rows that exist)', async () => {

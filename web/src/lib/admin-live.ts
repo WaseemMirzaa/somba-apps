@@ -35,7 +35,10 @@ export type PaymentRow = Payment & {
   /** Where a refund went, and the state of a phone refund (pawaPay). */
   refundTo?: "wallet" | "phone" | null;
   refundStatus?: "sending" | "completed" | "failed" | null;
+  /** The running total of its refunds, whatever path made them (admin, return, dispute, cancellation...). */
   refundedUsd?: number | null;
+  /** What can still be refunded on it: the server refuses any refund beyond this (C-refund). */
+  refundableUsd?: number | null;
 };
 
 /** What the finance screens can offer (`payments:provider`): the live provider, refunds to the phone, pawaPay payouts. */

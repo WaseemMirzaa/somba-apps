@@ -1127,9 +1127,28 @@ _Source: `api/src/database/entities/payment.entity.ts`_
 | `refundTo` | varchar(10) | yes |  |  | Values: wallet, phone — where a refund went. |
 | `refundRef` | varchar(100) | yes |  | yes | pawaPay `refundId` of a phone refund. |
 | `refundStatus` | varchar(20) | yes |  |  | Values: sending, completed, failed (failed → credited to the wallet). |
-| `refundedUsd` | float | yes |  |  | What was actually paid back. |
+| `refundedUsd` | float | yes |  |  | The running TOTAL of everything refunded on this payment (the sum of its `payment_refunds` rows), whatever path made the refunds. No refund may take it past `amountUsd` (C-refund). |
 | `createdAt` | datetime |  |  |  | Set on insert |
 | `updatedAt` | datetime |  |  |  | Set on every update |
+
+#### `payment_refunds` — PaymentRefund (the refund ledger)
+
+One row per refund of a payment, written by every refund path in the same transaction as the money movement: finance's order refund (`admin`), a cancellation (`cancellation`), the refund of returned items (`return`), an admin's dispute decision (`dispute`), a seller cancelling lines (`seller_cancel`), a payment that arrived after its order was closed (`late_payment`), and refunds made before the ledger (`legacy`, written by the migration). The admin Refunds page lists these rows (amount, where it went, when, which return) and `analytics:finance` counts them.
+
+| Column | Type | Nullable | Default | Index | Notes |
+|---|---|---|---|---|---|
+| `id` | varchar(36) |  |  | PK |  |
+| `paymentId` | varchar(36) |  |  | yes |  |
+| `orderId` / `orderReference` | varchar | yes |  | yes (orderId) |  |
+| `userId` | varchar(36) |  |  |  | The customer who got the money. |
+| `amountUsd` | float |  |  |  |  |
+| `refundTo` | varchar(10) |  |  |  | wallet, phone |
+| `status` | varchar(12) |  | completed |  | completed, sending (phone refund pawaPay has not confirmed), failed (credited to the wallet instead) |
+| `refundRef` | varchar(100) | yes |  | yes | pawaPay `refundId` of a phone refund. |
+| `kind` | varchar(16) |  |  |  | admin, cancellation, return, dispute, seller_cancel, late_payment, legacy |
+| `disputeId` / `disputeReference` | varchar | yes |  |  | The return or dispute the refund belongs to. |
+| `memo` | varchar | yes |  |  | The wallet history line, in English. |
+| `createdAt` / `updatedAt` | datetime |  |  |  |  |
 
 #### `wallet_transactions` — WalletTransaction  
 _Source: `api/src/database/entities/wallet-transaction.entity.ts`_
@@ -1598,7 +1617,7 @@ Status: lifecycle, webhook, idempotency, expiry and late-success handling are im
 ### F7. Cancellation and refunds ✅
 
 * **Customer cancel** (`orders:cancel`): atomic claim from `pending`/`confirmed` → if money was received, payment `refunded` + wallet credit (one transaction); pending mobile money is abandoned (late approval goes to wallet) → stock restocked → delivery task `failed` → pushes to customer, ops and the assigned rider.
-* **Admin refund** (`orders:refund`, admin/finance): only a `succeeded` payment; to wallet (instant) or "original method" (recorded only — no provider refund call ❌); order → `returned`.
+* **Admin refund** (`orders:refund`, admin/finance): only a `succeeded` payment, and only what is LEFT on it (amount paid − already refunded, returns and seller cancellations included; refused with "That is more than what is left…" / "Nothing is left to refund on this order." / "Already refunded."); to wallet (instant) or back to the paying phone through pawaPay; recorded in the refund ledger like every refund; order → `returned`.
 * **Dispute refund**: see F12.
 
 ### F8. Fulfilment and last-mile delivery 🟡
@@ -1737,7 +1756,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `orders:list` | Signed-in, role-scoped | `—` | Customer: own; rider: assigned; ops: last 200; seller: only lines of own products, no address, first name only |
 | `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above `codCapUsd` |
 | `orders:updateStatus` | Ops (any admin_* role, warehouse_staff) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
-| `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | To wallet or original method; marks order returned |
+| `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | Refunds what is left on the payment (never more) to the wallet or the paying phone; answers the payment with `refund` (the ledger row of this refund); marks order returned |
 | `orders:cancel` | Order owner, admins | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
 
 #### `delivery:*`
@@ -1763,7 +1782,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `payments:list` | Signed-in | `—` | Own payments; finance/admin see all |
+| `payments:list` | Signed-in | `—` | Own payments; finance/admin see all. Each carries `refundedUsd` (running total of its refunds) and `refundableUsd` (what can still be refunded) |
+| `payments:refunds` | admin, admin_finance | `{ limit?, offset? }` | The refund ledger, newest first: every refund of every payment with `paymentReference`, `method`, `amountUsd`, `refundTo`, `status`, `kind`, `disputeReference`, `createdAt` |
 | `payments:status` | Signed-in (own) | `{ reference: string }` | Poll-free status lookup by reference (used after reconnect) |
 
 #### `payouts:*`

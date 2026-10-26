@@ -724,13 +724,18 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     let refundUsd = 0;
     let replacementNote = '';
     if (outcome === 'refund_full') {
-      const left = await this.refunds.outstanding(d.orderId);
-      const paid = await this.payments.refund(d.orderId, toWallet); // throws if it cannot be refunded
-      refundUsd = paid.refundedUsd ?? left;
+      const paid = await this.payments.refund(d.orderId, toWallet, { kind: 'dispute', disputeId: d.id, disputeReference: d.reference }); // throws if it cannot be refunded
+      refundUsd = paid.refund.amountUsd;
     } else if (outcome === 'refund_partial') {
       const amount = cents(Number(input.amountUsd));
       if (!(amount > 0)) throw new BadRequestException('Enter the amount to refund.');
-      const done = await this.refunds.refund({ orderId: d.orderId, amountUsd: amount, toWallet, memo: `Refund for ${d.orderReference} (dispute)` });
+      const done = await this.refunds.refund({
+        orderId: d.orderId,
+        amountUsd: amount,
+        toWallet,
+        memo: `Refund for ${d.orderReference} (dispute)`,
+        source: { kind: 'dispute', disputeId: d.id, disputeReference: d.reference },
+      });
       refundUsd = done.refundedUsd;
     } else if (outcome === 'replacement') {
       const made = await this.replacements.createFromDispute(d, input.items);
@@ -805,8 +810,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (opts.refund) {
       if (dispute.type === 'return') refundUsd = (await this.refundReturnedItems(dispute)).refundedUsd;
       else {
-        const paid = await this.payments.refund(dispute.orderId, dispute.refundTo !== 'phone'); // throws if it can't be refunded
-        refundUsd = paid.refundedUsd ?? 0;
+        const paid = await this.payments.refund(dispute.orderId, dispute.refundTo !== 'phone', { kind: 'dispute', disputeId: dispute.id, disputeReference: dispute.reference }); // throws if it can't be refunded
+        refundUsd = paid.refund.amountUsd;
       }
     }
     return this.close(
@@ -978,6 +983,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       toWallet: d.refundTo !== 'phone',
       memo: `Refund for ${d.orderReference} (returned items)`,
       lines,
+      source: { kind: 'return', disputeId: d.id, disputeReference: d.reference },
     });
     for (const l of value.lines) if (l.disputeItemId) await this.itemsRepo.update({ id: l.disputeItemId }, { refundUsd: cents(l.usd * k) });
     await this.markOrderReturned(d.orderId);

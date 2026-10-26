@@ -100,6 +100,24 @@ export class GeoGateway {
     }
   }
 
+  /**
+   * One area by id (or code) with its ancestors. Hidden areas are served too: an order keeps the area it was placed
+   * for (`orders.destinationAreaId`) even after an admin switched that area off, and its name must still be shown.
+   */
+  @SubscribeMessage('geo:get')
+  async getArea(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { id?: string; code?: string }) {
+    try {
+      const user = client.data?.user;
+      if (!user || user.role === 'guest') return fail('Sign in to continue.'); // a guest's read-only socket is not signed in
+      const row = body?.code ? await this.geo.getByCode(String(body.code)) : await this.geo.get(body?.id);
+      if (!row) return fail('Area not found.');
+      const [area, chain] = await Promise.all([this.geo.view(row.id), this.geo.chainView(row.id)]);
+      return ok({ area, chain });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('geo:resolve')
   async resolve(@MessageBody() body?: { components?: unknown; text?: { commune?: string; city?: string; province?: string }; pin?: { lat?: number; lng?: number } }) {
     try {

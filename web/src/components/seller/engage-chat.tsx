@@ -21,6 +21,7 @@ import {
   type ChatConversation,
   type ChatMessage,
 } from "@/lib/seller-engage";
+import { localized } from "@/lib/i18n-fields";
 import { cn } from "@/lib/utils";
 
 const PAGE = 30;
@@ -32,7 +33,7 @@ function ContextChips({ c, fr }: { c: ChatConversation; fr: boolean }) {
       {c.productName && (
         <span className="inline-flex max-w-[14rem] items-center gap-1 truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
           <Package className="h-3 w-3 shrink-0" aria-hidden="true" />
-          <span className="truncate">{c.productName}</span>
+          <span className="truncate">{localized(c, "productName", fr)}</span>
         </span>
       )}
       {c.orderReference && (
@@ -58,7 +59,7 @@ export function ChatInbox() {
     return (list.data ?? []).filter(
       (c) =>
         (!unreadOnly || c.unread > 0) &&
-        (!needle || [c.buyerName, c.productName, c.orderReference, c.lastMessagePreview].some((v) => (v ?? "").toLowerCase().includes(needle))),
+        (!needle || [c.buyerName, c.productName, c.productNameFr, c.orderReference, c.lastMessagePreview].some((v) => (v ?? "").toLowerCase().includes(needle))),
     );
   }, [list.data, unreadOnly, q]);
   const unreadTotal = (list.data ?? []).reduce((n, c) => n + c.unread, 0);

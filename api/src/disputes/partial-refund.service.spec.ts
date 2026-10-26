@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { Order, OrderItem, Payment, User, WalletTransaction } from '../database/entities';
+import { Order, OrderItem, Payment, PaymentRefund, User, WalletTransaction } from '../database/entities';
 import { PaymentsService } from '../payments/payments.service';
 import { PawapayUnavailableError } from '../payments/pawapay.provider';
 import { recordingEmitter, testDb } from '../testing/test-db';
@@ -91,6 +91,9 @@ describe('PartialRefundService', () => {
     expect((await ds.getRepository(OrderItem).findOneBy({ id: line.id }))!.refundedUsd).toBe(40);
     expect((await ds.getRepository(Payment).findOneBy({ orderId: order.id }))!.status).toBe('succeeded');
     expect(await svc.outstanding(order.id)).toBe(23);
+    // C-refund: recorded on the payment (running total) and in the ledger, the way every refund path does
+    expect((await ds.getRepository(Payment).findOneBy({ orderId: order.id }))!.refundedUsd).toBe(40);
+    expect(await ds.getRepository(PaymentRefund).find()).toEqual([expect.objectContaining({ amountUsd: 40, refundTo: 'wallet', status: 'completed', kind: 'dispute', disputeId: null })]);
     expect(notices).toEqual([expect.objectContaining({ to: user.id, title: 'Refund issued', body: '$40.00 for SOM-1 → wallet.', type: 'payment', entityId: order.id })]);
     expect(emitter.sent.some((e) => e.event === 'payment:updated' && e.to === `user:${user.id}`)).toBe(true);
   });
@@ -100,7 +103,7 @@ describe('PartialRefundService', () => {
     await svc.refund({ orderId: order.id, amountUsd: 40, toWallet: true, memo: 'm' });
     await expect(svc.refund({ orderId: order.id, amountUsd: 30, toWallet: true, memo: 'm' })).rejects.toThrow('more than what is left to refund on this order ($23.00)');
     await svc.refund({ orderId: order.id, amountUsd: 23, toWallet: true, memo: 'm' });
-    expect((await ds.getRepository(Payment).findOneBy({ orderId: order.id }))!.status).toBe('refunded');
+    expect(await ds.getRepository(Payment).findOneBy({ orderId: order.id })).toMatchObject({ status: 'refunded', refundedUsd: 63 });
     await expect(svc.refund({ orderId: order.id, amountUsd: 1, toWallet: true, memo: 'm' })).rejects.toThrow('Already refunded.');
   });
 
