@@ -88,11 +88,22 @@ async function main() {
   const products = await emit<any[]>(cSock, 'products:list');
   check(`customer fetched ${products.length} products over socket`, products.length > 0);
 
+  // The journey below runs through the Kinshasa warehouse (rider@somba.app works there), so the basket must come from
+  // seller@somba.app's store (pickup in Gombe, which Entrepôt Kinshasa covers). Never take `products[0]`: the seed also
+  // has a Limete wholesaler whose listing picks up from Entrepôt Limete (another warehouse's riders), and the catalogue
+  // order does not say whose listing comes first (on SQLite every seeded row shares one createdAt second, so the id
+  // tie-break is random per seed).
+  const seller = await login('seller@somba.app');
+  const sSock = await connect(seller.token);
+  const ownListings = await emit<any[]>(sSock, 'products:list');
+  const product = ownListings.find((p) => p.status === 'live');
+  check("seller@somba.app has a live listing of their own to buy", !!product && products.some((p) => p.id === product.id));
+
   // COD is off by default (client scope: codEnabled=false) — refused until an admin enables it.
   let codRefused = false;
   try {
     await emit(cSock, 'orders:create', {
-      items: [{ productId: products[0].id, qty: 1 }],
+      items: [{ productId: product.id, qty: 1 }],
       paymentMethod: 'cod',
       shippingAddress: ADDRESS,
     });
@@ -105,7 +116,7 @@ async function main() {
   // Admin dashboard listens for the new order pushed in real time.
   const adminSawOrder = waitFor<any>(aSock, 'order:created');
   const created = await emit<any>(cSock, 'orders:create', {
-    items: [{ productId: products[0].id, qty: 2 }],
+    items: [{ productId: product.id, qty: 2 }],
     paymentMethod: 'cod',
     shippingAddress: ADDRESS,
   });
@@ -207,8 +218,6 @@ async function main() {
   const sold = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'delivered');
   await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
   check('rider completes the delivery → order delivered', (await sold).status === 'delivered');
-  const seller = await login('seller@somba.app');
-  const sSock = await connect(seller.token);
   const avail = await emit<{ available: number }>(sSock, 'payouts:available');
   check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);
   const financeSawPayout = waitFor<any>(aSock, 'payout:created');

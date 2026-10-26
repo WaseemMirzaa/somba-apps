@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ENTITIES } from './entities';
 import { MYSQL_UTC_OPTIONS } from './mysql-utc';
+import { serializeSqliteTransactions } from './sqlite-transactions';
 
 /**
  * TypeORM wiring. `DB_TYPE=sqlite` (default) runs anywhere with a local file;
@@ -14,6 +16,8 @@ import { MYSQL_UTC_OPTIONS } from './mysql-utc';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
+      // SQLite has one shared connection: let transactions queue instead of colliding (no-op on MySQL).
+      dataSourceFactory: async (options) => serializeSqliteTransactions(new DataSource(options!)),
       useFactory: (config: ConfigService): TypeOrmModuleOptions => {
         const db = config.get<{
           type: 'sqlite' | 'mysql';

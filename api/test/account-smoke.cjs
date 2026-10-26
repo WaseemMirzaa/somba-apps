@@ -15,10 +15,17 @@ const tag = Date.now().toString().slice(-8);
 
 let pass = 0;
 const fails = [];
+let lastCheck = '(start)';
 const ok = (cond, name, extra = '') => {
+  lastCheck = name;
   if (cond) { pass++; console.log(`  ✅ ${name}`); }
   else { fails.push(name); console.log(`  ❌ ${name} ${extra}`); }
 };
+// A precondition the rest of the run builds on: stop with a clear message instead of a TypeError further down.
+class Abort extends Error {}
+const need = (cond, msg) => { if (!cond) throw new Abort(msg); };
+// The data of a reply that had to work (the next checks use it).
+const must = (res, what) => { need(res?.ok, `${what} failed: ${res?.error ?? 'no answer'}`); return res.data; };
 
 // The API allows 30 sign-ins/registrations a minute per address; when the suites run back to back (CI), wait and retry.
 // Only the general limiter's 429 is retried; the resend cooldown's own 429 is what one check expects.
@@ -75,6 +82,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   console.log('\n— Registration & email verification');
   let r = await rest('POST', '/api/v1/auth/register', { email, password: pw, name: 'Smoke User', phone: '+243 970 000 111' });
   ok(r.status === 201 && r.json.user.emailVerified === false && r.json.user.prefs.push === true, 'register → unverified, default prefs');
+  need(r.status === 201, `registering the suite's customer failed (${r.status}): ${r.json?.message ?? ''}`);
   let { accessToken: at, refreshToken: rt } = r.json;
 
   r = await rest('POST', '/api/v1/auth/email/send', null, at);
@@ -153,6 +161,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(r.status === 401, 'reset signed out existing sessions');
   r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
   ok(r.status === 200, 'login with the reset password works');
+  need(r.status === 200, `the customer cannot sign in with the reset password (${r.status}): ${r.json?.message ?? ''}`);
   at = r.json.accessToken; rt = r.json.refreshToken;
   const userId = r.json.user.id;
 
@@ -183,10 +192,11 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   console.log('\n— Address book (no mass assignment)');
   a = await req(s, 'addresses:create', { label: 'Home', line1: '12 Ave du Commerce', city: 'Kinshasa', commune: 'Gombe', phone: '+243812345678' });
   ok(a.ok && a.data.isDefault === true, 'first address becomes the default');
-  const addr1 = a.data;
+  const addr1 = must(a, 'creating the first address');
   a = await req(s, 'addresses:create', { label: 'x', city: 'Kinshasa' });
   ok(!a.ok, 'an address without a street is rejected');
   const other = await rest('POST', '/api/v1/auth/register', { email: `other${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Other' });
+  need(other.status === 201, `registering the second customer failed (${other.status}): ${other.json?.message ?? ''}`);
   const so = await connect(other.json.accessToken);
   a = await req(so, 'addresses:create', { id: addr1.id, userId: 'someone-else', label: 'Hijack', line1: 'Attacker St', city: 'Nowhere' });
   ok(a.ok && a.data.id !== addr1.id && a.data.userId === other.json.user.id, 'client cannot choose the id or owner of an address');
@@ -201,13 +211,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   console.log('\n— New payment methods (Orange Money, Vodacom M-Pesa)');
   const adminLogin = await rest('POST', '/api/v1/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
   ok(adminLogin.status === 200, 'admin can sign in');
+  need(adminLogin.status === 200, `the admin cannot sign in (${adminLogin.status}): check ADMIN_EMAIL / ADMIN_PASSWORD, and that the admin exists (npm run seed or npm run bootstrap:prod)`);
   const admin = await connect(adminLogin.json.accessToken);
 
   console.log('\n— Support tickets are private');
   a = await req(s, 'support:open', { subject: 'Where is my refund?', message: 'Please help' });
   ok(a.ok && a.data.reference, 'customer opens a ticket');
-  const tk = a.data;
+  const tk = must(a, 'opening a support ticket');
   const intruder = await rest('POST', '/api/v1/auth/register', { email: `intruder${tag}@smoke.test`, password: 'Smoke-Pass-2026', name: 'Intruder' });
+  need(intruder.status === 201, `registering the third customer failed (${intruder.status}): ${intruder.json?.message ?? ''}`);
   const si = await connect(intruder.json.accessToken);
   a = await req(si, 'support:reply', { id: tk.id, text: 'I can see your ticket' });
   ok(!a.ok, "another customer cannot reply into someone else's ticket");
@@ -222,10 +234,15 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   // Own listing with plenty of stock, so this suite doesn't depend on (or disturb) other data.
   const own = await req(admin, 'products:create', { name: `Smoke Item ${tag}`, price: 100, category: 'Electronics', stock: 100 });
-  const pid = own.data.id;
+  const pid = must(own, "creating the suite's own product").id;
   const PHONE = '+243 81 234 5678';
-  // Delivery needs an address in a served area (a plain Kinshasa address resolves to the city, which Entrepôt Kinshasa covers).
-  const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
+  // Delivery needs an address in a served area, and a production bootstrap turns "pin your address on the map" on
+  // (requirePinnedAddress), so the address carries a pin: central Kinshasa, inside the province that the launch
+  // warehouse (Entrepôt Kinshasa: made by bootstrap:prod, and by the seed) covers.
+  const PIN = { lat: -4.3086, lng: 15.3171 };
+  const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa', geo: PIN });
+  const preflight = await req(s, 'delivery:quote', { geo: PIN, city: 'Kinshasa', lines: [] });
+  need(preflight.ok && preflight.data?.destinationHubId, `no warehouse serves the test address (central Kinshasa): ${(preflight.error ?? 'no route').replace(/\.$/, '')}. Open one that covers the province of Kinshasa (npm run bootstrap:prod does) and run again.`);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const orderOf = async (id) => (await req(s, 'orders:list')).data.find((o) => o.id === id);
   const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
@@ -256,7 +273,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE });
   ok(a.ok && a.data.status === 'pending', 'mobile-money order starts PENDING (not paid yet)', a.error ?? '');
-  const mm1 = a.data;
+  const mm1 = must(a, 'placing the first mobile-money order');
   const approveNotice = await until(async () => (await req(s, 'notifications:list')).data.find((n) => n.title === 'Approve your payment' && n.body.includes(mm1.reference)));
   ok(approveNotice && approveNotice.body === `Approve the Orange Money request on your phone to confirm ${mm1.reference}.`, 'the approve-your-payment notice names the method "Orange Money", not the raw id', approveNotice?.body);
   ok(approveNotice && approveNotice.bodyFr === `Validez la demande Orange Money sur votre téléphone pour confirmer ${mm1.reference}.`, 'and its French version names it too', approveNotice?.bodyFr);
@@ -278,7 +295,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const stock2 = (await req(s, 'products:get', { id: pid })).data.stock;
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'vodacom_mpesa', paymentPhone: '+243810000000' });
   ok(a.ok, 'M-Pesa order placed');
-  const declined = await until(async () => { const o = await orderOf(a.data.id); return o?.status === 'cancelled' ? o : null; });
+  const mpesa = must(a, 'placing the M-Pesa order');
+  const declined = await until(async () => { const o = await orderOf(mpesa.id); return o?.status === 'cancelled' ? o : null; });
   ok(!!declined, 'declined payment → order CANCELLED');
   ok((await req(s, 'products:get', { id: pid })).data.stock === stock2, 'declined payment → stock released');
 
@@ -287,7 +305,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const bal0 = await balance();
   a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'orange_money', phone: PHONE });
   ok(a.ok && a.data.status === 'pending' && a.data.purpose === 'topup', 'top-up returns a PENDING payment (wallet not credited yet)', a.error ?? '');
-  const topRef = a.data.reference;
+  const topRef = must(a, 'starting the wallet top-up').reference;
   ok((await balance()) === bal0, 'wallet is NOT credited before confirmation');
   let w = await webhook(body(topRef), 'wrong-secret');
   ok(w.status === 401, 'webhook with a bad signature is rejected (401)');
@@ -315,7 +333,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   console.log('\n— Cancelling an UNPAID order gives no free refund; a late payment is not lost');
   const bal1 = await balance();
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE });
-  const unpaid = a.data;
+  const unpaid = must(a, 'placing the order that stays unpaid');
   const unpaidPay = await payOf(unpaid.id);
   a = await req(s, 'orders:cancel', { orderId: unpaid.id });
   ok(a.ok && a.data.status === 'cancelled', 'customer cancels the unpaid order');
@@ -327,7 +345,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Cancelling a PAID order refunds exactly once');
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE });
-  const paid = a.data;
+  const paid = must(a, 'placing the order that gets paid');
   await until(async () => (await orderOf(paid.id))?.status === 'confirmed');
   const bal2 = await balance();
   a = await req(s, 'orders:cancel', { orderId: paid.id });
@@ -335,10 +353,10 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok((await balance()) === bal2 + paid.totalUsd, `paid order refunded to wallet (+$${paid.totalUsd})`);
 
   console.log('\n— Order integrity (the server, not the client, decides the price)');
-  const real = (await req(s, 'products:get', { id: pid })).data;
+  const real = must(await req(s, 'products:get', { id: pid }), 'reading back the suite product');
   const mk = (over) => ({ shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, ...over });
-  const quoted = (await req(s, 'delivery:quote', { city: 'Kinshasa', lines: [{ productId: pid, qty: 1 }] })).data;
-  ok(quoted && quoted.feeUsd > 0 && quoted.destinationHubId, 'delivery:quote prices the delivery (base fee for an unpinned address)', JSON.stringify(quoted));
+  const quoted = must(await req(s, 'delivery:quote', { geo: PIN, city: 'Kinshasa', lines: [{ productId: pid, qty: 1 }] }), 'quoting the delivery');
+  ok(quoted.feeUsd > 0 && quoted.destinationHubId, 'delivery:quote prices the delivery (base fee + per km to the pin)', JSON.stringify(quoted));
   a = await req(s, 'orders:create', mk({ deliveryFeeUsd: -5 }));
   ok(a.ok && a.data.deliveryFeeUsd === quoted.feeUsd, `a negative client fee is ignored — the quoted fee ($${quoted.feeUsd}) is charged`, `got ${a.data?.deliveryFeeUsd}`);
   a = await req(s, 'orders:create', mk({ deliveryFeeUsd: 0 }));
@@ -379,11 +397,11 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(a.ok && Math.abs(a.data.totalUsd - (a.data.subtotalUsd - a.data.discountUsd + a.data.deliveryFeeUsd)) < 0.011, 'promo + delivery fee add up');
 
   console.log('\n— Reviews need a delivered purchase (and only one each)');
-  const other2 = (await req(admin, 'products:create', { name: `Never Bought ${tag}`, price: 9, category: 'Electronics', stock: 5 })).data;
+  const other2 = must(await req(admin, 'products:create', { name: `Never Bought ${tag}`, price: 9, category: 'Electronics', stock: 5 }), 'creating the never-bought product');
   a = await req(s, 'reviews:create', { productId: other2.id, rating: 5, text: 'Great!' });
   ok(!a.ok && /delivered/i.test(a.error ?? ''), 'cannot review a product you never received', a.error ?? '');
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE });
-  const rv = a.data;
+  const rv = must(a, 'placing the order to review');
   await until(async () => (await orderOf(rv.id))?.status === 'confirmed');
   a = await req(s, 'reviews:create', { productId: pid, rating: 5, text: 'Great!' });
   ok(!a.ok, 'cannot review before delivery');
@@ -444,4 +462,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   console.log(`\n${fails.length ? '❌' : '🎉'} ${pass} passed, ${fails.length} failed`);
   if (fails.length) console.log('Failed:\n - ' + fails.join('\n - '));
   process.exit(fails.length ? 1 : 0);
-})().catch((e) => { console.error('Test crashed:', e); process.exit(2); });
+})().catch((e) => {
+  if (e instanceof Abort) console.error(`\n💥 Smoke aborted after "${lastCheck}": ${e.message}`);
+  else console.error(`\n💥 Smoke crashed after "${lastCheck}":`, e);
+  if (fails.length) console.error(`Failed before that:\n - ${fails.join('\n - ')}`);
+  process.exit(2);
+});

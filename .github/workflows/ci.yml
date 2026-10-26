@@ -41,8 +41,8 @@ jobs:
           if [ $STATUS -eq 0 ]; then npm run smoke:authz; STATUS=$?; fi
           if [ $STATUS -eq 0 ]; then npm run smoke:flows; STATUS=$?; fi
           if [ $STATUS -eq 0 ]; then npm run smoke:coverage; STATUS=$?; fi
-          # SQLite cannot run concurrent transactions, so the race suite is flaky here: retry once.
-          # The authoritative run is on MySQL (see docs/LOCAL-RUN.md).
+          # SQLite has one shared connection (the API queues its transactions, but plain queries still interleave), so a
+          # race check can still lose here: retry once. The authoritative run is on MySQL (see docs/LOCAL-RUN.md).
           if [ $STATUS -eq 0 ]; then npm run smoke:race || npm run smoke:race; STATUS=$?; fi
           kill $SERVER_PID || true
           exit $STATUS

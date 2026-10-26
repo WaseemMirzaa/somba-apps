@@ -425,6 +425,8 @@ describe('disputes: the thread and support’s decision', () => {
     expect(d.items).toHaveLength(1);
     await expect(svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Another problem entirely' })).rejects.toThrow('open request');
     expect(titles('user:su1')).toContain('Dispute opened on your order');
+    // A dispute is a matter for the seller and support: unlike a return, it is not sent to the warehouse.
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(false);
   });
 
   it('the seller replies with evidence; the stage moves; only parties can join', async () => {

@@ -403,7 +403,14 @@ const register = async (label, role = 'customer') => {
   a = await req(sellerU.sock, 'campaigns:create', { name: `Store-wide ${tag}`, discount: 10, startDate: day(-1), endDate: day(1) });
   await req(admin.sock, 'campaigns:setStatus', { id: a.data.id, status: 'active' });
   ok((await priceOf(cq.id)).price === 90 && (await priceOf(cp.id)).price === 180, 'a campaign without a product list covers the seller\'s whole store');
-  ok((await priceOf(prod.id)).price !== undefined && (await req(cust.sock, 'products:get', { id: (await req(cust.sock, 'products:list')).data.find((p) => p.sellerId !== store.id)?.id ?? prod.id })).data.campaignPct === 0, "and another seller's products are untouched");
+  // Another store's listing made for this check: the shared test database also holds campaigns left by earlier suites, and the
+  // catalogue order differs between databases (random on SQLite), so "the first product of someone else" proves nothing.
+  const bystander = await register('shop3', 'seller');
+  const bystanderStore = (await req(bystander.sock, 'sellers:register', kyc(`Bystander Store ${tag}`))).data;
+  await req(admin.sock, 'sellers:setStatus', { id: bystanderStore?.id, status: 'approved' });
+  const theirs = (await req(bystander.sock, 'products:create', { name: `Bystander item ${tag}`, price: 30, category: 'Electronics', stock: 5 })).data;
+  const theirsNow = theirs ? await priceOf(theirs.id) : null;
+  ok(theirsNow?.price === 30 && theirsNow?.campaignPct === 0, "and another seller's products are untouched", JSON.stringify(theirsNow));
   const sf = (await req(guest.sock, 'sellers:storefront', { id: store.id })).data;
   ok(sf.products.find((p) => p.id === cq.id)?.price === 90 && sf.seller.plan !== undefined && !('planExpiresAt' in sf.seller), 'the public storefront shows the same campaign prices, and the plan in force but not its expiry date');
   await req(admin.sock, 'campaigns:setStatus', { id: a.data.id, status: 'ended' });

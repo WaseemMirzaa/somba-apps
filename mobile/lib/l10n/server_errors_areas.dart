@@ -33,6 +33,9 @@ const Map<String, String> kServerErrorsAreas = {
   'This run has not left yet.': 'Cette tournée n’est pas encore partie.',
   'This run is already closed.': 'Cette tournée est déjà clôturée.',
   'Run not found.': 'Tournée introuvable.',
+  // staff:setActive (admin only; listed by the contract, so every client knows them)
+  'Super admin only.': 'Réservé au super administrateur.',
+  'Only riders and warehouse staff can be switched on or off here.': 'Seuls les livreurs et le personnel d’entrepôt peuvent être activés ou désactivés ici.',
   'Only parcels waiting at this warehouse can join this run.': 'Seuls les colis en attente dans cet entrepôt peuvent rejoindre cette tournée.',
   'Choose at least one parcel.': 'Choisissez au moins un colis.',
   'Choose parcels of this run.': 'Choisissez des colis de cette tournée.',
