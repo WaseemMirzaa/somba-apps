@@ -151,7 +151,9 @@ export class AnalyticsService {
       this.payments
         .createQueryBuilder('p')
         .select("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'revenue')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
+        // C-refund: refunds come from the ledger (the same figure as the finance overview), not from `refunded` payments:
+        // a return or a partial refund leaves the payment `succeeded`.
+        .addSelect(`(SELECT COALESCE(SUM(r.amountUsd), 0) FROM payment_refunds r)`, 'refunds')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'plan' THEN p.amountUsd ELSE 0 END), 0)", 'plans')
         .getRawOne<Record<string, string>>(),
       this.gmvByCategory(),
