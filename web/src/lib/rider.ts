@@ -107,6 +107,11 @@ function toRiderTask(row: RiderQueueRow) {
     geo,
     fromGeo: pin(fromEnd),
     hubId: row.hubId,
+    /** The transfer run this parcel travels in (its card shows it), and its place in a multi-hop route (1 of 1 otherwise). */
+    runId: row.runId ?? null,
+    runReference: row.runReference ?? null,
+    hop: row.hop ?? 1,
+    hops: row.hops ?? 1,
     orderId: row.orderReference,
     orderUuid: row.orderId,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,

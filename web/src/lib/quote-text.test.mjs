@@ -90,3 +90,29 @@ test("transit time is written as people say it", () => {
   assert.equal(q.formatTransit(60, true), "2 j 12 h");
   assert.equal(q.formatTransit(null, true), "—");
 });
+
+test("a hop with no known transit time (a direct transfer, no lane) shows its cost only: no \"~0 min\"", () => {
+  const money = (usd) => `$${usd.toFixed(2)}`;
+  // the case from the demo: no lane configured, the default transfer fee, transit 0
+  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 1.5 }, false, money), "$1.50");
+  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 1.5 }, true, money), "$1.50");
+  assert.equal(q.hopFigures({ transitHours: null, costUsd: 1.5 }, false, money), "$1.50");
+  assert.equal(q.hopFigures({ costUsd: 1.5 }, false, money), "$1.50");
+  // a lane with a transit time shows both
+  assert.equal(q.hopFigures({ transitHours: 4, costUsd: 2 }, false, money), "~4 h · $2.00");
+  assert.equal(q.hopFigures({ transitHours: 36, costUsd: 2 }, true, money), "~36 h · $2.00");
+  assert.equal(q.hopFigures({ transitHours: 72, costUsd: 0 }, true, money), "~3 j · Gratuit");
+  assert.equal(q.hopFigures({ transitHours: 0.5, costUsd: null }, false, money), "~30 min");
+  // a free hop with no transit is still said
+  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 0 }, false, money), "Free");
+  // nothing to say
+  assert.equal(q.hopFigures({ transitHours: 0, costUsd: null }, false, money), "");
+  assert.equal(q.hopFigures({}, false, money), "");
+});
+
+test("hopTransitText hides unknown, zero and nonsense transit", () => {
+  for (const h of [null, undefined, 0, -1, NaN, Infinity]) assert.equal(q.hopTransitText(h, false), null);
+  assert.equal(q.hopTransitText(4, false), "~4 h");
+  assert.equal(q.hopTransitText(24, true), "~24 h");
+  assert.equal(q.hopTransitText(60, true), "~2 j 12 h");
+});

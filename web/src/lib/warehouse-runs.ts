@@ -44,10 +44,10 @@ export function runStatusVariant(s: string): "success" | "warning" | "info" | "d
   }
 }
 
-/** "Run TR-0042 · hop 1/2" / "Navette TR-0042 · étape 1/2": the badge a transfer leg wears on the desk. */
+/** "Run TR-0042 · hop 1/2" / "Tournée TR-0042 · étape 1/2": the badge a transfer leg wears on the desk. */
 export function runBadgeText(t: Pick<TaskView, "runReference" | "hop" | "hops">, fr: boolean): string | null {
   const parts: string[] = [];
-  if (t.runReference) parts.push(`${fr ? "Navette" : "Run"} ${t.runReference}`);
+  if (t.runReference) parts.push(`${fr ? "Tournée" : "Run"} ${t.runReference}`);
   if (t.hops && t.hops > 1 && t.hop) parts.push(`${fr ? "étape" : "hop"} ${t.hop}/${t.hops}`);
   return parts.length ? parts.join(" · ") : null;
 }

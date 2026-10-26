@@ -141,7 +141,7 @@ function hopSteps(
     bits.push(`${from} → ${to}`);
     if (l.riderFirstName) bits.push(t(`driver ${l.riderFirstName}`, `chauffeur ${l.riderFirstName}`));
     else if (!done) bits.push(t("driver not chosen yet", "chauffeur pas encore choisi"));
-    if (l.runReference) bits.push(`${t("run", "navette")} ${l.runReference}`);
+    if (l.runReference) bits.push(`${t("run", "tournée")} ${l.runReference}`);
     if (hop < hops && done === false && hops > legs.length) bits.push(t("more hops follow", "d'autres étapes suivent"));
     out.push({
       key: `hop-${l.id}`,

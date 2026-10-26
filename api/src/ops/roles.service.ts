@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Hub, User } from '../database/entities';
+import { DeliveryTask, Hub, User } from '../database/entities';
 import { WAREHOUSE_TIERS, WarehouseTier, tierOf } from '../logistics/tiers';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -37,6 +37,7 @@ export class RolesService {
     private readonly usersSvc: UsersService,
     private readonly emitter: RealtimeEmitter,
     @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
+    @InjectRepository(DeliveryTask) private readonly tasks?: Repository<DeliveryTask>,
   ) {}
 
   /**
@@ -81,6 +82,27 @@ export class RolesService {
         hubId: u.hubId ?? null,
         warehouseTier: u.role === 'warehouse_staff' ? tierOf(u.warehouseTier) : null,
       }));
+  }
+
+  /**
+   * Switch a rider or a warehouse employee off (or back on). `active` is what the routing counts: a warehouse whose riders
+   * are all inactive has no rider (UC-8: the nearest staffed warehouse stands in), and an inactive rider is offered by no
+   * rider list (`logistics:riders`, `warehouse:riders`, the run driver) and cannot be assigned. Switching off also revokes
+   * the person's sessions (`tokenVersion`), so the caller can drop their open sockets. Their open tasks stay assigned:
+   * the desk gives them to someone else (`openTasks` says how many).
+   */
+  async setStaffActive(id: string, active: boolean): Promise<{ id: string; name: string; email: string; role: UserRole; active: boolean; hubId: string | null; warehouseTier: WarehouseTier | null; openTasks: number }> {
+    const target = await this.users.findOne({ where: { id } });
+    if (!target) throw new Error('Account not found.');
+    if (target.role !== 'rider' && target.role !== 'warehouse_staff') throw new Error('Only riders and warehouse staff can be switched on or off here.');
+    await this.users.update({ id }, active ? { active } : { active, tokenVersion: (target.tokenVersion ?? 0) + 1 });
+    const view = { id: target.id, role: target.role, active, hubId: target.hubId ?? null, warehouseTier: target.role === 'warehouse_staff' ? tierOf(target.warehouseTier) : null };
+    const openTasks = target.role === 'rider' && this.tasks ? await this.tasks.count({ where: { riderId: id, status: In(['assigned', 'picked_up', 'in_transit']) } }) : 0;
+    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
+    // The directory's rider and staff counts changed with it.
+    const hub = target.hubId ? await this.hubs.findOne({ where: { id: target.hubId } }) : null;
+    if (hub) this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'hub:updated', hub);
+    return { ...view, name: target.name, email: target.email, openTasks };
   }
 
   async setRole(id: string, role: UserRole, hubId?: string | null): Promise<void> {

@@ -170,8 +170,8 @@ function DeskContent() {
 
       {(activeTab.id === "transfer_out" || activeTab.id === "transfer") && (
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-sm text-blue-800" data-testid="desk-runs-hint">
-          {fr ? "Plusieurs colis partent vers le même entrepôt ? Regroupez-les dans une navette avec un seul chauffeur." : "Several parcels leaving for the same warehouse? Group them in a run with one driver."}
-          <Link href={ops("/runs")} className="font-semibold underline">{fr ? "Ouvrir les navettes de transfert" : "Open transfer runs"}</Link>
+          {fr ? "Plusieurs colis partent vers le même entrepôt ? Regroupez-les dans une tournée avec un seul chauffeur." : "Several parcels leaving for the same warehouse? Group them in a run with one driver."}
+          <Link href={ops("/runs")} className="font-semibold underline">{fr ? "Ouvrir les tournées de transfert" : "Open transfer runs"}</Link>
         </p>
       )}
 

@@ -12,6 +12,7 @@ import { DISPATCH_STATUS, REPLACEMENT_NEXT, REPLACEMENT_STATUS, pick, shortDate,
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
 import { assetUrl } from "@/lib/warehouse-returns";
+import { replacementConditionLabel } from "@/lib/replacement-condition";
 
 const FLOW = ["requested", "approved", "dispatched", "delivered"] as const;
 
@@ -74,7 +75,7 @@ export default function WarehouseReplacementDetailPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-red-700">{fr ? "Motif du remplacement" : "Replacement reason"}</p>
               <p className="mt-1 text-lg font-bold text-red-950">{rep.reason}</p>
-              {rep.condition && <p className="mt-1 text-sm text-red-900/80">{fr ? "État : " : "Condition: "}{rep.condition}</p>}
+              {rep.condition && <p className="mt-1 text-sm text-red-900/80">{fr ? "État : " : "Condition: "}{replacementConditionLabel(rep.condition, fr)}</p>}
             </div>
           </div>
         </div>

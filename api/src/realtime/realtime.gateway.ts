@@ -1716,6 +1716,26 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * `staff:setActive { userId, active }`: the super admin switches a rider or a warehouse employee off or on. Off means no
+   * sign-in, no open sockets, never offered as a driver, and not counted as a rider by the area routing (UC-8).
+   */
+  @SubscribeMessage('staff:setActive')
+  async staffSetActive(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { userId?: string; active?: boolean }) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin') return fail('Super admin only.');
+      if (typeof body?.active !== 'boolean') return fail('Active must be true or false.');
+      const id = String(body?.userId ?? '');
+      const done = await this.roles.setStaffActive(id, body.active);
+      await this.audit.record({ actor: user.name, role: user.role, action: body.active ? 'staff.reactivate' : 'staff.deactivate', entity: 'user', entityId: id, detail: `${done.role} ${done.email}` });
+      if (!body.active) this.kick(id); // switched-off people lose their live sockets immediately
+      return ok(done);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   /** Active riders (for dispatch screens: assign a task or build a batch). */
   @SubscribeMessage('warehouse:riders')
   async warehouseRiders(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {

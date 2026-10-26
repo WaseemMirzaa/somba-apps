@@ -9,6 +9,7 @@ import { SWAP_STATUS, swapSteps, type ExchangeRow, type ReplacementRow } from "@
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { pickText } from "@/lib/i18n-fields";
+import { replacementConditionLabel } from "@/lib/replacement-condition";
 
 export function SwapNotFound({ loaded }: { loaded: boolean }) {
   const { locale } = useLocale();
@@ -47,7 +48,7 @@ export function ReplacementStatusView({ r }: { r: ReplacementRow }) {
             { label: fr ? "Article" : "Item", value: `${pickText(fr, r.productName, r.productNameFr)} × ${r.qty}` },
             ...(r.variant && r.variant !== "Default" ? [{ label: fr ? "Option" : "Option", value: r.variant }] : []),
             { label: fr ? "Demandé le" : "Requested", value: new Date(r.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB") },
-            ...(r.condition ? [{ label: fr ? "État" : "Condition", value: r.condition }] : []),
+            ...(r.condition ? [{ label: fr ? "État" : "Condition", value: replacementConditionLabel(r.condition, fr) }] : []),
             ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: r.reason, full: true }] : []),
             ...(r.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: r.sellerReason, full: true }] : []),
             ...(r.status === "dispatched" ? [{ label: fr ? "Livraison" : "Delivery", value: fr ? "Un livreur vous apporte le nouvel article et reprend l'ancien." : "A rider is bringing the new item and will collect the old one.", full: true }] : []),

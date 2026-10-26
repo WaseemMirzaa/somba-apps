@@ -68,28 +68,31 @@ add("An area with this code already exists", "Une zone avec ce code existe déj�
 add("An area with this name already exists here", "Une zone portant ce nom existe déjà à cet endroit.");
 add("Choose at least one area", "Choisissez au moins une zone.");
 add("Choose at least one parcel", "Choisissez au moins un colis.");
-add("Choose parcels of this run", "Choisissez des colis de cette navette.");
-add("Choose some of the parcels of this run, not all of them", "Choisissez une partie des colis de cette navette, pas tous.");
+add("Choose parcels of this run", "Choisissez des colis de cette tournée.");
+add("Choose some of the parcels of this run, not all of them", "Choisissez une partie des colis de cette tournée, pas tous.");
 add("Code may only contain letters, digits and hyphens", "Le code ne peut contenir que des lettres, des chiffres et des tirets.");
 add("Hub not found", "Entrepôt introuvable.");
+add("Account not found", "Compte introuvable.");
+add("Super admin only", "Réservé au super administrateur.");
+add("Only riders and warehouse staff can be switched on or off here", "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.");
 add("Lane not found", "Liaison introuvable.");
-add("Run not found", "Navette introuvable.");
-add("That parcel is not in this run", "Ce colis n'est pas dans cette navette.");
-add("This run has no parcels left to send", "Cette navette n'a plus de colis à envoyer.");
-add("This run has not left yet", "Cette navette n'est pas encore partie.");
-add("This run is already closed", "Cette navette est déjà clôturée.");
+add("Run not found", "Tournée introuvable.");
+add("That parcel is not in this run", "Ce colis n'est pas dans cette tournée.");
+add("This run has no parcels left to send", "Cette tournée n'a plus de colis à envoyer.");
+add("This run has not left yet", "Cette tournée n'est pas encore partie.");
+add("This run is already closed", "Cette tournée est déjà clôturée.");
 add("Staff only", "Réservé au personnel.");
 add("Status must be in_transit", "Le statut doit être « en route ».");
 add("Choose a warehouse", "Choisissez un entrepôt.");
 add("Riders only", "Réservé aux livreurs.");
 add("Delivery between cities is not available right now", "La livraison entre villes n'est pas disponible pour le moment.");
 add("One seller in your cart cannot ship from their area yet", "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone.");
-add("This parcel is part of a transfer run. Manage it from the run", "Ce colis fait partie d'une navette de transfert. Gérez-le depuis la navette.");
+add("This parcel is part of a transfer run. Manage it from the run", "Ce colis fait partie d'une tournée de transfert. Gérez-le depuis la tournée.");
 add("We don't deliver to this area yet", "Nous ne livrons pas encore dans cette zone.");
 add("Address not found", "Adresse introuvable.");
-add("This run has already left", "Cette navette est déjà partie.");
-add("Only parcels waiting at this warehouse can join this run", "Seuls les colis qui attendent dans cet entrepôt peuvent rejoindre cette navette.");
-add("Choose a driver for this run first", "Choisissez d'abord un chauffeur pour cette navette.");
+add("This run has already left", "Cette tournée est déjà partie.");
+add("Only parcels waiting at this warehouse can join this run", "Seuls les colis qui attendent dans cet entrepôt peuvent rejoindre cette tournée.");
+add("Choose a driver for this run first", "Choisissez d'abord un chauffeur pour cette tournée.");
 add("These warehouses are not connected by any lane", "Ces entrepôts ne sont reliés par aucune liaison.");
 add("Area not found", "Zone introuvable.");
 add("A warehouse cannot cover an area it is not allowed to serve", "Un entrepôt ne peut pas couvrir une zone qu'il n'a pas le droit de desservir.");
@@ -342,7 +345,7 @@ const RULES: Rule[] = [
   [/^(.+) must be (?:a number|a whole number) between (\d+) and (\d+)\.?$/i, (m) => `${areaField(m[1])} : un nombre entre ${m[2]} et ${m[3]}.`],
   [/^Level must be one of: .+$/i, () => "Le niveau doit être : pays, province, ville, district, commune ou quartier."],
   [/^A (\w+) cannot be added under a (\w+)\.?$/i, (m) => `Impossible d'ajouter ${AREA_LEVEL_ADD_FR[m[1]] ?? m[1]} sous ${AREA_LEVEL_ADD_FR[m[2]] ?? m[2]}.`],
-  [/^Parcel missing from run (.+?)\.?$/i, (m) => `Colis manquant dans la navette ${m[1]}.`],
+  [/^Parcel missing from run (.+?)\.?$/i, (m) => `Colis manquant dans la tournée ${m[1]}.`],
   [/^This area is already covered by (.+?)\.?$/i, (m) => `Cette zone est déjà couverte par ${m[1]}.`],
   [/^We don[’']t deliver to this area yet\.?$/i, () => "Nous ne livrons pas encore dans cette zone."],
   [/^We don[’']t deliver to (.+?) yet\.?$/i, (m) => `Nous ne livrons pas encore à ${m[1]}.`],

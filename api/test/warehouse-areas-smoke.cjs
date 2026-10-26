@@ -82,7 +82,7 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
   const opK = await login('operator@somba.app'); // Entrepôt Kinshasa, operator
   const supL = await login('warehouse.limete@somba.app'); // Entrepôt Limete, supervisor
   const riderK = await login('rider@somba.app');
-  const riderL = await login('rider.limete@somba.app');
+  let riderL = await login('rider.limete@somba.app'); // reassigned when the UC-8 deactivation check signs them in again
   const sellerK = await login('seller@somba.app'); // pickup in Gombe
   const sellerL = await login('seller2@somba.app'); // pickup in Limete
 
@@ -505,6 +505,111 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
     await req(admin.sock, 'hubs:unassign', { hubId: NG.id, areaIds: [GOMA_AREA.id] });
     await req(admin.sock, 'hubs:setActive', { id: NG.id, active: false });
     ok(!(await quote({ areaId: GOMA_AREA.id, city: 'Goma' }, [line(prodK)])).ok, 'unassigned and switched off again: Goma is not served');
+
+    // ================================================================================================
+    section('UC-8: an admin deactivates a warehouse\'s only rider (staff:setActive): signed out, counted as gone, never offered, fallback and notices');
+    const hubRow = async (id) => (await hubList()).find((h) => h.id === id);
+    const LIMETE_RIDER = 'rider.limete@somba.app';
+    const limeteRiders0 = (await hubRow(L.id)).activeRiders;
+    ok(limeteRiders0 === 1, 'Entrepôt Limete has exactly one active rider (Marc)', String(limeteRiders0));
+    // an order in flight: the Gombe seller to Masina, its transfer Kinshasa -> Limete is waiting for a driver
+    a = await place([line(prodK)], MASINA);
+    const uc8a = a.data;
+    ok(a.ok && uc8a.destinationHubId === L.id, 'a Gombe seller -> Masina order is placed while Limete has its rider (destination Entrepôt Limete)', a.error ?? '');
+    a = await move(await taskOf(uc8a.id, 'pickup'), riderK, opK);
+    const transfer8 = a.data?.next?.[0];
+    ok(a.ok && transfer8?.kind === 'transfer' && transfer8.fromHubId === K.id && transfer8.toHubId === L.id, 'its transfer Kinshasa -> Limete is waiting for a driver', a.error ?? '');
+    a = await req(admin.sock, 'logistics:riders', { taskId: transfer8.id });
+    ok(a.ok && a.data.some((r) => r.id === riderL.user.id) && a.data.some((r) => r.id === riderK.user.id), 'before: logistics:riders offers a rider of either end of the transfer (Marc and Jean)', JSON.stringify(a.data?.map((r) => r.name)));
+    // who may switch someone off
+    for (const [who, u] of [['a customer', cust], ['a seller', sellerK], ['a warehouse manager', mgrK], ['a rider', riderL], ['a guest', guest]]) {
+      a = await req(u.sock, 'staff:setActive', { userId: riderL.user.id, active: false });
+      ok(!a.ok, `${who} cannot switch a rider off`, JSON.stringify(a));
+    }
+    a = await req(mgrK.sock, 'staff:setActive', { userId: riderL.user.id, active: false });
+    ok(a.error === 'Super admin only.', 'the refusal says "Super admin only."', a.error ?? '');
+    ok((await req(riderL.sock, 'rider:assignment')).ok && (await hubRow(L.id)).activeRiders === 1, 'and nothing changed: Marc is still signed in and counted');
+    a = await req(admin.sock, 'staff:setActive', { userId: riderL.user.id, active: 'no' });
+    ok(!a.ok && a.error === 'Active must be true or false.', 'active must be a real true or false', a.error ?? '');
+    a = await req(admin.sock, 'staff:setActive', { userId: cust.user.id, active: false });
+    ok(!a.ok && a.error === 'Only riders and warehouse staff can be switched on or off here.', 'a customer is not switched here (customers:setActive is theirs)', a.error ?? '');
+    a = await req(admin.sock, 'staff:setActive', { userId: 'nope', active: false });
+    ok(!a.ok && a.error === 'Account not found.', 'an unknown account', a.error ?? '');
+    // switch Marc off
+    const wwr0 = (await noteTitles(admin)).filter((t) => t === 'Warehouse without riders').length;
+    const wwrSup0 = (await noteTitles(supL)).filter((t) => t === 'Warehouse without riders').length;
+    const wwrMgr0 = (await noteTitles(mgrK)).filter((t) => t === 'Warehouse without riders').length;
+    const rolesPush = record(admin.sock, 'roles:updated');
+    const hubPush = record(supL.sock, 'hub:updated');
+    const oldRiderToken = riderL.token;
+    a = await req(admin.sock, 'staff:setActive', { userId: riderL.user.id, active: false });
+    ok(a.ok && a.data.id === riderL.user.id && a.data.active === false && a.data.role === 'rider' && a.data.hubId === L.id && a.data.openTasks === 0, 'the super admin switches Marc off', a.error ?? JSON.stringify(a.data));
+    ok(!!(await until(async () => riderL.sock.disconnected)), 'his open socket is dropped at once');
+    ok(!!(await until(async () => rolesPush.some((p) => p.id === riderL.user.id && p.active === false && !('email' in p) && !('name' in p)))), 'admins get roles:updated { id, role, active, hubId } (no name, no e-mail)', JSON.stringify(rolesPush));
+    ok(!!(await until(async () => hubPush.some((h) => h.id === L.id))), 'and the warehouse desk gets hub:updated (its rider count changed)');
+    const audit = (await req(admin.sock, 'audit:list', { limit: 50 })).data ?? [];
+    ok(audit.some((l) => l.action === 'staff.deactivate' && l.entityId === riderL.user.id && /rider/.test(l.detail ?? '')), 'it is audited (staff.deactivate)', JSON.stringify(audit.slice(0, 2)));
+    for (let i = 0; i < 4; i++) {
+      a = await rest('/api/v1/auth/login', { email: LIMETE_RIDER, password: PW });
+      if (a.status !== 429) break;
+      await sleep(15000);
+    }
+    ok(a.status === 401 && /suspended/i.test(a.json?.message ?? ''), 'a switched-off rider cannot sign in again', JSON.stringify(a));
+    ok(await connect(oldRiderToken).then((s) => { s.close(); return false; }, () => true), 'and the session he had stopped working (the token is revoked)');
+    // counted as gone
+    const limeteNow = await hubRow(L.id);
+    ok(limeteNow.activeRiders === 0 && limeteNow.riders === 0 && limeteNow.active === true, 'hubs:list: Entrepôt Limete has no active rider any more', JSON.stringify([limeteNow.activeRiders, limeteNow.riders]));
+    ok(((await req(admin.sock, 'roles:staff')).data ?? []).find((u) => u.id === riderL.user.id)?.active === false, 'roles:staff lists him as inactive');
+    // never offered
+    a = await req(admin.sock, 'logistics:riders', { taskId: transfer8.id });
+    ok(a.ok && !a.data.some((r) => r.id === riderL.user.id) && a.data.some((r) => r.id === riderK.user.id), 'logistics:riders no longer offers him for the transfer (the driver list of a run is this list)', JSON.stringify(a.data?.map((r) => r.name)));
+    a = await req(admin.sock, 'warehouse:riders', { hubId: L.id });
+    ok(a.ok && a.data.length === 0, 'warehouse:riders: Entrepôt Limete has none to pick from', JSON.stringify(a.data));
+    a = await req(admin.sock, 'logistics:assign', { taskId: transfer8.id, riderId: riderL.user.id });
+    ok(!a.ok && a.error === 'Choose an active rider.', 'a task cannot be given to him', a.error ?? '');
+    a = await req(mgrK.sock, 'logistics:createRun', { toHubId: L.id, taskIds: [transfer8.id] });
+    const run8 = a.data;
+    ok(a.ok && run8.count === 1, 'a transfer run is created for the waiting parcel', a.error ?? '');
+    a = await req(mgrK.sock, 'logistics:assignRun', { runId: run8.id, riderId: riderL.user.id });
+    ok(!a.ok && a.error === 'Choose an active rider.', 'and he cannot be its driver', a.error ?? '');
+    // the fallback of UC-8
+    q = (await quote(MASINA, [line(prodK)])).data;
+    ok(q?.destinationHubId === K.id && q.fallback === 'city' && q.coveringHubId === L.id && q.coveringHubName === L.name, 'Masina is Entrepôt Limete\'s, which now has no rider: the nearest staffed warehouse of the city (Entrepôt Kinshasa) takes over (fallback "city")', JSON.stringify(q && { d: q.destinationHubName, f: q.fallback, c: q.coveringHubName }));
+    a = await place([line(prodK)], MASINA);
+    const uc8b = a.data;
+    ok(a.ok && uc8b.destinationHubId === K.id, 'a new order is accepted and routed to Entrepôt Kinshasa', a.error ?? '');
+    ok(!!(await until(async () => (await noteTitles(admin)).filter((t) => t === 'Warehouse without riders').length > wwr0)), 'admins get a "Warehouse without riders" notice');
+    ok(!!(await until(async () => (await noteTitles(supL)).filter((t) => t === 'Warehouse without riders').length > wwrSup0)), 'so does the covering warehouse (Entrepôt Limete)');
+    ok(!!(await until(async () => (await noteTitles(mgrK)).filter((t) => t === 'Warehouse without riders').length > wwrMgr0)), 'and the warehouse that stands in (Entrepôt Kinshasa)');
+    const legs8b = await tasksOf(uc8b.id);
+    ok(legs8b.length === 1 && legs8b[0].kind === 'pickup' && legs8b[0].hubId === K.id, 'its pickup is Entrepôt Kinshasa\'s: no transfer is needed any more');
+    a = await move(legs8b[0], riderK, opK);
+    ok(a.ok && a.data.next[0]?.kind === 'delivery' && a.data.next[0].hubId === K.id, 'Entrepôt Kinshasa scans it in and delivers it itself', a.error ?? '');
+    a = await deliver(a.data.next[0], riderK);
+    ok(a.ok && (await orderOf(uc8b.id)).status === 'delivered', 'delivered by Entrepôt Kinshasa\'s rider', a.error ?? '');
+    // switch Marc back on
+    a = await req(admin.sock, 'staff:setActive', { userId: riderL.user.id, active: true });
+    ok(a.ok && a.data.active === true, 'the super admin switches him back on', a.error ?? '');
+    ok((await hubRow(L.id)).activeRiders === 1, 'Entrepôt Limete has its rider again');
+    q = (await quote(MASINA, [line(prodK)])).data;
+    ok(q?.destinationHubId === L.id && q.fallback === null, 'and Masina is delivered by Entrepôt Limete again (no fallback)', JSON.stringify(q && { d: q.destinationHubName, f: q.fallback }));
+    riderL = await login(LIMETE_RIDER);
+    ok(riderL.user.role === 'rider' && (await req(riderL.sock, 'rider:assignment')).data?.hub?.id === L.id, 'he can sign in again, at his warehouse');
+    a = await req(admin.sock, 'logistics:riders', { taskId: transfer8.id });
+    ok(a.ok && a.data.some((r) => r.id === riderL.user.id), 'and he is offered again');
+    // the run goes with him as the driver: assign, dispatch, on the road, received, delivered
+    a = await req(mgrK.sock, 'logistics:assignRun', { runId: run8.id, riderId: riderL.user.id });
+    ok(a.ok && a.data.riderId === riderL.user.id, 'he is the driver of the waiting run', a.error ?? '');
+    a = await req(mgrK.sock, 'logistics:dispatchRun', { runId: run8.id });
+    ok(a.ok && a.data.status === 'dispatched', 'dispatched', a.error ?? '');
+    a = await req(riderL.sock, 'rider:runStatus', { runId: run8.id, status: 'in_transit' });
+    ok(a.ok && a.data.inTransit === true, 'he puts the run on the road', a.error ?? '');
+    a = await req(supL.sock, 'logistics:receiveRun', { runId: run8.id });
+    ok(a.ok && a.data.receivedCount === 1, 'Entrepôt Limete receives it', a.error ?? '');
+    const delivery8 = await taskOf(uc8a.id, 'delivery');
+    ok(delivery8?.hubId === L.id, 'and the delivery leg is Entrepôt Limete\'s');
+    a = await deliver(delivery8, riderL);
+    ok(a.ok && (await orderOf(uc8a.id)).status === 'delivered', 'delivered by Marc: the first order finished through Entrepôt Limete', a.error ?? '');
 
     // ================================================================================================
     section('UC-6: another city. Entrepôt Lubumbashi (with a rider) covers the city Lubumbashi; local order, then Kinshasa -> Lubumbashi');

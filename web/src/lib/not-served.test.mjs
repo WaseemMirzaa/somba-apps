@@ -95,3 +95,16 @@ test("old server: the English name is found in the cached tree (no geo:search)",
   assert.equal(m.englishAreaName(tree, "Nowhere"), null);
   assert.equal(m.englishAreaName(null, "Goma"), null);
 });
+
+test("the seller-area refusal is recognised in English and in French, by the raw text or the shown message", () => {
+  assert.equal(m.isSellerAreaRefusal({ raw: "One seller in your cart cannot ship from their area yet.", message: "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone." }), true);
+  assert.equal(m.isSellerAreaRefusal({ message: "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone." }), true);
+  assert.equal(m.isSellerAreaRefusal({ message: "One seller in your cart cannot ship from their area yet" }), true);
+  assert.equal(m.isSellerAreaRefusal(new Error("One seller in your cart cannot ship from their area yet.")), true);
+  assert.equal(m.isSellerAreaRefusal("One seller in your cart cannot ship from their area yet."), true);
+  // not the same thing as an unserved address, nor any other failure
+  assert.equal(m.isSellerAreaRefusal({ raw: "We don't deliver to Goma yet.", message: "Nous ne livrons pas encore à Goma." }), false);
+  assert.equal(m.isSellerAreaRefusal(new Error("Request failed.")), false);
+  assert.equal(m.isSellerAreaRefusal(null), false);
+  assert.equal(m.isSellerAreaRefusal(undefined), false);
+});

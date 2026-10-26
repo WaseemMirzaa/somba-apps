@@ -5,7 +5,7 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { formatTransit, type DeliveryQuote } from "@/lib/logistics";
 import { areaName, notServedArea, notServedCityNames, notServedText, servedCityNames, useFootprint, type Area, type NotServedInfo } from "@/lib/areas";
 import { englishAreaName } from "@/lib/not-served";
-import { originAreaName, originFallbackNote, quoteFallbackNote, quoteRoutes } from "@/lib/quote-text";
+import { hopFigures, originAreaName, originFallbackNote, quoteFallbackNote, quoteRoutes } from "@/lib/quote-text";
 import { formatCurrency } from "@/lib/utils";
 
 export type NotServed = NotServedInfo | null;
@@ -35,6 +35,27 @@ export function NotServedNotice({ notServed, areaObj, fr, children }: { notServe
             : "Choose or add an address in a served area to continue."}
         </p>
         {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "One seller in your cart cannot ship from their area yet": the address is served, but a store in the cart picks up in an area
+ * nobody serves yet (docs/contracts/areas.md). Shown instead of the fee wherever the quote is refused for that reason; the checkout
+ * button stays off until the cart no longer holds that store's items. The sentence is the server's own, in the UI language.
+ */
+export function SellerAreaNotice({ fr }: { fr: boolean }) {
+  return (
+    <div role="alert" data-testid="seller-not-served" className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <MapPinOff className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="space-y-1">
+        <p className="font-semibold">{fr ? "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone." : "One seller in your cart cannot ship from their area yet."}</p>
+        <p className="text-xs">
+          {fr
+            ? "Retirez ses articles de votre panier pour continuer : la zone de collecte de sa boutique n'est pas encore desservie."
+            : "Remove its items from your cart to continue: its store's pickup area is not served yet."}
+        </p>
       </div>
     </div>
   );
@@ -140,11 +161,7 @@ export function DeliveryQuoteCard({
                         <span className="text-slate-700">
                           {fr ? `Étape ${k + 1}` : `Hop ${k + 1}`}: {h.from} → {h.to}
                         </span>
-                        <span className="text-slate-600">
-                          {h.transitHours != null ? `~${formatTransit(h.transitHours, fr)}` : ""}
-                          {h.transitHours != null && h.costUsd != null ? " · " : ""}
-                          {h.costUsd != null ? (h.costUsd === 0 ? (fr ? "Gratuit" : "Free") : formatCurrency(h.costUsd, locale)) : ""}
-                        </span>
+                        <span className="text-slate-600">{hopFigures(h, fr, (usd) => formatCurrency(usd, locale))}</span>
                       </li>
                     ))}
                   </ol>

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useRealtime } from "@/context/realtime-context";
 import type { Area, AreaChain } from "@/lib/areas";
-import { notServedFromAck, notServedFromError, type NotServedInfo } from "@/lib/not-served";
+import { isSellerAreaRefusal, notServedFromAck, notServedFromError, type NotServedInfo } from "@/lib/not-served";
 import { formatTransit } from "@/lib/quote-text";
 
 export { formatTransit };
@@ -435,6 +435,8 @@ export function useDeliveryQuote(input: { addressId?: string | null; geo?: { lat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notServed, setNotServed] = useState<NotServedInfo | null>(null);
+  // The address is served, but a seller in the cart picks up in an area nobody serves yet: nothing can be ordered from this cart.
+  const [sellerBlocked, setSellerBlocked] = useState(false);
   const key = JSON.stringify([input.addressId ?? null, input.geo ?? null, input.city ?? null, input.lines.map((l) => [l.productId, l.qty])]);
   const ready = rt.status === "connected" && input.enabled !== false;
 
@@ -462,11 +464,13 @@ export function useDeliveryQuote(input: { addressId?: string | null; geo?: { lat
             : null,
         );
         setError(refused ? "Not served." : null);
+        setSellerBlocked(false);
       })
       .catch((e) => {
         if (!alive) return;
         setQuote(null);
         setNotServed(notServedFromError(e));
+        setSellerBlocked(isSellerAreaRefusal(e));
         setError(e instanceof Error ? e.message : "Request failed.");
       })
       .finally(() => alive && setLoading(false));
@@ -475,7 +479,7 @@ export function useDeliveryQuote(input: { addressId?: string | null; geo?: { lat
     };
   }, [ready, key]);
 
-  return input.enabled === false ? { quote: null, loading: false, error: null, notServed: null } : { quote, loading, error, notServed };
+  return input.enabled === false ? { quote: null, loading: false, error: null, notServed: null, sellerBlocked: false } : { quote, loading, error, notServed, sellerBlocked };
 }
 
 /** Pin on an address ({geo:{lat,lng}} or top-level lat/lng in the JSON shipping address). */

@@ -90,7 +90,10 @@ export class User {
   @Column({ type: 'float', default: 0 })
   walletBalance: number;
 
-  /** Rider/warehouse availability toggle. */
+  /**
+   * Account switched on by an admin. Off: no sign-in for customers, sellers, riders and warehouse staff
+   * (`customers:setActive` / `staff:setActive`), and an inactive rider is never offered or counted by the routing.
+   */
   @Column({ type: 'boolean', default: true })
   active: boolean;
 

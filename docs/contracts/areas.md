@@ -88,6 +88,25 @@ city → province) **decides** the warehouse; a warehouse that is switched off c
 unserved). A flat `feeOverrideUsd` replaces base + per km of the addresses it decides (the transfer fee still applies).
 Changing coverage never reroutes an order already placed; it recomputes every store's `originHubId`.
 
+## Events — switching a rider or an employee off (UC-8)
+| Event | Who | Payload | Reply |
+|---|---|---|---|
+| `staff:setActive` | **super admin** (`admin`) | `{ userId: string, active: boolean }` | `{ id, name, email, role, active, hubId, warehouseTier, openTasks }` |
+| push `roles:updated` | admins, warehouse staff | `{ id, role, active, hubId, warehouseTier }` (no name, no e-mail) | — |
+| push `hub:updated` | admins, warehouse staff | the person's warehouse (its rider and staff counts changed) | — |
+
+- `customers:setActive` cannot do this: it refuses staff accounts (`Staff accounts are managed in Roles.`). `staff:setActive` is its twin for **riders and
+  warehouse employees only**; any other account → `Only riders and warehouse staff can be switched on or off here.`, an unknown id → `Account not found.`,
+  a non-boolean `active` → `Active must be true or false.`, anybody but the super admin → `Super admin only.`.
+- **Off** (`active: false`): the account is signed out at once (`tokenVersion` is bumped and the user's open sockets are dropped) and cannot sign in or refresh a
+  session (`This account has been suspended. Contact support.`, as for a suspended customer or seller). **On** restores it; nothing else changes.
+- Audited (`staff.deactivate` / `staff.reactivate`, entity `user`, detail `"{role} {email}"`).
+- A switched-off rider **does not count as a rider** anywhere: `hubs:list` (`activeRiders` / `riders`), the area routing and the UC-8 fallback (a covering warehouse with no
+  active rider hands new orders to the nearest staffed warehouse of the city, then of the province; admins and that warehouse get `Warehouse without riders`), and
+  they are in no driver list: `logistics:riders`, `warehouse:riders`, the transfer-run driver (`logistics:assignRun` → `Choose an active rider.`), `logistics:assign`.
+  A switched-off employee gets no warehouse notices.
+- Tasks the rider already holds stay assigned to them (`openTasks` says how many); the warehouse desk gives them to somebody else with `logistics:assign`.
+
 ## Addresses, sellers, orders
 - `addresses:create` / `addresses:update` accept `areaId` (most specific area) and optionally Google `components`. If `areaId` is
   missing the server resolves it from the components, the pin, then `commune` / `city` / `region` text. Every address payload
@@ -227,6 +246,11 @@ receive; supervisor+ of either hub to close; admins everything):
 - **One driver per run; several drivers on a lane = several runs** (use `logistics:splitRun`). Each hop is a separate run, assigned by that hop's sending hub.
 - Rider: `rider:runs` lists the runs assigned to me (open ones, and those closed in the last 3 days). `delivery:updateStatus` on any task of a dispatched run with
   `in_transit` marks the whole run in transit; `rider:runStatus { runId, status: 'in_transit' }` does the same explicitly (reply: the `Run`).
+- Rider clients (the Flutter rider app and the web rider portal, `/rider/tasks`, `/rider` and `/rider/history`) draw **one card per run** from `rider:runs` + `run:updated`, with
+  the same words (Transfer run · Being prepared / Loaded / On the road / Handed over / Closed · "Transfer to {hub} · N parcels" · "From {hub}" · "N of M parcels scanned in" ·
+  "Hand over at {hub}" / "Waiting for the warehouse to scan it in" · "Handed over at {hub}" / "Every parcel was scanned in. This run is done." · "N parcels missing from this run").
+  The parcels of a run the rider knows are listed inside its card and never again as tasks of their own; a run moves to the done list when it is closed, or arrived with
+  `receivedCount >= count`; "On the road" is `rider:runStatus`.
 - Analytics: `analytics:warehouse` gains `runs: { total, byLane: { fromHubId, from, toHubId, to, runs, parcels, parcelsPerRun, missing, avgTransitMinutes }[] }` (30 days)
   and `byCommune: { areaId, area, areaEn, level, hubId, hub, orders, delivered, failed, failureRatePct, avgDeliveryMinutes }[]` (customer deliveries per commune, 30 days;
   quartiers count in their commune); `byHub` stays.
@@ -256,6 +280,7 @@ Warehouses (`hubs:*`):
 - `Place the warehouse on the map: latitude and longitude are required.`
 - `A hub with this name already exists.` / `You cannot deactivate the last active hub.`
 - `Hub must be 1-64 characters.` / `Hub name must be 2-100 characters.` / `City must be 2-100 characters.` / `Country must be 1-100 characters.` / `Address must be 3-200 characters.` / `Capacity must be a whole number between 1 and 1000000.`
+- `Super admin only.` / `Account not found.` / `Only riders and warehouse staff can be switched on or off here.` (`staff:setActive`)
 - `Only managers can see the staff list.` / `Only managers can change staff tiers.` / `Tier must be one of: operator, supervisor, manager.` / `Only warehouse staff have a tier.` / `You cannot change your own tier.` / `This person works at another warehouse.` / `Only an administrator can make someone a manager.`
 
 Addresses:

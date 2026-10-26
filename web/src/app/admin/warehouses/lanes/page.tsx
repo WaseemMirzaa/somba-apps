@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { ArrowRight, ArrowLeftRight, Pencil, Plus, Route as RouteIcon, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -273,15 +273,26 @@ export default function AdminLanesPage() {
                       <span key={i} className="inline-flex items-center gap-2">
                         <ArrowRight className="h-4 w-4 text-slate-400" />
                         <span>{hubName(h.toHubId)}</span>
-                        <Badge variant="info">{formatTransit(h.transitHours, fr)}</Badge>
+                        {h.transitHours > 0 && <Badge variant="info">{formatTransit(h.transitHours, fr)}</Badge>}
                       </span>
                     ))}
                   </>
                 )}
               </p>
               <p className="text-xs text-slate-600">
-                {preview.hops.length || 1} {fr ? ((preview.hops.length || 1) > 1 ? "étapes" : "étape") : (preview.hops.length || 1) > 1 ? "hops" : "hop"} · {fr ? "transit total" : "total transit"}: <strong>{formatTransit(preview.totalHours, fr)}</strong>
-                {preview.hops.length > 0 ? <> · {fr ? "frais de transfert" : "transfer fee"}: <strong>{formatCurrency(previewFee, locale)}</strong></> : null}
+                {[
+                  <span key="hops">{preview.hops.length || 1} {fr ? ((preview.hops.length || 1) > 1 ? "étapes" : "étape") : (preview.hops.length || 1) > 1 ? "hops" : "hop"}</span>,
+                  // A direct transfer with no lane has no known transit: nothing to say (not "0 min").
+                  preview.totalHours > 0 ? <span key="transit">{fr ? "transit total" : "total transit"}: <strong>{formatTransit(preview.totalHours, fr)}</strong></span> : null,
+                  preview.hops.length > 0 ? <span key="fee">{fr ? "frais de transfert" : "transfer fee"}: <strong>{formatCurrency(previewFee, locale)}</strong></span> : null,
+                ]
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && " · "}
+                      {part}
+                    </Fragment>
+                  ))}
               </p>
             </div>
           )}

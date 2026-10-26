@@ -62,7 +62,7 @@ export default function WarehouseRunsPage() {
     setCreateError(null);
     try {
       const run = await runActions.create(creating.toHubId, [...pick], hubId);
-      toast(fr ? `Navette ${run.reference} créée : ${run.count} colis vers ${run.toHubName}` : `Run ${run.reference} created: ${run.count} parcels to ${run.toHubName}`, "success");
+      toast(fr ? `Tournée ${run.reference} créée : ${run.count} colis vers ${run.toHubName}` : `Run ${run.reference} created: ${run.count} parcels to ${run.toHubName}`, "success");
       setCreating(null);
       reloadAll();
     } catch (e) {
@@ -84,15 +84,15 @@ export default function WarehouseRunsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={fr ? "Navettes de transfert" : "Transfer runs"}
+        title={fr ? "Tournées de transfert" : "Transfer runs"}
         subtitle={fr ? "Un voyage, plusieurs colis : regroupez les transferts qui partent vers le même entrepôt, confiez-les à un chauffeur, puis scannez-les à l'arrivée" : "One trip, many parcels: group the transfers leaving for the same warehouse, give them one driver, then scan them in on arrival"}
-        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Navettes" : "Runs" }]}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Tournées" : "Runs" }]}
       />
       <HubScopeBar />
 
       {needsHub ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="note">
-          {fr ? "Choisissez un entrepôt ci-dessus pour voir ses navettes." : "Pick a warehouse above to see its runs."}
+          {fr ? "Choisissez un entrepôt ci-dessus pour voir ses tournées." : "Pick a warehouse above to see its runs."}
         </p>
       ) : (
         <>
@@ -106,7 +106,7 @@ export default function WarehouseRunsPage() {
             </div>
             <label className="flex items-center gap-2 text-xs text-slate-600">
               <input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
-              {fr ? "Afficher les navettes clôturées" : "Show closed runs"}
+              {fr ? "Afficher les tournées clôturées" : "Show closed runs"}
             </label>
           </div>
 
@@ -118,7 +118,7 @@ export default function WarehouseRunsPage() {
                   <Badge variant={waitingParcels ? "warning" : "default"}>{waitingParcels}</Badge>
                 </div>
                 <p className="text-xs text-slate-500">
-                  {fr ? "Transferts prêts à partir, regroupés par entrepôt suivant. Créez une navette pour tous, ou choisissez les colis." : "Transfers ready to leave, grouped by the next warehouse. Create a run for all of them, or pick the parcels."}
+                  {fr ? "Transferts prêts à partir, regroupés par entrepôt suivant. Créez une tournée pour tous, ou choisissez les colis." : "Transfers ready to leave, grouped by the next warehouse. Create a run for all of them, or pick the parcels."}
                 </p>
                 {proposals.error ? (
                   <OpsError message={proposals.error} onRetry={() => void proposals.reload()} />
@@ -138,14 +138,14 @@ export default function WarehouseRunsPage() {
                         {canAssign && (
                           <Button size="sm" className="ml-auto" onClick={() => openCreate(p)} data-testid="run-create">
                             <Plus className="h-3.5 w-3.5" />
-                            {fr ? "Créer une navette" : "Create run"}
+                            {fr ? "Créer une tournée" : "Create run"}
                           </Button>
                         )}
                       </li>
                     ))}
                   </ul>
                 )}
-                {!canAssign && <p className="text-xs text-slate-500">{fr ? "Seuls les superviseurs et les responsables créent et font partir les navettes." : "Only supervisors and managers create and dispatch runs."}</p>}
+                {!canAssign && <p className="text-xs text-slate-500">{fr ? "Seuls les superviseurs et les responsables créent et font partir les tournées." : "Only supervisors and managers create and dispatch runs."}</p>}
               </CardContent>
             </Card>
           )}
@@ -156,7 +156,7 @@ export default function WarehouseRunsPage() {
             <OpsLoading />
           ) : list.data.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400" data-testid="runs-empty">
-              {tab === "out" ? (fr ? "Aucune navette au départ." : "No run is leaving.") : fr ? "Aucune navette en route vers cet entrepôt." : "No run is on its way to this warehouse."}
+              {tab === "out" ? (fr ? "Aucune tournée au départ." : "No run is leaving.") : fr ? "Aucune tournée en route vers cet entrepôt." : "No run is on its way to this warehouse."}
             </p>
           ) : (
             <div className="space-y-4">
@@ -182,7 +182,7 @@ export default function WarehouseRunsPage() {
       <Modal
         open={!!creating}
         onClose={() => !busy && setCreating(null)}
-        title={creating ? (fr ? `Navette vers ${creating.toHubName}` : `Run to ${creating.toHubName}`) : ""}
+        title={creating ? (fr ? `Tournée vers ${creating.toHubName}` : `Run to ${creating.toHubName}`) : ""}
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={() => setCreating(null)} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
@@ -194,7 +194,7 @@ export default function WarehouseRunsPage() {
       >
         {creating && (
           <>
-            <p className="text-slate-500">{fr ? "Décochez les colis à laisser pour une autre navette." : "Untick the parcels to leave for another run."}</p>
+            <p className="text-slate-500">{fr ? "Décochez les colis à laisser pour une autre tournée." : "Untick the parcels to leave for another run."}</p>
             <ul className="divide-y divide-slate-100">
               {creating.taskIds.map((id) => {
                 const t = parcels.byId.get(id);

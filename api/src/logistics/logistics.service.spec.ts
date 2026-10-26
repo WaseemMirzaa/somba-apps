@@ -7,6 +7,9 @@ import { RoutingService } from './routing.service';
 import { LanesService } from './lanes.service';
 import { RunsService } from './runs.service';
 import { sellerTracking } from '../orders/seller-tracking';
+import { RolesService } from '../ops/roles.service';
+import { RiderService } from '../warehouse/rider.service';
+import { AuthService } from '../auth/auth.service';
 import { geoWorld } from '../testing/geo-world';
 
 /**
@@ -985,6 +988,102 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       const done = await runs.receive(staff(limete, 'operator'), { runId: run.id });
       expect(done.receivedCount).toBe(1);
       expect((await tasksOf(order.id)).some((t) => t.kind === 'return_to_seller' && t.fromHubId === limete.id)).toBe(true);
+    });
+  });
+
+  describe('a rider switched off by an admin (staff:setActive)', () => {
+    const MASINA_PIN = { lat: -4.37, lng: 15.395 };
+    const roles = () => new RolesService(ds.getRepository(User), {} as never, emitter as never, ds.getRepository(Hub), ds.getRepository(DeliveryTask));
+    const user = (id: string) => ds.getRepository(User).findOneOrFail({ where: { id } });
+    /** A transfer leg Entrepôt Kinshasa -> Entrepôt Limete waiting for a driver. */
+    const transferLeg = async () => {
+      const { order } = await place([sellerG], { commune: 'Masina', pin: MASINA_PIN });
+      const [pickup] = await tasksOf(order.id);
+      return (await assignAndScan(pickup.id)).next[0];
+    };
+
+    it('switches a rider off and on: the flag, revoked sessions on the way off, and the admins and desks told', async () => {
+      const before = (await user(riderL.id)).tokenVersion;
+      emitter.toRoles.mockClear();
+      const off = await roles().setStaffActive(riderL.id, false);
+      expect(off).toMatchObject({ id: riderL.id, role: 'rider', active: false, hubId: limete.id, openTasks: 0 });
+      const row = await user(riderL.id);
+      expect(row.active).toBe(false);
+      expect(row.tokenVersion).toBe(before + 1); // every token they hold stops working
+      const sent = emitter.toRoles.mock.calls.map(([, ev, payload]) => [ev, payload]);
+      expect(sent).toContainEqual(['roles:updated', { id: riderL.id, role: 'rider', active: false, hubId: limete.id, warehouseTier: null }]);
+      expect(sent.some(([ev]) => ev === 'hub:updated')).toBe(true); // the directory's rider count follows
+      // the broadcast carries no name or e-mail
+      expect(JSON.stringify(sent)).not.toContain(row.email);
+
+      const on = await roles().setStaffActive(riderL.id, true);
+      expect(on.active).toBe(true);
+      const back = await user(riderL.id);
+      expect(back.active).toBe(true);
+      expect(back.tokenVersion).toBe(before + 1); // switching on needs no new revocation
+    });
+
+    it('counts the rider\'s open tasks, which stay assigned for the desk to hand over', async () => {
+      const leg = await transferLeg();
+      await logistics.assign(leg.id, riderG.id, admin);
+      const done = await roles().setStaffActive(riderG.id, false);
+      expect(done.openTasks).toBe(1);
+      expect(await ds.getRepository(DeliveryTask).findOneOrFail({ where: { id: leg.id } })).toMatchObject({ riderId: riderG.id, status: 'assigned' });
+      // the desk gives it to a rider who is on
+      const other = await mkUser('rider', gombe.id);
+      expect(await logistics.assign(leg.id, other.id, admin)).toMatchObject({ riderId: other.id });
+    });
+
+    it('only riders and warehouse staff can be switched here (not customers, not other admins), and the account must exist', async () => {
+      const customer = await mkUser('customer', null);
+      const adminUser = await mkUser('admin_support', null);
+      await expect(roles().setStaffActive(customer.id, false)).rejects.toThrow('Only riders and warehouse staff can be switched on or off here.');
+      await expect(roles().setStaffActive(adminUser.id, false)).rejects.toThrow('Only riders and warehouse staff can be switched on or off here.');
+      await expect(roles().setStaffActive('nope', false)).rejects.toThrow('Account not found.');
+      expect((await user(customer.id)).active).toBe(true);
+      const staffUser = await mkUser('warehouse_staff', limete.id, { warehouseTier: 'operator' });
+      expect(await roles().setStaffActive(staffUser.id, false)).toMatchObject({ role: 'warehouse_staff', active: false, warehouseTier: 'operator' });
+      expect(await logistics.staffIds(limete.id)).not.toContain(staffUser.id); // no notices for a switched-off employee
+    });
+
+    it('UC-8: the warehouse whose only rider is switched off has no rider, so the nearest staffed warehouse stands in', async () => {
+      expect((await routing.hubsWithRiders()).find((h) => h.id === limete.id)?.activeRiders).toBe(1);
+      expect(await routing.route({ geo: LIMETE_PIN, commune: 'Limete', sellerIds: [] })).toMatchObject({ destinationHubId: limete.id, fallback: null });
+      await roles().setStaffActive(riderL.id, false);
+      expect((await routing.hubsWithRiders()).find((h) => h.id === limete.id)?.activeRiders).toBe(0);
+      expect(await routing.route({ geo: LIMETE_PIN, commune: 'Limete', sellerIds: [] })).toMatchObject({ destinationHubId: gombe.id, fallback: 'city', coveringHubId: limete.id, coveringHubName: 'Entrepôt Limete' });
+      // a placed order is planned at the stand-in, and the pickup of a Limete seller is collected by it too
+      const { order } = await place([sellerL], { commune: 'Limete', pin: LIMETE_PIN });
+      expect(order.destinationHubId).toBe(gombe.id);
+      expect((await tasksOf(order.id))[0]).toMatchObject({ kind: 'pickup', hubId: gombe.id });
+      await roles().setStaffActive(riderL.id, true);
+      expect(await routing.route({ geo: LIMETE_PIN, commune: 'Limete', sellerIds: [] })).toMatchObject({ destinationHubId: limete.id, fallback: null });
+    });
+
+    it('a switched-off rider is offered by no driver list and cannot be given a task or a run', async () => {
+      const leg = await transferLeg(); // Kinshasa -> Limete: either end's riders may drive it
+      const riders = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics);
+      expect((await logistics.ridersFor(leg)).map((r) => r.id).sort()).toEqual([riderG.id, riderL.id].sort());
+      expect((await riders.activeRiders(limete.id)).map((r) => r.id)).toEqual([riderL.id]);
+      await roles().setStaffActive(riderL.id, false);
+      expect((await logistics.ridersFor(leg)).map((r) => r.id)).toEqual([riderG.id]); // logistics:riders
+      expect(await riders.activeRiders(limete.id)).toEqual([]); // warehouse:riders
+      expect((await riders.activeRiders()).map((r) => r.id)).not.toContain(riderL.id);
+      await expect(logistics.assign(leg.id, riderL.id, admin)).rejects.toThrow('Choose an active rider.');
+      const run = await runs.create(staff(gombe, 'supervisor'), { toHubId: limete.id, taskIds: [leg.id] });
+      await expect(runs.assign(staff(gombe, 'supervisor'), { runId: run.id, riderId: riderL.id })).rejects.toThrow('Choose an active rider.');
+      expect(await runs.assign(staff(gombe, 'supervisor'), { runId: run.id, riderId: riderG.id })).toMatchObject({ riderId: riderG.id });
+      await roles().setStaffActive(riderL.id, true);
+      expect((await logistics.ridersFor(leg)).map((r) => r.id).sort()).toEqual([riderG.id, riderL.id].sort());
+    });
+
+    it('a switched-off rider, warehouse employee, customer or seller gets no new session; the other admin roles are not affected', () => {
+      const guard = Object.create(AuthService.prototype) as AuthService;
+      for (const role of ['rider', 'warehouse_staff', 'customer', 'seller'] as const) {
+        expect(() => guard.assertNotSuspended({ role, active: false } as User)).toThrow('This account has been suspended. Contact support.');
+        expect(() => guard.assertNotSuspended({ role, active: true } as User)).not.toThrow();
+      }
+      expect(() => guard.assertNotSuspended({ role: 'admin_support', active: false } as User)).not.toThrow();
     });
   });
 });

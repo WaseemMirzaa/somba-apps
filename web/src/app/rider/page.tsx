@@ -5,8 +5,11 @@ import { Bike, CheckCircle, DollarSign, Warehouse, Banknote } from "lucide-react
 import { PageHeader } from "@/components/ui/page-header";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
+import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useLocale } from "@/context/locale-context";
 import { useRiderAssignment, useRiderData } from "@/lib/rider";
+import { looseTasks } from "@/lib/rider-runs";
+import { useRiderRuns } from "@/lib/rider-runs-live";
 import { formatCurrency } from "@/lib/utils";
 
 function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
@@ -28,9 +31,12 @@ function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon:
 export default function RiderDashboardPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { riderProfile, getActiveRiderTasks, earnings, error, loading } = useRiderData();
+  const { riderProfile, getActiveRiderTasks, mine, earnings, error, loading } = useRiderData();
+  const rr = useRiderRuns(mine);
   const assignment = useRiderAssignment();
-  const activeTasks = getActiveRiderTasks();
+  // A transfer run is one card; its parcels are not listed again as tasks of their own.
+  const activeTasks = looseTasks(getActiveRiderTasks(), rr.runs);
+  const activeCount = activeTasks.length + rr.activeRuns.length;
 
   return (
     <div className="space-y-6">
@@ -41,7 +47,7 @@ export default function RiderDashboardPage() {
       <RiderGpsPanel />
 
       <div className="grid grid-cols-2 gap-3">
-        <Kpi title={t("activeTasks")} value={String(activeTasks.length)} icon={Bike} />
+        <Kpi title={t("activeTasks")} value={String(activeCount)} icon={Bike} />
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
         <Kpi title={fr ? "Livrées" : "Delivered"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
         <Kpi title={t("earnings")} value={formatCurrency(earnings?.earningsUsd ?? 0, locale)} icon={DollarSign} />
@@ -61,12 +67,15 @@ export default function RiderDashboardPage() {
             {fr ? "Toutes les tâches" : "All tasks"}
           </Link>
         </div>
-        {activeTasks.length === 0 ? (
+        {activeCount === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
             {loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Aucune tâche en cours." : "No active tasks.")}
           </p>
         ) : (
           <div className="space-y-3">
+            {rr.activeRuns.map((run) => (
+              <RiderRunCard key={run.id} run={run} parcels={rr.parcelsOf(run)} onRoad={rr.onRoad(run)} onMarkOnRoad={rr.markOnRoad} />
+            ))}
             {activeTasks.map((task) => (
               <RiderTaskCard key={task.id} task={task} />
             ))}

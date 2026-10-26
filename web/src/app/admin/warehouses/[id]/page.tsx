@@ -29,7 +29,7 @@ import { countryName } from "@/lib/countries";
 const FULFILLMENT_LINKS = [
   { href: "/admin/fulfillment/desk", label: "Warehouse desk", labelFr: "Bureau de l'entrepôt" },
   { href: "/admin/fulfillment/deliveries", label: "Deliveries", labelFr: "Livraisons" },
-  { href: "/admin/fulfillment/runs", label: "Transfer runs", labelFr: "Navettes de transfert" },
+  { href: "/admin/fulfillment/runs", label: "Transfer runs", labelFr: "Tournées de transfert" },
   { href: "/admin/fulfillment/returns", label: "Returns", labelFr: "Retours" },
   { href: "/admin/fulfillment/riders", label: "Riders", labelFr: "Livreurs" },
   { href: "/admin/fulfillment/exceptions", label: "Exceptions", labelFr: "Exceptions" },

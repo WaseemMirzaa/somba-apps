@@ -205,7 +205,7 @@ export const translations = {
     warehouses: "Entrepôts",
     geography: "Géographie",
     lanes: "Liaisons",
-    transferRuns: "Navettes de transfert",
+    transferRuns: "Tournées de transfert",
     warehouseStaff: "Personnel d'entrepôt",
     inbound: "Arrivages",
     sorting: "Tri",

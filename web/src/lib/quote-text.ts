@@ -52,6 +52,21 @@ export function formatTransit(hours: number | null | undefined, fr: boolean): st
   return h ? `${d} ${fr ? "j" : "d"} ${h} h` : `${d} ${fr ? "j" : "d"}`;
 }
 
+/**
+ * "~4 h" for a hop's transit time, or null when there is nothing to say: the server did not send it, or it is 0 (a direct
+ * transfer with no lane configured has no known transit, and "~0 min" would read as a promise).
+ */
+export function hopTransitText(hours: number | null | undefined, fr: boolean): string | null {
+  if (hours == null || !Number.isFinite(hours) || hours <= 0) return null;
+  return `~${formatTransit(hours, fr)}`;
+}
+
+/** What a hop line shows on its right: the transit time when it is known and above 0, then the cost ("Free" for 0), joined by " · ". */
+export function hopFigures(h: { transitHours?: number | null; costUsd?: number | null }, fr: boolean, money: (usd: number) => string): string {
+  const cost = h.costUsd == null || !Number.isFinite(h.costUsd) ? null : h.costUsd === 0 ? (fr ? "Gratuit" : "Free") : money(h.costUsd);
+  return [hopTransitText(h.transitHours, fr), cost].filter((x): x is string => x !== null).join(" · ");
+}
+
 const hasName = (s: string | null | undefined): s is string => typeof s === "string" && s.trim() !== "";
 
 /**

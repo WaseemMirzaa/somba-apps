@@ -14,9 +14,9 @@ import { LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { localDateTime } from "@/lib/dates";
 import { pickText } from "@/lib/i18n-fields";
+import { replacementConditionLabel } from "@/lib/replacement-condition";
 import { sellerRequest } from "@/lib/seller-api";
 import {
-  caseCategoryLabel,
   exchangeStageLabel,
   exchangeStageVariant,
   legKindLabel,
@@ -167,7 +167,7 @@ export function AftersaleFlowDetail({ kind, idOrRef }: { kind: FlowKind; idOrRef
                 ? [
                     { label: fr ? "Article" : "Item", value: `${itemName}${variantSuffix(rep.variant, fr)}` },
                                         { label: fr ? "Quantité" : "Quantity", value: String(qty) },
-                    { label: fr ? "État signalé" : "Reported condition", value: caseCategoryLabel(rep.condition, fr) },
+                    { label: fr ? "État signalé" : "Reported condition", value: replacementConditionLabel(rep.condition, fr) },
                   ]
                 : exc
                   ? [

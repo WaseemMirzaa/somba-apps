@@ -42,19 +42,19 @@ test("area contract errors map to French (docs/contracts/areas.md)", () => {
 
 test("lane and transfer-run errors map to French", () => {
   const fr = (m) => localizeApiError(m, "fr");
-  assert.equal(fr("This run has already left."), "Cette navette est déjà partie.");
-  assert.equal(fr("Choose a driver for this run first."), "Choisissez d'abord un chauffeur pour cette navette.");
-  assert.equal(fr("Only parcels waiting at this warehouse can join this run."), "Seuls les colis qui attendent dans cet entrepôt peuvent rejoindre cette navette.");
-  assert.equal(fr("Parcel missing from run TR-0042."), "Colis manquant dans la navette TR-0042.");
+  assert.equal(fr("This run has already left."), "Cette tournée est déjà partie.");
+  assert.equal(fr("Choose a driver for this run first."), "Choisissez d'abord un chauffeur pour cette tournée.");
+  assert.equal(fr("Only parcels waiting at this warehouse can join this run."), "Seuls les colis qui attendent dans cet entrepôt peuvent rejoindre cette tournée.");
+  assert.equal(fr("Parcel missing from run TR-0042."), "Colis manquant dans la tournée TR-0042.");
   assert.equal(fr("These warehouses are not connected by any lane."), "Ces entrepôts ne sont reliés par aucune liaison.");
 });
 
 test("geography, lane and run validation errors map to French", () => {
   const fr = (m) => localizeApiError(m, "fr");
-  assert.equal(fr("Run not found."), "Navette introuvable.");
+  assert.equal(fr("Run not found."), "Tournée introuvable.");
   assert.equal(fr("Lane not found."), "Liaison introuvable.");
   assert.equal(fr("A lane connects two different warehouses."), "Une liaison relie deux entrepôts différents.");
-  assert.equal(fr("Choose some of the parcels of this run, not all of them."), "Choisissez une partie des colis de cette navette, pas tous.");
+  assert.equal(fr("Choose some of the parcels of this run, not all of them."), "Choisissez une partie des colis de cette tournée, pas tous.");
   assert.equal(fr("Name must be 2-150 characters."), "Le nom : 2 à 150 caractères.");
   assert.equal(fr("Transit time (hours) must be a number between 0 and 720."), "Le temps de transit (heures) : un nombre entre 0 et 720.");
   assert.equal(fr("A quartier cannot be added under a province."), "Impossible d'ajouter un quartier sous une province.");
@@ -65,7 +65,7 @@ test("routing and checkout errors of the final areas contract map to French", ()
   const fr = (m) => localizeApiError(m, "fr");
   assert.equal(fr("Delivery between cities is not available right now."), "La livraison entre villes n'est pas disponible pour le moment.");
   assert.equal(fr("One seller in your cart cannot ship from their area yet."), "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone.");
-  assert.equal(fr("This parcel is part of a transfer run. Manage it from the run."), "Ce colis fait partie d'une navette de transfert. Gérez-le depuis la navette.");
+  assert.equal(fr("This parcel is part of a transfer run. Manage it from the run."), "Ce colis fait partie d'une tournée de transfert. Gérez-le depuis la tournée.");
   assert.equal(fr("Address not found."), "Adresse introuvable.");
   // `{area}` is "this area" when the server matched nothing at all.
   assert.equal(fr("We don't deliver to this area yet."), "Nous ne livrons pas encore dans cette zone.");
@@ -86,4 +86,13 @@ test("every error sentence listed in docs/contracts/areas.md has a French text (
   const fill = (s) => s.replace("{area}", "Lubumbashi").replace("{hub}", "Entrepôt Limete").replace("{ref}", "TR-0042").replaceAll("{level}", "province");
   const missing = sentences.map(fill).filter((s) => localizeApiError(s, "fr") === s);
   assert.deepEqual(missing, []);
+});
+
+test("staff:setActive errors map to French", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Only riders and warehouse staff can be switched on or off here."), "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.");
+  assert.equal(fr("Super admin only."), "Réservé au super administrateur.");
+  assert.equal(fr("Account not found."), "Compte introuvable.");
+  assert.equal(fr("Active must be true or false."), "« Active » doit être vrai ou faux.");
+  assert.equal(localizeApiError("Super admin only.", "en"), "Super admin only.");
 });

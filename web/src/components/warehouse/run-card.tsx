@@ -137,19 +137,19 @@ export function RunCard({
                 <PackagePlus className="h-3.5 w-3.5" />{fr ? "Ajouter des colis" : "Add parcels"}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => { setSplitPick(new Set()); setSplitOpen(true); }} disabled={ids.length < 2} data-testid="run-split" title={ids.length < 2 ? (fr ? "Il faut au moins deux colis pour scinder" : "A run needs at least two parcels to split") : undefined}>
-                <Scissors className="h-3.5 w-3.5" />{fr ? "Scinder la navette" : "Split run"}
+                <Scissors className="h-3.5 w-3.5" />{fr ? "Scinder la tournée" : "Split run"}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setAssignOpen(true)} data-testid="run-assign">
                 <Bike className="h-3.5 w-3.5" />{run.riderName ? (fr ? "Changer de chauffeur" : "Change driver") : fr ? "Assigner un chauffeur" : "Assign driver"}
               </Button>
-              <Button size="sm" onClick={() => void act("dispatch", () => runActions.dispatch(run.id), fr ? `Navette ${run.reference} partie : ${ids.length} colis remis au chauffeur` : `Run ${run.reference} left: ${ids.length} parcels handed to the driver`)} disabled={!!busy || ids.length === 0} data-testid="run-dispatch">
-                <PackageCheck className="h-3.5 w-3.5" />{busy === "dispatch" ? "…" : fr ? "Faire partir la navette" : "Dispatch run"}
+              <Button size="sm" onClick={() => void act("dispatch", () => runActions.dispatch(run.id), fr ? `Tournée ${run.reference} partie : ${ids.length} colis remis au chauffeur` : `Run ${run.reference} left: ${ids.length} parcels handed to the driver`)} disabled={!!busy || ids.length === 0} data-testid="run-dispatch">
+                <PackageCheck className="h-3.5 w-3.5" />{busy === "dispatch" ? "…" : fr ? "Faire partir la tournée" : "Dispatch run"}
               </Button>
             </>
           )}
           {canReceive && (
             <>
-              <Button size="sm" onClick={() => void act("receive", () => runActions.receive(run.id), fr ? `Navette ${run.reference} : tous les colis reçus` : `Run ${run.reference}: every parcel received`)} disabled={!!busy || waiting <= 0} data-testid="run-receive-all">
+              <Button size="sm" onClick={() => void act("receive", () => runActions.receive(run.id), fr ? `Tournée ${run.reference} : tous les colis reçus` : `Run ${run.reference}: every parcel received`)} disabled={!!busy || waiting <= 0} data-testid="run-receive-all">
                 <CheckCheck className="h-3.5 w-3.5" />{busy === "receive" ? "…" : fr ? "Tout recevoir" : "Receive all"}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setCloseOpen(true)} disabled={!!busy} data-testid="run-close">
@@ -165,7 +165,7 @@ export function RunCard({
       {siblings.length > 0 && (
         <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500" data-testid="run-siblings">
           <Link2 className="h-3.5 w-3.5" />
-          {fr ? "Autres navettes sur la même liaison :" : "Other runs on the same lane:"}
+          {fr ? "Autres tournées sur la même liaison :" : "Other runs on the same lane:"}
           {siblings.map((s) => (
             <span key={s.id} className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-700">
               {s.reference} · {s.taskIds.length} {fr ? "colis" : s.taskIds.length === 1 ? "parcel" : "parcels"} · {s.riderName ?? (fr ? "sans chauffeur" : "no driver")}
@@ -176,7 +176,7 @@ export function RunCard({
       {!incoming && planned && (
         <p className="mt-2 text-[11px] text-slate-400">
           {fr
-            ? "Un chauffeur par navette. Si les colis ne tiennent pas dans un seul véhicule, scindez la navette : chaque navette a son chauffeur. Chaque étape d'un itinéraire a sa propre navette et son propre chauffeur."
+            ? "Un chauffeur par tournée. Si les colis ne tiennent pas dans un seul véhicule, scindez la tournée : chaque tournée a son chauffeur. Chaque étape d'un itinéraire a sa propre tournée et son propre chauffeur."
             : "One driver per run. If the parcels do not fit one vehicle, split the run: each run gets its own driver. Each hop of a route has its own run and its own driver."}
         </p>
       )}
@@ -189,7 +189,7 @@ export function RunCard({
             buttonLabel={fr ? "Recevoir" : "Receive"}
             onFound={async (leg) => {
               if (!ids.includes(leg.id)) {
-                toast(fr ? `${parcelCode(leg)} ne fait pas partie de cette navette.` : `${parcelCode(leg)} is not part of this run.`, "error");
+                toast(fr ? `${parcelCode(leg)} ne fait pas partie de cette tournée.` : `${parcelCode(leg)} is not part of this run.`, "error");
                 return;
               }
               await act("scan", () => runActions.receive(run.id, [leg.id]), fr ? `${parcelCode(leg)} reçu` : `${parcelCode(leg)} received`);
@@ -211,7 +211,7 @@ export function RunCard({
                 fr={fr}
                 trailing={
                   !incoming && planned && canAssign ? (
-                    <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-50" disabled={!!busy} onClick={() => void act("remove", () => runActions.update(run.id, { removeTaskIds: [id] }), fr ? "Colis retiré de la navette" : "Parcel removed from the run")} data-testid="run-remove">
+                    <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-50" disabled={!!busy} onClick={() => void act("remove", () => runActions.update(run.id, { removeTaskIds: [id] }), fr ? "Colis retiré de la tournée" : "Parcel removed from the run")} data-testid="run-remove">
                       <PackageMinus className="h-3.5 w-3.5" />{fr ? "Retirer" : "Remove"}
                     </button>
                   ) : canReceive && !received ? (
@@ -283,18 +283,18 @@ export function RunCard({
                     );
                     setSplitOpen(false);
                   },
-                  fr ? `Navette ${run.reference} scindée` : `Run ${run.reference} split`,
+                  fr ? `Tournée ${run.reference} scindée` : `Run ${run.reference} split`,
                 )
               }
             >
-              {busy === "split" ? "…" : fr ? `Déplacer ${splitPick.size} colis dans une nouvelle navette` : `Move ${splitPick.size} parcels to a new run`}
+              {busy === "split" ? "…" : fr ? `Déplacer ${splitPick.size} colis dans une nouvelle tournée` : `Move ${splitPick.size} parcels to a new run`}
             </Button>
           </>
         }
       >
         <p className="text-slate-500">
           {fr
-            ? `Choisissez les colis qui partiront dans une autre navette sur la même liaison (${run.fromHubName} → ${run.toHubName}). Laissez-en au moins un dans ${run.reference}.`
+            ? `Choisissez les colis qui partiront dans une autre tournée sur la même liaison (${run.fromHubName} → ${run.toHubName}). Laissez-en au moins un dans ${run.reference}.`
             : `Pick the parcels that will leave in another run on the same lane (${run.fromHubName} → ${run.toHubName}). Leave at least one in ${run.reference}.`}
         </p>
         <ul className="divide-y divide-slate-100">
@@ -302,7 +302,7 @@ export function RunCard({
             <ParcelLine key={id} id={id} task={taskOf(id) as DeskTask | undefined} fr={fr} trailing={<input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={splitPick.has(id)} onChange={() => togglePick(splitPick, id, setSplitPick)} aria-label={fr ? "Déplacer ce colis" : "Move this parcel"} />} />
           ))}
         </ul>
-        {splitPick.size >= ids.length && <p className="text-xs text-red-600" role="alert">{fr ? "Laissez au moins un colis dans la navette d'origine." : "Leave at least one parcel in the original run."}</p>}
+        {splitPick.size >= ids.length && <p className="text-xs text-red-600" role="alert">{fr ? "Laissez au moins un colis dans la tournée d'origine." : "Leave at least one parcel in the original run."}</p>}
       </Modal>
 
       {/* The driver may come from the sending or the receiving warehouse. */}
@@ -310,12 +310,12 @@ export function RunCard({
         open={assignOpen}
         taskId={ids[0]}
         selectedRiderId={run.riderId}
-        title={fr ? `Chauffeur de la navette ${run.reference}` : `Driver for run ${run.reference}`}
+        title={fr ? `Chauffeur de la tournée ${run.reference}` : `Driver for run ${run.reference}`}
         subtitle={fr ? `${run.fromHubName} → ${run.toHubName}. Le chauffeur peut venir de l'un ou l'autre entrepôt.` : `${run.fromHubName} → ${run.toHubName}. The driver may come from either warehouse.`}
         onClose={() => setAssignOpen(false)}
         onConfirm={async (rider) => {
           await runActions.assign(run.id, rider.id);
-          toast(fr ? `${rider.name} conduira la navette ${run.reference}` : `${rider.name} will drive run ${run.reference}`, "success");
+          toast(fr ? `${rider.name} conduira la tournée ${run.reference}` : `${rider.name} will drive run ${run.reference}`, "success");
           onChanged();
         }}
       />
@@ -324,11 +324,11 @@ export function RunCard({
       <Modal
         open={closeOpen}
         onClose={() => !busy && setCloseOpen(false)}
-        title={fr ? `Clôturer la navette ${run.reference} ?` : `Close run ${run.reference}?`}
+        title={fr ? `Clôturer la tournée ${run.reference} ?` : `Close run ${run.reference}?`}
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={() => setCloseOpen(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button variant={waiting > 0 ? "danger" : "primary"} size="sm" disabled={!!busy} onClick={() => void act("close", async () => { await runActions.close(run.id); setCloseOpen(false); }, fr ? `Navette ${run.reference} clôturée` : `Run ${run.reference} closed`)} data-testid="run-close-confirm">
+            <Button variant={waiting > 0 ? "danger" : "primary"} size="sm" disabled={!!busy} onClick={() => void act("close", async () => { await runActions.close(run.id); setCloseOpen(false); }, fr ? `Tournée ${run.reference} clôturée` : `Run ${run.reference} closed`)} data-testid="run-close-confirm">
               {busy === "close" ? "…" : fr ? "Clôturer" : "Close run"}
             </Button>
           </>
@@ -337,11 +337,11 @@ export function RunCard({
         {waiting > 0 ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-red-700" role="alert">
             {fr
-              ? `${waiting} colis ne sont pas reçus. À la clôture, chacun devient une exception « Colis manquant dans la navette ${run.reference} », avec une alerte aux deux entrepôts et aux admins.`
+              ? `${waiting} colis ne sont pas reçus. À la clôture, chacun devient une exception « Colis manquant dans la tournée ${run.reference} », avec une alerte aux deux entrepôts et aux admins.`
               : `${waiting} parcels are not received. On closing, each becomes an exception “Parcel missing from run ${run.reference}”, with notices to both warehouses and admins.`}
           </p>
         ) : (
-          <p className="text-slate-600">{fr ? "Tous les colis sont reçus : la navette peut être clôturée." : "Every parcel is received: the run can be closed."}</p>
+          <p className="text-slate-600">{fr ? "Tous les colis sont reçus : la tournée peut être clôturée." : "Every parcel is received: the run can be closed."}</p>
         )}
       </Modal>
     </div>

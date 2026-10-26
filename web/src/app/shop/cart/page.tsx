@@ -12,7 +12,7 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
-import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue } from "@/components/shop/delivery-quote";
+import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue, SellerAreaNotice } from "@/components/shop/delivery-quote";
 import { chainText } from "@/lib/areas";
 import { formatCurrency } from "@/lib/utils";
 import { useCatalog } from "@/lib/catalog";
@@ -47,7 +47,7 @@ export default function ShopCartPage() {
   const address = addresses.find((a) => a.id === addressId) ?? null;
   const pinned = !!addressPin(address);
   const quoteLines = useMemo(() => lines.filter((l) => !l.unavailable).map((l) => ({ productId: l.id, qty: l.qty })), [lines]);
-  const { quote, loading: quoteLoading, error: quoteError, notServed: quoteNotServed } = useDeliveryQuote({
+  const { quote, loading: quoteLoading, error: quoteError, notServed: quoteNotServed, sellerBlocked } = useDeliveryQuote({
     addressId: address?.id ?? null,
     lines: quoteLines,
     enabled: !!address && pinned,
@@ -245,6 +245,8 @@ export default function ShopCartPage() {
               <NotServedNotice notServed={notServed} areaObj={deepestArea} fr={fr}>
                 <Link href="/shop/account/addresses" className="font-semibold underline">{fr ? "Gérer mes adresses" : "Manage my addresses"}</Link>
               </NotServedNotice>
+            ) : sellerBlocked ? (
+              <SellerAreaNotice fr={fr} />
             ) : (
               <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} />
             )}
@@ -277,7 +279,7 @@ export default function ShopCartPage() {
             <DualCurrency amount={total} className="text-blue-700" />
           </div>
         </div>
-        {hasUnavailable || hasVacation || notServed ? (
+        {hasUnavailable || hasVacation || notServed || sellerBlocked ? (
           <button disabled className="btn-primary mt-4 block w-full py-3 text-center opacity-50" data-testid="checkout-blocked">
             {fr ? "Passer à la caisse" : "Continue to Checkout"}
           </button>

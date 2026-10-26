@@ -42,6 +42,24 @@ export function parseNotServed(message: string | null | undefined): NotServedInf
   return { area: UNNAMED.test(hit[1]) ? "" : hit[1] };
 }
 
+const SELLER_AREA_EN = /^One seller in your cart cannot ship from their area yet\.?$/i;
+const SELLER_AREA_FR = /^Un vendeur de votre panier ne peut pas encore expédier depuis sa zone\.?$/i;
+
+/**
+ * The other refusal of a quote (docs/contracts/areas.md, "Addresses, sellers, orders"): the address is served, but a seller in
+ * the cart picks up in an area nobody serves yet. English on the wire (`raw` on the error `socketClient.request` throws), and
+ * already French in `message` when the UI is French, so both are read.
+ */
+export function isSellerAreaRefusal(e: unknown): boolean {
+  if (!e) return false;
+  const err = e as { raw?: unknown; message?: unknown };
+  return [err.raw, err.message, e].some((m) => {
+    if (typeof m !== "string") return false;
+    const t = m.trim().replace(/\s+/g, " ");
+    return SELLER_AREA_EN.test(t) || SELLER_AREA_FR.test(t);
+  });
+}
+
 function cleanCities(v: unknown): ServedCity[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out: ServedCity[] = [];

@@ -21,13 +21,13 @@ test("area contract errors map to French in the seller portal", () => {
 });
 
 test("lane and transfer-run errors map to French in the seller portal", () => {
-  assert.equal(frenchServerMessage("This run has already left."), "Cette navette est déjà partie.");
-  assert.equal(frenchServerMessage("Parcel missing from run TR-0042."), "Colis manquant dans la navette TR-0042.");
+  assert.equal(frenchServerMessage("This run has already left."), "Cette tournée est déjà partie.");
+  assert.equal(frenchServerMessage("Parcel missing from run TR-0042."), "Colis manquant dans la tournée TR-0042.");
   assert.equal(frenchServerMessage("These warehouses are not connected by any lane."), "Ces entrepôts ne sont reliés par aucune liaison.");
 });
 
 test("geography, lane and run validation errors map to French in the seller portal", () => {
-  assert.equal(frenchServerMessage("Run not found."), "Navette introuvable.");
+  assert.equal(frenchServerMessage("Run not found."), "Tournée introuvable.");
   assert.equal(frenchServerMessage("Name must be 2-150 characters."), "Le nom : 2 à 150 caractères.");
   assert.equal(frenchServerMessage("Transit time (hours) must be a number between 0 and 720."), "Le temps de transit (heures) : un nombre entre 0 et 720.");
 });
@@ -35,7 +35,7 @@ test("geography, lane and run validation errors map to French in the seller port
 test("routing, checkout and desk errors of the final areas contract map to French in the seller portal", () => {
   assert.equal(frenchServerMessage("Delivery between cities is not available right now."), "La livraison entre villes n'est pas disponible pour le moment.");
   assert.equal(frenchServerMessage("One seller in your cart cannot ship from their area yet."), "Un vendeur de votre panier ne peut pas encore expédier depuis sa zone.");
-  assert.equal(frenchServerMessage("This parcel is part of a transfer run. Manage it from the run."), "Ce colis fait partie d'une navette de transfert. Gérez-le depuis la navette.");
+  assert.equal(frenchServerMessage("This parcel is part of a transfer run. Manage it from the run."), "Ce colis fait partie d'une tournée de transfert. Gérez-le depuis la tournée.");
   assert.equal(frenchServerMessage("Choose a warehouse."), "Choisissez un entrepôt.");
   assert.equal(frenchServerMessage("Riders only."), "Réservé aux livreurs.");
   assert.equal(frenchServerMessage("We don't deliver to this area yet."), "Nous ne livrons pas encore dans cette zone.");
@@ -55,4 +55,11 @@ test("every error sentence listed in docs/contracts/areas.md has a French text i
   const fill = (s) => s.replace("{area}", "Lubumbashi").replace("{hub}", "Entrepôt Limete").replace("{ref}", "TR-0042").replaceAll("{level}", "province");
   const missing = sentences.map(fill).filter((s) => frenchServerMessage(s) === s);
   assert.deepEqual(missing, []);
+});
+
+test("staff:setActive errors map to French in the portal too", () => {
+  assert.equal(frenchServerMessage("Only riders and warehouse staff can be switched on or off here."), "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.");
+  assert.equal(frenchServerMessage("Super admin only."), "Réservé au super administrateur.");
+  assert.equal(frenchServerMessage("Account not found."), "Compte introuvable.");
+  assert.equal(englishServerMessage("Super admin only."), "Super admin only.");
 });

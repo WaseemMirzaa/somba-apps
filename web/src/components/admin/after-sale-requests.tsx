@@ -21,6 +21,7 @@ import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { localDateTime, localDay } from "@/lib/dates";
 import { errMsg, useServerList } from "@/lib/admin-live";
 import { LEG_KIND, LEG_STATUS, pickL } from "@/lib/logistics";
+import { replacementConditionLabel } from "@/lib/replacement-condition";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
 
@@ -164,7 +165,7 @@ export function AfterSaleList({ kind }: { kind: AfterSaleKind }) {
                 { key: "item", label: fr ? "Article" : "Item", render: (r) => <span className="line-clamp-2 max-w-[18rem] text-slate-700">{String(r.item)}</span> },
                 ...(kind === "exchange"
                   ? [{ key: "priceDiffUsd", label: fr ? "Différence" : "Difference", render: (r: Record<string, unknown>) => { const d = Number(r.priceDiffUsd ?? 0); return <span className={d > 0 ? "text-red-600" : d < 0 ? "text-emerald-600" : "text-slate-500"}>{d > 0 ? "+" : ""}{formatCurrency(d, locale)}</span>; } }]
-                  : [{ key: "condition", label: fr ? "État" : "Condition", render: (r: Record<string, unknown>) => String(r.condition ?? "—") }]),
+                  : [{ key: "condition", label: fr ? "État" : "Condition", render: (r: Record<string, unknown>) => replacementConditionLabel(r.condition as string | null | undefined, fr) }]),
                 { key: "status", label: fr ? "Statut" : "Status", render: (r) => <Badge variant={STATUS_BADGE[String(r.status)] ?? "default"}>{lbl(String(r.status), fr)}</Badge> },
                 { key: "date", label: "Date" },
                 { key: "actions", label: "", render: (r) => <Link href={`${c.base}/${r.id}`} className="text-sm text-[var(--primary)] hover:underline">{fr ? "Voir" : "View"}</Link> },
@@ -284,7 +285,7 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
               { label: fr ? "Client" : "Customer", value: r.customerName },
               { label: fr ? "Article" : "Item", value: itemOf(r, kind, fr), full: true },
               { label: fr ? "Quantité" : "Quantity", value: r.qty ?? 1 },
-              ...(r.condition ? [{ label: fr ? "État" : "Condition", value: r.condition }] : []),
+              ...(r.condition ? [{ label: fr ? "État" : "Condition", value: replacementConditionLabel(r.condition, fr) }] : []),
               { label: fr ? "Motif" : "Reason", value: r.reason ?? "—", full: true },
             ]}
           />

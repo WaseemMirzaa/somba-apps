@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bike, Plus, Users, Warehouse } from "lucide-react";
+import { Bike, Plus, Power, Users, Warehouse } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,23 +12,26 @@ import { Tabs } from "@/components/ui/tabs";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SecretBox } from "@/components/admin/copy-box";
 import { HomeWarehouseDialog, HubTierFields, needsHubText } from "@/components/admin/home-warehouse-dialog";
-import { ErrorNote } from "@/components/admin/modal";
+import { ErrorNote, Modal } from "@/components/admin/modal";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
+import { useRealtime } from "@/context/realtime-context";
 import { errMsg, useServerList, type StaffRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { HubRow } from "@/lib/admin-stats";
 import { TIER_LABEL, type WarehouseTier } from "@/lib/logistics";
+import { staffActiveCopy } from "@/lib/staff-active";
 
 export default function AdminWarehouseStaffPage() {
   const { toast } = useToast();
   const { locale } = useLocale();
   const fr = locale === "fr";
   // Real accounts: every warehouse employee and rider the server knows about.
-  const { items, reload, error: loadError, loading } = useServerList<StaffRow>("roles:staff");
+  const { items, setItems, reload, error: loadError, loading } = useServerList<StaffRow>("roles:staff");
+  const rt = useRealtime();
   const hubs = useServerList<HubRow>("hubs:list");
   const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
   const [tab, setTab] = useState<"warehouse_staff" | "rider">("warehouse_staff");
@@ -41,6 +44,25 @@ export default function AdminWarehouseStaffPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [secret, setSecret] = useState<{ email: string; password: string } | null>(null);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  // Deactivate / reactivate a rider or an employee (staff:setActive), after a confirmation.
+  const [toggle, setToggle] = useState<StaffRow | null>(null);
+  const [toggleBusy, setToggleBusy] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  // Another admin (or another tab) switched someone: the list follows without a reload.
+  useEffect(() => {
+    if (rt.status !== "connected") return;
+    const s = socketClient.current;
+    if (!s) return;
+    const h = (p: Partial<StaffRow> & { id: string }) => {
+      if (typeof p?.active !== "boolean") return;
+      setItems((cur) => cur.map((u) => (u.id === p.id ? { ...u, active: p.active } : u)));
+    };
+    s.on("roles:updated", h);
+    return () => {
+      s.off("roles:updated", h);
+    };
+  }, [rt.status, setItems]);
 
   const filtered = useMemo(
     () => applyListFilters(staff, filters, { searchFields: ["name", "email", "phone"] }),
@@ -80,6 +102,24 @@ export default function AdminWarehouseStaffPage() {
     }
   }
 
+  async function confirmToggle() {
+    if (!toggle) return;
+    const next = toggle.active === false;
+    setToggleBusy(true);
+    setToggleError(null);
+    try {
+      const res = await socketClient.request<{ id: string; active: boolean; openTasks?: number }>("staff:setActive", { userId: toggle.id, active: next });
+      setItems((cur) => cur.map((u) => (u.id === toggle.id ? { ...u, active: res.active } : u)));
+      toast(staffActiveCopy(toggle.role, res.active, fr).done(res.openTasks ?? 0), "success");
+      setToggle(null);
+    } catch (e) {
+      setToggleError(errMsg(e));
+    } finally {
+      setToggleBusy(false);
+    }
+  }
+  const copy = toggle ? staffActiveCopy(toggle.role, toggle.active === false, fr) : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -107,8 +147,8 @@ export default function AdminWarehouseStaffPage() {
       {loading && !loadError && <SectionLoading />}
       <NoticeBar>
         {fr
-          ? "Chacun travaille dans un entrepôt, obligatoirement. Un livreur ne voit que les tâches que son entrepôt lui assigne ; un employé a un niveau : opérateur (scanne), superviseur (assigne aussi les livreurs), responsable (gère aussi l'entrepôt). Seul le super administrateur crée les comptes (mot de passe temporaire affiché une seule fois)."
-          : "Everyone must belong to one warehouse. A rider only sees the tasks their warehouse assigns; an employee has a tier: operator (scans), supervisor (also assigns riders), manager (also runs the warehouse). Only the super admin creates accounts (the temporary password is shown once)."}
+          ? "Chacun travaille dans un entrepôt, obligatoirement. Un livreur ne voit que les tâches que son entrepôt lui assigne ; un employé a un niveau : opérateur (scanne), superviseur (assigne aussi les livreurs), responsable (gère aussi l'entrepôt). Seul le super administrateur crée les comptes (mot de passe temporaire affiché une seule fois) et peut les désactiver : un livreur désactivé n'est plus compté dans son entrepôt."
+          : "Everyone must belong to one warehouse. A rider only sees the tasks their warehouse assigns; an employee has a tier: operator (scans), supervisor (also assigns riders), manager (also runs the warehouse). Only the super admin creates accounts (the temporary password is shown once) and can deactivate them: a deactivated rider no longer counts for their warehouse."}
       </NoticeBar>
 
       {secret && <SecretBox email={secret.email} secret={secret.password} fr={fr} onDismiss={() => setSecret(null)} />}
@@ -219,17 +259,52 @@ export default function AdminWarehouseStaffPage() {
               {
                 key: "actions",
                 label: "",
-                render: (row) => (
-                  <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditing(row as unknown as StaffRow)}>
-                    {tab === "warehouse_staff" ? (fr ? "Entrepôt et niveau" : "Warehouse and tier") : fr ? "Changer d'entrepôt" : "Change warehouse"}
-                  </button>
-                ),
+                render: (row) => {
+                  const person = row as unknown as StaffRow;
+                  const off = person.active === false;
+                  return (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditing(person)}>
+                        {tab === "warehouse_staff" ? (fr ? "Entrepôt et niveau" : "Warehouse and tier") : fr ? "Changer d'entrepôt" : "Change warehouse"}
+                      </button>
+                      <Button size="sm" variant={off ? "approve" : "reject"} onClick={() => { setToggle(person); setToggleError(null); }}>
+                        <Power className="h-3.5 w-3.5" />
+                        {staffActiveCopy(person.role, off, fr).button}
+                      </Button>
+                    </div>
+                  );
+                },
               },
             ]}
             data={filtered as unknown as Record<string, unknown>[]}
           />
         </CardContent>
       </Card>
+
+      <Modal
+        open={!!toggle}
+        onClose={() => !toggleBusy && setToggle(null)}
+        title={copy?.title ?? ""}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setToggle(null)} disabled={toggleBusy}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant={toggle?.active === false ? "primary" : "danger"} size="sm" onClick={confirmToggle} disabled={toggleBusy}>
+              {toggleBusy ? "…" : copy?.button}
+            </Button>
+          </>
+        }
+      >
+        {toggle && copy && (
+          <>
+            <p>
+              <strong>{toggle.name}</strong> · {toggle.email}
+              {toggle.hubId ? ` · ${hubName.get(String(toggle.hubId)) ?? (fr ? "Entrepôt inconnu" : "Unknown warehouse")}` : ""}
+            </p>
+            <p className="text-slate-500">{copy.body}</p>
+            <ErrorNote message={toggleError} />
+          </>
+        )}
+      </Modal>
 
       <HomeWarehouseDialog user={editing} hubs={hubs.items} fr={fr} onClose={() => setEditing(null)} onSaved={() => void reload()} />
 

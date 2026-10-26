@@ -10,20 +10,15 @@ import {
   CmsBlock,
   DeliveryTask,
   Exchange,
-  Notification,
   Order,
-  OrderItem,
-  Payment,
   Product,
   Promo,
   Replacement,
   Review,
   Seller,
   Hub,
-  HubCoverage,
   Setting,
   Translation,
-  TranslationJob,
   User,
   WalletTransaction,
   WarehouseException,
@@ -39,6 +34,7 @@ import { DEFAULT_SELLER_PLANS } from '../content/plans';
 import { GeoService } from '../geo/geo.service';
 import { CoverageService } from '../geo/coverage.service';
 import { sourceHash } from '../translation/translatable';
+import { wipeSeededData } from './seed-wipe';
 
 /** Every demo account shares one password so the prototype is easy to drive. */
 const DEMO_PASSWORD = 'Somba@2026';
@@ -100,33 +96,8 @@ async function run() {
   const ds = app.get(DataSource);
 
   console.log('Clearing existing data…');
-  // Order matters because of FKs. Query-builder delete avoids the
-  // "empty criteria" guard that repo.delete({}) trips on.
-  const wipe = (entity: Parameters<DataSource['getRepository']>[0]) =>
-    ds.getRepository(entity).createQueryBuilder().delete().execute();
-  await wipe(OrderItem);
-  await wipe(DeliveryTask);
-  await wipe(Payment);
-  await wipe(Order);
-  await wipe(Address);
-  await wipe(Notification);
-  await wipe(WalletTransaction);
-  await wipe(Product);
-  await wipe(Seller);
-  await wipe(User);
-  await wipe(Category);
-  await wipe(HubCoverage);
-  await wipe(Hub);
-  await wipe(Promo);
-  await wipe(CmsBlock);
-  await wipe(Setting);
-  await wipe(Review);
-  await wipe(Translation);
-  await wipe(TranslationJob);
-  await wipe(Campaign);
-  await wipe(Replacement);
-  await wipe(Exchange);
-  await wipe(WarehouseException);
+  // Foreign keys decide the order (see seed-wipe.ts); lanes, transfer runs and batches go with the hubs and tasks they refer to.
+  await wipeSeededData(ds);
 
   // The DRC geography (26 provinces, 38 cities, Kinshasa's districts and communes) is reference data: added when missing, never wiped.
   const geo = app.get(GeoService);
