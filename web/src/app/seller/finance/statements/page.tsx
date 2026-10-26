@@ -14,6 +14,7 @@ import { sellerRequest } from "@/lib/seller-api";
 import { monthLabel, saveCsvText, useStatementMonth, useStatementMonths } from "@/lib/seller-finance";
 import { errMessage, payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { localized } from "@/lib/i18n-fields";
 
 /** Monthly statements built by the server (sales dated at delivery, refunds dated at return), with CSV per month. */
 export default function SellerStatementsPage() {
@@ -121,7 +122,7 @@ export default function SellerStatementsPage() {
                   { key: "date", label: fr ? "Date" : "Date", render: (row) => localDay(row.date as string) },
                   { key: "kind", label: "Type", render: (row) => <Badge variant={row.kind === "refund" ? "danger" : "success"}>{row.kind === "refund" ? (fr ? "Remboursement" : "Refund") : fr ? "Vente" : "Sale"}</Badge> },
                   { key: "orderReference", label: fr ? "Commande" : "Order" },
-                  { key: "productName", label: fr ? "Produit" : "Product", render: (row) => `${row.productName}${row.variant && row.variant !== "Default" ? ` · ${row.variant}` : ""} × ${row.qty}` },
+                  { key: "productName", label: fr ? "Produit" : "Product", render: (row) => `${localized(row, "productName", fr)}${row.variant && row.variant !== "Default" ? ` · ${localized(row, "variant", fr)}` : ""} × ${row.qty}` },
                   { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => money(row.grossUsd as number) },
                   { key: "commissionUsd", label: "Commission", render: (row) => `${money(row.commissionUsd as number)} (${row.commissionPct} %)` },
                   { key: "netUsd", label: "Net", render: (row) => <strong className={(row.netUsd as number) < 0 ? "text-red-600" : ""}>{money(row.netUsd as number)}</strong> },

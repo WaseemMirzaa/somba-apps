@@ -46,6 +46,9 @@ export interface EarningRow {
   deliveredAt: string | null;
   productName: string;
   variant: string | null;
+  /** French name and option (null: show `productName` / `variant`). */
+  productNameFr?: string | null;
+  variantFr?: string | null;
   qty: number;
   grossUsd: number;
   couponUsd: number;
@@ -94,6 +97,8 @@ export interface StatementLine {
   orderReference: string;
   productName: string;
   variant: string | null;
+  productNameFr?: string | null;
+  variantFr?: string | null;
   qty: number;
   grossUsd: number;
   commissionPct: number;
@@ -286,8 +291,8 @@ export function earningsCsvRows(rows: EarningRow[], fr: boolean): (string | numb
     head,
     ...rows.map((r) => [
       r.orderReference,
-      r.productName,
-      r.variant ?? "",
+      fr ? (r.productNameFr ?? r.productName) : r.productName,
+      fr ? (r.variantFr ?? r.variant ?? "") : (r.variant ?? ""),
       r.qty,
       r.orderedAt.slice(0, 10),
       r.deliveredAt ? r.deliveredAt.slice(0, 10) : "",

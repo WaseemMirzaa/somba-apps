@@ -348,6 +348,24 @@ describe('transactions name the product in the viewer\'s language (bug 2)', () =
     const en = (await w.finance.transactions(owner, { format: 'csv' })) as { csv: string };
     expect(en.csv).toContain('1 × Running shoes');
   });
+
+  it('earnings and the month\'s statement carry the French name and option; the French statement CSV uses them', async () => {
+    const a = await sale({ at: new Date(Date.UTC(2026, 9, 5, 12)), price: 20, name: 'Hat' });
+    await w.ds.getRepository(OrderItem).update({ id: a.item.id }, { variant: 'Colour: Blue' });
+    await snap(a.item.id, 'productName', 'Chapeau');
+    await snap(a.item.id, 'variant', 'Couleur : Bleu');
+    await sale({ at: new Date(Date.UTC(2026, 9, 6, 12)), price: 10, name: 'Lamp' });
+    const earn = (await w.finance.earnings(owner, {})) as { items: { productName: string; productNameFr: string | null; variantFr: string | null }[] };
+    expect(earn.items.find((l) => l.productName === 'Hat')).toMatchObject({ productNameFr: 'Chapeau', variantFr: 'Couleur : Bleu' });
+    const st = (await w.finance.statements(owner, { month: '2026-10' })) as { lines: { productName: string; productNameFr: string | null }[] };
+    expect(st.lines.find((l) => l.productName === 'Hat')!.productNameFr).toBe('Chapeau');
+    const lamp = st.lines.find((l) => l.productName === 'Lamp')!.productNameFr;
+    expect(lamp === null || lamp === 'Lamp').toBe(true); // no French name: the page shows the base name
+    const fr = (await w.finance.statements(owner, { month: '2026-10', format: 'csv', locale: 'fr' })) as { csv: string };
+    expect(fr.csv).toContain('Chapeau,Couleur : Bleu');
+    const en = (await w.finance.statements(owner, { month: '2026-10', format: 'csv' })) as { csv: string };
+    expect(en.csv).toContain('Hat,Colour: Blue');
+  });
 });
 
 describe('transactions CSV language', () => {

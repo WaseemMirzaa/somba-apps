@@ -27,6 +27,7 @@ import {
 import { payoutMethodLabel, payoutStatusLabel, payoutStatusVariant } from "@/lib/seller-labels";
 import { localDay } from "@/lib/dates";
 import { formatCurrency } from "@/lib/utils";
+import { localized } from "@/lib/i18n-fields";
 
 export default function SellerFinancePage() {
   const { t, locale } = useLocale();
@@ -137,7 +138,7 @@ export default function SellerFinancePage() {
               emptyMessage={fr ? "Aucune transaction pour le moment." : "No transactions yet."}
               columns={[
                 { key: "reference", label: fr ? "Référence" : "Reference", render: (row) => String(row.reference) },
-                { key: "description", label: fr ? "Détail" : "Description" },
+                { key: "description", label: fr ? "Détail" : "Description", render: (row) => localized(row, "description", fr) },
                 { key: "kind", label: "Type", render: (row) => <Badge variant={txnKindVariant(String(row.kind))}>{txnKindLabel(String(row.kind), fr)}</Badge> },
                 { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => (row.kind === "payout" ? "—" : money(row.grossUsd as number)) },
                 { key: "commissionUsd", label: "Commission", render: (row) => (row.kind === "payout" ? "—" : money(row.commissionUsd as number)) },

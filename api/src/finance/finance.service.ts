@@ -54,6 +54,9 @@ export interface EarningLine {
   deliveredAt: Date | null;
   productName: string;
   variant: string;
+  /** The French name and option of the line (null where the line has none: show `productName` / `variant`). */
+  productNameFr: string | null;
+  variantFr: string | null;
   qty: number;
   /** price x qty, less this line's share of a store coupon. */
   grossUsd: number;
@@ -70,10 +73,14 @@ export interface EarningLine {
 }
 
 export interface StatementLine {
+  itemId: string;
   kind: 'sale' | 'refund';
   date: string;
   orderReference: string;
   productName: string;
+  /** The French name and option of the line, filled for the statement of one month (null otherwise). */
+  productNameFr: string | null;
+  variantFr: string | null;
   variant: string;
   qty: number;
   grossUsd: number;
@@ -176,6 +183,17 @@ export class FinanceService {
     if (q) qb.andWhere('(LOWER(o.reference) LIKE :q OR LOWER(i.productName) LIKE :q)', { q: `%${q}%` });
   }
 
+  /** Fills the French name and option of each line (one lookup for the lines served; unnamed lines keep null). */
+  private async withFrenchNames<T extends { itemId: string; productNameFr: string | null; variantFr: string | null }>(lines: T[]): Promise<T[]> {
+    const names = await frenchLineNames(this.items.manager, lines.map((l) => l.itemId));
+    for (const l of lines) {
+      const fr = names.get(l.itemId);
+      l.productNameFr = fr?.nameFr ?? null;
+      l.variantFr = fr?.variantFr ?? null;
+    }
+    return lines;
+  }
+
   private earningOf(r: Record<string, unknown>, clock: Clock): EarningLine {
     const qty = num(r.qty);
     const gross = lineGross({ priceUsd: num(r.priceUsd), qty, couponDiscountUsd: num(r.couponUsd) });
@@ -193,6 +211,8 @@ export class FinanceService {
       deliveredAt,
       productName: String(r.productName),
       variant: String(r.variant),
+      productNameFr: null,
+      variantFr: null,
       qty,
       grossUsd: gross,
       couponUsd: round2(num(r.couponUsd)),
@@ -249,7 +269,7 @@ export class FinanceService {
       offset: skip,
       total,
       holdHours: clock.hold,
-      items: rows.map((r) => this.earningOf(r, clock)),
+      items: await this.withFrenchNames(rows.map((r) => this.earningOf(r, clock))),
       totals,
       balance,
     };
@@ -266,10 +286,13 @@ export class FinanceService {
       const refund = String(r.orderStatus) === 'returned';
       const date = (toDate(r.orderUpdatedAt) ?? start).toISOString().slice(0, 10);
       return {
+        itemId: String(r.itemId),
         kind: refund ? 'refund' : 'sale',
         date,
         orderReference: String(r.orderReference),
         productName: String(r.productName),
+        productNameFr: null,
+        variantFr: null,
         variant: String(r.variant),
         qty: num(r.qty),
         grossUsd: refund ? -gross : gross,
@@ -316,7 +339,7 @@ export class FinanceService {
       };
     }
     const { month, start, end } = monthRange(input.month);
-    const lines = await this.monthLines(keys, start, end);
+    const lines = await this.withFrenchNames(await this.monthLines(keys, start, end));
     const totals = FinanceService.totalsOf(lines);
     const payoutRows = seller.userId
       ? await this.payouts
@@ -339,17 +362,17 @@ export class FinanceService {
       payouts: payoutsOut,
     };
     if (input.format === 'csv') {
-      return { filename: `statement-${month}.csv`, csv: FinanceService.statementCsv(statement, csvWords(asLocale(input.locale) ?? 'en')) };
+      return { filename: `statement-${month}.csv`, csv: FinanceService.statementCsv(statement, csvWords(asLocale(input.locale) ?? 'en'), asLocale(input.locale) === 'fr') };
     }
     return statement;
   }
 
-  private static statementCsv(s: { month: string; store: string; totals: ReturnType<typeof FinanceService.totalsOf> & { payoutsRequestedUsd: number; payoutsPaidUsd: number }; lines: StatementLine[] }, w: CsvWords): string {
+  private static statementCsv(s: { month: string; store: string; totals: ReturnType<typeof FinanceService.totalsOf> & { payoutsRequestedUsd: number; payoutsPaidUsd: number }; lines: StatementLine[] }, w: CsvWords, fr = false): string {
     const rows: (string | number | null)[][] = [
       [w.t('h.statement'), s.month, s.store],
       [],
       [w.t('h.date'), w.t('h.kind'), w.t('h.order'), w.t('h.product'), w.t('h.option'), w.t('h.qty'), w.t('h.sales'), w.t('h.commissionPct'), w.t('h.commission'), w.t('h.net')],
-      ...s.lines.map((l) => [l.date, w.kind(l.kind), l.orderReference, l.productName, l.variant, l.qty, fixed2(l.grossUsd), l.commissionPct, fixed2(l.commissionUsd), fixed2(l.netUsd)]),
+      ...s.lines.map((l) => [l.date, w.kind(l.kind), l.orderReference, fr ? (l.productNameFr ?? l.productName) : l.productName, fr ? (l.variantFr ?? l.variant) : l.variant, l.qty, fixed2(l.grossUsd), l.commissionPct, fixed2(l.commissionUsd), fixed2(l.netUsd)]),
       [],
       [w.t('t.orders'), s.totals.orders],
       [w.t('t.units'), s.totals.units],
@@ -505,7 +528,7 @@ export class FinanceService {
     if (existing && closed && !(input.refresh === true && admin)) return existing;
     if (start.getTime() > Date.now()) throw new BadRequestException('That month has not started yet.');
 
-    const lines = await this.monthLines(this.keysOf(seller), start, end);
+    const lines = await this.withFrenchNames(await this.monthLines(this.keysOf(seller), start, end));
     if (!lines.length) throw new BadRequestException(`There were no sales in ${period}: nothing to invoice.`);
     const totals = FinanceService.totalsOf(lines);
     const owner = await this.users.findOne({ where: { id: sellerUserId }, select: ['id', 'locale'] });
@@ -514,7 +537,7 @@ export class FinanceService {
     const invoiceLines: InvoiceLine[] = lines.map((l) => ({
       orderReference: l.orderReference,
       date: l.date,
-      productName: l.productName,
+      productName: locale === 'fr' ? (l.productNameFr ?? l.productName) : l.productName,
       qty: l.qty,
       grossUsd: Math.abs(l.grossUsd),
       commissionPct: l.commissionPct,

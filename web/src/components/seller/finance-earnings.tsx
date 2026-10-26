@@ -27,6 +27,7 @@ import {
 } from "@/lib/seller-finance";
 import { downloadCsv, errMessage } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { localized } from "@/lib/i18n-fields";
 
 const PAGE = 25;
 
@@ -149,8 +150,8 @@ export function FinanceEarnings({ compact = false }: { compact?: boolean }) {
                   label: fr ? "Produit" : "Product",
                   render: (row) => (
                     <span>
-                      {String(row.productName)}
-                      {row.variant && row.variant !== "Default" ? <span className="text-slate-500"> · {String(row.variant)}</span> : null}
+                      {localized(row, "productName", fr)}
+                      {row.variant && row.variant !== "Default" ? <span className="text-slate-500"> · {localized(row, "variant", fr)}</span> : null}
                       <span className="text-slate-500"> × {String(row.qty)}</span>
                     </span>
                   ),
