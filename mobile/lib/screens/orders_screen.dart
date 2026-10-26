@@ -138,8 +138,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
             TextButton(
               onPressed: () => _open(o),
               style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 8), textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              child: Text(s.details),
+                  foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 8)),
+              child: Text(s.details, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             ),
           ]),
           if (o.cancelledLineCount > 0 && o.status != 'cancelled')

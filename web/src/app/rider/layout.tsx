@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { List, User, Wallet, Home, LogOut, Bell, MapPin } from "lucide-react";
+import { List, User, Wallet, Home, LogOut, Bell, Headphones } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { RiderGpsProvider } from "@/lib/rider-gps";
 import { BrandMark } from "@/components/landing/brand-mark";
@@ -10,12 +10,13 @@ import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalGuard } from "@/components/layout/portal-guard";
+import { useOpsTickets } from "@/lib/ops-support";
 
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
   { href: "/rider/tasks", icon: List, label: "activeTasks" },
-  { href: "/rider/zone", icon: MapPin, label: "myZone" },
   { href: "/rider/earnings", icon: Wallet, label: "earnings" },
+  { href: "/rider/support", icon: Headphones, label: "support" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
 
@@ -35,6 +36,15 @@ function RiderBell() {
         </span>
       )}
     </Link>
+  );
+}
+
+/** Unread staff replies on my tickets, shown on the Support tab. */
+function SupportBadge() {
+  const { unread } = useOpsTickets();
+  if (!unread) return null;
+  return (
+    <span className="absolute right-2 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{unread}</span>
   );
 }
 
@@ -79,11 +89,12 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 text-[10px] font-semibold transition-colors",
+                  "relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 text-[10px] font-semibold transition-colors",
                   active ? "text-emerald-600" : "text-slate-400"
                 )}
               >
                 <item.icon className="h-5 w-5" />
+                {item.href === "/rider/support" && <SupportBadge />}
                 {t(item.label as Parameters<typeof t>[0])}
               </Link>
             );

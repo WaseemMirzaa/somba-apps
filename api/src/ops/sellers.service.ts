@@ -14,9 +14,13 @@ import { TranslationService } from '../translation/translation.service';
 import { planWrite } from '../translation/translatable';
 import type { WritePlan, WriteState } from '../translation/translatable';
 import { isLocale } from '../translation/translator.provider';
+import { cleanPoint } from '../common/geo/geo';
+import { AreaChainView, GeoService } from '../geo/geo.service';
 import { parseJsonList, sellerView } from '../database/entities/seller.entity';
 import type { SellerStatus, SellerView } from '../database/entities/seller.entity';
 import { normalizePhone } from '../common/phone/phone-hash';
+import { onVacation, vacationNotice } from '../sellers/storefront';
+import { privateIdOf } from '../sellers/private-url';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import {
   ADMIN_ROLES,
@@ -91,7 +95,8 @@ export function validateKyc(input: KycInput | null | undefined): ValidKyc {
   }
   const documentUrls: string[] = [];
   for (const u of rawDocs) {
-    const url = typeof u === 'string' && u !== '' ? uploadedImageUrl(u, 'Document') : null;
+    // A document is a platform upload, or (preferred) a private file from POST /api/v1/private-uploads.
+    const url = typeof u === 'string' && u !== '' ? (u.length <= 500 && privateIdOf(u) ? u : uploadedImageUrl(u, 'Document')) : null;
     if (!url) throw new BadRequestException('Document is not a valid image.');
     if (!documentUrls.includes(url)) documentUrls.push(url);
   }
@@ -115,6 +120,13 @@ function decisionReason(raw: unknown, required: boolean): string | null {
 const PRIVATE_SELLER_KEYS = [
   'userId',
   'pickupAddress',
+  'pickupLat',
+  'pickupLng',
+  'originHubId',
+  'originHubName',
+  'pickupAreaId',
+  'pickupAreaChain',
+  'pickupServed',
   'planExpiresAt',
   'legalName',
   'phone',
@@ -127,6 +139,10 @@ const PRIVATE_SELLER_KEYS = [
   'statusReason',
   'statusChangedAt',
   'suspendedListingIds',
+  'goals',
+  'payoutMethod',
+  'payoutAccount',
+  'payoutAccountMasked',
 ] as const;
 
 @Injectable()
@@ -143,6 +159,7 @@ export class SellersService {
     private readonly settings: SettingsService,
     private readonly productsSvc: ProductsService,
     private readonly translations?: TranslationService,
+    private readonly geo?: GeoService,
   ) {
     // A seller-plan payment (wallet now, or mobile money once confirmed) switches the plan on.
     this.payments.registerPlanSettledHandler((payment) => this.activatePlan(payment));
@@ -159,8 +176,17 @@ export class SellersService {
    * What the apps add to a stored store (plan §2.2): `descriptionFr` composed from translations, `productCount`
    * counted from live listings (never stored: it went stale), and where machine translation stands.
    */
-  async present<T extends Seller | SellerView>(sellers: T[]): Promise<(T & { descriptionFr: string | null; productCount: number; machineTranslated: string[]; translationStatus: string })[]> {
+  async present<T extends Seller | SellerView>(
+    sellers: T[],
+  ): Promise<(T & { descriptionFr: string | null; productCount: number; machineTranslated: string[]; translationStatus: string; pickupAreaChain: AreaChainView; pickupServed: boolean; originHubName: string | null })[]> {
     if (!sellers.length) return [];
+    // Where each store collects from (area chain, whether it is served) and which warehouse that is.
+    const chains = new Map<string, AreaChainView>();
+    let hubNames = new Map<string, { name: string }>();
+    if (this.geo) {
+      for (const id of new Set(sellers.map((s) => s.pickupAreaId).filter((x): x is string => !!x))) chains.set(id, await this.geo.chainView(id));
+      hubNames = await this.geo.hubDirectory();
+    }
     const keys = sellers.flatMap((s) => [s.id, ...(s.userId ? [s.userId] : [])]);
     const [texts, counts] = await Promise.all([
       this.translations ? this.translations.present('seller', sellers as unknown as { id: string; sourceLang: string }[]) : Promise.resolve(new Map()),
@@ -175,10 +201,23 @@ export class SellersService {
     const live = new Map(counts.map((c) => [c.sellerId, Number(c.n)]));
     return sellers.map((s) => {
       const t = texts.get(s.id);
+      const chain = s.pickupAreaId ? (chains.get(s.pickupAreaId) ?? []) : [];
       return {
         ...s,
+        pickupAreaId: s.pickupAreaId ?? null,
+        pickupAreaChain: chain,
+        pickupServed: chain.length ? chain[chain.length - 1].served : false,
+        originHubName: s.originHubId ? (hubNames.get(s.originHubId)?.name ?? null) : null,
         description: t?.texts.description ?? s.description ?? null,
         descriptionFr: t?.texts.descriptionFr ?? s.description ?? null,
+        // Storefront policies (both languages) and whether the store is away right now.
+        returnsPolicy: t?.texts.returnsPolicy ?? s.returnsPolicy ?? null,
+        returnsPolicyFr: t?.texts.returnsPolicyFr ?? s.returnsPolicy ?? null,
+        shippingPolicy: t?.texts.shippingPolicy ?? s.shippingPolicy ?? null,
+        shippingPolicyFr: t?.texts.shippingPolicyFr ?? s.shippingPolicy ?? null,
+        onVacation: onVacation(s),
+        // The same bilingual sentence the listings and the `store:vacation` push carry (null while the store is open).
+        vacationNotice: onVacation(s) ? vacationNotice(s.name, s.vacationUntil as Date) : null,
         productCount: (live.get(s.id) ?? 0) + (s.userId ? (live.get(s.userId) ?? 0) : 0),
         machineTranslated: t?.machineTranslated ?? [],
         translationStatus: t?.translationStatus ?? 'done',
@@ -208,6 +247,17 @@ export class SellersService {
     const seller = await this.sellers.findOne({ where: { id } });
     if (!seller) throw new NotFoundException('Seller not found.');
     return this.withPlanState(seller);
+  }
+
+  /**
+   * A store whose pickup area is known but not served cannot put listings on sale (it can still prepare its store).
+   * A store with no pickup area at all is governed by the `requireSellerPickupPin` setting instead.
+   */
+  async assertPickupServed(seller: Pick<Seller, 'pickupAreaId'>): Promise<void> {
+    if (!this.geo || !seller.pickupAreaId) return;
+    if (!(await this.geo.covering(seller.pickupAreaId))) {
+      throw new BadRequestException('Your pickup area is not served yet. You can prepare your store; sales open when we deliver there.');
+    }
   }
 
   // ── Subscription plans ────────────────────────────────────────────────────
@@ -359,13 +409,39 @@ export class SellersService {
   /** A seller edits their own store profile (name, pickup address, branding, description in either language). */
   async updateProfile(
     userId: string,
-    patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
+    patch: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
   ) {
     const seller = await this.byUser(userId);
     if (!seller) throw new NotFoundException('Store not found.');
     if (patch.name != null) seller.name = str(patch.name, 'Store name', { min: 2, max: 100 });
     if (patch.pickupAddress !== undefined) {
       seller.pickupAddress = patch.pickupAddress === null || patch.pickupAddress === '' ? null : str(patch.pickupAddress, 'Pickup address', { min: 5, max: 300 });
+    }
+    // The map pin of the pickup location.
+    let pinMoved = false;
+    if (patch.pickupLat !== undefined || patch.pickupLng !== undefined) {
+      const blank = (v: unknown) => v === null || v === undefined || v === '';
+      if (blank(patch.pickupLat) && blank(patch.pickupLng)) {
+        seller.pickupLat = null;
+        seller.pickupLng = null;
+      } else {
+        const pin = cleanPoint(patch.pickupLat, patch.pickupLng);
+        if (!pin) throw new BadRequestException('Enter a valid pickup location: latitude -90 to 90 and longitude -180 to 180.');
+        pinMoved = pin.lat !== seller.pickupLat || pin.lng !== seller.pickupLng;
+        seller.pickupLat = pin.lat;
+        seller.pickupLng = pin.lng;
+      }
+    }
+    // The pickup area decides the origin warehouse: the one given, else the one under the new pin. A store can sit in an
+    // area nobody serves yet (it just cannot sell there: see assertPickupServed).
+    if (this.geo) {
+      if (patch.pickupAreaId !== undefined) {
+        seller.pickupAreaId = patch.pickupAreaId === null || patch.pickupAreaId === '' ? null : (await this.geo.get(patch.pickupAreaId)).id;
+      } else if (pinMoved && seller.pickupLat !== null && seller.pickupLng !== null) {
+        const found = await this.geo.resolveRow({ geo: { lat: seller.pickupLat, lng: seller.pickupLng }, city: null });
+        seller.pickupAreaId = found.area?.id ?? null;
+      }
+      if (patch.pickupAreaId !== undefined || pinMoved) seller.originHubId = (await this.geo.covering(seller.pickupAreaId))?.hubId ?? null;
     }
     if (patch.logoUrl !== undefined) seller.logoUrl = uploadedImageUrl(patch.logoUrl, 'Logo');
     if (patch.bannerUrl !== undefined) seller.bannerUrl = uploadedImageUrl(patch.bannerUrl, 'Banner');

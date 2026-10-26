@@ -18,7 +18,11 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "return") return pick(`/shop/returns/${id}`, "/shop/returns");
       if (t === "dispute") return pick(`/shop/disputes/${id}`, "/shop/returns");
       if (t === "support") return pick(`/shop/support/${id}`, "/shop/support");
-      if (t === "exchange" || t === "replacement") return "/shop/returns";
+      if (t === "replacement") return pick(`/shop/replacements/${id}`, "/shop/returns");
+      if (t === "exchange") return pick(`/shop/exchanges/${id}`, "/shop/returns");
+      if (t === "chat") return pick(`/shop/messages/${id}`, "/shop/messages");
+      if (t === "question") return pick(`/shop/products/${id}`, "/shop/products");
+      if (t === "review") return pick(`/shop/products/${id}`, "/shop/products");
       return "/shop/notifications";
     case "seller":
       if (t === "order") return pick(`/seller/orders/${id}`, "/seller/orders");
@@ -31,6 +35,15 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "dispute") return pick(`/seller/disputes/${id}`, "/seller/disputes");
       if (t === "replacement") return pick(`/seller/replacements/${id}`, "/seller/replacements");
       if (t === "exchange") return pick(`/seller/exchanges/${id}`, "/seller/exchanges");
+      if (t === "question") return pick(`/seller/questions?focus=${id}`, "/seller/questions");
+      if (t === "review") return pick(`/seller/reviews?focus=${id}`, "/seller/reviews");
+      if (t === "chat") return pick(`/seller/messages/${id}`, "/seller/messages");
+      if (t === "stock") return "/seller/inventory";
+      if (t === "flash") return "/seller/flash-sales";
+      if (t === "promo") return "/seller/coupons";
+      if (t === "finance") return "/seller/finance/tax";
+      if (t === "team") return "/seller/team";
+      if (t === "security") return "/seller/settings";
       return "/seller/notifications";
     case "admin":
       if (t === "order" || t === "delivery") return pick(`/admin/orders/${id}`, "/admin/orders");
@@ -49,10 +62,13 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "return" || t === "dispute") return pick(`/warehouse/returns/${id}`, "/warehouse/returns");
       if (t === "exchange") return pick(`/warehouse/exchanges/${id}`, "/warehouse/exchanges");
       if (t === "replacement") return pick(`/warehouse/replacements/${id}`, "/warehouse/replacements");
-      if (t === "order" || t === "delivery") return "/warehouse/deliveries";
-      return "/warehouse";
+      if (t === "task") return pick(`/warehouse/tasks/${id}`, "/warehouse/desk");
+      if (t === "order" || t === "delivery") return "/warehouse/desk?kind=delivery";
+      if (t === "support") return pick(`/warehouse/support/${id}`, "/warehouse/support");
+      return "/warehouse/notifications";
     case "rider":
       if (t === "task") return pick(`/rider/tasks/${id}`, "/rider/tasks");
+      if (t === "support") return pick(`/rider/support/${id}`, "/rider/support");
       return "/rider/notifications";
   }
 }

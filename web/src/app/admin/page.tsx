@@ -39,7 +39,7 @@ import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useRealtime } from "@/context/realtime-context";
 import { categoryLabel } from "@/lib/i18n-fields";
 import { useLocale } from "@/context/locale-context";
-import { ORDER_STATUS_BADGE, orderStatusLabel, useServerList } from "@/lib/admin-live";
+import { ORDER_STATUS_BADGE, orderStatusLabel, useFinanceVersion, useLiveKey, useServerList } from "@/lib/admin-live";
 import { rankSellers, useSocketQuery, type AdminStatsFull, type RevenuePoint } from "@/lib/admin-stats";
 import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
@@ -84,7 +84,10 @@ export default function AdminDashboard() {
   const [days, setDays] = useState<PeriodDays>(30);
 
   // Re-fetch the figures when the live order / payment feed changes.
-  const refreshKey = `${rt.orders.length}:${rt.payments.length}:${rt.payouts.length}:${rt.disputes.length}`;
+  // Any order / delivery / dispute change, or the server's `finance:changed` (payments, payouts), refreshes the figures.
+  const liveKey = useLiveKey();
+  const financeVersion = useFinanceVersion();
+  const refreshKey = `${liveKey}|${financeVersion}`;
   const stats = useSocketQuery<AdminStatsFull>("analytics:admin", undefined, { refreshKey });
   const series = useSocketQuery<RevenuePoint[]>("analytics:revenue", { days }, { refreshKey });
   const sellers = useServerList<Seller>("sellers:list", { pushEvents: ["seller:updated"] });

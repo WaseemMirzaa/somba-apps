@@ -1,9 +1,11 @@
+import 'server_errors_areas.dart';
+import 'server_errors_features.dart';
 import 'strings.dart';
 
 /// Server errors reach the app in English. The common ones are shown in the
 /// user's language; any other message is displayed as received.
 String translateServerError(String raw, Strings s) {
-  if (!s.isFr) return raw;
+  if (!s.isFr) return englishServerError(raw);
   final text = raw.trim();
   final exact = _exactFr[text];
   if (exact != null) return exact;
@@ -18,6 +20,49 @@ String translateServerError(String raw, Strings s) {
 Iterable<String> get knownServerErrors => _exactFr.keys;
 
 final Map<String, String> _exactFr = {
+  ...kServerErrorsLogistics,
+  ...kServerErrorsAfterSale,
+  ...kServerErrorsSocial,
+  ...kServerErrorsEngage,
+  ...kServerErrorsAreas,
+  // areas contract, second pass (docs/contracts/areas.md, "Errors"): validation, warehouse directory and desk sentences the first list omitted
+  "Flatten must be 'commune'.": 'Le paramètre « flatten » doit être « commune ».',
+  'Aliases must be a list of names.': 'Les alias doivent être une liste de noms.',
+  'Alias must be 1-100 characters.': 'Un alias doit contenir entre 1 et 100 caractères.',
+  'Name must be 2-150 characters.': 'Le nom doit contenir entre 2 et 150 caractères.',
+  'English name must be 2-150 characters.': 'Le nom anglais doit contenir entre 2 et 150 caractères.',
+  'Google name must be 1-150 characters.': 'Le nom Google doit contenir entre 1 et 150 caractères.',
+  'Google name (English) must be 1-150 characters.': 'Le nom Google (anglais) doit contenir entre 1 et 150 caractères.',
+  'Code must be 2-64 characters.': 'Le code doit contenir entre 2 et 64 caractères.',
+  'Code may only contain letters, digits and hyphens.': 'Le code ne peut contenir que des lettres, des chiffres et des tirets.',
+  'Order must be a whole number between 0 and 100000.': 'L’ordre d’affichage doit être un nombre entier compris entre 0 et 100000.',
+  'Enter a valid latitude (-90 to 90) and longitude (-180 to 180).': 'Saisissez une latitude (-90 à 90) et une longitude (-180 à 180) valides.',
+  'Place the warehouse on the map: latitude and longitude are required.': 'Placez l’entrepôt sur la carte : la latitude et la longitude sont obligatoires.',
+  'A hub with this name already exists.': 'Un entrepôt portant ce nom existe déjà.',
+  'You cannot deactivate the last active hub.': 'Vous ne pouvez pas désactiver le dernier entrepôt actif.',
+  'Hub must be 1-64 characters.': 'L’identifiant de l’entrepôt doit contenir entre 1 et 64 caractères.',
+  'Hub name must be 2-100 characters.': 'Le nom de l’entrepôt doit contenir entre 2 et 100 caractères.',
+  'City must be 2-100 characters.': 'La ville doit contenir entre 2 et 100 caractères.',
+  'Country must be 1-100 characters.': 'Le pays doit contenir entre 1 et 100 caractères.',
+  'Address must be 3-200 characters.': 'L’adresse doit contenir entre 3 et 200 caractères.',
+  'Capacity must be a whole number between 1 and 1000000.': 'La capacité doit être un nombre entier compris entre 1 et 1000000.',
+  'Only managers can see the staff list.': 'Seuls les responsables peuvent voir la liste du personnel.',
+  'Only managers can change staff tiers.': 'Seuls les responsables peuvent modifier les niveaux du personnel.',
+  'Tier must be one of: operator, supervisor, manager.': 'Le niveau doit être l’un des suivants : opérateur, superviseur, responsable.',
+  'Only warehouse staff have a tier.': 'Seul le personnel d’entrepôt a un niveau.',
+  'You cannot change your own tier.': 'Vous ne pouvez pas modifier votre propre niveau.',
+  'This person works at another warehouse.': 'Cette personne travaille dans un autre entrepôt.',
+  'Only an administrator can make someone a manager.': 'Seul un administrateur peut nommer un responsable.',
+  'This parcel is not due at a warehouse.': 'Ce colis n’est attendu dans aucun entrepôt.',
+  'This parcel does not leave from a warehouse.': 'Ce colis ne part d’aucun entrepôt.',
+  'This task is finished by the rider, not scanned in.': 'Cette tâche est terminée par le livreur, pas par un scan.',
+  'This parcel was already scanned in.': 'Ce colis a déjà été scanné.',
+  'A failed task cannot be scanned in.': 'Une tâche échouée ne peut pas être scannée.',
+  'A rider must collect this parcel before it can be scanned in.': 'Un livreur doit d’abord récupérer ce colis avant qu’il puisse être scanné.',
+  'Assign a rider before handing the parcel over.': 'Assignez un livreur avant de lui remettre le colis.',
+  'This parcel does not leave from your warehouse.': 'Ce colis ne part pas de votre entrepôt.',
+  'Case must be 1-64 characters.': 'Le numéro de dossier doit contenir entre 1 et 64 caractères.',
+  'A replacement or an exchange is required.': 'Un remplacement ou un échange est requis.',
   // sign-in / account
   'Invalid email or password.': 'E-mail ou mot de passe incorrect.',
   'Invalid or expired refresh token.': 'Votre session a expiré. Reconnectez-vous.',
@@ -130,6 +175,7 @@ final Map<String, String> _exactFr = {
   // uploads
   'Attach an image in the "file" field.': 'Joignez une image dans le champ « file ».',
   'Only JPEG, PNG or WebP images are allowed.': 'Seules les images JPEG, PNG ou WebP sont acceptées.',
+  'Only JPEG, PNG, WebP or HEIC images are allowed.': 'Seules les images JPEG, PNG, WebP ou HEIC sont acceptées.',
   'That file is not a valid image.': 'Ce fichier n’est pas une image valide.',
   'Invalid avatar URL.': 'URL d’avatar invalide.',
   // delivery (rider)
@@ -147,6 +193,11 @@ final Map<String, String> _exactFr = {
 };
 
 final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
+  ...kServerPatternsLogistics,
+  ...kServerPatternsAfterSale,
+  ...kServerPatternsSocial,
+  ...kServerPatternsEngage,
+  ...kServerPatternsAreas,
   (RegExp(r'^"(.+)" just sold out or has too little stock left\.$'), (m) => '« ${m[1]} » est épuisé ou n’a plus assez de stock.'),
   (RegExp(r'^"(.+)" is not available\.$'), (m) => '« ${m[1]} » n’est pas disponible.'),
   (RegExp(r'^Insufficient wallet balance \(\$([\d.,]+) < \$([\d.,]+)\)\.$'),

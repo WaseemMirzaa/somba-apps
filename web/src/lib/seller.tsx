@@ -28,6 +28,7 @@ import type {
   SellerOrderView,
   SellerStats,
 } from "@/lib/realtime/types";
+import { hasPermission, type SellerMembership, type SellerPermission } from "@/lib/seller-access";
 import {
   applySellerReady,
   commissionRateOf,
@@ -58,7 +59,7 @@ import {
  */
 
 const DEFAULT_COMMISSION_PCT = 12;
-const LOW_STOCK_THRESHOLD = 10;
+const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 /** Pushes arrive in bursts (an order + its payment + its delivery): coalesce the follow-up reads. */
 const PUSH_DEBOUNCE_MS = 400;
 const FALLBACK_IMAGE = "/brand/logo-stack.png";
@@ -75,6 +76,31 @@ export type SellerStore = Seller & {
   planExpiresAt?: string | null;
   /** The plan actually in force right now (a lapsed paid plan reads "free"). */
   activePlan?: string;
+  /** Who the signed-in account is in this store (the owner, or a team member with a role). Absent on an old server = owner. */
+  membership?: SellerMembership;
+  /** Map pin of the pickup location (needed to route the pickup rider) and the warehouse nearest to it. */
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  originHubId?: string | null;
+  /** Area routing (docs/contracts/areas.md): the pickup area, its chain, whether we deliver there, and the origin warehouse. */
+  pickupAreaId?: string | null;
+  pickupAreaChain?: import("@/lib/areas").AreaChain | null;
+  pickupServed?: boolean;
+  originHubName?: string | null;
+  /** Storefront: vacation mode, handling time, policies (EN/FR). */
+  vacationUntil?: string | null;
+  onVacation?: boolean;
+  handlingDays?: number | null;
+  returnsPolicy?: string | null;
+  returnsPolicyFr?: string | null;
+  shippingPolicy?: string | null;
+  shippingPolicyFr?: string | null;
+  /** Low-stock line for the whole store (default 10). */
+  lowStockThreshold?: number | null;
+  goals?: { revenueUsd: number | null; orders: number | null; rating: number | null; products: number | null } | null;
+  ratingCount?: number | null;
+  fulfilmentRate?: number | null;
+  payoutAccountMasked?: string | null;
 };
 
 /** A product row as `products:list` / `product:updated` return it for the owning seller. */
@@ -86,6 +112,8 @@ export type SellerProductRow = Product & {
   campaignName?: string | null;
   campaignNameFr?: string | null;
   priceSource?: "base" | "flash" | "campaign";
+  /** Units set aside per option label ("Size: 42 · Colour: Black"); null = stock is not split (docs/contracts/commerce.md §2). */
+  variantStock?: Record<string, number> | null;
 };
 
 export type SellerReview = Review & {
@@ -160,10 +188,15 @@ export interface Campaign {
 }
 
 export interface SupportMessage {
+  id?: string;
   from: string;
+  fromId?: string;
+  /** The sender's real role (customer | seller | rider | admin_support …). */
   role: string;
   text: string;
   at: string;
+  /** Photos the sender attached (upload URLs). */
+  attachments?: string[];
 }
 
 export interface SupportTicket {
@@ -176,6 +209,12 @@ export interface SupportTicket {
   orderId: string | null;
   status: "open" | "pending" | "resolved" | "closed";
   messages: SupportMessage[];
+  /** The creator's role, who the ticket is assigned to, and how many staff replies the owner has not read. */
+  role?: string;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  userUnread?: number;
+  staffUnread?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -231,6 +270,15 @@ export interface ProductInput {
   categoryId?: string;
   stock: number;
   image?: string;
+  /** The whole gallery, cover first (max 8): uploads of ours or https links. */
+  images?: string[];
+  /** Unique per store (letters, digits and . _ - / #), at most 60 characters; null clears it. */
+  sku?: string | null;
+  brand?: string | null;
+  /** Weight in kilograms (the server stores grams). */
+  weightKg?: number | null;
+  /** Units per option; null removes the split. `stock` must then be at least the sum of the entries. */
+  variantStock?: Record<string, number> | null;
   description?: string;
   descriptionFr?: string;
   /** The language the seller wrote the listing in (matters when both titles are sent). */
@@ -241,6 +289,8 @@ export interface ProductInput {
 
 export type StoreGateState =
   | "loading"
+  /** The owner removed this account from the store's team. */
+  | "removed"
   | "none"
   | "pending"
   | "approved"
@@ -386,7 +436,13 @@ interface BuildInput {
 }
 
 /** A seller order as the portal reads it (the address / rider only exist on a full order). */
-type RawOrder = SellerOrderView & { shippingAddress?: string | null; riderId?: string | null };
+type RawOrder = SellerOrderView & {
+  shippingAddress?: string | null;
+  riderId?: string | null;
+  /** The delivery city only (never the street), and the delivery legs the seller may see. */
+  city?: string | null;
+  tracking?: import("@/lib/seller-orders").OrderTracking | null;
+};
 
 function buildSellerData(input: BuildInput) {
   const {
@@ -394,12 +450,16 @@ function buildSellerData(input: BuildInput) {
     available, campaigns, replacements, exchanges, fr,
   } = input;
   const commissionPct = available?.commissionPct ?? DEFAULT_COMMISSION_PCT;
+  // The store's own low-stock line (Inventory > settings); 10 until the seller sets one.
+  const lowStockThreshold = seller?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD;
   const rate = commissionPct / 100;
 
+  // A team member's copy of the store has no owner account id: the server already scopes `products:list` to the store.
+  const staffView = !!seller?.membership && !seller.membership.isOwner;
   const mine = products.filter(
     (p) =>
       p.status !== "removed" &&
-      ((seller && p.sellerId === seller.id) || (!!seller?.userId && p.sellerId === seller.userId)),
+      (staffView || (seller && p.sellerId === seller.id) || (!!seller?.userId && p.sellerId === seller.userId)),
   );
   const imageById = new Map(mine.map((p) => [p.id, p.image || FALLBACK_IMAGE]));
 
@@ -450,6 +510,12 @@ function buildSellerData(input: BuildInput) {
       campaignName: pickText(fr, p.campaignName, p.campaignNameFr) || null,
       image: p.image || FALLBACK_IMAGE,
       hasImage: !!p.image,
+      /** The real listing fields (the `sku` above is the portal's internal key, kept for inventory links). */
+      skuReal: p.sku ?? null,
+      images: p.images && p.images.length ? p.images : p.image ? [p.image] : [],
+      brandName: p.brand ?? "",
+      weightGrams: p.weightGrams ?? null,
+      variantStock: p.variantStock ?? null,
       status: p.status, // REAL: live | pending | rejected | draft | removed
       description: pickText(fr, p.description, p.descriptionFr),
       descriptionFr: pickText(true, p.description, p.descriptionFr),
@@ -470,7 +536,7 @@ function buildSellerData(input: BuildInput) {
       reviewsCount: p.reviewsCount,
       commission: commissionPct,
       netRevenue: money(p.price * (1 - rate)), // per sale at the price shoppers pay now
-      lowStockThreshold: LOW_STOCK_THRESHOLD,
+      lowStockThreshold,
       allocatedStock: sale.inFlight,
       orders: sale.orders,
       revenue: money(sale.revenue),
@@ -553,7 +619,9 @@ function buildSellerData(input: BuildInput) {
       id: o.reference,
       orderId: o.id,
       customer: firstNameOnly(o.customerName),
-      customerCity: cityFromAddress(o.shippingAddress),
+      customerCity: o.city || cityFromAddress(o.shippingAddress),
+      /** Real delivery legs (pickup, transfer, delivery) from the server; null until a leg exists. */
+      tracking: o.tracking ?? null,
       items: liveQty(items),
       amount,
       paymentMethod: o.paymentMethod,
@@ -594,6 +662,7 @@ function buildSellerData(input: BuildInput) {
         refundedUsd: it.refundedUsd ?? 0,
         commissionUsd: lineCommission(it, commissionPct),
         commissionPct: it.commissionPct ?? null,
+        couponDiscountUsd: (it as { couponDiscountUsd?: number }).couponDiscountUsd ?? 0,
         readyAt: it.readyAt ?? null,
       })),
       timeline,
@@ -803,7 +872,8 @@ function buildSellerData(input: BuildInput) {
     pendingOrders,
     productsSold,
     storeRating: seller?.rating || avgRating,
-    pendingReturns: sellerReturnList.filter((r) => r.status === "open").length,
+    // Waiting for the seller's own answer (stage awaiting_seller); an older server without `stage` counts every open one.
+    pendingReturns: disputes.filter((d) => d.type === "return" && d.status === "open" && ((d as { stage?: string }).stage ?? "awaiting_seller") === "awaiting_seller").length,
     pendingReplacements: replacements.filter((r) => r.status === "requested").length,
   };
 
@@ -845,7 +915,7 @@ function buildSellerData(input: BuildInput) {
   };
 
   const lowStockProducts = sellerProductList.filter(
-    (p) => p.status !== "rejected" && p.availableStock < LOW_STOCK_THRESHOLD,
+    (p) => p.status !== "rejected" && p.availableStock <= lowStockThreshold,
   );
   const topSellingProducts = [...sellerProductList].sort((a, b) => b.soldCount - a.soldCount).slice(0, 5);
 
@@ -1016,7 +1086,7 @@ interface Actions {
   /** Needs the full KYC payload (`sellers:register` refuses a bare name). */
   registerStore: (input: Record<string, unknown>) => Promise<SellerStore>;
   /** sellers:update {name?, pickupAddress?, logoUrl?, bannerUrl?, description?} */
-  updateStore: (patch: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null }) => Promise<SellerStore>;
+  updateStore: (patch: StorePatch) => Promise<SellerStore>;
   createProduct: (input: ProductInput) => Promise<Product>;
   /** Only send the fields that changed: `price` is the stored LIST price, never the discounted one. */
   updateProduct: (id: string, patch: Partial<ProductInput> & { status?: "live" | "draft" }) => Promise<Product>;
@@ -1055,11 +1125,35 @@ interface Actions {
    * The customer is refunded for those lines; the order continues with the other sellers.
    */
   sellerCancel: (orderId: string, reason: string, itemIds?: string[]) => Promise<SellerOrderView>;
-  openTicket: (input: { subject: string; message: string; category?: string; orderId?: string }) => Promise<SupportTicket>;
-  replyTicket: (id: string, text: string) => Promise<SupportTicket>;
+  openTicket: (input: { subject: string; message: string; category?: string; orderId?: string; attachments?: string[] }) => Promise<SupportTicket>;
+  replyTicket: (id: string, text: string, attachments?: string[]) => Promise<SupportTicket>;
+  /** support:markRead — zeroes the unread counter of a ticket the seller has opened. */
+  markTicketRead: (id: string) => Promise<SupportTicket>;
   /** reviews:reply — publishes (or replaces) the seller's public answer to a review. */
   replyReview: (reviewId: string, text: string) => Promise<SellerReview>;
   uploadImage: (file: File) => Promise<string>;
+}
+
+/** The fields `sellers:update` accepts (docs/contracts/seller-platform.md §4, logistics.md §5). */
+export interface StorePatch {
+  name?: string;
+  pickupAddress?: string | null;
+  /** Map pin of the pickup location: both or null both. */
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  /** The most specific area of the pickup address (province → commune pickers). */
+  pickupAreaId?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  description?: string | null;
+  descriptionFr?: string | null;
+  /** ISO date, or a bare YYYY-MM-DD (end of that day); null / "" reopens. */
+  vacationUntil?: string | null;
+  handlingDays?: number;
+  returnsPolicy?: string | null;
+  returnsPolicyFr?: string | null;
+  shippingPolicy?: string | null;
+  shippingPolicyFr?: string | null;
 }
 
 /** What the portal knows about how fresh its data is. */
@@ -1074,6 +1168,8 @@ export interface SellerLoadState {
 interface SellerCtx {
   seller: SellerStore | null;
   sellerLoaded: boolean;
+  /** Set (to the store's name) when the owner removed this account from the team. */
+  removedFrom: string | null;
   stats: SellerStats | null;
   reviews: SellerReview[];
   ownProducts: SellerProductRow[] | null;
@@ -1118,6 +1214,15 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     productsRef.current = ownProducts;
   }, [ownProducts]);
+  const [removedFrom, setRemovedFrom] = useState<string | null>(null);
+  const sellerNameRef = useRef<string | null>(null);
+  const sellerIdRef = useRef<string | null>(null);
+  const membershipRef = useRef<SellerMembership | undefined>(undefined);
+  useEffect(() => {
+    sellerIdRef.current = seller?.id ?? null;
+    sellerNameRef.current = seller?.name ?? sellerNameRef.current;
+    membershipRef.current = seller?.membership;
+  }, [seller]);
   const [firstLoadDone, setFirstLoadDone] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -1132,14 +1237,21 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         return rest;
       });
     } catch (e) {
+      // Kept as the server wrote it: <LoadError> shows it in the language the portal is in right now.
       setErrors((cur) => ({ ...cur, [key]: e instanceof Error ? e.message : "Request failed." }));
     }
   }, []);
 
-  const refreshSeller = useCallback(
-    () => read<SellerStore | null>("seller", "sellers:mine", (m) => { setSeller(m); setSellerLoaded(true); }),
-    [read],
-  );
+  const refreshSeller = useCallback(async (): Promise<SellerStore | null> => {
+    let got: SellerStore | null = null;
+    await read<SellerStore | null>("seller", "sellers:mine", (m) => {
+      got = m;
+      setSeller(m);
+      setSellerLoaded(true);
+      if (m) setRemovedFrom(null);
+    });
+    return got;
+  }, [read]);
   const refreshProducts = useCallback(() => read<SellerProductRow[]>("products", "products:list", setOwnProducts), [read]);
   const refreshOrders = useCallback(() => read<SellerOrderView[]>("orders", "orders:list", setOrdersRaw), [read]);
   const refreshAvailable = useCallback(() => read<PayoutAvailability>("available", "payouts:available", setAvailable), [read]);
@@ -1161,17 +1273,19 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const refreshPlans = useCallback(() => read<SellerPlanInfo[]>("plans", "sellers:plans", setPlans), [read]);
 
   const refresh = useCallback(async () => {
-    await refreshSeller();
+    const mine = await refreshSeller();
+    // A team member only reads what their role allows (the server would answer the others with an error).
+    const can = (perm: SellerPermission) => hasPermission(mine?.membership, perm);
     await Promise.allSettled([
-      refreshProducts(),
-      refreshOrders(),
-      refreshAvailable(),
-      refreshStats(),
-      refreshReviews(),
-      refreshCampaigns(),
-      refreshTickets(),
-      refreshReplacements(),
-      refreshExchanges(),
+      can("catalog_read") ? refreshProducts() : Promise.resolve(),
+      can("orders") ? refreshOrders() : Promise.resolve(),
+      can("finance") ? refreshAvailable() : Promise.resolve(),
+      can("insight") ? refreshStats() : Promise.resolve(),
+      can("support") ? refreshReviews() : Promise.resolve(),
+      can("catalog") ? refreshCampaigns() : Promise.resolve(),
+      can("support") ? refreshTickets() : Promise.resolve(),
+      can("orders") ? refreshReplacements() : Promise.resolve(),
+      can("orders") ? refreshExchanges() : Promise.resolve(),
       refreshPlans(),
     ]);
     setFirstLoadDone(true);
@@ -1257,19 +1371,47 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       scheduleFollowUp({ analytics: true });
     };
     const onSeller = (x: SellerStore) => {
-      if (x.userId === userId) {
-        setSeller(x);
+      // The owner's row carries the owner's account id; a team member's copy has none, so match the store id.
+      const sameStore = !!sellerIdRef.current && x.id === sellerIdRef.current;
+      if (x.userId === userId || sameStore) {
+        // Keep who-I-am: a push never carries the viewer's own membership.
+        setSeller((cur) => ({ ...x, membership: x.membership ?? cur?.membership }));
         setSellerLoaded(true);
-        void refreshProducts();
+        if (hasPermission(x.membership ?? membershipRef.current, "catalog_read")) void refreshProducts();
         scheduleFollowUp({ money: true });
       }
     };
+    const onTeamMe = (m: { seller?: Partial<SellerStore>; role: SellerMembership["role"]; permissions: SellerPermission[] }) => {
+      setSeller((cur) =>
+        cur ? { ...cur, ...(m.seller ?? {}), membership: { role: m.role, isOwner: false, permissions: m.permissions } } : cur,
+      );
+      void refresh();
+    };
+    // Removed from the team: the store disappears from this account.
+    const onTeamRemoved = () => {
+      setRemovedFrom(sellerNameRef.current ?? "");
+      setSeller(null);
+      setSellerLoaded(true);
+    };
     const onPayout = () => scheduleFollowUp({ money: true });
     const onNotify = () => scheduleFollowUp({ money: true, cases: true });
+    // A delivery leg moved (rider assigned, parcel scanned in...): the order's tracking changed, so re-read the orders.
+    let taskTimer: ReturnType<typeof setTimeout> | null = null;
+    const onTask = () => {
+      if (taskTimer) clearTimeout(taskTimer);
+      taskTimer = setTimeout(() => void refreshOrders(), PUSH_DEBOUNCE_MS);
+    };
     const onCampaign = (c: Campaign) => setCampaigns((cur) => upsert(cur, c));
     const onTicket = (t: unknown) => setTickets((cur) => upsert(cur, parseTicket(t)));
     const onReplacement = (r: Replacement) => setReplacements((cur) => upsert(cur, r));
     const onExchange = (x: Exchange) => setExchanges((cur) => upsert(cur, x));
+    // Warehouse coverage changed: the store's pickup area may have become (or stopped being) served.
+    let coverageTimer: ReturnType<typeof setTimeout> | null = null;
+    const onCoverage = () => {
+      if (coverageTimer) clearTimeout(coverageTimer);
+      coverageTimer = setTimeout(() => void refreshSeller(), PUSH_DEBOUNCE_MS);
+    };
+    s.on("coverage:updated", onCoverage);
     s.on("order:created", onOrder);
     s.on("order:updated", onOrder);
     s.on("product:created", onProduct);
@@ -1284,6 +1426,10 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     s.on("support:updated", onTicket);
     s.on("replacement:updated", onReplacement);
     s.on("exchange:updated", onExchange);
+    s.on("task:updated", onTask);
+    s.on("delivery:updated", onTask);
+    s.on("team:me", onTeamMe);
+    s.on("team:removed", onTeamRemoved);
     return () => {
       s.off("order:created", onOrder);
       s.off("order:updated", onOrder);
@@ -1299,8 +1445,15 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       s.off("support:updated", onTicket);
       s.off("replacement:updated", onReplacement);
       s.off("exchange:updated", onExchange);
+      s.off("task:updated", onTask);
+      s.off("delivery:updated", onTask);
+      if (taskTimer) clearTimeout(taskTimer);
+      if (coverageTimer) clearTimeout(coverageTimer);
+      s.off("coverage:updated", onCoverage);
+      s.off("team:me", onTeamMe);
+      s.off("team:removed", onTeamRemoved);
     };
-  }, [isSeller, userId, scheduleFollowUp, refreshProducts, refreshReviews]);
+  }, [isSeller, userId, scheduleFollowUp, refreshProducts, refreshReviews, refreshOrders, refreshSeller, refresh]);
 
   // A sign-out / account switch clears everything.
   useEffect(() => {
@@ -1406,8 +1559,13 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         setTickets((cur) => upsert(cur, t));
         return t;
       },
-      replyTicket: async (id, text) => {
-        const t = parseTicket(await request<unknown>("support:reply", { id, text }));
+      replyTicket: async (id, text, attachments) => {
+        const t = parseTicket(await request<unknown>("support:reply", { id, text, ...(attachments && attachments.length ? { attachments } : {}) }));
+        setTickets((cur) => upsert(cur, t));
+        return t;
+      },
+      markTicketRead: async (id) => {
+        const t = parseTicket(await request<unknown>("support:markRead", { id }));
         setTickets((cur) => upsert(cur, t));
         return t;
       },
@@ -1427,10 +1585,10 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
 
   const value = useMemo<SellerCtx>(
     () => ({
-      seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available,
+      seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw, available,
       campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions,
     }),
-    [seller, sellerLoaded, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
+    [seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
   );
 
   return <SellerContext.Provider value={value}>{children}</SellerContext.Provider>;
@@ -1443,20 +1601,34 @@ function useSellerCtx(): SellerCtx {
 }
 
 /** Store approval state used by the portal gate. */
-export function useStoreGate(): { state: StoreGateState; seller: SellerStore | null } {
+export function useStoreGate(): { state: StoreGateState; seller: SellerStore | null; removedFrom: string | null } {
   const ctx = useSellerCtx();
   const state: StoreGateState = !ctx.sellerLoaded
     ? "loading"
     : !ctx.seller
-      ? "none"
+      ? ctx.removedFrom !== null ? "removed" : "none"
       : ctx.seller.status;
-  return { state, seller: ctx.seller };
+  return { state, seller: ctx.seller, removedFrom: ctx.removedFrom };
+}
+
+/** Who the signed-in account is in the store, and what that role may do. Owners (and old servers) may do everything. */
+export function useSellerAccess() {
+  const ctx = useSellerCtx();
+  const membership = ctx.seller?.membership;
+  return {
+    loaded: ctx.sellerLoaded,
+    membership,
+    role: membership?.role ?? "owner",
+    isOwner: membership ? membership.isOwner : true,
+    can: (perm: SellerPermission) => hasPermission(membership, perm),
+    suspended: ctx.seller?.status === "suspended",
+  };
 }
 
 /** Support tickets (live) and their actions. */
 export function useSellerTickets() {
   const ctx = useSellerCtx();
-  return { tickets: ctx.tickets, openTicket: ctx.actions.openTicket, replyTicket: ctx.actions.replyTicket };
+  return { tickets: ctx.tickets, openTicket: ctx.actions.openTicket, replyTicket: ctx.actions.replyTicket, markTicketRead: ctx.actions.markTicketRead };
 }
 
 /** Loading / error state of the portal's core lists (for the "loading", "failed + retry" UI). */

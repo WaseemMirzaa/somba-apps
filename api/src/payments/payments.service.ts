@@ -16,6 +16,7 @@ import {
   ADMIN_ROLES,
   NotificationsService,
 } from '../notifications/notifications.service';
+import { pushOrderToOps } from '../logistics/hub-scope';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { SettingsService } from '../content/settings.service';
@@ -715,7 +716,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       for (const item of order.items ?? []) {
         // A line a seller already cancelled was restocked then.
         if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
-          await this.products.restock(item.productId, item.qty);
+          await this.products.restock(item.productId, item.qty, { variant: item.variant, orderId: order.id, reason: 'cancel_restock' });
         }
       }
       const tasks = await this.deliveries.find({
@@ -725,12 +726,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         task.status = 'failed';
         task.failureReason = 'Refunded';
         await this.deliveries.save(task);
-        this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'delivery:updated', task);
+        // Admins, the warehouses at the ends of the leg (not every warehouse) and the rider hear that it was voided.
+        this.emitter.toRoles(ADMIN_ROLES, 'delivery:updated', task);
+        for (const hub of new Set([task.hubId, task.fromHubId, task.toHubId])) if (hub) this.emitter.toHub(hub, 'delivery:updated', task);
         if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
       }
     }
     this.emitter.toUser(order.customerId, 'order:updated', order);
-    this.emitter.toRoles(ADMIN_ROLES, 'order:updated', order);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', order);
   }
 
   /**

@@ -149,13 +149,12 @@ extension StringsKeys on Strings {
   String get estimatedDelivery => t('estimated_delivery');
   String get deliveryEstimateHint => t('delivery_estimate_hint');
   String pdDeliveryDays(Object? days, Object? day) => t('pd_delivery_days', {'days': days, 'day': day});
+  String pdDeliveryDayOne(Object? day) => t('pd_delivery_day_one', {'day': day});
   String chooseOption(Object? name) => t('choose_option', {'name': '$name'.toLowerCase()});
   String get addrEditTitle => t('addr_edit_title');
   String get addrUpdated => t('addr_updated');
   String get addrLandmark => t('addr_landmark');
   String get addrLandmarkHint => t('addr_landmark_hint');
-  String addrZoneOk(Object? fee) => t('addr_zone_ok', {'fee': fee});
-  String get addrZoneNone => t('addr_zone_none');
   String get addrEdit => t('addr_edit');
   String get addrMakeDefault => t('addr_make_default');
   String get addrDefaultDone => t('addr_default_done');
@@ -379,8 +378,6 @@ extension StringsKeys on Strings {
   String get checkoutNoAddress => t('checkout_no_address');
   String get add => t('add');
   String get change => t('change');
-  String get checkoutNotServed => t('checkout_not_served');
-  String get checkoutNeedCommune => t('checkout_need_commune');
   String get checkoutEditAddress => t('checkout_edit_address');
   String get checkoutChangeAddress => t('checkout_change_address');
   String get mmNumber => t('mm_number');
@@ -541,6 +538,7 @@ extension StringsKeys on Strings {
   String get orderPayFailed => t('order_pay_failed');
   String get trackPlaced => t('track_placed');
   String get trackCurrent => t('track_current');
+  String get journeyNext => t('journey_next');
   String get trackOnway => t('track_onway');
   String get trackHeading => t('track_heading');
   String get trackNotYet => t('track_not_yet');

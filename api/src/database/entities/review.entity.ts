@@ -44,6 +44,14 @@ export class Review {
   @Column({ type: 'datetime', nullable: true })
   sellerReplyAt: Date | null;
 
+  /** How many open reports sellers filed against this review. */
+  @Column({ type: 'int', default: 0 })
+  reportCount: number;
+
+  /** Why a moderator hid it (shown to the author and the seller). */
+  @Column({ type: 'text', nullable: true })
+  moderationReason: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -8,6 +8,7 @@ import {
   Campaign,
   Category,
   CmsBlock,
+  ConversationMessage,
   FlashSale,
   Product,
   ProductQuestion,
@@ -63,6 +64,8 @@ export const STORED_KINDS = {
   review_reply: { entity: Review, column: 'sellerReply', field: 'reply' },
   question: { entity: ProductQuestion, column: 'question', field: 'text' },
   answer: { entity: ProductQuestion, column: 'answer', field: 'text' },
+  /** A chat message: private to the two sides of its conversation, so only `ChatService.translate` may ask for it (`private: true`). */
+  chat_message: { entity: ConversationMessage, column: 'text', field: 'text' },
 } as const;
 export type StoredKind = keyof typeof STORED_KINDS;
 export const isStoredKind = (k: unknown): k is StoredKind => typeof k === 'string' && k in STORED_KINDS;
@@ -563,10 +566,11 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     kind: unknown,
     id: unknown,
     target: unknown,
-    opts: { staff?: boolean } = {},
+    opts: { staff?: boolean; private?: boolean } = {},
   ): Promise<{ text: string; sourceLang: string; same: boolean }> {
     const nothing = 'Nothing to translate.';
     if (!isStoredKind(kind) || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing); // C-I5
+    if (kind === 'chat_message' && !opts.private) throw new Error(nothing); // private text: the chat service checks who may read it
     if (!isLocale(target)) throw new Error('Choose English or French.');
     const spec = STORED_KINDS[kind];
     const rec = (await this.ds.getRepository(spec.entity as never).findOne({ where: { id } as never })) as unknown as Record<string, unknown> | null;

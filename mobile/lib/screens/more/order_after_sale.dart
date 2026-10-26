@@ -7,14 +7,16 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/catalog_live.dart';
 import '../../data/shop_state.dart';
 import '../../l10n/strings.dart';
+import '../../services/engage_store.dart';
 import '../../services/maps_config.dart';
 import '../../services/models.dart';
-import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
 import '../cart_screen.dart';
 import 'catalog_extra.dart';
+
+export 'aftersale_item_issue.dart' show ItemIssueScreen;
 
 /// "Buy again": puts every still-available line of [order] back in the cart (capped at stock) and opens the cart.
 Future<void> buyAgain(BuildContext context, OrderDto order, Locale locale) async {
@@ -24,7 +26,7 @@ Future<void> buyAgain(BuildContext context, OrderDto order, Locale locale) async
   final missing = <String>[];
   for (final i in order.items.where((i) => !i.isCancelled)) {
     final p = productByUuid(i.productId);
-    if (p == null || p.stock <= 0) {
+    if (p == null || p.stock <= 0 || EngageStore.instance.vacationOf(p) != null) {
       missing.add(i.displayName(s.lang));
       continue;
     }
@@ -140,129 +142,6 @@ class ReviewPromptCard extends StatelessWidget {
               child: Text(s.reviewWrite),
             ),
           ]),
-      ]),
-    );
-  }
-}
-
-/// Ask for a replacement (same item: damaged / faulty / wrong) or an exchange (different size, colour or model).
-class ItemIssueScreen extends StatefulWidget {
-  final OrderDto order;
-  const ItemIssueScreen({super.key, required this.order});
-
-  @override
-  State<ItemIssueScreen> createState() => _ItemIssueScreenState();
-}
-
-class _ItemIssueScreenState extends State<ItemIssueScreen> {
-  String _kind = 'replacement';
-  OrderItemDto? _item;
-  final _want = TextEditingController();
-  final _reason = TextEditingController();
-  bool _busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final items = widget.order.items.where((i) => !i.isCancelled).toList();
-    if (items.length == 1) _item = items.first;
-  }
-
-  @override
-  void dispose() {
-    _want.dispose();
-    _reason.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final s = Strings.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final item = _item;
-    String? err;
-    if (item == null) {
-      err = s.issuePickItem;
-    } else if (_kind == 'exchange' && _want.text.trim().length < 2) {
-      err = s.issueSayWhat;
-    } else if (_reason.text.trim().length < 5) {
-      err = s.issueSayWhy;
-    }
-    if (err != null) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(err)));
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      final store = RealtimeStore.instance;
-      final res = _kind == 'replacement'
-          ? await store.call('replacements:create', {
-              'orderId': widget.order.id,
-              'sku': item!.productId,
-              'productName': item.productName,
-              'reason': _reason.text.trim(),
-              'condition': 'customer_reported',
-            })
-          : await store.call('exchanges:create', {
-              'orderId': widget.order.id,
-              'fromSku': item!.productId,
-              'fromName': item.productName,
-              'toSku': item.productId,
-              'toName': _want.text.trim(),
-              'reason': _reason.text.trim(),
-            });
-      if (!mounted) return;
-      final ref = res is Map ? (res['reference'] ?? '').toString() : '';
-      messenger.showSnackBar(SnackBar(content: Text(s.issueSent(ref))));
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Strings.of(context);
-    final items = widget.order.items.where((i) => !i.isCancelled).toList();
-    return Scaffold(
-      appBar: backAppBar(context, s.issueTitle),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
-        SegmentedButton<String>(
-          key: const ValueKey('issue-kind'),
-          segments: [
-            ButtonSegment(value: 'replacement', label: Text(s.issueReplacement), icon: const Icon(Icons.autorenew_rounded)),
-            ButtonSegment(value: 'exchange', label: Text(s.issueExchange), icon: const Icon(Icons.swap_horiz_rounded)),
-          ],
-          selected: {_kind},
-          onSelectionChanged: (v) => setState(() => _kind = v.first),
-        ),
-        const SizedBox(height: 8),
-        Text(_kind == 'replacement' ? s.issueReplacementHint : s.issueExchangeHint, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-        const SizedBox(height: 16),
-        Text(s.issueWhichItem, style: const TextStyle(fontWeight: FontWeight.w700)),
-        RadioGroup<String>(
-          groupValue: _item?.productId,
-          onChanged: (id) => setState(() => _item = items.firstWhere((i) => i.productId == id)),
-          child: Column(children: [
-            for (final i in items)
-              RadioListTile<String>(
-                key: ValueKey('issue-item-${i.productId}'),
-                contentPadding: EdgeInsets.zero,
-                value: i.productId,
-                title: Text('${i.qty} × ${i.displayName(s.lang)}', style: const TextStyle(fontSize: 13.5)),
-              ),
-          ]),
-        ),
-        if (_kind == 'exchange') ...[
-          const SizedBox(height: 8),
-          AppField(key: const ValueKey('issue-want'), label: s.issueWantLabel, hint: s.issueWantHint, controller: _want),
-        ],
-        const SizedBox(height: 12),
-        AppField(key: const ValueKey('issue-reason'), label: s.issueReasonLabel, hint: s.issueReasonHint, controller: _reason, maxLines: 3),
-        const SizedBox(height: 18),
-        FilledButton(key: const ValueKey('issue-submit'), onPressed: _busy ? null : _submit, child: _busy ? const ButtonSpinner() : Text(s.issueSubmit)),
       ]),
     );
   }

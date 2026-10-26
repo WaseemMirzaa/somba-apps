@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../app.module';
 import {
+  Address,
   Campaign,
   Category,
   CmsBlock,
@@ -19,6 +20,7 @@ import {
   Review,
   Seller,
   Hub,
+  HubCoverage,
   Setting,
   Translation,
   TranslationJob,
@@ -29,9 +31,13 @@ import {
 import type { TranslationEntityType } from './entities';
 import { UsersService } from '../users/users.service';
 import { OrdersService } from '../orders/orders.service';
+import { LogisticsService } from '../logistics/logistics.service';
+import { DeliveryService } from '../delivery/delivery.service';
 import type { UserRole } from './entities';
 import { seedCategories, seedProducts } from './seed-catalog';
 import { DEFAULT_SELLER_PLANS } from '../content/plans';
+import { GeoService } from '../geo/geo.service';
+import { CoverageService } from '../geo/coverage.service';
 import { sourceHash } from '../translation/translatable';
 
 /** Every demo account shares one password so the prototype is easy to drive. */
@@ -50,7 +56,24 @@ const DEMO_USERS: {
   { email: 'finance@somba.app', name: 'Finance Manager', role: 'admin_finance' },
   { email: 'warehouse@somba.app', name: 'Hub Kinshasa', role: 'warehouse_staff' },
   { email: 'rider@somba.app', name: 'Jean Rider', role: 'rider', phone: '+243 900 000 009' },
+  { email: 'seller2@somba.app', name: 'Limete Wholesale', role: 'seller', phone: '+243 900 000 004' },
+  { email: 'warehouse.limete@somba.app', name: 'Hub Limete', role: 'warehouse_staff' },
+  { email: 'operator@somba.app', name: 'Hub Kinshasa Operator', role: 'warehouse_staff' },
+  { email: 'rider.limete@somba.app', name: 'Marc Rider (Limete)', role: 'rider', phone: '+243 900 000 010' },
 ];
+
+/** Where the demo warehouses stand (WGS84). Each sits in a commune and covers areas (see the coverage block below). */
+const HUB_POSITIONS = {
+  kinshasa: { lat: -4.3105, lng: 15.3136 }, // Gombe
+  limete: { lat: -4.354, lng: 15.347 },
+};
+/** Pickup pins of the demo sellers and the pinned demo addresses. */
+const PINS = {
+  sellerGombe: { lat: -4.3152, lng: 15.3098 },
+  sellerLimete: { lat: -4.3561, lng: 15.3492 },
+  customerGombe: { lat: -4.3086, lng: 15.3171 },
+  customerMasina: { lat: -4.37, lng: 15.395 },
+};
 
 /**
  * Map the storefront catalog (web/src/lib/mock-data) onto Product entities. The French name is not a column: it is
@@ -85,12 +108,14 @@ async function run() {
   await wipe(DeliveryTask);
   await wipe(Payment);
   await wipe(Order);
+  await wipe(Address);
   await wipe(Notification);
   await wipe(WalletTransaction);
   await wipe(Product);
   await wipe(Seller);
   await wipe(User);
   await wipe(Category);
+  await wipe(HubCoverage);
   await wipe(Hub);
   await wipe(Promo);
   await wipe(CmsBlock);
@@ -102,6 +127,19 @@ async function run() {
   await wipe(Replacement);
   await wipe(Exchange);
   await wipe(WarehouseException);
+
+  // The DRC geography (26 provinces, 38 cities, Kinshasa's districts and communes) is reference data: added when missing, never wiped.
+  const geo = app.get(GeoService);
+  const seededAreas = await geo.ensureSeeded();
+  if (seededAreas) console.log(`Seeded ${seededAreas} delivery areas…`);
+  const area = async (code: string) => {
+    const a = await geo.getByCode(code);
+    if (!a) throw new Error(`Area ${code} is missing from the geography.`);
+    return a;
+  };
+  const [gombeArea, limeteArea, masinaArea, kinshasaProvince, montAmbaDistrict, tshanguDistrict] = await Promise.all(
+    ['CD-KN-GOM', 'CD-KN-LMT', 'CD-KN-MSN', 'CD-KN', 'CD-KN-D-MAM', 'CD-KN-D-TSH'].map(area),
+  );
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const userRepo = ds.getRepository(User);
@@ -128,6 +166,8 @@ async function run() {
         phone: u.phone ?? null,
         // Give the demo customer some store credit to exercise the wallet.
         walletBalance: u.role === 'customer' ? 250 : 0,
+        // The demo customer's number is a verified sign-in number (phone-code login works on a fresh seed).
+        phoneVerified: u.role === 'customer' && !!u.phone,
       }),
     );
     if (u.role === 'customer') {
@@ -153,6 +193,23 @@ async function run() {
       badge: 'somba_assured',
       rating: 4.6,
       pickupAddress: '14 Avenue du Commerce, Gombe, Kinshasa',
+      pickupLat: PINS.sellerGombe.lat,
+      pickupLng: PINS.sellerGombe.lng,
+      pickupAreaId: gombeArea.id,
+    }),
+  );
+  const seller2User = await userRepo.findOne({ where: { emailHash: UsersService.emailHash('seller2@somba.app') } });
+  const seller2 = await sellerRepo.save(
+    sellerRepo.create({
+      name: 'Limete Wholesale',
+      userId: seller2User!.id,
+      status: 'approved',
+      badge: 'silver',
+      rating: 4.2,
+      pickupAddress: '8 Boulevard Lumumba, Limete, Kinshasa',
+      pickupLat: PINS.sellerLimete.lat,
+      pickupLng: PINS.sellerLimete.lng,
+      pickupAreaId: limeteArea.id,
     }),
   );
 
@@ -193,6 +250,8 @@ async function run() {
       }),
     );
     createdProducts.push(product);
+    // Every fifth listing belongs to the Limete wholesaler (so a basket can mix two sellers and two warehouses).
+    if (createdProducts.length % 5 === 0) await productRepo.update({ id: product.id }, { sellerId: seller2.id });
     await authorFr('product', product.id, 'name', product.name, nameFr);
   }
 
@@ -204,42 +263,61 @@ async function run() {
   ]);
   const cmsRepo = ds.getRepository(CmsBlock);
   const blocks = await cmsRepo.save([
-    cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa & Paris.', type: 'banner', active: true }),
+    cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa.', type: 'banner', active: true }),
     cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
   ]);
   await authorFr('cms_block', blocks[0].id, 'title', blocks[0].title, 'Somba&Teka — achetez tout');
-  await authorFr('cms_block', blocks[0].id, 'body', blocks[0].body, 'Livraison rapide à Kinshasa et à Paris.');
+  await authorFr('cms_block', blocks[0].id, 'body', blocks[0].body, 'Livraison rapide à Kinshasa.');
   await authorFr('cms_block', blocks[1].id, 'title', blocks[1].title, 'Livraison gratuite dès 50\u00A0$');
   await authorFr('cms_block', blocks[1].id, 'body', blocks[1].body, 'Utilisez SOMBA10 pour 10 % de réduction.');
   const hubRepo = ds.getRepository(Hub);
-  const [kinshasaHub, , parisHub] = await hubRepo.save([
-    hubRepo.create({ name: 'Kinshasa Hub', city: 'Kinshasa', country: 'DRC', capacity: 800 }),
-    hubRepo.create({ name: 'Lubumbashi Hub', city: 'Lubumbashi', country: 'DRC', capacity: 400 }),
-    hubRepo.create({ name: 'Paris Hub', city: 'Paris', country: 'France', capacity: 600 }),
+  const [kinshasaHub, limeteHub] = await hubRepo.save([
+    hubRepo.create({ name: 'Entrepôt Kinshasa', city: 'Kinshasa', country: 'DRC', capacity: 800, address: 'Avenue du Commerce, Gombe', areaId: gombeArea.id, ...HUB_POSITIONS.kinshasa }),
+    hubRepo.create({ name: 'Entrepôt Limete', city: 'Kinshasa', country: 'DRC', capacity: 500, address: 'Boulevard Lumumba, Limete', areaId: limeteArea.id, ...HUB_POSITIONS.limete }),
   ]);
+  // Coverage: Entrepôt Kinshasa covers the whole province; Entrepôt Limete covers two districts (the most specific wins).
+  const coverage = app.get(CoverageService);
+  await coverage.assign({ hubId: kinshasaHub.id, areaIds: [kinshasaProvince.id] });
+  await coverage.assign({ hubId: limeteHub.id, areaIds: [montAmbaDistrict.id, tshanguDistrict.id] });
+  // The demo sellers' origin warehouse is the one covering their pickup area (Gombe -> Kinshasa, Limete -> Limete).
+  await coverage.recomputeSellerOrigins();
   const setRepo = ds.getRepository(Setting);
   await setRepo.save([
     setRepo.create({ key: 'fxRate', value: '2850' }),
     setRepo.create({ key: 'codCapUsd', value: '500' }),
     // Demo cash orders below need COD on; it is switched back to the client scope (off) right after.
     setRepo.create({ key: 'codEnabled', value: 'true' }),
-    // Each zone (commune) is delivered by one warehouse.
-    setRepo.create({ key: 'deliveryZones', value: JSON.stringify([{ id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', feeUsd: 3, hubId: kinshasaHub.id }, { id: 'limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', feeUsd: 5, hubId: kinshasaHub.id }, { id: 'zone-a', name: 'Zone A — Centre', nameFr: 'Zone A — Centre', city: 'Paris', feeUsd: 0, hubId: parisHub.id }, { id: 'zone-b', name: 'Zone B — Nord', nameFr: 'Zone B — Nord', city: 'Paris', feeUsd: 5, hubId: parisHub.id }]) }),
+    // Delivery fee = base + per km (destination warehouse -> customer pin), capped, + a transfer fee between warehouses.
+    setRepo.create({ key: 'deliveryBaseUsd', value: '2' }),
+    setRepo.create({ key: 'deliveryPerKmUsd', value: '0.5' }),
+    setRepo.create({ key: 'deliveryMaxUsd', value: '15' }),
+    setRepo.create({ key: 'deliveryTransferUsd', value: '1.5' }),
+    // A parcel may travel between cities (e.g. Kinshasa -> Lubumbashi); the estimate grows by these days.
+    setRepo.create({ key: 'allowInterCityDelivery', value: 'true' }),
+    setRepo.create({ key: 'interCityTransferDays', value: '3' }),
+    setRepo.create({ key: 'requirePinnedAddress', value: 'false' }),
+    setRepo.create({ key: 'requireSellerPickupPin', value: 'false' }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
     setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),
     // Dev/demo accounts are not verified, so the policy is off here; bootstrap-prod turns it on.
     setRepo.create({ key: 'requireVerifiedForCheckout', value: 'false' }),
+    // After-sale: returns are accepted for 7 days after delivery; a seller has 48 hours to answer.
+    setRepo.create({ key: 'returnWindowDays', value: '7' }),
+    setRepo.create({ key: 'sellerResponseHours', value: '48' }),
     setRepo.create({ key: 'sellerPlans', value: JSON.stringify(DEFAULT_SELLER_PLANS) }),
     setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
   ]);
-  // The demo rider and warehouse staff work at the Kinshasa warehouse; the rider prefers Gombe.
-  for (const [email, extra] of [
-    ['rider@somba.app', { preferredZones: JSON.stringify(['gombe']) }],
-    ['warehouse@somba.app', {}],
+  // Every rider and staff member belongs to one warehouse; staff have a tier (operator < supervisor < manager).
+  for (const [email, hubId, tier] of [
+    ['rider@somba.app', kinshasaHub.id, null],
+    ['warehouse@somba.app', kinshasaHub.id, 'manager'],
+    ['operator@somba.app', kinshasaHub.id, 'operator'],
+    ['rider.limete@somba.app', limeteHub.id, null],
+    ['warehouse.limete@somba.app', limeteHub.id, 'supervisor'],
   ] as const) {
-    await userRepo.update({ emailHash: UsersService.emailHash(email) }, { hubId: kinshasaHub.id, ...extra });
+    await userRepo.update({ emailHash: UsersService.emailHash(email) }, { hubId, ...(tier ? { warehouseTier: tier } : {}) });
   }
 
   // A couple of seed reviews on the first product.
@@ -283,36 +361,82 @@ async function run() {
       { items: [{ productId: pick(2).id, qty: 3 }], paymentMethod: 'cod', advanceTo: 'delivered' },
     ];
 
+    // Saved, pinned addresses for the demo customer (the customer picks one at checkout).
+    const addressRepo = ds.getRepository(Address);
+    const home = await addressRepo.save(
+      addressRepo.create({
+        userId: customer.id,
+        label: 'Home',
+        line1: '12 Ave. du Commerce',
+        city: 'Kinshasa',
+        commune: 'Gombe',
+        region: 'Kinshasa',
+        country: 'République démocratique du Congo',
+        areaId: gombeArea.id,
+        phone: '+243 900 000 001',
+        geo: { lat: PINS.customerGombe.lat, lng: PINS.customerGombe.lng, formatted: '12 Ave. du Commerce, Gombe, Kinshasa' },
+        isDefault: true,
+      }),
+    );
+    await addressRepo.save(
+      addressRepo.create({
+        userId: customer.id,
+        label: 'Family (Masina)',
+        line1: '7 Avenue de la Paix',
+        city: 'Kinshasa',
+        commune: 'Masina',
+        region: 'Kinshasa',
+        country: 'République démocratique du Congo',
+        areaId: masinaArea.id,
+        phone: '+243 900 000 001',
+        geo: { lat: PINS.customerMasina.lat, lng: PINS.customerMasina.lng, formatted: '7 Avenue de la Paix, Masina, Kinshasa' },
+      }),
+    );
+    const shippingAddress = JSON.stringify({
+      line1: home.line1,
+      city: 'Kinshasa',
+      commune: 'Gombe',
+      areaId: gombeArea.id,
+      geo: { lat: PINS.customerGombe.lat, lng: PINS.customerGombe.lng },
+    });
+
+    const logistics = app.get(LogisticsService);
+    const delivery = app.get(DeliveryService);
+    const adminActor = { id: 'seed', role: 'admin', name: 'Seed', hubId: null, tier: null };
+    /** The open tasks of an order, oldest first. */
+    const openTasks = async (orderId: string) =>
+      (await taskRepo.find({ where: { orderId }, order: { createdAt: 'ASC' } })).filter((t) => ['unassigned', 'assigned', 'picked_up', 'in_transit'].includes(t.status));
+    /** Walk a task along its leg with the real services: assign a rider of its warehouse, then let them (or the staff) finish it. */
+    const run = async (orderId: string, upTo: 'assigned' | 'delivered' | 'on_the_road') => {
+      for (let guard = 0; guard < 8; guard++) {
+        const [task] = await openTasks(orderId);
+        if (!task) return;
+        const rider = (await userRepo.find({ where: { role: 'rider', hubId: task.hubId ?? undefined } }))[0] ?? riderUser;
+        if (!rider) return;
+        if (task.status === 'unassigned') await logistics.assign(task.id, rider.id, adminActor);
+        if (upTo === 'assigned') return;
+        const fresh = (await taskRepo.findOne({ where: { id: task.id } }))!;
+        if (['pickup', 'transfer', 'return_pickup', 'return_transfer'].includes(fresh.kind)) {
+          await delivery.updateStatus(fresh.id, 'picked_up', rider.id);
+          await delivery.updateStatus(fresh.id, 'in_transit', rider.id);
+          await logistics.onScanIn(fresh.id, fresh.toHubId as string, adminActor);
+          continue;
+        }
+        await delivery.updateStatus(fresh.id, 'picked_up', rider.id);
+        await delivery.updateStatus(fresh.id, 'in_transit', rider.id);
+        if (upTo === 'on_the_road') return;
+        await delivery.updateStatus(fresh.id, 'delivered', rider.id);
+      }
+    };
+
     for (const spec of specs) {
       const order = await ordersSvc.create(
         { id: customer.id, name: customer.name },
-        {
-          items: spec.items,
-          paymentMethod: spec.paymentMethod,
-          deliveryFeeUsd: 3,
-          zoneId: 'gombe',
-          shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
-        },
+        { items: spec.items, paymentMethod: spec.paymentMethod, shippingAddress },
       );
-      if (spec.advanceTo) {
-        order.status = spec.advanceTo;
-        await orderRepo.save(order);
-        // Assign + advance the delivery task so warehouse/rider surfaces fill.
-        const task = await taskRepo.findOne({ where: { orderId: order.id } });
-        if (task) {
-          if (spec.advanceTo === 'processing') {
-            task.status = 'assigned';
-            task.riderId = riderUser?.id ?? null;
-          } else if (spec.advanceTo === 'out_for_delivery') {
-            task.status = 'in_transit';
-            task.riderId = riderUser?.id ?? null;
-          } else if (spec.advanceTo === 'delivered') {
-            task.status = 'delivered';
-            task.riderId = riderUser?.id ?? null;
-          }
-          await taskRepo.save(task);
-        }
-      }
+      if (spec.advanceTo === 'processing') await run(order.id, 'assigned');
+      if (spec.advanceTo === 'out_for_delivery') await run(order.id, 'on_the_road');
+      if (spec.advanceTo === 'delivered') await run(order.id, 'delivered');
     }
   }
 
@@ -367,7 +491,7 @@ async function run() {
         orderReference: deliveredOrder.reference,
         customerId: deliveredOrder.customerId,
         customerName: deliveredOrder.customerName,
-        sellerId: seller.id,
+        sellerId: item?.sellerId ?? seller.id,
         sku: item ? `SKU-${item.productId.slice(0, 6)}` : 'SKU-000000',
         productName: item?.productName ?? 'Product',
         reason: 'Defective on arrival',
@@ -384,6 +508,8 @@ async function run() {
         orderReference: deliveredOrder.reference,
         customerId: deliveredOrder.customerId,
         customerName: deliveredOrder.customerName,
+        // The store that sold the line: it is who approves the exchange.
+        sellerId: item?.sellerId ?? seller.id,
         fromSku: item ? `SKU-${item.productId.slice(0, 6)}` : 'SKU-000000',
         fromName: item?.productName ?? 'Product',
         toSku: 'SKU-VARIANT',
@@ -405,7 +531,8 @@ async function run() {
       type: 'missing_item',
       severity: 'high',
       status: 'open',
-      hub: 'Kinshasa Hub',
+      hub: 'Entrepôt Kinshasa',
+      hubId: kinshasaHub.id,
       notes: 'Parcel arrived with one item missing — awaiting seller response.',
       raisedBy: 'Hub Kinshasa',
     }),
@@ -415,7 +542,8 @@ async function run() {
       type: 'damaged',
       severity: 'medium',
       status: 'investigating',
-      hub: 'Kinshasa Hub',
+      hub: 'Entrepôt Kinshasa',
+      hubId: kinshasaHub.id,
       notes: 'Outer box crushed in transit; inspecting contents.',
       raisedBy: 'Hub Kinshasa',
     }),

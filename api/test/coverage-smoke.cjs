@@ -7,6 +7,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { hubId, tasksOf, toDelivery, receiveAtHub } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -133,10 +134,9 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   a = await req(sellerU.sock, 'questions:answer', { id: q.id, answer: 'Yes, 12 months.' });
   ok(a.ok && a.data.answer === 'Yes, 12 months.', 'the seller answers');
   // deliver an order so the customer can review
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: addr });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr });
   const o1 = a.data;
-  const t1 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o1.id));
-  await req(rider.sock, 'delivery:accept', { taskId: t1.id });
+  const t1 = await toDelivery(admin, rider, o1.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t1.id, status: st });
   a = await req(cust.sock, 'reviews:create', { productId: prod.id, rating: 4, text: 'Works well' });
   ok(a.ok, 'the customer reviews after delivery');
@@ -150,14 +150,14 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(!(await req(cust.sock, 'reviews:seller')).ok || (await req(cust.sock, 'reviews:seller')).data.length === 0, 'customers get no seller review feed');
 
   section('Exchanges, replacements, disputes (after delivery)');
-  a = await req(cust.sock, 'exchanges:create', { orderId: o1.id, fromSku: 'A', fromName: 'Cov Item', toSku: 'B', toName: 'Bigger one', reason: 'Wrong size' });
-  ok(a.ok, 'the customer asks for an exchange');
+  a = await req(cust.sock, 'exchanges:create', { orderId: o1.id, fromSku: prod.id, fromName: 'Cov Item', toSku: 'B', toName: 'Bigger one', reason: 'Wrong size' });
+  ok(a.ok, 'the customer asks for an exchange', a.error ?? '');
   const ex = a.data;
   ok(!(await req(cust.sock, 'exchanges:setStatus', { id: ex.id, status: 'approved' })).ok, 'a customer cannot approve their own exchange');
   a = await req(warehouse.sock, 'exchanges:setStatus', { id: ex.id, status: 'approved' });
   ok(a.ok && a.data.status === 'approved', 'warehouse approves the exchange');
   ok(!(await req(warehouse.sock, 'exchanges:setStatus', { id: ex.id, status: 'teleported' })).ok, 'an unknown exchange status is refused');
-  a = await req(cust.sock, 'replacements:create', { orderId: o1.id, sku: 'A', productName: 'Cov Item', reason: 'Dead on arrival' });
+  a = await req(cust.sock, 'replacements:create', { orderId: o1.id, sku: prod.id, productName: 'Cov Item', reason: 'Dead on arrival' });
   ok(a.ok, 'the customer asks for a replacement');
   a = await req(warehouse.sock, 'replacements:setStatus', { id: a.data.id, status: 'approved' });
   ok(a.ok && a.data.status === 'approved', 'warehouse approves the replacement');
@@ -185,7 +185,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   section('Fraud flags');
   await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
   await req(admin.sock, 'settings:set', { key: 'codCapUsd', value: 100 });
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 5 }], paymentMethod: 'cod', zoneId: 'gombe', shippingAddress: addr });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 5 }], paymentMethod: 'cod', shippingAddress: addr });
   ok(a.ok, 'a large cash-on-delivery order is accepted');
   const flagged = await until(async () => (await req(finance.sock, 'fraud:list')).data.find((f) => f.orderId === a.data.id));
   ok(!!flagged, 'and flagged for fraud review');
@@ -250,7 +250,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
     ok(!(await req(cust.sock, ev)).ok && !(await req(rider.sock, ev)).ok, `${ev} is closed to customers and riders`);
   }
   // batch
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: addr });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr });
   const ob = a.data;
   const tb = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === ob.id));
   const riders = (await req(warehouse.sock, 'warehouse:riders')).data;
@@ -263,14 +263,14 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(a.ok && a.data.length > 0, 'warehouse:batches lists it');
   const moved = (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.id === tb.id);
   ok(moved.status === 'assigned' && moved.riderId === rid.id, 'the parcel is now assigned to that rider');
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'Kinshasa Hub', toHub: 'Lubumbashi Hub', sku: 'SKU-1', productName: 'Thing', qty: 5, status: 'received', id: 'evil' });
+  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'Entrepôt Kinshasa', toHub: 'Entrepôt Limete', sku: 'SKU-1', productName: 'Thing', qty: 5, status: 'received', id: 'evil' });
   ok(a.ok && a.data.status === 'requested' && a.data.id !== 'evil', 'a stock transfer is created (client cannot set status or id)');
   ok(!(await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'A', toHub: 'A', sku: 's', qty: 1 })).ok, 'a transfer to the same hub is refused');
   ok(!(await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'A', toHub: 'B', sku: 's', qty: -3 })).ok, 'a negative transfer quantity is refused');
   a = await req(warehouse.sock, 'warehouse:transfers');
   ok(a.ok && a.data.length > 0, 'warehouse:transfers lists transfers');
 
-  a = await req(warehouse.sock, 'exceptions:create', { orderReference: ob.reference, taskId: tb.id, type: 'damaged', severity: 'high', hub: 'Kinshasa Hub', notes: 'Box crushed' });
+  a = await req(warehouse.sock, 'exceptions:create', { orderReference: ob.reference, taskId: tb.id, type: 'damaged', severity: 'high', hub: 'Entrepôt Kinshasa', notes: 'Box crushed' });
   ok(a.ok && a.data.status === 'open', 'warehouse raises an exception');
   const exc = a.data;
   ok(!(await req(warehouse.sock, 'exceptions:create', { type: 'meteor', notes: 'x yz' })).ok, 'an unknown exception type is refused');
@@ -293,9 +293,8 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   // ======================================================================
   const today = new Date().toISOString().slice(0, 10);
   const deliverFor = async (c, productId, qty = 1, method = 'stripe_card') => {
-    const o = (await req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: method, zoneId: 'gombe', shippingAddress: addr })).data;
-    const t = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((x) => x.orderId === o.id));
-    await req(rider.sock, 'delivery:accept', { taskId: t.id });
+    const o = (await req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: method, shippingAddress: addr })).data;
+    const t = await toDelivery(admin, rider, o.id);
     for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t.id, status: st });
     return { order: o, task: t };
   };
@@ -316,7 +315,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   for (const k of ['orders', 'gmv', 'revenue', 'customers', 'sellers', 'liveProducts', 'pendingDisputes', 'pendingPayouts', 'commissionUsd', 'ordersByStatus']) {
     ok(adm0[k] !== undefined, `analytics:admin keeps the existing field ${k}`);
   }
-  const sale = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 2 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: addr })).data;
+  const sale = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 2 }], paymentMethod: 'stripe_card', shippingAddress: addr })).data;
   const adm1 = (await req(admin.sock, 'analytics:admin')).data;
   const rev1 = (await req(admin.sock, 'analytics:revenue', { days: 3 })).data;
   const near = (x, y) => Math.abs(x - y) < 0.011;
@@ -383,24 +382,25 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   for (const k of ['totalParcels', 'unassigned', 'inTransit', 'delivered', 'codToCollect', 'byStatus']) ok(wh0[k] !== undefined, `analytics:warehouse keeps ${k}`);
   ok(wh0.throughput.length === 7 && wh0.throughput[6].date === today && wh0.throughput.every((d) => 'received' in d && 'delivered' in d), 'throughput is the last 7 days of received / delivered counts');
   // receive one parcel at the hub, then deliver it
-  const ro = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: addr })).data;
-  const rt = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((x) => x.orderId === ro.id));
-  ok((await req(warehouse.sock, 'warehouse:receive', { taskId: rt.id })).ok, 'the hub scans a parcel in');
+  const ro = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr })).data;
+  const rp = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((x) => x.orderId === ro.id && x.kind === 'pickup'));
+  await req(admin.sock, 'logistics:assign', { taskId: rp.id, riderId: rider.user.id });
+  await req(rider.sock, 'delivery:updateStatus', { taskId: rp.id, status: 'picked_up' });
+  ok((await req(warehouse.sock, 'warehouse:receive', { taskId: rp.id })).ok, 'the hub scans a parcel in');
   const whR = (await req(warehouse.sock, 'analytics:warehouse')).data;
   ok(whR.throughput[6].received === wh0.throughput[6].received + 1, "today's received count grows by one");
-  await req(rider.sock, 'delivery:accept', { taskId: rt.id });
+  const rt = await toDelivery(admin, rider, ro.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: rt.id, status: st });
   const wh1 = (await req(warehouse.sock, 'analytics:warehouse')).data;
   ok(wh1.throughput[6].delivered === wh0.throughput[6].delivered + 1, "today's delivered count grows by one");
-  ok(wh1.delivered === wh0.delivered + 1 && wh1.totalParcels === wh0.totalParcels + 1, 'parcel totals grow by one');
+  ok(wh1.delivered === wh0.delivered + 1 && wh1.totalParcels === wh0.totalParcels + 2, 'deliveries grow by one and every leg counts as a task (pickup + delivery)', JSON.stringify([wh0.delivered, wh1.delivered, wh0.totalParcels, wh1.totalParcels]));
   ok(typeof wh1.avgPickupToDeliveryMinutes === 'number' && wh1.avgPickupToDeliveryMinutes >= 0 && wh1.pickupToDeliverySamples >= 1, 'pickup -> delivery time is measured from real timestamps', JSON.stringify(wh1.avgPickupToDeliveryMinutes));
   ok(wh1.failureRatePct >= 0 && wh1.failureRatePct <= 100 && typeof wh1.failed30 === 'number', 'a failure rate is reported');
-  ok(Array.isArray(wh1.byZone) && wh1.byZone.some((z) => z.zoneId === 'gombe'), 'parcels are broken down by delivery zone');
-  ok(Array.isArray(wh1.byHub), 'dispatch batches are broken down by hub');
+  ok(wh1.byZone === undefined && Array.isArray(wh1.byHub) && wh1.byHub.length === 1 && wh1.byHub[0].hub && wh1.byHub[0].parcels > 0, 'parcels are broken down by hub (zones are gone), and staff see only their own hub', JSON.stringify(wh1.byHub));
+  ok(wh1.byKind && typeof wh1.byKind === 'object', 'open legs are broken down by kind');
   // a failed attempt moves the failure rate
-  const fl = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: addr })).data;
-  const ft = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((x) => x.orderId === fl.id));
-  await req(rider.sock, 'delivery:accept', { taskId: ft.id });
+  const fl = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr })).data;
+  const ft = await toDelivery(admin, rider, fl.id);
   await req(rider.sock, 'delivery:updateStatus', { taskId: ft.id, status: 'failed', reason: 'Nobody home' });
   const wh2 = (await req(warehouse.sock, 'analytics:warehouse')).data;
   ok(wh2.failed30 === wh1.failed30 + 1 && wh2.failureRatePct > 0, 'a failed attempt raises the failure rate');
@@ -463,10 +463,10 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(a.ok && a.data.active === false, 'admin deactivates the hub');
   ok(!(await req(warehouse.sock, 'warehouse:hubs', { activeOnly: true })).data.some((h) => h.id === hub.id), 'activeOnly hides it');
   ok((await req(warehouse.sock, 'warehouse:hubs')).data.some((h) => h.id === hub.id && h.active === false), 'the directory still lists it as inactive');
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Kinshasa Hub', sku: 'SKU-1', qty: 2 });
+  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Entrepôt Kinshasa', sku: 'SKU-1', qty: 2 });
   ok(!a.ok && /deactivated/.test(a.error ?? ''), 'a deactivated hub cannot take transfers', a.error ?? '');
   await req(admin.sock, 'warehouse:setHubActive', { id: hub.id, active: true });
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Kinshasa Hub', sku: 'SKU-1', qty: 2 });
+  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Entrepôt Kinshasa', sku: 'SKU-1', qty: 2 });
   ok(a.ok, 'once reactivated it can again');
 
   section('List pagination (limit / offset), same array shape');

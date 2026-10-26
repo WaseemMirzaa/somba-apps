@@ -34,7 +34,7 @@ export default function RiderPodPage() {
       </DetailSection>
 
       <DetailSection title={fr ? "Vérification" : "Verification"}>
-        {task.status === "in_transit" ? (
+        {task.status === "in_transit" && !task.hubBound ? (
           <DeliveredForm
             task={task}
             onDone={() => {
@@ -44,6 +44,13 @@ export default function RiderPodPage() {
           />
         ) : task.status === "delivered" ? (
           <p className="text-sm text-emerald-700">{fr ? "Cette livraison est déjà confirmée." : "This delivery is already confirmed."}</p>
+        ) : task.hubBound ? (
+          <p className="text-sm text-slate-600">
+            {fr ? "Ce trajet se termine à l'entrepôt : le personnel scanne le colis, vous n'avez rien à confirmer." : "This leg ends at the warehouse: the staff scan the parcel in, there is nothing for you to confirm."}{" "}
+            <Link href={`/rider/tasks/${id}`} className="text-emerald-700 underline">
+              {fr ? "Retour à la tâche" : "Back to the task"}
+            </Link>
+          </p>
         ) : (
           <p className="text-sm text-slate-600">
             {fr

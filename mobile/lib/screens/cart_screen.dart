@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
+import '../services/delivery_quote.dart';
 import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
+import '../util/variants.dart' show defaultVariant;
+import 'more/account_more.dart' show AddressBookScreen;
 import '../widgets/common.dart';
+import '../widgets/kit.dart';
+import '../widgets/not_served_notice.dart';
+import '../widgets/product_actions.dart' show blockedByVacation;
 import '../widgets/product_image.dart';
 import 'checkout_screen.dart';
 
@@ -20,12 +26,26 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final shop = ShopState.instance;
   final _promoCtrl = TextEditingController();
+  final _quote = QuoteController();
 
   /// Lines removed / reduced because stock ran out, shown until dismissed.
   final List<String> _stockNotices = [];
 
   @override
+  void initState() {
+    super.initState();
+    _quote.addListener(_onQuote);
+  }
+
+  void _onQuote() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _quote
+      ..removeListener(_onQuote)
+      ..dispose();
     _promoCtrl.dispose();
     super.dispose();
   }
@@ -83,6 +103,8 @@ class _CartScreenState extends State<CartScreen> {
   void _moveToCart(int i) {
     final s = Strings.of(context);
     final item = shop.savedForLater[i];
+    // A store on vacation takes no new orders: say so instead of moving the line.
+    if (blockedByVacation(context, item.product, widget.locale)) return;
     final added = shop.moveToCart(i);
     _cartChanged();
     ScaffoldMessenger.of(context)
@@ -97,6 +119,8 @@ class _CartScreenState extends State<CartScreen> {
     return ListenableBuilder(listenable: RealtimeStore.instance, builder: (_, __) {
       shop.syncWithCatalog();
       _stockNotices.addAll(shop.takeStockNotices());
+      // The delivery fee is the server's quote for the delivery address and these lines.
+      _quote.update(shop.deliveryAddress, shop.cart);
       return _scaffold(context);
     });
   }
@@ -300,9 +324,11 @@ class _CartScreenState extends State<CartScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      const SizedBox(height: 3),
-                      Text(item.variantText(s),
-                          style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                      if (item.variant != defaultVariant) ...[
+                        const SizedBox(height: 3),
+                        Text(item.variantText(s),
+                            style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                      ],
                       if ((item.product.sellerName ?? '').isNotEmpty)
                         Text(s.soldBy(item.product.sellerName),
                             key: ValueKey('cart-sold-by-${item.product.id}'),
@@ -312,18 +338,18 @@ class _CartScreenState extends State<CartScreen> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Text(money(item.product.price),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary)),
-                          if (item.product.strikePrice != null) ...[
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(money(item.product.strikePrice!),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
-                            ),
-                          ],
-                          const Spacer(),
+                          // Wrap: the old price moves under the price when both do not fit beside the stepper (never cut).
+                          Expanded(
+                            child: Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                              Text(money(item.product.price),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary)),
+                              if (item.product.strikePrice != null)
+                                Text(money(item.product.strikePrice!),
+                                    style: const TextStyle(fontSize: 12, color: AppColors.faint, decoration: TextDecoration.lineThrough)),
+                            ]),
+                          ),
+                          const SizedBox(width: 8),
                           QuantityStepper(
                             value: item.qty,
                             onChanged: (v) {
@@ -373,10 +399,19 @@ class _CartScreenState extends State<CartScreen> {
         );
   }
 
+  /// Choose another saved address (or add one); the quote follows it.
+  Future<void> _changeAddress() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale, pickMode: true)));
+    if (mounted) setState(() {});
+  }
+
   Widget _summaryBar(Strings s) {
-    final deliveryFee = deliveryFeeUsd;
+    final quote = _quote.quote;
+    final address = shop.deliveryAddress;
+    final deliveryFee = quote?.feeUsd ?? 0;
     final discount = shop.promoDiscount(shop.subtotal);
     final total = shop.subtotal + deliveryFee - discount;
+    final notServed = _quote.notice(s, address);
     return Container(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
@@ -427,10 +462,32 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
           const SizedBox(height: 6),
-          _row(s.delivery, deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
+          _row(
+              s.delivery,
+              quote == null
+                  ? (address == null || _quote.error != null ? s.cartDeliveryLater : '…')
+                  : deliveryFee == 0
+                      ? s.free.toUpperCase()
+                      : money(deliveryFee)),
+          if (quote == null && address == null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(s.cartDeliveryHint,
+                  key: const ValueKey('cart-delivery-hint'), textAlign: TextAlign.end, style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+            ),
+          if (quote != null && !quote.pinned)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(s.cartDeliveryUnpinned,
+                  key: const ValueKey('cart-delivery-unpinned'), textAlign: TextAlign.end, style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+            ),
           if (discount > 0) ...[
             const SizedBox(height: 6),
             _row(s.promoRow(shop.appliedPromo!.code), '- ${money(discount)}'),
+          ],
+          if (notServed != null) ...[
+            const SizedBox(height: 10),
+            NotServedNotice(message: notServed.headline, cities: notServed.cities, onChangeAddress: _changeAddress),
           ],
           const SizedBox(height: 10),
           _row(s.total, money(total), bold: true),
@@ -440,7 +497,7 @@ class _CartScreenState extends State<CartScreen> {
             child: FilledButton(
               onPressed: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => CheckoutScreen(locale: widget.locale))),
-              child: Text('${s.checkout}  ·  ${money(total)}'),
+              child: ButtonLabel('${s.checkout}  ·  ${money(total)}'),
             ),
           ),
         ],

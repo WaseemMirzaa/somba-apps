@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,8 +11,9 @@ import { StatusButtons } from "@/components/warehouse/status-buttons";
 import { DISPATCH_STATUS, REPLACEMENT_NEXT, REPLACEMENT_STATUS, pick, shortDate, useOpsQuery, type ReplacementRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { useLocale } from "@/context/locale-context";
+import { assetUrl } from "@/lib/warehouse-returns";
 
-const FLOW = ["requested", "approved", "received", "allocated", "dispatched"] as const;
+const FLOW = ["requested", "approved", "dispatched", "delivered"] as const;
 
 export default function WarehouseReplacementDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,7 +48,7 @@ export default function WarehouseReplacementDetailPage() {
           { label: fr ? "Remplacements" : "Replacements", href: listHref },
           { label: rep.reference },
         ]}
-        actions={<Badge variant={rep.status === "dispatched" ? "success" : rep.status === "rejected" ? "danger" : "warning"}>{statusLabel}</Badge>}
+        actions={<Badge variant={rep.status === "dispatched" || rep.status === "delivered" ? "success" : rep.status === "rejected" ? "danger" : "warning"}>{statusLabel}</Badge>}
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-white p-3 text-xs">
@@ -91,10 +93,31 @@ export default function WarehouseReplacementDetailPage() {
 
         <DetailGridSection title={fr ? "Article" : "Item"}>
           <InfoGrid items={[
-            { label: fr ? "Produit" : "Product", value: rep.productName },
+            { label: fr ? "Produit" : "Product", value: fr && rep.productNameFr ? rep.productNameFr : rep.productName },
             { label: "SKU", value: rep.sku },
+            ...(rep.variant ? [{ label: fr ? "Option" : "Option", value: rep.variant }] : []),
+            { label: fr ? "Quantité" : "Quantity", value: rep.qty ?? 1 },
             { label: fr ? "Expédition" : "Dispatch", value: rep.dispatchStatus ? pick(DISPATCH_STATUS[rep.dispatchStatus], fr, rep.dispatchStatus) : "—" },
+            { label: fr ? "Livré le" : "Delivered", value: rep.deliveredAt ? shortDate(rep.deliveredAt, locale) : "—" },
+            ...(rep.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: rep.sellerReason, full: true }] : []),
           ]} />
+          {rep.deliveryTaskId ? (
+            <Link href={ops(`/tasks/${rep.deliveryTaskId}`)} className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">
+              {fr ? "Suivre les trajets de livraison (le statut suit le trajet) →" : "Follow the delivery legs (the status follows the leg) →"}
+            </Link>
+          ) : rep.status === "approved" ? (
+            <p className="mt-3 text-xs text-slate-500">{fr ? "Le trajet de livraison est créé à l'approbation." : "The delivery leg is created on approval."}</p>
+          ) : null}
+          {(rep.attachments?.length ?? 0) > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {rep.attachments!.map((u) => (
+                <a key={u} href={assetUrl(u)} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={assetUrl(u)} alt={fr ? "Photo" : "Photo"} className="h-20 w-20 rounded-lg border border-[var(--border)] object-cover" />
+                </a>
+              ))}
+            </div>
+          )}
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Faire avancer le dossier" : "Move the case along"}>

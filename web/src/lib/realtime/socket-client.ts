@@ -1,5 +1,6 @@
 import { io, Socket } from "socket.io-client";
-import type { Ack } from "./types";
+import type { Ack, RequestError } from "./types";
+import { currentLocale, localizeApiError } from "../api-errors";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ??
@@ -40,14 +41,23 @@ class SocketClient {
   }
 
   /** Request→ack helper: emits and resolves the server's `{ok,data}` reply. */
-  request<T>(event: string, body?: unknown): Promise<T> {
+  request<T>(event: string, body?: unknown, opts: { timeoutMs?: number } = {}): Promise<T> {
     return new Promise((resolve, reject) => {
       const s = this.socket;
       if (!s) return reject(new Error("Socket not connected."));
-      s.timeout(8000).emit(event, body ?? {}, (err: Error | null, res: Ack<T>) => {
+      s.timeout(opts.timeoutMs ?? 8000).emit(event, body ?? {}, (err: Error | null, res: Ack<T>) => {
         if (err) return reject(err);
         if (!res || res.ok === false) {
-          return reject(new Error(res?.error ?? "Request failed."));
+          // `raw` keeps the server's English sentence so callers can recognise a known failure (e.g. "not served")
+          // whatever language the message was shown in.
+          const failure = new Error(localizeApiError(res?.error ?? "Request failed.", currentLocale())) as RequestError;
+          failure.raw = res?.error ?? "Request failed.";
+          // The refusal's structured fields (docs/contracts/areas.md `not_served`: areaName, areaNameEn, servedCities…).
+          if (res && typeof res === "object") {
+            failure.ack = res as unknown as Record<string, unknown>;
+            if (typeof res.code === "string") failure.code = res.code;
+          }
+          return reject(failure);
         }
         resolve(res.data);
       });

@@ -67,7 +67,6 @@ export default function LiveConsolePage() {
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [busy, setBusy] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [unassigned, setUnassigned] = useState<DeliveryTask[]>([]);
   const [newProduct, setNewProduct] = useState({
     name: "",
     price: "",
@@ -97,21 +96,6 @@ export default function LiveConsolePage() {
     [rt, password],
   );
 
-  const refreshUnassigned = useCallback(async () => {
-    if (!isRider) return;
-    try {
-      setUnassigned(await socketClient.request<DeliveryTask[]>("delivery:unassigned"));
-    } catch {
-      /* ignore */
-    }
-  }, [isRider]);
-
-  // Riders: keep the unassigned pool fresh as orders stream in.
-  useEffect(() => {
-    if (!isRider || rt.status !== "connected") return;
-    refreshUnassigned();
-  }, [isRider, rt.status, rt.orders.length, refreshUnassigned]);
-
   const placeTestOrder = useCallback(
     async (paymentMethod: "cod" | "wallet") => {
       const p = rt.products[0];
@@ -121,7 +105,6 @@ export default function LiveConsolePage() {
         await rt.placeOrder({
           items: [{ productId: p.id, qty: 1 }],
           paymentMethod,
-          deliveryFeeUsd: 3,
           shippingAddress: JSON.stringify({
             city: "Kinshasa",
             line1: "12 Ave du Commerce",
@@ -589,32 +572,6 @@ export default function LiveConsolePage() {
               <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-800">
                 <Truck className="h-4 w-4" /> Deliveries
               </h2>
-              {unassigned.length > 0 && (
-                <div className="mb-3">
-                  <p className="mb-1 text-xs font-semibold text-slate-500">
-                    Unassigned pool
-                  </p>
-                  {unassigned.map((t) => (
-                    <div
-                      key={t.id}
-                      className="mb-1 flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 p-2 text-xs"
-                    >
-                      <span>
-                        {t.orderReference} · COD ${t.codAmountUsd.toFixed(2)}
-                      </span>
-                      <button
-                        onClick={async () => {
-                          await rt.acceptDelivery(t.id);
-                          refreshUnassigned();
-                        }}
-                        className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
-                      >
-                        Accept
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
               {rt.deliveries.map((t) => (
                 <div
                   key={t.id}

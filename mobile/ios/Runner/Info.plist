@@ -70,6 +70,10 @@
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Somba&amp;Teka uses your location to place the pin on your delivery address when you open the map. It is not tracked or shared.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Somba&amp;Teka lets you attach photos from your library to a return, a support request or a message to a seller.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Somba&amp;Teka uses the camera so you can take a photo of an item for a return, a support request or a message to a seller.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

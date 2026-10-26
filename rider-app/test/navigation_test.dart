@@ -1,4 +1,6 @@
 // Navigate to the customer's map pin: pin parsing, the Google Maps link, and the Navigate button.
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,8 +13,10 @@ import 'package:somba_rider/services/navigation_link.dart';
 import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
+import 'task_fixtures.dart';
+
 DeliveryTaskDto _task(String status, {String? address, String? pickup = 'Seller, Gombe'}) => DeliveryTaskDto(
-      id: 't-$status',
+      id: 't77',
       orderId: 'o',
       orderReference: 'SOM-77',
       status: status,
@@ -89,7 +93,6 @@ void main() {
       store.myTasks
         ..clear()
         ..addAll(tasks);
-      store.pool.clear();
       t.view.physicalSize = const Size(360 * 3, 740 * 3);
       t.view.devicePixelRatio = 3;
       addTearDown(t.view.reset);
@@ -110,7 +113,7 @@ void main() {
     for (final lang in ['en', 'fr']) {
       testWidgets('in transit: navigate to the customer, pin noted, no overflow ($lang)', (t) async {
         await show(t, lang, [_task('in_transit', address: _pinned)]);
-        expect(find.byKey(const ValueKey('navigate-SOM-77')), findsOneWidget);
+        expect(find.byKey(const ValueKey('navigate-t77')), findsOneWidget);
         expect(find.text(Strings(lang).navigateCustomer), findsOneWidget);
         expect(find.text(Strings(lang).pinExact), findsOneWidget);
         expect(t.takeException(), isNull);
@@ -123,17 +126,90 @@ void main() {
       });
     }
 
+    group('per leg kind', () {
+      Uri? opened;
+      Future<bool> grab(Uri u) async {
+        opened = u;
+        return true;
+      }
+
+      Future<void> tapNav(WidgetTester t, String id) async {
+        opened = null;
+        await t.ensureVisible(find.byKey(ValueKey('navigate-$id')));
+        await t.pump();
+        await t.tap(find.byKey(ValueKey('navigate-$id')));
+        await t.pump(const Duration(milliseconds: 300));
+      }
+
+      testWidgets('pickup: to the seller before the pickup, to the warehouse after', (t) async {
+        await show(t, 'en', [leg('pickup', id: 'k1')], launcher: grab);
+        expect(find.text(Strings('en').navigateSeller), findsOneWidget);
+        await tapNav(t, 'k1');
+        expect(opened!.queryParameters['destination'], '-4.33,15.29', reason: 'the seller pin');
+
+        await show(t, 'en', [leg('pickup', id: 'k1', status: 'in_transit')], launcher: grab);
+        expect(find.text(Strings('en').navigateHub), findsOneWidget);
+        await tapNav(t, 'k1');
+        expect(opened!.queryParameters['destination'], '-4.35,15.34', reason: 'the origin warehouse pin');
+      });
+
+      testWidgets('transfer: from the origin warehouse, then to the destination warehouse', (t) async {
+        await show(t, 'fr', [leg('transfer', id: 'k2')], launcher: grab);
+        expect(find.text(Strings('fr').navigateHub), findsOneWidget);
+        await tapNav(t, 'k2');
+        expect(opened!.queryParameters['destination'], '-4.35,15.34');
+        await show(t, 'fr', [leg('transfer', id: 'k2', status: 'picked_up')], launcher: grab);
+        await tapNav(t, 'k2');
+        expect(opened!.queryParameters['destination'], '-4.3105,15.3136');
+      });
+
+      testWidgets('delivery: to the warehouse to fetch it, then to the customer pin', (t) async {
+        await show(t, 'en', [leg('delivery', id: 'k3')], launcher: grab);
+        await tapNav(t, 'k3');
+        expect(opened!.queryParameters['destination'], '-4.3105,15.3136');
+        await show(t, 'en', [leg('delivery', id: 'k3', status: 'in_transit')], launcher: grab);
+        expect(find.text(Strings('en').navigateCustomer), findsOneWidget);
+        await tapNav(t, 'k3');
+        expect(opened!.queryParameters['destination'], '-4.3101,15.3125');
+      });
+
+      testWidgets('return pickup: the customer first, then the warehouse', (t) async {
+        await show(t, 'en', [leg('return_pickup', id: 'k4')], launcher: grab);
+        expect(find.text(Strings('en').navigateCustomer), findsOneWidget);
+        await tapNav(t, 'k4');
+        expect(opened!.queryParameters['destination'], '-4.3101,15.3125');
+        await show(t, 'en', [leg('return_pickup', id: 'k4', status: 'in_transit')], launcher: grab);
+        expect(find.text(Strings('en').navigateHub), findsOneWidget);
+      });
+
+      testWidgets('return to seller: ends at the seller', (t) async {
+        await show(t, 'en', [leg('return_to_seller', id: 'k5', status: 'in_transit')], launcher: grab);
+        expect(find.text(Strings('en').navigateSeller), findsOneWidget);
+        await tapNav(t, 'k5');
+        expect(opened!.queryParameters['destination'], '-4.33,15.29');
+      });
+
+      testWidgets('an endpoint without coordinates is searched by its address', (t) async {
+        final j = jsonDecode(jsonEncode(legJson('pickup', id: 'k6'))) as Map<String, dynamic>;
+        (j['from'] as Map)['lat'] = null;
+        (j['from'] as Map)['lng'] = null;
+        await show(t, 'en', [DeliveryTaskDto.fromJson(j)], launcher: grab);
+        await tapNav(t, 'k6');
+        expect(opened!.queryParameters['destination'], '27, avenue Kasa-Vubu, Bandalungwa');
+      });
+    });
+
     testWidgets('no pin note for a typed address, button still offered', (t) async {
       await show(t, 'en', [_task('in_transit', address: _typed)]);
       expect(find.text(Strings('en').pinExact), findsNothing);
-      expect(find.byKey(const ValueKey('navigate-SOM-77')), findsOneWidget);
+      expect(find.byKey(const ValueKey('navigate-t77')), findsOneWidget);
     });
 
     testWidgets('finished deliveries have no Navigate button', (t) async {
       await show(t, 'en', [_task('delivered', address: _pinned)]);
-      await t.tap(find.byKey(const ValueKey('tab-2')));
+      await t.tap(find.byKey(const ValueKey('tab-1')));
       await t.pump(const Duration(milliseconds: 300));
-      expect(find.byKey(const ValueKey('navigate-SOM-77')), findsNothing);
+      expect(find.byKey(const ValueKey('navigate-t77')), findsNothing);
     });
 
     testWidgets('tapping it opens Google Maps at the customer pin', (t) async {
@@ -142,9 +218,9 @@ void main() {
         opened = u;
         return true;
       });
-      await t.ensureVisible(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.ensureVisible(find.byKey(const ValueKey('navigate-t77')));
       await t.pump();
-      await t.tap(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.tap(find.byKey(const ValueKey('navigate-t77')));
       await t.pump(const Duration(milliseconds: 300));
       expect(opened!.queryParameters['destination'], '-4.3101,15.3125');
       expect(find.text(Strings('en').navFailed), findsNothing);
@@ -156,9 +232,9 @@ void main() {
         opened = u;
         return true;
       });
-      await t.ensureVisible(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.ensureVisible(find.byKey(const ValueKey('navigate-t77')));
       await t.pump();
-      await t.tap(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.tap(find.byKey(const ValueKey('navigate-t77')));
       await t.pump(const Duration(milliseconds: 300));
       expect(opened!.queryParameters['destination'], 'Seller, Gombe');
     });
@@ -171,9 +247,9 @@ void main() {
         return true;
       });
       expect(find.textContaining('Blue gate, next to the pharmacy'), findsOneWidget, reason: 'the rider still reads the landmark');
-      await t.ensureVisible(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.ensureVisible(find.byKey(const ValueKey('navigate-t77')));
       await t.pump();
-      await t.tap(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.tap(find.byKey(const ValueKey('navigate-t77')));
       await t.pump(const Duration(milliseconds: 300));
       expect(opened!.queryParameters['destination'], '12 Avenue de la Paix, Gombe, Kinshasa');
     });
@@ -197,9 +273,9 @@ void main() {
 
     testWidgets('a maps app that cannot open shows a friendly message', (t) async {
       await show(t, 'en', [_task('in_transit', address: _pinned)], launcher: (_) async => false);
-      await t.ensureVisible(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.ensureVisible(find.byKey(const ValueKey('navigate-t77')));
       await t.pump();
-      await t.tap(find.byKey(const ValueKey('navigate-SOM-77')));
+      await t.tap(find.byKey(const ValueKey('navigate-t77')));
       await t.pump();
       await t.pump(const Duration(milliseconds: 300));
       expect(find.text(Strings('en').navFailed), findsOneWidget);

@@ -11,7 +11,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Tabs } from "@/components/ui/tabs";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SecretBox } from "@/components/admin/copy-box";
-import { HomeWarehouseDialog } from "@/components/admin/home-warehouse-dialog";
+import { HomeWarehouseDialog, HubTierFields, needsHubText } from "@/components/admin/home-warehouse-dialog";
 import { ErrorNote } from "@/components/admin/modal";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
@@ -20,7 +20,8 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { errMsg, useServerList, type StaffRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSocketQuery, type HubRow } from "@/lib/admin-stats";
+import type { HubRow } from "@/lib/admin-stats";
+import { TIER_LABEL, type WarehouseTier } from "@/lib/logistics";
 
 export default function AdminWarehouseStaffPage() {
   const { toast } = useToast();
@@ -28,23 +29,14 @@ export default function AdminWarehouseStaffPage() {
   const fr = locale === "fr";
   // Real accounts: every warehouse employee and rider the server knows about.
   const { items, reload, error: loadError, loading } = useServerList<StaffRow>("roles:staff");
-  const hubs = useServerList<HubRow>("warehouse:hubs", { pushEvents: ["hub:updated"] });
+  const hubs = useServerList<HubRow>("hubs:list");
   const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
-  // Zone id → name, for riders' preferred zones.
-  const settings = useSocketQuery<Record<string, string>>("settings:get");
-  const zoneName = useMemo(() => {
-    try {
-      const zones = JSON.parse(settings.data?.deliveryZones ?? "[]") as { id: string; name: string; nameFr?: string }[];
-      return new Map(zones.map((z) => [z.id, fr ? z.nameFr || z.name : z.name]));
-    } catch {
-      return new Map<string, string>();
-    }
-  }, [settings.data, fr]);
   const [tab, setTab] = useState<"warehouse_staff" | "rider">("warehouse_staff");
   const staff = useMemo(() => items.filter((u) => u.role === tab), [items, tab]);
   const [editing, setEditing] = useState<StaffRow | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", hubId: "", tier: "operator" as WarehouseTier });
+  const [hubError, setHubError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [secret, setSecret] = useState<{ email: string; password: string } | null>(null);
@@ -60,6 +52,11 @@ export default function AdminWarehouseStaffPage() {
       setFormError(fr ? "Nom et e-mail requis." : "Name and email are required.");
       return;
     }
+    if (!form.hubId) {
+      setHubError(needsHubText(fr));
+      return;
+    }
+    setHubError(null);
     setCreating(true);
     setFormError(null);
     try {
@@ -67,10 +64,12 @@ export default function AdminWarehouseStaffPage() {
         role: tab,
         name: form.name.trim(),
         email: form.email.trim(),
+        hubId: form.hubId,
+        ...(tab === "warehouse_staff" ? { warehouseTier: form.tier } : {}),
         ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
       });
       setSecret({ email: res.email, password: res.tempPassword });
-      setForm({ name: "", email: "", phone: "" });
+      setForm({ name: "", email: "", phone: "", hubId: form.hubId, tier: "operator" });
       setShowCreate(false);
       toast(tab === "rider" ? (fr ? "Compte livreur créé" : "Rider account created") : fr ? "Compte entrepôt créé" : "Warehouse account created", "success");
       void reload();
@@ -108,8 +107,8 @@ export default function AdminWarehouseStaffPage() {
       {loading && !loadError && <SectionLoading />}
       <NoticeBar>
         {fr
-          ? "Chacun travaille dans un entrepôt : un livreur ne voit et ne reçoit que les livraisons des zones de son entrepôt, ses zones préférées en premier ; un employé ne voit que les colis de son entrepôt. Sans entrepôt, la personne voit tout. Seul le super administrateur crée les comptes (mot de passe temporaire affiché une seule fois)."
-          : "Everyone works at one warehouse: a rider only sees and is told about deliveries in their warehouse's zones, preferred zones first, and an employee only sees their warehouse's parcels. With no warehouse, the person sees everything. Only the super admin creates accounts (the temporary password is shown once)."}
+          ? "Chacun travaille dans un entrepôt, obligatoirement. Un livreur ne voit que les tâches que son entrepôt lui assigne ; un employé a un niveau : opérateur (scanne), superviseur (assigne aussi les livreurs), responsable (gère aussi l'entrepôt). Seul le super administrateur crée les comptes (mot de passe temporaire affiché une seule fois)."
+          : "Everyone must belong to one warehouse. A rider only sees the tasks their warehouse assigns; an employee has a tier: operator (scans), supervisor (also assigns riders), manager (also runs the warehouse). Only the super admin creates accounts (the temporary password is shown once)."}
       </NoticeBar>
 
       {secret && <SecretBox email={secret.email} secret={secret.password} fr={fr} onDismiss={() => setSecret(null)} />}
@@ -143,8 +142,8 @@ export default function AdminWarehouseStaffPage() {
           <CardContent className="flex items-center gap-4 p-5">
             <Warehouse className="h-8 w-8 text-amber-500" />
             <div>
-              <p className="text-2xl font-bold">{staff.filter((s) => !s.hubId).length}</p>
-              <p className="text-sm text-slate-500">{fr ? "Sans entrepôt" : "No warehouse"}</p>
+              <p className="text-2xl font-bold">{new Set(staff.map((s) => s.hubId).filter(Boolean)).size}</p>
+              <p className="text-sm text-slate-500">{fr ? "Entrepôts couverts" : "Warehouses covered"}</p>
             </div>
           </CardContent>
         </Card>
@@ -159,6 +158,7 @@ export default function AdminWarehouseStaffPage() {
               <input className="input-premium px-4 py-2 text-sm" type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
               <input className="input-premium px-4 py-2 text-sm" placeholder={fr ? "Téléphone" : "Phone"} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
+            <HubTierFields hubs={hubs.items} hubId={form.hubId} onHub={(id) => { setForm({ ...form, hubId: id }); setHubError(null); }} tier={form.tier} onTier={(t) => setForm({ ...form, tier: t })} showTier={tab === "warehouse_staff"} fr={fr} error={hubError} />
             <ErrorNote message={formError} />
             <div className="flex gap-2">
               <Button size="sm" onClick={create} disabled={creating}>{creating ? "…" : fr ? "Créer le compte" : "Create account"}</Button>
@@ -191,17 +191,17 @@ export default function AdminWarehouseStaffPage() {
                   row.hubId ? (
                     <span className="font-medium text-slate-800">{hubName.get(String(row.hubId)) ?? (fr ? "Entrepôt inconnu" : "Unknown warehouse")}</span>
                   ) : (
-                    <Badge variant="warning">{fr ? "Tous" : "Any"}</Badge>
+                    <Badge variant="danger">{fr ? "Aucun : à choisir" : "None: pick one"}</Badge>
                   ),
               },
-              ...(tab === "rider"
+              ...(tab === "warehouse_staff"
                 ? [
                     {
-                      key: "preferredZones",
-                      label: fr ? "Zones préférées" : "Preferred zones",
+                      key: "warehouseTier",
+                      label: fr ? "Niveau" : "Tier",
                       render: (row: Record<string, unknown>) => {
-                        const z = (row.preferredZones as string[] | undefined) ?? [];
-                        return z.length ? <span className="text-xs text-slate-600">{z.map((id) => zoneName.get(id) ?? id).join(", ")}</span> : <span className="text-slate-400">—</span>;
+                        const t = row.warehouseTier as WarehouseTier | null | undefined;
+                        return t ? <Badge variant={t === "manager" ? "purple" : t === "supervisor" ? "info" : "default"}>{fr ? TIER_LABEL[t].fr : TIER_LABEL[t].en}</Badge> : <span className="text-slate-400">—</span>;
                       },
                     },
                   ]
@@ -221,7 +221,7 @@ export default function AdminWarehouseStaffPage() {
                 label: "",
                 render: (row) => (
                   <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditing(row as unknown as StaffRow)}>
-                    {fr ? "Choisir l'entrepôt" : "Set warehouse"}
+                    {tab === "warehouse_staff" ? (fr ? "Entrepôt et niveau" : "Warehouse and tier") : fr ? "Changer d'entrepôt" : "Change warehouse"}
                   </button>
                 ),
               },

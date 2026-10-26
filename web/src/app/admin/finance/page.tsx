@@ -16,7 +16,7 @@ import { NoAccess, SectionError, SectionLoading } from "@/components/admin/query
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { canMoveMoney, canSeeFinance, errMsg, useRole, type PaymentCapabilities, type PaymentRow } from "@/lib/admin-live";
+import { canMoveMoney, canSeeFinance, errMsg, useFinanceVersion, useRole, type PaymentCapabilities, type PaymentRow } from "@/lib/admin-live";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { ageLabel, useSocketQuery, type FinanceStats } from "@/lib/admin-stats";
 import { useLocale } from "@/context/locale-context";
@@ -59,7 +59,8 @@ export default function AdminFinancePage() {
   const { toast } = useToast();
   const mayDecide = canMoveMoney(role);
   const allowed = canSeeFinance(role);
-  const refreshKey = `${rt.payments.length}:${rt.payouts.length}:${rt.orders.length}`;
+  // The server pushes `finance:changed` after any order / payment / payout save: refresh on that, not on list lengths.
+  const refreshKey = useFinanceVersion(allowed);
   const fin = useSocketQuery<FinanceStats>("analytics:finance", undefined, { enabled: allowed, refreshKey });
   const caps = useSocketQuery<PaymentCapabilities>("payments:provider", undefined, { enabled: allowed });
   const payments = (rt.payments as PaymentRow[]).filter((p) => p.purpose !== "topup");

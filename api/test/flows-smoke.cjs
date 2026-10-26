@@ -7,6 +7,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { hubId, tasksOf, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -122,7 +123,7 @@ const register = async (label, role = 'customer') => {
   ok(listed?.price === 10 && listed?.originalPrice === 25 && listed?.discount === 60, 'the storefront shows the flash price with the normal price struck through', JSON.stringify(listed && { p: listed.price, o: listed.originalPrice, d: listed.discount }));
   const sellerOrderPush = new Promise((res) => { sellerU.sock.once('order:created', res); setTimeout(() => res(null), 4000); });
   const otherSellerPush = new Promise((res) => { seller2.sock.once('order:created', res); setTimeout(() => res(null), 1500); });
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const sp = await sellerOrderPush;
   ok(sp && sp.reference === a.data.reference && !('shippingAddress' in sp) && !('customerId' in sp) && sp.customerName === 'buyer', 'the seller is pushed the order live, without address or customer id');
   ok((await otherSellerPush) === null, 'a different seller is NOT told about it');
@@ -131,27 +132,34 @@ const register = async (label, role = 'customer') => {
   // ---- pickup, seller ready, hub receive --------------------------------------
   section('Pickup address, seller ready, hub receiving');
   const order = a.data;
-  const task = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === order.id));
-  ok(!!task && /Limete/.test(task.pickupAddress ?? ''), 'the delivery task carries the seller pickup address', task?.pickupAddress ?? 'no task');
+  const task = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === order.id && t.kind === 'pickup'));
+  ok(!!task && /Limete/.test(task.pickupAddress ?? ''), 'the pickup task carries the seller pickup address', task?.pickupAddress ?? 'no task');
   ok(!(await req(seller2.sock, 'orders:sellerReady', { orderId: order.id })).ok, "another seller cannot mark someone else's order ready");
   ok(!(await req(cust.sock, 'orders:sellerReady', { orderId: order.id })).ok, 'a customer cannot mark an order ready');
   a = await req(sellerU.sock, 'orders:sellerReady', { orderId: order.id });
   ok(a.ok && !!a.data.readyAt, 'the seller marks the parcel ready for pickup');
   ok(!(await req(cust.sock, 'warehouse:receive', { taskId: task.id })).ok, 'a customer cannot receive parcels');
   ok(!(await req(rider.sock, 'warehouse:receive', { taskId: task.id })).ok, 'a rider cannot receive parcels at the hub');
+  a = await req(warehouse.sock, 'logistics:assign', { taskId: task.id, riderId: rider.user.id });
+  ok(a.ok, 'the warehouse gives the pickup to a rider', a.error ?? '');
+  const rq = (await req(rider.sock, 'rider:tasks')).data.find((t) => t.id === task.id);
+  ok(rq && /Limete/.test(rq.pickupAddress ?? '') && rq.readyAt, 'the rider sees where to collect it, and that it is ready', JSON.stringify(rq && { p: rq.pickupAddress, r: rq.readyAt }));
+  a = await req(warehouse.sock, 'warehouse:receive', { taskId: task.id });
+  ok(!a.ok && /rider must collect/.test(a.error ?? ''), 'the hub cannot scan in a parcel the rider has not collected', a.error ?? '');
+  await req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status: 'picked_up' });
   a = await req(warehouse.sock, 'warehouse:receive', { taskId: task.id });
   ok(a.ok && !!a.data.receivedAt, 'warehouse staff scan the parcel in');
-  const rq = (await req(rider.sock, 'rider:tasks')).data.find((t) => t.id === task.id);
-  ok(rq && /Limete/.test(rq.pickupAddress ?? '') && rq.readyAt && rq.receivedAt, 'the rider sees where to collect it, and that it is ready and received');
+  const firstDelivery = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === order.id && t.kind === 'delivery'));
+  ok(!!firstDelivery && firstDelivery.status === 'unassigned', 'scanning the parcel in creates the delivery leg');
 
   // ---- failed delivery: re-attempt, then cancel + refund ------------------------
   section('Failed delivery workflow');
   const stockBefore = (await req(cust.sock, 'products:get', { id: prod.id })).data.stock;
-  let current = task;
+  let current = firstDelivery;
   const customerNotes = async () => (await req(cust.sock, 'notifications:list')).data;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    a = await req(rider.sock, 'delivery:accept', { taskId: current.id });
-    ok(a.ok, `attempt ${attempt}: rider accepts`, a.error ?? '');
+    a = await req(warehouse.sock, 'logistics:assign', { taskId: current.id, riderId: rider.user.id });
+    ok(a.ok, `attempt ${attempt}: the warehouse assigns the rider`, a.error ?? '');
     ok((await req(rider.sock, 'delivery:updateStatus', { taskId: current.id, status: 'failed', reason: `Customer unreachable #${attempt}` })).ok, `attempt ${attempt}: rider reports the delivery failed with a reason`);
     const orders = (await req(cust.sock, 'orders:list')).data;
     const o = orders.find((x) => x.id === order.id);
@@ -169,19 +177,18 @@ const register = async (label, role = 'customer') => {
   ok(stockAfter === stockBefore + 1, 'the stock is released after the final failed attempt', `${stockBefore} → ${stockAfter}`);
   const w = (await req(cust.sock, 'wallet:transactions')).data;
   ok(w.some((t) => t.type === "refund" && Math.abs(t.amount - order.totalUsd) < 0.01), 'the prepaid amount is refunded to the customer wallet');
-  const mine = (await req(rider.sock, 'delivery:list')).data.find((t) => t.id === task.id);
+  const mine = (await req(rider.sock, 'delivery:list')).data.find((t) => t.id === firstDelivery.id);
   ok(mine?.failureReason?.startsWith('Customer unreachable'), 'the failure reason is kept on the task');
-  ok(!(await req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' })).ok, 'a finished attempt cannot be revived');
+  ok(!(await req(rider.sock, 'delivery:updateStatus', { taskId: firstDelivery.id, status: 'delivered' })).ok, 'a finished attempt cannot be revived');
 
   // ---- proof of delivery code -----------------------------------------------------
   section('Proof of delivery: the customer code');
   ok(!(await req(cust.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'true' })).ok, 'customers cannot switch the delivery-code rule');
   await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'true' });
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const oc = a.data;
-  const tc = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === oc.id));
+  const tc = await toDelivery(admin, rider, oc.id);
   ok(!JSON.stringify(tc).includes('proofCode'), 'the handover code is never part of the task data staff and riders receive');
-  await req(rider.sock, 'delivery:accept', { taskId: tc.id });
   await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'picked_up' });
   await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'in_transit' });
   a = await req(cust.sock, 'orders:deliveryCode', { orderId: oc.id });
@@ -199,10 +206,9 @@ const register = async (label, role = 'customer') => {
   await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'false' });
 
   // ---- customer can cancel after one failed attempt --------------------------------
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const o2 = a.data;
-  const t2 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o2.id));
-  await req(rider.sock, 'delivery:accept', { taskId: t2.id });
+  const t2 = await toDelivery(admin, rider, o2.id);
   await req(rider.sock, 'delivery:updateStatus', { taskId: t2.id, status: 'picked_up' });
   await req(rider.sock, 'delivery:updateStatus', { taskId: t2.id, status: 'failed', reason: 'Wrong address' });
   a = await req(cust.sock, 'orders:cancel', { orderId: o2.id });
@@ -212,10 +218,9 @@ const register = async (label, role = 'customer') => {
 
   // ---- returns must arrive before a refund --------------------------------------------
   section('Returns: goods first, then the refund');
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 2 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 2 }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const o3 = a.data;
-  const t3 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o3.id));
-  await req(rider.sock, 'delivery:accept', { taskId: t3.id });
+  const t3 = await toDelivery(admin, rider, o3.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t3.id, status: st });
   const stockBeforeReturn = (await req(cust.sock, 'products:get', { id: prod.id })).data.stock;
   a = await req(cust.sock, 'disputes:open', { orderId: o3.id, type: 'return', reason: 'Not as described at all' });
@@ -247,13 +252,12 @@ const register = async (label, role = 'customer') => {
   ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Returned goods received'), 'the seller was told when the warehouse received the goods');
   ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Return resolved'), 'the seller was told how the return ended');
   ok(!(await noticesOf(seller2)).some((x) => x.entityId === ret.id), 'an unrelated seller hears nothing');
-  ok((await noticesOf(rider)).some((x) => x.type === 'task' && x.title === 'New delivery available'), 'riders were told a new delivery was waiting');
+  ok((await noticesOf(rider)).some((x) => x.type === 'task' && x.title === 'New task assigned to you'), 'the rider was told when a task was assigned to them');
 
   // A fresh delivered order (the returned one above is closed).
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   const o4 = a.data;
-  const t4 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o4.id));
-  await req(rider.sock, 'delivery:accept', { taskId: t4.id });
+  const t4 = await toDelivery(admin, rider, o4.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t4.id, status: st });
   a = await req(cust.sock, 'replacements:create', { orderId: o4.id, sku: prod.id, productName: prod.name, reason: 'Second unit arrived cracked' });
   ok(a.ok, 'the customer asks for a replacement of the item', a.error ?? '');
@@ -310,7 +314,7 @@ const register = async (label, role = 'customer') => {
   const email = `rider${tag}@staff.test`;
   ok(!(await req(finance.sock, 'roles:createStaff', { email, name: 'New Rider', role: 'rider' })).ok, 'only the super admin creates staff');
   ok(!(await req(admin.sock, 'roles:createStaff', { email, name: 'Bad', role: 'admin' })).ok, 'a second super admin cannot be created this way');
-  a = await req(admin.sock, 'roles:createStaff', { email, name: 'New Rider', role: 'rider', phone: '+243800000001' });
+  a = await req(admin.sock, 'roles:createStaff', { email, name: 'New Rider', role: 'rider', phone: '+243800000001', hubId: await hubId(admin) });
   ok(a.ok && a.data.role === 'rider' && a.data.tempPassword?.length >= 10, 'the super admin creates a rider with a temporary password');
   const signin = await rest('/api/v1/auth/login', { email, password: a.data.tempPassword });
   ok(signin.status === 200 && signin.json.user.role === 'rider', 'the new rider can sign in');
@@ -325,9 +329,9 @@ const register = async (label, role = 'customer') => {
   const cp = await mk('Camp A', 200);
   const cq = await mk('Camp B', 100);
   const cr = await mk('Camp C', 200);
-  const order1 = async (c, productId, qty = 1, extra = {}) => req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }), ...extra });
+  const order1 = async (c, productId, qty = 1, extra = {}) => req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }), ...extra });
   const priceOf = async (id) => (await req(cust.sock, 'products:get', { id })).data;
-  a = await req(sellerU.sock, 'campaigns:create', { name: `Spring ${tag}`, discount: 25, productIds: [cp.id, cr.id], startDate: day(-1), endDate: day(1), budgetUsd: 100 });
+  a = await req(sellerU.sock, 'campaigns:create', { name: `Spring ${tag}`, discount: 25, productIds: [cp.id, cr.id], startDate: day(-1), endDate: day(1), budgetUsd: 1000 });
   ok(a.ok && a.data.status === 'pending' && a.data.productIds.length === 2 && a.data.productCount === 2 && a.data.discount === 25, 'a seller proposes a 25% campaign on two of their products');
   const camp = a.data;
   ok(!(await req(seller2.sock, 'campaigns:create', { name: 'Steal', discount: 50, productIds: [cp.id] })).ok, "another store cannot put someone else's product in a campaign");
@@ -350,7 +354,7 @@ const register = async (label, role = 'customer') => {
   ok(list.find((p) => p.id === cp.id)?.price === 150 && list.find((p) => p.id === cq.id)?.price === 100 && list.find((p) => p.id === cq.id)?.campaignPct === 0, 'products:list shows it too, and a product outside the campaign keeps its price');
   ok(list.find((p) => p.id === prod.id)?.campaignPct === 0, 'products without a campaign report campaignPct 0');
   a = await order1(cust, cp.id, 2);
-  ok(a.ok && a.data.subtotalUsd === 300 && a.data.totalUsd === 303 && a.data.campaignDiscountUsd === 100, 'checkout charges the campaign price (2 x $150 + $3 delivery) and records the $100 discount', a.error ?? JSON.stringify({ s: a.data?.subtotalUsd, t: a.data?.totalUsd, d: a.data?.campaignDiscountUsd }));
+  ok(a.ok && a.data.subtotalUsd === 300 && a.data.totalUsd === 300 + a.data.deliveryFeeUsd && a.data.campaignDiscountUsd === 100, 'checkout charges the campaign price (2 x $150 + the quoted delivery fee) and records the $100 discount', a.error ?? JSON.stringify({ s: a.data?.subtotalUsd, t: a.data?.totalUsd, d: a.data?.campaignDiscountUsd }));
   const li = a.data.items[0];
   ok(li.priceUsd === 150 && li.listPriceUsd === 200 && li.campaignPct === 25 && li.campaignId === camp.id, 'the order line keeps price, list price, campaignPct and campaignId');
   const stored = (await req(cust.sock, 'orders:list')).data.find((o) => o.id === a.data.id);
@@ -371,7 +375,7 @@ const register = async (label, role = 'customer') => {
   ok(a.ok && a.data.subtotalUsd === 120 && a.data.campaignDiscountUsd === 0, 'checkout charges the flash price and records no campaign discount');
   // a promo code is a coupon on top of the already-discounted subtotal
   a = await order1(other, cp.id, 1, { promoCode: 'SOMBA10' });
-  ok(a.ok && a.data.subtotalUsd === 150 && a.data.discountUsd === 15 && a.data.totalUsd === 138, 'a promo code applies on top of the campaign price (150 - 10% + $3 delivery)', a.error ?? JSON.stringify({ s: a.data?.subtotalUsd, d: a.data?.discountUsd, t: a.data?.totalUsd }));
+  ok(a.ok && a.data.subtotalUsd === 150 && a.data.discountUsd === 15 && Math.abs(a.data.totalUsd - (135 + a.data.deliveryFeeUsd)) < 0.011, 'a promo code applies on top of the campaign price (150 - 10% + the quoted delivery fee)', a.error ?? JSON.stringify({ s: a.data?.subtotalUsd, d: a.data?.discountUsd, t: a.data?.totalUsd }));
   // dates and status gate the discount
   await req(admin.sock, 'campaigns:update', { id: camp.id, patch: { startDate: day(-5), endDate: day(-3) } });
   g = await priceOf(cp.id);
@@ -382,15 +386,19 @@ const register = async (label, role = 'customer') => {
   ok((await priceOf(cp.id)).price === 200, 'a campaign that has not started yet gives no discount');
   await req(admin.sock, 'campaigns:update', { id: camp.id, patch: { startDate: day(-1), endDate: day(1) } });
   ok((await priceOf(cp.id)).price === 150, 'inside its dates it discounts again');
-  for (const st of ['rejected', 'pending', 'ended', 'draft']) {
-    await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: st });
-    ok((await priceOf(cp.id)).price === 200, `a ${st} campaign gives no discount`);
+  // The campaign state machine (commerce): an approved campaign never goes back to pending / rejected / draft; stopping it ends it for good.
+  for (const st of ['rejected', 'pending', 'draft']) {
+    a = await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: st, reason: 'not allowed now' });
+    ok(!a.ok && (await priceOf(cp.id)).price === 150, `an active campaign cannot be moved back to ${st} (and keeps discounting)`);
   }
-  await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: 'scheduled' });
-  ok((await priceOf(cp.id)).price === 150, 'a scheduled (approved) campaign whose start date has passed discounts');
-  await req(admin.sock, 'campaigns:update', { id: camp.id, patch: { startDate: day(2) } });
-  ok((await priceOf(cp.id)).price === 200, 'a scheduled campaign waits for its start date');
   await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: 'ended' });
+  ok((await priceOf(cp.id)).price === 200, 'an ended campaign gives no discount');
+  a = await req(sellerU.sock, 'campaigns:create', { name: `Sched ${tag}`, discount: 25, productIds: [cp.id], startDate: day(-1), endDate: day(1) });
+  await req(admin.sock, 'campaigns:setStatus', { id: a.data.id, status: 'scheduled' });
+  ok((await priceOf(cp.id)).price === 150, 'an approved campaign whose start date has passed discounts');
+  await req(admin.sock, 'campaigns:update', { id: a.data.id, patch: { startDate: day(2) } });
+  ok((await priceOf(cp.id)).price === 200, 'a scheduled campaign waits for its start date');
+  await req(admin.sock, 'campaigns:setStatus', { id: a.data.id, status: 'ended' });
   // whole-store campaign (no product list)
   a = await req(sellerU.sock, 'campaigns:create', { name: `Store-wide ${tag}`, discount: 10, startDate: day(-1), endDate: day(1) });
   await req(admin.sock, 'campaigns:setStatus', { id: a.data.id, status: 'active' });
@@ -404,8 +412,7 @@ const register = async (label, role = 'customer') => {
   section('Reviews: seller reply and moderation');
   const deliverTo = async (c, productId, qty = 1) => {
     const o = (await order1(c, productId, qty)).data;
-    const t = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((x) => x.orderId === o.id));
-    await req(rider.sock, 'delivery:accept', { taskId: t.id });
+    const t = await toDelivery(admin, rider, o.id);
     for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: t.id, status: st });
     return o;
   };

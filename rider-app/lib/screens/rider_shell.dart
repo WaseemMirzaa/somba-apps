@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import 'deliveries_screen.dart';
 import 'earnings_screen.dart';
 import 'profile_screen.dart';
+import 'support_screen.dart';
 
 class RiderShell extends StatefulWidget {
   final Locale locale;
@@ -34,12 +35,22 @@ class _RiderShellState extends State<RiderShell> {
     super.dispose();
   }
 
-  /// A tapped notification: show its tab (Deliveries clears the focus once it has picked Active/Available).
+  /// A tapped notification: show its tab (Deliveries clears the focus once it has picked Active/Done). A support
+  /// notice opens the support screen (the ticket, when it names one) on top of Profile.
   void _onFocus() {
     final f = RiderStore.instance.focus.value;
     if (f == null) return;
     if (f.tab != _index) setState(() => _index = f.tab);
     if (f.tab != RiderFocus.deliveriesIndex) RiderStore.instance.focus.value = null;
+    if (f.supportOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final nav = Navigator.of(context);
+        // Support screens already open make way for the one the notice asks for.
+        nav.popUntil((r) => r.settings.name != kSupportRoute && r.settings.name != kSupportThreadRoute && r.settings.name != kSupportNewRoute);
+        nav.push(MaterialPageRoute<void>(settings: const RouteSettings(name: kSupportRoute), builder: (_) => SupportScreen(openTicketId: f.supportId)));
+      });
+    }
   }
 
   @override

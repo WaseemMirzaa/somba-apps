@@ -3,38 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 
 /**
- * Live rider data layer. `rider:tasks` returns the rider's own tasks PLUS the
- * open pool (status `unassigned`), each with an order snapshot. The pool is
- * exposed separately as "available" so it is never mistaken for assigned work.
- * Refreshes on every `delivery:updated` push and after each action.
+ * Live rider data layer. `rider:tasks` returns ONLY the legs assigned to this rider (their warehouse assigns them;
+ * there is no pool and no accepting), each with an order snapshot. On legs that do not meet the customer
+ * (pickup, transfer, return to seller) the customer's address is not sent and the name is the first name only.
+ * Refreshes on every `task:updated` push and after each action.
  */
 
-interface RiderQueueRow {
-  id: string;
-  orderId: string;
-  orderReference: string;
-  status: string;
-  zoneId: string | null;
-  /** Zone display name and whether it is one of the rider's preferred zones (the server sorts those first). */
-  zoneName?: string | null;
-  preferred?: boolean;
-  hubId?: string | null;
-  codAmountUsd: number;
-  address: string | null;
-  lat: number | null;
-  lng: number | null;
-  pickupAddress?: string | null;
-  attempts?: number;
-  failureReason?: string | null;
-  readyAt?: string | null;
-  receivedAt?: string | null;
-  createdAt: string;
+interface RiderQueueRow extends Omit<TaskView, "desk"> {
   order: {
     reference: string;
     customerName: string;
     paymentMethod: string;
+    estimatedDeliveryDate?: string | null;
     totalUsd: number;
     shippingAddress: string | null;
     items: { productId: string; productName: string; productNameFr?: string | null; variant: string; variantFr?: string | null; qty: number; priceUsd: number }[];
@@ -49,7 +32,7 @@ export interface RiderEarnings {
   earningsUsd: number;
 }
 
-export type RiderTaskStatus = "available" | "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
+export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
 
 const PAYMENT_LABEL: Record<string, string> = {
   cod: "Cash on Delivery",
@@ -58,16 +41,10 @@ const PAYMENT_LABEL: Record<string, string> = {
   wallet: "Wallet (prepaid)",
 };
 
-const STATUS_STEP: Record<string, number> = {
-  unassigned: 1,
-  assigned: 2,
-  picked_up: 3,
-  in_transit: 4,
-  delivered: 5,
-  failed: 4,
-};
+/** The order the legs are shown in: what meets the customer first, then warehouse runs. */
+export const RIDER_KIND_ORDER: LegKind[] = ["delivery", "replacement_delivery", "return_pickup", "pickup", "transfer", "return_transfer", "return_to_seller"];
 
-function addressText(raw: string | null): string {
+function addressText(raw: string | null | undefined): string {
   if (!raw) return "—";
   try {
     const a = JSON.parse(raw) as { line1?: string; commune?: string; city?: string };
@@ -78,7 +55,6 @@ function addressText(raw: string | null): string {
   return raw;
 }
 
-/** The customer's map pin (if they picked one) from the address JSON. */
 function geoFrom(raw: string | null | undefined): { lat: number; lng: number } | null {
   if (!raw) return null;
   try {
@@ -101,35 +77,56 @@ function phoneFrom(raw: string | null | undefined): string | null {
   }
 }
 
+const pin = (e: Endpoint | null | undefined) => (e && e.lat != null && e.lng != null ? { lat: Number(e.lat), lng: Number(e.lng) } : null);
+
 function toRiderTask(row: RiderQueueRow) {
   const o = row.order;
-  const step = STATUS_STEP[row.status] ?? 1;
   const items = o?.items ?? [];
-  const status: RiderTaskStatus = row.status === "unassigned" ? "available" : (row.status as RiderTaskStatus);
+  const legItems: LegItem[] = row.items ?? [];
+  const status = row.status as RiderTaskStatus;
+  const toEnd = row.to;
+  const fromEnd = row.from;
+  const hubBound = isHubBound(row.kind);
+  const geo = pin(toEnd) ?? geoFrom(row.address) ?? geoFrom(o?.shippingAddress);
+  const stepsDone = ["assigned", "picked_up", "in_transit", "delivered"].indexOf(status);
   return {
     id: row.id,
-    type: "delivery" as const,
+    kind: row.kind,
+    hubBound,
     status,
-    isPool: row.status === "unassigned",
-    customer: o?.customerName ?? "Customer",
-    address: addressText(row.address ?? o?.shippingAddress ?? null),
-    pickupAddress: addressText(row.pickupAddress ?? null),
-    phone: phoneFrom(row.address) ?? phoneFrom(o?.shippingAddress),
-    geo: geoFrom(row.address) ?? geoFrom(o?.shippingAddress),
-    zone: row.zoneName ?? row.zoneId ?? "—",
-    zoneId: row.zoneId,
-    preferred: !!row.preferred,
+    customer: o?.customerName ?? toEnd?.name ?? "—",
+    /** Where the rider goes to (customer, warehouse or seller). */
+    address: toEnd?.address ?? addressText(row.address ?? o?.shippingAddress ?? null),
+    /** Where the rider collects from. */
+    pickupAddress: fromEnd?.address ?? addressText(row.pickupAddress ?? null),
+    from: fromEnd,
+    to: toEnd,
+    toName: toEnd?.name ?? "—",
+    fromName: fromEnd?.name ?? "—",
+    phone: toEnd?.phone ?? phoneFrom(row.address) ?? phoneFrom(o?.shippingAddress),
+    geo,
+    fromGeo: pin(fromEnd),
+    hubId: row.hubId,
     orderId: row.orderReference,
+    orderUuid: row.orderId,
     amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
     paymentType: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? o?.paymentMethod ?? "—",
     /** The raw method id (cod, wallet…): pages turn it into a label in the rider's language. */
     paymentMethod: o?.paymentMethod ?? "",
-    items: items.reduce((s, it) => s + it.qty, 0),
+    items: legItems.length ? legItems.reduce((s, it) => s + it.qty, 0) : items.reduce((s, it) => s + it.qty, 0),
+    legItems,
+    legItemsText: (fr: boolean) => legItemsText(legItems, fr),
     attempts: row.attempts ?? 1,
     failureReason: row.failureReason ?? null,
     readyAt: row.readyAt ?? null,
     receivedAt: row.receivedAt ?? null,
+    pickedUpAt: row.pickedUpAt ?? null,
+    deliveredAt: row.deliveredAt ?? null,
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    needsCode: !!row.needsCode,
+    collectOld: !!row.collectOld,
+    sellerName: row.sellerName,
     products: items.map((it) => ({
       productId: it.productId,
       name: it.productName,
@@ -139,16 +136,8 @@ function toRiderTask(row: RiderQueueRow) {
       variantFr: it.variantFr?.trim() || null,
       qty: it.qty,
     })),
-    timeline: [
-      { time: new Date(row.createdAt).toLocaleString(), label: "Order placed", done: step >= 1 },
-      { time: row.readyAt ? new Date(row.readyAt).toLocaleString() : "—", label: "Seller ready", done: !!row.readyAt },
-      { time: "—", label: "Picked from seller", done: step >= 3 },
-      { time: "—", label: "Out for delivery", done: step >= 4 && row.status !== "failed" },
-      row.status === "failed"
-        ? { time: "—", label: `Failed${row.failureReason ? `: ${row.failureReason}` : ""}`, done: true }
-        : { time: "—", label: "Delivered", done: step >= 5 },
-    ],
-    codAmount: row.codAmountUsd,
+    stepsDone,
+    codAmount: row.kind === "delivery" ? row.codAmountUsd : 0,
   };
 }
 
@@ -182,19 +171,21 @@ export function useRiderData() {
 
   useEffect(() => {
     if (!connected || !isRider) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const s = socketClient.current;
     const onPush = () => void refresh();
+    s?.on("task:updated", onPush);
     s?.on("delivery:updated", onPush);
     return () => {
+      s?.off("task:updated", onPush);
       s?.off("delivery:updated", onPush);
     };
   }, [connected, isRider, refresh]);
 
   return useMemo(() => {
     const riderTasks = queue.map(toRiderTask);
-    const available = riderTasks.filter((t) => t.isPool);
-    const mine = riderTasks.filter((t) => !t.isPool);
+    const mine = riderTasks;
     const active = mine.filter((t) => t.status !== "delivered" && t.status !== "failed");
     const riderProfile = {
       id: rt.user?.id ? `RDR-${rt.user.id.slice(0, 4).toUpperCase()}` : "RDR-001",
@@ -209,11 +200,8 @@ export function useRiderData() {
     };
     return {
       riderProfile,
-      /** Every row the server sent: own tasks + open pool. */
+      /** Every leg assigned to this rider (any status). */
       riderTasks,
-      /** Open pool: unclaimed, can be accepted. */
-      available,
-      /** The rider's own tasks (any status). */
       mine,
       earnings,
       loading,
@@ -227,11 +215,9 @@ export function useRiderData() {
 
 export type RiderData = ReturnType<typeof useRiderData>;
 
-/** Where the rider works (`rider:assignment`): home warehouse, its zones and the rider's preferred zones. */
+/** Where the rider works (`rider:assignment`): the home warehouse. */
 export interface RiderAssignment {
-  hub: { id: string; name: string; city: string; address: string | null } | null;
-  preferredZones: { id: string; name: string }[];
-  hubZones: { id: string; name: string }[];
+  hub: { id: string; name: string; city: string; address: string | null; lat?: number | null; lng?: number | null } | null;
 }
 
 export function useRiderAssignment() {
@@ -241,7 +227,6 @@ export function useRiderAssignment() {
   const [nonce, setNonce] = useState(0);
   const ready = rt.status === "connected" && rt.user?.role === "rider";
 
-  // Re-read on every (re)connect: an admin changing the rider's warehouse signs them out and back in.
   useEffect(() => {
     if (!ready) return;
     let live = true;

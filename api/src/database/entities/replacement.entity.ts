@@ -13,6 +13,7 @@ export type ReplacementStatus =
   | 'received'
   | 'allocated'
   | 'dispatched'
+  | 'delivered'
   | 'rejected';
 
 /**
@@ -64,6 +65,44 @@ export class Replacement {
 
   @Column({ type: 'varchar', nullable: true })
   dispatchStatus: string | null;
+
+  /** How many units to send (the units the customer is unhappy with). */
+  @Column({ type: 'int', default: 1 })
+  qty: number;
+
+  /** The option label of the order line (so the same variant is sent). */
+  @Column({ type: 'varchar', nullable: true })
+  variant: string | null;
+
+  /** Customer photos (upload URLs) as a JSON array. */
+  @Column({ type: 'text', nullable: true })
+  attachments: string | null;
+
+  /** The seller must answer by then. */
+  @Column({ type: 'datetime', nullable: true })
+  sellerDueAt: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  sellerRespondedAt: Date | null;
+
+  /** The seller's reason when they approve or reject. */
+  @Column({ type: 'text', nullable: true })
+  sellerReason: string | null;
+
+  /** Units taken from the seller's stock for this replacement (0 until approved). */
+  @Column({ type: 'int', default: 0 })
+  stockTaken: number;
+
+  /** The delivery task logistics created to bring the new unit (and collect the old one). */
+  @Column({ type: 'varchar', nullable: true })
+  deliveryTaskId: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  deliveredAt: Date | null;
+
+  /** The dispute that led to this replacement (admin decision), if any. */
+  @Column({ type: 'varchar', nullable: true })
+  disputeId: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

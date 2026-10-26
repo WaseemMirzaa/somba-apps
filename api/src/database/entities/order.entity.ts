@@ -1,4 +1,5 @@
 import {
+  BeforeUpdate,
   Column,
   CreateDateColumn,
   Entity,
@@ -77,8 +78,35 @@ export class Order {
   @Column({ type: 'float', default: 0 })
   totalUsd: number;
 
+  /** @deprecated Zones are gone; history only. */
   @Column({ type: 'varchar', nullable: true })
   zoneId: string | null;
+
+  /** The warehouse that delivers the order: the nearest to the customer's map pin that has riders. */
+  @Index('IDX_orders_destinationHubId')
+  @Column({ type: 'varchar', nullable: true })
+  destinationHubId: string | null;
+
+  /** The delivery area of the customer's address when the order was placed (history; later coverage changes never reroute). */
+  @Index('IDX_orders_destinationAreaId')
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  destinationAreaId: string | null;
+
+  /** One origin warehouse per seller on the order (the one nearest each seller's pickup pin). */
+  @Column({ type: 'simple-json', nullable: true })
+  originHubIds: string[] | null;
+
+  /** The planned chain of warehouses each seller's parcel travels: `{ [sellerId]: [originHubId, …, destinationHubId] }` (one entry when no transfer is needed). */
+  @Column({ type: 'simple-json', nullable: true })
+  routeBySeller: Record<string, string[]> | null;
+
+  /**
+   * Which warehouse collects from which seller: `{ [sellerId]: hubId }` (keys are the `sellerId` of the order lines).
+   * `originHubIds` lists the same warehouses but in no promised order; read this to match a seller to its warehouse.
+   * Null on orders placed before this existed.
+   */
+  @Column({ type: 'simple-json', nullable: true })
+  originBySeller: Record<string, string> | null;
 
   /** Encrypted at rest — full JSON delivery address. */
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
@@ -100,4 +128,13 @@ export class Order {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  /**
+   * Every save moves `updatedAt` forward. TypeORM can otherwise write back the loaded value (rounded to the
+   * millisecond), so a later copy looked older than an earlier one and clients that keep the newest copy ignored it.
+   */
+  @BeforeUpdate()
+  touch() {
+    this.updatedAt = new Date();
+  }
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PickupAreaBanner } from "@/components/seller/pickup-area-banner";
 import {
   DollarSign,
   ShoppingCart,
@@ -34,7 +35,7 @@ import { RevenueOrdersChart } from "@/components/seller/revenue-chart";
 import { StatTile } from "@/components/seller/stat-tile";
 import { PlanSummary } from "@/components/seller/plan-summary";
 import { useLocale } from "@/context/locale-context";
-import { useSellerData, useSellerLoad } from "@/lib/seller";
+import { useSellerAccess, useSellerData, useSellerLoad } from "@/lib/seller";
 import { packageStatusLabel, packageStatusVariant } from "@/lib/seller-labels";
 import {
   HEALTH_LABELS,
@@ -78,20 +79,23 @@ export default function SellerDashboard() {
     categoryRevenue,
     recentActivity,
     getRawProduct,
+    seller,
   } = useSellerData();
   const load = useSellerLoad();
+  const access = useSellerAccess();
   const an = useSellerAnalytics(days);
   const s = sellerDashboardStats;
   const a = an.data;
-  const needsPickup = !sellerStore.pickupAddress;
+  // Riders need the address AND the map pin (the nearest warehouse is computed from the pin).
+  const needsPickup = !sellerStore.pickupAddress || seller?.pickupLat == null || seller?.pickupLng == null;
   const periodLabel = fr ? `${days} derniers jours` : `last ${days} days`;
 
   const quickActions = [
-    { href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
-    { href: "/seller/products/create", label: t("createProduct"), sub: fr ? "Ajouter une annonce" : "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
-    { href: "/seller/finance/payouts/request", label: fr ? "Demander un paiement" : "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
-    { href: "/seller/promotions/create", label: fr ? "Demander une promotion" : "Request promotion", sub: fr ? "Booster les ventes" : "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
-  ];
+    { perm: "orders" as const, href: "/seller/orders", label: t("orders"), sub: fr ? `${s.pendingOrders} en attente` : `${s.pendingOrders} pending`, icon: ShoppingCart, color: "bg-blue-50 text-blue-700" },
+    { perm: "catalog" as const, href: "/seller/products/create", label: t("createProduct"), sub: fr ? "Ajouter une annonce" : "Add listing", icon: Package, color: "bg-emerald-50 text-emerald-700" },
+    { perm: "finance" as const, href: "/seller/finance/payouts/request", label: fr ? "Demander un paiement" : "Request payout", sub: formatCurrency(sellerFinanceStats.availableBalance, locale), icon: Wallet, color: "bg-violet-50 text-violet-700" },
+    { perm: "catalog" as const, href: "/seller/promotions/create", label: fr ? "Demander une promotion" : "Request promotion", sub: fr ? "Booster les ventes" : "Boost sales", icon: TrendingUp, color: "bg-amber-50 text-amber-700" },
+  ].filter((q) => access.can(q.perm));
 
   const series = a?.revenueSeries.map((d) => ({ label: shortDay(d.date, fr), revenue: d.revenue, orders: d.orders })) ?? [];
   const openShipments = sellerOrderList.filter((o) => !["pending", "delivered", "cancelled", "returned"].includes(o.packageStatus)).length;
@@ -106,12 +110,16 @@ export default function SellerDashboard() {
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/seller/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              {t("analytics")}
-            </Link>
-            <Link href="/seller/products/create" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
-              {t("createProduct")}
-            </Link>
+            {access.can("insight") && (
+              <Link href="/seller/analytics" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                {t("analytics")}
+              </Link>
+            )}
+            {access.can("catalog") && (
+              <Link href="/seller/products/create" className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--primary-hover)]">
+                {t("createProduct")}
+              </Link>
+            )}
           </div>
         }
       />
@@ -121,14 +129,16 @@ export default function SellerDashboard() {
       {needsPickup && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>
-            <strong>{fr ? "Les livreurs ont besoin de votre adresse de collecte." : "Riders need your pickup address."}</strong>{" "}
+            <strong>{fr ? "Les livreurs ont besoin de votre lieu de collecte (adresse et position sur la carte)." : "Riders need your pickup location (address and map pin)."}</strong>{" "}
             {fr ? "Sans elle, vos colis ne peuvent pas être collectés." : "Without it your parcels cannot be collected."}
           </span>
           <Link href="/seller/settings" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">
-            {fr ? "Ajouter l'adresse" : "Add pickup address"}
+            {fr ? "Compléter le lieu" : "Complete the location"}
           </Link>
         </div>
       )}
+
+      <PickupAreaBanner withLink />
 
       <PlanSummary />
 
@@ -325,7 +335,7 @@ export default function SellerDashboard() {
                 <p className="text-xs text-slate-500">{fr ? `Commandes passées (${periodLabel})` : `Orders placed (${periodLabel})`}</p>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))] gap-4">
                   {[
                     { label: fr ? "Délai de préparation" : "Time to pack", value: formatHours(a.fulfilment.avgHoursToReady, fr) },
                     { label: fr ? "Délai de livraison" : "Time to deliver", value: formatHours(a.fulfilment.avgHoursToDelivered, fr) },
@@ -334,9 +344,9 @@ export default function SellerDashboard() {
                     { label: fr ? "Annulations" : "Cancellations", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.cancelRatePct}%` : "—" },
                     { label: fr ? "Commandes ouvertes" : "Open orders", value: String(openShipments) },
                   ].map((m) => (
-                    <div key={m.label} className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{m.label}</p>
-                      <p className="mt-1 text-lg font-bold text-slate-900">{m.value}</p>
+                    <div key={m.label} className="min-w-0 rounded-lg bg-slate-50 p-3">
+                      <p className="break-words text-[10px] font-medium uppercase tracking-wide text-slate-500">{m.label}</p>
+                      <p className="mt-1 break-words text-lg font-bold text-slate-900">{m.value}</p>
                     </div>
                   ))}
                 </div>
@@ -438,7 +448,8 @@ export default function SellerDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1">
+        {access.can("catalog") && (
+<Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{t("lowStock")}</h2>
             <NavLinkButton href="/seller/inventory">{t("viewAll")}</NavLinkButton>
@@ -470,11 +481,13 @@ export default function SellerDashboard() {
             />
           </CardContent>
         </Card>
+)}
       </div>
 
       {/* Bottom row: orders, promotions, finance snapshot */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        {access.can("orders") && (
+<Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{t("recentOrders")}</h2>
             <NavLinkButton href="/seller/orders">{t("viewAll")}</NavLinkButton>
@@ -503,9 +516,11 @@ export default function SellerDashboard() {
             />
           </CardContent>
         </Card>
+)}
 
         <div className="space-y-6">
-          <Card>
+          {access.can("catalog") && (
+<Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <h2 className="font-semibold text-slate-900">{fr ? "Promotions actives" : "Active promotions"}</h2>
               <NavLinkButton href="/seller/promotions">{t("viewAll")}</NavLinkButton>
@@ -534,29 +549,31 @@ export default function SellerDashboard() {
               />
             </CardContent>
           </Card>
+)}
 
-          <Card>
+          {access.can("finance") && (
+<Card>
             <CardHeader className="flex flex-row items-center gap-2">
               <Truck className="h-4 w-4 text-[var(--primary)]" />
               <h2 className="font-semibold text-slate-900">{fr ? "Aperçu financier" : "Finance snapshot"}</h2>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-blue-50 p-4">
+                <div className="min-w-0 rounded-xl bg-blue-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Solde disponible" : "Available balance"}</p>
-                  <p className="text-xl font-bold text-[var(--primary)]">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
+                  <p className="break-words text-lg font-bold sm:text-xl text-[var(--primary)]">{formatCurrency(sellerFinanceStats.availableBalance, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Chiffre d'affaires en attente" : "Pending revenue"}</p>
-                  <p className="text-xl font-bold text-slate-900">{formatCurrency(sellerFinanceStats.pendingRevenue, locale)}</p>
+                  <p className="break-words text-lg font-bold sm:text-xl text-slate-900">{formatCurrency(sellerFinanceStats.pendingRevenue, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Commission payée" : "Commission paid"}</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(sellerFinanceStats.commissionPaid, locale)}</p>
+                  <p className="break-words text-lg font-bold text-slate-900">{formatCurrency(sellerFinanceStats.commissionPaid, locale)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
+                <div className="min-w-0 rounded-xl bg-slate-50 p-4">
                   <p className="text-xs text-slate-500">{fr ? "Annulées / retournées" : "Cancelled / returned"}</p>
-                  <p className="text-lg font-bold text-amber-600">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
+                  <p className="break-words text-lg font-bold text-amber-600">{formatCurrency(sellerFinanceStats.refundAmount, locale)}</p>
                 </div>
               </div>
               <NavLinkButton href="/seller/finance" className="mt-4">
@@ -564,6 +581,7 @@ export default function SellerDashboard() {
               </NavLinkButton>
             </CardContent>
           </Card>
+)}
         </div>
       </div>
     </div>

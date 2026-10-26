@@ -17,9 +17,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Words/names that are legitimately the same in both languages.
 const _sameInBothLanguages = {
+  'as_sec_thread',
   'total', 'description', 'ok', 'addr_commune', 'addr_commune_hint', 'addr_city_hint', 'settings_notifications',
   'settings_sms', 'kv_type', 'notifications', 'notifications_n', 'promo_row', 'reg_phone_hint', 'country_cg',
-  'country_fr', 'country_ke',
+  'country_fr', 'country_ke', 'area_province', 'area_commune',
 };
 
 Set<String> _placeholders(String text) => RegExp(r'\{(\w+)\}').allMatches(text).map((m) => m.group(1)!).toSet();

@@ -15,7 +15,7 @@ import type { AppNotification } from "@/lib/realtime/types";
 const ALL_PAGE: Record<NoticePortal, string> = {
   admin: "/admin/notifications",
   seller: "/seller/notifications",
-  warehouse: "/warehouse",
+  warehouse: "/warehouse/notifications",
   shop: "/shop/notifications",
   rider: "/rider/notifications",
 };
@@ -155,7 +155,7 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
         )}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-2xl">
+        <div role="dialog" aria-label="Notifications" className="fixed inset-x-3 top-[4.25rem] z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[380px] rounded-2xl border border-[var(--border)] bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <p className="text-sm font-bold text-slate-900">Notifications</p>
             {unreadCount > 0 && (

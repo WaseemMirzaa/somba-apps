@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import '../data/catalog_models.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
+import '../services/engage_store.dart';
 import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/flash_section.dart';
 import '../widgets/product_actions.dart';
 import '../widgets/product_card.dart';
 import '../widgets/product_image.dart';
 import 'cart_screen.dart';
 import 'categories_screen.dart';
+import 'deals_screen.dart';
 import 'more/search_screen.dart';
 import 'more/browse.dart';
 import 'more/catalog_extra.dart';
@@ -55,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Rebuild when the live catalog hydrates/changes over the socket.
     RealtimeStore.instance.addListener(_onStore);
+    EngageStore.instance.addListener(_onStore); // flash sales start, end and tick live
     _autoplay = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_pageController.hasClients) return;
       final count = RealtimeStore.instance.banners.isEmpty ? 1 : RealtimeStore.instance.banners.length;
@@ -72,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     RealtimeStore.instance.removeListener(_onStore);
+    EngageStore.instance.removeListener(_onStore);
     _autoplay?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -102,7 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final s = Strings.of(context);
     final lang = s.lang;
-    final deals = liveCatalog().where((p) => p.discount >= 15).toList();
+    final catalogue = liveCatalog();
+    // Real flash sales running now (with their countdown); the deals row keeps the other discounted products.
+    final flash = flashEntries(catalogue);
+    final flashIds = {for (final e in flash) e.product.uuid};
+    final deals = catalogue.where((p) => p.discount >= 15 && !flashIds.contains(p.uuid)).toList();
     final feed = _feed();
 
     return CustomScrollView(
@@ -115,6 +124,19 @@ class _HomeScreenState extends State<HomeScreen> {
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategoriesScreen(locale: widget.locale)))),
         ),
         SliverToBoxAdapter(child: _categories(lang)),
+        if (flash.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: SectionHeader(s.flashSale, actionLabel: s.seeAll, onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DealsScreen(locale: widget.locale)))),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              key: const ValueKey('home-flash'),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: FlashHeader(soonest: flash.first.sale),
+            ),
+          ),
+          SliverToBoxAdapter(child: _dealsRow([for (final e in flash) e.product], lang)),
+        ],
         if (deals.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: SectionHeader(s.deals, actionLabel: s.seeAll, onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, title: s.deals, dealsOnly: true)))),
@@ -287,7 +309,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const SizedBox(height: 18),
         SizedBox(
-          height: 168,
+          // Grows with the text size so a two-line title and body still fit (they are capped at two lines each).
+          height: MediaQuery.textScalerOf(context).scale(168).clamp(168, 230),
           child: PageView.builder(
             controller: _pageController,
             itemCount: banners.length,
@@ -317,12 +340,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Text(
                               b.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: -0.5),
                             ),
                             const SizedBox(height: 6),
                             Text(b.body,
-                                maxLines: 3,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
                           ],

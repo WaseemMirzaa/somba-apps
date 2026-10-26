@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { socketClient } from "@/lib/realtime/socket-client";
 import { useRealtime } from "@/context/realtime-context";
 import { useCatalog } from "@/lib/catalog";
 import { pickText } from "@/lib/i18n-fields";
 import type { Dispute, Order, Payment } from "@/lib/realtime/types";
+import { stageText } from "@/lib/after-sale";
 
 const STATUS_FLOW = [
   "pending",
@@ -191,12 +193,7 @@ export function useMyDisputes(): DisputeRow[] {
 
 /** Human status for a return / dispute row. */
 export function disputeStageLabel(d: DisputeRow, fr: boolean): string {
-  if (d.status === "resolved") return fr ? "Résolu" : "Resolved";
-  if (d.status === "rejected") return fr ? "Rejeté" : "Rejected";
-  if (d.type === "return" && d.receivedAt) return fr ? "Colis reçu — en cours d'examen" : "Goods received — under review";
-  return d.type === "return"
-    ? fr ? "Demande reçue — en attente du retour du colis" : "Request received — waiting for the goods"
-    : fr ? "Ouvert — en cours d'examen" : "Open — under review";
+  return stageText(d, fr);
 }
 
 const STATUS_FR: Record<string, string> = {
@@ -229,4 +226,26 @@ export function canCancelOrder(status: string): boolean {
 /** Statuses in which a 4-digit handover code may exist for the rider. */
 export function hasDeliveryCodeStage(status: string): boolean {
   return status === "processing" || status === "shipped" || status === "out_for_delivery";
+}
+
+/** The customer's 4-digit handover code, only while the parcel is on its way (`orders:deliveryCode`). */
+export function useDeliveryCode(orderUuid: string | undefined, status: string | undefined): string | null {
+  const rt = useRealtime();
+  const [code, setCode] = useState<{ orderId: string; value: string } | null>(null);
+  useEffect(() => {
+    if (!orderUuid || !status || !hasDeliveryCodeStage(status) || rt.status !== "connected") return;
+    let alive = true;
+    socketClient
+      .request<{ required: boolean; code: string | null }>("orders:deliveryCode", { orderId: orderUuid })
+      .then((res) => {
+        if (alive) setCode(res.required && res.code ? { orderId: orderUuid, value: res.code } : null);
+      })
+      .catch(() => {
+        if (alive) setCode(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [orderUuid, status, rt.status]);
+  return code && code.orderId === orderUuid && status && hasDeliveryCodeStage(status) ? code.value : null;
 }

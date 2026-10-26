@@ -10,6 +10,7 @@ import { LOGIN_HERO_IMAGE } from "@/lib/product-landing";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth, getPersonaDisplayName, getPersonaDisplaySubRole } from "@/context/auth-context";
 import { useRealtime } from "@/context/realtime-context";
+import { TwoFactorRequired } from "@/lib/realtime/auth-api";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/ui/language-toggle";
@@ -30,12 +31,15 @@ const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
 
 export default function LoginPage() {
   const { login, signInReal, isAuthenticated, authReady, persona, personas } = useAuth();
-  const { login: realLogin } = useRealtime();
+  const { login: realLogin, login2fa } = useRealtime();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Kept raw (not as text) so the message follows the language toggle if it is switched after the error.
   const [signInError, setSignInError] = useState<{ missing: true } | { err: unknown } | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  // Set when the password was right but the account asks for a two-factor code (6 digits or a recovery code).
+  const [twoFactor, setTwoFactor] = useState<{ challenge: string } | null>(null);
+  const [code, setCode] = useState("");
   const { locale, t } = useLocale();
   const fr = locale === "fr";
   const heroAlt = fr ? LOGIN_HERO_IMAGE.altFr : LOGIN_HERO_IMAGE.alt;
@@ -63,14 +67,30 @@ export default function LoginPage() {
     }
     setSigningIn(true);
     try {
-      const user = await realLogin(email, password);
+      let user;
+      if (twoFactor) {
+        if (!code.trim()) {
+          setSignInError({ err: new Error("Two-factor authentication code required.") });
+          return;
+        }
+        user = await login2fa(twoFactor.challenge, code.trim());
+      } else {
+        user = await realLogin(email, password);
+      }
       const p = signInReal(user.role, { name: user.name, email: user.email });
       // Customers coming from a shop page (cart, checkout...) go back where they were.
       const next = new URLSearchParams(window.location.search).get("next");
       const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
       router.push(user.role === "customer" && safeNext ? safeNext : p.portal || getHomeForRole(p.role as UserRole));
     } catch (err) {
-      setSignInError({ err });
+      if (err instanceof TwoFactorRequired) {
+        setTwoFactor({ challenge: err.challenge });
+        setCode("");
+      } else {
+        // A sign-in that expired (or locked) goes back to the password step.
+        if (twoFactor && /expired/i.test(err instanceof Error ? err.message : "")) setTwoFactor(null);
+        setSignInError({ err });
+      }
     } finally {
       setSigningIn(false);
     }
@@ -156,8 +176,34 @@ export default function LoginPage() {
           {(
             <div className="space-y-4">
               <form onSubmit={signInWithAccount} className="space-y-3">
+                {twoFactor ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-slate-600">
+                      {fr
+                        ? "Saisissez le code à 6 chiffres de votre application d'authentification, ou un code de récupération."
+                        : "Enter the 6-digit code from your authenticator app, or a recovery code."}
+                    </p>
+                    <input
+                      className="input-premium w-full px-4 py-3 text-sm tracking-widest"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="one-time-code"
+                      autoFocus
+                      aria-label={fr ? "Code de vérification" : "Verification code"}
+                      placeholder={fr ? "Code à 6 chiffres ou code de récupération" : "6-digit code or recovery code"}
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                    />
+                    <button type="button" onClick={() => { setTwoFactor(null); setCode(""); setSignInError(null); }} className="text-xs font-medium text-[var(--primary)] hover:underline">
+                      {fr ? "← Changer de compte" : "← Use another account"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
                 <input className="input-premium w-full px-4 py-3 text-sm" type="email" autoComplete="username" aria-label={fr ? "E-mail" : "Email"} placeholder={fr ? "E-mail" : "Email"} value={email} onChange={(e) => setEmail(e.target.value)} />
                 <input className="input-premium w-full px-4 py-3 text-sm" type="password" autoComplete="current-password" aria-label={fr ? "Mot de passe" : "Password"} placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+                  </>
+                )}
                 {signInError && (
                   <p role="alert" className="text-sm text-red-600">
                     {"missing" in signInError
@@ -166,7 +212,7 @@ export default function LoginPage() {
                   </p>
                 )}
                 <Button type="submit" disabled={signingIn} className="w-full">
-                  {signingIn ? (fr ? "Veuillez patienter…" : "Please wait…") : (fr ? "Se connecter" : "Sign in")}
+                  {signingIn ? (fr ? "Veuillez patienter…" : "Please wait…") : twoFactor ? (fr ? "Vérifier" : "Verify") : (fr ? "Se connecter" : "Sign in")}
                 </Button>
               </form>
               {DEMO_MODE && (

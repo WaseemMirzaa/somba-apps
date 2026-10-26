@@ -58,6 +58,11 @@ export class Address {
   @Column({ type: 'text', nullable: true, transformer: encryptedJsonColumn })
   geo: AddressGeo | null;
 
+  /** The most specific delivery area this address is in (a quartier, commune, city…). Decides the warehouse. */
+  @Index('IDX_addresses_areaId')
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  areaId: string | null;
+
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
 

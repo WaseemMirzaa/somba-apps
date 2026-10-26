@@ -15,6 +15,10 @@ describe('seller package status', () => {
     expect(OrdersService.packageStatus(paid, lines('cancelled', 'cancelled'))).toBe('cancelled');
   });
 
+  it("'shipped' means every parcel is at a warehouse: the package is still at the hub until the delivery rider is on the road", () => {
+    expect(OrdersService.packageStatus({ ...paid, status: 'shipped' }, lines('received'))).toBe('at_hub');
+  });
+
   it('after the hub, the package follows the last-mile delivery', () => {
     expect(OrdersService.packageStatus({ ...paid, status: 'out_for_delivery' }, lines('received'))).toBe('out_for_delivery');
     expect(OrdersService.packageStatus({ ...paid, status: 'delivered' }, lines('received'))).toBe('delivered');

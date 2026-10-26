@@ -26,7 +26,7 @@ function make(over: { product?: Record<string, unknown>; settings?: Record<strin
   const products = { get: async () => product, findLiveByName: async () => null, reserve: async () => (calls.reserve++, true), restock: async () => undefined };
   const sellers = { findOne: async () => null };
   const settings = { get: async (k: string) => over.settings?.[k] ?? null };
-  const svc = new OrdersService(orders as never, {} as never, sellers as never, noop as never, products as never, {} as never, emitter as never, noop as never, {} as never, {} as never, settings as never);
+  const svc = new OrdersService(orders as never, {} as never, sellers as never, noop as never, products as never, {} as never, emitter as never, noop as never, {} as never, {} as never, settings as never, undefined, undefined, undefined, {} as never, { route: async () => ({ feeUsd: 3, deliveryUsd: 3, transferUsd: 0, distanceKm: 1, destinationHubId: 'h1', destinationHub: { id: 'h1', name: 'H', city: 'C' }, originHubIds: [], originBySeller: {}, transfer: false, pinned: true, fallback: null }) } as never);
   return { svc, calls, view: registered.view };
 }
 

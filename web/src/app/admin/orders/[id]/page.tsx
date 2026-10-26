@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorNote, Modal } from "@/components/admin/modal";
 import { RefundDialog } from "@/components/admin/refund-dialog";
+import { OrderRouting } from "@/components/admin/order-routing";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -28,7 +29,7 @@ import {
   useServerList,
   type PaymentRow,
 } from "@/lib/admin-live";
-import { DELIVERY_TASK_STATUS, pick } from "@/lib/warehouse-live";
+import { LEG_STATUS, pickL } from "@/lib/logistics";
 import {
   PACKAGE_STATUS_BADGE,
   PACKAGE_STATUS_LABEL,
@@ -69,7 +70,7 @@ export default function AdminOrderDetailPage() {
   const { toast } = useToast();
   const role = useRole();
   const live = rt.orders.find((o) => o.id === id || o.reference === id);
-  const task = rt.deliveries.find((d) => live && d.orderId === live.id);
+  const task = rt.deliveries.find((d) => live && d.orderId === live.id && (!d.kind || d.kind === "delivery"));
   const payment = rt.payments.find((p) => live && p.orderId === live.id && (p as PaymentRow).purpose !== "topup");
   const sellerList = useServerList<Seller>("sellers:list", { pushEvents: ["seller:updated"] });
   const [confirm, setConfirm] = useState<{ kind: "status"; status: string } | { kind: "refund" } | null>(null);
@@ -289,11 +290,14 @@ export default function AdminOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
-            { label: fr ? "Livraison" : "Delivery task", value: task ? pick(DELIVERY_TASK_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
+            { label: fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
             { label: fr ? "Livreur assigné" : "Rider assigned", value: live.riderId ? (fr ? "Oui" : "Yes") : "—" },
-            { label: fr ? "Zone" : "Zone", value: live.zoneId ?? "—" },
             { label: fr ? "COD à encaisser" : "COD to collect", value: task && task.codAmountUsd > 0 ? formatCurrency(task.codAmountUsd, locale) : "—" },
           ]} />
+        </DetailGridSection>
+
+        <DetailGridSection title={fr ? "Acheminement par les entrepôts" : "Routing through the warehouses"} span={3}>
+          <OrderRouting order={live} sellers={sellerList.items} />
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Montants" : "Amounts"}>

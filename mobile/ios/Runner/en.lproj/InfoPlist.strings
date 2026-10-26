@@ -1,0 +1,4 @@
+/* Texts shown in system permission prompts (English). */
+"NSLocationWhenInUseUsageDescription" = "Somba&Teka uses your location to place the pin on your delivery address when you open the map. It is not tracked or shared.";
+"NSPhotoLibraryUsageDescription" = "Somba&Teka lets you attach photos from your library to a return, a support request or a message to a seller.";
+"NSCameraUsageDescription" = "Somba&Teka uses the camera so you can take a photo of an item for a return, a support request or a message to a seller.";

@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { IsNull, Not, Repository } from 'typeorm';
-import { parsePreferredZones } from '../common/zones/hub-scope';
 import { User, UserRole } from '../database/entities';
+import { DEFAULT_NOTIFY, NOTIFY_CATEGORIES, parseNotify } from './notify-prefs';
+import type { NotifyPrefs } from './notify-prefs';
 
 /** Public-safe projection of a user (never leaks the password hash). */
 export interface PublicUser {
@@ -18,11 +19,13 @@ export interface PublicUser {
   emailVerified: boolean;
   phoneVerified: boolean;
   avatar: string | null;
+  /** Two-factor authentication is on (the sign-in asks for a second code). */
+  twofaEnabled: boolean;
   prefs: UserPrefs;
-  /** Home warehouse (riders and warehouse staff; null = not tied to one). */
+  /** Home warehouse (riders and warehouse staff always have one; null for everyone else). */
   hubId: string | null;
-  /** A rider's preferred zone ids, shown first in their queue. */
-  preferredZones: string[];
+  /** Warehouse staff tier: operator | supervisor | manager (null for everyone else). */
+  warehouseTier: 'operator' | 'supervisor' | 'manager' | null;
 }
 
 /** Notification + privacy + market preferences (customer Settings screen). */
@@ -32,6 +35,8 @@ export interface UserPrefs {
   sms: boolean;
   personalize: boolean;
   market: 'FR' | 'DRC';
+  /** Which kinds of notice may push (order, payout, stock, review, question, message, product, promo). */
+  notify: NotifyPrefs;
 }
 
 export const DEFAULT_PREFS: UserPrefs = {
@@ -40,6 +45,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   sms: false,
   personalize: true,
   market: 'DRC',
+  notify: { ...DEFAULT_NOTIFY },
 };
 
 const PHONE_RE = /^\+?[0-9 ()-]{7,20}$/;
@@ -107,9 +113,10 @@ export class UsersService {
 
   static parsePrefs(raw: string | null): UserPrefs {
     try {
-      return { ...DEFAULT_PREFS, ...(raw ? (JSON.parse(raw) as Partial<UserPrefs>) : {}) };
+      const stored = raw ? (JSON.parse(raw) as Partial<UserPrefs>) : {};
+      return { ...DEFAULT_PREFS, ...stored, notify: parseNotify(stored.notify) };
     } catch {
-      return { ...DEFAULT_PREFS };
+      return { ...DEFAULT_PREFS, notify: { ...DEFAULT_NOTIFY } };
     }
   }
 
@@ -157,6 +164,14 @@ export class UsersService {
       if (patch.market !== 'FR' && patch.market !== 'DRC') throw new Error('market must be FR or DRC.');
       next.market = patch.market;
     }
+    if (patch.notify !== undefined) {
+      if (!patch.notify || typeof patch.notify !== 'object' || Array.isArray(patch.notify)) throw new Error('notify must be an object of true/false switches.');
+      for (const [k, v] of Object.entries(patch.notify as Record<string, unknown>)) {
+        if (!(NOTIFY_CATEGORIES as readonly string[]).includes(k)) throw new Error(`Unknown notification kind: ${k}.`);
+        if (typeof v !== 'boolean') throw new Error(`${k} must be true or false.`);
+        next.notify[k as keyof NotifyPrefs] = v;
+      }
+    }
     user.prefs = JSON.stringify(next);
     await this.repo.save(user);
     return next;
@@ -179,9 +194,10 @@ export class UsersService {
       emailVerified: !!user.emailVerified,
       phoneVerified: !!user.phoneVerified,
       avatar: user.avatar ?? null,
+      twofaEnabled: !!user.twofaEnabled,
       prefs: UsersService.parsePrefs(user.prefs),
       hubId: user.hubId ?? null,
-      preferredZones: parsePreferredZones(user.preferredZones),
+      warehouseTier: user.role === 'warehouse_staff' ? (user.warehouseTier ?? 'operator') : null,
     };
   }
 }

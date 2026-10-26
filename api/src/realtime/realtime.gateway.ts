@@ -12,11 +12,15 @@ import {
 import { WsThrottleInterceptor } from './ws-throttle.interceptor';
 import { oneOf, str } from '../common/validate';
 import { pageOf } from '../common/paging';
+import { asLocale } from '../common/locale';
 import { activePlanId } from '../content/plans';
 import { clampDays } from '../ops/analytics.util';
 import { cleanListing, materialTextChange } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
 import { TranslationService } from '../translation/translation.service';
+import { SellerPlatformKit } from '../sellers/seller-kit';
+import { touchesStorefront } from '../sellers/storefront.service';
+import type { SellerContext } from '../sellers/seller-context';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
@@ -32,6 +36,7 @@ import { PayoutsService } from '../payouts/payouts.service';
 import { DisputesService } from '../disputes/disputes.service';
 import { CategoriesService } from '../catalog/categories.service';
 import { AddressesService } from '../addresses/addresses.service';
+import { notServedFields } from '../geo/geo.service';
 import { ReviewsService } from '../content/reviews.service';
 import { WishlistService } from '../content/wishlist.service';
 import { SupportService } from '../content/support.service';
@@ -47,6 +52,9 @@ import { CustomersService } from '../ops/customers.service';
 import { BroadcastsService } from '../ops/broadcasts.service';
 import { RolesService } from '../ops/roles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
+import { LogisticsService } from '../logistics/logistics.service';
+import type { Actor } from '../logistics/logistics.service';
+import { tierOf } from '../logistics/tiers';
 import { RiderService } from '../warehouse/rider.service';
 import { CampaignsService } from '../flows/campaigns.service';
 import { ReplacementsService } from '../flows/replacements.service';
@@ -154,18 +162,30 @@ export class RealtimeGateway
     private readonly replacements: ReplacementsService,
     private readonly exchanges: ExchangesService,
     private readonly translations: TranslationService,
+    private readonly kit: SellerPlatformKit,
+    private readonly logistics: LogisticsService,
     private readonly emitter: RealtimeEmitter,
     private readonly throttle: WsThrottleInterceptor,
   ) {}
 
   /**
-   * The warehouse a request is limited to: a warehouse-bound rider or staff member is limited to their own; admins
-   * see everything unless they ask for one warehouse.
+   * The warehouse a request is limited to: riders and warehouse staff belong to exactly one and see only that one;
+   * admins see everything unless they ask for one warehouse.
    */
   private async hubScope(user: SocketUser, requested?: string | null): Promise<string | null> {
     if (this.isAdmin(user.role)) return requested ? String(requested) : null;
     if (user.role !== 'rider' && user.role !== 'warehouse_staff') return null;
-    return (await this.users.findById(user.id))?.hubId ?? null;
+    const hubId = (await this.users.findById(user.id))?.hubId ?? null;
+    if (!hubId) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
+    return hubId;
+  }
+
+  /** The caller as the warehouse desk sees them (warehouse and tier come from the database, not the socket). */
+  private async deskActor(user: SocketUser): Promise<Actor> {
+    if (this.isAdmin(user.role)) return { id: user.id, role: user.role, name: user.name, hubId: null, tier: null };
+    const row = await this.users.findById(user.id);
+    if (user.role !== 'warehouse_staff' || !row?.hubId) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
+    return { id: user.id, role: user.role, name: user.name, hubId: row.hubId, tier: tierOf(row.warehouseTier) };
   }
 
   private isOps(role: string) {
@@ -240,8 +260,8 @@ export class RealtimeGateway
       client.data.user = socketUser;
       await client.join(RealtimeEmitter.userRoom(user.id));
       await client.join(RealtimeEmitter.roleRoom(user.role));
-      // Riders hear about new tasks of their own warehouse (or of every warehouse when not tied to one).
-      if (user.role === 'rider') await client.join(RealtimeEmitter.riderHubRoom(user.hubId ?? null));
+      // Warehouse staff follow the tasks of their own warehouse (`task:updated` goes to this room).
+      if (user.role === 'warehouse_staff' && user.hubId) await client.join(RealtimeEmitter.hubRoom(user.hubId));
       client.emit('ready', {
         user: UsersService.toPublic(user),
         serverTime: new Date().toISOString(),
@@ -258,6 +278,22 @@ export class RealtimeGateway
     const u = client.data.user;
     if (u) this.logger.log(`disconnected ${u.role} ${u.id}`);
     this.throttle.release(client.id);
+  }
+
+  /**
+   * The store a seller-role account acts for (owner or team member), enforcing the team role; admins get their own
+   * (none). Throws a message safe to show. See docs/contracts/seller-platform.md.
+   */
+  private async sellerFor(user: SocketUser, permission: Parameters<SellerPlatformKit['orNull']>[1], opts?: { write?: boolean }) {
+    if (user.role === 'seller') return (await this.kit.ctx.resolve(user, permission, opts)).seller;
+    return this.sellersSvc.byUser(user.id);
+  }
+
+  /** The identity services key a seller's data by: the store owner's account (a team member acts as the owner), else the caller. */
+  private async sellerActor(user: SocketUser, permission: Parameters<SellerPlatformKit['orNull']>[1], opts?: { write?: boolean }): Promise<{ id: string; name: string; role: string }> {
+    if (user.role !== 'seller') return user;
+    const ctx = await this.kit.orNull(user, permission, opts);
+    return ctx ? ctx.actor : user;
   }
 
   /** Require a real, signed-in account (rejects anonymous guests). */
@@ -285,12 +321,20 @@ export class RealtimeGateway
     const category = typeof body?.category === 'string' ? body.category : undefined;
     const categoryId = typeof body?.categoryId === 'string' ? body.categoryId : undefined;
     if (this.isAdmin(role)) return ok(await this.products.list({ category, categoryId, status: body?.status, limit: take, offset: skip }));
-    let ownerIds: string[] | undefined;
     if (role === 'seller') {
-      const mine = await this.sellersSvc.byUser(user!.id);
-      ownerIds = [user!.id, ...(mine ? [mine.id] : [])];
+      // A seller's catalogue is THEIR store's listings (drafts included): for the owner and for the team members
+      // who work with the catalogue (resolved through the seller context). Other stores' products never appear.
+      const ctx = await this.kit.ctx.resolve(user!, 'catalog_read', { write: false }).catch(() => null);
+      if (ctx) {
+        const ownerIds = [...new Set([user!.id, ...ctx.ownerIds])];
+        return ok(await this.products.list({ category, categoryId, status: typeof body?.status === 'string' ? body.status : undefined, ownerIds, ownOnly: true, limit: take, offset: skip }));
+      }
+      // A role without the catalogue permission (finance…), or a suspended store, sees the store's LIVE listings only.
+      const seat = await this.kit.ctx.membership(user!.id).catch(() => null);
+      const ownerIds = seat ? [seat.seller.id, ...(seat.seller.userId ? [seat.seller.userId] : [])] : [user!.id];
+      return ok(await this.products.list({ category, categoryId, status: 'live', ownerIds, ownOnly: true, limit: take, offset: skip }));
     }
-    return ok(await this.products.list({ category, categoryId, liveOnly: true, ownerIds, limit: take, offset: skip }));
+    return ok(await this.products.list({ category, categoryId, liveOnly: true, limit: take, offset: skip }));
   }
 
   @SubscribeMessage('products:get')
@@ -303,7 +347,7 @@ export class RealtimeGateway
     const role = user?.role ?? 'guest';
     if (p && p.status !== 'live' && !this.isAdmin(role)) {
       // Non-live listings are visible only to their own seller (and admins).
-      const mine = role === 'seller' ? await this.sellersSvc.byUser(user!.id) : null;
+      const mine = role === 'seller' ? ((await this.kit.ctx.resolve(user!, 'catalog_read', { write: false }).catch(() => null))?.seller ?? null) : null;
       if (!(role === 'seller' && (p.sellerId === mine?.id || p.sellerId === user!.id))) {
         return fail('Product not found.');
       }
@@ -347,7 +391,7 @@ export class RealtimeGateway
       }
       // Products are keyed to the Seller entity (not the user row) so seller
       // dashboards, stats, and payouts all join on the same id.
-      const seller = await this.sellersSvc.byUser(user.id);
+      const seller = await this.sellerFor(user, 'catalog');
       if (user.role === 'seller' && seller?.status !== 'approved') {
         return fail(
           seller?.status === 'pending'
@@ -355,6 +399,12 @@ export class RealtimeGateway
             : 'Your store is not active. Contact support.',
         );
       }
+      // New listings need the store's pickup pin (routing derives the origin warehouse from it) once the platform requires it.
+      if (user.role === 'seller' && seller && (await this.settings.get('requireSellerPickupPin')) === 'true' && (seller.pickupLat == null || seller.pickupLng == null)) {
+        return fail('Pin your pickup location on the map (Store settings) before listing products.');
+      }
+      // A store whose pickup area nobody serves yet can prepare itself but cannot put listings on sale.
+      if (user.role === 'seller' && seller) await this.sellersSvc.assertPickupServed(seller);
       // The seller's plan may cap how many listings they can hold (`maxProducts`; none by default).
       if (user.role === 'seller' && seller) {
         const plan = (await this.sellersSvc.plans()).find((p) => p.id === activePlanId(seller));
@@ -392,7 +442,7 @@ export class RealtimeGateway
       // The stored row (not the promotional price) is what edits are validated against.
       const existing = await this.products.get(body.id);
       if (!existing) return fail('Product not found.');
-      const seller = await this.sellersSvc.byUser(user.id);
+      const seller = await this.sellerFor(user, 'catalog');
       const isOwner =
         existing.sellerId === user.id ||
         (seller != null && existing.sellerId === seller.id);
@@ -415,6 +465,7 @@ export class RealtimeGateway
         const pause = wanted === 'draft' && existing.status === 'live';
         const resume = wanted === 'live' && existing.status === 'draft';
         if (!pause && !resume) return fail('Only a moderator can change this listing\'s status.');
+        if (resume && seller) await this.sellersSvc.assertPickupServed(seller);
         clean.columns.status = wanted as typeof existing.status;
       }
       // A live listing edited by its seller goes back to moderation when the change is material
@@ -473,7 +524,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       const existing = await this.products.getRaw(String(body?.id ?? ''));
       if (!existing) return fail('Product not found.');
-      const seller = await this.sellersSvc.byUser(user.id);
+      const seller = await this.sellerFor(user, 'catalog');
       const isOwner = existing.sellerId === user.id || (seller != null && existing.sellerId === seller.id);
       if (!isOwner && !this.isAdmin(user.role)) return fail('You can only retranslate your own products.');
       if (!this.translations.enabled) return fail('Automatic translation is not available right now.');
@@ -521,6 +572,8 @@ export class RealtimeGateway
     @MessageBody() body: { kind?: string; id?: string; target?: string },
   ) {
     try {
+      // A chat message is private to the two sides of its conversation: the chat service checks who is asking.
+      if (body?.kind === 'chat_message') return ok(await this.kit.chat.translate(this.requireUser(client), body.id, body.target));
       const staff = this.can(client.data.user?.role ?? 'guest', 'moderate');
       return ok(await this.translations.translateStored(body?.kind, body?.id, body?.target, { staff }));
     } catch (e) {
@@ -536,8 +589,19 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      const sellerId = user.role === 'seller' ? (await this.sellersSvc.byUser(user.id))?.id : undefined;
-      return ok(await this.orders.list(user, sellerId, body));
+      if (user.role === 'seller') {
+        const ctx = await this.kit.orNull(user, 'orders', { write: false });
+        // A CSV export is written in the language of whoever asked (the caller's saved language unless the request names one).
+        let query: unknown = body;
+        if (body && (body as { format?: unknown }).format === 'csv') {
+          const asked = asLocale((body as { locale?: unknown }).locale);
+          query = { ...body, locale: asked ?? asLocale((await this.users.findById(user.id))?.locale) ?? 'en' };
+        }
+        // A team member sees the store's orders as the owner does; an account with no store sees none.
+        return ok(await this.orders.list(ctx ? ctx.actor : user, ctx?.seller.id, query));
+      }
+      // Warehouse staff get their own warehouse's orders only; admins get every order.
+      return ok(await this.orders.list(user, undefined, body, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -560,9 +624,11 @@ export class RealtimeGateway
         const cap = Number((await this.settings.get('codCapUsd')) ?? '500');
         await this.fraud.flagCodRisk(user.name, order.id, order.totalUsd, cap);
       }
-      return ok(order);
+      // The same view the customer's list and pushes carry (journey and warehouse names).
+      return ok((await this.orders.customerViews([order]))[0] ?? order);
     } catch (e) {
-      return fail((e as Error).message);
+      // An address nobody serves: the English message plus { areaId, areaName, areaNameEn, servedCities } to render it in either language.
+      return { ...fail((e as Error).message), ...notServedFields(e) };
     }
   }
 
@@ -628,9 +694,10 @@ export class RealtimeGateway
     @MessageBody() body?: { limit?: number; offset?: number },
   ) {
     try {
-      // Tasks carry customers' delivery addresses: riders and ops only.
+      // Tasks carry customers' delivery addresses: ops only. Riders have no open pool any more (the warehouse assigns).
       const user = this.requireUser(client);
-      if (user.role !== 'rider' && !this.isOps(user.role)) return fail('Not allowed.');
+      if (user.role === 'rider') return ok([]);
+      if (!this.isOps(user.role)) return fail('Not allowed.');
       return ok(await this.delivery.listUnassigned(body, await this.hubScope(user, (body as { hubId?: string })?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -645,12 +712,8 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'rider') return fail('Riders only.');
-      return ok(
-        await this.delivery.accept(body.taskId, {
-          id: user.id,
-          name: user.name,
-        }),
-      );
+      // Riders no longer take tasks: this always answers with the "your warehouse assigns your tasks" error.
+      return ok(this.delivery.accept(body?.taskId));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -688,7 +751,7 @@ export class RealtimeGateway
     }
   }
 
-  /** Hub staff scan a parcel in (independent of the rider's progress). */
+  /** Hub staff scan a parcel in at THEIR warehouse (old name of `logistics:scanIn`); the next leg is created when due. */
   @SubscribeMessage('warehouse:receive')
   async warehouseReceive(
     @ConnectedSocket() client: AuthedSocket,
@@ -697,8 +760,11 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
-      const task = await this.delivery.markReceived(String(body?.taskId ?? ''));
-      await this.audit.record({ actor: user.name, role: user.role, action: 'parcel.received', entity: 'delivery', entityId: task.id, detail: task.orderReference });
+      const me = await this.deskActor(user);
+      const taskId = String(body?.taskId ?? '');
+      const hubId = me.hubId ?? (await this.logistics.getTask(taskId)).toHubId;
+      if (!hubId) return fail('This parcel is not due at a warehouse.');
+      const { task } = await this.logistics.onScanIn(taskId, hubId, me);
       return ok(task);
     } catch (e) {
       return fail((e as Error).message);
@@ -727,8 +793,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      return ok(await this.orders.sellerReady(user, String(body?.orderId ?? '')));
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerReady(ctx.actor, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -745,9 +811,9 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
       const itemIds = Array.isArray(body?.itemIds) ? body.itemIds.map(String).slice(0, 100) : undefined;
-      return ok(await this.orders.sellerCancel(user, String(body?.orderId ?? ''), String(body?.reason ?? ''), itemIds));
+      return ok(await this.orders.sellerCancel(ctx.actor, String(body?.orderId ?? ''), String(body?.reason ?? ''), itemIds));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -878,7 +944,7 @@ export class RealtimeGateway
   async payoutsList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.payouts.list(user));
+      return ok(await this.payouts.list(await this.sellerActor(user, 'finance', { write: false })));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -889,8 +955,8 @@ export class RealtimeGateway
   async payoutsAvailable(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      return ok(await this.payouts.available(user.id));
+      const ctx = await this.kit.ctx.resolve(user, 'finance', { write: false });
+      return ok(await this.payouts.available(ctx.actor.id));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -903,16 +969,25 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      const store = await this.sellersSvc.byUser(user.id);
-      if (store?.status !== 'approved') return fail('Your store must be approved before you can request payouts.');
+      const ctx = await this.kit.ctx.resolve(user, 'finance');
+      const store = ctx.seller;
+      if (store.status !== 'approved') return fail('Your store must be approved before you can request payouts.');
       const amount = assertAmount(body?.amountUsd);
+      let method = body.method;
+      let account = body.account;
+      if (!ctx.isOwner && method !== 'wallet') {
+        // Staff pay out to the account the owner saved; only the owner can name another destination.
+        if (!store.payoutMethod || !store.payoutAccount) return fail('The store owner has not saved a payout account yet.');
+        method = store.payoutMethod;
+        account = store.payoutAccount;
+      }
+      const owner = ctx.isOwner ? user : await this.users.findById(ctx.actor.id);
       return ok(
         await this.payouts.request(
-          { id: user.id, name: user.name },
+          { id: ctx.actor.id, name: owner?.name ?? store.name },
           amount,
-          body.method,
-          body.account,
+          method,
+          account,
         ),
       );
     } catch (e) {
@@ -989,7 +1064,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.payouts.statement(String(body?.payoutId ?? ''), user));
+      return ok(await this.payouts.statement(String(body?.payoutId ?? ''), await this.sellerActor(user, 'finance', { write: false }) as typeof user));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1012,87 +1087,6 @@ export class RealtimeGateway
         await this.audit.record({ actor: user.name, role: user.role, action: 'payout.paid', entity: 'payout', entityId: r.payout.id, detail: `${r.payout.reference} $${r.payout.amountUsd} ref ${r.payout.providerRef ?? 'wallet'} (batch)` });
       }
       return ok(results);
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  // ---- Disputes / returns (customer ⇄ admin) ------------------------------
-  @SubscribeMessage('disputes:list')
-  async disputesList(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.disputes.list(user));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('disputes:open')
-  async disputesOpen(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { orderId: string; type: DisputeType; reason: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (user.role !== 'customer') return fail('Customers only.');
-      return ok(
-        await this.disputes.open(
-          { id: user.id, name: user.name },
-          { orderId: body.orderId, type: body.type, reason: body.reason },
-        ),
-      );
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('disputes:resolve')
-  async disputesResolve(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { disputeId: string; resolution?: string; refund?: boolean; force?: boolean },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(
-        await this.disputes.resolve(
-          body.disputeId,
-          { resolution: body.resolution, refund: body.refund, force: body.force === true && user.role === 'admin' },
-          user.role === 'admin' || user.role === 'admin_finance',
-        ),
-      );
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  /** The warehouse confirms returned goods arrived (needed before a refund on a return). */
-  @SubscribeMessage('disputes:markReceived')
-  async disputesMarkReceived(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { disputeId: string; restock?: boolean },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
-      const d = await this.disputes.markReceived(String(body?.disputeId ?? ''), body?.restock !== false);
-      await this.audit.record({ actor: user.name, role: user.role, action: 'return.received', entity: 'dispute', entityId: d.id, detail: d.reference });
-      return ok(d);
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('disputes:reject')
-  async disputesReject(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { disputeId: string; resolution?: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(await this.disputes.reject(body.disputeId, body.resolution));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1149,190 +1143,6 @@ export class RealtimeGateway
     }
   }
 
-  // ---- Reviews & Q&A (public read; customer writes) ----------------------
-  /** Public. Hidden (moderated) reviews are left out; moderators may pass `includeHidden`. */
-  @SubscribeMessage('reviews:list')
-  async reviewsList(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { productId: string; includeHidden?: boolean },
-  ) {
-    const staff = this.can(client.data.user?.role ?? 'guest', 'moderate');
-    return ok(await this.reviews.listForProduct(String(body?.productId ?? ''), staff && body?.includeHidden === true));
-  }
-
-  /** All (visible) reviews across the signed-in seller's catalogue, with the seller reply. */
-  @SubscribeMessage('reviews:seller')
-  async reviewsSeller(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body?: { limit?: number; offset?: number },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      const seller = await this.sellersSvc.byUser(user.id);
-      if (!seller) return ok([]);
-      return ok(await this.reviews.listForSeller(this.analytics.sellerIdsOf(seller), body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  /** The seller of the product (or an admin) answers a review in public. */
-  @SubscribeMessage('reviews:reply')
-  async reviewsReply(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { reviewId: string; text: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (user.role !== 'seller' && !this.can(user.role, 'moderate')) return fail('Not allowed.');
-      return ok(await this.reviews.reply(user, String(body?.reviewId ?? ''), body?.text));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  /** Moderation: hide or restore a review (hidden ones leave public lists and the product rating). */
-  @SubscribeMessage('reviews:setStatus')
-  async reviewsSetStatus(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { reviewId: string; status: 'visible' | 'hidden' },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.can(user.role, 'moderate')) return fail('Not allowed.');
-      const status = oneOf(body?.status, ['visible', 'hidden'] as const, 'Status');
-      const review = await this.reviews.setStatus(String(body?.reviewId ?? ''), status);
-      await this.audit.record({ actor: user.name, role: user.role, action: `review.${status}`, entity: 'review', entityId: review.id });
-      return ok(review);
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  /** Moderation queue: reviews across the catalogue (filter by status / productId, paged). */
-  @SubscribeMessage('reviews:admin')
-  async reviewsAdmin(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body?: { status?: 'visible' | 'hidden'; productId?: string; limit?: number; offset?: number },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.can(user.role, 'moderate')) return fail('Not allowed.');
-      const status = body?.status === undefined ? undefined : oneOf(body.status, ['visible', 'hidden'] as const, 'Status');
-      return ok(await this.reviews.listForModeration({ status, productId: body?.productId ? String(body.productId) : undefined }, body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('reviews:create')
-  async reviewsCreate(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { productId: string; rating: number; text: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(
-        await this.reviews.create({ id: user.id, name: user.name }, body),
-      );
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('questions:list')
-  async questionsList(@MessageBody() body: { productId: string }) {
-    return ok(await this.reviews.listQuestions(body.productId));
-  }
-
-  @SubscribeMessage('questions:ask')
-  async questionsAsk(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { productId: string; question: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.reviews.ask({ id: user.id, name: user.name }, body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('questions:answer')
-  async questionsAnswer(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string; answer: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!String(body?.answer ?? '').trim()) return fail('Write an answer first.');
-      if (!this.isAdmin(user.role)) {
-        // A seller may answer questions about THEIR OWN products only.
-        if (user.role !== 'seller') return fail('Not allowed.');
-        const seller = await this.sellersSvc.byUser(user.id);
-        const pid = await this.reviews.productIdOfQuestion(body.id);
-        const owner = pid ? await this.reviews.productSellerId(pid) : null;
-        if (!seller || !owner || owner !== seller.id) return fail('Not allowed.');
-      }
-      return ok(await this.reviews.answer(body.id, body.answer.trim().slice(0, 2000), user.name));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  // ---- Support tickets ----------------------------------------------------
-  @SubscribeMessage('support:list')
-  async supportList(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      return ok(await this.support.list(this.requireUser(client)));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('support:open')
-  async supportOpen(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody()
-    body: { subject: string; category?: string; message: string; orderId?: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.support.open({ id: user.id, name: user.name }, body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('support:reply')
-  async supportReply(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string; text: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(
-        await this.support.reply(body.id, { id: user.id, name: user.name, role: user.role }, body.text),
-      );
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('support:setStatus')
-  async supportSetStatus(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string; status: 'open' | 'pending' | 'resolved' | 'closed' },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Not allowed.');
-      return ok(await this.support.setStatus(body.id, body.status));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
   // ---- Promotions & flash sales ------------------------------------------
   @SubscribeMessage('promos:list')
   async promosList(@ConnectedSocket() client: AuthedSocket) {
@@ -1342,11 +1152,20 @@ export class RealtimeGateway
   @SubscribeMessage('promos:validate')
   async promosValidate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { code: string; subtotalUsd: number },
+    @MessageBody() body: { code: string; subtotalUsd: number; items?: { productId: string; qty?: number }[] },
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.promos.validate(String(body?.code ?? ''), Number(body?.subtotalUsd), user.id));
+      // A store coupon discounts only that store's lines: price the cart here (the same effective prices checkout uses).
+      let lines: { productId: string; sellerId: string | null; priceUsd: number; qty: number }[] | undefined;
+      if (Array.isArray(body?.items) && body.items.length) {
+        lines = [];
+        for (const it of body.items.slice(0, 100)) {
+          const p = await this.products.get(String(it?.productId ?? ''));
+          if (p) lines.push({ productId: p.id, sellerId: p.sellerId ?? null, priceUsd: p.price, qty: Math.max(1, Math.floor(Number(it?.qty) || 1)) });
+        }
+      }
+      return ok(await this.promos.validate(String(body?.code ?? ''), Number(body?.subtotalUsd), user.id, lines));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1391,10 +1210,10 @@ export class RealtimeGateway
   @SubscribeMessage('flashsales:list')
   async flashSalesList(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body?: { all?: boolean },
+    @MessageBody() body?: { all?: boolean; upcoming?: boolean },
   ) {
     const all = body?.all === true && this.can(client.data.user?.role ?? 'guest', 'content');
-    return ok(await this.promos.listFlashSales(all));
+    return ok(await this.promos.listFlashSales(all, { upcoming: body?.upcoming === true }));
   }
 
   /** End a flash sale now. */
@@ -1558,8 +1377,10 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'seller') return fail('Only seller accounts can open a store.');
+      const staff = await this.kit.ctx.membership(user.id);
+      if (staff && staff.member !== 'owner') return fail('You work for a store as staff. Leave its team before opening your own store.');
       return ok(
-        await this.sellersSvc.register({ id: user.id, name: user.name }, body),
+        await this.sellersSvc.register({ id: user.id, name: user.name }, staff ? body : await this.kit.kycBody(user.id, body)),
       );
     } catch (e) {
       return fail((e as Error).message);
@@ -1574,8 +1395,9 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      return ok(await this.sellersSvc.resubmit(user.id, body));
+      // allowSuspended: the service explains why a suspended store cannot resubmit.
+      const ctx = await this.kit.ctx.resolve(user, 'account', { allowSuspended: true });
+      return ok(await this.sellersSvc.resubmit(ctx.actor.id, await this.kit.kycBody(ctx.actor.id, body)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1609,7 +1431,7 @@ export class RealtimeGateway
   async sellersStats(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      const seller = await this.sellersSvc.byUser(user.id);
+      const seller = (await this.kit.orNull(user, 'insight', { write: false }))?.seller;
       const sellerId = seller?.id;
       if (!sellerId) return ok({ products: 0, orders: 0, revenue: 0, paidOut: 0, pendingPayouts: 0 });
       return ok(await this.sellersSvc.stats(sellerId));
@@ -1623,8 +1445,7 @@ export class RealtimeGateway
   async sellersMine(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      const seller = await this.sellersSvc.byUser(user.id);
-      return ok(seller ? await this.sellersSvc.withPlanState(seller) : null);
+      return ok(await this.kit.mine(user));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1647,8 +1468,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      return ok(await this.sellersSvc.subscribe(user.id, body ?? ({} as never)));
+      const ctx = await this.kit.ctx.resolve(user, 'account', { allowSuspended: true });
+      return ok(await this.sellersSvc.subscribe(ctx.actor.id, body ?? ({} as never)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1667,13 +1488,14 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('analytics:warehouse')
-  async analyticsWarehouse(@ConnectedSocket() client: AuthedSocket) {
+  async analyticsWarehouse(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
         return fail('Staff only.');
       }
-      return ok(await this.analytics.warehouseStats());
+      // Staff see their own warehouse's figures; admins see all, or one warehouse when they ask.
+      return ok(await this.analytics.warehouseStats(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1719,8 +1541,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       let seller;
       if (user.role === 'seller') {
-        seller = await this.sellersSvc.byUser(user.id);
-        if (!seller) return fail('Open a store first.');
+        seller = (await this.kit.ctx.resolve(user, 'insight', { write: false })).seller;
       } else if (this.can(user.role, 'insight')) {
         seller = body?.sellerId ? await this.sellersSvc.get(String(body.sellerId)) : null;
         if (!seller) return fail('Choose a store (sellerId).');
@@ -1833,16 +1654,16 @@ export class RealtimeGateway
     return ok(this.roles.defs());
   }
 
-  /** Tie a rider or warehouse staff member to a warehouse (and a rider's preferred zones). */
+  /** Move a rider or warehouse staff member to a (different) warehouse. They always belong to one. */
   @SubscribeMessage('roles:setHub')
   async rolesSetHub(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { userId: string; hubId: string | null; preferredZones?: string[] },
+    @MessageBody() body: { userId: string; hubId: string | null },
   ) {
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'hubs')) return fail('Not allowed.');
-      const out = await this.roles.setHub(String(body?.userId ?? ''), body?.hubId ? String(body.hubId) : null, body?.preferredZones);
+      const out = await this.roles.setHub(String(body?.userId ?? ''), body?.hubId ? String(body.hubId) : null);
       await this.audit.record({ actor: user.name, role: user.role, action: 'staff.hub', entity: 'user', entityId: out.id, detail: out.hubId ?? 'none' });
       // Reconnect them so their sockets join the new warehouse's rooms.
       this.kick(out.id);
@@ -1852,7 +1673,7 @@ export class RealtimeGateway
     }
   }
 
-  /** A rider's home warehouse and zones (profile and "My zone"). */
+  /** A rider's home warehouse (profile). */
   @SubscribeMessage('rider:assignment')
   async riderAssignment(@ConnectedSocket() client: AuthedSocket) {
     try {
@@ -1878,7 +1699,7 @@ export class RealtimeGateway
   @SubscribeMessage('roles:setRole')
   async rolesSetRole(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string; role: string },
+    @MessageBody() body: { id: string; role: string; hubId?: string | null },
   ) {
     try {
       const user = this.requireUser(client);
@@ -1886,7 +1707,7 @@ export class RealtimeGateway
       const role = oneOf(body?.role, ALL_ROLES, 'Role');
       const id = String(body?.id ?? '');
       if (id === user.id) return fail('You cannot change your own role.');
-      await this.roles.setRole(id, role);
+      await this.roles.setRole(id, role, body?.hubId ? String(body.hubId) : null);
       await this.audit.record({ actor: user.name, role: user.role, action: 'role.set', entity: 'user', entityId: id, detail: role });
       this.kick(id); // old privileges must not survive on an open socket
       return ok({ id, role });
@@ -1911,7 +1732,7 @@ export class RealtimeGateway
   @SubscribeMessage('roles:createStaff')
   async rolesCreateStaff(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { email: string; name: string; role: string; phone?: string },
+    @MessageBody() body: { email: string; name: string; role: string; phone?: string; hubId?: string; warehouseTier?: string },
   ) {
     try {
       const user = this.requireUser(client);
@@ -1919,7 +1740,14 @@ export class RealtimeGateway
       const role = oneOf(body?.role, ['rider', 'warehouse_staff', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation'] as const, 'Role');
       const email = str(body?.email, 'Email', { max: 200 }).toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email.');
-      const created = await this.roles.createStaff({ email, name: str(body?.name, 'Name', { min: 2, max: 100 }), role, phone: body?.phone ? str(body.phone, 'Phone', { max: 30 }) : null });
+      const created = await this.roles.createStaff({
+        email,
+        name: str(body?.name, 'Name', { min: 2, max: 100 }),
+        role,
+        phone: body?.phone ? str(body.phone, 'Phone', { max: 30 }) : null,
+        hubId: body?.hubId ? String(body.hubId) : null,
+        warehouseTier: body?.warehouseTier ? String(body.warehouseTier) : null,
+      });
       await this.audit.record({ actor: user.name, role: user.role, action: 'staff.created', entity: 'user', entityId: created.id, detail: `${role} ${email}` });
       return ok(created);
     } catch (e) {
@@ -1979,11 +1807,13 @@ export class RealtimeGateway
   @SubscribeMessage('warehouse:parcels')
   async whParcels(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { stage?: string; limit?: number; offset?: number },
+    @MessageBody() body: { stage?: string; hubId?: string; limit?: number; offset?: number },
   ) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.parcels(body?.stage, body));
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      // Staff see their own warehouse's parcels; admins may look at one warehouse.
+      return ok(await this.warehouse.parcels(body?.stage, body, await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1992,11 +1822,12 @@ export class RealtimeGateway
   @SubscribeMessage('warehouse:aged')
   async whAged(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body?: { limit?: number; offset?: number },
+    @MessageBody() body?: { hubId?: string; limit?: number; offset?: number },
   ) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.aged(body));
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      return ok(await this.warehouse.aged(body, await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2005,26 +1836,29 @@ export class RealtimeGateway
   @SubscribeMessage('warehouse:inventory')
   async whInventory(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body?: { limit?: number; offset?: number },
+    @MessageBody() body?: { limit?: number; offset?: number; hubId?: string },
   ) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.inventory(body));
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      return ok(await this.warehouse.inventory(body, await this.hubScope(user, (body as { hubId?: string })?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
   @SubscribeMessage('warehouse:batches')
-  async whBatches(@ConnectedSocket() client: AuthedSocket) {
+  async whBatches(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.listBatches());
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      return ok(await this.warehouse.listBatches(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
+  /** Give several tasks to one rider (supervisor tier or above): same checks as `logistics:assign`, all or nothing. */
   @SubscribeMessage('warehouse:buildBatch')
   async whBuildBatch(
     @ConnectedSocket() client: AuthedSocket,
@@ -2037,20 +1871,18 @@ export class RealtimeGateway
       const rider = await this.users.findById(String(body?.riderId ?? ''));
       if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
       if (!Array.isArray(body.taskIds) || body.taskIds.length === 0 || body.taskIds.length > 200) return fail('Select 1–200 parcels.');
-      // A batch belongs to the staff member's warehouse; its rider must work there (or not be tied to one).
-      const hubId = (await this.hubScope(user, body.hubId)) ?? null;
-      if (hubId && rider.hubId && rider.hubId !== hubId) return fail('This rider works at another warehouse.');
-      return ok(await this.warehouse.buildBatch(hubId, body.taskIds, { id: rider.id, name: rider.name }));
+      return ok(await this.warehouse.buildBatch(await this.deskActor(user), body.taskIds.map(String), { id: rider.id, name: rider.name, hubId: rider.hubId ?? null }));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
   @SubscribeMessage('warehouse:reconcile')
-  async whReconcile(@ConnectedSocket() client: AuthedSocket) {
+  async whReconcile(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.reconcile());
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Staff only.');
+      return ok(await this.warehouse.reconcile(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2107,7 +1939,7 @@ export class RealtimeGateway
   async campaignsList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.campaigns.list(user));
+      return ok(await this.campaigns.list((await this.sellerActor(user, 'catalog_read', { write: false })) as typeof user));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2125,6 +1957,7 @@ export class RealtimeGateway
       budgetUsd?: number;
       startDate?: string;
       endDate?: string;
+      draft?: boolean;
     },
   ) {
     try {
@@ -2132,8 +1965,11 @@ export class RealtimeGateway
       if (user.role !== 'seller' && !this.isAdmin(user.role)) {
         return fail('Only sellers or admins can create campaigns.');
       }
-      if (user.role === 'seller' && (await this.sellersSvc.byUser(user.id))?.status !== 'approved') {
-        return fail('Your store must be approved before you can run campaigns.');
+      if (user.role === 'seller') {
+        const ctx = await this.kit.ctx.resolve(user, 'catalog');
+        if (ctx.seller.status !== 'approved') return fail('Your store must be approved before you can run campaigns.');
+        await this.kit.planGate.assert(ctx.seller, 'promotions');
+        return ok(await this.campaigns.create(ctx.actor, body));
       }
       return ok(await this.campaigns.create(user, body));
     } catch (e) {
@@ -2151,7 +1987,8 @@ export class RealtimeGateway
       if (user.role !== 'seller' && !this.isAdmin(user.role)) {
         return fail('Not allowed.');
       }
-      return ok(await this.campaigns.update(user, body.id, body.patch));
+      const who = user.role === 'seller' ? (await this.kit.ctx.resolve(user, 'catalog')).actor : user;
+      return ok(await this.campaigns.update(who, body.id, body.patch));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2166,7 +2003,8 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (user.role !== 'seller') return fail('Only the seller can withdraw a campaign.');
-      return ok(await this.campaigns.withdraw(user, String(body?.id ?? '')));
+      const ctx = await this.kit.ctx.resolve(user, 'catalog');
+      return ok(await this.campaigns.withdraw(ctx.actor, String(body?.id ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2179,115 +2017,14 @@ export class RealtimeGateway
     body: {
       id: string;
       status: 'draft' | 'pending' | 'scheduled' | 'active' | 'ended' | 'rejected';
+      reason?: string;
     },
   ) {
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role)) return fail('Admins only.');
       oneOf(body?.status, ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'] as const, 'Status');
-      return ok(await this.campaigns.setStatus(body.id, body.status));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  // ---- Replacements -------------------------------------------------------
-  @SubscribeMessage('replacements:list')
-  async replacementsList(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.replacements.list(user));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('replacements:create')
-  async replacementsCreate(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody()
-    body: {
-      orderId: string;
-      sku: string;
-      productName: string;
-      reason?: string;
-      condition?: string;
-    },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.replacements.create(user, body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('replacements:setStatus')
-  async replacementsSetStatus(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody()
-    body: {
-      id: string;
-      status: 'requested' | 'approved' | 'received' | 'allocated' | 'dispatched' | 'rejected';
-    },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
-      oneOf(body?.status, ['requested', 'approved', 'received', 'allocated', 'dispatched', 'rejected'] as const, 'Status');
-      return ok(await this.replacements.setStatus(body.id, body.status));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  // ---- Exchanges ----------------------------------------------------------
-  @SubscribeMessage('exchanges:list')
-  async exchangesList(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.exchanges.list(user));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('exchanges:create')
-  async exchangesCreate(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody()
-    body: {
-      orderId: string;
-      fromSku: string;
-      fromName: string;
-      toSku: string;
-      toName: string;
-      priceDiffUsd?: number;
-      reason?: string;
-    },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.exchanges.create(user, body));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('exchanges:setStatus')
-  async exchangesSetStatus(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody()
-    body: {
-      id: string;
-      status: 'requested' | 'approved' | 'received' | 'ready' | 'dispatched' | 'rejected';
-    },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
-      oneOf(body?.status, ['requested', 'approved', 'received', 'ready', 'dispatched', 'rejected'] as const, 'Status');
-      return ok(await this.exchanges.setStatus(body.id, body.status));
+      return ok(await this.campaigns.setStatus(body.id, body.status, body.reason));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2302,7 +2039,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
-      return ok(await this.warehouse.listExceptions(body?.status));
+      return ok(await this.warehouse.listExceptions(body?.status, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2325,7 +2062,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
       if (!body?.notes) return fail('notes is required.');
-      return ok(await this.warehouse.createException(user.name, body));
+      return ok(await this.warehouse.createException(user.name, body, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2345,7 +2082,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
       return ok(
-        await this.warehouse.setExceptionStatus(body.id, body.status, body.resolution),
+        await this.warehouse.setExceptionStatus(body.id, body.status, body.resolution, user.role === 'warehouse_staff' ? await this.hubScope(user) : null),
       );
     } catch (e) {
       return fail((e as Error).message);
@@ -2377,7 +2114,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       const existing = await this.products.get(body.id);
       if (!existing) return fail('Product not found.');
-      const seller = await this.sellersSvc.byUser(user.id);
+      const seller = await this.sellerFor(user, 'catalog');
       const isOwner =
         existing.sellerId === user.id ||
         (seller != null && existing.sellerId === seller.id);
@@ -2394,35 +2131,26 @@ export class RealtimeGateway
   @SubscribeMessage('sellers:update')
   async sellersUpdate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { name?: string; pickupAddress?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
+    @MessageBody() body: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
+      const ctx = await this.kit.ctx.resolve(user, 'storefront');
+      // Vacation mode, handling time and policies are validated first, so a bad value saves nothing.
+      if (touchesStorefront(body)) await this.kit.storefront.update(ctx, body as never);
       return ok(
-        await this.sellersSvc.updateProfile(user.id, {
+        await this.sellersSvc.updateProfile(ctx.actor.id, {
           name: body?.name,
           pickupAddress: body?.pickupAddress,
+          pickupLat: body?.pickupLat,
+          pickupLng: body?.pickupLng,
+          pickupAreaId: body?.pickupAreaId,
           logoUrl: body?.logoUrl,
           bannerUrl: body?.bannerUrl,
           description: body?.description,
           descriptionFr: body?.descriptionFr,
         }),
       );
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  /** Mark a review helpful. */
-  @SubscribeMessage('reviews:helpful')
-  async reviewsHelpful(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string },
-  ) {
-    try {
-      this.requireUser(client);
-      return ok(await this.reviews.markHelpful(body.id));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2462,36 +2190,8 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
-      // The assignee must be a real, active rider account.
-      const rider = await this.users.findById(String(body?.riderId ?? ''));
-      if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
-      const staffHubId = user.role === 'warehouse_staff' ? await this.hubScope(user) : null;
-      return ok(await this.delivery.assign(body.taskId, { id: rider.id, name: rider.name, hubId: rider.hubId ?? null }, staffHubId));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  // ---- Notifications ------------------------------------------------------
-  @SubscribeMessage('notifications:list')
-  async notificationsList(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      const user = this.requireUser(client);
-      return ok(await this.notifications.listForUser(user.id, user.role));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('notifications:markRead')
-  async notificationsMarkRead(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string },
-  ) {
-    try {
-      const user = this.requireUser(client);
-      await this.notifications.markRead(String(body?.id ?? ''), user.id);
-      return ok({ id: body.id });
+      // Same rules as `logistics:assign`: supervisor tier or above, the task's warehouse, a rider who may run it.
+      return ok(await this.logistics.assign(String(body?.taskId ?? ''), String(body?.riderId ?? ''), await this.deskActor(user)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2576,7 +2276,10 @@ export class RealtimeGateway
       if (user.role !== 'customer' && user.role !== 'seller') {
         return fail('Staff accounts are removed by an administrator.');
       }
+      if (user.role === 'seller') await this.kit.account.check(user); // open orders / unpaid earnings block closing a store
       await this.auth.deleteAccount(user.id, body?.password);
+      if (user.role === 'seller') await this.kit.account.finish(user);
+      await this.kit.chat.forgetBuyer(user.id);
       for (const a of await this.addresses.list(user.id)) {
         await this.addresses.remove(user.id, a.id);
       }
@@ -2632,14 +2335,4 @@ export class RealtimeGateway
     }
   }
 
-  @SubscribeMessage('notifications:markAllRead')
-  async notificationsMarkAllRead(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      const user = this.requireUser(client);
-      const count = await this.notifications.markAllRead(user.id);
-      return ok({ count });
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
 }

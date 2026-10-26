@@ -13,6 +13,8 @@ import {
 } from '../database/entities';
 import { WarehouseService } from './warehouse.service';
 import { RiderService } from './rider.service';
+import { LogisticsModule } from '../logistics/logistics.module';
+import { GeoModule } from '../geo/geo.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProductsModule } from '../products/products.module';
 
@@ -29,6 +31,8 @@ import { ProductsModule } from '../products/products.module';
       User,
       Setting,
     ]),
+    LogisticsModule,
+    GeoModule,
     NotificationsModule,
     ProductsModule,
   ],

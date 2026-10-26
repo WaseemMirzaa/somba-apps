@@ -102,7 +102,6 @@ void main() {
       await until(() => store.hydrated, what: 'first download');
       expect(store.products.any((p) => p.id == productId), isTrue, reason: 'live catalogue includes the new listing');
       expect(store.categories, isNotEmpty);
-      expect(store.zones.map((z) => z.id), containsAll(['gombe', 'limete']), reason: 'delivery zones come from the server');
       expect(store.fxRate, isNotNull);
       expect(store.prefs['market'], 'DRC');
       expect(store.walletBalance, 0);
@@ -147,19 +146,17 @@ void main() {
     });
 
     test('place an order paid from the wallet; the SERVER prices it', () async {
-      final zone = store.zones.first;
       final order = await store.placeOrder(
         items: [
           {'productId': productId, 'qty': 1},
         ],
         paymentMethod: 'wallet',
-        deliveryFeeUsd: 0, // ignored: the zone decides
-        zoneId: zone.id,
       );
       expect(order.status, 'confirmed');
       expect(order.subtotalUsd, 40);
-      expect(order.deliveryFeeUsd, zone.deliveryFeeUsd);
-      expect(order.totalUsd, 40 + zone.deliveryFeeUsd);
+      // The fee is the warehouse routing's (`delivery:quote`), never the app's: the total is always items + fee.
+      expect(order.deliveryFeeUsd, greaterThanOrEqualTo(0));
+      expect(order.totalUsd, 40 + order.deliveryFeeUsd);
       await until(() => store.walletBalance == 60 - order.totalUsd, what: 'wallet debited live');
       expect(store.orders.first.id, order.id);
       expect(store.orders.first.items.single.productName, contains('Flutter Test Item'));
@@ -172,7 +169,6 @@ void main() {
         ],
         paymentMethod: 'orange_money',
         paymentPhone: '+243 81 234 5678',
-        zoneId: 'gombe',
       );
       expect(order.status, 'pending');
       expect(store.paymentForOrder(order.id)?.status, 'pending');
@@ -191,7 +187,6 @@ void main() {
         ],
         paymentMethod: 'vodacom_mpesa',
         paymentPhone: '+243810000000', // sandbox: numbers ending 0000 are declined
-        zoneId: 'gombe',
       );
       expect(order.status, 'pending');
       final settled = await store.awaitOrderSettled(order.id);
@@ -204,20 +199,14 @@ void main() {
       expect(
         () => store.placeOrder(items: [
           {'productId': productId, 'qty': 1},
-        ], paymentMethod: 'cod', zoneId: 'gombe'),
+        ], paymentMethod: 'cod'),
         throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('not available'))),
       );
       expect(
         () => store.placeOrder(items: [
           {'productId': productId, 'qty': 1},
-        ], paymentMethod: 'orange_money', zoneId: 'gombe'),
+        ], paymentMethod: 'orange_money'),
         throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('phone'))),
-      );
-      expect(
-        () => store.placeOrder(items: [
-          {'productId': productId, 'qty': 1},
-        ], paymentMethod: 'wallet', zoneId: 'atlantis'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('zone'))),
       );
     });
 
@@ -239,7 +228,6 @@ void main() {
       final order = await store.placeOrder(
         items: shop.cart.map((c) => {'productId': c.product.uuid, 'qty': c.qty}).toList(),
         paymentMethod: 'wallet',
-        zoneId: 'gombe',
         promoCode: shop.appliedPromo!.code,
       );
       expect(order.discountUsd, 8);
@@ -265,7 +253,6 @@ void main() {
         items: shop.cart.map((c) => {'productId': c.product.uuid, 'qty': c.qty}).toList(),
         paymentMethod: 'orange_money',
         paymentPhone: '+243 81 234 5678',
-        zoneId: 'gombe',
       );
       expect(order.subtotalUsd, shop.subtotal, reason: 'client total == server total');
       expect(order.subtotalUsd, 60);
@@ -291,7 +278,7 @@ void main() {
         try {
           await store.placeOrder(items: [
             {'productId': productId, 'qty': 1},
-          ], paymentMethod: 'wallet', zoneId: 'gombe');
+          ], paymentMethod: 'wallet');
         } catch (e) {
           refused = e;
         }
@@ -321,8 +308,7 @@ void main() {
             {'productId': productId, 'qty': 1},
           ],
           paymentMethod: 'stripe_card',
-          zoneId: 'gombe',
-        );
+          );
         expect(order.status, 'confirmed');
 
         var info = await store.call('orders:deliveryCode', {'orderId': order.id}) as Map;

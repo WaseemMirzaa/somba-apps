@@ -1,0 +1,4 @@
+/* Texte affiché dans les demandes d’autorisation du système (français). */
+"NSLocationWhenInUseUsageDescription" = "Somba&Teka utilise votre position pour placer l’épingle sur votre adresse de livraison quand vous ouvrez la carte. Elle n’est ni suivie ni partagée.";
+"NSPhotoLibraryUsageDescription" = "Somba&Teka vous permet de joindre des photos de votre photothèque à un retour, une demande d’aide ou un message à un vendeur.";
+"NSCameraUsageDescription" = "Somba&Teka utilise l’appareil photo pour que vous puissiez photographier un article pour un retour, une demande d’aide ou un message à un vendeur.";

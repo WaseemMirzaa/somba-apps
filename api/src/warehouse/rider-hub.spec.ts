@@ -1,103 +1,68 @@
-import { parsePreferredZones, sameHub, tasksOfHub } from '../common/zones/hub-scope';
+import { DataSource } from 'typeorm';
+import { DeliveryTask, ENTITIES, Hub, Order, User } from '../database/entities';
+import { tasksOfHub } from '../logistics/hub-scope';
 import { RiderService } from './rider.service';
 
-type Task = { id: string; riderId: string | null; status: string; zoneId: string | null; hubId: string | null; orderId: string; createdAt: Date };
-type Rider = { id: string; role: string; active: boolean; hubId: string | null; preferredZones: string | null; name: string; phone: string | null };
+/** Riders belong to one warehouse and only ever see the tasks assigned to them. */
+describe('riders, warehouses and tasks', () => {
+  let ds: DataSource;
+  let svc: RiderService;
+  let seq = 0;
 
-/** TypeORM-like matching for the shapes the service builds: equality, IsNull() and In([...]), OR-ed arrays. */
-function matches(row: Record<string, unknown>, where: Record<string, unknown> | Record<string, unknown>[]): boolean {
-  if (Array.isArray(where)) return where.some((w) => matches(row, w));
-  return Object.entries(where).every(([k, v]) => {
-    const op = v as { _type?: string; _value?: unknown } | null;
-    if (op && typeof op === 'object' && op._type === 'isNull') return row[k] == null;
-    if (op && typeof op === 'object' && op._type === 'in') return (op._value as unknown[]).includes(row[k]);
-    return row[k] === v;
+  const mkHub = (name: string) => ds.getRepository(Hub).save(ds.getRepository(Hub).create({ name, city: 'Kinshasa', lat: -4.3, lng: 15.3 }));
+  const mkRider = (hubId: string | null, active = true) => {
+    const n = ++seq;
+    return ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: `e${n}`, email: `r${n}@t.test`, passwordHash: 'x', name: `Rider ${n}`, role: 'rider', hubId, active }));
+  };
+  const mkTask = (o: Partial<DeliveryTask> & { orderId: string }) =>
+    ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderReference: `SOM-${++seq}`, status: 'unassigned', kind: 'delivery', ...o }));
+
+  beforeEach(async () => {
+    ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: ENTITIES, synchronize: true });
+    await ds.initialize();
+    const logistics = { viewMany: async (rows: DeliveryTask[]) => rows.map((t) => ({ kind: t.kind, from: null, to: null })) };
+    svc = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics as never);
   });
-}
+  afterEach(async () => ds.destroy());
 
-function make(tasks: Task[], riders: Rider[], zones: unknown[] = []) {
-  const repo = <T extends Record<string, unknown>>(rows: T[]) => ({
-    find: async ({ where }: { where?: Record<string, unknown> | Record<string, unknown>[] } = {}) => rows.filter((r) => !where || matches(r, where)),
-    findOne: async ({ where }: { where: Record<string, unknown> }) => rows.find((r) => matches(r, where)) ?? null,
+  it("lists a warehouse's active riders with their open workload, and every rider for an admin", async () => {
+    const [h1, h2] = [await mkHub('H1'), await mkHub('H2')];
+    const [r1, r2, r3] = [await mkRider(h1.id), await mkRider(h2.id), await mkRider(h1.id, false)];
+    await mkTask({ orderId: 'o1', riderId: r1.id, status: 'assigned', hubId: h1.id });
+    await mkTask({ orderId: 'o2', riderId: r1.id, status: 'delivered', hubId: h1.id });
+    const h1Riders = await svc.activeRiders(h1.id);
+    expect(h1Riders.map((r) => r.id)).toEqual([r1.id]);
+    expect(h1Riders[0].activeTasks).toBe(1);
+    expect((await svc.activeRiders()).map((r) => r.id).sort()).toEqual([r1.id, r2.id].sort());
+    expect((await svc.activeRiders()).map((r) => r.id)).not.toContain(r3.id);
   });
-  const settings = { findOne: async () => ({ key: 'deliveryZones', value: JSON.stringify(zones) }) };
-  const hubs = repo([{ id: 'H1', name: 'Kinshasa Hub', city: 'Kinshasa' }, { id: 'H2', name: 'Paris Hub', city: 'Paris' }]);
-  return new RiderService(repo(tasks) as never, repo([]) as never, repo(riders) as never, hubs as never, settings as never);
-}
 
-const t = (id: string, hubId: string | null, zoneId: string | null, extra: Partial<Task> = {}): Task => ({
-  id,
-  riderId: null,
-  status: 'unassigned',
-  zoneId,
-  hubId,
-  orderId: `o-${id}`,
-  createdAt: new Date(),
-  ...extra,
-});
-const rider = (id: string, hubId: string | null, preferredZones: string[] = []): Rider => ({
-  id,
-  role: 'rider',
-  active: true,
-  hubId,
-  preferredZones: JSON.stringify(preferredZones),
-  name: id,
-  phone: null,
-});
+  it("shows a rider only the tasks assigned to them: no open pool, nothing of another rider's", async () => {
+    const h1 = await mkHub('H1');
+    const [me, other] = [await mkRider(h1.id), await mkRider(h1.id)];
+    const mine = await mkTask({ orderId: 'o1', riderId: me.id, status: 'assigned', hubId: h1.id });
+    await mkTask({ orderId: 'o2', riderId: null, status: 'unassigned', hubId: h1.id }); // waiting in the warehouse queue
+    await mkTask({ orderId: 'o3', riderId: other.id, status: 'assigned', hubId: h1.id });
+    const q = await svc.queue(me.id);
+    expect(q.map((t) => t.id)).toEqual([mine.id]);
+    expect(q[0]).toMatchObject({ kind: 'delivery', status: 'assigned', hubId: h1.id });
+    expect('zoneId' in q[0]).toBe(false);
+  });
 
-describe('hub scope helpers', () => {
-  it('limits a bound user to their hub plus unbound tasks, and leaves unbound users alone', () => {
+  it("tells a rider their warehouse, with its position (no zones any more)", async () => {
+    const h1 = await mkHub('H1');
+    const me = await mkRider(h1.id);
+    const a = await svc.assignment(me.id);
+    expect(a.hub).toMatchObject({ id: h1.id, name: 'H1', lat: -4.3, lng: 15.3 });
+    expect(Object.keys(a)).toEqual(['hub']);
+  });
+
+  it("a warehouse's task filter covers the legs it manages, sends or receives", () => {
+    expect(tasksOfHub({ status: 'unassigned' }, 'H1')).toEqual([
+      { status: 'unassigned', hubId: 'H1' },
+      { status: 'unassigned', fromHubId: 'H1' },
+      { status: 'unassigned', toHubId: 'H1' },
+    ]);
     expect(tasksOfHub({ status: 'unassigned' }, null)).toEqual({ status: 'unassigned' });
-    const scoped = tasksOfHub({ status: 'unassigned' }, 'H1') as Record<string, unknown>[];
-    expect(scoped).toHaveLength(2);
-    expect(scoped[0]).toEqual({ status: 'unassigned', hubId: 'H1' });
-  });
-
-  it('only refuses when both sides name different hubs', () => {
-    expect(sameHub('H1', 'H1')).toBe(true);
-    expect(sameHub('H1', null)).toBe(true);
-    expect(sameHub(null, 'H2')).toBe(true);
-    expect(sameHub('H1', 'H2')).toBe(false);
-  });
-
-  it('reads preferred zones defensively', () => {
-    expect(parsePreferredZones('["gombe",3,"limete"]')).toEqual(['gombe', 'limete']);
-    expect(parsePreferredZones('not json')).toEqual([]);
-    expect(parsePreferredZones(null)).toEqual([]);
-  });
-});
-
-describe('RiderService warehouse scoping', () => {
-  const tasks = [t('a', 'H1', 'limete'), t('b', 'H2', 'zone-a'), t('c', null, null), t('d', 'H1', 'gombe'), t('e', 'H2', 'zone-b', { riderId: 'r1', status: 'assigned' })];
-  const zones = [
-    { id: 'gombe', name: 'Gombe', city: 'Kinshasa', feeUsd: 3, hubId: 'H1' },
-    { id: 'limete', name: 'Limete', city: 'Kinshasa', feeUsd: 5, hubId: 'H1' },
-  ];
-
-  it("shows a bound rider their warehouse's open tasks, unbound ones and their own, preferred zones first", async () => {
-    const svc = make(tasks, [rider('r1', 'H1', ['gombe'])], zones);
-    const q = await svc.queue('r1');
-    expect(q.map((x) => x.id).sort()).toEqual(['a', 'c', 'd', 'e']);
-    expect(q[0].id).toBe('d');
-    expect(q[0]).toMatchObject({ preferred: true, zoneName: 'Gombe', hubId: 'H1' });
-  });
-
-  it('shows an unbound rider every open task', async () => {
-    const svc = make(tasks, [rider('r2', null)], zones);
-    expect((await svc.queue('r2')).map((x) => x.id).sort()).toEqual(['a', 'b', 'c', 'd']);
-  });
-
-  it("lists a warehouse's riders plus riders not tied to one", async () => {
-    const svc = make([], [rider('r1', 'H1'), rider('r2', 'H2'), rider('r3', null)], zones);
-    expect((await svc.activeRiders('H1')).map((r) => r.id).sort()).toEqual(['r1', 'r3']);
-    expect((await svc.activeRiders()).map((r) => r.id).sort()).toEqual(['r1', 'r2', 'r3']);
-  });
-
-  it("tells a rider their warehouse, its zones and their preferred zones by name", async () => {
-    const svc = make([], [rider('r1', 'H1', ['gombe'])], zones);
-    const a = await svc.assignment('r1');
-    expect(a.hub).toMatchObject({ id: 'H1', name: 'Kinshasa Hub' });
-    expect(a.hubZones.map((z) => z.id)).toEqual(['gombe', 'limete']);
-    expect(a.preferredZones).toEqual([{ id: 'gombe', name: 'Gombe' }]);
   });
 });

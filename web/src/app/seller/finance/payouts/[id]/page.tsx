@@ -56,7 +56,12 @@ export default function SellerPayoutDetailPage() {
             { label: t("date"), value: payout.date },
             {
               label: fr ? "Réf. du virement" : "Transfer reference",
-              value: payout.status === "paid" ? payout.providerRef || (payout.methodKey === "wallet" ? (fr ? "Crédit portefeuille" : "Wallet credit") : "—") : fr ? "Renseignée au paiement" : "Shown once paid",
+              value:
+                payout.status === "paid"
+                  ? payout.providerRef || (payout.methodKey === "wallet" ? (fr ? "Crédit portefeuille" : "Wallet credit") : "—")
+                  : payout.status === "rejected"
+                    ? "—"
+                    : fr ? "Renseignée au paiement" : "Shown once paid",
             },
             ...(payout.note ? [{ label: fr ? "Note de la finance" : "Finance note", value: payout.note, full: true }] : []),
           ]}

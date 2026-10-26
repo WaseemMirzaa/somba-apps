@@ -70,7 +70,6 @@ void main() {
     final store = RiderStore.instance;
     store.user = null;
     store.myTasks.clear();
-    store.pool.clear();
     store.notifications.clear();
   });
 
@@ -156,10 +155,10 @@ void main() {
       expect(find.textContaining('Coque'), findsNothing);
     });
 
-    testWidgets('an available delivery (the pool) shows the French names too', (tester) async {
-      RiderStore.instance.pool
+    testWidgets('a finished delivery (Done tab) shows the French names too', (tester) async {
+      RiderStore.instance.myTasks
         ..clear()
-        ..add(_task('unassigned', items: lines));
+        ..add(_task('delivered', items: lines));
       await show(tester, 'fr', const Scaffold(body: DeliveriesScreen()));
       await tester.tap(find.byKey(const ValueKey('tab-1')));
       await tester.pump(const Duration(milliseconds: 300));

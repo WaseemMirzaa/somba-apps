@@ -33,7 +33,7 @@ export function AnalyticsKpiCard({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
+          <p className="mt-1 break-words font-[family-name:var(--font-display)] text-xl font-bold leading-tight text-slate-900 sm:text-2xl">{value}</p>
           <p className={cn("mt-1 flex items-center gap-0.5 text-xs font-semibold", good ? "text-emerald-600" : "text-red-500")}>
             {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
             {Math.abs(change)}% {fr ? "vs période précédente" : "vs last period"}

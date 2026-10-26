@@ -82,10 +82,12 @@ class EarningsScreen extends StatelessWidget {
         child: Row(children: [
           Container(height: 42, width: 42, decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color)),
           const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
-            Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-          ]),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+              Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            ]),
+          ),
         ]),
       );
 }

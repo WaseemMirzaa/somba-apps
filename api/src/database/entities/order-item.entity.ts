@@ -90,6 +90,10 @@ export class OrderItem {
   /** Money given back for this line alone (seller cancellation). */
   @Column({ type: 'float', default: 0 })
   refundedUsd: number;
+  /** This line's share of a store coupon (paid by the seller: it comes off the line's earnings). */
+  @Column({ type: 'float', default: 0 })
+  couponDiscountUsd: number;
+
   /** Platform commission % frozen when the order was placed (a later rate change never rewrites history). */
   @Column({ type: 'float', default: 0 })
   commissionPct: number;

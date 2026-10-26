@@ -52,6 +52,9 @@ export const translations = {
     exchanges: "Exchanges",
     exceptions: "Exceptions",
     warehouses: "Warehouses",
+    geography: "Geography",
+    lanes: "Lanes",
+    transferRuns: "Transfer runs",
     warehouseStaff: "Warehouse Staff",
     inbound: "Inbound",
     sorting: "Sorting",
@@ -61,7 +64,6 @@ export const translations = {
     shipping: "Shipping",
     reviews: "Reviews",
     payouts: "Payouts",
-    zones: "Zones",
     fulfillmentOps: "Fulfillment Ops",
     moderation: "Moderation",
     disputes: "Disputes",
@@ -97,7 +99,6 @@ export const translations = {
     email: "Email",
     phone: "Phone",
     customer: "Customer",
-    zone: "Zone",
     amount: "Amount",
     date: "Date",
     action: "Action",
@@ -140,10 +141,16 @@ export const translations = {
     activeTasks: "Active Tasks",
     completedToday: "Completed Today",
     earnings: "Earnings",
-    myZone: "My Zone",
     markDelivered: "Mark Delivered",
     navigate: "Navigate",
     callCustomer: "Call Customer",
+    // @@WH-KEYS-EN
+    desk: "Hub desk",
+    custody: "In custody",
+    myWarehouse: "My warehouse",
+    adminWarehouseDesk: "Warehouse desk",
+    // @@ADMIN-KEYS-EN
+    // @@SHOP-KEYS-EN
   },
   fr: {
     brand: "Somba&Teka",
@@ -196,6 +203,9 @@ export const translations = {
     exchanges: "Échanges",
     exceptions: "Exceptions",
     warehouses: "Entrepôts",
+    geography: "Géographie",
+    lanes: "Liaisons",
+    transferRuns: "Navettes de transfert",
     warehouseStaff: "Personnel d'entrepôt",
     inbound: "Arrivages",
     sorting: "Tri",
@@ -205,7 +215,6 @@ export const translations = {
     shipping: "Expédition",
     reviews: "Avis",
     payouts: "Paiements",
-    zones: "Zones",
     fulfillmentOps: "Logistique",
     moderation: "Modération",
     disputes: "Litiges",
@@ -241,7 +250,6 @@ export const translations = {
     email: "E-mail",
     phone: "Téléphone",
     customer: "Client",
-    zone: "Zone",
     amount: "Montant",
     date: "Date",
     action: "Action",
@@ -284,10 +292,16 @@ export const translations = {
     activeTasks: "Tâches actives",
     completedToday: "Terminées aujourd'hui",
     earnings: "Gains",
-    myZone: "Ma zone",
     markDelivered: "Marquer livré",
     navigate: "Naviguer",
     callCustomer: "Appeler le client",
+    // @@WH-KEYS-FR
+    desk: "Bureau",
+    custody: "Colis en garde",
+    myWarehouse: "Mon entrepôt",
+    adminWarehouseDesk: "Bureau entrepôt",
+    // @@ADMIN-KEYS-FR
+    // @@SHOP-KEYS-FR
   },
 } as const;
 

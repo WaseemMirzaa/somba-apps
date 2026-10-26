@@ -6,19 +6,19 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { useMyOrders } from "@/lib/orders";
 import { useLocale } from "@/context/locale-context";
 
-function ExchangeInfo() {
+function ExchangePicker() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const delivered = useMyOrders().filter((o) => o.status === "delivered");
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={fr ? "Demander un échange" : "Request an exchange"} backHref="/shop/orders" />
-      <div className="card-premium space-y-3 p-6 text-sm text-slate-600">
+      <PageHeader title={fr ? "Remplacer ou échanger" : "Replace or exchange"} backHref="/shop/returns" />
+      <div className="card-premium space-y-2 p-6 text-sm text-slate-600">
         <p>
           {fr
-            ? "Les échanges sont traités par notre équipe support. Choisissez une commande livrée ci-dessous et ouvrez un ticket en précisant l'article et la variante souhaitée, ou demandez un retour avec remboursement."
-            : "Exchanges are handled by our support team. Pick a delivered order below and open a ticket naming the item and the variant you want, or request a return for a refund."}
+            ? "Choisissez une commande livrée. Un remplacement envoie une unité neuve du même article ; un échange change la taille, la couleur ou l'option (la différence de prix passe par votre portefeuille). Un livreur de l'entrepôt apporte le nouvel article et reprend l'ancien."
+            : "Pick a delivered order. A replacement sends a new unit of the same item; an exchange swaps the size, colour or option (any price difference goes through your wallet). A warehouse rider brings the new item and collects the old one."}
         </p>
       </div>
       {delivered.length === 0 ? (
@@ -32,12 +32,8 @@ function ExchangeInfo() {
                 <p className="text-xs text-slate-500">{o.date} · {o.itemsCount} {fr ? "articles" : "items"}</p>
               </div>
               <div className="flex gap-3 text-sm">
-                <Link href={`/shop/support?order=${o.id}&subject=${encodeURIComponent(fr ? "Demande d'échange" : "Exchange request")}`} className="btn-primary px-4 py-2 text-xs">
-                  {fr ? "Ouvrir un ticket d'échange" : "Open exchange ticket"}
-                </Link>
-                <Link href={`/shop/orders/${o.id}/return`} className="rounded-xl border px-4 py-2 text-xs font-medium">
-                  {fr ? "Demander un retour" : "Request a return"}
-                </Link>
+                <Link href={`/shop/orders/${o.id}/exchange`} className="btn-primary px-4 py-2 text-xs">{fr ? "Remplacer / échanger" : "Replace / exchange"}</Link>
+                <Link href={`/shop/orders/${o.id}/return`} className="rounded-xl border px-4 py-2 text-xs font-medium">{fr ? "Demander un retour" : "Request a return"}</Link>
               </div>
             </div>
           ))}
@@ -50,7 +46,7 @@ function ExchangeInfo() {
 export default function ShopExchangePage() {
   return (
     <RequireSignIn next="/shop/exchange">
-      <ExchangeInfo />
+      <ExchangePicker />
     </RequireSignIn>
   );
 }

@@ -66,6 +66,9 @@ export interface FinanceSeriesPoint {
 }
 
 export interface FinanceStats {
+  /** Fingerprint of orders / payments / payouts: changes whenever any of them changes. */
+  version?: string;
+  updatedAt?: string | null;
   currency: string;
   commissionPct: number;
   grossGmvUsd: number;
@@ -111,8 +114,9 @@ export interface WarehouseStats {
   failed30: number;
   delivered30: number;
   agedOver24h: number;
-  byZone: { zoneId: string; parcels: number; delivered: number; failed: number }[];
-  byHub: { hubId: string; hub: string; batches30: number }[];
+  /** Open legs per kind (pickup, transfer, delivery...). */
+  byKind?: Record<string, number>;
+  byHub: { hubId: string; hub: string; parcels: number; delivered: number; failed: number; batches30: number }[];
 }
 
 export interface HubRow {
@@ -123,7 +127,19 @@ export interface HubRow {
   address: string | null;
   capacity: number;
   active: boolean;
+  /** Position on the map; a hub without one is never chosen by the router. */
+  lat?: number | null;
+  lng?: number | null;
+  activeRiders?: number;
+  staffCount?: number;
+  placed?: boolean;
   createdAt?: string;
+  /** Where the warehouse sits and the areas it covers (docs/contracts/areas.md). `riders` / `staff` count everyone attached. */
+  areaId?: string | null;
+  area?: import("@/lib/areas").Area | null;
+  coverage?: import("@/lib/areas").Area[];
+  riders?: number;
+  staff?: number;
 }
 
 export interface ReviewRow {
@@ -139,6 +155,20 @@ export interface ReviewRow {
   status: "visible" | "hidden";
   sellerReply: string | null;
   sellerReplyAt: string | null;
+  /** Open reports from sellers (the review stays visible until a moderator acts). */
+  reportCount?: number;
+  /** Why a moderator hid it (sent to the author and the seller). */
+  moderationReason?: string | null;
+  createdAt: string;
+}
+
+export interface ReviewReport {
+  id: string;
+  reviewId: string;
+  reporterId: string;
+  reporterName: string;
+  reason: string;
+  status: string;
   createdAt: string;
 }
 

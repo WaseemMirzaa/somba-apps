@@ -111,6 +111,14 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
+/// A button label kept on one line: a long label (French, a price, large text) shrinks to fit rather than wrapping.
+class ButtonLabel extends StatelessWidget {
+  final String text;
+  const ButtonLabel(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1));
+}
+
 /// Replaces a button's label while its action runs: label height, in the button's text colour.
 class ButtonSpinner extends StatelessWidget {
   const ButtonSpinner({super.key});

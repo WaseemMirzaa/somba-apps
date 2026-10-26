@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
+import '../services/engage_store.dart';
 import '../services/models.dart';
 import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
@@ -70,7 +71,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
   void _retry(OrderDto order) {
     for (final i in order.items) {
       final p = productByUuid(i.productId);
-      if (p != null) ShopState.instance.addToCart(p, variant: i.variant, qty: i.qty);
+      if (p != null && EngageStore.instance.vacationOf(p) == null) ShopState.instance.addToCart(p, variant: i.variant, qty: i.qty);
     }
     Navigator.popUntil(context, (r) => r.isFirst);
   }
@@ -170,7 +171,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-                    child: Text(s.ppContinue),
+                    child: ButtonLabel(s.ppContinue),
                   ),
                 ],
               ]),

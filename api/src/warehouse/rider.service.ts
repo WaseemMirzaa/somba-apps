@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
-import { DeliveryTask, Hub, Order, Setting, User } from '../database/entities';
-import { parsePreferredZones, tasksOfHub } from '../common/zones/hub-scope';
-import { parseZones } from '../common/zones/zone-match';
+import { In, Repository } from 'typeorm';
+import { DeliveryTask, Hub, Order, User } from '../database/entities';
+import { LogisticsService } from '../logistics/logistics.service';
+import { CoverageService } from '../geo/coverage.service';
 
 const PER_DELIVERY_USD = 2.5;
+/** Legs where the rider meets the customer. */
+const CUSTOMER_LEGS: readonly string[] = ['delivery', 'return_pickup', 'replacement_delivery'];
 
 @Injectable()
 export class RiderService {
@@ -18,50 +20,34 @@ export class RiderService {
     private readonly users: Repository<User>,
     @InjectRepository(Hub)
     private readonly hubs: Repository<Hub>,
-    @InjectRepository(Setting)
-    private readonly settings: Repository<Setting>,
+    private readonly logistics?: LogisticsService,
+    private readonly coverage?: CoverageService,
   ) {}
 
   /**
-   * Active rider accounts with their open workload (for dispatch screens). With `hubId`, only that warehouse's
-   * riders and riders not tied to a warehouse.
+   * Active riders of a warehouse with their open workload (for dispatch screens). Without `hubId` (admins) every
+   * active rider.
    */
   async activeRiders(hubId?: string | null) {
-    const where = hubId
-      ? [
-          { role: 'rider' as const, active: true, hubId },
-          { role: 'rider' as const, active: true, hubId: IsNull() },
-        ]
-      : { role: 'rider' as const, active: true };
-    const riders = await this.users.find({ where });
-    const open = await this.tasks.find({ where: { status: In(['assigned', 'picked_up', 'in_transit']) } });
+    const riders = await this.users.find({ where: hubId ? { role: 'rider' as const, active: true, hubId } : { role: 'rider' as const, active: true } });
+    if (!riders.length) return [];
+    const open = await this.tasks.find({ where: { riderId: In(riders.map((r) => r.id)), status: In(['assigned', 'picked_up', 'in_transit']) }, select: ['id', 'riderId'] });
     return riders.map((r) => ({
       id: r.id,
       name: r.name,
       phone: r.phone,
       hubId: r.hubId ?? null,
-      preferredZones: parsePreferredZones(r.preferredZones),
       activeTasks: open.filter((t) => t.riderId === r.id).length,
     }));
   }
 
-  /** Zone id → display name, from the deliveryZones setting. */
-  private async zoneNames(): Promise<Map<string, string>> {
-    const row = await this.settings.findOne({ where: { key: 'deliveryZones' } });
-    return new Map(parseZones(row?.value).map((z) => [z.id, z.name]));
-  }
-
-  /** Where a rider works: home warehouse and preferred zones (rider profile, "My zone"). */
+  /** Where a rider works: their home warehouse (rider profile) and the areas it covers. */
   async assignment(riderId: string) {
     const me = await this.users.findOne({ where: { id: riderId } });
     const hub = me?.hubId ? await this.hubs.findOne({ where: { id: me.hubId } }) : null;
-    const names = await this.zoneNames();
-    const row = await this.settings.findOne({ where: { key: 'deliveryZones' } });
-    const hubZones = hub ? parseZones(row?.value).filter((z) => z.hubId === hub.id) : [];
+    const coverage = hub && this.coverage ? (await this.coverage.forHub(hub.id)).areas : [];
     return {
-      hub: hub ? { id: hub.id, name: hub.name, city: hub.city, address: hub.address ?? null } : null,
-      preferredZones: parsePreferredZones(me?.preferredZones).map((id) => ({ id, name: names.get(id) ?? id })),
-      hubZones: hubZones.map((z) => ({ id: z.id, name: z.name })),
+      hub: hub ? { id: hub.id, name: hub.name, city: hub.city, address: hub.address ?? null, lat: hub.lat ?? null, lng: hub.lng ?? null, areaId: hub.areaId ?? null, coverage } : null,
     };
   }
 
@@ -89,40 +75,24 @@ export class RiderService {
   }
 
   /**
-   * The rider's delivery queue — their assigned tasks plus anything still
-   * unassigned — each enriched with a snapshot of the order (customer, items,
-   * payment) so the rider app renders in one live call.
+   * The rider's task list: ONLY the tasks the warehouse assigned to them (riders never pick from an open pool),
+   * each with its leg (`kind`, `from`, `to`) and a snapshot of the order, so the rider app renders in one live call.
    */
   async queue(riderId: string) {
-    // The open pool is limited to the rider's own warehouse (plus tasks not tied to one); preferred zones first.
-    const me = await this.users.findOne({ where: { id: riderId }, select: ['id', 'hubId', 'preferredZones'] });
-    const pool = tasksOfHub({ status: 'unassigned' }, me?.hubId ?? null);
-    const rows = await this.tasks.find({
-      where: [{ riderId }, ...(Array.isArray(pool) ? pool : [pool])],
-      order: { createdAt: 'DESC' },
-      take: 500,
-    });
-    const preferred = new Set(parsePreferredZones(me?.preferredZones));
-    if (preferred.size) {
-      rows.sort((a, b) => Number(!!b.zoneId && preferred.has(b.zoneId)) - Number(!!a.zoneId && preferred.has(a.zoneId)));
-    }
-    const names = await this.zoneNames();
+    const rows = await this.tasks.find({ where: { riderId }, order: { createdAt: 'DESC' }, take: 500 });
+    const views = this.logistics ? await this.logistics.viewMany(rows) : [];
     const orderIds = [...new Set(rows.map((t) => t.orderId))];
-    const orders = orderIds.length
-      ? await this.orders.find({ where: { id: In(orderIds) } })
-      : [];
+    const orders = orderIds.length ? await this.orders.find({ where: { id: In(orderIds) } }) : [];
     const byId = new Map(orders.map((o) => [o.id, o]));
-    return rows.map((t) => {
+    return rows.map((t, i) => {
       const o = byId.get(t.orderId) ?? null;
       return {
+        ...(views[i] ?? {}),
         id: t.id,
         orderId: t.orderId,
         orderReference: t.orderReference,
         status: t.status,
-        zoneId: t.zoneId,
-        zoneName: t.zoneId ? (names.get(t.zoneId) ?? t.zoneId) : null,
         hubId: t.hubId ?? null,
-        preferred: !!t.zoneId && preferred.has(t.zoneId),
         codAmountUsd: t.codAmountUsd,
         address: t.address,
         lat: t.lat,
@@ -136,12 +106,13 @@ export class RiderService {
         order: o
           ? {
               reference: o.reference,
-              customerName: o.customerName,
+              // Only the legs that meet the customer show who and where; a pickup or a transfer shows the parcel.
+              customerName: CUSTOMER_LEGS.includes(t.kind) ? o.customerName : (o.customerName ?? '').split(' ')[0],
               paymentMethod: o.paymentMethod,
               estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
               totalUsd: o.totalUsd,
-              shippingAddress: o.shippingAddress,
-              items: o.items ?? [],
+              shippingAddress: CUSTOMER_LEGS.includes(t.kind) ? o.shippingAddress : null,
+              items: CUSTOMER_LEGS.includes(t.kind) || !t.sellerId ? (o.items ?? []) : (o.items ?? []).filter((i) => !i.sellerId || i.sellerId === t.sellerId),
             }
           : null,
       };

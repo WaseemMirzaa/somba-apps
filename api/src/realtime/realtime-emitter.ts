@@ -40,7 +40,26 @@ export class RealtimeEmitter {
     for (const e of events) this.userViews.set(e, fn);
   }
 
+  private mirror: ((userId: string, event: string, payload: unknown) => Promise<{ to: string; payload: unknown }[]>) | null = null;
+
+  /**
+   * Live events addressed to a store owner also reach their staff. The seller module registers the rule once (who
+   * works for this owner, which of them handles this event, and what they may see of it); `toUser` then repeats the
+   * event to those accounts.
+   */
+  registerMirror(fn: (userId: string, event: string, payload: unknown) => Promise<{ to: string; payload: unknown }[]>): void {
+    this.mirror = fn;
+  }
+
   toUser(userId: string, event: string, payload: unknown): void {
+    this.deliverToUser(userId, event, payload);
+    if (!this.mirror) return;
+    this.mirror(userId, event, payload)
+      .then((copies) => copies.forEach((c) => this.deliverToUser(c.to, event, c.payload)))
+      .catch(() => undefined);
+  }
+
+  private deliverToUser(userId: string, event: string, payload: unknown): void {
     const room = RealtimeEmitter.userRoom(userId);
     const view = this.userViews.get(event);
     if (!view) return this.emit(room, event, payload);
@@ -92,19 +111,23 @@ export class RealtimeEmitter {
     this.fanout(event, payload);
   }
 
-  /** Room of the riders based at a warehouse; `null` = riders not tied to any warehouse. */
-  static riderHubRoom(hubId: string | null): string {
-    return hubId ? `riders:hub:${hubId}` : 'riders:nohub';
+  /** Push to every connected client (guests included), whatever their role. For reference data everybody follows. */
+  broadcast(event: string, payload: unknown): void {
+    if (!this.server) {
+      this.logger.warn(`No socket server yet; dropped ${event} → everyone`);
+      return;
+    }
+    this.server.emit(event, payload);
   }
 
-  /**
-   * Riders who may take a task of this warehouse: its own riders plus riders not tied to a warehouse. A task with
-   * no warehouse goes to every rider. Each rider socket joins exactly one of these rooms on connect.
-   */
-  toRiders(hubId: string | null, event: string, payload: unknown): void {
-    if (!hubId) return this.emit(RealtimeEmitter.roleRoom('rider'), event, payload);
-    this.emit(RealtimeEmitter.riderHubRoom(hubId), event, payload);
-    this.emit(RealtimeEmitter.riderHubRoom(null), event, payload);
+  /** Room of a warehouse: its staff join it on connect, and every task touching the warehouse is pushed to it. */
+  static hubRoom(hubId: string): string {
+    return `hub:${hubId}`;
+  }
+
+  /** Push to everyone connected to a warehouse (its staff). */
+  toHub(hubId: string, event: string, payload: unknown): void {
+    this.emit(RealtimeEmitter.hubRoom(hubId), event, payload);
   }
 
   private emit(room: string, event: string, payload: unknown): void {

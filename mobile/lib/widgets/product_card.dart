@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_models.dart';
 import '../l10n/strings.dart';
+import '../services/engage_store.dart';
 import '../services/realtime_store.dart';
 import '../theme/app_theme.dart';
 import '../util/format.dart';
 import 'common.dart';
+import 'engage_widgets.dart';
+import 'feedback.dart';
 import 'product_image.dart';
 
 /// Premium grid product card: image tile, wishlist heart, discount badge,
@@ -33,14 +36,39 @@ class _ProductCardState extends State<ProductCard> {
   bool _pressed = false;
 
   @override
+  void initState() {
+    super.initState();
+    EngageStore.instance.trackView(widget.product); // a promoted product on screen (once per session)
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductCard old) {
+    super.didUpdateWidget(old);
+    if (old.product.uuid != widget.product.uuid) EngageStore.instance.trackView(widget.product);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = widget.product;
 
+    return ListenableBuilder(
+      listenable: EngageStore.instance,
+      builder: (context, _) => _card(context, p),
+    );
+  }
+
+  Widget _card(BuildContext context, Product p) {
+    final store = EngageStore.instance;
+    final vacation = store.vacationOf(p);
+    final flash = vacation == null ? store.flashFor(p.uuid) : null;
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
+      onTap: () {
+        store.trackClick(p);
+        widget.onTap?.call();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.97 : 1,
         duration: const Duration(milliseconds: 120),
@@ -61,11 +89,23 @@ class _ProductCardState extends State<ProductCard> {
                           const BorderRadius.vertical(top: Radius.circular(20)),
                       child: SizedBox.expand(child: ProductImage(product: p)),
                     ),
-                    if (p.discount > 0)
+                    // Discount, then the sale timer or the vacation tag under it: one column, so they never overlap.
+                    if (p.discount > 0 || vacation != null || flash != null)
                       Positioned(
                         top: 10,
                         left: 10,
-                        child: Pill('-${p.discount}%', color: AppColors.accent),
+                        right: 6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (p.discount > 0) Pill('-${p.discount}%', color: AppColors.accent),
+                            if (vacation != null || flash != null) ...[
+                              if (p.discount > 0) const SizedBox(height: 4),
+                              vacation != null ? const VacationTag() : FlashTimerPill(sale: flash!),
+                            ],
+                          ],
+                        ),
                       ),
                     Positioned(
                       top: 6,
@@ -151,7 +191,13 @@ class _ProductCardState extends State<ProductCard> {
                             ],
                           ),
                         ),
-                        _AddButton(onTap: widget.onAdd),
+                        // A store on vacation takes no new orders: the "+" explains instead of adding.
+                        _AddButton(
+                          muted: vacation != null,
+                          onTap: vacation != null
+                              ? () => showSnack(context, Strings.of(context).vacationText(notice: vacation.notice, until: vacation.until))
+                              : widget.onAdd,
+                        ),
                       ],
                     ),
                   ],
@@ -167,15 +213,18 @@ class _ProductCardState extends State<ProductCard> {
 
 class _AddButton extends StatelessWidget {
   final VoidCallback? onTap;
-  const _AddButton({this.onTap});
+  final bool muted;
+  const _AddButton({this.onTap, this.muted = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: muted ? const ValueKey('card-add-muted') : const ValueKey('card-add'),
       decoration: BoxDecoration(
-        gradient: AppColors.brandGradient,
+        gradient: muted ? null : AppColors.brandGradient,
+        color: muted ? AppColors.faint : null,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: AppShadow.lifted,
+        boxShadow: muted ? null : AppShadow.lifted,
       ),
       child: Material(
         color: Colors.transparent,

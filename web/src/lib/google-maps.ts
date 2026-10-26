@@ -6,6 +6,8 @@
  * Without the key the picker explains that and the address form keeps working with manual entry.
  */
 import { countryFromGoogle } from "@/lib/countries";
+import type { GeoComponent } from "@/lib/areas";
+import { currentLocale } from "@/lib/api-errors";
 
 export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 /** Advanced markers need a Map ID; "DEMO_MAP_ID" is Google's development map, replace it with your own style in production. */
@@ -28,6 +30,11 @@ export interface PickedParts {
   region?: string;
   country?: string;
   postalCode?: string;
+}
+
+/** What a pick also hands back: Google's raw address components, to send to `geo:resolve` (docs/contracts/areas.md). */
+export interface PickedMeta {
+  components: GeoComponent[];
 }
 
 export class MapsError extends Error {
@@ -55,7 +62,8 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
     };
     w.__initGoogleMaps = () => resolve(w.google!.maps);
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&loading=async&v=weekly&callback=__initGoogleMaps`;
+    // Labels on the map follow the language the page was opened in; address lookups ask for the live language themselves.
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&loading=async&v=weekly&language=${currentLocale()}&callback=__initGoogleMaps`;
     s.async = true;
     s.onerror = () => {
       loading = null;
@@ -93,17 +101,39 @@ export function partsFromComponents(components: Component[]): PickedParts {
   };
 }
 
-/** Reverse-geocode a pin into address parts + a formatted line. */
+/** Google components in the shape `geo:resolve` takes. */
+export function toGeoComponents(components: Component[]): GeoComponent[] {
+  return components.map((c) => ({ types: c.types, long_name: c.long, short_name: c.short }));
+}
+
+/**
+ * Reverse-geocode a pin into address parts + a formatted line.
+ * `language` asks Google for names in the UI language ("fr" or "en"); the server matches either spelling.
+ * The components of every result are merged (most specific first) so a missing commune on the first result is
+ * still found on the next one.
+ */
 export async function reverseGeocode(
   maps: typeof google.maps,
   pos: { lat: number; lng: number },
-): Promise<{ parts: PickedParts; formatted?: string; placeId?: string }> {
+  language: string = currentLocale(),
+): Promise<{ parts: PickedParts; components: GeoComponent[]; formatted?: string; placeId?: string }> {
   const { Geocoder } = (await maps.importLibrary("geocoding")) as google.maps.GeocodingLibrary;
-  const res = await new Geocoder().geocode({ location: pos });
+  const res = await new Geocoder().geocode({ location: pos, language });
   const best = res.results[0];
-  if (!best) return { parts: {} };
+  if (!best) return { parts: {}, components: [] };
+  const seen = new Set<string>();
+  const merged: Component[] = [];
+  for (const r of res.results) {
+    for (const c of r.address_components) {
+      const key = `${c.types.join(",")}|${c.long_name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push({ types: c.types, long: c.long_name, short: c.short_name });
+    }
+  }
   return {
     parts: partsFromComponents(best.address_components.map((c) => ({ types: c.types, long: c.long_name, short: c.short_name }))),
+    components: toGeoComponents(merged),
     formatted: best.formatted_address,
     placeId: best.place_id,
   };

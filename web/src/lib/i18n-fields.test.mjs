@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.M
 const {
   pickText, localized, localizedNotice, foldText, matchesSearch, labeledGroups, localizeVariantText,
   isMachineText, fieldOrigin, ownText, frInForm,
-  noticeTypeLabel, variantDisplay, localizeVariant, daysLabel, categoryLabel, productNameFor,
+  noticeTypeLabel, variantDisplay, localizeVariant, daysLabel, categoryLabel, productNameFor, resolutionText,
 } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 test("pickText falls back to the other language when one is empty", () => {
@@ -127,4 +127,14 @@ test("categoryLabel / productNameFor read the other language from the list by En
   const prods = [{ id: "p1", name: "Dyson V15 Vacuum", nameFr: "Aspirateur Dyson V15" }];
   assert.equal(productNameFor(prods, "p1", "x", true), "Aspirateur Dyson V15");
   assert.equal(productNameFor(prods, "p2", "Fallback", true), "Fallback");
+});
+
+test("resolutionText: the API's French first, known stock phrases mapped, an agent's own words untouched", () => {
+  assert.equal(resolutionText({ resolution: "Refunded to wallet", resolutionFr: "Remboursé sur le portefeuille" }, true), "Remboursé sur le portefeuille");
+  assert.equal(resolutionText({ resolution: "Refunded to wallet" }, true), "Remboursé sur le portefeuille");
+  assert.equal(resolutionText({ resolution: "Partially refunded" }, true), "Remboursement partiel");
+  assert.equal(resolutionText({ resolution: "Refunded to wallet", resolutionFr: "Remboursé sur le portefeuille" }, false), "Refunded to wallet");
+  assert.equal(resolutionText({ resolution: "Item was damaged, refunded in full" }, true), "Item was damaged, refunded in full");
+  assert.equal(resolutionText({ resolution: null }, true), "");
+  assert.equal(resolutionText(null, false), "");
 });

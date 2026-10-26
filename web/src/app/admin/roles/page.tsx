@@ -10,7 +10,7 @@ import { SecretBox } from "@/components/admin/copy-box";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote } from "@/components/admin/modal";
-import { HomeWarehouseDialog } from "@/components/admin/home-warehouse-dialog";
+import { HomeWarehouseDialog, HubTierFields, needsHubText } from "@/components/admin/home-warehouse-dialog";
 import type { HubRow } from "@/lib/admin-stats";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
@@ -18,6 +18,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { errMsg, useRole, useServerList, type StaffRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { TIER_LABEL, type WarehouseTier } from "@/lib/logistics";
 
 interface RoleDef {
   key: string;
@@ -59,12 +60,14 @@ export default function AdminRolesPage() {
   const isSuper = role === "admin";
   const [defs, setDefs] = useState<RoleDef[]>([]);
   const { items: staff, reload, error: staffError, loading } = useServerList<StaffRow>("roles:staff", { enabled: isSuper });
-  const [form, setForm] = useState({ name: "", email: "", phone: "", role: "admin_support" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", role: "admin_support", hubId: "", tier: "operator" as WarehouseTier });
+  const [hubError, setHubError] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState<{ user: StaffRow; role: "rider" | "warehouse_staff" } | null>(null);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [secret, setSecret] = useState<{ email: string; password: string } | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const hubs = useServerList<HubRow>("warehouse:hubs", { enabled: isSuper, pushEvents: ["hub:updated"] });
+  const hubs = useServerList<HubRow>("hubs:list", { enabled: isSuper });
   const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
   const [placing, setPlacing] = useState<StaffRow | null>(null);
 
@@ -95,17 +98,25 @@ export default function AdminRolesPage() {
       setFormError(fr ? "Nom et e-mail requis." : "Name and email are required.");
       return;
     }
+    const needsHub = form.role === "rider" || form.role === "warehouse_staff";
+    if (needsHub && !form.hubId) {
+      setHubError(needsHubText(fr));
+      return;
+    }
+    setHubError(null);
     setCreating(true);
     setFormError(null);
     try {
       const res = await socketClient.request<{ id: string; email: string; role: string; tempPassword: string }>("roles:createStaff", {
+        ...(needsHub ? { hubId: form.hubId } : {}),
+        ...(form.role === "warehouse_staff" ? { warehouseTier: form.tier } : {}),
         name: form.name.trim(),
         email: form.email.trim(),
         role: form.role,
         ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
       });
       setSecret({ email: res.email, password: res.tempPassword });
-      setForm({ name: "", email: "", phone: "", role: form.role });
+      setForm({ name: "", email: "", phone: "", role: form.role, hubId: form.hubId, tier: "operator" });
       toast(fr ? "Compte créé" : "Account created", "success");
       void reload();
     } catch (e) {
@@ -117,9 +128,14 @@ export default function AdminRolesPage() {
 
   async function changeRole(u: StaffRow, next: string) {
     if (next === u.role) return;
+    // A rider / warehouse employee must belong to a warehouse: ask for it first (the role and warehouse are saved together).
+    if ((next === "rider" || next === "warehouse_staff") && !u.hubId) {
+      setPromoting({ user: u, role: next });
+      return;
+    }
     setSavingId(u.id);
     try {
-      await socketClient.request("roles:setRole", { id: u.id, role: next });
+      await socketClient.request("roles:setRole", { id: u.id, role: next, ...((next === "rider" || next === "warehouse_staff") && u.hubId ? { hubId: u.hubId } : {}) });
       toast(fr ? `Rôle de ${u.name} : ${roleName(next)}` : `${u.name} is now ${roleName(next)}`, "success");
       await reload();
     } catch (e) {
@@ -180,6 +196,9 @@ export default function AdminRolesPage() {
             ))}
           </select>
         </div>
+        {(form.role === "rider" || form.role === "warehouse_staff") && (
+          <HubTierFields hubs={hubs.items} hubId={form.hubId} onHub={(id) => { setForm({ ...form, hubId: id }); setHubError(null); }} tier={form.tier} onTier={(t) => setForm({ ...form, tier: t })} showTier={form.role === "warehouse_staff"} fr={fr} error={hubError} />
+        )}
         <ErrorNote message={formError} />
         <Button onClick={createStaff} disabled={creating}>{creating ? "…" : fr ? "Créer le compte" : "Create account"}</Button>
       </div>
@@ -235,6 +254,7 @@ export default function AdminRolesPage() {
                 return (
                   <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setPlacing(u)}>
                     {u.hubId ? (hubName.get(u.hubId) ?? (fr ? "Entrepôt inconnu" : "Unknown warehouse")) : fr ? "Choisir…" : "Set…"}
+                    {u.role === "warehouse_staff" && u.warehouseTier ? ` · ${fr ? TIER_LABEL[u.warehouseTier].fr : TIER_LABEL[u.warehouseTier].en}` : ""}
                   </button>
                 );
               },
@@ -243,6 +263,7 @@ export default function AdminRolesPage() {
         />
       </div>
       <HomeWarehouseDialog user={placing} hubs={hubs.items} fr={fr} onClose={() => setPlacing(null)} onSaved={() => void reload()} />
+      <HomeWarehouseDialog user={promoting?.user ?? null} nextRole={promoting?.role} hubs={hubs.items} fr={fr} onClose={() => setPromoting(null)} onSaved={() => void reload()} />
     </div>
   );
 }

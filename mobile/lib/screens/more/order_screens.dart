@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/catalog_live.dart';
 import '../../l10n/strings.dart';
+import '../../services/hub_directory.dart';
 import '../../services/models.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../util/delivery_estimate.dart';
+import '../../util/journey.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import '../payment_pending_screen.dart';
+import 'aftersale_dispute_form.dart';
 import 'order_after_sale.dart';
 import 'returns_extra.dart';
 import 'support_extra.dart';
@@ -158,30 +161,55 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ]),
               ),
               const SizedBox(height: 14),
-              Row(children: [
-                if (cancellable)
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('cancel-order'),
-                      onPressed: _busy ? null : () => _cancel(o),
-                      child: Text(s.cancelOrder),
-                    ),
-                  )
-                else if (o.status == 'delivered')
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale, order: o))),
-                      child: Text(s.orderReturn),
-                    ),
-                  ),
-                if (cancellable || o.status == 'delivered') const SizedBox(width: 12),
-                Expanded(
+              // Stacked full width: "Annuler la commande" does not fit half a phone row (and must survive large text).
+              if (cancellable) ...[
+                SizedBox(
+                  width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: widget.locale))),
-                    child: Text(s.orderHelp),
+                    key: const ValueKey('cancel-order'),
+                    onPressed: _busy ? null : () => _cancel(o),
+                    child: Text(s.cancelOrder),
                   ),
                 ),
-              ]),
+                const SizedBox(height: 10),
+              ] else if (o.status == 'delivered') ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('order-return'),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnRequestScreen(locale: widget.locale, order: o))),
+                    child: Text(s.orderReturn),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('report-problem'),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DisputeFormScreen(locale: widget.locale, order: o))),
+                    child: Text(s.asReportProblem),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ] else if (o.status == 'shipped' || o.status == 'out_for_delivery') ...[
+                // Not received: the server accepts a report while the parcel is on its way.
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('report-problem'),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DisputeFormScreen(locale: widget.locale, order: o))),
+                    child: Text(s.asReportProblem),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HelpScreen(locale: widget.locale))),
+                  child: Text(s.orderHelp),
+                ),
+              ),
               if (o.status == 'delivered') ...[
                 const SizedBox(height: 10),
                 // Stacked full width: "Replace or exchange" does not fit half a phone row (and must survive large text).
@@ -198,7 +226,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   width: double.infinity,
                   child: OutlinedButton(
                     key: const ValueKey('item-issue'),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemIssueScreen(order: o))),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ItemIssueScreen(locale: widget.locale, order: o))),
                     child: Text(s.issueOpen),
                   ),
                 ),
@@ -402,10 +430,15 @@ class OrderTrackingScreen extends StatelessWidget {
         final cancelled = o.status == 'cancelled' || o.status == 'returned';
         final loc = store.riderLocations[o.id];
         String label(int i) => s.orderStatus(flow[i]);
+        // From the moment the pickup starts the timeline follows the parcel through the warehouses; before that,
+        // and for orders from before the warehouse routing, it follows the order's status.
+        final journey = orderJourney(o);
         final steps = <(String, String, bool)>[
           (s.trackPlaced, o.reference, true),
-          for (var i = 0; i < flow.length; i++)
-            (label(i), i == reached ? s.trackCurrent : '', !cancelled && reached >= i),
+          if (journey.isEmpty)
+            for (var i = 0; i < flow.length; i++) (label(i), i == reached ? s.trackCurrent : '', !cancelled && reached >= i)
+          else
+            for (final st in journey) _journeyRow(s, st),
         ];
         return Scaffold(
           appBar: backAppBar(context, s.trackOrder),
@@ -454,7 +487,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   OutlinedButton(
                     key: const ValueKey('call-rider'),
                     onPressed: () => callRider(context, o.rider!),
-                    child: Text(s.trackCallRider(o.rider!.name)),
+                    child: ButtonLabel(s.trackCallRider(o.rider!.name)),
                   ),
                 ]),
               ),
@@ -473,7 +506,7 @@ class OrderTrackingScreen extends StatelessWidget {
                   OutlinedButton(
                     key: const ValueKey('open-maps'),
                     onPressed: () => openInMaps(context, loc.lat, loc.lng),
-                    child: Text(s.trackOpenMaps),
+                    child: ButtonLabel(s.trackOpenMaps),
                   ),
                 ]),
               ),
@@ -485,6 +518,40 @@ class OrderTrackingScreen extends StatelessWidget {
       },
     );
   }
+}
+
+/// One row of the parcel's journey: what happened, where (the warehouse's name) and when.
+(String, String, bool) _journeyRow(Strings s, JourneyStep st) {
+  final ids = st.hubId != null ? [st.hubId!] : st.hubIds;
+  final names = st.hubNames.isNotEmpty
+      ? st.hubNames.toSet()
+      : [for (final id in ids) HubDirectory.instance.nameOf(id)].whereType<String>().where((n) => n.isNotEmpty).toSet();
+  // A relayed parcel has a step per hop; each names the warehouse it travels to / is at, in its title.
+  final hopped = st.hop != null;
+  final joined = names.join(', ');
+  final title = switch (st.key) {
+    'picked_up' => s.journeyPickedUp,
+    'at_origin' => s.journeyAtOrigin,
+    'in_transfer' when hopped => names.isNotEmpty ? s.journeyHopTransfer(joined) : (st.hop == st.hops ? s.journeyInTransfer : s.journeyHopNext),
+    'in_transfer' => s.journeyInTransfer,
+    'at_hub' => names.isNotEmpty ? s.journeyHopAt(joined) : s.journeyHopRelay,
+    'at_destination' => s.journeyAtDestination,
+    'out_for_delivery' => s.journeyOutForDelivery,
+    _ => s.journeyDelivered,
+  };
+  // A step in transfer names the destination warehouse; the others name the warehouse the parcel is at.
+  final where = st.key == 'picked_up' || names.isEmpty || st.key == 'at_hub' || (st.key == 'in_transfer' && hopped) ? null : joined;
+  // The run a transfer travels in, its driver (each hop has its own) by first name, then when the hop left.
+  final parts = <String>[
+    if (where != null) where,
+    if (st.key == 'in_transfer' && st.runs.isNotEmpty) s.journeyRun(st.runs.join(', ')),
+    if (st.key == 'in_transfer' && st.drivers.isNotEmpty) s.journeyDriver(st.drivers.join(', ')),
+    if (st.at != null) s.when(st.at!),
+  ];
+  // A step under way (the server gave the time it started) is ticked like the ones before it; the step that comes next
+  // says "Up next" until it starts.
+  final sub = parts.isNotEmpty ? parts.join(' · ') : (st.current ? s.journeyNext : '');
+  return (title, sub, st.done || (st.current && st.at != null));
 }
 
 /// Opens the phone's dialler on the rider's number.

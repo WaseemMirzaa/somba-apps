@@ -6,6 +6,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { KycForm, EMPTY_KYC, kycPayload, type KycValues } from "@/components/seller/kyc-form";
+import { AddressMapPicker } from "@/components/shop/address-map-picker";
+import { AreaPicker, type AreaSelection } from "@/components/geo/area-picker";
+import type { AreaHint } from "@/lib/areas";
+import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useAuth } from "@/context/auth-context";
@@ -27,6 +31,10 @@ export default function SellerRegisterPage() {
 
   const [checking, setChecking] = useState(true);
   const [pickup, setPickup] = useState("");
+  // The pickup location: map pin → geo:resolve → province / city / commune (same picker as Store settings).
+  const [pin, setPin] = useState<AddressGeo | null>(null);
+  const [hint, setHint] = useState<AreaHint | null>(null);
+  const [area, setArea] = useState<AreaSelection | null>(null);
   // Only for a visitor without an account: the seller account is created together with the store.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,8 +66,25 @@ export default function SellerRegisterPage() {
     };
   }, [ready, router]);
 
+  /** The pickup address is optional, but a pin needs its area (an unserved area is fine: the store can still be opened). */
+  function pickupProblem(): { en: string; fr: string } | null {
+    if (pickup.trim() !== "" && (pickup.trim().length < 5 || pickup.trim().length > 300)) {
+      return { en: "The pickup address needs 5 to 300 characters, or leave it empty.", fr: "L'adresse de collecte doit faire de 5 à 300 caractères, ou restez vide." };
+    }
+    if (pin && (!area?.areaId || (area.served && !area.complete))) {
+      return { en: "Choose the pickup province, city and commune.", fr: "Choisissez la province, la ville et la commune de collecte." };
+    }
+    return null;
+  }
+
   /** The account fields only exist for a visitor without an account. */
   function precheck(): boolean {
+    const problem = pickupProblem();
+    if (problem) {
+      setError(fr ? problem.fr : problem.en);
+      return false;
+    }
+    setError(null);
     if (rt.user) return true;
     if (!email.trim() || password.length < 8 || fullName.trim().length < 2) {
       setAccountError({
@@ -96,10 +121,17 @@ export default function SellerRegisterPage() {
       setBusy(false);
       return;
     }
-    // The store exists now. The pickup address is a second, separate write.
-    if (pickup.trim()) {
+    // The store exists now. The pickup address, pin and area are a second, separate write.
+    const pickupPatch: Record<string, unknown> = {};
+    if (pickup.trim()) pickupPatch.pickupAddress = pickup.trim();
+    if (pin) {
+      pickupPatch.pickupLat = Number(pin.lat.toFixed(6));
+      pickupPatch.pickupLng = Number(pin.lng.toFixed(6));
+      if (area?.areaId) pickupPatch.pickupAreaId = area.areaId;
+    }
+    if (Object.keys(pickupPatch).length > 0) {
       try {
-        await socketClient.request("sellers:update", { pickupAddress: pickup.trim() });
+        await socketClient.request("sellers:update", pickupPatch);
       } catch (err) {
         toast(
           (fr ? "Boutique créée, mais l'adresse n'a pas été enregistrée : " : "Store created, but the pickup address was not saved: ") + errMessage(err),
@@ -132,19 +164,38 @@ export default function SellerRegisterPage() {
   );
 
   const pickupField = (
-    <div>
-      <label className="mb-1 block text-sm font-medium" htmlFor="sr-pickup">{fr ? "Adresse de collecte (optionnel)" : "Pickup address (optional)"}</label>
-      <input
-        id="sr-pickup"
-        className="input-premium w-full px-4 py-2 text-sm"
-        value={pickup}
-        onChange={(e) => setPickup(e.target.value)}
-        maxLength={300}
-        placeholder={fr ? "Où les livreurs récupèrent vos colis" : "Where riders collect your parcels"}
-      />
-      <p className="mt-1 text-xs text-slate-500">
-        {fr ? "Vous pourrez la modifier dans les paramètres." : "You can change it later in Settings."}
-      </p>
+    <div className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium" htmlFor="sr-pickup">{fr ? "Adresse de collecte (optionnel)" : "Pickup address (optional)"}</label>
+        <input
+          id="sr-pickup"
+          className="input-premium w-full px-4 py-2 text-sm"
+          value={pickup}
+          onChange={(e) => setPickup(e.target.value)}
+          maxLength={300}
+          placeholder={fr ? "Où les livreurs récupèrent vos colis" : "Where riders collect your parcels"}
+        />
+      </div>
+      <div className="space-y-3 rounded-xl border border-slate-200 p-4" data-testid="register-pickup-location">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{fr ? "Position du lieu de collecte sur la carte (optionnel)" : "Pickup location on the map (optional)"}</p>
+          <p className="text-xs text-slate-500">
+            {fr
+              ? "L'entrepôt qui couvre la zone de ce point collecte vos colis. Vous pourrez la modifier dans les paramètres ; sans position, vous ne pourrez pas publier de produits."
+              : "The warehouse covering this point's area collects your parcels. You can change it later in Settings; without a pin you cannot list products."}
+          </p>
+        </div>
+        <AddressMapPicker
+          fr={fr}
+          value={pin}
+          onPick={(geo: AddressGeo, parts: PickedParts, meta: PickedMeta) => {
+            setPin(geo);
+            if (!pickup.trim() && geo.formatted) setPickup(geo.formatted.slice(0, 300));
+            setHint({ components: meta.components, pin: { lat: geo.lat, lng: geo.lng }, text: { commune: parts.commune, city: parts.city, province: parts.region } });
+          }}
+        />
+        {pin && <AreaPicker fr={fr} hint={hint} onChange={setArea} purpose="pickup" testId="register-area-picker" />}
+      </div>
     </div>
   );
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/loader";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { PhotoPicker } from "@/components/shop/photo-picker";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -36,6 +37,7 @@ function SupportContent() {
   const [subject, setSubject] = useState(params.get("subject") ?? "");
   const [category, setCategory] = useState(params.get("order") ? "orders" : "general");
   const [message, setMessage] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   // Prefill the order from ?order= (an order id or reference) once the orders are loaded.
   const orderParam = params.get("order");
   const [orderId, setOrderId] = useState("");
@@ -71,6 +73,7 @@ function SupportContent() {
         category,
         message: message.trim(),
         ...(orderId ? { orderId } : {}),
+        ...(photos.length ? { attachments: photos } : {}),
       });
       put(ticket);
       toast(fr ? "Ticket envoyé" : "Ticket submitted");
@@ -113,9 +116,16 @@ function SupportContent() {
                   <p className="text-xs text-slate-500">{tk.reference} · {new Date(tk.updatedAt).toLocaleDateString()}</p>
                 </div>
               </div>
-              <Badge variant={tk.status === "resolved" || tk.status === "closed" ? "success" : tk.status === "pending" ? "info" : "warning"}>
-                {ticketStatusLabel(tk.status, fr)}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {(tk.userUnread ?? 0) > 0 && (
+                  <span data-testid="ticket-unread" className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white" aria-label={fr ? `${tk.userUnread} message(s) non lu(s)` : `${tk.userUnread} unread`}>
+                    {tk.userUnread}
+                  </span>
+                )}
+                <Badge variant={tk.status === "resolved" || tk.status === "closed" ? "success" : tk.status === "pending" ? "info" : "warning"}>
+                  {ticketStatusLabel(tk.status, fr)}
+                </Badge>
+              </div>
             </Link>
           ))}
         </div>
@@ -141,13 +151,17 @@ function SupportContent() {
             <label className="mb-1.5 block text-sm font-medium text-slate-700">{fr ? "Commande concernée (facultatif)" : "Related order (optional)"}</label>
             <select value={orderId} onChange={(e) => setOrderId(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm">
               <option value="">{fr ? "Aucune" : "None"}</option>
-              {orders.map((o) => <option key={o.id} value={o.id}>{o.reference}</option>)}
+              {orders.map((o) => <option key={o.id} value={o.id}>{o.reference} · {new Date(o.createdAt).toLocaleDateString(fr ? "fr-FR" : "en-GB")}</option>)}
             </select>
           </div>
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Message</label>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="input-premium w-full px-4 py-2.5 text-sm" rows={4} placeholder={fr ? "Décrivez votre problème..." : "Describe your issue..."} />
+        </div>
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-slate-700">{fr ? "Photos (facultatif)" : "Photos (optional)"}</p>
+          <PhotoPicker value={photos} onChange={setPhotos} max={4} fr={fr} />
         </div>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={busy}>{busy ? "…" : fr ? "Soumettre le ticket" : "Submit Ticket"}</Button>

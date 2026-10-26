@@ -120,9 +120,10 @@ class _TranslatableTextState extends State<TranslatableText> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
-              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: MachineNote._linkSize),
             ),
-            child: Text(_busy ? '…' : (showing ? s.seeOriginal : s.seeTranslation)),
+            // Size on the Text, not the button's textStyle (that would drop the theme font).
+            child: Text(_busy ? '…' : (showing ? s.seeOriginal : s.seeTranslation),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: MachineNote._linkSize)),
           ),
         ),
     ]);

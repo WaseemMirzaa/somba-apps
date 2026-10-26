@@ -183,8 +183,8 @@ void main() {
     test('returns, tickets and after-sale requests', () {
       expect(noticeRoute('return', 'd1', hasOrder: known), const NoticeRoute(NoticeDest.returnStatus, 'd1'));
       expect(noticeRoute('dispute', 'd2', hasOrder: known), const NoticeRoute(NoticeDest.returnStatus, 'd2'));
-      expect(noticeRoute('exchange', 'x1', hasOrder: known), const NoticeRoute(NoticeDest.returns));
-      expect(noticeRoute('replacement', 'r1', hasOrder: known), const NoticeRoute(NoticeDest.returns));
+      expect(noticeRoute('exchange', 'x1', hasOrder: known), const NoticeRoute(NoticeDest.exchangeStatus, 'x1'));
+      expect(noticeRoute('replacement', 'r1', hasOrder: known), const NoticeRoute(NoticeDest.replacementStatus, 'r1'));
       expect(noticeRoute('support', 't1', hasOrder: known), const NoticeRoute(NoticeDest.ticket, 't1'));
       expect(noticeRoute('support', null, hasOrder: known), const NoticeRoute(NoticeDest.support));
     });

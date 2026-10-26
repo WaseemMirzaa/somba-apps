@@ -7,31 +7,27 @@ import { SellerListPage } from "@/components/seller/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useSellerData } from "@/lib/seller";
-import { SHIPPING_STATUS_OPTIONS, shippingStatusLabel, shippingStatusVariant } from "@/lib/seller-labels";
+import { SHIPPING_STEP_OPTIONS, legKindLabel, shippingStepLabel, shippingStepVariant, useSellerShipments } from "@/lib/seller-orders";
 
 
 export default function SellerShippingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { shipmentList } = useSellerData();
+  const { shipments } = useSellerShipments();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const filtered = useMemo(
     () =>
       applyListFilters(
-        shipmentList.map((s) => ({
-          ...s,
-          rider: s.riderAssigned ? (fr ? "Assigné" : "Assigned") : "—",
-        })),
+        shipments.map((s) => ({ ...s, rider: s.riderFirstName ?? "—", city: s.customer.city })),
         filters,
         {
-          searchFields: ["id", "orderId", "trackingNumber"],
+          searchFields: ["id", "orderId", "rider", "city"],
           dateField: (item) => String(item.createdDate),
           statusField: "status",
         }
       ),
-    [shipmentList, filters, fr]
+    [shipments, filters]
   );
 
   return (
@@ -39,15 +35,15 @@ export default function SellerShippingPage() {
       title={t("shipping")}
       subtitle={
         fr
-          ? "Expéditions suivies d'après le statut réel de chaque commande"
-          : "Shipments tracked from each order's real status"
+          ? "Suivi réel de chaque colis : livreur d'enlèvement, entrepôts, transfert et livraison"
+          : "Real tracking of each parcel: pickup rider, warehouses, transfer and delivery"
       }
       breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: t("shipping") }]}
       filters={
         <ListFilters
           values={filters}
           onChange={setFilters}
-          statusOptions={SHIPPING_STATUS_OPTIONS}
+          statusOptions={SHIPPING_STEP_OPTIONS}
           searchPlaceholder={fr ? "N° expédition, commande…" : "Shipment ID, order…"}
         />
       }
@@ -71,17 +67,18 @@ export default function SellerShippingPage() {
           ),
         },
         { key: "rider", label: fr ? "Livreur" : "Rider" },
+        { key: "city", label: fr ? "Ville" : "City" },
         {
-          key: "trackingNumber",
-          label: fr ? "N° suivi" : "Tracking #",
-          render: (row) => String(row.trackingNumber ?? "—"),
+          key: "currentLeg",
+          label: fr ? "Étape en cours" : "Current leg",
+          render: (row) => (row.currentLeg ? legKindLabel(String(row.currentLeg), fr) : "—"),
         },
         {
           key: "status",
           label: t("status"),
           render: (row) => (
-            <Badge variant={shippingStatusVariant(String(row.status))}>
-              {shippingStatusLabel(String(row.status), fr)}
+            <Badge variant={shippingStepVariant(String(row.status))}>
+              {shippingStepLabel(String(row.status), fr)}
             </Badge>
           ),
         },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
+import '../services/models.dart' show AddressDto;
 import '../services/realtime_store.dart';
 import '../util/variants.dart' show defaultVariant;
 import 'catalog_live.dart';
@@ -36,7 +37,7 @@ class CartItem {
 }
 
 /// Device-local shopping state: the cart, recently viewed items and the chosen
-/// delivery zone/address. Everything that belongs to the ACCOUNT (wishlist,
+/// delivery address. Everything that belongs to the ACCOUNT (wishlist,
 /// addresses, orders, wallet) lives in [RealtimeStore], pushed by the server.
 class ShopState {
   static final ShopState instance = ShopState._();
@@ -53,11 +54,16 @@ class ShopState {
   /// A promo code the server accepted for the current subtotal (null when none).
   AppliedPromo? appliedPromo;
 
-  /// Selected delivery zone id (drives the delivery fee); null → first zone.
-  String? selectedZoneId;
 
   /// The saved address (backend id) used for delivery; null → default / first.
   String? selectedAddressId;
+
+  /// The address the order would be delivered to: the chosen one, else the default, else the first (null: none saved).
+  AddressDto? get deliveryAddress {
+    final list = RealtimeStore.instance.addresses;
+    if (list.isEmpty) return null;
+    return list.firstWhere((a) => a.id == selectedAddressId, orElse: () => list.firstWhere((a) => a.isDefault, orElse: () => list.first));
+  }
 
   /// What [syncWithCatalog] changed because stock ran out or dropped (shown
   /// once on the cart / checkout, then cleared with [takeStockNotices]).
@@ -157,10 +163,13 @@ class ShopState {
 
   /// Ask the server whether [code] works for the current subtotal.
   /// Returns an error message, or null on success.
-  Future<String?> applyPromo(String code, {double? subtotalUsd}) async {
+  ///
+  /// [lines] are the lines being bought (the whole cart when null): the server needs them to preview a STORE coupon,
+  /// which only discounts that store's lines.
+  Future<String?> applyPromo(String code, {double? subtotalUsd, List<CartItem>? lines}) async {
     final sub = subtotalUsd ?? subtotal;
     try {
-      final res = await RealtimeStore.instance.validatePromo(code.trim(), sub);
+      final res = await RealtimeStore.instance.validatePromo(code.trim(), sub, items: _promoItems(lines ?? cart));
       if (res['ok'] == true) {
         appliedPromo = AppliedPromo(
           code: (res['code'] ?? code).toString(),
@@ -177,6 +186,9 @@ class ShopState {
     }
   }
 
+  static List<Map<String, dynamic>> _promoItems(List<CartItem> lines) =>
+      [for (final c in lines) {'productId': c.product.uuid, 'qty': c.qty}];
+
   /// Re-check an applied code after the cart changed.
   Future<void> revalidatePromo() async {
     final p = appliedPromo;
@@ -189,7 +201,6 @@ class ShopState {
   Future<void> load() async {
     try {
       _prefs = await SharedPreferences.getInstance();
-      selectedZoneId = _prefs!.getString('selectedZoneId');
       selectedAddressId = _prefs!.getString('selectedAddressId');
       recentlyViewed
         ..clear()
@@ -212,7 +223,6 @@ class ShopState {
   void _saveLocal() {
     final p = _prefs;
     if (p == null) return;
-    if (selectedZoneId != null) p.setString('selectedZoneId', selectedZoneId!);
     if (selectedAddressId != null) p.setString('selectedAddressId', selectedAddressId!);
     p.setStringList('recentlyViewed', recentlyViewed);
     p.setString('cart', jsonEncode(cart.map((c) => c.toJson()).toList()));
