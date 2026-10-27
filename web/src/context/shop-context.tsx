@@ -5,6 +5,7 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useCatalog, priceView, type PriceView } from "@/lib/catalog";
 import { localizeVariantText } from "@/lib/i18n-fields";
+import { currentLocale, localizeApiError } from "@/lib/api-errors";
 
 /**
  * A cart line. `id` IS the live backend product id, so checkout can send
@@ -21,6 +22,25 @@ export type CartItem = {
   variant: string;
 };
 
+/** Why a code was refused, in the shopper's language (the server answers in English). */
+const PROMO_FR: [RegExp, (m: RegExpExecArray) => string][] = [
+  [/^Invalid code\.?$/i, () => "Code invalide."],
+  [/^This code has expired\.?$/i, () => "Ce code a expiré."],
+  [/^Minimum order \$([\d.,]+)\.?$/i, (m) => `Commande minimum de $${m[1]}.`],
+  [/^This code is no longer available\.?$/i, () => "Ce code n'est plus disponible."],
+  [/^You have already used this code\.?$/i, () => "Vous avez déjà utilisé ce code."],
+  [/^Enter a promo code\.?$/i, () => "Saisissez un code promo."],
+  [/^Your cart is empty\.?$/i, () => "Votre panier est vide."],
+];
+function promoReason(reason: string): string {
+  if (currentLocale() !== "fr") return reason;
+  for (const [re, fn] of PROMO_FR) {
+    const m = re.exec(reason.trim());
+    if (m) return fn(m);
+  }
+  return localizeApiError(reason, "fr");
+}
+
 export type PromoResult = { ok: boolean; reason?: string };
 
 type ServerLine = { productId: string; variant: string; qty: number; priceWhenAdded?: number | null };
@@ -32,9 +52,8 @@ type ShopContextType = {
   followedStores: string[];
   promoCode: string | null;
   promoDiscount: number;
-  /** Delivery zone chosen for the order (id from the public `deliveryZones` setting). */
-  zoneId: string | null;
-  setZoneId: (zoneId: string | null) => void;
+  /** Set when the code is a store coupon: the store (seller id) whose products it discounts. */
+  promoSellerId: string | null;
   addToCart: (item: Omit<CartItem, "qty"> & { qty?: number }) => void;
   removeFromCart: (id: string, variant: string) => void;
   updateQty: (id: string, variant: string, qty: number) => void;
@@ -62,7 +81,6 @@ type Persisted = {
   followedStores: string[];
   recentlyViewed: string[];
   promoCode: string | null;
-  zoneId: string | null;
 };
 
 function readStored(): Partial<Persisted> {
@@ -99,7 +117,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [followedStores, setFollowedStores] = useState<string[]>([]);
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
-  const [zoneId, setZoneIdState] = useState<string | null>(null);
+  const [promoSellerId, setPromoSellerId] = useState<string | null>(null);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const restoredPromo = useRef<string | null>(null);
@@ -112,7 +130,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     setWishlist(Array.isArray(s.wishlist) ? s.wishlist.map(String) : []);
     setFollowedStores(Array.isArray(s.followedStores) ? s.followedStores.map(String) : []);
     setRecentlyViewed(Array.isArray(s.recentlyViewed) ? s.recentlyViewed.map(String) : []);
-    setZoneIdState(typeof s.zoneId === "string" ? s.zoneId : null);
     restoredPromo.current = typeof s.promoCode === "string" ? s.promoCode : null;
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -122,12 +139,12 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      const data: Persisted = { cart, wishlist, followedStores, recentlyViewed, promoCode, zoneId };
+      const data: Persisted = { cart, wishlist, followedStores, recentlyViewed, promoCode };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       /* storage may be blocked (private window) — the cart still works for this session */
     }
-  }, [hydrated, cart, wishlist, followedStores, recentlyViewed, promoCode, zoneId]);
+  }, [hydrated, cart, wishlist, followedStores, recentlyViewed, promoCode]);
 
   // Keep the cart in sync across tabs.
   useEffect(() => {
@@ -259,6 +276,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     setCart([]);
     setPromoCode(null);
     setPromoDiscount(0);
+    setPromoSellerId(null);
   }, []);
 
   const toggleWishlist = useCallback((productId: string) => {
@@ -281,34 +299,41 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return Math.round(cart.reduce((s, i) => s + (byId.get(i.id) ?? i.price) * i.qty, 0) * 100) / 100;
   }, [cart, catalog]);
 
+  /** The cart as the server prices it: only the products and quantities (a store coupon is checked against them). */
+  const promoItems = useMemo(() => cart.map((c) => ({ productId: c.id, qty: c.qty })), [cart]);
+  const promoItemsKey = JSON.stringify(promoItems);
+
   const applyPromo = useCallback(
     async (code: string): Promise<PromoResult> => {
       const clean = code.trim();
-      if (!clean) return { ok: false, reason: "Enter a promo code." };
-      if (subtotal <= 0) return { ok: false, reason: "Your cart is empty." };
+      if (!clean) return { ok: false, reason: promoReason("Enter a promo code.") };
+      if (subtotal <= 0) return { ok: false, reason: promoReason("Your cart is empty.") };
       try {
-        const res = await socketClient.request<{ ok: boolean; discount: number; code?: string; reason?: string }>(
+        const res = await socketClient.request<{ ok: boolean; discount: number; code?: string; reason?: string; sellerId?: string }>(
           "promos:validate",
-          { code: clean, subtotalUsd: subtotal },
+          { code: clean, subtotalUsd: subtotal, items: promoItems },
         );
         if (!res.ok) {
           setPromoCode(null);
           setPromoDiscount(0);
-          return { ok: false, reason: res.reason ?? "Invalid code." };
+          setPromoSellerId(null);
+          return { ok: false, reason: promoReason(res.reason ?? "Invalid code.") };
         }
         setPromoCode(res.code ?? clean.toUpperCase());
         setPromoDiscount(res.discount);
+        setPromoSellerId(res.sellerId ?? null);
         return { ok: true };
       } catch (e) {
         return { ok: false, reason: (e as Error).message };
       }
     },
-    [subtotal],
+    [subtotal, promoItems],
   );
 
   const removePromo = useCallback(() => {
     setPromoCode(null);
     setPromoDiscount(0);
+    setPromoSellerId(null);
   }, []);
 
   // Re-check the code whenever the cart total changes (or after a reload / sign-in),
@@ -325,15 +350,17 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     restoredPromo.current = null;
     let alive = true;
     socketClient
-      .request<{ ok: boolean; discount: number; code?: string }>("promos:validate", { code, subtotalUsd: subtotal })
+      .request<{ ok: boolean; discount: number; code?: string; sellerId?: string }>("promos:validate", { code, subtotalUsd: subtotal, items: JSON.parse(promoItemsKey) })
       .then((res) => {
         if (!alive) return;
         if (res.ok) {
           setPromoCode(res.code ?? code);
           setPromoDiscount(res.discount);
+          setPromoSellerId(res.sellerId ?? null);
         } else {
           setPromoCode(null);
           setPromoDiscount(0);
+          setPromoSellerId(null);
         }
       })
       .catch(() => {
@@ -342,7 +369,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [hydrated, rt.status, rt.user, subtotal, promoCode]);
+  }, [hydrated, rt.status, rt.user, subtotal, promoCode, promoItemsKey]);
 
   const toggleFollowStore = useCallback((storeName: string) => {
     setFollowedStores((prev) =>
@@ -362,8 +389,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const setZoneId = useCallback((z: string | null) => setZoneIdState(z), []);
-
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   return (
@@ -374,8 +399,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         followedStores,
         promoCode,
         promoDiscount,
-        zoneId,
-        setZoneId,
+        promoSellerId,
         addToCart,
         removeFromCart,
         updateQty,
@@ -418,6 +442,9 @@ export type CartLine = CartItem & {
   /** The chosen options as the shopper reads them in each language (`variant` stays the purchase key). */
   variantEn: string;
   variantFr: string;
+  /** The seller's store is on vacation: the line cannot be ordered until it is back. */
+  onVacation: boolean;
+  vacationNotice: { en: string; fr: string } | null;
 };
 
 /** Cart lines enriched with the live catalogue (price, stock, availability). */
@@ -425,6 +452,8 @@ export function useCartLines(): {
   lines: CartLine[];
   subtotal: number;
   hasUnavailable: boolean;
+  /** At least one line belongs to a store that is on vacation (live: follows the `store:vacation` push). */
+  hasVacation: boolean;
   /** What the campaigns / flash sales currently save on this cart (already inside `subtotal`). */
   savings: number;
 } {
@@ -444,16 +473,19 @@ export function useCartLines(): {
         variantEn: p ? localizeVariantText(i.variant, p.variants, p.variantLabels, false) : i.variant,
         variantFr: p ? localizeVariantText(i.variant, p.variants, p.variantLabels, true) : i.variant,
         livePrice: p ? p.price : i.price,
-        deliveryDays: p ? p.deliveryDays : null,
+        deliveryDays: p ? p.totalDeliveryDays : null,
         stock: p ? p.stock : null,
         unavailable: catalogReady && (!p || p.stock <= 0),
         priceInfo: p ? priceView(p) : null,
+        onVacation: !!p?.sellerOnVacation,
+        vacationNotice: p?.sellerVacationNotice ?? null,
       };
     });
     return {
       lines,
       subtotal: round2(lines.reduce((s, l) => s + l.livePrice * l.qty, 0)),
       hasUnavailable: lines.some((l) => l.unavailable),
+      hasVacation: lines.some((l) => l.onVacation),
       savings: round2(
         lines.reduce((s, l) => (l.priceInfo && l.priceInfo.source !== "base" && l.priceInfo.was ? s + (l.priceInfo.was - l.livePrice) * l.qty : s), 0),
       ),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRealtime } from "@/context/realtime-context";
@@ -8,14 +8,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { OrderProducts, type OrderProductEntry } from "@/components/shop/order-products";
-import { ActivityTimeline } from "@/components/ui/timeline";
+import { StepList } from "@/components/shop/step-list";
+import { ContactSeller } from "@/components/shop/contact-seller";
+import { customerJourney } from "@/lib/order-journey";
+import { useHubDirectory } from "@/lib/shop-engage";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
-import { useMyOrder, orderStatusLabel, orderStatusTitle, canCancelOrder, hasDeliveryCodeStage } from "@/lib/orders";
+import { useMyOrder, orderStatusLabel, canCancelOrder, hasDeliveryCodeStage, useDeliveryCode } from "@/lib/orders";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
-import { socketClient } from "@/lib/realtime/socket-client";
 import { isMobileMoneyMethod } from "@/lib/shop-live";
 import { refundedTotal } from "@/lib/shop-packages";
 import { dayLabel } from "@/lib/delivery-estimate";
@@ -30,26 +32,8 @@ function OrderDetail() {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const order = useMyOrder(id);
-  const [code, setCode] = useState<{ orderId: string; value: string } | null>(null);
-  const orderUuid = order?.id;
-  const orderStatus = order?.status;
-
-  // The customer's 4-digit handover code, only while the parcel is on its way.
-  useEffect(() => {
-    if (!orderUuid || !orderStatus || !hasDeliveryCodeStage(orderStatus) || rt.status !== "connected") return;
-    let alive = true;
-    socketClient
-      .request<{ required: boolean; code: string | null }>("orders:deliveryCode", { orderId: orderUuid })
-      .then((res) => {
-        if (alive) setCode(res.required && res.code ? { orderId: orderUuid, value: res.code } : null);
-      })
-      .catch(() => {
-        if (alive) setCode(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [orderUuid, orderStatus, rt.status]);
+  const hubs = useHubDirectory();
+  const code = useDeliveryCode(order?.id, order?.status);
 
   const paymentStatusLabel = (status: string) => {
     const map: Record<string, { en: string; fr: string }> = {
@@ -61,10 +45,6 @@ function OrderDetail() {
     const m = map[status];
     return m ? (fr ? m.fr : m.en) : status;
   };
-
-  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
-  const paymentMethodLabel = (method: string) =>
-    fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 
   // The raw order carries the per-line seller state the detail view model leaves out.
   const raw = order ? rt.orders.find((o) => o.id === order.id) : undefined;
@@ -119,7 +99,12 @@ function OrderDetail() {
     };
   });
   const refunded = refundedTotal(productEntries);
-  const showCode = code && code.orderId === order.id && hasDeliveryCodeStage(order.status);
+  const showCode = code && hasDeliveryCodeStage(order.status);
+  const steps = raw ? customerJourney(raw, hubs, fr) : [];
+  const destHub = raw?.destinationHubId ? hubs.get(raw.destinationHubId) : undefined;
+  const requests = rt.disputes.filter((d) => d.orderId === order.id);
+  const sellers = [...new Map(rawItems.filter((i) => i.sellerId).map((i) => [i.sellerId as string, i.sellerName ?? ""])).entries()];
+  const reportable = ["shipped", "out_for_delivery", "delivered"].includes(order.status);
 
   return (
     <div className="space-y-6">
@@ -133,10 +118,14 @@ function OrderDetail() {
               <>
                 <button onClick={reorder} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">{fr ? "Commander à nouveau" : "Reorder"}</button>
                 <Link href={`/shop/orders/${order.id}/return`} className="rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-blue-200">{fr ? "Retour" : "Return"}</Link>
+                <Link href={`/shop/orders/${order.id}/exchange`} className="rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium shadow-sm hover:border-blue-200">{fr ? "Remplacer / échanger" : "Replace / exchange"}</Link>
                 {order.items[0] && (
                   <Link href={`/shop/products/${order.items[0].productId}/reviews`} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium">{fr ? "Avis" : "Review"}</Link>
                 )}
               </>
+            )}
+            {reportable && (
+              <Link href={`/shop/orders/${order.id}/dispute`} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100">{fr ? "Signaler un problème" : "Report a problem"}</Link>
             )}
             {canCancelOrder(order.status) && (
               <button onClick={cancel} disabled={cancelling} className="rounded-xl border border-red-200 px-4 py-2 text-sm text-red-600 disabled:opacity-50">
@@ -160,7 +149,7 @@ function OrderDetail() {
           <p className="text-sm font-medium text-emerald-800">
             {fr ? "Donnez ce code au livreur à la livraison" : "Give this code to the rider on delivery"}
           </p>
-          <p className="mt-2 font-mono text-4xl font-extrabold tracking-[0.4em] text-emerald-900">{code.value}</p>
+          <p className="mt-2 font-mono text-4xl font-extrabold tracking-[0.4em] text-emerald-900">{code}</p>
         </div>
       )}
 
@@ -197,7 +186,7 @@ function OrderDetail() {
 
         <DetailGridSection title={fr ? "Paiement" : "Payment"}>
           <InfoGrid items={[
-            { label: fr ? "Moyen" : "Method", value: paymentMethodLabel(order.paymentMethod) },
+            { label: fr ? "Moyen" : "Method", value: formatPaymentMethod(order.paymentMethodId ?? order.paymentMethod, locale) },
             { label: fr ? "Statut" : "Status", value: paymentStatusLabel(order.paymentStatus) },
             { label: fr ? "Montant" : "Amount", value: formatCurrency(order.amount, locale) },
           ]} />
@@ -209,7 +198,7 @@ function OrderDetail() {
             {order.discount > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Code promo" : "Promo code"}</dt><dd>-{formatCurrency(order.discount, locale)}</dd></div>
             )}
-            <div className="flex justify-between"><dt>{fr ? "Livraison" : "Delivery"}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
+            <div className="flex justify-between"><dt>{fr ? "Livraison" : "Delivery"}{destHub ? ` (${destHub.name})` : ""}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
             <div className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold"><dt>Total</dt><dd>{formatCurrency(order.amount, locale)}</dd></div>
             {refunded > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Remboursé" : "Refunded"}</dt><dd>-{formatCurrency(refunded, locale)}</dd></div>
@@ -223,12 +212,27 @@ function OrderDetail() {
 
         <DetailGridSection title={fr ? "Suivi de commande" : "Order Tracking"} span={2}>
           <Link href={`/shop/orders/${order.id}/tracking`} className="mb-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Suivre la livraison →" : "Track delivery →"}</Link>
-          <ActivityTimeline events={order.timeline.map((e) => ({ ...e, label: orderStatusTitle(e.label, fr) }))} />
+          <StepList steps={steps} fr={fr} />
         </DetailGridSection>
 
         <DetailGridSection title="Support">
           <p className="text-sm text-slate-500">{fr ? "Besoin d'aide avec cette commande ?" : "Need help with this order?"}</p>
-          <Link href={`/shop/support?order=${order.id}`} className="btn-primary mt-3 inline-block px-4 py-2 text-sm">{fr ? "Ouvrir un ticket de support" : "Open Support Ticket"}</Link>
+          <div className="mt-3 flex flex-col items-start gap-2">
+            <Link href={`/shop/support?order=${order.id}`} className="btn-primary inline-block px-4 py-2 text-sm">{fr ? "Ouvrir un ticket de support" : "Open Support Ticket"}</Link>
+            {sellers.map(([sid, name]) => (
+              <ContactSeller key={sid} sellerId={sid} orderId={order.id} fr={fr} label={fr ? `Écrire à ${name}` : `Message ${name}`} returnTo={`/shop/orders/${order.id}`} />
+            ))}
+          </div>
+          {requests.length > 0 && (
+            <div className="mt-4 border-t border-[var(--border)] pt-3" data-testid="order-requests">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{fr ? "Demandes liées" : "Related requests"}</p>
+              <ul className="space-y-1 text-sm">
+                {requests.map((d) => (
+                  <li key={d.id}><Link href={`/shop/returns/${d.id}`} className="text-[var(--primary)] hover:underline">{d.reference}</Link> <span className="text-xs text-slate-500">· {d.type === "return" ? (fr ? "Retour" : "Return") : fr ? "Litige" : "Dispute"}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
         </DetailGridSection>
       </DetailGrid>
     </div>

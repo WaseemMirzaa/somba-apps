@@ -55,21 +55,26 @@ class SocketService {
     socket.emitWithAck(
       event,
       body ?? const <String, dynamic>{},
-      ack: (dynamic res) {
-        if (completer.isCompleted) return;
-        if (res is Map && res['ok'] == false) {
-          completer.completeError(res['error'] == null ? ApiException.local('err_generic') : ApiException(res['error'].toString()));
-        } else if (res is Map && res.containsKey('data')) {
-          completer.complete(res['data']);
-        } else {
-          completer.complete(res);
-        }
-      },
+      ack: (dynamic res) => settleAck(completer, res),
     );
     return completer.future.timeout(
       const Duration(seconds: 8),
       onTimeout: () => throw ApiException.local('err_no_response'),
     );
+  }
+
+  /// Finish a request with the server's acknowledgement: `{ok: false, error, code?, ...}` fails with an
+  /// [ApiException] that keeps the structured fields, `{ok: true, data}` completes with the data, anything else with
+  /// the reply itself. A second ack for the same request is ignored.
+  static void settleAck(Completer<dynamic> completer, dynamic res) {
+    if (completer.isCompleted) return;
+    if (res is Map && res['ok'] == false) {
+      completer.completeError(ApiException.fromAck(res));
+    } else if (res is Map && res.containsKey('data')) {
+      completer.complete(res['data']);
+    } else {
+      completer.complete(res);
+    }
   }
 
   void disconnect() {

@@ -9,12 +9,17 @@ export function InfoGrid({
   columns?: 2 | 3 | 4;
   className?: string;
 }) {
-  const colClass = { 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-4" };
+  // Up to `columns` tracks, but never narrower than a readable minimum: the number of columns follows the width of
+  // the card the grid sits in (not the viewport), so three short stat labels in a narrow card stack instead of colliding.
+  const minCol = { 2: "11rem", 3: "8.5rem", 4: "7.5rem" }[columns];
+  const gridStyle = {
+    gridTemplateColumns: `repeat(auto-fit, minmax(max(${minCol}, calc((100% - ${(columns - 1) * 1}rem) / ${columns})), 1fr))`,
+  };
   return (
-    <dl className={cn("grid gap-4", colClass[columns], className)}>
+    <dl className={cn("grid gap-4", className)} style={gridStyle}>
       {items.map((item) => (
-        <div key={item.label} className={cn("min-w-0", item.full && "sm:col-span-full")}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        <div key={item.label} className={cn("min-w-0", item.full && "col-span-full")}>
+          <dt className="break-words text-xs font-medium uppercase tracking-wide text-slate-400">
             {item.label}
           </dt>
           <dd className="mt-1 break-words text-sm font-medium text-slate-900">{item.value}</dd>

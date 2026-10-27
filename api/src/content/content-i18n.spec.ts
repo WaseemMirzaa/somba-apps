@@ -91,7 +91,7 @@ describe('flash sales', () => {
 describe('campaigns', () => {
   function campaigns() {
     const notifications = { toRole: async () => undefined, toUser: async () => undefined };
-    const productsSvc = { broadcastCampaignPrices: async () => undefined };
+    const productsSvc = { broadcastCampaignPrices: async () => undefined, onCampaignSale: () => undefined };
     return new CampaignsService(ds.getRepository(Campaign), ds.getRepository(Seller), ds.getRepository(Product), notifications as never, emitter as never, productsSvc as never, translations);
   }
 

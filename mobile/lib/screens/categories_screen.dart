@@ -66,7 +66,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.12, crossAxisSpacing: 14, mainAxisSpacing: 14),
+        // Height from the content (icon, a two-line name, the count) at the current text size, not a fixed ratio.
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2, mainAxisExtent: 104 + MediaQuery.textScalerOf(context).scale(58), crossAxisSpacing: 14, mainAxisSpacing: 14),
         itemCount: cats.length,
         itemBuilder: (_, i) {
           final cat = cats[i];
@@ -83,7 +85,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Container(height: 50, width: 50, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(16)), child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 26)),
                 const Spacer(),
-                Text(cat.displayName(lang), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text(cat.displayName(lang), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 2),
                 Text(s.itemsCount(liveCategoryCountOf(cat)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w500)),
               ]),

@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app.dart';
 import 'data/market_profiles.dart';
 import 'data/shop_state.dart';
+import 'l10n/language_sync.dart';
 import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
 import 'screens/more/auth_screens.dart';
@@ -54,6 +55,10 @@ class _SombaAppState extends State<SombaApp> {
     RealtimeStore.instance.addListener(_openPendingTap);
     _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
     // The server can end a session (revoked, suspended, deleted): go back to sign-in.
+    // Once the account is loaded its language is authoritative: apply the language rule again (and tell the account).
+    RealtimeStore.instance.onHydrated = () {
+      if (mounted && _authed) unawaited(reconcileLanguage(RealtimeStore.instance));
+    };
     RealtimeStore.instance.onSessionEnded = (messageKey) {
       if (!mounted) return;
       ShopState.instance.clearSession();
@@ -78,6 +83,7 @@ class _SombaAppState extends State<SombaApp> {
     Strings.langNotifier.removeListener(_onLang);
     PushService.instance.pendingTap.removeListener(_openPendingTap);
     RealtimeStore.instance.removeListener(_openPendingTap);
+    RealtimeStore.instance.onHydrated = null;
     _foregroundSub?.cancel();
     super.dispose();
   }
@@ -119,16 +125,9 @@ class _SombaAppState extends State<SombaApp> {
   /// Called once a session exists (restored or freshly signed in).
   void _enter() {
     _authed = true;
-    final user = RealtimeStore.instance.user;
-    if (user != null) {
-      if (!Strings.hasChoice) {
-        // No choice made on this device yet: follow the account's language.
-        Strings.setLang(user.locale, persist: false);
-      } else if (user.locale != Strings.current.lang) {
-        // The language picked on this device wins; tell the account.
-        unawaited(RealtimeStore.instance.updateProfile(locale: Strings.current.lang).catchError((_) {}));
-      }
-    }
+    // No choice made on this device: follow the account's language. A choice made here wins (it is saved to the
+    // account once the session is up: see onHydrated).
+    unawaited(reconcileLanguage(RealtimeStore.instance));
     final market = RealtimeStore.instance.prefs['market'];
     marketNotifier.value = market == 'FR' ? MarketProfileId.france : MarketProfileId.drc;
     // A notification tapped before sign-in opens now (after this frame, once the shell exists).

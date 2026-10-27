@@ -51,6 +51,7 @@ class NotificationsScreen extends StatelessWidget {
         'return' || 'dispute' || 'exchange' || 'replacement' => (Icons.assignment_return_rounded, AppColors.royalBlue),
         'broadcast' || 'promo' => (Icons.campaign_rounded, AppColors.royalBlue),
         'support' => (Icons.headset_mic_rounded, AppColors.royalBlue),
+        'chat' => (Icons.chat_bubble_outline_rounded, AppColors.mint),
         _ => (Icons.notifications_rounded, AppColors.primary),
       };
 
@@ -74,7 +75,13 @@ class NotificationsScreen extends StatelessWidget {
         final unread = store.unreadCount;
         return Scaffold(
           appBar: backAppBar(context, unread > 0 ? s.notificationsN(unread) : s.notifications, actions: [
-            TextButton(onPressed: unread == 0 ? null : () => store.markAllRead(), child: Text(s.markAll)),
+            // An icon with a tooltip, not the words: "Tout marquer comme lu" took the room of the title in French.
+            IconButton(
+              key: const ValueKey('mark-all-read'),
+              tooltip: s.markAll,
+              icon: const Icon(Icons.done_all_rounded),
+              onPressed: unread == 0 ? null : () => store.markAllRead(),
+            ),
           ]),
           body: items.isEmpty
               ? Center(child: Text(s.allCaughtUp, style: const TextStyle(color: AppColors.muted)))
@@ -170,7 +177,13 @@ class AddressBookScreen extends StatelessWidget {
                             if (a.isDefault) Pill(s.defaultLabel, color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary, fontSize: 10.5),
                           ]),
                           const SizedBox(height: 4),
-                          Text(a.oneLine, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                          Text(a.oneLineIn(s.lang), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                          if (a.notServed)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Pill(s.areaNotServedBadge,
+                                  key: ValueKey('address-not-served-${a.id}'), color: AppColors.dangerSoft, textColor: AppColors.dangerStrong, fontSize: 10.5),
+                            ),
                           if ((a.line2 ?? '').isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 2),

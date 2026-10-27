@@ -25,8 +25,11 @@ import {
   isVerificationError,
   usePublicSettings,
   useVerificationStatus,
-  zoneLabel,
 } from "@/lib/shop-live";
+import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { DeliveryQuoteCard } from "@/components/shop/delivery-quote";
+import { notServedArea, notServedCityNames, notServedFromError, notServedText, type NotServedInfo } from "@/lib/areas";
+import { pinRequiredText } from "@/components/shop/address-pin-editor";
 import { formatCurrency } from "@/lib/utils";
 import type { Order } from "@/lib/realtime/types";
 
@@ -37,7 +40,7 @@ function PaymentContent() {
   const rt = useRealtime();
   const router = useRouter();
   const params = useSearchParams();
-  const { promoCode, promoDiscount, zoneId, clearCart, addToCart } = useShop();
+  const { promoCode, promoDiscount, clearCart, addToCart } = useShop();
   const { lines, subtotal, hasUnavailable, savings } = useCartLines();
   const verification = useVerificationStatus();
   const settings = usePublicSettings();
@@ -47,9 +50,14 @@ function PaymentContent() {
   const note = params.get("note") ?? "";
   const address = rt.addresses.find((a) => a.id === addressId) ?? null;
 
-  const zone = settings.deliveryZones.find((z) => z.id === zoneId) ?? null;
-  const zoneMissing = settings.deliveryZones.length > 0 && !zone;
-  const deliveryFee = zone?.feeUsd ?? 0;
+  const pinned = !!addressPin(address);
+  const quoteLines = useMemo(() => lines.filter((l) => !l.unavailable).map((l) => ({ productId: l.id, qty: l.qty })), [lines]);
+  const { quote, loading: quoteLoading, error: quoteError, notServed } = useDeliveryQuote({
+    addressId: address && pinned ? address.id : null,
+    lines: quoteLines,
+    enabled: !!address && pinned,
+  });
+  const deliveryFee = quote?.feeUsd ?? 0;
   const discount = Math.min(promoDiscount, subtotal);
   const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
@@ -60,6 +68,8 @@ function PaymentContent() {
   const [msisdn, setMsisdn] = useState(rt.user?.phone ?? "");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // `orders:create` refused the address as outside every served area (the quote may not have said so yet).
+  const [orderNotServed, setOrderNotServed] = useState<NotServedInfo | null>(null);
   const [created, setCreated] = useState<Order | null>(null);
   const snapshot = useRef<CartLine[]>([]);
 
@@ -99,6 +109,7 @@ function PaymentContent() {
 
   async function placeOrder() {
     setError(null);
+    setOrderNotServed(null);
     if (verification.blocked) {
       setError(null);
       return;
@@ -111,8 +122,12 @@ function PaymentContent() {
       setError(fr ? "Votre panier contient des articles indisponibles ou est vide." : "Your cart is empty or has unavailable items.");
       return;
     }
-    if (zoneMissing) {
-      setError(fr ? "Choisissez une zone de livraison." : "Choose a delivery zone first.");
+    if (!pinned) {
+      setError(pinRequiredText(fr));
+      return;
+    }
+    if (!quote) {
+      setError(quoteError ?? (fr ? "Les frais de livraison ne sont pas encore calculés." : "The delivery fee is not worked out yet."));
       return;
     }
     if (mobile && msisdn.replace(/\D/g, "").length < 9) {
@@ -126,13 +141,12 @@ function PaymentContent() {
 
     setPlacing(true);
     try {
-      const shipping = JSON.parse(addressToShipping(address, zoneId)) as Record<string, unknown>;
+      const shipping = JSON.parse(addressToShipping(address)) as Record<string, unknown>;
       if (note.trim()) shipping.note = note.trim();
       shipping.openBox = openBox;
       const order = await socketClient.request<Order>("orders:create", {
         items: lines.map((l) => ({ productId: l.id, qty: l.qty, variant: l.variant })),
         paymentMethod: chosen,
-        ...(zoneId ? { zoneId } : {}),
         shippingAddress: JSON.stringify(shipping),
         ...(promoCode ? { promoCode } : {}),
         ...(mobile ? { paymentPhone: msisdn.trim() } : {}),
@@ -147,6 +161,13 @@ function PaymentContent() {
       toast(fr ? "Commande passée" : "Order placed");
       router.replace(`/shop/orders/${order.reference}/confirmed`);
     } catch (e) {
+      // A refusal for an unserved area carries the area and the served cities: the sentence is built here, in the UI language.
+      const refused = notServedFromError(e);
+      if (refused) {
+        setOrderNotServed(refused);
+        toast(notServedText(notServedArea(refused, fr), notServedCityNames(refused, fr), fr), "error");
+        return;
+      }
       const message = (e as Error).message || (fr ? "La commande a échoué." : "Could not place the order.");
       setError(message);
       toast(message, "error");
@@ -192,8 +213,11 @@ function PaymentContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"} (${promoCode})`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: `${fr ? "Livraison" : "Delivery"}${zone ? ` — ${zoneLabel(zone, fr)}` : ""}`, value: deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          { label: fr ? "Livraison" : "Delivery", value: notServed ? (fr ? "Zone non desservie" : "Not served yet") : !quote ? (fr ? "Calcul…" : "Calculating…") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
         ]} />
+        <div className="mt-4">
+          <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} notServed={notServed ?? orderNotServed} />
+        </div>
       </DetailSection>
 
       <DetailSection title={fr ? "Mode de paiement" : "Payment Method"}>
@@ -248,7 +272,7 @@ function PaymentContent() {
           <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>
         )}
 
-        <Button onClick={placeOrder} disabled={placing || zoneMissing || verification.blocked} className="mt-4 w-full">
+        <Button onClick={placeOrder} disabled={placing || !pinned || !quote || verification.blocked} className="mt-4 w-full">
           {placing ? (fr ? "Traitement…" : "Placing…") : fr ? "Payer" : "Pay"}
         </Button>
         <Link href="/shop/checkout" className="mt-2 block text-center text-sm text-slate-500 hover:underline">{fr ? "← Retour" : "← Back"}</Link>

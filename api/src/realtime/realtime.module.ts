@@ -14,6 +14,7 @@ import { AddressesModule } from '../addresses/addresses.module';
 import { ContentModule } from '../content/content.module';
 import { OpsModule } from '../ops/ops.module';
 import { WarehouseModule } from '../warehouse/warehouse.module';
+import { LogisticsModule } from '../logistics/logistics.module';
 import { FlowsModule } from '../flows/flows.module';
 import { RealtimeGateway } from './realtime.gateway';
 import { WsThrottleInterceptor } from './ws-throttle.interceptor';
@@ -35,6 +36,7 @@ import { WsThrottleInterceptor } from './ws-throttle.interceptor';
     ContentModule,
     OpsModule,
     WarehouseModule,
+    LogisticsModule,
     FlowsModule,
   ],
   providers: [RealtimeGateway, WsThrottleInterceptor],

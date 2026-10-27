@@ -2,3 +2,5 @@
 "CFBundleDisplayName" = "Somba&Teka Rider";
 "NSLocationWhenInUseUsageDescription" = "Somba&Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Somba&Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.";
+"NSPhotoLibraryUsageDescription" = "Somba&Teka Rider lets you attach photos from your library to a support ticket, for example a damaged parcel or a problem at an address.";
+"NSCameraUsageDescription" = "Somba&Teka Rider uses the camera to take a photo you attach to a support ticket, for example a damaged parcel or a problem at an address.";

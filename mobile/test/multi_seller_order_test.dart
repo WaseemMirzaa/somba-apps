@@ -102,12 +102,11 @@ void main() {
       ..addAll([_multi(), _single()]);
     store.hydrated = true;
     store.walletBalance = 100;
-    store.zones = const [Zone(id: 'zone-gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', deliveryFeeUsd: 3)];
+    store.debugCallRequest = (event, [body]) async => event == 'delivery:quote' ? {'feeUsd': 3, 'pinned': true} : const <dynamic>[];
     store.addresses
       ..clear()
       ..add(AddressDto(id: 'a1', label: 'Home', line1: '12 Avenue de la Paix', city: 'Kinshasa', commune: 'Gombe', isDefault: true));
     ShopState.instance.cart.clear();
-    ShopState.instance.selectedZoneId = null;
     ShopState.instance.appliedPromo = null;
   });
 
@@ -116,7 +115,7 @@ void main() {
     store.products.clear();
     store.orders.clear();
     store.addresses.clear();
-    store.zones = [];
+    store.debugCallRequest = null;
     store.hydrated = false;
     store.walletBalance = 0;
     ShopState.instance.cart.clear();

@@ -1,5 +1,5 @@
 // The checkout / cart bugs of docs/CUSTOMER-APP-GAP-ANALYSIS.md §0 (B1–B5): every "Place order" tap
-// either sends the order or says why not, the zone shown is the zone sent, verifying from the prompt
+// either sends the order or says why not, the delivery fee shown is the server's quote, verifying from the prompt
 // carries on with the order, iOS reaches the local API by default, and the cart never exceeds stock.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +20,8 @@ import 'package:lipcart/theme/app_theme.dart';
 import 'package:lipcart/util/format.dart';
 import 'package:lipcart/widgets/verify_prompt.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'gap_helpers.dart';
 
 ProductDto _dto(String id, {int stock = 5, double price = 20}) => ProductDto.fromJson({
       'id': id,
@@ -43,10 +45,9 @@ BackendUser _user({bool verified = true, String phone = ''}) => BackendUser.from
       'emailVerified': verified,
     });
 
-const _zones = [
-  Zone(id: 'zone-gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', deliveryFeeUsd: 3),
-  Zone(id: 'zone-limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', deliveryFeeUsd: 5),
-];
+/// The delivery quote of each saved address: a pinned address in Gombe costs 3, in Limete 5.
+Map<String, dynamic> _quoteFor(Map<String, dynamic>? body) =>
+    gapQuoteJson(fee: body?['addressId'] == 'a2' ? 5 : 3, hub: body?['addressId'] == 'a2' ? 'Limete Hub' : 'Kinshasa Hub');
 
 Widget _app(Widget home, {String lang = 'en'}) => MaterialApp(
       theme: AppTheme.light(),
@@ -86,15 +87,15 @@ void main() {
     store.user = _user();
     store.requireVerifiedForCheckout = false;
     store.walletBalance = 1000;
-    store.zones = List.of(_zones);
+    store.requirePinnedAddress = false;
+    store.debugCallRequest = gapCalls(quote: _quoteFor);
     store.addresses
       ..clear()
-      ..add(AddressDto(id: 'a1', label: 'Home', line1: '12 Avenue de la Paix', city: 'Kinshasa', commune: 'Gombe', isDefault: true));
+      ..add(AddressDto(id: 'a1', label: 'Home', line1: '12 Avenue de la Paix', city: 'Kinshasa', commune: 'Gombe', isDefault: true, geo: (lat: -4.31, lng: 15.31, placeId: null, formatted: null)));
     store.debugPlaceOrderRequest = _fakeServer;
     final shop = ShopState.instance;
     shop.cart.clear();
     shop.stockNotices.clear();
-    shop.selectedZoneId = null;
     shop.appliedPromo = null;
   });
 
@@ -102,7 +103,8 @@ void main() {
     final store = RealtimeStore.instance;
     store.products.clear();
     store.addresses.clear();
-    store.zones = [];
+    store.requirePinnedAddress = false;
+    store.debugCallRequest = null;
     store.user = null;
     store.hydrated = false;
     store.walletBalance = 0;
@@ -113,7 +115,7 @@ void main() {
     marketNotifier.value = MarketProfileId.drc;
   });
 
-  // Tall viewport: the whole checkout (address, zone, delivery time, payment) is built, so the tests reach every control.
+  // Tall viewport: the whole checkout (address, delivery fee, delivery time, payment) is built, so the tests reach every control.
   Future<void> openCheckout(WidgetTester tester, {String lang = 'en'}) async {
     tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
     tester.view.devicePixelRatio = 3;
@@ -169,40 +171,96 @@ void main() {
     });
   });
 
-  group('B2 · the zone sent is the address\'s zone', () {
-    testWidgets('a Gombe address sends the Gombe zone and its fee', (tester) async {
-      ShopState.instance.addToCart(productByUuid('p1')!);
-      await openCheckout(tester);
+  group('B2 · the delivery fee is the server\'s quote', () {
+    Future<void> payWithWallet(WidgetTester tester) async {
       await tester.tap(find.byKey(const ValueKey('pay-wallet')));
       await tester.pump();
       await placeOrder(tester);
+    }
+
+    testWidgets('a Gombe address is quoted 3 and the order carries no zone and no fee of the app\'s', (tester) async {
+      ShopState.instance.addToCart(productByUuid('p1')!);
+      await openCheckout(tester);
+      expect(find.text(money(3)), findsWidgets, reason: 'the quoted fee is on the summary');
+      expect(find.byKey(const ValueKey('checkout-hub')), findsOneWidget);
+      expect(find.text(const Strings('en').checkoutFromHub('Kinshasa Hub')), findsOneWidget);
+      await payWithWallet(tester);
       expect(_sent, hasLength(1));
-      expect(_sent.single['zoneId'], 'zone-gombe');
-      expect(_sent.single['deliveryFeeUsd'], 3);
-      expect(_sent.single['shippingAddress'], contains('"zone":"zone-gombe"'));
+      expect(_sent.single.containsKey('zoneId'), isFalse);
+      expect(_sent.single.containsKey('deliveryFeeUsd'), isFalse, reason: 'the server charges its own quote');
+      expect(_sent.single['shippingAddress'], isNot(contains('zone')));
+      expect(_sent.single['shippingAddress'], contains('"geo"'), reason: 'the pin travels with the order');
     });
 
-    testWidgets('a stale saved zone is replaced by the address\'s zone, never sent', (tester) async {
-      ShopState.instance.selectedZoneId = 'zone-that-was-removed';
-      ShopState.instance.addToCart(productByUuid('p1')!);
-      await openCheckout(tester);
-      await tester.tap(find.byKey(const ValueKey('pay-wallet')));
-      await tester.pump();
-      await placeOrder(tester);
-      expect(_sent.single['zoneId'], 'zone-gombe');
-    });
-
-    testWidgets('a Limete address sends the Limete zone and its fee', (tester) async {
+    testWidgets('a Limete address is quoted 5', (tester) async {
       RealtimeStore.instance.addresses
         ..clear()
-        ..add(AddressDto(id: 'a2', label: 'Office', line1: '5 Boulevard du 30 Juin', city: 'Kinshasa', commune: 'Limete', isDefault: true));
+        ..add(AddressDto(id: 'a2', label: 'Office', line1: '5 Boulevard du 30 Juin', city: 'Kinshasa', commune: 'Limete', isDefault: true, geo: (lat: -4.35, lng: 15.34, placeId: null, formatted: null)));
       ShopState.instance.addToCart(productByUuid('p1')!);
       await openCheckout(tester);
+      expect(find.text(money(5)), findsWidgets);
+      expect(find.text(const Strings('en').checkoutFromHub('Limete Hub')), findsOneWidget);
+    });
+
+    testWidgets('a transfer between warehouses is explained under the fee', (tester) async {
+      RealtimeStore.instance.debugCallRequest = gapCalls(quote: (_) => gapQuoteJson(fee: 4.5, transfer: 1.5));
+      ShopState.instance.addToCart(productByUuid('p1')!);
+      await openCheckout(tester);
+      expect(find.byKey(const ValueKey('checkout-transfer')), findsOneWidget);
+      expect(find.text(const Strings('en').checkoutTransferFee(money(1.5))), findsOneWidget);
+    });
+
+    testWidgets('an address without a pin must be pinned first when the shop requires it', (tester) async {
+      RealtimeStore.instance
+        ..requirePinnedAddress = true
+        ..addresses.clear()
+        ..addresses.add(AddressDto(id: 'a1', label: 'Home', line1: '12 Avenue de la Paix', city: 'Kinshasa', isDefault: true));
+      ShopState.instance.addToCart(productByUuid('p1')!);
+      await openCheckout(tester);
+      expect(find.byKey(const ValueKey('address-needs-pin')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('pay-wallet')));
       await tester.pump();
       await placeOrder(tester);
-      expect(_sent.single['zoneId'], 'zone-limete');
-      expect(_sent.single['deliveryFeeUsd'], 5);
+      expect(_sent, isEmpty, reason: 'no order without a pin');
+      expect(find.descendant(of: find.byType(SnackBar), matching: find.text(const Strings('en').checkoutNeedPin)), findsOneWidget);
+    });
+
+    testWidgets('a quote that fails blocks the order, says so, and Try again asks again', (tester) async {
+      var calls = 0;
+      RealtimeStore.instance.debugCallRequest = (event, [body]) async {
+        if (event != 'delivery:quote') return const <dynamic>[];
+        calls++;
+        if (calls == 1) throw ApiException('Delivery is not available right now: no warehouse is open.');
+        return gapQuoteJson();
+      };
+      ShopState.instance.addToCart(productByUuid('p1')!);
+      await openCheckout(tester);
+      expect(find.byKey(const ValueKey('address-needs-pin')), findsOneWidget);
+      expect(find.text(const Strings('en').checkoutQuoteFailed), findsOneWidget);
+      await payWithWallet(tester);
+      expect(_sent, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('fix-address')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(calls, 2);
+      expect(find.byKey(const ValueKey('address-needs-pin')), findsNothing);
+      await payWithWallet(tester);
+      expect(_sent, hasLength(1));
+    });
+
+    testWidgets('the quote is asked for the address id and the cart products (not the fee)', (tester) async {
+      Map<String, dynamic>? asked;
+      RealtimeStore.instance.debugCallRequest = (event, [body]) async {
+        if (event != 'delivery:quote') return const <dynamic>[];
+        asked = body;
+        return gapQuoteJson();
+      };
+      ShopState.instance.addToCart(productByUuid('p1')!, qty: 2);
+      await openCheckout(tester);
+      expect(asked!['addressId'], 'a1');
+      expect(asked!['lines'], [
+        {'productId': 'p1', 'qty': 2}
+      ]);
     });
   });
 

@@ -22,14 +22,14 @@ const req = (s, e, b = {}) => new Promise((r) => s.emit(e, b, r));
   ok(settings.codEnabled === 'false' && settings.productModeration === 'true' && settings.requireDeliveryCode === 'true', 'production defaults: COD off, moderation on, handover code required', JSON.stringify(settings));
   ok(settings.requireVerifiedForCheckout === 'true', 'production default: a verified phone or email is required to check out', JSON.stringify(settings));
   ok((await req(cust, 'settings:get')).data.requireVerifiedForCheckout === 'true', 'and customers can read the policy (to show the prompt)');
-  const unv = await req(cust, 'orders:create', { items: [{ name: 'Free stuff', priceUsd: 1, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' });
+  const unv = await req(cust, 'orders:create', { items: [{ name: 'Free stuff', priceUsd: 1, qty: 1 }], paymentMethod: 'wallet', });
   ok(!unv.ok && /verify/i.test(unv.error ?? ''), 'an unverified customer is told to verify before ordering', unv.error ?? '');
   const unvTop = await req(cust, 'wallet:topup', { amountUsd: 25, method: 'orange_money', phone: '+243822222222' });
   ok(!unvTop.ok && /verify/i.test(unvTop.error ?? ''), 'and before topping up');
   ok(!(await req(cust, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' })).ok, 'a customer cannot switch the policy off');
   // the rest of this check exercises payment paths, so switch the policy off (as an admin could)
   await req(admin, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
-  ok(!(await req(cust, 'orders:create', { items: [{ name: 'Free stuff', priceUsd: 1, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' })).ok, 'client-priced items are refused in production');
+  ok(!(await req(cust, 'orders:create', { items: [{ name: 'Free stuff', priceUsd: 1, qty: 1 }], paymentMethod: 'wallet', })).ok, 'client-priced items are refused in production');
   const fp = await rest('/api/v1/auth/forgot', { email: `prod${tag}@check.test` });
   ok(fp.status === 200 && !fp.json.devToken, 'no reset token is leaked in production');
   const t = await req(cust, 'wallet:topup', { amountUsd: 25, method: 'orange_money', phone: '+243822222222' });

@@ -56,7 +56,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   key: const ValueKey('wallet-topup'),
                   onPressed: _topUp,
                   style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.primary),
-                  child: Text(s.walletTopupBtn),
+                  child: ButtonLabel(s.walletTopupBtn),
                 ),
               ]),
             ),

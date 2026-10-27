@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
+import '../services/chat_store.dart';
 import '../services/realtime_store.dart';
+import '../services/support_store.dart';
 import '../util/format.dart';
 import 'wallet_screen.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
 import 'more/account_more.dart';
+import 'more/chat_inbox.dart';
+import 'more/chat_widgets.dart' show CountBadge;
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
 import 'more/auth_screens.dart' show VerifyEmailScreen;
@@ -24,7 +28,7 @@ class AccountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Strings.of(context);
 
-    return ListenableBuilder(listenable: RealtimeStore.instance, builder: (context, _) => Scaffold(
+    return ListenableBuilder(listenable: Listenable.merge([RealtimeStore.instance, ChatStore.instance, SupportStore.instance]), builder: (context, _) => Scaffold(
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -52,8 +56,12 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerEditProfileScreen(locale: locale)))),
             _MenuItem(Icons.notifications_none_rounded, s.notifications, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
+            _MenuItem(Icons.chat_bubble_outline_rounded, s.chatInboxTitle, AppColors.mint,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatInboxScreen(locale: locale))),
+                badge: ChatStore.instance.unread, key: 'menu-messages'),
             _MenuItem(Icons.confirmation_number_outlined, s.support, AppColors.royalBlue,
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale))),
+                badge: SupportStore.instance.unread, key: 'menu-support'),
             _MenuItem(Icons.settings_outlined, s.settings, AppColors.inkSoft,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSettingsScreen(locale: locale)))),
             _MenuItem(Icons.help_outline_rounded, s.help, AppColors.inkSoft,
@@ -68,16 +76,22 @@ class AccountScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: AppShadow.card,
               ),
-              child: ListTile(
-                onTap: () => _confirmLogout(context, s),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                leading: Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
+              // A Material over the card colour, so the row's press highlight shows (and stays inside the corners).
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  onTap: () => _confirmLogout(context, s),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  leading: Container(
+                    height: 40,
+                    width: 40,
+                    decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 21),
+                  ),
+                  title: Text(s.logout, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
                 ),
-                title: Text(s.logout, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: AppColors.danger)),
               ),
             ),
           ),
@@ -211,29 +225,41 @@ class AccountScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: AppShadow.card,
         ),
-        child: Column(
-          children: [
-            for (int i = 0; i < items.length; i++) ...[
-              ListTile(
-                onTap: items[i].onTap,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                leading: Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: items[i].color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                ListTile(
+                  key: items[i].key == null ? null : ValueKey<String>(items[i].key!),
+                  onTap: items[i].onTap,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  leading: Container(
+                    height: 40,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: items[i].color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(items[i].icon, color: items[i].color, size: 21),
                   ),
-                  child: Icon(items[i].icon, color: items[i].color, size: 21),
+                  title: Text(items[i].label,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                  trailing: items[i].badge > 0
+                      ? Row(mainAxisSize: MainAxisSize.min, children: [
+                          CountBadge(items[i].badge),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+                        ])
+                      : const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
                 ),
-                title: Text(items[i].label,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
-              ),
-              if (i != items.length - 1)
-                const Divider(height: 1, indent: 68, endIndent: 14),
+                if (i != items.length - 1)
+                  const Divider(height: 1, indent: 68, endIndent: 14),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -327,5 +353,8 @@ class _MenuItem {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  _MenuItem(this.icon, this.label, this.color, this.onTap);
+  /// An unread count shown as a badge before the chevron (0 = none).
+  final int badge;
+  final String? key;
+  _MenuItem(this.icon, this.label, this.color, this.onTap, {this.badge = 0, this.key});
 }

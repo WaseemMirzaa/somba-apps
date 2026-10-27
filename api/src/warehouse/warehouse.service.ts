@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { In, Not } from 'typeorm';
+import { FindOptionsWhere, In, Not } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { pageOf } from '../common/paging';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +19,11 @@ import type {
   ExceptionType,
 } from '../database/entities';
 import { num, oneOf, str } from '../common/validate';
+import { tasksOfHub } from '../logistics/hub-scope';
+import { HubsService } from '../logistics/hubs.service';
+import { Actor, LogisticsService } from '../logistics/logistics.service';
+import { riderFits } from '../logistics/leg-rules';
+import { tierAllows } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
@@ -41,15 +47,23 @@ export class WarehouseService {
     private readonly emitter: RealtimeEmitter,
     private readonly notifications: NotificationsService,
     private readonly productsSvc: ProductsService,
+    private readonly hubsSvc: HubsService,
+    private readonly logistics: LogisticsService,
   ) {}
 
   // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
-  listExceptions(status?: string): Promise<WarehouseException[]> {
-    return this.exceptions.find({
-      where: status && status !== 'all' ? { status: status as ExceptionStatus } : undefined,
-      order: { createdAt: 'DESC' },
-      take: 200,
-    });
+  /** Incidents, newest first. `hubId` (warehouse staff) limits them to that warehouse; null/undefined = all (admins). */
+  listExceptions(status?: string, hubId?: string | null): Promise<WarehouseException[]> {
+    const where: FindOptionsWhere<WarehouseException> = {};
+    if (status && status !== 'all') where.status = status as ExceptionStatus;
+    if (hubId) where.hubId = hubId;
+    return this.exceptions.find({ where, order: { createdAt: 'DESC' }, take: 200 });
+  }
+
+  /** Tell the admins and the staff of the incident's own warehouse (nobody else's). */
+  private pushException(exc: WarehouseException): void {
+    this.emitter.toRoles(ADMIN_ROLES, 'exception:updated', exc);
+    if (exc.hubId) this.emitter.toHub(exc.hubId, 'exception:updated', exc);
   }
 
   async createException(
@@ -62,21 +76,36 @@ export class WarehouseService {
       hub?: string;
       notes: string;
     },
+    scopeHubId?: string | null,
   ): Promise<WarehouseException> {
+    // The incident belongs to a warehouse: the staff member's own, else the parcel's, else the one named.
+    const task = input.taskId ? await this.tasks.findOne({ where: { id: str(input.taskId, 'Task', { max: 64 }) } }) : null;
+    if (scopeHubId && task && ![task.hubId, task.fromHubId, task.toHubId].includes(scopeHubId)) {
+      throw new BadRequestException('That parcel belongs to another warehouse.');
+    }
+    let hubRow: Hub | null = null;
+    if (scopeHubId) hubRow = await this.hubs.findOne({ where: { id: scopeHubId } });
+    else if (task?.hubId ?? task?.toHubId) hubRow = await this.hubs.findOne({ where: { id: (task?.hubId ?? task?.toHubId) as string } });
+    else if (input.hub) {
+      const wanted = str(input.hub, 'Hub', { max: 100 }).toLowerCase();
+      hubRow = (await this.hubs.find()).find((h) => h.name.trim().toLowerCase() === wanted) ?? null;
+    }
     const exc = await this.exceptions.save(
       this.exceptions.create({
-        reference: `INC-${Date.now().toString().slice(-8)}`,
+        // Time plus a random tail: two incidents raised in the same millisecond must not collide on the unique reference.
+        reference: `INC-${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`,
         taskId: input.taskId ? str(input.taskId, 'Task', { max: 64 }) : null,
         orderReference: input.orderReference ? str(input.orderReference, 'Order', { max: 40 }) : null,
         type: oneOf(input.type ?? 'other', ['damaged', 'missing_item', 'wrong_item', 'address_issue', 'lost', 'other'] as const, 'Type'),
         severity: oneOf(input.severity ?? 'medium', ['low', 'medium', 'high'] as const, 'Severity'),
         status: 'open',
-        hub: input.hub ? str(input.hub, 'Hub', { max: 100 }) : null,
+        hub: hubRow ? hubRow.name : input.hub ? str(input.hub, 'Hub', { max: 100 }) : null,
+        hubId: hubRow?.id ?? null,
         notes: str(input.notes, 'Notes', { min: 3, max: 2000 }),
         raisedBy,
       }),
     );
-    this.emitter.toRoles(OPS_ROOMS, 'exception:updated', exc);
+    this.pushException(exc);
     return exc;
   }
 
@@ -84,61 +113,36 @@ export class WarehouseService {
     id: string,
     status: ExceptionStatus,
     resolution?: string,
+    scopeHubId?: string | null,
   ): Promise<WarehouseException> {
     const exc = await this.exceptions.findOne({ where: { id } });
-    if (!exc) throw new Error('Exception not found.');
+    // Another warehouse's incident looks like it does not exist.
+    if (!exc || (scopeHubId && exc.hubId !== scopeHubId)) throw new Error('Exception not found.');
     exc.status = status;
     if (resolution != null) exc.resolution = resolution;
     const saved = await this.exceptions.save(exc);
-    this.emitter.toRoles(OPS_ROOMS, 'exception:updated', saved);
+    this.pushException(saved);
     return saved;
   }
 
-  // ── Hub directory ────────────────────────────────────────────────────────
+  // ── Hub directory (the logic lives in HubsService; these keep the warehouse:* events working) ──
   /** Every hub (inactive ones included, flagged `active:false`); `activeOnly` hides the inactive ones. */
-  listHubs(opts: { activeOnly?: boolean } = {}): Promise<Hub[]> {
-    return this.hubs.find({ where: opts.activeOnly ? { active: true } : undefined, order: { name: 'ASC' } });
+  listHubs(opts: { activeOnly?: boolean } = {}) {
+    return this.hubsSvc.list(opts);
   }
 
-  /** Create (no `id`) or update (`id`) a hub. Only the listed fields are accepted. */
-  async saveHub(data: Record<string, unknown>): Promise<Hub> {
-    const id = data?.id === undefined || data.id === null || data.id === '' ? null : str(data.id, 'Hub', { max: 64 });
-    const existing = id ? await this.hubs.findOne({ where: { id } }) : null;
-    if (id && !existing) throw new Error('Hub not found.');
-    const hub = existing ?? this.hubs.create({ active: true, country: null, address: null });
-    const has = (k: string) => data[k] !== undefined;
-    if (!existing || has('name')) hub.name = str(data.name, 'Hub name', { min: 2, max: 100 });
-    if (!existing || has('city')) hub.city = str(data.city, 'City', { min: 2, max: 100 });
-    if (has('country')) hub.country = data.country === null || data.country === '' ? null : str(data.country, 'Country', { max: 100 });
-    if (has('address')) hub.address = data.address === null || data.address === '' ? null : str(data.address, 'Address', { min: 3, max: 200 });
-    if (!existing || has('capacity')) hub.capacity = num(data.capacity ?? 500, 'Capacity', { min: 1, max: 1_000_000, int: true });
-    // Hub names are how transfers and incidents refer to a hub, so they must stay unique.
-    const clash = (await this.hubs.find({ select: { id: true, name: true } })).find(
-      (h) => h.name.trim().toLowerCase() === hub.name.toLowerCase() && h.id !== hub.id,
-    );
-    if (clash) throw new Error('A hub with this name already exists.');
-    const saved = await this.hubs.save(hub);
-    this.emitter.toRoles(OPS_ROOMS, 'hub:updated', saved);
-    return saved;
+  /** Create (no `id`) or update (`id`) a hub, with its map position. Only the listed fields are accepted. */
+  saveHub(data: Record<string, unknown>): Promise<Hub> {
+    return this.hubsSvc.save(data);
   }
 
-  /** Switch a hub on or off. An inactive hub cannot send or receive stock transfers. */
-  async setHubActive(id: string, active: boolean): Promise<Hub> {
-    const hub = await this.hubs.findOne({ where: { id: str(id, 'Hub', { max: 64 }) } });
-    if (!hub) throw new Error('Hub not found.');
-    if (hub.active !== active) {
-      if (!active && (await this.hubs.count({ where: { active: true, id: Not(hub.id) } })) === 0) {
-        throw new Error('You cannot deactivate the last active hub.');
-      }
-      hub.active = active;
-      await this.hubs.save(hub);
-    }
-    this.emitter.toRoles(OPS_ROOMS, 'hub:updated', hub);
-    return hub;
+  /** Switch a hub on or off. An inactive hub cannot send or receive stock transfers or take orders. */
+  setHubActive(id: string, active: boolean): Promise<Hub> {
+    return this.hubsSvc.setActive(id, active);
   }
 
   /** Parcels grouped for the warehouse pipeline (inbound → dispatched). */
-  async parcels(stage?: string, paging?: unknown): Promise<DeliveryTask[]> {
+  async parcels(stage?: string, paging?: unknown, hubId?: string | null): Promise<DeliveryTask[]> {
     const { take, skip } = pageOf(paging);
     const map: Record<string, string[]> = {
       inbound: ['unassigned'],
@@ -147,22 +151,47 @@ export class WarehouseService {
       delivered: ['delivered'],
       exceptions: ['failed'],
     };
-    const where = !stage || stage === 'all' ? undefined : { status: In(map[stage] ?? [stage]) as never };
-    return this.tasks.find({ where, order: { createdAt: 'DESC' }, take, skip });
+    const base = !stage || stage === 'all' ? {} : { status: In(map[stage] ?? [stage]) as never };
+    return this.tasks.find({ where: tasksOfHub(base, hubId), order: { createdAt: 'DESC' }, take, skip });
   }
 
   /** Parcels not delivered, oldest first. */
-  async aged(paging?: unknown): Promise<DeliveryTask[]> {
+  async aged(paging?: unknown, hubId?: string | null): Promise<DeliveryTask[]> {
     const { take, skip } = pageOf(paging);
-    return this.tasks.find({ where: { status: Not(In(['delivered', 'failed'])) as never }, order: { createdAt: 'ASC' }, take, skip });
+    return this.tasks.find({ where: tasksOfHub({ status: Not(In(['delivered', 'failed'])) as never }, hubId), order: { createdAt: 'ASC' }, take, skip });
   }
 
-  /** Inventory levels by product/SKU. */
-  async inventory(paging?: unknown) {
+  /**
+   * Inventory levels by product/SKU. Stock stays with the seller, so a warehouse's view is the products of the parcels
+   * in ITS custody (inbound, on hand, outbound), with how many units that is; admins (no `hubId`) see every product.
+   */
+  async inventory(paging?: unknown, hubId?: string | null) {
     const { take, skip } = pageOf(paging);
-    const products = await this.products.find({ order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
+    let custodyQty: Map<string, number> | null = null;
+    if (hubId) {
+      const c = await this.logistics.custody(hubId);
+      const orderIds = [...new Set([...c.inbound, ...c.onHand, ...c.outbound].map((t) => t.orderId))];
+      custodyQty = new Map();
+      if (orderIds.length) {
+        const rows = await this.orders
+          .createQueryBuilder('o')
+          .innerJoin('o.items', 'i')
+          .select('i.productId', 'productId')
+          .addSelect('SUM(i.qty)', 'qty')
+          .where('o.id IN (:...orderIds)', { orderIds })
+          .groupBy('i.productId')
+          .getRawMany<{ productId: string; qty: string }>();
+        for (const r of rows) custodyQty.set(r.productId, Number(r.qty));
+      }
+    }
+    const products = custodyQty
+      ? custodyQty.size
+        ? await this.products.find({ where: { id: In([...custodyQty.keys()]) }, order: { createdAt: 'DESC', id: 'ASC' }, take, skip })
+        : []
+      : await this.products.find({ order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
     const served = await this.productsSvc.describe(products);
     return products.map((p) => ({
+      ...(custodyQty ? { custodyQty: custodyQty.get(p.id) ?? 0 } : {}),
       sku: `SKU-${p.id.slice(0, 6)}`,
       productId: p.id,
       name: served.get(p.id)?.name ?? p.name,
@@ -174,72 +203,57 @@ export class WarehouseService {
     }));
   }
 
-  listBatches(): Promise<WarehouseBatch[]> {
-    return this.batches.find({ order: { createdAt: 'DESC' }, take: 100 });
+  listBatches(hubId?: string | null): Promise<WarehouseBatch[]> {
+    return this.batches.find({ where: hubId ? { hubId } : undefined, order: { createdAt: 'DESC' }, take: 100 });
   }
 
-  /** Build a batch from unassigned parcels and assign them to a rider. */
+  /**
+   * Build a batch of tasks and give them all to one rider (supervisor tier or above). Every task must belong to the
+   * actor's warehouse and the rider must be allowed on each of them; nothing is assigned if any task is refused.
+   */
   async buildBatch(
-    hubId: string | null,
+    actor: Actor,
     taskIds: string[],
-    rider: { id: string; name: string },
+    rider: { id: string; name: string; hubId?: string | null },
   ): Promise<WarehouseBatch> {
-    const assigned: string[] = [];
-    for (const id of taskIds) {
+    if (!tierAllows(actor.role, actor.tier, 'assign')) throw new BadRequestException('Only supervisors and managers can assign riders.');
+    const ids = [...new Set(taskIds)];
+    const tasks: DeliveryTask[] = [];
+    for (const id of ids) {
       const task = await this.tasks.findOne({ where: { id } });
-      if (!task || !['unassigned', 'assigned'].includes(task.status)) continue;
-      task.riderId = rider.id;
-      task.status = 'assigned';
-      await this.tasks.save(task);
-      assigned.push(task.orderReference);
-      const order = await this.orders.findOne({ where: { id: task.orderId } });
-      if (order) {
-        order.riderId = rider.id;
-        order.status = 'processing';
-        await this.orders.save(order);
-        this.emitter.toUser(order.customerId, 'order:updated', order);
-        // Ops pages and (through the order fanout) the sellers on the order follow along.
-        this.emitter.toRoles(OPS_ROOMS, 'order:updated', order);
-        await this.notifications.toUser(order.customerId, {
-          title: 'Rider assigned',
-          body: `${rider.name} is handling ${order.reference}.`,
-          type: 'delivery',
-          entityId: order.id,
-        });
-      }
-      this.emitter.toUser(rider.id, 'delivery:updated', task);
-      this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
+      if (!task) throw new BadRequestException('Delivery task not found.');
+      if (!actor.role.startsWith('admin') && task.hubId !== actor.hubId) throw new BadRequestException('This task belongs to another warehouse.');
+      if (!riderFits(task, rider.hubId)) throw new BadRequestException('This rider works at another warehouse.');
+      if (!['unassigned', 'assigned'].includes(task.status)) continue;
+      tasks.push(task);
     }
-    if (assigned.length) {
-      await this.notifications.toUser(rider.id, {
-        title: assigned.length === 1 ? 'New delivery assigned to you' : `${assigned.length} deliveries assigned to you`,
-        body: `${assigned.slice(0, 5).join(', ')}${assigned.length > 5 ? '…' : ''} — collect them at the warehouse.`,
-        type: 'task',
-        extra: { view: 'active' },
-      });
-    }
+    for (const task of tasks) await this.logistics.assign(task.id, rider.id, actor);
+    const hubId = actor.hubId ?? tasks[0]?.hubId ?? null;
     const batch = await this.batches.save(
       this.batches.create({
         reference: `BATCH-${Date.now().toString().slice(-6)}`,
         hubId,
         riderId: rider.id,
         riderName: rider.name,
-        taskIds: JSON.stringify(taskIds),
+        taskIds: JSON.stringify(tasks.map((t) => t.id)),
         status: 'dispatched',
       }),
     );
-    this.emitter.toRoles(OPS_ROOMS, 'batch:updated', batch);
+    this.emitter.toRoles(ADMIN_ROLES, 'batch:updated', batch);
+    if (hubId) this.emitter.toHub(hubId, 'batch:updated', batch);
     return batch;
   }
 
   /** COD reconciliation: cash collected per rider from delivered parcels (one grouped query). */
-  async reconcile() {
-    const rows = await this.tasks
+  async reconcile(hubId?: string | null) {
+    const qb = this.tasks
       .createQueryBuilder('t')
       .select('t.riderId', 'riderId')
       .addSelect('COUNT(*)', 'parcels')
       .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'codUsd')
-      .where("t.status = 'delivered'")
+      .where("t.status = 'delivered' AND t.kind = 'delivery'");
+    if (hubId) qb.andWhere('(t.hubId = :hubId OR t.fromHubId = :hubId OR t.toHubId = :hubId)', { hubId });
+    const rows = await qb
       .groupBy('t.riderId')
       .getRawMany<{ riderId: string | null; parcels: string; codUsd: string }>();
     return rows.map((r) => ({

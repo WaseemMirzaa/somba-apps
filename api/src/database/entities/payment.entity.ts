@@ -79,7 +79,10 @@ export class Payment {
   @Column({ type: 'varchar', length: 20, nullable: true })
   refundStatus: 'sending' | 'completed' | 'failed' | null;
 
-  /** What was actually paid back (lines refunded earlier by a seller are not paid twice). */
+  /**
+   * The running total of everything refunded on this payment, whatever path made the refunds (finance, a return, a
+   * dispute, a cancellation, a seller cancelling lines): the sum of its `payment_refunds` rows, never more than `amountUsd`.
+   */
   @Column({ type: 'float', nullable: true })
   refundedUsd: number | null;
 

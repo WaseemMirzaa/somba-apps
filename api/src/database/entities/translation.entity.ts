@@ -21,7 +21,8 @@ export type TranslationEntityType =
   | 'review'
   | 'review_reply'
   | 'question'
-  | 'answer';
+  | 'answer'
+  | 'chat_message';
 
 /** author = typed by a person (a machine never overwrites it) · machine = Google · snapshot = copied at order time. */
 export type TranslationOrigin = 'author' | 'machine' | 'snapshot';

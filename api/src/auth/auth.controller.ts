@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { CodeDto, ForgotDto, LoginDto, PhoneDto, PhoneLoginDto, RefreshDto, RegisterDto, ResetDto, TokenDto } from './dto/auth.dto';
+import { CodeDto, ForgotDto, LoginDto, PhoneDto, PhoneLoginDto, RefreshDto, RegisterDto, ResetDto, TokenDto, TwoFaLoginDto } from './dto/auth.dto';
 import { VerificationService } from './verification.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -44,6 +44,14 @@ export class AuthController {
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  /** Two-factor sign-in, step 2: the `challenge` that `login` returned plus a 6-digit code (or a recovery code). */
+  @Post('login/2fa')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  loginTwoFa(@Body() dto: TwoFaLoginDto) {
+    return this.auth.completeLogin(dto.challenge, dto.code);
   }
 
   /** Phone-code login, step 1: text a 6-digit code to a verified customer number (same reply either way). */

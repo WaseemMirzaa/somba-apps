@@ -7,7 +7,8 @@ import { WarehouseListPage } from "@/components/warehouse/list-page";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useWarehouseData } from "@/lib/warehouse";
+import { useDeskQueue, useWarehouseData } from "@/lib/warehouse";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 
@@ -16,7 +17,9 @@ export default function WarehouseRidersPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
-  const { riders, ridersError, parcels } = useWarehouseData();
+  const { riders, ridersError } = useWarehouseData();
+  const queue = useDeskQueue({ status: "all" });
+  const parcels = queue.tasks;
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
 
   const rows = useMemo(
@@ -27,7 +30,7 @@ export default function WarehouseRidersPage() {
         return {
           ...r,
           delivered: delivered.length,
-          failed: mine.filter((p) => p.status === "exception").length,
+          failed: mine.filter((p) => p.status === "failed").length,
           cod: delivered.reduce((s, p) => s + p.codAmountUsd, 0),
         };
       }),
@@ -43,12 +46,13 @@ export default function WarehouseRidersPage() {
       title={fr ? "Livreurs" : "Riders"}
       subtitle={
         fr
-          ? "Comptes livreurs actifs avec leurs livraisons en cours."
-          : "Active rider accounts with their live deliveries."
+          ? "Livreurs actifs de cet entrepôt avec leurs trajets en cours."
+          : "Active riders of this warehouse with their live legs."
       }
       breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("riders") }]}
       filters={
         <div className="space-y-3">
+          <HubScopeBar />
           {ridersError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{ridersError}</p>}
           <ListFilters
             values={filters}
@@ -66,7 +70,7 @@ export default function WarehouseRidersPage() {
         { key: "phone", label: fr ? "Téléphone" : "Phone", render: (row) => row.phone ? (
           <a href={`tel:${String(row.phone).replace(/\s/g, "")}`} className="text-[var(--primary)] hover:underline">{String(row.phone)}</a>
         ) : "—" },
-        { key: "activeTasks", label: fr ? "Livraisons actives" : "Active Deliveries", render: (row) => (
+        { key: "activeTasks", label: fr ? "Trajets actifs" : "Active legs", render: (row) => (
           <Badge variant={Number(row.activeTasks) > 0 ? "info" : "default"}>{String(row.activeTasks)}</Badge>
         )},
         { key: "delivered", label: fr ? "Livrées" : "Delivered" },

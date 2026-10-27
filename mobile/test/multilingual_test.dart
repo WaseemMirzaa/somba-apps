@@ -349,7 +349,6 @@ void main() {
   group('product page', () {
     setUp(() async {
       await gapReset(products: [ProductDto.fromJson(_product()), ProductDto.fromJson(_oldProduct())]);
-      RealtimeStore.instance.zones = List.of(gapZones);
     });
 
     Future<void> open(WidgetTester tester, String uuid, String lang) async {

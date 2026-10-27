@@ -10,7 +10,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useWarehouseData } from "@/lib/warehouse";
+import { useHubScope, useWarehouseData } from "@/lib/warehouse";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { errorMessage, isOpsRole, useOpsQuery, type ReconcileRow } from "@/lib/warehouse-live";
 import { useOpsBase } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
@@ -26,7 +27,8 @@ export default function WarehouseReconcilePage() {
   const base = useOpsBase();
   const rt = useRealtime();
   const { riders } = useWarehouseData();
-  const recQ = useOpsQuery<ReconcileRow[]>("warehouse:reconcile", { initial: [] as ReconcileRow[], push: ["delivery:updated"] });
+  const { hubId } = useHubScope();
+  const recQ = useOpsQuery<ReconcileRow[]>("warehouse:reconcile", { initial: [] as ReconcileRow[], body: hubId ? { hubId } : {}, push: ["task:updated"] });
   const [codEnabled, setCodEnabled] = useState<boolean | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
@@ -78,6 +80,7 @@ export default function WarehouseReconcilePage() {
           )
         }
       />
+      <HubScopeBar />
       {settingsError && <p className="text-xs text-slate-500">{fr ? "Réglage COD indisponible : " : "COD setting unavailable: "}{settingsError}</p>}
       {recQ.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{recQ.error}</p>}
 

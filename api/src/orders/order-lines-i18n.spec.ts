@@ -153,7 +153,7 @@ describe('OrdersService.create writes the snapshot with the order', () => {
     const tr = { snapshot: async (_m: unknown, rows: (typeof snapshots)[number]) => void snapshots.push(rows) };
     const svc = new OrdersService(
       orders as never, {} as never, { findOne: async () => null } as never, { registerFailedHandler: () => undefined } as never, products as never, {} as never,
-      emitter as never, payments as never, {} as never, {} as never, { get: async () => null } as never, undefined, undefined, tr as never,
+      emitter as never, payments as never, {} as never, {} as never, { get: async () => null } as never, undefined, undefined, tr as never, {} as never, { route: async () => ({ feeUsd: 3, deliveryUsd: 3, transferUsd: 0, distanceKm: 1, destinationHubId: 'h1', destinationHub: { id: 'h1', name: 'H', city: 'C' }, originHubIds: [], originBySeller: {}, transfer: false, pinned: true, fallback: null }) } as never,
     );
     return { svc, snapshots, saved, txs: () => txs };
   }

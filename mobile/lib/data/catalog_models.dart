@@ -54,6 +54,23 @@ class Product {
   /// The seller's delivery time for this product, in days.
   final int deliveryDays;
 
+  /// The gallery, cover first; empty when the product has no picture (the tile placeholder is drawn).
+  final List<String> images;
+  final String? sku;
+  final String? brand;
+
+  /// The campaign behind [price] while it is a campaign price (view/click tracking).
+  final String? campaignId;
+
+  /// What the payload said about the store's vacation. Read it through `EngageStore.vacationOf` (a newer
+  /// `store:vacation` push beats this copy); [stamp] says how fresh this copy is.
+  final bool sellerOnVacation;
+  final DateTime? sellerVacationUntil;
+  final Map<String, String>? sellerVacationNotice;
+  final int sellerHandlingDays;
+  final int? totalDeliveryDays;
+  final int stamp;
+
   const Product({
     required this.id,
     required this.uuid,
@@ -82,7 +99,23 @@ class Product {
     this.campaignPct = 0,
     this.variants = const [],
     this.deliveryDays = deliveryDaysFallback,
+    this.images = const [],
+    this.sku,
+    this.brand,
+    this.campaignId,
+    this.sellerOnVacation = false,
+    this.sellerVacationUntil,
+    this.sellerVacationNotice,
+    this.sellerHandlingDays = 0,
+    this.totalDeliveryDays,
+    this.stamp = 0,
   });
+
+  /// Days until it arrives: the seller's delivery time plus the store's handling time when the server says so.
+  int get shipDays => totalDeliveryDays ?? deliveryDays;
+
+  /// The pictures to page through: the gallery, else the single cover, else none.
+  List<String> get gallery => images.isNotEmpty ? images : (image.isNotEmpty ? [image] : const []);
 
   String displayName(String lang) => pickLang(lang, name, nameFr);
 

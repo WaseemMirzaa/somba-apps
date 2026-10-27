@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSellerLiveTick, type SellerProductRow } from "@/lib/seller";
+import { useSellerAccess, useSellerLiveTick, type SellerProductRow } from "@/lib/seller";
 import { pickText } from "@/lib/i18n-fields";
 
 /**
@@ -82,7 +82,9 @@ export interface AnalyticsState {
 export function useSellerAnalytics(days: AnalyticsDays = 30): AnalyticsState {
   const rt = useRealtime();
   const tick = useSellerLiveTick();
-  const connected = rt.status === "connected" && rt.user?.role === "seller";
+  // A team role without the dashboards (orders, catalogue, support) would only get a refusal: do not ask.
+  const allowed = useSellerAccess().can("insight");
+  const connected = rt.status === "connected" && rt.user?.role === "seller" && allowed;
   const [data, setData] = useState<SellerAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
@@ -114,7 +116,7 @@ export function useSellerAnalytics(days: AnalyticsDays = 30): AnalyticsState {
 
   // Stale numbers of ANOTHER window are not shown as if they belonged to this one.
   const matches = data?.days === days;
-  return { data: matches ? data : null, loading: loadedFor !== days && !error, error, retry };
+  return { data: matches ? data : null, loading: allowed && loadedFor !== days && !error, error, retry };
 }
 
 /** "2026-10-17" -> "Oct 17" (UTC day buckets, so no timezone shift). */

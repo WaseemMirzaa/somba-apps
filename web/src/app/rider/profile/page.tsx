@@ -64,16 +64,8 @@ export default function RiderProfilePage() {
               label: fr ? "Entrepôt" : "Home warehouse",
               value: assignment.data.hub ? (
                 <span className="inline-flex items-center gap-1"><Warehouse className="h-3.5 w-3.5 text-emerald-600" />{assignment.data.hub.name} · {assignment.data.hub.city}</span>
-              ) : (fr ? "Aucun — vous voyez les livraisons de tous les entrepôts" : "None — you see every warehouse's deliveries"),
+              ) : (fr ? "Aucun entrepôt : contactez un administrateur" : "None: ask an administrator"),
               full: true,
-            },
-            {
-              label: fr ? "Mes zones" : "My zones",
-              value: assignment.data.preferredZones.length ? assignment.data.preferredZones.map((z) => z.name).join(", ") : "—",
-            },
-            {
-              label: fr ? "Zones de l'entrepôt" : "Warehouse zones",
-              value: assignment.data.hubZones.length ? assignment.data.hubZones.map((z) => z.name).join(", ") : "—",
             },
           ]} />
         )}
@@ -96,6 +88,7 @@ export default function RiderProfilePage() {
           <Link href="/rider/history" className="text-sm text-emerald-600 hover:underline">{fr ? "Historique" : "Task History"}</Link>
           <Link href="/rider/earnings" className="text-sm text-emerald-600 hover:underline">{t("earnings")}</Link>
           <Link href="/rider/notifications" className="text-sm text-emerald-600 hover:underline">Notifications</Link>
+          <Link href="/rider/support" className="text-sm text-emerald-600 hover:underline">{fr ? "Assistance" : "Support"}</Link>
         </div>
       </DetailSection>
 

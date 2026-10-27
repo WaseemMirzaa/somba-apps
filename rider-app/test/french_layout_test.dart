@@ -12,29 +12,15 @@ import 'package:somba_rider/screens/earnings_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/profile_screen.dart';
 import 'package:somba_rider/screens/rider_shell.dart';
+import 'package:somba_rider/screens/support_screen.dart';
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
 import 'button_rules.dart';
+import 'task_fixtures.dart';
 
 const _lang = String.fromEnvironment('LAYOUT_LANG', defaultValue: 'fr');
-
-DeliveryTaskDto _task(String id, String status, {double cod = 0, String? failure}) => DeliveryTaskDto(
-      id: id,
-      orderId: 'o$id',
-      orderReference: 'SOM-10$id',
-      status: status,
-      codAmountUsd: cod,
-      addressRaw: '{"line1":"12, avenue du Commerce","commune":"Gombe","city":"Kinshasa","phone":"+243812345678"}',
-      customerName: 'Aline Kabila',
-      pickupAddress: 'Entrepôt central, Limete',
-      items: const [OrderLine('Téléphone', 2)],
-      attempts: status == 'assigned' ? 2 : 1,
-      readyAt: DateTime(2026, 10, 1),
-      receivedAt: DateTime(2026, 10, 1),
-      failureReason: failure,
-    );
 
 void main() {
   final overflows = <String>[];
@@ -53,12 +39,20 @@ void main() {
     final store = RiderStore.instance;
     store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean Mukendi', role: 'rider', phone: '+243810000000');
     store.loaded = true;
+    store.requireDeliveryCode = true;
+    store.assignment = const RiderAssignment(hubId: 'h2', hubName: 'Entrepôt de Gombe', hubCity: 'Kinshasa', hubAddress: 'Boulevard du 30 Juin 8');
     store.myTasks
       ..clear()
-      ..addAll([_task('1', 'assigned', cod: 25.5), _task('2', 'in_transit'), _task('3', 'failed', failure: 'Client injoignable'), _task('4', 'delivered')]);
-    store.pool
-      ..clear()
-      ..add(_task('5', 'unassigned', cod: 12));
+      ..addAll([
+        leg('pickup', id: 'p1'),
+        leg('transfer', id: 'p2', status: 'in_transit'),
+        leg('delivery', id: 'p3', status: 'in_transit', cod: 25.5),
+        leg('replacement_delivery', id: 'p4'),
+        leg('return_to_seller', id: 'p5', status: 'picked_up'),
+        leg('delivery', id: 'p6', status: 'failed', failure: 'Client injoignable'),
+        leg('delivery', id: 'p7', status: 'delivered'),
+      ]);
+    fakeSupport(tickets: [ticket('1', unread: 1), ticket('2', status: 'closed')]);
     store.notifications
       ..clear()
       ..add(NotificationDto(id: 'n', title: 'Parcel ready for pickup', body: 'SOM-1 is packed and ready.', type: 'delivery', read: false));
@@ -68,8 +62,10 @@ void main() {
     final store = RiderStore.instance;
     store.user = null;
     store.myTasks.clear();
-    store.pool.clear();
     store.notifications.clear();
+    store.assignment = null;
+    store.requireDeliveryCode = false;
+    resetSupport();
   });
 
   Future<void> show(WidgetTester tester, Widget screen) async {
@@ -104,15 +100,13 @@ void main() {
     expect(overflows, isEmpty);
   });
 
-  testWidgets('layout: deliveries (active, available, done)', (tester) async {
+  testWidgets('layout: deliveries (active, done)', (tester) async {
     await show(tester, const Scaffold(body: DeliveriesScreen()));
     expect(overflows, isEmpty, reason: 'active');
-    for (final i in [1, 2]) {
-      await tester.tap(find.byKey(ValueKey('tab-$i')));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(overflows, isEmpty, reason: 'tab $i');
-      expectButtonRules(tester);
-    }
+    await tester.tap(find.byKey(const ValueKey('tab-1')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(overflows, isEmpty, reason: 'done');
+    expectButtonRules(tester);
   });
 
   testWidgets('layout: earnings, profile, navigation bar', (tester) async {
@@ -128,6 +122,26 @@ void main() {
       expect(overflows, isEmpty, reason: '$icon');
       expectButtonRules(tester);
     }
+  });
+
+  testWidgets('layout: one task card holds the only filled button, with a label and no icon', (tester) async {
+    RiderStore.instance.myTasks
+      ..clear()
+      ..add(leg('pickup', id: 'solo'));
+    await show(tester, const Scaffold(body: DeliveriesScreen()));
+    expect(overflows, isEmpty);
+    expect(find.byType(FilledButton), findsOneWidget);
+  });
+
+  testWidgets('layout: support list, new ticket, thread, closed thread', (tester) async {
+    await show(tester, const SupportScreen());
+    expect(overflows, isEmpty, reason: 'list');
+    await show(tester, const NewTicketScreen());
+    expect(overflows, isEmpty, reason: 'new ticket');
+    await show(tester, const SupportThreadScreen(ticketId: '1'));
+    expect(overflows, isEmpty, reason: 'thread');
+    await show(tester, const SupportThreadScreen(ticketId: '2'));
+    expect(overflows, isEmpty, reason: 'closed thread');
   });
 
   testWidgets('layout: failure sheet and delivery code dialog', (tester) async {

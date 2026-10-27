@@ -22,13 +22,20 @@ import { AddressesModule } from './addresses/addresses.module';
 import { ContentModule } from './content/content.module';
 import { OpsModule } from './ops/ops.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
+import { LogisticsModule } from './logistics/logistics.module';
+import { GeoModule } from './geo/geo.module';
 import { FlowsModule } from './flows/flows.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CartModule } from './cart/cart.module';
 import { SearchModule } from './search/search.module';
+import { AfterSaleModule } from './after-sale/after-sale.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { CommerceModule } from './products/commerce.module';
+import { FinanceModule } from './finance/finance.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { TranslationModule } from './translation/translation.module';
+import { SellerPlatformModule } from './sellers/seller-platform.module';
 
 @Module({
   imports: [
@@ -57,11 +64,18 @@ import { TranslationModule } from './translation/translation.module';
     ContentModule,
     OpsModule,
     WarehouseModule,
+    GeoModule,
+    LogisticsModule,
     FlowsModule,
     MessagingModule,
     UploadsModule,
     CartModule,
     SearchModule,
+    InventoryModule,
+    FinanceModule,
+    CommerceModule,
+    SellerPlatformModule,
+    AfterSaleModule,
     RealtimeModule,
   ],
   controllers: [AppController],

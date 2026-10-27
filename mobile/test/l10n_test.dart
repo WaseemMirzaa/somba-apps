@@ -17,9 +17,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Words/names that are legitimately the same in both languages.
 const _sameInBothLanguages = {
+  'as_sec_thread',
   'total', 'description', 'ok', 'addr_commune', 'addr_commune_hint', 'addr_city_hint', 'settings_notifications',
   'settings_sms', 'kv_type', 'notifications', 'notifications_n', 'promo_row', 'reg_phone_hint', 'country_cg',
-  'country_fr', 'country_ke',
+  'country_fr', 'country_ke', 'area_province', 'area_commune',
 };
 
 Set<String> _placeholders(String text) => RegExp(r'\{(\w+)\}').allMatches(text).map((m) => m.group(1)!).toSet();
@@ -130,6 +131,14 @@ void main() {
       expect(translateServerError('Order can no longer be cancelled (status: shipped).', fr), contains('expédiée'));
       expect(translateServerError('A brand new unknown message.', fr), 'A brand new unknown message.');
       expect(translateServerError('Order not found.', en), 'Order not found.', reason: 'English stays as the server wrote it');
+    });
+
+    test('the refund cap sentences are French on every refund path', () {
+      expect(translateServerError('Nothing is left to refund on this order.', fr), 'Il ne reste rien à rembourser sur cette commande.');
+      expect(translateServerError('Already refunded.', fr), 'Déjà remboursé.');
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', fr), contains('23.00'));
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', fr), startsWith('C’est plus que ce qu’il reste'));
+      expect(translateServerError('That is more than what is left to refund on this order (\$23.00).', en), contains('more than what is left'));
     });
 
     test('every mapped message has a French text', () {

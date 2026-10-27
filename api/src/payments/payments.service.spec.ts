@@ -1,70 +1,70 @@
+import { DataSource } from 'typeorm';
+import { DeliveryTask, Order, OrderItem, Payment, PaymentRefund, User, WalletTransaction } from '../database/entities';
+import { recordingEmitter, testDb } from '../testing/test-db';
+import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from './payments.service';
 import { PawapayRejectedError } from './pawapay.provider';
 
+let ds: DataSource | null = null;
+afterEach(async () => {
+  if (ds) await ds.destroy();
+  ds = null;
+});
+
 /**
- * A PaymentsService over one in-memory payment row, with conditional updates that behave like the real ones.
- * The default payment: $40 airtel_money, succeeded, pawaPay deposit `dep-1`.
+ * A PaymentsService over a real (in-memory SQLite) schema: one customer, one delivered order with two lines, and its
+ * payment ($40 airtel_money, succeeded, pawaPay deposit `dep-1`) unless `patch` says otherwise. `refundedLine` is what
+ * a seller already refunded on the first line.
  */
-function make(patch: Record<string, unknown> = {}, opts: { pawapay?: null; refundedLine?: number } = {}) {
-  const row: Record<string, unknown> = {
-    id: 'p1', reference: 'PAY-1', orderId: 'o1', orderReference: 'SOM-1', userId: 'u1', method: 'airtel_money',
-    amountUsd: 40, status: 'succeeded', providerRef: 'dep-1', refundTo: null, refundRef: null, refundStatus: null, refundedUsd: null,
-    ...patch,
-  };
-  const matches = (where: Record<string, unknown>) => Object.entries(where).every(([k, v]) => row[k] === v);
-  const qb = () => {
-    let set: Record<string, unknown> = {};
-    let cond: (r: Record<string, unknown>) => boolean = () => true;
-    const b = {
-      update: () => b,
-      set: (v: Record<string, unknown>) => ((set = v), b),
-      where: (sql: string, p: Record<string, unknown>) => {
-        cond = sql.includes('status IN')
-          ? (r) => r.id === p.id && (p.from as string[]).includes(r.status as string)
-          : sql.includes("refundStatus = 'sending'")
-            ? (r) => r.id === p.id && r.refundStatus === 'sending'
-            : () => false;
-        return b;
-      },
-      execute: async () => (cond(row) ? (Object.assign(row, set), { affected: 1 }) : { affected: 0 }),
-    };
-    return b;
-  };
-  const manager = {
-    createQueryBuilder: qb,
-    update: async (_e: unknown, where: Record<string, unknown>, v: Record<string, unknown>) => {
-      if (matches(where)) Object.assign(row, v);
-    },
-    transaction: async <T,>(fn: (m: unknown) => Promise<T>) => fn(manager),
-  };
-  const payments = {
-    findOne: async ({ where }: { where: Record<string, unknown> }) => (matches(where) ? { ...row } : null),
-    update: async (where: Record<string, unknown>, v: Record<string, unknown>) => {
-      if (matches(where)) Object.assign(row, v);
-    },
-    manager,
-  };
-  const order = { id: 'o1', reference: 'SOM-1', customerId: 'u1', status: 'delivered', items: [{ productId: 'x', qty: 1, refundedUsd: opts.refundedLine ?? 0 }] };
-  const orders = { findOne: async () => ({ ...order }), save: async (o: unknown) => o };
-  const wallet = { apply: jest.fn(async () => undefined) };
+async function make(patch: Partial<Payment> = {}, opts: { pawapay?: null; refundedLine?: number; orderStatus?: Order['status'] } = {}) {
+  ds = await testDb();
+  const emitter = recordingEmitter();
+  const user = await ds.getRepository(User).save(
+    ds.getRepository(User).create({ emailHash: 'h1', email: 'a@b.c', passwordHash: 'x', name: 'Marie', role: 'customer', walletBalance: 0 }),
+  );
+  const order = await ds.getRepository(Order).save(
+    ds.getRepository(Order).create({
+      reference: 'SOM-1',
+      customerId: user.id,
+      customerName: 'Marie',
+      status: opts.orderStatus ?? 'delivered',
+      subtotalUsd: 36,
+      deliveryFeeUsd: 4,
+      totalUsd: 40,
+      items: [
+        { productId: 'x', productName: 'X', variant: 'Default', qty: 1, priceUsd: 20, refundedUsd: opts.refundedLine ?? 0 },
+        { productId: 'y', productName: 'Y', variant: 'Default', qty: 1, priceUsd: 16 },
+      ] as OrderItem[],
+    }),
+  );
+  await ds.getRepository(Payment).save(
+    ds.getRepository(Payment).create({
+      reference: 'PAY-1', orderId: order.id, orderReference: 'SOM-1', userId: user.id, method: 'airtel_money', amountUsd: 40, status: 'succeeded', providerRef: 'dep-1',
+      ...patch,
+    }),
+  );
+  const wallet = new WalletService(ds.getRepository(User), ds.getRepository(WalletTransaction), emitter as never);
+  const apply = jest.spyOn(wallet, 'apply');
   const notices: { title: string; body: string }[] = [];
   const roleNotices: { title: string; body: string }[] = [];
   const notifications = {
     toUser: async (_u: string, n: { title: string; body: string }) => notices.push(n),
     toRole: async (_r: string, n: { title: string; body: string }) => roleNotices.push(n),
   };
-  const emitter = { toUser: () => undefined, toRoles: () => undefined };
   const pawapay = {
     newId: () => 'ref-1',
     refund: jest.fn(async () => undefined),
     check: jest.fn(async () => ({ found: true, final: false, succeeded: false }) as Record<string, unknown>),
   };
   const svc = new PaymentsService(
-    payments as never, orders as never, wallet as never, notifications as never, emitter as never, {} as never,
-    { name: 'pawapay' } as never, { find: async () => [] } as never, { restock: async () => undefined } as never,
+    ds.getRepository(Payment), ds.getRepository(Order), wallet, notifications as never, emitter as never, {} as never,
+    { name: 'pawapay' } as never, ds.getRepository(DeliveryTask), { restock: async () => undefined } as never,
     opts.pawapay === null ? null : (pawapay as never),
   );
-  return { svc, row, wallet, notices, roleNotices, pawapay };
+  const row = async () => (await ds!.getRepository(Payment).findOneByOrFail({ id: (await ds!.getRepository(Payment).findOneByOrFail({ reference: 'PAY-1' })).id }));
+  const ledger = () => ds!.getRepository(PaymentRefund).find({ order: { createdAt: 'ASC', id: 'ASC' } });
+  const balance = async () => (await ds!.getRepository(User).findOneByOrFail({ id: user.id })).walletBalance;
+  return { svc, ds, user, order, emitter, row, ledger, balance, wallet, apply, notices, roleNotices, pawapay };
 }
 
 describe('PaymentsService.normalisePhone', () => {
@@ -112,49 +112,58 @@ describe('PaymentsService.assertMethodAllowed', () => {
 
 describe('PaymentsService.refund', () => {
   it('refuses a refund to the phone without pawaPay, and for a payment that was not mobile money', async () => {
-    const card = make({ method: 'stripe_card' });
-    await expect(card.svc.refund('o1', false)).rejects.toThrow(/Only mobile-money payments/);
-    const noPawapay = make({}, { pawapay: null });
-    await expect(noPawapay.svc.refund('o1', false)).rejects.toThrow(/need pawaPay/);
+    const card = await make({ method: 'stripe_card' });
+    await expect(card.svc.refund(card.order.id, false)).rejects.toThrow(/Only mobile-money payments/);
+    const noPawapay = await make({}, { pawapay: null });
+    await expect(noPawapay.svc.refund(noPawapay.order.id, false)).rejects.toThrow(/need pawaPay/);
   });
 
   it('sends a phone refund through pawaPay, then completes it when pawaPay confirms', async () => {
-    const t = make();
-    const out = await t.svc.refund('o1', false);
+    const t = await make();
+    const out = await t.svc.refund(t.order.id, false);
     expect(out).toMatchObject({ status: 'refunded', refundTo: 'phone', refundStatus: 'sending', refundedUsd: 40 });
+    expect(out.refund).toMatchObject({ amountUsd: 40, refundTo: 'phone', status: 'sending', kind: 'admin', refundRef: 'ref-1' });
     expect(t.pawapay.refund).toHaveBeenCalledWith(expect.objectContaining({ depositId: 'dep-1', amountUsd: 40 }));
-    expect(t.wallet.apply).not.toHaveBeenCalled();
+    expect(t.apply).not.toHaveBeenCalled();
     expect(t.notices[0].body).toMatch(/\$40\.00 for SOM-1 is on its way back to your mobile-money number/);
     t.pawapay.check.mockResolvedValue({ found: true, final: true, succeeded: true });
     await t.svc.reconcileRefund(out.refundRef!);
-    expect(t.row.refundStatus).toBe('completed');
+    expect((await t.row()).refundStatus).toBe('completed');
+    expect((await t.ledger())[0]).toMatchObject({ status: 'completed', refundTo: 'phone' });
     expect(t.notices.at(-1)!.title).toBe('Refund sent');
   });
 
   it('when pawaPay fails a phone refund, the money goes to the wallet (once) and finance is told', async () => {
-    const t = make();
-    const out = await t.svc.refund('o1', false);
+    const t = await make();
+    const out = await t.svc.refund(t.order.id, false);
     t.pawapay.check.mockResolvedValue({ found: true, final: true, succeeded: false, failureMessage: 'Wallet limit' });
     await t.svc.reconcileRefund(out.refundRef!);
     await t.svc.reconcileRefund(out.refundRef!);
-    expect(t.row).toMatchObject({ refundStatus: 'failed', refundTo: 'wallet' });
-    expect(t.wallet.apply).toHaveBeenCalledTimes(1);
-    expect(t.wallet.apply).toHaveBeenCalledWith('u1', 'refund', 40, expect.stringContaining('phone refund failed'), expect.anything());
+    expect(await t.row()).toMatchObject({ refundStatus: 'failed', refundTo: 'wallet' });
+    expect(t.apply).toHaveBeenCalledTimes(1);
+    expect(t.apply).toHaveBeenCalledWith(t.user.id, 'refund', 40, expect.stringContaining('phone refund failed'), expect.anything());
+    expect(await t.balance()).toBe(40);
+    // the ledger says what really happened: the same $40, now a wallet refund
+    expect(await t.ledger()).toEqual([expect.objectContaining({ amountUsd: 40, refundTo: 'wallet', status: 'failed' })]);
     expect(t.roleNotices.map((n) => n.title)).toContain('Phone refund failed');
   });
 
   it('when pawaPay refuses the refund outright, nothing is refunded and finance can use the wallet', async () => {
-    const t = make();
+    const t = await make();
     t.pawapay.refund.mockRejectedValue(new PawapayRejectedError('Deposit not completed', 'INVALID_STATE'));
-    await expect(t.svc.refund('o1', false)).rejects.toThrow(/pawaPay refused the refund/);
-    expect(t.row).toMatchObject({ status: 'succeeded', refundTo: null, refundStatus: null });
+    await expect(t.svc.refund(t.order.id, false)).rejects.toThrow(/pawaPay refused the refund/);
+    expect(await t.row()).toMatchObject({ status: 'succeeded', refundTo: null, refundStatus: null, refundedUsd: null });
+    expect(await t.ledger()).toEqual([]); // the refund that never happened is not on the books
+    const again = await t.svc.refund(t.order.id, true);
+    expect(again.refund).toMatchObject({ amountUsd: 40, refundTo: 'wallet' });
   });
 
   it('a wallet refund says how much was refunded (lines a seller already refunded are left out)', async () => {
-    const t = make({}, { refundedLine: 10 });
-    await t.svc.refund('o1', true);
-    expect(t.wallet.apply).toHaveBeenCalledWith('u1', 'refund', 30, 'Refund for SOM-1', expect.anything());
+    const t = await make({}, { refundedLine: 10 });
+    const out = await t.svc.refund(t.order.id, true);
+    expect(t.apply).toHaveBeenCalledWith(t.user.id, 'refund', 30, 'Refund for SOM-1', expect.anything());
     expect(t.notices[0].body).toBe('$30.00 for SOM-1 → wallet.');
+    expect(out.refund.amountUsd).toBe(30);
   });
 
   it('never refunds more than is outstanding after seller-cancelled lines were paid back', () => {

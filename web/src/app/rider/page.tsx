@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Bike, CheckCircle, DollarSign, Hand, Banknote } from "lucide-react";
+import { Bike, CheckCircle, DollarSign, Warehouse, Banknote } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
+import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useLocale } from "@/context/locale-context";
-import { useRiderData } from "@/lib/rider";
+import { useRiderAssignment, useRiderData } from "@/lib/rider";
+import { looseTasks } from "@/lib/rider-runs";
+import { useRiderRuns } from "@/lib/rider-runs-live";
 import { formatCurrency } from "@/lib/utils";
 
 function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
@@ -15,7 +18,7 @@ function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon:
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 break-words font-[family-name:var(--font-display)] text-xl leading-tight font-bold text-slate-900">{value}</p>
         </div>
         <div className="rounded-xl bg-emerald-50 p-2">
           <Icon className="h-4 w-4 text-emerald-600" />
@@ -28,8 +31,12 @@ function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon:
 export default function RiderDashboardPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { riderProfile, getActiveRiderTasks, available, earnings, error, loading } = useRiderData();
-  const activeTasks = getActiveRiderTasks();
+  const { riderProfile, getActiveRiderTasks, mine, earnings, error, loading } = useRiderData();
+  const rr = useRiderRuns(mine);
+  const assignment = useRiderAssignment();
+  // A transfer run is one card; its parcels are not listed again as tasks of their own.
+  const activeTasks = looseTasks(getActiveRiderTasks(), rr.runs);
+  const activeCount = activeTasks.length + rr.activeRuns.length;
 
   return (
     <div className="space-y-6">
@@ -40,38 +47,35 @@ export default function RiderDashboardPage() {
       <RiderGpsPanel />
 
       <div className="grid grid-cols-2 gap-3">
-        <Kpi title={t("activeTasks")} value={String(activeTasks.length)} icon={Bike} />
-        <Kpi title={fr ? "Disponibles" : "Available"} value={String(available.length)} icon={Hand} />
-        <Kpi title={fr ? "Livrées" : "Delivered"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
+        <Kpi title={t("activeTasks")} value={String(activeCount)} icon={Bike} />
+        <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
+        <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
         <Kpi title={t("earnings")} value={formatCurrency(earnings?.earningsUsd ?? 0, locale)} icon={DollarSign} />
         <Kpi title={fr ? "COD encaissé" : "COD collected"} value={formatCurrency(earnings?.codCollectedUsd ?? 0, locale)} icon={Banknote} />
       </div>
 
-      {available.length > 0 && (
-        <Link
-          href="/rider/tasks"
-          className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"
-        >
-          <span>
-            <strong>{available.length}</strong> {fr ? "livraison(s) disponible(s) à accepter" : "open delivery(ies) you can accept"}
-          </span>
-          <span className="font-semibold">{fr ? "Voir →" : "View →"}</span>
-        </Link>
-      )}
+      <p className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
+        {fr
+          ? "Votre entrepôt vous assigne vos tâches : vous n'avez rien à accepter. Une notification vous prévient à chaque nouvelle tâche."
+          : "Your warehouse assigns your tasks: there is nothing to accept. A notification tells you about each new task."}
+      </p>
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">{fr ? "Mes livraisons en cours" : "My current deliveries"}</h2>
+          <h2 className="font-semibold text-slate-900">{fr ? "Mes tâches en cours" : "My current tasks"}</h2>
           <Link href="/rider/tasks" className="text-sm text-emerald-600 hover:underline">
             {fr ? "Toutes les tâches" : "All tasks"}
           </Link>
         </div>
-        {activeTasks.length === 0 ? (
+        {activeCount === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-            {loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Aucune livraison en cours." : "No active deliveries.")}
+            {loading ? (fr ? "Chargement…" : "Loading…") : (fr ? "Aucune tâche en cours." : "No active tasks.")}
           </p>
         ) : (
           <div className="space-y-3">
+            {rr.activeRuns.map((run) => (
+              <RiderRunCard key={run.id} run={run} parcels={rr.parcelsOf(run)} onRoad={rr.onRoad(run)} onMarkOnRoad={rr.markOnRoad} />
+            ))}
             {activeTasks.map((task) => (
               <RiderTaskCard key={task.id} task={task} />
             ))}

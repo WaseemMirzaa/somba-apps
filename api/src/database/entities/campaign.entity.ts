@@ -70,8 +70,21 @@ export class Campaign {
   @Column({ type: 'int', default: 0 })
   productCount: number;
 
+  /** Most the campaign may give away in discounts (0 = no limit). Reaching it ends the campaign. */
   @Column({ type: 'float', default: 0 })
   budgetUsd: number;
+
+  /** Discount given so far on orders (list price minus the campaign price). */
+  @Column({ type: 'float', default: 0 })
+  spentUsd: number;
+
+  /** Why marketing rejected it (shown to the seller). */
+  @Column({ type: 'varchar', length: 300, nullable: true })
+  rejectReason: string | null;
+
+  /** Why it ended: 'dates' | 'budget' | 'withdrawn' | 'admin'. */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  endedReason: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   startDate: string | null;

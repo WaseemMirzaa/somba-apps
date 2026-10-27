@@ -1,6 +1,9 @@
 import { OrdersService } from './orders.service';
 
 /** The platform commission in force at order time is frozen on every line (A-B15). */
+/** The route the order is placed on (the real router is covered in logistics/). */
+const ROUTING = { route: async () => ({ feeUsd: 3, deliveryUsd: 3, transferUsd: 0, distanceKm: 1, destinationHubId: 'h1', destinationHub: { id: 'h1', name: 'H', city: 'C' }, originHubIds: [], originBySeller: {}, transfer: false, pinned: true, fallback: null }) };
+
 function make(settings: Record<string, string>, product: Record<string, unknown> | null) {
   const saved: { items: Record<string, unknown>[] }[] = [];
   const orders: Record<string, unknown> = {
@@ -23,7 +26,7 @@ function make(settings: Record<string, string>, product: Record<string, unknown>
   };
   const sellers = { findOne: () => Promise.resolve(null) };
   const cfg = { get: (k: string) => Promise.resolve(settings[k] ?? null) };
-  const svc = new OrdersService(orders as never, {} as never, sellers as never, delivery as never, products as never, {} as never, emitter as never, payments as never, {} as never, {} as never, cfg as never);
+  const svc = new OrdersService(orders as never, {} as never, sellers as never, delivery as never, products as never, {} as never, emitter as never, payments as never, {} as never, {} as never, cfg as never, undefined, undefined, undefined, {} as never, ROUTING as never);
   return { svc, saved };
 }
 

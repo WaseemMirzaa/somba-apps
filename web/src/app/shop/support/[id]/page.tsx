@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { PhotoPicker } from "@/components/shop/photo-picker";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -19,10 +20,19 @@ function TicketThread() {
   const { toast } = useToast();
   const { tickets, loaded, put } = useSupportTickets();
   const [text, setText] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const ticket = tickets.find((t) => t.id === id || t.reference === id);
+
+  // Opening the ticket (and every staff message that lands while it is open) marks it read.
+  const ticketId = ticket?.id;
+  const unread = ticket?.userUnread ?? 0;
+  useEffect(() => {
+    if (!ticketId || unread <= 0) return;
+    socketClient.request<SupportTicketRow>("support:markRead", { id: ticketId }).then(put).catch(() => {});
+  }, [ticketId, unread, put]);
 
   if (!ticket) {
     return (
@@ -38,13 +48,14 @@ function TicketThread() {
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim() || !ticket) return;
+    if ((!text.trim() && photos.length === 0) || !ticket) return;
     setBusy(true);
     setError(null);
     try {
-      const saved = await socketClient.request<SupportTicketRow>("support:reply", { id: ticket.id, text: text.trim() });
+      const saved = await socketClient.request<SupportTicketRow>("support:reply", { id: ticket.id, text: text.trim() || undefined, ...(photos.length ? { attachments: photos } : {}) });
       put(saved);
       setText("");
+      setPhotos([]);
     } catch (err) {
       const msg = (err as Error).message;
       setError(msg);
@@ -70,9 +81,19 @@ function TicketThread() {
           return (
             <div key={i} className={`rounded-xl p-4 text-sm ${mine ? "ml-8 bg-blue-50" : "mr-8 bg-slate-50"}`}>
               <p className="text-xs font-medium text-slate-400">
-                {mine ? (fr ? "Vous" : "You") : `${m.from} · ${fr ? "Support" : "Support"}`} · {new Date(m.at).toLocaleString()}
+                {mine ? (fr ? "Vous" : "You") : `${m.from} · ${fr ? "Support Somba" : "Somba support"}`} · {new Date(m.at).toLocaleString()}
               </p>
-              <p className="mt-1 whitespace-pre-wrap text-slate-800">{m.text}</p>
+              {m.text && <p className="mt-1 whitespace-pre-wrap text-slate-800">{m.text}</p>}
+              {(m.attachments ?? []).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(m.attachments ?? []).map((u) => (
+                    <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block h-20 w-20 overflow-hidden rounded-lg border border-[var(--border)] bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt={fr ? "Photo jointe" : "Attached photo"} className="h-full w-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -84,7 +105,8 @@ function TicketThread() {
         <form onSubmit={send} className="card-premium space-y-3 p-4">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} className="input-premium w-full px-4 py-2.5 text-sm" placeholder={fr ? "Votre réponse..." : "Your reply..."} />
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" disabled={busy || !text.trim()}>{busy ? "…" : fr ? "Envoyer" : "Send"}</Button>
+          <PhotoPicker value={photos} onChange={setPhotos} max={4} fr={fr} />
+          <Button type="submit" disabled={busy || (!text.trim() && photos.length === 0)}>{busy ? "…" : fr ? "Envoyer" : "Send"}</Button>
         </form>
       )}
     </div>

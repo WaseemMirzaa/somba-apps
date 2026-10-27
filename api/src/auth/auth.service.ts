@@ -12,6 +12,8 @@ import * as bcrypt from 'bcryptjs';
 import { User } from '../database/entities';
 import { PublicUser, UsersService } from '../users/users.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { TwoFaService } from './twofa.service';
+import type { TwoFaChallenge } from './twofa.service';
 
 export interface JwtPayload {
   sub: string;
@@ -32,6 +34,8 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    // Second sign-in step for accounts that turned on two-factor authentication.
+    private readonly twofa?: TwoFaService,
   ) {}
 
   /**
@@ -61,17 +65,28 @@ export class AuthService {
     return this.issue(user);
   }
 
-  async login(dto: LoginDto): Promise<AuthResult> {
+  /** Tokens, or `{ needs2fa: true, challenge }` when the account has two-factor authentication on (see `completeLogin`). */
+  async login(dto: LoginDto): Promise<AuthResult | TwoFaChallenge> {
     const user = await this.users.findByEmail(dto.email);
     if (!user) throw new UnauthorizedException('Invalid email or password.');
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid email or password.');
     this.assertNotSuspended(user);
+    if (user.twofaEnabled && this.twofa) return this.twofa.challengeFor(user);
     return this.issue(user);
   }
 
   /** Sign in with a one-time code sent to the account's verified phone (customers only). */
-  async loginWithPhoneCode(user: User): Promise<AuthResult> {
+  async loginWithPhoneCode(user: User): Promise<AuthResult | TwoFaChallenge> {
+    this.assertNotSuspended(user);
+    if (user.twofaEnabled && this.twofa) return this.twofa.challengeFor(user);
+    return this.issue(user);
+  }
+
+  /** Second step: the challenge from `login` plus a code from the authenticator app (or a recovery code). */
+  async completeLogin(challenge: string, code: string): Promise<AuthResult> {
+    if (!this.twofa) throw new UnauthorizedException('Two-factor sign-in is not available.');
+    const user = await this.twofa.redeem(challenge, code);
     this.assertNotSuspended(user);
     return this.issue(user);
   }
@@ -95,12 +110,11 @@ export class AuthService {
   }
 
   /**
-   * An admin-suspended customer or seller (customers:setActive false) must not
-   * get new sessions. (`active` doubles as an availability toggle for riders and
-   * warehouse staff, so only these roles are hard-blocked here.)
+   * An admin-suspended customer or seller (customers:setActive false), or a rider or warehouse employee an admin
+   * switched off (staff:setActive false), must not get new sessions. The other admin roles have no off switch.
    */
   assertNotSuspended(user: User): void {
-    if ((user.role === 'customer' || user.role === 'seller') && !user.active) {
+    if ((user.role === 'customer' || user.role === 'seller' || user.role === 'rider' || user.role === 'warehouse_staff') && !user.active) {
       throw new UnauthorizedException('This account has been suspended. Contact support.');
     }
   }
@@ -139,6 +153,9 @@ export class AuthService {
     user.address = null;
     user.avatar = null;
     user.prefs = null;
+    user.twofaEnabled = false;
+    user.twofaSecret = null;
+    user.twofaRecovery = null;
     user.emailVerified = false;
     user.phoneVerified = false;
     user.passwordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);

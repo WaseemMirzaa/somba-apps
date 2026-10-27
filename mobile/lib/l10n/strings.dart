@@ -6,6 +6,11 @@ import 'messages.dart';
 import 'server_errors.dart';
 
 export 'strings_keys.dart';
+export 'strings_logistics.dart';
+export 'strings_aftersale.dart';
+export 'strings_social.dart';
+export 'strings_engage.dart';
+export 'strings_areas.dart';
 
 /// UI texts in English and French. Every text lives in `messages.dart`
 /// (key -> (English, French)); the typed accessors in `strings_keys.dart`

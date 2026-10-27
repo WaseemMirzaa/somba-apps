@@ -15,7 +15,7 @@ Product productFromDto(ProductDto d) => Product(
       discount: d.discount,
       rating: d.rating,
       reviews: d.reviews,
-      image: d.image,
+      image: d.image.isNotEmpty ? d.image : (d.images.isNotEmpty ? d.images.first : ''),
       category: d.category,
       categoryFr: d.categoryFr,
       stock: d.stock,
@@ -33,6 +33,16 @@ Product productFromDto(ProductDto d) => Product(
       campaignPct: d.campaignPct,
       variants: d.variants,
       deliveryDays: d.deliveryDays,
+      images: d.images,
+      sku: d.sku,
+      brand: d.brand,
+      campaignId: d.campaignId,
+      sellerOnVacation: d.sellerOnVacation,
+      sellerVacationUntil: d.sellerVacationUntil,
+      sellerVacationNotice: d.sellerVacationNotice,
+      sellerHandlingDays: d.sellerHandlingDays,
+      totalDeliveryDays: d.totalDeliveryDays,
+      stamp: d.stamp,
     );
 
 Category categoryFromDto(CategoryDto d) =>

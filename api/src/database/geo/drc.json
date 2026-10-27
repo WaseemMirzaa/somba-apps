@@ -1,0 +1,1120 @@
+{
+  "country": {
+    "code": "CD",
+    "name": "République démocratique du Congo",
+    "nameEn": "Democratic Republic of the Congo"
+  },
+  "meta": {
+    "title": "DRC geographic hierarchy: provinces, villes, Kinshasa districts and communes",
+    "compiledOn": "2026-10-26",
+    "readme": "docs/DRC-GEOGRAPHY.md",
+    "codePolicy": "Province codes are official ISO 3166-2:CD codes. All city, district and commune codes are INTERNAL codes proposed for this project (pattern CD-<province ISO suffix>-<3 letters>; districts CD-KN-D-<3 letters>). No official national code system for villes or communes was found. They are not ISO, INS or government codes.",
+    "cityStatus": {
+      "official": "Listed among the 33 villes of the CENI 2023 seat-distribution list, or Kinshasa (ville-province).",
+      "decree-2013": "Ville status conferred by the decrees of 13 June 2013 but absent from the CENI 2023 list; present in the owner list; current operational status not verified."
+    },
+    "inOwnerList": "true when the city is in the owner-supplied list of 33; false when it was ADDED because official sources list it (see docs/DRC-GEOGRAPHY.md section 4).",
+    "isCapital": "true when the city is the chef-lieu (provincial capital) of its province under Loi organique 15/006 of 25 March 2015. Kinshasa is also the national capital.",
+    "coordinates": "Decimal degrees WGS84, 4 decimals. Accuracy about 1-3 km (several sources round to the arc-minute). Commune points are OSM boundary centres, except Gombe, Mont-Ngafula, Maluku and Nsele where a point in the built-up area (Wikipedia) is used. See docs/DRC-GEOGRAPHY.md section 5.",
+    "communeStats": "areaKm2 from INS via FR Wikipedia (cross-checked with EN Wikipedia). population is the INS estimate for 1 July 2004 (populationYear) and is badly outdated for Kinshasa; use only for relative weights.",
+    "quartiers": "Empty for all 24 communes on purpose: no reliable, complete, consistent source was found. See docs/DRC-GEOGRAPHY.md section 6.",
+    "licences": "Includes data derived from OpenStreetMap (c) OpenStreetMap contributors, ODbL 1.0, and Wikipedia (CC BY-SA 4.0). Keep attribution if redistributed."
+  },
+  "provinces": [
+    {
+      "code": "CD-BC",
+      "name": "Kongo Central",
+      "nameEn": "Central Kongo",
+      "capital": "Matadi",
+      "lat": -5.8167,
+      "lng": 13.4833,
+      "cities": [
+        {
+          "code": "CD-BC-MAT",
+          "name": "Matadi",
+          "lat": -5.8167,
+          "lng": 13.4833,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-BC-BOM",
+          "name": "Boma",
+          "lat": -5.85,
+          "lng": 13.05,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-BC-MUA",
+          "name": "Muanda",
+          "lat": -5.9342,
+          "lng": 12.3495,
+          "isCapital": false,
+          "status": "decree-2013",
+          "inOwnerList": true,
+          "aliases": [
+            "Moanda"
+          ],
+          "note": "Ville status conferred by Décret n° 13/026 of 13 June 2013 (Bas-Congo; Journal Officiel special issue, 20 June 2013). Not among the 33 villes of the CENI 2023 list. Execution of the 2013 decrees was suspended in July 2015 (FR Wikipedia) and the 2013 grant was reaffirmed in 2018 (EN Wikipedia); whether this ville is currently operational is NOT verified.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-BU",
+      "name": "Bas-Uélé",
+      "nameEn": "Lower Uele",
+      "capital": "Buta",
+      "lat": 2.8,
+      "lng": 24.7333,
+      "cities": [
+        {
+          "code": "CD-BU-BUT",
+          "name": "Buta",
+          "lat": 2.8,
+          "lng": 24.7333,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": false,
+          "note": "Provincial capital of Bas-Uélé (a ville by law). Missing from the owner list.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-EQ",
+      "name": "Équateur",
+      "nameEn": "Equator",
+      "capital": "Mbandaka",
+      "lat": 0.0478,
+      "lng": 18.2558,
+      "cities": [
+        {
+          "code": "CD-EQ-MBA",
+          "name": "Mbandaka",
+          "lat": 0.0478,
+          "lng": 18.2558,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-HK",
+      "name": "Haut-Katanga",
+      "nameEn": "Upper Katanga",
+      "capital": "Lubumbashi",
+      "lat": -11.6642,
+      "lng": 27.4828,
+      "cities": [
+        {
+          "code": "CD-HK-LUB",
+          "name": "Lubumbashi",
+          "lat": -11.6642,
+          "lng": 27.4828,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-HK-LIK",
+          "name": "Likasi",
+          "lat": -10.9833,
+          "lng": 26.7333,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-HL",
+      "name": "Haut-Lomami",
+      "nameEn": "Upper Lomami",
+      "capital": "Kamina",
+      "lat": -8.7386,
+      "lng": 24.9906,
+      "cities": [
+        {
+          "code": "CD-HL-KAM",
+          "name": "Kamina",
+          "lat": -8.7386,
+          "lng": 24.9906,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-HU",
+      "name": "Haut-Uélé",
+      "nameEn": "Upper Uele",
+      "capital": "Isiro",
+      "lat": 2.7833,
+      "lng": 27.6167,
+      "cities": [
+        {
+          "code": "CD-HU-ISI",
+          "name": "Isiro",
+          "lat": 2.7833,
+          "lng": 27.6167,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-IT",
+      "name": "Ituri",
+      "nameEn": "Ituri",
+      "capital": "Bunia",
+      "lat": 1.5667,
+      "lng": 30.25,
+      "cities": [
+        {
+          "code": "CD-IT-BUN",
+          "name": "Bunia",
+          "lat": 1.5667,
+          "lng": 30.25,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": false,
+          "note": "Provincial capital of Ituri (a ville by law). Missing from the owner list.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-KC",
+      "name": "Kasaï Central",
+      "nameEn": "Central Kasai",
+      "capital": "Kananga",
+      "lat": -5.897,
+      "lng": 22.4488,
+      "cities": [
+        {
+          "code": "CD-KC-KAN",
+          "name": "Kananga",
+          "lat": -5.897,
+          "lng": 22.4488,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-KE",
+      "name": "Kasaï Oriental",
+      "nameEn": "Eastern Kasai",
+      "capital": "Mbuji-Mayi",
+      "lat": -6.1261,
+      "lng": 23.5997,
+      "cities": [
+        {
+          "code": "CD-KE-MBM",
+          "name": "Mbuji-Mayi",
+          "lat": -6.1261,
+          "lng": 23.5997,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "aliases": [
+            "Mbujimayi",
+            "Mbuji Mayi"
+          ],
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-KG",
+      "name": "Kwango",
+      "nameEn": "Kwango",
+      "capital": "Kenge",
+      "lat": -4.8056,
+      "lng": 17.0417,
+      "cities": [
+        {
+          "code": "CD-KG-KEN",
+          "name": "Kenge",
+          "lat": -4.8056,
+          "lng": 17.0417,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-KL",
+      "name": "Kwilu",
+      "nameEn": "Kwilu",
+      "capital": "Bandundu",
+      "lat": -3.3167,
+      "lng": 17.3667,
+      "cities": [
+        {
+          "code": "CD-KL-BAN",
+          "name": "Bandundu",
+          "lat": -3.3167,
+          "lng": 17.3667,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "aliases": [
+            "Bandundu-ville"
+          ],
+          "districts": []
+        },
+        {
+          "code": "CD-KL-KIK",
+          "name": "Kikwit",
+          "lat": -5.0386,
+          "lng": 18.8181,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-KN",
+      "name": "Kinshasa",
+      "nameEn": "Kinshasa",
+      "capital": "Kinshasa",
+      "lat": -4.3219,
+      "lng": 15.3119,
+      "cities": [
+        {
+          "code": "CD-KN-KIN",
+          "name": "Kinshasa",
+          "lat": -4.3219,
+          "lng": 15.3119,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "note": "Ville-province (Constitution art. 2): city and province at once; national capital. Not counted among the 33 provincial villes in the CENI list.",
+          "districts": [
+            {
+              "code": "CD-KN-D-FUN",
+              "name": "Funa",
+              "communes": [
+                {
+                  "code": "CD-KN-BDL",
+                  "name": "Bandalungwa",
+                  "lat": -4.3422,
+                  "lng": 15.2832,
+                  "areaKm2": 6.82,
+                  "population": 202341,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-BMB",
+                  "name": "Bumbu",
+                  "lat": -4.3726,
+                  "lng": 15.2934,
+                  "areaKm2": 5.3,
+                  "population": 329234,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-KLM",
+                  "name": "Kalamu",
+                  "lat": -4.3496,
+                  "lng": 15.3179,
+                  "areaKm2": 6.64,
+                  "population": 315342,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-KSV",
+                  "name": "Kasa-Vubu",
+                  "lat": -4.3417,
+                  "lng": 15.304,
+                  "areaKm2": 5.05,
+                  "population": 157320,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "Kasavubu",
+                    "Kasa Vubu"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-MKL",
+                  "name": "Makala",
+                  "lat": -4.383,
+                  "lng": 15.3085,
+                  "areaKm2": 5.6,
+                  "population": 253844,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-NGN",
+                  "name": "Ngiri-Ngiri",
+                  "lat": -4.3569,
+                  "lng": 15.2987,
+                  "areaKm2": 3.4,
+                  "population": 174843,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "Ngiri Ngiri"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-SLM",
+                  "name": "Selembao",
+                  "lat": -4.401,
+                  "lng": 15.2852,
+                  "areaKm2": 23.18,
+                  "population": 335581,
+                  "populationYear": 2004,
+                  "quartiers": []
+                }
+              ]
+            },
+            {
+              "code": "CD-KN-D-LUK",
+              "name": "Lukunga",
+              "communes": [
+                {
+                  "code": "CD-KN-BRM",
+                  "name": "Barumbu",
+                  "lat": -4.319,
+                  "lng": 15.3257,
+                  "areaKm2": 4.72,
+                  "population": 150319,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-GOM",
+                  "name": "Gombe",
+                  "lat": -4.3031,
+                  "lng": 15.3033,
+                  "areaKm2": 29.33,
+                  "population": 32373,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "La Gombe"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-KNS",
+                  "name": "Kinshasa",
+                  "lat": -4.3219,
+                  "lng": 15.3118,
+                  "areaKm2": 2.87,
+                  "population": 164857,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "Kinshasa (commune)"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-KTB",
+                  "name": "Kintambo",
+                  "lat": -4.3434,
+                  "lng": 15.2667,
+                  "areaKm2": 2.72,
+                  "population": 106772,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-LNG",
+                  "name": "Lingwala",
+                  "lat": -4.3253,
+                  "lng": 15.3013,
+                  "areaKm2": 2.88,
+                  "population": 94635,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-MNG",
+                  "name": "Mont-Ngafula",
+                  "lat": -4.4247,
+                  "lng": 15.2956,
+                  "areaKm2": 358.92,
+                  "population": 261004,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "Mont Ngafula"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-NGL",
+                  "name": "Ngaliema",
+                  "lat": -4.3755,
+                  "lng": 15.2474,
+                  "areaKm2": 224.3,
+                  "population": 683135,
+                  "populationYear": 2004,
+                  "quartiers": []
+                }
+              ]
+            },
+            {
+              "code": "CD-KN-D-MAM",
+              "name": "Mont-Amba",
+              "communes": [
+                {
+                  "code": "CD-KN-KSN",
+                  "name": "Kisenso",
+                  "lat": -4.4177,
+                  "lng": 15.3417,
+                  "areaKm2": 16.6,
+                  "population": 386151,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-LMB",
+                  "name": "Lemba",
+                  "lat": -4.404,
+                  "lng": 15.3173,
+                  "areaKm2": 23.7,
+                  "population": 349838,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-LMT",
+                  "name": "Limete",
+                  "lat": -4.3543,
+                  "lng": 15.3467,
+                  "areaKm2": 67.6,
+                  "population": 375726,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-MTT",
+                  "name": "Matete",
+                  "lat": -4.389,
+                  "lng": 15.3513,
+                  "areaKm2": 4.88,
+                  "population": 268781,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-NGB",
+                  "name": "Ngaba",
+                  "lat": -4.3813,
+                  "lng": 15.3218,
+                  "areaKm2": 4,
+                  "population": 180650,
+                  "populationYear": 2004,
+                  "quartiers": []
+                }
+              ]
+            },
+            {
+              "code": "CD-KN-D-TSH",
+              "name": "Tshangu",
+              "communes": [
+                {
+                  "code": "CD-KN-KMB",
+                  "name": "Kimbanseke",
+                  "lat": -4.4417,
+                  "lng": 15.4035,
+                  "areaKm2": 237.78,
+                  "population": 946372,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-MLK",
+                  "name": "Maluku",
+                  "lat": -4.4614,
+                  "lng": 16.0786,
+                  "areaKm2": 7948.8,
+                  "population": 179648,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-MSN",
+                  "name": "Masina",
+                  "lat": -4.3662,
+                  "lng": 15.391,
+                  "areaKm2": 69.93,
+                  "population": 485167,
+                  "populationYear": 2004,
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-NDJ",
+                  "name": "N'djili",
+                  "lat": -4.407,
+                  "lng": 15.3755,
+                  "areaKm2": 11.4,
+                  "population": 442138,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "Ndjili",
+                    "N'Djili"
+                  ],
+                  "quartiers": []
+                },
+                {
+                  "code": "CD-KN-NSL",
+                  "name": "Nsele",
+                  "lat": -4.3744,
+                  "lng": 15.4947,
+                  "areaKm2": 898.79,
+                  "population": 140929,
+                  "populationYear": 2004,
+                  "aliases": [
+                    "N'sele"
+                  ],
+                  "quartiers": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "CD-KS",
+      "name": "Kasaï",
+      "nameEn": "Kasai",
+      "capital": "Tshikapa",
+      "lat": -6.4167,
+      "lng": 20.8,
+      "cities": [
+        {
+          "code": "CD-KS-TSH",
+          "name": "Tshikapa",
+          "lat": -6.4167,
+          "lng": 20.8,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": false,
+          "note": "Provincial capital of Kasaï (a ville by law). Missing from the owner list.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-LO",
+      "name": "Lomami",
+      "nameEn": "Lomami",
+      "capital": "Kabinda",
+      "lat": -6.13,
+      "lng": 24.48,
+      "cities": [
+        {
+          "code": "CD-LO-KAB",
+          "name": "Kabinda",
+          "lat": -6.13,
+          "lng": 24.48,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-LO-MWD",
+          "name": "Mwene-Ditu",
+          "lat": -7,
+          "lng": 23.45,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "aliases": [
+            "Mwene Ditu"
+          ],
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-LU",
+      "name": "Lualaba",
+      "nameEn": "Lualaba",
+      "capital": "Kolwezi",
+      "lat": -10.7167,
+      "lng": 25.4667,
+      "cities": [
+        {
+          "code": "CD-LU-KOL",
+          "name": "Kolwezi",
+          "lat": -10.7167,
+          "lng": 25.4667,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-MA",
+      "name": "Maniema",
+      "nameEn": "Maniema",
+      "capital": "Kindu",
+      "lat": -2.95,
+      "lng": 25.95,
+      "cities": [
+        {
+          "code": "CD-MA-KIN",
+          "name": "Kindu",
+          "lat": -2.95,
+          "lng": 25.95,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-MN",
+      "name": "Mai-Ndombe",
+      "nameEn": "Mai-Ndombe",
+      "capital": "Inongo",
+      "lat": -1.95,
+      "lng": 18.2667,
+      "cities": [
+        {
+          "code": "CD-MN-INO",
+          "name": "Inongo",
+          "lat": -1.95,
+          "lng": 18.2667,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-MO",
+      "name": "Mongala",
+      "nameEn": "Mongala",
+      "capital": "Lisala",
+      "lat": 2.1486,
+      "lng": 21.5136,
+      "cities": [
+        {
+          "code": "CD-MO-LIS",
+          "name": "Lisala",
+          "lat": 2.1486,
+          "lng": 21.5136,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-MO-BUM",
+          "name": "Bumba",
+          "lat": 2.1844,
+          "lng": 22.4703,
+          "isCapital": false,
+          "status": "decree-2013",
+          "inOwnerList": true,
+          "note": "Ville status conferred by Décret n° 13/024 of 13 June 2013 (former Équateur, now Mongala; Journal Officiel special issue, 20 June 2013). Not among the 33 villes of the CENI 2023 list. Execution of the 2013 decrees was suspended in July 2015 (FR Wikipedia) and the 2013 grant was reaffirmed in 2018 (EN Wikipedia); whether this ville is currently operational is NOT verified.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-NK",
+      "name": "Nord-Kivu",
+      "nameEn": "North Kivu",
+      "capital": "Goma",
+      "lat": -1.6794,
+      "lng": 29.2336,
+      "cities": [
+        {
+          "code": "CD-NK-GOM",
+          "name": "Goma",
+          "lat": -1.6794,
+          "lng": 29.2336,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-NK-BEN",
+          "name": "Beni",
+          "lat": 0.5,
+          "lng": 29.4667,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-NK-BTM",
+          "name": "Butembo",
+          "lat": 0.15,
+          "lng": 29.2833,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-NU",
+      "name": "Nord-Ubangi",
+      "nameEn": "North Ubangi",
+      "capital": "Gbadolite",
+      "lat": 4.2833,
+      "lng": 21.0167,
+      "cities": [
+        {
+          "code": "CD-NU-GBA",
+          "name": "Gbadolite",
+          "lat": 4.2833,
+          "lng": 21.0167,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-SA",
+      "name": "Sankuru",
+      "nameEn": "Sankuru",
+      "capital": "Lusambo",
+      "lat": -4.9729,
+      "lng": 23.4368,
+      "cities": [
+        {
+          "code": "CD-SA-LUS",
+          "name": "Lusambo",
+          "lat": -4.9729,
+          "lng": 23.4368,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-SA-LMV",
+          "name": "Lumumbaville",
+          "lat": -4.0748,
+          "lng": 24.5515,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": false,
+          "aliases": [
+            "Wembo-Nyama",
+            "Lumumba Ville"
+          ],
+          "note": "Created from Wembo-Nyama (Décret 13/023 of 13 June 2013); in the CENI 2023 list of 33 villes; not a provincial capital; first mayor appointed August 2020 and installed January 2022 (EN Wikipedia). Missing from the owner list.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-SK",
+      "name": "Sud-Kivu",
+      "nameEn": "South Kivu",
+      "capital": "Bukavu",
+      "lat": -2.5061,
+      "lng": 28.8608,
+      "cities": [
+        {
+          "code": "CD-SK-BUK",
+          "name": "Bukavu",
+          "lat": -2.5061,
+          "lng": 28.8608,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-SK-BAR",
+          "name": "Baraka",
+          "lat": -4.1041,
+          "lng": 29.094,
+          "isCapital": false,
+          "status": "decree-2013",
+          "inOwnerList": true,
+          "note": "Ville status conferred by Décret n° 13/029 of 13 June 2013 (Sud-Kivu; Journal Officiel special issue, 20 June 2013). Not among the 33 villes of the CENI 2023 list. Execution of the 2013 decrees was suspended in July 2015 (FR Wikipedia) and the 2013 grant was reaffirmed in 2018 (EN Wikipedia); whether this ville is currently operational is NOT verified. FR Wikipedia calls Baraka the 34th ville (May 2018); EN Wikipedia lists it among settlements that have had a first mayor appointed.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-SU",
+      "name": "Sud-Ubangi",
+      "nameEn": "South Ubangi",
+      "capital": "Gemena",
+      "lat": 3.25,
+      "lng": 19.7667,
+      "cities": [
+        {
+          "code": "CD-SU-GEM",
+          "name": "Gemena",
+          "lat": 3.25,
+          "lng": 19.7667,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-SU-ZON",
+          "name": "Zongo",
+          "lat": 4.3433,
+          "lng": 18.5928,
+          "isCapital": false,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-TA",
+      "name": "Tanganyika",
+      "nameEn": "Tanganyika",
+      "capital": "Kalemie",
+      "lat": -5.9128,
+      "lng": 29.1906,
+      "cities": [
+        {
+          "code": "CD-TA-KAL",
+          "name": "Kalemie",
+          "lat": -5.9128,
+          "lng": 29.1906,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        },
+        {
+          "code": "CD-TA-KON",
+          "name": "Kongolo",
+          "lat": -5.4,
+          "lng": 27,
+          "isCapital": false,
+          "status": "decree-2013",
+          "inOwnerList": true,
+          "note": "Ville status conferred by Décret n° 13/020 of 13 June 2013 (then Katanga, now Tanganyika; Journal Officiel special issue, 20 June 2013). Not among the 33 villes of the CENI 2023 list. Execution of the 2013 decrees was suspended in July 2015 (FR Wikipedia) and the 2013 grant was reaffirmed in 2018 (EN Wikipedia); whether this ville is currently operational is NOT verified.",
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-TO",
+      "name": "Tshopo",
+      "nameEn": "Tshopo",
+      "capital": "Kisangani",
+      "lat": 0.5167,
+      "lng": 25.2,
+      "cities": [
+        {
+          "code": "CD-TO-KIS",
+          "name": "Kisangani",
+          "lat": 0.5167,
+          "lng": 25.2,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": true,
+          "districts": []
+        }
+      ]
+    },
+    {
+      "code": "CD-TU",
+      "name": "Tshuapa",
+      "nameEn": "Tshuapa",
+      "capital": "Boende",
+      "lat": -0.281,
+      "lng": 20.876,
+      "cities": [
+        {
+          "code": "CD-TU-BOE",
+          "name": "Boende",
+          "lat": -0.281,
+          "lng": 20.876,
+          "isCapital": true,
+          "status": "official",
+          "inOwnerList": false,
+          "note": "Provincial capital of Tshuapa (a ville by law). Missing from the owner list.",
+          "districts": []
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "S01",
+      "title": "ISO 3166-2:CD (Wikipedia, mirrors the ISO standard and its change history)",
+      "url": "https://en.wikipedia.org/wiki/ISO_3166-2:CD",
+      "usedFor": "Province ISO 3166-2 codes, ISO French names, English reference names"
+    },
+    {
+      "id": "S02",
+      "title": "Debian iso-codes, data/iso_3166-2.json (open-source package that tracks the ISO 3166-2 standard)",
+      "url": "https://salsa.debian.org/iso-codes-team/iso-codes/-/raw/main/data/iso_3166-2.json",
+      "usedFor": "Independent confirmation of the 26 CD-xx codes and French names (Kinshasa typed City, the other 25 Province)"
+    },
+    {
+      "id": "S03",
+      "title": "Loi organique n° 15/006 du 25 mars 2015 portant fixation des limites des provinces et celles de la ville de Kinshasa",
+      "url": "https://www.droitcongolais.info/files/128.03.15-Loi-du-25-mars-2015_Limites-de-province.pdf",
+      "usedFor": "Official names of the 25 provinces (art. 2) and their chefs-lieux (provincial capitals)"
+    },
+    {
+      "id": "S04",
+      "title": "Provinces of the Democratic Republic of the Congo (Wikipedia EN)",
+      "url": "https://en.wikipedia.org/wiki/Provinces_of_the_Democratic_Republic_of_the_Congo",
+      "usedFor": "Cross-check of codes and capitals; former province of each new province"
+    },
+    {
+      "id": "S05",
+      "title": "Provinces de la république démocratique du Congo (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Provinces_de_la_r%C3%A9publique_d%C3%A9mocratique_du_Congo",
+      "usedFor": "Cross-check of chefs-lieux"
+    },
+    {
+      "id": "S06",
+      "title": "Statoids - Provinces of DR Congo",
+      "url": "https://statoids.com/ucd.html",
+      "usedFor": "Cross-check only; its capitals for Kasaï (Luebo) and Kwilu (Kikwit) are outdated planning values and were NOT used"
+    },
+    {
+      "id": "S07",
+      "title": "CENI - Villes et communes de la RDC telles que reprises dans la loi portant répartition des sièges 2023",
+      "url": "https://www.ceni.cd/sites/default/files/2023-08/Listes%20des%20Villes%20et%20Communes_D%C3%A9put%C3%A9_Provincial_Conseiller_Communal.pdf",
+      "usedFor": "Official list of the 33 villes (excl. Kinshasa) and the 24 communes of Kinshasa"
+    },
+    {
+      "id": "S08",
+      "title": "Cities of the Democratic Republic of the Congo (Wikipedia EN)",
+      "url": "https://en.wikipedia.org/wiki/Cities_of_the_Democratic_Republic_of_the_Congo",
+      "usedFor": "Province of each of the 33 villes; legal framework; list of settlements becoming cities (Baraka, Uvira, Kamituga, Kasaji, Kasumbalesa, Oicha, Tshimbulu)"
+    },
+    {
+      "id": "S09",
+      "title": "Liste des villes de la république démocratique du Congo (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Liste_des_villes_de_la_r%C3%A9publique_d%C3%A9mocratique_du_Congo",
+      "usedFor": "History of ville status (2013 decrees, 2015 suspension leaving 33, Baraka 34th in 2018, Uvira 35th); 35-ville list of 2019"
+    },
+    {
+      "id": "S10",
+      "title": "Journal Officiel de la RDC, numéro spécial du 20 juin 2013 (Décrets n° 13/020 à 13/030 du 13 juin 2013)",
+      "url": "https://droitcongolais.info/files/Decrets-13-juin-2013.pdf",
+      "usedFor": "Primary text confirming ville status of Kongolo, Bumba, Muanda, Baraka, Uvira, Boende, Lumumbaville (Wembo-Nyama)"
+    },
+    {
+      "id": "S11",
+      "title": "Lumumbaville (Wikipedia EN)",
+      "url": "https://en.wikipedia.org/wiki/Lumumbaville",
+      "usedFor": "Lumumbaville = former Wembo-Nyama, Sankuru, status history, coordinates"
+    },
+    {
+      "id": "S12",
+      "title": "Communes of Kinshasa (Wikipedia EN)",
+      "url": "https://en.wikipedia.org/wiki/Communes_of_Kinshasa",
+      "usedFor": "District membership of the 24 communes; areas (cross-check)"
+    },
+    {
+      "id": "S13",
+      "title": "Liste des communes de Kinshasa (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Liste_des_communes_de_Kinshasa",
+      "usedFor": "Commune areas (km2) and INS 2004 populations; \"24 communes et 314 quartiers\""
+    },
+    {
+      "id": "S14",
+      "title": "citypopulation.de - Kinshasa districts and communes (INS data)",
+      "url": "https://citypopulation.de/en/drcongo/kinshasa/admin/",
+      "usedFor": "District membership; 1984 census and 2004 estimates (cross-check of populations)"
+    },
+    {
+      "id": "S15",
+      "title": "OpenStreetMap Wiki - Kinshasa",
+      "url": "https://wiki.openstreetmap.org/wiki/Kinshasa",
+      "usedFor": "District membership of the 24 communes; OSM relation ids"
+    },
+    {
+      "id": "S16",
+      "title": "Districts of the Democratic Republic of the Congo (Wikipedia EN)",
+      "url": "https://en.wikipedia.org/wiki/Districts_of_the_Democratic_Republic_of_the_Congo",
+      "usedFor": "District membership; note that Kinshasa districts are not decentralised-entity subdivisions"
+    },
+    {
+      "id": "S17",
+      "title": "Kinshasa (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Kinshasa",
+      "usedFor": "Districts; per-commune quartier counts (unreliable, internally inconsistent)"
+    },
+    {
+      "id": "S18",
+      "title": "Lukunga (district) (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Lukunga_(district)",
+      "usedFor": "Mont-Ngafula placed in Lukunga"
+    },
+    {
+      "id": "S19",
+      "title": "Mont-Ngafula (Wikipédia FR)",
+      "url": "https://fr.wikipedia.org/wiki/Mont-Ngafula",
+      "usedFor": "Self-inconsistent on district (text says Mont-Amba, navigation says Lukunga); 21 quartiers listed (conflicts with 16 on S17)"
+    },
+    {
+      "id": "S20",
+      "title": "Ordonnance n° 77-100 du 6 avril 1977 fixant les limites de la ville de Kinshasa, ses sous-régions et zones (Leganet)",
+      "url": "https://www.leganet.cd/Legislation/Droit%20Public/Administration.ter/o.77.100.06.04.1977.html",
+      "usedFor": "Historical legal basis of the four sub-regions (Lukunga incl. Mont Ngafula). NOTE: the page could not be fetched directly (TLS certificate error); its content was seen only through a search-result summary"
+    },
+    {
+      "id": "S21",
+      "title": "Wikipedia (EN/FR) article coordinates via the MediaWiki API (prop=coordinates)",
+      "url": "https://en.wikipedia.org/w/api.php?action=query&prop=coordinates",
+      "usedFor": "City-centre coordinates; commune coordinates for Gombe, Mont-Ngafula, Maluku, Nsele. Text licence CC BY-SA"
+    },
+    {
+      "id": "S22",
+      "title": "OpenStreetMap Nominatim - administrative boundary centre points of the Kinshasa communes",
+      "url": "https://nominatim.openstreetmap.org/",
+      "usedFor": "Commune coordinates for the 20 communes marked coordSource=osm. Data (c) OpenStreetMap contributors, ODbL 1.0"
+    },
+    {
+      "id": "S23",
+      "title": "Quartier candidates examined (NOT imported): Ngaliema (FR Wikipedia), Kinshasa commune (EN Wikipedia), Gombe and Limete (student theses on memoireonline.com)",
+      "url": "https://fr.wikipedia.org/wiki/Ngaliema",
+      "usedFor": "Evidence for the decision not to import any quartier list; see docs/DRC-GEOGRAPHY.md section 6"
+    }
+  ]
+}

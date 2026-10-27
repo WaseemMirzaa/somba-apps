@@ -100,7 +100,7 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     const lamp = await listing(shop2, 'Statement lamp', 50);
     ok(sofa?.status === 'live' && lamp?.status === 'live', 'setup: two sellers each have a live product', JSON.stringify([sofa?.status, lamp?.status]));
 
-    const order = async (items) => req(cust.sock, 'orders:create', { items, paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS });
+    const order = async (items) => req(cust.sock, 'orders:create', { items, paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
     const walk = async (id, statuses = ['processing', 'shipped', 'out_for_delivery', 'delivered']) => { for (const s of statuses) { const r = await req(ops.sock, 'orders:updateStatus', { orderId: id, status: s }); if (!r.ok) return r; } return { ok: true }; };
     const avail = async (shop) => (await req(shop.sock, 'payouts:available')).data;
     const statement = (who, id) => req(who.sock, 'payouts:statement', { payoutId: id });

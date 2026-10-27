@@ -4,7 +4,8 @@ import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 
-/// Earnings and cash to hand over, computed by the server from finished deliveries.
+/// Earnings and cash to hand over, computed by the server from finished tasks (the pay is flat per task of any kind,
+/// so the screen says tasks and breaks them down by kind: deliveries, seller pickups, transfers…).
 class EarningsScreen extends StatelessWidget {
   const EarningsScreen({super.key});
 
@@ -27,18 +28,41 @@ class EarningsScreen extends StatelessWidget {
                 Text(s.yourEarnings, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
                 const SizedBox(height: 6),
                 Text(s.usd(e.earningsUsd), key: const ValueKey('earnings-total'), style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800)),
-                Text(e.delivered == 1 ? s.fromDeliveriesOne(e.delivered) : s.fromDeliveriesMany(e.delivered), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                Text(e.completed == 1 ? s.fromTasksOne(e.completed) : s.fromTasksMany(e.completed), key: const ValueKey('earnings-from'), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
               ]),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
               child: Column(children: [
                 Row(children: [
-                  Expanded(child: _tile(Icons.check_circle_rounded, AppColors.success, '${e.delivered}', s.delivered)),
+                  Expanded(child: _tile(Icons.check_circle_rounded, AppColors.success, '${e.completed}', s.tasksDone)),
                   const SizedBox(width: 12),
                   Expanded(child: _tile(Icons.two_wheeler_rounded, AppColors.primary, '${e.active}', s.inProgress)),
                 ]),
                 const SizedBox(height: 12),
+                if (e.byKind.isNotEmpty) ...[
+                  SurfaceCard(
+                    key: const ValueKey('earnings-by-kind'),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(s.earnByKind, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                      const SizedBox(height: 10),
+                      for (final k in e.byKind)
+                        Padding(
+                          key: ValueKey('earnings-kind-${k.kind}'),
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(children: [
+                            Expanded(child: Text('${_kindLabel(s, k.kind)} × ${k.count}', style: const TextStyle(fontSize: 13.5))),
+                            Text(s.usd(k.earningsUsd), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          ]),
+                        ),
+                      if (e.perTaskUsd > 0) ...[
+                        const SizedBox(height: 6),
+                        Text(s.earnRateNote(s.usd(e.perTaskUsd)), key: const ValueKey('earnings-rate'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.35)),
+                      ],
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 SurfaceCard(
                   child: Row(children: [
                     Container(
@@ -78,14 +102,18 @@ class EarningsScreen extends StatelessWidget {
     );
   }
 
+  static String _kindLabel(Strings s, String kind) => s.has('kind_$kind') ? s.t('kind_$kind') : kind.replaceAll('_', ' ');
+
   Widget _tile(IconData icon, Color color, String value, String label) => SurfaceCard(
         child: Row(children: [
           Container(height: 42, width: 42, decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color)),
           const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
-            Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-          ]),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+              Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            ]),
+          ),
         ]),
       );
 }

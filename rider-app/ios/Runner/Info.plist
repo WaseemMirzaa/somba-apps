@@ -75,6 +75,10 @@
 	<string>Somba&amp;Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Somba&amp;Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Somba&amp;Teka Rider lets you attach photos from your library to a support ticket, for example a damaged parcel or a problem at an address.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Somba&amp;Teka Rider uses the camera to take a photo you attach to a support ticket, for example a damaged parcel or a problem at an address.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

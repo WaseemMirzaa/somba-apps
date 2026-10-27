@@ -17,6 +17,7 @@ import 'package:somba_rider/screens/deliveries_screen.dart';
 import 'package:somba_rider/services/auth_service.dart';
 import 'package:somba_rider/services/location_reporter.dart';
 import 'package:somba_rider/services/models.dart';
+import 'package:somba_rider/services/support_models.dart';
 import 'package:somba_rider/services/rider_store.dart';
 
 /// Texts that are the same word in both languages.
@@ -92,14 +93,23 @@ void main() {
       }
       expect(kMessages.keys.toSet().containsAll(used), isTrue, reason: '${used.difference(kMessages.keys.toSet())}');
       const s = Strings('fr');
-      for (final st in ['assigned', 'picked_up', 'in_transit', 'delivered', 'failed', 'unassigned']) {
+      for (final st in ['assigned', 'picked_up', 'in_transit', 'delivered', 'failed']) {
         expect(s.has('task_$st'), isTrue, reason: 'task_$st');
       }
       for (final r in kFailReasonIds) {
         expect(s.has('fail_$r'), isTrue, reason: 'fail_$r');
       }
-      for (final a in ['act_picked_up', 'act_in_transit', 'act_delivered']) {
-        expect(s.has(a), isTrue);
+      for (final a in ['act_picked_up', 'act_in_transit', 'act_delivered', 'act_picked_up_seller', 'act_picked_up_customer', 'act_in_transit_hub', 'act_in_transit_seller', 'act_delivered_seller']) {
+        expect(s.has(a), isTrue, reason: a);
+      }
+      for (final k in LegKind.all) {
+        expect(s.has('kind_$k'), isTrue, reason: 'kind_$k');
+      }
+      for (final st in ['open', 'pending', 'resolved', 'closed']) {
+        expect(s.has('ticket_$st'), isTrue, reason: 'ticket_$st');
+      }
+      for (final c in kSupportCategories) {
+        expect(s.has('cat_$c'), isTrue, reason: 'cat_$c');
       }
     });
 
@@ -134,6 +144,156 @@ void main() {
       for (final m in knownServerErrors) {
         expect(translateServerError(m, fr), isNot(equals(m)), reason: m);
       }
+    });
+
+    // docs/contracts/logistics.md section 10, after-sale.md sections 6 and 11, and the photo upload.
+    const newErrors = [
+      'Your warehouse assigns your tasks. You cannot accept a task yourself.',
+      'Your account is not linked to a warehouse. Ask an administrator.',
+      'Only supervisors and managers can assign riders.',
+      'Only managers can change staff tiers.',
+      'Only managers can see the staff list.',
+      'Only an administrator can make someone a manager.',
+      'You cannot change your own tier.',
+      'This person works at another warehouse.',
+      'Only warehouse staff have a tier.',
+      'This task belongs to another warehouse.',
+      'This rider works at another warehouse.',
+      'Choose an active rider.',
+      'This delivery is no longer available.',
+      'This parcel is not due at your warehouse.',
+      'This parcel was already scanned in.',
+      'A failed task cannot be scanned in.',
+      'This task is finished by the rider, not scanned in.',
+      'This leg ends at the warehouse: warehouse staff scan the parcel in.',
+      'This parcel does not leave from your warehouse.',
+      'Assign a rider before handing the parcel over.',
+      'Pin your delivery address on the map.',
+      'Delivery is not available right now: no warehouse is open.',
+      'Place the warehouse on the map: latitude and longitude are required.',
+      'Enter a valid latitude (-90 to 90) and longitude (-180 to 180).',
+      'Enter a valid pickup location: latitude -90 to 90 and longitude -180 to 180.',
+      'Pin your pickup location on the map (Store settings) before listing products.',
+      'Riders and warehouse staff must belong to a warehouse. Pick one from the list.',
+      'Pick an active warehouse from the list.',
+      'This order has no destination warehouse.',
+      'One of the returned items is not on this order.',
+      'Delivery task not found.',
+      'This delivery was just updated. Refresh and try again.',
+      'Wrong delivery code. Ask the customer for the 4-digit code shown in their app.',
+      'Subject and message are required.',
+      'Write a message first.',
+      'Ticket not found.',
+      'Order not found.',
+      'Photos must be a list of uploaded images.',
+      'Photos must be images uploaded through the app.',
+      'Only JPEG, PNG or WebP images are allowed.',
+      'No file uploaded (field name "file").',
+      'File too large',
+    ];
+
+    test('every new server error of the logistics and support contracts has a French text', () {
+      final known = knownServerErrors.toSet();
+      for (final m in newErrors) {
+        expect(known, contains(m), reason: 'not in the known errors: $m');
+        expect(translateServerError(m, fr), isNot(equals(m)), reason: m);
+      }
+      expect(translateServerError('You can attach up to 6 photos.', fr), 'Vous pouvez joindre jusqu’à 6 photos.');
+      expect(translateServerError('Ticket not found.', fr), 'Ticket introuvable.');
+      expect(translateServerError('Ticket not found.', const Strings('en')), 'Ticket not found.');
+    });
+
+    // docs/contracts/areas.md, "Errors (English on the wire -> French in clients)": EVERY string of the section.
+    const areasLiteralErrors = [
+      // geography and coverage
+      'Choose where this warehouse is.',
+      'Area not found.',
+      'Hub not found.',
+      'Choose at least one area.',
+      'Flat delivery fee must be a number between 0 and 500.',
+      'An area with this name already exists here.',
+      'An area with this code already exists.',
+      'Level must be one of: country, province, city, district, commune, quartier.',
+      'Active must be true or false.',
+      'Not allowed.',
+      'A warehouse cannot cover an area it is not allowed to serve.',
+      // routing and checkout
+      'Delivery between cities is not available right now.',
+      'One seller in your cart cannot ship from their area yet.',
+      'Your pickup area is not served yet. You can prepare your store; sales open when we deliver there.',
+      'Pin your delivery address on the map.',
+      'Delivery is not available right now: no warehouse is open.',
+      // lanes and runs
+      'These warehouses are not connected by any lane.',
+      'A lane connects two different warehouses.',
+      'Lane not found.',
+      'Transit time (hours) must be a number between 0 and 720.',
+      'Lane cost must be a number between 0 and 1000.',
+      'Bidirectional must be true or false.',
+      'This run has already left.',
+      'This run has not left yet.',
+      'This run is already closed.',
+      'Run not found.',
+      'Only parcels waiting at this warehouse can join this run.',
+      'Choose at least one parcel.',
+      'Choose parcels of this run.',
+      'Choose some of the parcels of this run, not all of them.',
+      'That parcel is not in this run.',
+      'Choose a driver for this run first.',
+      'This run has no parcels left to send.',
+      'Choose an active rider.',
+      'This rider works at another warehouse.',
+      'This parcel is part of a transfer run. Manage it from the run.',
+      'Only supervisors and managers can assign riders.',
+      'This task belongs to another warehouse.',
+      'This parcel is not due at your warehouse.',
+      'Your account is not linked to a warehouse. Ask an administrator.',
+      'Choose a warehouse.',
+      'Staff only.',
+      'Riders only.',
+      'Status must be in_transit.',
+    ];
+    // The ones with a placeholder, as the server fills them in.
+    const areasPatternErrors = {
+      'This area is already covered by Entrepôt Limete.': 'Cette zone est déjà couverte par Entrepôt Limete.',
+      'A commune cannot be added under a province.': 'Le niveau « commune » ne peut pas être ajouté sous le niveau « province ».',
+      'A city cannot be added under a country.': 'Le niveau « ville » ne peut pas être ajouté sous le niveau « pays ».',
+      'A quartier cannot be added under a district.': 'Le niveau « quartier » ne peut pas être ajouté sous le niveau « district ».',
+      'We don\'t deliver to Goma yet.': 'Nous ne livrons pas encore à Goma.',
+      'We don’t deliver to Limete yet.': 'Nous ne livrons pas encore à Limete.',
+      'We don\'t deliver to this area yet.': 'Nous ne livrons pas encore dans cette zone.',
+      'Parcel missing from run TR-0042.': 'Colis manquant dans la tournée TR-0042.',
+    };
+
+    test('every error string of the areas contract has a French text; English stays English', () {
+      const en = Strings('en');
+      final known = knownServerErrors.toSet();
+      for (final m in areasLiteralErrors) {
+        expect(known, contains(m), reason: 'not in the known errors: $m');
+        final text = translateServerError(m, fr);
+        expect(text, isNot(equals(m)), reason: m);
+        expect(text, isNot(contains('{')), reason: m);
+        expect(translateServerError(m, en), m, reason: m);
+      }
+      areasPatternErrors.forEach((m, expected) {
+        expect(translateServerError(m, fr), expected, reason: m);
+        expect(translateServerError(m, en), m, reason: m);
+      });
+    });
+
+    test('the server may add a trailing space or a new sentence: a text we do not know is shown as received', () {
+      expect(translateServerError('  Run not found.  ', fr), 'Tournée introuvable.');
+      expect(translateServerError('Run not found. Try later.', fr), 'Run not found. Try later.');
+    });
+
+    test('rider notices are French: task, support and attention notices', () {
+      expect(localizeNotification(fr, 'New task assigned to you', 'SOM-1: pickup is now in your tasks.'), ('Nouvelle tâche qui vous est assignée', 'SOM-1 : la collecte est maintenant dans vos tâches.'));
+      expect(localizeNotification(fr, 'New task assigned to you', 'SOM-1: return to seller is now in your tasks.').$2, 'SOM-1 : le retour au vendeur est maintenant dans vos tâches.');
+      expect(localizeNotification(fr, 'Support reply', 'TKT-1: Merci').$1, 'Réponse de l’assistance');
+      expect(localizeNotification(fr, 'Task needs attention', 'SOM-1: transfer failed after 3 attempts (Customer unreachable).'),
+          ('Tâche à vérifier', 'SOM-1 : le transfert a échoué après 3 tentatives (Customer unreachable).'));
+      expect(localizeNotification(fr, 'Ticket resolved', 'TKT-1 · x').$1, 'Ticket résolu');
+      expect(localizeNotification(const Strings('en'), 'Support reply', 'TKT-1: Merci').$1, 'Support reply');
     });
 
     test('ApiException prints in the current language; notifications are translated', () async {

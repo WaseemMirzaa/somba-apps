@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
@@ -14,14 +14,24 @@ import { VerificationNotice } from "@/components/shop/verification";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useShop, useCartLines } from "@/context/shop-context";
+import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue } from "@/components/shop/delivery-quote";
+import { AreaPicker, type AreaSelection } from "@/components/geo/area-picker";
+import { addressTextFromChain, chainText, notServedArea, notServedText, type AreaHint, type NotServedInfo } from "@/lib/areas";
+import { AddressPinEditor, UnpinnedWarning, pinRequiredText } from "@/components/shop/address-pin-editor";
+import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
 import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
-import type { AddressGeo, PickedParts } from "@/lib/google-maps";
-import { usePublicSettings, useVerificationStatus, zoneLabel } from "@/lib/shop-live";
+import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
+import { useVerificationStatus } from "@/lib/shop-live";
 import type { Address } from "@/lib/realtime/types";
+
+/** The one-line refusal used in a snackbar (the full message with the served cities is on the page). */
+function notServedLine(n: NotServedInfo, fr: boolean): string {
+  return notServedText(notServedArea(n, fr), [], fr);
+}
 
 function CheckoutContent() {
   const { locale } = useLocale();
@@ -29,18 +39,19 @@ function CheckoutContent() {
   const rt = useRealtime();
   const { toast } = useToast();
   const router = useRouter();
-  const { promoDiscount, promoCode, zoneId, setZoneId } = useShop();
-  const { lines, subtotal, hasUnavailable, savings } = useCartLines();
+  const { promoDiscount, promoCode } = useShop();
+  const { lines, subtotal, hasUnavailable, hasVacation, savings } = useCartLines();
   const verification = useVerificationStatus();
-  const settings = usePublicSettings();
-  const zones = settings.deliveryZones;
 
   const [pickedAddress, setPickedAddress] = useState<string | null>(null);
   const [openBox, setOpenBox] = useState(true);
   const [orderNote, setOrderNote] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<{ label: string; line1: string; commune: string; city: string; phone: string; zoneId: string; geo: AddressGeo | null }>({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "", geo: null });
+  const [form, setForm] = useState<{ label: string; line1: string; phone: string; geo: AddressGeo | null }>({ label: "", line1: "", phone: rt.user?.phone ?? "", geo: null });
+  const [hint, setHint] = useState<AreaHint | null>(null);
+  const [area, setArea] = useState<AreaSelection | null>(null);
+  const [pinningId, setPinningId] = useState<string | null>(null);
 
   const addresses = rt.addresses;
   // Selected address: the customer's pick, else the default, else the first one.
@@ -50,33 +61,38 @@ function CheckoutContent() {
   }, [pickedAddress, addresses]);
   const address = addresses.find((a) => a.id === selectedId) ?? null;
 
-  // Following the chosen address, default the zone to the address's zone.
-  useEffect(() => {
-    if (!address?.zoneId) return;
-    if (zones.some((z) => z.id === address.zoneId) && zoneId !== address.zoneId) setZoneId(address.zoneId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address?.id, address?.zoneId, zones]);
-
-  const zone = zones.find((z) => z.id === zoneId) ?? null;
-  const zoneMissing = zones.length > 0 && !zone;
-  const deliveryFee = zone?.feeUsd ?? 0;
+  const pinned = !!addressPin(address);
+  const quoteLines = useMemo(() => lines.filter((l) => !l.unavailable).map((l) => ({ productId: l.id, qty: l.qty })), [lines]);
+  const { quote, loading: quoteLoading, error: quoteError, notServed: quoteNotServed } = useDeliveryQuote({
+    addressId: address && pinned ? address.id : null,
+    lines: quoteLines,
+    enabled: !!address && pinned,
+  });
+  // Outside every served area: the quote is refused (or the address already says so). No fee, no checkout.
+  const addressUnserved = !!address && address.served === false;
+  const deepestArea = address?.areaChain?.[address.areaChain.length - 1] ?? null;
+  const notServed = quoteNotServed ?? (addressUnserved ? { area: deepestArea?.name ?? address?.commune ?? address?.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
+  const deliveryFee = quote?.feeUsd ?? 0;
   const discount = Math.min(promoDiscount, subtotal);
   const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
   /** A map pick pre-fills the typed fields (still editable) and keeps the pin for the order. */
-  function applyPick(geo: AddressGeo, parts: PickedParts) {
-    setForm((f) => ({
-      ...f,
-      geo,
-      line1: parts.line1 ?? f.line1,
-      city: parts.city ?? f.city,
-      commune: parts.commune ?? f.commune,
-    }));
+  function applyPick(geo: AddressGeo, parts: PickedParts, meta: PickedMeta) {
+    setForm((f) => ({ ...f, geo, line1: parts.line1 ?? f.line1 }));
+    setHint({ components: meta.components, pin: { lat: geo.lat, lng: geo.lng }, text: { commune: parts.commune, city: parts.city, province: parts.region } });
   }
 
   async function saveAddress() {
-    if (!form.line1.trim() || !form.city.trim()) {
-      toast(fr ? "Adresse et ville obligatoires" : "Street address and city are required", "error");
+    if (!form.line1.trim()) {
+      toast(fr ? "L'adresse est obligatoire" : "Street address is required", "error");
+      return;
+    }
+    if (!form.geo) {
+      toast(pinRequiredText(fr), "error");
+      return;
+    }
+    if (!area?.areaId || (area.served && !area.complete)) {
+      toast(fr ? "Choisissez la province, la ville et la commune." : "Choose the province, city and commune.", "error");
       return;
     }
     setSaving(true);
@@ -84,16 +100,16 @@ function CheckoutContent() {
       const created = await socketClient.request<Address>("addresses:create", {
         label: form.label.trim() || (fr ? "Domicile" : "Home"),
         line1: form.line1.trim(),
-        city: form.city.trim(),
-        commune: form.commune.trim() || undefined,
         phone: form.phone.trim() || undefined,
-        zoneId: form.zoneId || undefined,
-        ...(form.geo ? { geo: form.geo } : {}),
+        geo: form.geo,
+        areaId: area.areaId,
+        ...addressTextFromChain(area.chain, fr),
       });
       setPickedAddress(created.id);
-      if (created.zoneId && zones.some((z) => z.id === created.zoneId)) setZoneId(created.zoneId);
       setShowAdd(false);
-      setForm({ label: "", line1: "", commune: "", city: "", phone: rt.user?.phone ?? "", zoneId: "", geo: null });
+      setForm({ label: "", line1: "", phone: rt.user?.phone ?? "", geo: null });
+      setHint(null);
+      setArea(null);
       toast(fr ? "Adresse ajoutée" : "Address added");
     } catch (e) {
       toast((e as Error).message, "error");
@@ -102,15 +118,20 @@ function CheckoutContent() {
     }
   }
 
-  const canContinue = lines.length > 0 && !hasUnavailable && !!address && !zoneMissing && !verification.blocked;
+  const canContinue = lines.length > 0 && !hasUnavailable && !hasVacation && !!address && pinned && !!quote && !notServed && !verification.blocked;
 
   function continueToPayment() {
     if (!address) {
       toast(fr ? "Choisissez ou ajoutez une adresse de livraison" : "Choose or add a delivery address", "error");
       return;
     }
-    if (zoneMissing) {
-      toast(fr ? "Choisissez une zone de livraison" : "Choose a delivery zone", "error");
+    if (!pinned) {
+      toast(pinRequiredText(fr), "error");
+      setPinningId(address.id);
+      return;
+    }
+    if (notServed) {
+      toast(notServedLine(notServed, fr), "error");
       return;
     }
     const params = new URLSearchParams({ address: address.id, openBox: String(openBox), note: orderNote });
@@ -138,6 +159,13 @@ function CheckoutContent() {
         </div>
       )}
 
+      {hasVacation && (
+        <div role="alert" data-testid="checkout-vacation" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {fr ? "Une boutique de votre panier est en vacances." : "A store in your cart is on vacation."}{" "}
+          <Link href="/shop/cart" className="font-medium underline">{fr ? "Modifier le panier" : "Edit cart"}</Link>
+        </div>
+      )}
+
       {verification.blocked && <VerificationNotice status={verification} />}
 
       <DetailSection title={fr ? "Votre commande" : "Your order"}>
@@ -155,29 +183,41 @@ function CheckoutContent() {
               <div>
                 <p className="font-medium">{a.label} {a.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
                 <p className="text-sm text-slate-500">{[a.line1, a.commune, a.city].filter(Boolean).join(", ")}</p>
+                {a.areaChain && a.areaChain.length > 0 && (
+                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    {chainText(a.areaChain, fr, { skipLevels: ["district"] })}
+                    {a.served === false && <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-100">{fr ? "Pas encore desservie" : "Not served yet"}</span>}
+                  </p>
+                )}
                 {a.phone && <p className="text-xs text-slate-400">{a.phone}</p>}
+                {addressPin(a) ? (
+                  <p className="mt-1 text-xs text-emerald-700">📍 {fr ? "Épinglée sur la carte" : "Pinned on the map"}</p>
+                ) : (
+                  <UnpinnedWarning fr={fr} onPin={() => { setPickedAddress(a.id); setPinningId(a.id); }} />
+                )}
               </div>
             </label>
           ))}
+          {pinningId && addresses.find((a) => a.id === pinningId) && (
+            <AddressPinEditor
+              key={pinningId}
+              address={addresses.find((a) => a.id === pinningId)!}
+              fr={fr}
+              onSaved={() => setPinningId(null)}
+              onCancel={() => setPinningId(null)}
+            />
+          )}
 
           {showAdd ? (
             <div className="space-y-3 rounded-xl border border-dashed border-blue-200 p-4">
               <AddressMapPicker value={form.geo} onPick={applyPick} fr={fr} />
+              <AreaPicker fr={fr} hint={hint} onChange={setArea} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse (rue, numéro)" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Commune / Quartier" : "Commune / District"} value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
-                <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Ville" : "City"} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-              </div>
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Téléphone de contact" : "Contact phone"} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              {zones.length > 0 && (
-                <select className="input-premium w-full px-4 py-2 text-sm" value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value })}>
-                  <option value="">{fr ? "Zone de livraison" : "Delivery zone"}</option>
-                  {zones.map((z) => <option key={z.id} value={z.id}>{zoneLabel(z, fr)} — {z.city}</option>)}
-                </select>
-              )}
+              {!form.geo && <p role="note" className="text-xs text-amber-800">{pinRequiredText(fr)}</p>}
               <div className="flex gap-2">
-                <Button onClick={saveAddress} disabled={saving}>{saving ? "…" : fr ? "Enregistrer l'adresse" : "Save address"}</Button>
+                <Button onClick={saveAddress} disabled={saving || !form.geo}>{saving ? "…" : fr ? "Enregistrer l'adresse" : "Save address"}</Button>
                 <Button variant="ghost" onClick={() => setShowAdd(false)}>{fr ? "Annuler" : "Cancel"}</Button>
               </div>
             </div>
@@ -190,23 +230,22 @@ function CheckoutContent() {
       </DetailSection>
 
       <DetailSection title={fr ? "Options de livraison" : "Delivery Options"}>
-        {zones.length > 0 && (
-          <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-slate-700">{fr ? "Zone de livraison" : "Delivery zone"}</label>
-            <select className="input-premium w-full px-3 py-2 text-sm" value={zoneId ?? ""} onChange={(e) => setZoneId(e.target.value || null)}>
-              <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : formatCurrency(z.feeUsd, locale)})
-                </option>
-              ))}
-            </select>
-          </div>
+        {address && !pinned && (
+          <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            {pinRequiredText(fr)}
+          </p>
         )}
+        <div className="mb-4">
+          {notServed ? (
+            <NotServedNotice notServed={notServed} areaObj={deepestArea} fr={fr} />
+          ) : (
+            <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} />
+          )}
+        </div>
         {/* The sellers set each product's delivery time; the shopper only sees the resulting estimate. */}
         <div className="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm" data-testid="delivery-estimate">
           <span className="font-semibold">{fr ? "Livraison estimée :" : "Estimated delivery:"}</span>
-          <span>{dayLabel(estimateFor(lines.map((l) => l.deliveryDays)), fr)}</span>
+          <span>{dayLabel(estimateFor(lines.map((l) => l.deliveryDays), new Date(), quote?.extraDays ?? Math.ceil((quote?.transitHours ?? 0) / 24)), fr)}</span>
         </div>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />
@@ -218,7 +257,7 @@ function CheckoutContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"}${promoCode ? ` (${promoCode})` : ""}`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: fr ? "Frais de zone" : "Zone delivery fee", value: zoneMissing ? (fr ? "Choisissez une zone" : "Choose a zone") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          { label: fr ? "Frais de livraison" : "Delivery fee", value: <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={address && !pinned ? (fr ? "Épinglez l'adresse" : "Pin the address") : undefined} /> },
           { label: "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>

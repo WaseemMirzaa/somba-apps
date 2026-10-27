@@ -1,10 +1,9 @@
 "use client";
 
-import { localDay } from "@/lib/dates";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Pencil, Power } from "lucide-react";
+import { ExternalLink, Pencil, Power } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
@@ -15,56 +14,35 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
 import { HubFormModal } from "@/components/admin/hub-form";
 import { HomeWarehouseDialog } from "@/components/admin/home-warehouse-dialog";
+import { CoverageEditor, CoverageList, GapsPanel, useHubCoverage } from "@/components/admin/coverage-editor";
+import { CoverageMap } from "@/components/geo/coverage-map";
+import { areaName, chainFromTree, chainText, useFootprint } from "@/lib/areas";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
-import { canManageHubs, errMsg, useRole, useServerList, type StaffRow, type ZoneSetting } from "@/lib/admin-live";
+import { canManageHubs, errMsg, useRole, useServerList, type StaffRow } from "@/lib/admin-live";
 import { useSocketQuery, type HubRow, type WarehouseStats } from "@/lib/admin-stats";
+import { LEG_KIND_SHORT, TIER_LABEL, pickL, type Custody, type LegKind } from "@/lib/logistics";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { countryName } from "@/lib/countries";
 
 const FULFILLMENT_LINKS = [
-  { href: "/admin/fulfillment/inbound", label: "Inbound Queue", labelFr: "File d'attente entrante" },
-  { href: "/admin/fulfillment/sorting", label: "Sorting", labelFr: "Tri" },
-  { href: "/admin/fulfillment/dispatch", label: "Dispatch", labelFr: "Expédition" },
+  { href: "/admin/fulfillment/desk", label: "Warehouse desk", labelFr: "Bureau de l'entrepôt" },
   { href: "/admin/fulfillment/deliveries", label: "Deliveries", labelFr: "Livraisons" },
+  { href: "/admin/fulfillment/runs", label: "Transfer runs", labelFr: "Tournées de transfert" },
   { href: "/admin/fulfillment/returns", label: "Returns", labelFr: "Retours" },
-  { href: "/admin/fulfillment/inventory", label: "Inventory", labelFr: "Inventaire" },
   { href: "/admin/fulfillment/riders", label: "Riders", labelFr: "Livreurs" },
   { href: "/admin/fulfillment/exceptions", label: "Exceptions", labelFr: "Exceptions" },
+  { href: "/admin/fulfillment/analytics", label: "Analytics", labelFr: "Analytique" },
 ];
-
-interface TransferRow {
-  id: string;
-  reference: string;
-  fromHub: string;
-  toHub: string;
-  sku: string;
-  productName: string | null;
-  qty: number;
-  status: string;
-  createdAt: string;
-}
 
 interface HubRider {
   id: string;
   name: string;
   phone: string | null;
   hubId: string | null;
-  preferredZones: string[];
   activeTasks: number;
 }
-
-function parseZones(raw: string | undefined): ZoneSetting[] {
-  try {
-    const v = raw ? (JSON.parse(raw) as ZoneSetting[]) : [];
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}
-
-const TRANSFER_STATUS_FR: Record<string, string> = { requested: "Demandé", in_transit: "En transit", received: "Reçu" };
 
 export default function AdminWarehouseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -73,31 +51,44 @@ export default function AdminWarehouseDetailPage() {
   const role = useRole();
   const fr = locale === "fr";
   const mayManage = canManageHubs(role);
-  const hubs = useServerList<HubRow>("warehouse:hubs", { pushEvents: ["hub:updated"] });
-  const wh = useSocketQuery<WarehouseStats>("analytics:warehouse");
-  const transfers = useSocketQuery<TransferRow[]>("warehouse:transfers");
-  // Who and what belongs to this warehouse: the zones it delivers, its riders and (super admin) its staff.
-  const settings = useSocketQuery<Record<string, string>>("settings:get");
+  const hubs = useServerList<HubRow>("hubs:list");
+  const reloadHubs = hubs.reload;
+  const wh = useSocketQuery<WarehouseStats>("analytics:warehouse", { hubId: id });
+  const custody = useSocketQuery<Custody>("logistics:custody", { hubId: id });
   const riders = useSocketQuery<HubRider[]>("warehouse:riders", { hubId: id });
-  const staff = useServerList<StaffRow>("roles:staff", { enabled: role === "admin" });
+  const people = useServerList<StaffRow>("hubs:people", { body: { hubId: id } });
+  const reloadPeople = people.reload;
   const [editingPerson, setEditingPerson] = useState<StaffRow | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [toggleOpen, setToggleOpen] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The hub, or its riders / staff, changed: ask again.
+  useEffect(() => {
+    const sock = socketClient.current;
+    const h = () => {
+      void reloadHubs();
+      void reloadPeople();
+    };
+    sock?.on("hub:updated", h);
+    // Coverage changed (here or elsewhere): the covered-areas figures must follow.
+    sock?.on("coverage:updated", h);
+    return () => {
+      sock?.off("hub:updated", h);
+      sock?.off("coverage:updated", h);
+    };
+  }, [reloadHubs, reloadPeople]);
+
   const hub = hubs.items.find((h) => h.id === id) ?? null;
+  const footprint = useFootprint();
+  const coverage = useHubCoverage(id, !mayManage);
   const w = wh.data;
-  const today = w?.throughput[w.throughput.length - 1];
-  const batches30 = w?.byHub.find((h) => h.hubId === id)?.batches30 ?? 0;
-  const zones = useMemo(() => parseZones(settings.data?.deliveryZones), [settings.data]);
-  const hubZones = zones.filter((z) => z.hubId === id);
-  const zoneName = new Map(zones.map((z) => [z.id, fr ? z.nameFr || z.name : z.name]));
-  const hubRiders = (riders.data ?? []).filter((r) => r.hubId === id);
-  const hubStaff = staff.items.filter((u) => u.role === "warehouse_staff" && u.hubId === id);
-  const hubTransfers = useMemo(
-    () => (transfers.data ?? []).filter((t) => hub && [t.fromHub, t.toHub].some((n) => n.trim().toLowerCase() === hub.name.trim().toLowerCase())),
-    [transfers.data, hub],
+  const mine = w?.byHub.find((h) => h.hubId === id);
+  const hubStaff = people.items.filter((u) => u.role === "warehouse_staff");
+  const kindRows = useMemo(
+    () => Object.entries(w?.byKind ?? {}).filter(([, n]) => n > 0) as [LegKind, number][],
+    [w],
   );
 
   async function toggleActive() {
@@ -105,8 +96,8 @@ export default function AdminWarehouseDetailPage() {
     setBusy(true);
     setToggleError(null);
     try {
-      const saved = await socketClient.request<HubRow>("warehouse:setHubActive", { id: hub.id, active: !hub.active });
-      hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? saved : h)));
+      const saved = await socketClient.request<HubRow>("hubs:setActive", { id: hub.id, active: !hub.active });
+      hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? { ...h, ...saved } : h)));
       toast(saved.active ? (fr ? "Hub activé" : "Hub activated") : fr ? "Hub désactivé" : "Hub deactivated", "success");
       setToggleOpen(false);
     } catch (e) {
@@ -128,6 +119,7 @@ export default function AdminWarehouseDetailPage() {
       </div>
     );
   }
+  const placed = hub.lat != null && hub.lng != null;
 
   return (
     <div className="space-y-6">
@@ -161,16 +153,64 @@ export default function AdminWarehouseDetailPage() {
         <DetailGridSection title={fr ? "Détails du hub" : "Hub details"}>
           <InfoGrid
             items={[
-              { label: fr ? "Ville" : "City", value: hub.city },
-              { label: fr ? "Pays" : "Country", value: countryName(hub.country, fr) || "—" },
+              { label: fr ? "Emplacement" : "Location", value: hub.area ? chainText(chainFromTree(hub.area, footprint.root).length ? chainFromTree(hub.area, footprint.root) : [hub.area], fr, { skipLevels: ["district"] }) || areaName(hub.area, fr) : hub.city },
+              { label: fr ? "Zones couvertes" : "Areas covered", value: hub.coverage ? hub.coverage.length : "—" },
               { label: fr ? "Adresse" : "Address", value: hub.address ?? "—", full: true },
               { label: fr ? "Capacité (colis)" : "Capacity (parcels)", value: hub.capacity.toLocaleString() },
-              { label: fr ? "Statut" : "Status", value: hub.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive" },
+              { label: fr ? "Livreurs actifs" : "Active riders", value: hub.activeRiders ?? 0 },
+              { label: fr ? "Personnel" : "Staff", value: hub.staffCount ?? 0 },
             ]}
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Activité de ce hub" : "This hub's activity"}>
+        <DetailGridSection title={fr ? "Position sur la carte" : "Position on the map"}>
+          {placed ? (
+            <div className="space-y-2 text-sm">
+              <p className="font-mono text-slate-700">{hub.lat!.toFixed(5)}, {hub.lng!.toFixed(5)}</p>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${hub.lat},${hub.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-[var(--primary)] hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />{fr ? "Ouvrir dans Google Maps" : "Open in Google Maps"}
+              </a>
+              <p className="text-xs text-slate-500">
+                {fr ? "La position sert à la carte de couverture et au calcul de la distance et des frais de livraison ; ce sont les zones couvertes qui choisissent l'entrepôt." : "The position drives the coverage map and the distance and delivery fee; the covered areas are what choose the warehouse."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Badge variant="warning">{fr ? "Hors carte : absent de la carte de couverture" : "Not on the map: missing from the coverage map"}</Badge>
+              {mayManage && <p className="text-xs text-slate-500">{fr ? "Modifiez le hub pour le placer sur la carte." : "Edit the hub to place it on the map."}</p>}
+            </div>
+          )}
+        </DetailGridSection>
+
+        <DetailGridSection title={fr ? "Zones couvertes" : "Coverage"} span={3}>
+          {mayManage ? (
+            <CoverageEditor hub={hub} fr={fr} mayManage={mayManage} />
+          ) : coverage.error ? (
+            <SectionError message={coverage.error} onRetry={coverage.reload} />
+          ) : (
+            <CoverageList areas={coverage.areas ?? hub.coverage ?? []} fr={fr} />
+          )}
+        </DetailGridSection>
+
+        <DetailGridSection title={fr ? "Carte de la couverture" : "Coverage map"} span={3}>
+          <CoverageMap fr={fr} hubs={hubs.items} highlightHubId={hub.id} height={360} />
+        </DetailGridSection>
+
+        {mayManage && (
+          <DetailGridSection title={fr ? "Trous de couverture" : "Coverage gaps"} span={3}>
+            <p className="mb-3 text-xs text-slate-500">
+              {fr ? "Zones d'une ville desservie qu'aucun entrepôt ne couvre. Vous pouvez les assigner à cet entrepôt." : "Areas inside a served city that no warehouse covers. You can assign them to this warehouse."}
+            </p>
+            <GapsPanel fr={fr} hubs={hubs.items} mayManage={mayManage} fixedHub={hub} />
+          </DetailGridSection>
+        )}
+
+        <DetailGridSection title={fr ? "Activité (30 jours)" : "Activity (30 days)"}>
           {wh.error ? (
             <SectionError message={wh.error} onRetry={wh.reload} />
           ) : !w ? (
@@ -178,72 +218,70 @@ export default function AdminWarehouseDetailPage() {
           ) : (
             <InfoGrid
               items={[
-                { label: fr ? "Lots d'expédition (30 j)" : "Dispatch batches (30 d)", value: batches30 },
-                { label: fr ? "Transferts de stock" : "Stock transfers", value: transfers.data ? hubTransfers.length : "…" },
+                { label: fr ? "Trajets gérés" : "Legs managed", value: mine?.parcels ?? 0 },
+                { label: fr ? "Livrés" : "Delivered", value: mine?.delivered ?? 0 },
+                { label: fr ? "Échecs" : "Failed", value: mine?.failed ?? 0 },
+                { label: fr ? "Non assignés" : "Unassigned", value: w.unassigned },
+                { label: fr ? "En transit" : "In transit", value: w.inTransit },
+                { label: fr ? "Ouverts > 24 h" : "Open > 24 h", value: w.agedOver24h },
               ]}
             />
           )}
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Zones desservies" : "Zones it delivers"}>
-          {settings.error ? (
-            <SectionError message={settings.error} onRetry={settings.reload} />
-          ) : !settings.data ? (
+        <DetailGridSection title={fr ? "Colis en garde" : "Parcels in custody"} span={2}>
+          {custody.error ? (
+            <SectionError message={custody.error} onRetry={custody.reload} />
+          ) : !custody.data ? (
             <SectionLoading />
-          ) : hubZones.length === 0 ? (
-            <EmptyState>
-              {fr ? "Aucune zone. Rattachez des zones à cet entrepôt sur la page " : "No zones yet. Tie zones to this warehouse on the "}
-              <Link href="/admin/zones" className="font-semibold text-[var(--primary)] hover:underline">{fr ? "Zones" : "Zones page"}</Link>.
-            </EmptyState>
           ) : (
-            <ul className="space-y-1 text-sm">
-              {hubZones.map((z) => (
-                <li key={z.id} className="flex justify-between gap-3">
-                  <span className="font-medium text-slate-800">{fr ? z.nameFr || z.name : z.name}</span>
-                  <span className="text-slate-500">{z.city} · ${z.feeUsd}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-3">
+              <InfoGrid
+                columns={3}
+                items={[
+                  { label: fr ? "À recevoir" : "Inbound", value: custody.data.inbound.length },
+                  { label: fr ? "En stock à l'entrepôt" : "On hand", value: custody.data.onHand.length },
+                  { label: fr ? "À sortir" : "Outbound", value: custody.data.outbound.length },
+                ]}
+              />
+              {kindRows.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {kindRows.map(([k, n]) => (
+                    <Badge key={k} variant="info">{pickL(LEG_KIND_SHORT[k], fr, k)}: {n}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Livreurs de cet entrepôt" : "Riders at this warehouse"} span={2}>
+        <DetailGridSection title={fr ? "Livreurs de cet entrepôt" : "Riders at this warehouse"} span={3}>
           <p className="mb-3 text-xs text-slate-500">
-            {fr
-              ? "Ils voient et reçoivent les livraisons des zones de cet entrepôt, leurs zones préférées en premier."
-              : "They see and are told about deliveries in this warehouse's zones, their preferred zones first."}
+            {fr ? "Le personnel de l'entrepôt leur assigne chaque trajet ; ils ne peuvent pas en accepter eux-mêmes." : "Warehouse staff assign every leg to them; riders cannot accept tasks themselves."}
           </p>
           {riders.error ? (
             <SectionError message={riders.error} onRetry={riders.reload} />
           ) : !riders.data ? (
             <SectionLoading />
-          ) : hubRiders.length === 0 ? (
-            <EmptyState>{fr ? "Aucun livreur rattaché. Choisissez l'entrepôt des livreurs sur la page Personnel." : "No riders yet. Set riders' warehouse on the Staff page."}</EmptyState>
+          ) : riders.data.length === 0 ? (
+            <EmptyState>{fr ? "Aucun livreur rattaché. Un hub sans livreur n'est jamais choisi pour une commande." : "No riders yet. A hub without riders is never chosen for an order."}</EmptyState>
           ) : (
             <DataTable
               columns={[
                 { key: "name", label: fr ? "Nom" : "Name" },
                 { key: "phone", label: fr ? "Téléphone" : "Phone", render: (row) => (row.phone ? String(row.phone) : "—") },
-                {
-                  key: "preferredZones",
-                  label: fr ? "Zones préférées" : "Preferred zones",
-                  render: (row) => {
-                    const z = (row.preferredZones as string[]) ?? [];
-                    return z.length ? z.map((x) => zoneName.get(x) ?? x).join(", ") : "—";
-                  },
-                },
-                { key: "activeTasks", label: fr ? "En cours" : "Active jobs" },
+                { key: "activeTasks", label: fr ? "Tâches en cours" : "Active tasks" },
               ]}
-              data={hubRiders as unknown as Record<string, unknown>[]}
+              data={riders.data as unknown as Record<string, unknown>[]}
             />
           )}
         </DetailGridSection>
 
-        {role === "admin" && (
+        {(role === "admin" || role === "admin_operations") && (
           <DetailGridSection title={fr ? "Employés de cet entrepôt" : "Staff at this warehouse"} span={3}>
-            {staff.error ? (
-              <SectionError message={staff.error} onRetry={staff.reload} />
-            ) : staff.loading ? (
+            {people.error ? (
+              <SectionError message={people.error} onRetry={people.reload} />
+            ) : people.loading ? (
               <SectionLoading />
             ) : hubStaff.length === 0 ? (
               <EmptyState>{fr ? "Aucun employé rattaché." : "No staff tied to this warehouse yet."}</EmptyState>
@@ -253,13 +291,22 @@ export default function AdminWarehouseDetailPage() {
                   { key: "name", label: fr ? "Nom" : "Name" },
                   { key: "email", label: "Email" },
                   {
+                    key: "warehouseTier",
+                    label: fr ? "Niveau" : "Tier",
+                    render: (row) => {
+                      const t = row.warehouseTier as keyof typeof TIER_LABEL | null;
+                      return t ? <Badge variant={t === "manager" ? "purple" : t === "supervisor" ? "info" : "default"}>{pickL(TIER_LABEL[t], fr)}</Badge> : "—";
+                    },
+                  },
+                  {
                     key: "actions",
                     label: "",
-                    render: (row) => (
-                      <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditingPerson(row as unknown as StaffRow)}>
-                        {fr ? "Changer d'entrepôt" : "Change warehouse"}
-                      </button>
-                    ),
+                    render: (row) =>
+                      role === "admin" ? (
+                        <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditingPerson(row as unknown as StaffRow)}>
+                          {fr ? "Entrepôt et niveau" : "Warehouse and tier"}
+                        </button>
+                      ) : null,
                   },
                 ]}
                 data={hubStaff as unknown as Record<string, unknown>[]}
@@ -267,51 +314,6 @@ export default function AdminWarehouseDetailPage() {
             )}
           </DetailGridSection>
         )}
-
-        <DetailGridSection title={fr ? "Réseau de colis, aujourd'hui (tous hubs)" : "Parcel network today (all hubs)"} span={2}>
-          <p className="mb-3 text-xs text-slate-500">
-            {fr ? "Ces chiffres couvrent tout le réseau, tous entrepôts confondus." : "These figures cover the whole network, every warehouse together."}
-          </p>
-          {wh.error ? (
-            <SectionError message={wh.error} onRetry={wh.reload} />
-          ) : !w ? (
-            <SectionLoading />
-          ) : (
-            <InfoGrid
-              columns={4}
-              items={[
-                { label: fr ? "Reçus aujourd'hui" : "Received today", value: today?.received ?? 0 },
-                { label: fr ? "Enlevés aujourd'hui" : "Picked up today", value: today?.pickedUp ?? 0 },
-                { label: fr ? "Livrés aujourd'hui" : "Delivered today", value: today?.delivered ?? 0 },
-                { label: fr ? "Non assignés" : "Unassigned", value: w.unassigned },
-                { label: fr ? "En transit" : "In transit", value: w.inTransit },
-                { label: fr ? "Ouverts > 24 h" : "Open > 24 h", value: w.agedOver24h },
-              ]}
-            />
-          )}
-        </DetailGridSection>
-
-        <DetailGridSection title={fr ? "Transferts de stock de ce hub" : "Stock transfers of this hub"} span={3}>
-          {transfers.error ? (
-            <SectionError message={transfers.error} onRetry={transfers.reload} />
-          ) : transfers.loading ? (
-            <SectionLoading />
-          ) : hubTransfers.length === 0 ? (
-            <EmptyState>{fr ? "Aucun transfert pour ce hub." : "No stock transfers for this hub."}</EmptyState>
-          ) : (
-            <DataTable
-              columns={[
-                { key: "reference", label: fr ? "Référence" : "Reference" },
-                { key: "route", label: fr ? "Trajet" : "Route", render: (row) => `${row.fromHub} → ${row.toHub}` },
-                { key: "sku", label: "SKU", render: (row) => `${row.sku}${row.productName ? ` · ${row.productName}` : ""}` },
-                { key: "qty", label: fr ? "Qté" : "Qty" },
-                { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge variant={row.status === "received" ? "success" : "info"}>{fr ? TRANSFER_STATUS_FR[String(row.status)] ?? String(row.status) : String(row.status).replace(/_/g, " ")}</Badge> },
-                { key: "createdAt", label: "Date", render: (row) => localDay(String(row.createdAt)) },
-              ]}
-              data={hubTransfers as unknown as Record<string, unknown>[]}
-            />
-          )}
-        </DetailGridSection>
 
         <DetailGridSection title={fr ? "Opérations logistiques (vue admin)" : "Fulfillment Operations (Admin View)"} span={3}>
           <p className="mb-4 text-sm text-slate-600">{fr ? "Accédez à toutes les données du portail entrepôt depuis l'admin." : "Access all warehouse portal data from admin."}</p>
@@ -332,13 +334,13 @@ export default function AdminWarehouseDetailPage() {
         </DetailGridSection>
       </DetailGrid>
 
-      <HomeWarehouseDialog user={editingPerson} hubs={hubs.items} fr={fr} onClose={() => setEditingPerson(null)} onSaved={() => void staff.reload()} />
+      <HomeWarehouseDialog user={editingPerson} hubs={hubs.items} fr={fr} onClose={() => setEditingPerson(null)} onSaved={() => void people.reload()} />
 
       <HubFormModal
         open={editOpen}
         hub={hub}
         onClose={() => setEditOpen(false)}
-        onSaved={(saved) => hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? saved : h)))}
+        onSaved={(saved) => hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? { ...h, ...saved } : h)))}
       />
 
       <Modal
@@ -356,8 +358,8 @@ export default function AdminWarehouseDetailPage() {
       >
         <p className="text-slate-500">
           {hub.active
-            ? fr ? "Un hub désactivé ne peut plus recevoir de transferts de stock. Le dernier hub actif ne peut pas être désactivé." : "A deactivated hub cannot take new stock transfers. The last active hub cannot be deactivated."
-            : fr ? "Le hub pourra de nouveau recevoir des transferts de stock." : "The hub will be able to take stock transfers again."}
+            ? fr ? "Un hub désactivé ne dessert plus ses zones tant qu'un autre entrepôt actif ne couvre pas une zone parente. Le dernier hub actif ne peut pas être désactivé." : "A deactivated hub no longer serves its areas unless another active warehouse covers a parent area. The last active hub cannot be deactivated."
+            : fr ? "Le hub dessert de nouveau les zones qu'il couvre." : "The hub serves the areas it covers again."}
         </p>
         <ErrorNote message={toggleError} />
       </Modal>

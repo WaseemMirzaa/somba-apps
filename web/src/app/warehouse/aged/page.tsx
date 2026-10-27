@@ -4,20 +4,23 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseListPage } from "@/components/warehouse/list-page";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
-import { useRealtime } from "@/context/realtime-context";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { STAGE_LABEL, STAGE_OPTIONS, buildParcels, stageVariant, useWarehouseData, type LiveTask, type ParcelStage } from "@/lib/warehouse";
-import { shortDate, useOpsQuery } from "@/lib/warehouse-live";
+import { LEG_KIND, LEG_STATUS, endpointName, legStatusVariant, pickL } from "@/lib/logistics";
+import { isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue } from "@/lib/warehouse";
+import { shortDate } from "@/lib/warehouse-live";
 
 const MIN_AGE = [
-  { value: "0", en: "All open parcels", fr: "Tous les colis ouverts" },
+  { value: "0", en: "All open legs", fr: "Tous les trajets ouverts" },
   { value: "24", en: "Older than 24 h", fr: "Plus de 24 h" },
   { value: "48", en: "Older than 48 h", fr: "Plus de 48 h" },
   { value: "72", en: "Older than 72 h", fr: "Plus de 72 h" },
 ];
+
+const STATUS_OPTIONS = (["unassigned", "assigned", "picked_up", "in_transit"] as const).map((v) => ({ value: v, label: LEG_STATUS[v].en, labelFr: LEG_STATUS[v].fr }));
 
 function ageLabel(hours: number, fr: boolean) {
   if (hours < 48) return `${Math.round(hours)} h`;
@@ -28,48 +31,50 @@ function ageLabel(hours: number, fr: boolean) {
 export default function WarehouseAgedPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const rt = useRealtime();
   const ops = useOpsPath();
   const base = useOpsBase();
-  const { riders } = useWarehouseData();
-  const agedQ = useOpsQuery<LiveTask[]>("warehouse:aged", { initial: [] as LiveTask[], push: ["delivery:updated"] });
+  const q = useDeskQueue({ status: "open" });
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [minAge, setMinAge] = useState("24");
 
-  const parcels = useMemo(
-    () => buildParcels(agedQ.data, rt.orders, rt.products, riders),
-    [agedQ.data, rt.orders, rt.products, riders],
+  const rows = useMemo(
+    () =>
+      q.tasks
+        .filter(isOpenLeg)
+        .map((t) => ({
+          ...t,
+          code: parcelCode(t),
+          ageHours: legAgeHours(t),
+          route: `${endpointName(t.from, fr)} → ${endpointName(t.to, fr)}`,
+          riderText: riderLabel(t, fr),
+        }))
+        .sort((a, b) => b.ageHours - a.ageHours),
+    [q.tasks, fr],
   );
   const filtered = useMemo(() => {
     const min = Number(minAge);
-    return applyListFilters(
-      parcels.filter((p) => p.ageHours >= min),
-      filters,
-      { searchFields: ["id", "orderId", "customer", "seller", "zone"], statusField: "status" },
-    );
-  }, [parcels, filters, minAge]);
+    return applyListFilters(rows.filter((p) => p.ageHours >= min), filters, {
+      searchFields: ["code", "orderReference", "route", "sellerName", "riderText"],
+      statusField: "status",
+    });
+  }, [rows, filters, minAge]);
 
   return (
     <WarehouseListPage
-      error={agedQ.error}
-      onRetry={() => void agedQ.reload()}
+      error={q.error}
+      onRetry={() => void q.reload()}
       title={fr ? "Colis bloqués / anciens" : "Aged / Stuck Parcels"}
       subtitle={
         fr
-          ? `${filtered.length} colis ouverts non livrés, les plus anciens d'abord`
-          : `${filtered.length} open, undelivered parcels, oldest first`
+          ? `${filtered.length} trajets ouverts, les plus anciens d'abord`
+          : `${filtered.length} open legs, oldest first`
       }
       breadcrumbs={[
-        { label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
+        { label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" },
         { label: fr ? "Colis bloqués" : "Aged Parcels" },
       ]}
       actions={
-        <select
-          aria-label={fr ? "Âge minimum" : "Minimum age"}
-          className="input-premium px-3 py-2 text-sm"
-          value={minAge}
-          onChange={(e) => setMinAge(e.target.value)}
-        >
+        <select aria-label={fr ? "Âge minimum" : "Minimum age"} className="input-premium px-3 py-2 text-sm" value={minAge} onChange={(e) => setMinAge(e.target.value)}>
           {MIN_AGE.map((o) => (
             <option key={o.value} value={o.value}>{fr ? o.fr : o.en}</option>
           ))}
@@ -77,33 +82,33 @@ export default function WarehouseAgedPage() {
       }
       filters={
         <div className="space-y-3">
-          {agedQ.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{agedQ.error}</p>}
+          <HubScopeBar />
           <ListFilters
             values={filters}
             onChange={setFilters}
-            statusOptions={STAGE_OPTIONS.filter((o) => o.value !== "delivered" && o.value !== "exception")}
-            searchPlaceholder={fr ? "ID colis, commande, client, vendeur…" : "Parcel ID, order, customer, seller…"}
+            statusOptions={STATUS_OPTIONS}
+            searchPlaceholder={fr ? "Colis, commande, vendeur, livreur…" : "Parcel, order, seller, rider…"}
             showDateFilters={false}
           />
         </div>
       }
       columns={[
-        { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
-          <Link href={ops(`/aged/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+        { key: "code", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
+          <Link href={ops(`/tasks/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.code)}</Link>
         )},
-        { key: "orderId", label: fr ? "N° commande" : "Order ID" },
-        { key: "customer", label: t("customer") },
-        { key: "seller", label: fr ? "Vendeur" : "Seller" },
-        { key: "status", label: t("status"), render: (row) => {
-          const s = String(row.status) as ParcelStage;
-          return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
-        }},
+        { key: "orderReference", label: fr ? "N° commande" : "Order ID" },
+        { key: "kind", label: fr ? "Type" : "Type", render: (row) => pickL(LEG_KIND[row.kind as keyof typeof LEG_KIND], fr) },
+        { key: "route", label: fr ? "Trajet" : "Route" },
+        { key: "riderText", label: fr ? "Livreur" : "Rider" },
+        { key: "status", label: t("status"), render: (row) => (
+          <Badge variant={legStatusVariant(String(row.status))}>{pickL(LEG_STATUS[row.status as keyof typeof LEG_STATUS], fr)}</Badge>
+        )},
         { key: "createdAt", label: fr ? "Créé le" : "Created", render: (row) => shortDate(String(row.createdAt), locale) },
         { key: "ageHours", label: fr ? "Âge" : "Age", render: (row) => (
           <Badge variant={Number(row.ageHours) >= 48 ? "danger" : "warning"}>{ageLabel(Number(row.ageHours), fr)}</Badge>
         )},
         { key: "actions", label: t("action"), render: (row) => (
-          <Link href={ops(`/aged/${row.id}`)} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
+          <Link href={ops(`/tasks/${row.id}`)} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
       ]}
       data={filtered as unknown as Record<string, unknown>[]}

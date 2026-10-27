@@ -21,7 +21,7 @@ export default function RiderFailedDeliveryPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <PageHeader title={fr ? "Livraison échouée" : "Could not deliver"} subtitle={task.orderId} backHref={`/rider/tasks/${id}`} />
+      <PageHeader title={fr ? "Impossible de terminer" : "Could not complete"} subtitle={task.orderId} backHref={`/rider/tasks/${id}`} />
       <div className="card-premium space-y-4 p-6">
         {canFail ? (
           <FailedForm
@@ -33,9 +33,7 @@ export default function RiderFailedDeliveryPage() {
           />
         ) : (
           <p className="text-sm text-slate-600">
-            {task.status === "available"
-              ? (fr ? "Acceptez d'abord cette livraison." : "Accept this delivery first.")
-              : (fr ? "Cette livraison est déjà terminée." : "This delivery is already finished.")}{" "}
+            {fr ? "Cette tâche est déjà terminée." : "This task is already finished."}{" "}
             <Link href={`/rider/tasks/${id}`} className="text-emerald-700 underline">
               {fr ? "Retour à la tâche" : "Back to the task"}
             </Link>

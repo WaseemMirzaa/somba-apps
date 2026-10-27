@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CartLine } from '../database/entities/cart-line.entity';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { assertNoNewVacationLines } from '../sellers/storefront';
 
 export interface CartLineInput {
   productId: string;
@@ -60,6 +61,9 @@ export class CartService {
   async set(userId: string, body: { lines?: unknown; saved?: unknown }): Promise<CartView> {
     const lines = cleanLines(body?.lines, 'Cart');
     const saved = cleanLines(body?.saved, 'Saved for later');
+    // Nothing from a store on vacation can be ADDED (what the cart already held stays, so syncing an old cart never fails).
+    const held = await this.repo.find({ where: { userId }, select: { productId: true } });
+    await assertNoNewVacationLines(this.ds, new Set(held.map((r) => r.productId)), lines.map((l) => l.productId));
     await this.ds.transaction(async (m) => {
       await m.delete(CartLine, { userId });
       const rows = [

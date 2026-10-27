@@ -257,7 +257,7 @@ export function HorizontalBarChart({
         return (
           <div key={String(item[labelKey])}>
             <div className="mb-1 flex justify-between text-xs">
-              <span className="font-medium text-slate-700 truncate pr-2">{String(item[labelKey])}</span>
+              <span className="font-medium text-slate-700 truncate pr-2" title={String(item[labelKey])}>{String(item[labelKey])}</span>
               <span className="shrink-0 font-bold text-slate-900">
                 {formatValue ? formatValue(val) : val.toLocaleString()}
               </span>

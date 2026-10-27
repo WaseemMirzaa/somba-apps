@@ -4,7 +4,7 @@ const NONE = {} as never;
 
 describe('roles:defs', () => {
   it('serves every role with an English and a French scope', () => {
-    const defs = new RolesService(NONE, NONE, NONE, NONE, NONE).defs();
+    const defs = new RolesService(NONE, NONE, NONE, NONE).defs();
     expect(defs).toBe(ROLE_DEFS);
     expect(defs.map((d) => d.key)).toEqual([
       'admin',

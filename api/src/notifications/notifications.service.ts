@@ -1,13 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
-import { Notification, User } from '../database/entities';
+import { In, Like, Repository } from 'typeorm';
+import { Notification, NotificationRead, User } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { UsersService } from '../users/users.service';
 import { linkFor } from './links';
 import { frenchNotice } from './localize';
 import { PushService } from './push.service';
 import { TranslationService } from '../translation/translation.service';
+import { TeamDirectory } from '../sellers/team-directory';
+import { noticeCategory } from '../users/notify-prefs';
 
 export interface NoticeInput {
   title: string;
@@ -35,6 +37,9 @@ function frData(fr: { title: string; body: string } | null): Record<string, stri
 /** Role notices that also go to phones (everything else reaches staff on the web only). */
 const MOBILE_ROLE_TYPES = new Set(['marketing', 'task']);
 
+/** The `role` of a saved notice for all admin roles at once (see `toAdmins`). */
+export const ALL_ADMINS = 'admins';
+
 export const ADMIN_ROLES = [
   'admin',
   'admin_operations',
@@ -54,6 +59,10 @@ export class NotificationsService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly translations?: TranslationService,
+    // Staff of a store hear the notices addressed to its owner that their role handles (seller team accounts).
+    @Optional() private readonly team?: TeamDirectory,
+    // Who has read a role-wide notice (those rows have no owner to hold a `read` flag).
+    @Optional() @InjectRepository(NotificationRead) private readonly reads?: Repository<NotificationRead>,
   ) {}
 
   /** An authored French version is data like any other translation: rows keyed by the notification id. */
@@ -67,6 +76,13 @@ export class NotificationsService {
 
   /** Persist + push a notification to a single user. */
   async toUser(userId: string, data: NoticeInput): Promise<Notification> {
+    const n = await this.deliver(userId, data);
+    await this.toStoreStaff(userId, data);
+    return n;
+  }
+
+  /** Save, emit and push one user's copy (no staff fan-out: a staff copy is never repeated). */
+  private async deliver(userId: string, data: NoticeInput): Promise<Notification> {
     const n = await this.repo.save(
       this.repo.create({
         userId,
@@ -85,6 +101,16 @@ export class NotificationsService {
     // best-effort and must never slow down or fail the triggering action.
     void this.pushToUser(userId, n, link, user, data.extra, data.fr);
     return n;
+  }
+
+  /** A notice addressed to a store owner also goes to the staff whose role handles it (their own saved copy and push). */
+  private async toStoreStaff(ownerUserId: string, data: NoticeInput): Promise<void> {
+    if (!this.team) return;
+    try {
+      for (const id of await this.team.recipientsForNotice(ownerUserId, data.type ?? 'system')) await this.deliver(id, data);
+    } catch {
+      /* best-effort: the owner's own notice is already saved */
+    }
   }
 
   /** The stored row plus the page it opens and its French text, as sockets and the list deliver it. */
@@ -108,7 +134,13 @@ export class NotificationsService {
     authored?: Authored,
   ): Promise<void> {
     try {
-      if (user && UsersService.parsePrefs(user.prefs).push === false) return;
+      if (user) {
+        const prefs = UsersService.parsePrefs(user.prefs);
+        if (prefs.push === false) return;
+        // Switched off in Settings -> Notifications: still in the bell, no push.
+        const kind = noticeCategory(n.type);
+        if (kind && prefs.notify[kind] === false) return;
+      }
       const fr = NotificationsService.french(n, authored);
       const text = (user?.locale === 'fr' && fr) || n;
       await this.push.sendToUser(userId, {
@@ -136,6 +168,11 @@ export class NotificationsService {
     await this.keepAuthored(n, data.fr);
     this.emitter.toRole(role, 'notification:new', NotificationsService.view(n, linkFor(role, n.type, n.entityId), data.fr));
     void this.pushToRole(role, n, data.extra, data.fr);
+    // The super admin hears what every admin role hears.
+    if (role.startsWith('admin_')) {
+      this.emitter.toRole('admin', 'notification:new', NotificationsService.view(n, linkFor('admin', n.type, n.entityId), data.fr));
+      void this.pushToRole('admin', n, data.extra, data.fr);
+    }
     return n;
   }
 
@@ -148,6 +185,12 @@ export class NotificationsService {
     try {
       const optedOut = await this.users.find({ where: { role: role as User['role'], prefs: Like('%"push":false%') }, select: ['id'] });
       const skipUserIds = new Set(optedOut.map((u) => u.id));
+      // A kind switched off in Settings -> Notifications is not pushed to staff either (the bell still has it).
+      const kind = noticeCategory(n.type);
+      if (kind) {
+        const off = await this.users.find({ where: { role: role as User['role'], prefs: Like(`%"${kind}":false%`) }, select: ['id'] });
+        for (const u of off) skipUserIds.add(u.id);
+      }
       const fr = NotificationsService.french(n, authored);
       const payload = {
         title: n.title,
@@ -180,36 +223,85 @@ export class NotificationsService {
     return { pushEnabled: this.push.enabled, devices: await this.push.countForUser(user.id) };
   }
 
-  /** Broadcast to every admin sub-role at once. */
+  /**
+   * Broadcast to every admin role at once. ONE saved row (role `admins`) that all of them see, each reading it on their
+   * own, so the super admin does not get the same notice six times.
+   */
   async toAdmins(data: NoticeInput): Promise<void> {
-    for (const role of ADMIN_ROLES) await this.toRole(role, data);
+    const n = await this.repo.save(
+      this.repo.create({ role: ALL_ADMINS, title: data.title, body: data.body, type: data.type ?? 'system', entityId: data.entityId ?? null }),
+    );
+    await this.keepAuthored(n, data.fr);
+    this.emitter.toRoles(ADMIN_ROLES, 'notification:new', NotificationsService.view(n, linkFor('admin', n.type, n.entityId), data.fr));
+    for (const role of ADMIN_ROLES) void this.pushToRole(role, n, data.extra, data.fr);
+  }
+
+  /** Which saved role rows a viewer of `role` may see: their own role's, every admin role's for the super admin. */
+  private static roleRows(role: string): Record<string, unknown>[] {
+    if (role === 'admin') return [{ role: Like('admin%') }];
+    if (role.startsWith('admin_')) return [{ role }, { role: ALL_ADMINS }];
+    return [{ role }];
+  }
+
+  /** Is a row addressed to `rowRole` one that a viewer of `viewerRole` may see (and so mark read)? */
+  static canSeeRoleRow(viewerRole: string, rowRole: string | null): boolean {
+    if (!rowRole) return false;
+    if (viewerRole === 'admin') return rowRole.startsWith('admin');
+    if (viewerRole.startsWith('admin_')) return rowRole === viewerRole || rowRole === ALL_ADMINS;
+    return rowRole === viewerRole;
   }
 
   /** The user's own notices and their role's broadcasts, newest first, each with the page it opens and its French text. */
   async listForUser(userId: string, role: string): Promise<NoticeView[]> {
     const rows = await this.repo.find({
-      where: [{ userId }, { role }],
+      where: [{ userId }, ...NotificationsService.roleRows(role)] as never,
       order: { createdAt: 'DESC' },
       take: 100,
     });
+    // A role-wide row has no owner to carry `read`: this viewer's own read marks decide.
+    const roleIds = rows.filter((n) => !n.userId).map((n) => n.id);
+    const seen = new Set(
+      this.reads && roleIds.length ? (await this.reads.find({ where: { userId, notificationId: In(roleIds) } })).map((r) => r.notificationId) : [],
+    );
     // One batched lookup for the authored French of the whole page.
     const authored = this.translations ? await this.translations.rowsFor('notification', rows.map((n) => n.id)) : new Map();
     return rows.map((n) => {
       const mine = (authored.get(n.id) ?? []) as { field: string; locale: string; value: string }[];
       const title = mine.find((r) => r.field === 'title' && r.locale === 'fr')?.value;
       const body = mine.find((r) => r.field === 'body' && r.locale === 'fr')?.value;
-      return NotificationsService.view(n, linkFor(role, n.type, n.entityId), title && body ? { title, body } : null);
+      const view = NotificationsService.view(n, linkFor(role, n.type, n.entityId), title && body ? { title, body } : null);
+      return n.userId ? view : { ...view, read: seen.has(n.id) };
     });
   }
 
-  /** Scoped to the owner so one user cannot touch another's notifications. */
-  async markRead(id: string, userId: string): Promise<void> {
-    await this.repo.update({ id, userId }, { read: true });
+  /**
+   * Scoped to the owner so one user cannot touch another's notifications. A role-wide notice (given `role`, the
+   * reader's) is marked read for this reader only.
+   */
+  async markRead(id: string, userId: string, role?: string): Promise<void> {
+    const res = await this.repo.update({ id, userId }, { read: true });
+    if (res.affected || !role || !this.reads) return;
+    const row = await this.repo.findOne({ where: { id } });
+    if (row && !row.userId && NotificationsService.canSeeRoleRow(role, row.role)) {
+      await this.reads.createQueryBuilder().insert().values({ notificationId: id, userId }).orIgnore().execute();
+    }
   }
 
-  /** Mark every one of a user's notifications read in a single call. */
-  async markAllRead(userId: string): Promise<number> {
+  /** Mark every one of a user's notifications read in a single call (and, given `role`, the role-wide ones too). */
+  async markAllRead(userId: string, role?: string): Promise<number> {
     const res = await this.repo.update({ userId, read: false }, { read: true });
-    return res.affected ?? 0;
+    let count = res.affected ?? 0;
+    if (role && this.reads) {
+      const rows = await this.repo.find({ where: NotificationsService.roleRows(role) as never, select: ['id'], order: { createdAt: 'DESC' }, take: 300 });
+      const done = new Set(
+        rows.length ? (await this.reads.find({ where: { userId, notificationId: In(rows.map((r) => r.id)) } })).map((r) => r.notificationId) : [],
+      );
+      const fresh = rows.filter((r) => !done.has(r.id));
+      if (fresh.length) {
+        await this.reads.createQueryBuilder().insert().values(fresh.map((r) => ({ notificationId: r.id, userId }))).orIgnore().execute();
+        count += fresh.length;
+      }
+    }
+    return count;
   }
 }

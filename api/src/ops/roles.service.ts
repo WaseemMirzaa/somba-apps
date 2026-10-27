@@ -4,9 +4,8 @@ import { randomBytes } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Hub, Setting, User } from '../database/entities';
-import { parsePreferredZones } from '../common/zones/hub-scope';
-import { parseZones } from '../common/zones/zone-match';
+import { DeliveryTask, Hub, User } from '../database/entities';
+import { WAREHOUSE_TIERS, WarehouseTier, tierOf } from '../logistics/tiers';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
@@ -38,37 +37,25 @@ export class RolesService {
     private readonly usersSvc: UsersService,
     private readonly emitter: RealtimeEmitter,
     @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
-    @InjectRepository(Setting) private readonly settings: Repository<Setting>,
+    @InjectRepository(DeliveryTask) private readonly tasks?: Repository<DeliveryTask>,
   ) {}
 
   /**
-   * Tie a rider or warehouse staff member to their home warehouse (null = not tied: sees every warehouse), and set a
-   * rider's preferred zones (offered first). The caller then reconnects the user so they join the right rooms.
+   * Tie a rider or warehouse staff member to their home warehouse. Both must belong to one (no "sees every
+   * warehouse" accounts any more). The caller then reconnects the user so they join the right rooms.
    */
-  async setHub(userId: string, hubId: string | null, preferredZones?: unknown) {
+  async setHub(userId: string, hubId: string | null) {
     const target = await this.users.findOne({ where: { id: userId } });
     if (!target || (target.role !== 'rider' && target.role !== 'warehouse_staff')) {
       throw new Error('Only riders and warehouse staff have a home warehouse.');
     }
-    if (hubId) {
-      const hub = await this.hubs.findOne({ where: { id: hubId } });
-      if (!hub) throw new Error('Pick a warehouse from the list.');
-      if (!hub.active) throw new Error('That warehouse is switched off. Switch it on first.');
-    }
-    const patch: Partial<User> = { hubId: hubId || null };
-    if (preferredZones !== undefined) {
-      if (target.role !== 'rider') throw new Error('Only riders have preferred zones.');
-      const wanted = Array.isArray(preferredZones) ? preferredZones.map(String) : [];
-      const row = await this.settings.findOne({ where: { key: 'deliveryZones' } });
-      const zones = parseZones(row?.value);
-      const known = new Set(zones.filter((z) => !hubId || !z.hubId || z.hubId === hubId).map((z) => z.id));
-      const unknown = wanted.filter((id) => !known.has(id));
-      if (unknown.length) throw new Error("A preferred zone is not one of this warehouse's zones.");
-      patch.preferredZones = JSON.stringify([...new Set(wanted)].slice(0, 50));
-    }
-    await this.users.update({ id: userId }, patch);
+    if (!hubId) throw new Error('Riders and warehouse staff must belong to a warehouse. Pick one from the list.');
+    const hub = await this.hubs.findOne({ where: { id: hubId } });
+    if (!hub) throw new Error('Pick a warehouse from the list.');
+    if (!hub.active) throw new Error('That warehouse is switched off. Switch it on first.');
+    await this.users.update({ id: userId }, { hubId });
     const saved = (await this.users.findOne({ where: { id: userId } }))!;
-    const view = { id: saved.id, role: saved.role, hubId: saved.hubId ?? null, preferredZones: parsePreferredZones(saved.preferredZones) };
+    const view = { id: saved.id, role: saved.role, hubId: saved.hubId ?? null, warehouseTier: saved.role === 'warehouse_staff' ? tierOf(saved.warehouseTier) : null };
     this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
     return view;
   }
@@ -93,13 +80,42 @@ export class RolesService {
         role: u.role,
         active: u.active,
         hubId: u.hubId ?? null,
-        preferredZones: parsePreferredZones(u.preferredZones),
+        warehouseTier: u.role === 'warehouse_staff' ? tierOf(u.warehouseTier) : null,
       }));
   }
 
-  async setRole(id: string, role: UserRole): Promise<void> {
+  /**
+   * Switch a rider or a warehouse employee off (or back on). `active` is what the routing counts: a warehouse whose riders
+   * are all inactive has no rider (UC-8: the nearest staffed warehouse stands in), and an inactive rider is offered by no
+   * rider list (`logistics:riders`, `warehouse:riders`, the run driver) and cannot be assigned. Switching off also revokes
+   * the person's sessions (`tokenVersion`), so the caller can drop their open sockets. Their open tasks stay assigned:
+   * the desk gives them to someone else (`openTasks` says how many).
+   */
+  async setStaffActive(id: string, active: boolean): Promise<{ id: string; name: string; email: string; role: UserRole; active: boolean; hubId: string | null; warehouseTier: WarehouseTier | null; openTasks: number }> {
     const target = await this.users.findOne({ where: { id } });
     if (!target) throw new Error('Account not found.');
+    if (target.role !== 'rider' && target.role !== 'warehouse_staff') throw new Error('Only riders and warehouse staff can be switched on or off here.');
+    await this.users.update({ id }, active ? { active } : { active, tokenVersion: (target.tokenVersion ?? 0) + 1 });
+    const view = { id: target.id, role: target.role, active, hubId: target.hubId ?? null, warehouseTier: target.role === 'warehouse_staff' ? tierOf(target.warehouseTier) : null };
+    const openTasks = target.role === 'rider' && this.tasks ? await this.tasks.count({ where: { riderId: id, status: In(['assigned', 'picked_up', 'in_transit']) } }) : 0;
+    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
+    // The directory's rider and staff counts changed with it.
+    const hub = target.hubId ? await this.hubs.findOne({ where: { id: target.hubId } }) : null;
+    if (hub) this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'hub:updated', hub);
+    return { ...view, name: target.name, email: target.email, openTasks };
+  }
+
+  async setRole(id: string, role: UserRole, hubId?: string | null): Promise<void> {
+    const target = await this.users.findOne({ where: { id } });
+    if (!target) throw new Error('Account not found.');
+    // A rider or warehouse staff member always belongs to a warehouse: name it here, or have one already.
+    if (role === 'rider' || role === 'warehouse_staff') {
+      const wanted = hubId ?? target.hubId ?? null;
+      if (!wanted) throw new Error('Riders and warehouse staff must belong to a warehouse. Pick one from the list.');
+      const hub = await this.hubs.findOne({ where: { id: wanted } });
+      if (!hub || !hub.active) throw new Error('Pick an active warehouse from the list.');
+      await this.users.update({ id }, { hubId: wanted, ...(role === 'warehouse_staff' && !target.warehouseTier ? { warehouseTier: 'operator' as WarehouseTier } : {}) });
+    }
     if (target.role === 'admin' && role !== 'admin') {
       const admins = await this.users.count({ where: { role: 'admin', active: true } });
       if (admins <= 1) throw new Error('You cannot remove the last administrator.');
@@ -113,8 +129,21 @@ export class RolesService {
    * A super admin creates a staff / rider account. The generated password is
    * returned ONCE; the person should change it after the first sign-in.
    */
-  async createStaff(data: { email: string; name: string; role: UserRole; phone?: string | null }): Promise<{ id: string; email: string; role: UserRole; tempPassword: string }> {
+  async createStaff(data: { email: string; name: string; role: UserRole; phone?: string | null; hubId?: string | null; warehouseTier?: string | null }): Promise<{ id: string; email: string; role: UserRole; tempPassword: string; hubId: string | null; warehouseTier: WarehouseTier | null }> {
     if (await this.usersSvc.findByEmail(data.email)) throw new Error('An account with this email already exists.');
+    // Riders and warehouse staff must belong to an active warehouse; staff get a tier (operator unless told otherwise).
+    let hubId: string | null = null;
+    let tier: WarehouseTier | null = null;
+    if (data.role === 'rider' || data.role === 'warehouse_staff') {
+      if (!data.hubId) throw new Error('Riders and warehouse staff must belong to a warehouse. Pick one from the list.');
+      const hub = await this.hubs.findOne({ where: { id: data.hubId } });
+      if (!hub || !hub.active) throw new Error('Pick an active warehouse from the list.');
+      hubId = hub.id;
+      if (data.role === 'warehouse_staff') {
+        if (data.warehouseTier && !(WAREHOUSE_TIERS as readonly string[]).includes(data.warehouseTier)) throw new Error(`Tier must be one of: ${WAREHOUSE_TIERS.join(', ')}.`);
+        tier = (data.warehouseTier as WarehouseTier | null | undefined) ?? 'operator';
+      }
+    }
     const tempPassword = randomBytes(9).toString('base64url');
     const user = await this.usersSvc.create({
       email: data.email,
@@ -124,8 +153,10 @@ export class RolesService {
       phone: data.phone ?? null,
     });
     user.emailVerified = true;
+    user.hubId = hubId;
+    user.warehouseTier = tier;
     await this.usersSvc.save(user);
-    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id: user.id, role: user.role });
-    return { id: user.id, email: data.email, role: user.role, tempPassword };
+    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id: user.id, role: user.role, hubId, warehouseTier: tier });
+    return { id: user.id, email: data.email, role: user.role, tempPassword, hubId, warehouseTier: tier };
   }
 }

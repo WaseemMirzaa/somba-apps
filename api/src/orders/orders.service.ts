@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   DeliveryTask,
   Hub,
@@ -21,17 +21,28 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
-import { randomInt } from 'crypto';
+import { recordRefund } from '../payments/refund-ledger';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
+import { CouponsService } from '../content/coupons.service';
 import { SettingsService } from '../content/settings.service';
 import { DeliveryService } from '../delivery/delivery.service';
-import { checkVariant, hasNoOptions, localizeVariantLabel, storedVariantGroups } from '../common/variants/variants';
+import { DEFAULT_VARIANT, checkVariant, hasNoOptions, localizeVariantLabel, storedVariantGroups } from '../common/variants/variants';
+import { randomUUID } from 'crypto';
+import { availableFor } from '../products/variant-stock';
+import { cityOf, sellerTracking } from './seller-tracking';
+import type { HubName, SellerTracking } from './seller-tracking';
 import { TranslationService } from '../translation/translation.service';
+import { assertStoreOpen, storeForListing, totalDeliveryDays } from '../sellers/storefront';
 import { DELIVERY_DAYS, estimatedDeliveryDate } from '../common/delivery/estimate';
 import { linesBySeller, sellerUserId } from './order-sellers';
 import { paymentMethodLabel } from '../common/payment-method';
-import { parseZones, zoneForAddress } from '../common/zones/zone-match';
+import { LogisticsService } from '../logistics/logistics.service';
+import { RoutingService } from '../logistics/routing.service';
+import type { Route } from '../logistics/routing.service';
+import { isOrderFlow } from '../logistics/leg-rules';
+import { ORDER_HUB_SQL, hubsOfOrder, orderHubParams, pushOrderToOps } from '../logistics/hub-scope';
+import { parseAddressPin } from '../common/geo/geo';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -50,7 +61,9 @@ export interface OrderLineInput {
 export interface CreateOrderInput {
   items: OrderLineInput[];
   paymentMethod: PaymentMethod;
+  /** @deprecated Ignored: zones are gone, the warehouse and the fee come from the map pin. */
   zoneId?: string;
+  /** @deprecated Ignored: the server charges exactly the fee `delivery:quote` returns. */
   deliveryFeeUsd?: number;
   shippingAddress?: string; // JSON string; encrypted at rest
   /** Mobile-money subscriber number that will approve the charge. */
@@ -66,7 +79,6 @@ export interface RiderContact {
 }
 const RIDER_VISIBLE: readonly string[] = ['shipped', 'out_for_delivery'];
 
-const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
 const ORDER_STATUSES: readonly string[] = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'];
 
 /** The only forward step an operator may take by hand (cancelling goes through `cancel`). */
@@ -102,6 +114,9 @@ export class OrdersService {
     @InjectRepository(Hub) private readonly hubs?: Repository<Hub>,
     @InjectRepository(User) private readonly users?: Repository<User>,
     private readonly translations?: TranslationService,
+    private readonly logisticsSvc?: LogisticsService,
+    private readonly routingSvc?: RoutingService,
+    private readonly coupons?: CouponsService,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -119,6 +134,14 @@ export class OrdersService {
     this.delivery.registerFailedHandler((task, reason) => this.onDeliveryFailed(task, reason));
   }
 
+  private get logistics(): LogisticsService {
+    return this.logisticsSvc as LogisticsService;
+  }
+
+  private get routing(): RoutingService {
+    return this.routingSvc as RoutingService;
+  }
+
   async create(
     customer: { id: string; name: string },
     input: CreateOrderInput,
@@ -131,7 +154,6 @@ export class OrdersService {
     await this.payments.assertMethodAllowed(input.paymentMethod);
 
     const MAX_QTY = 100;
-    const MAX_DELIVERY_FEE = Number(process.env.MAX_DELIVERY_FEE_USD ?? 50);
     // Only dev/demo may accept prices the client invents. In production every
     // line must resolve to a live listing and is priced from OUR database.
     const allowClientPriced =
@@ -147,11 +169,13 @@ export class OrdersService {
     const items: OrderItem[] = [];
     // The French name / option label each line carries, written next to the order as a snapshot (plan §2.1).
     const frSnapshots: ({ name?: string; variant?: string } | undefined)[] = [];
-    const stockToReserve: { productId: string; qty: number; name: string }[] = [];
+    const stockToReserve: { productId: string; qty: number; name: string; variant: string }[] = [];
     let subtotal = 0;
     // Seller-campaign discount actually applied on the lines (flash + campaign never stack).
     let campaignDiscount = 0;
     const campaignSales = new Map<string, number>();
+    // The discount each campaign gave on this order (counts against its budget).
+    const campaignSpend = new Map<string, number>();
     // Each line's seller-set delivery time; the order's estimate is the slowest one.
     const lineDays: unknown[] = [];
     for (const line of input.items) {
@@ -171,6 +195,9 @@ export class OrdersService {
       if (product?.sellerId && buyerKeys.has(product.sellerId)) {
         throw new BadRequestException('You cannot buy your own listing.');
       }
+      // A store on vacation takes no new orders (its orders in flight carry on); its handling time counts in the estimate.
+      const store = product?.sellerId ? await storeForListing(this.sellers, product.sellerId) : null;
+      assertStoreOpen(store);
 
       let name: string;
       let price: number;
@@ -186,12 +213,14 @@ export class OrdersService {
         sellerName = product.sellerName ?? null;
         // The shopper must have chosen every option the seller defined; stored in its canonical form.
         variant = checkVariant(storedVariantGroups(product.variants), line.variant, product.name);
-        if (product.stock < qty) {
-          throw new BadRequestException(
-            product.stock > 0
-              ? `Only ${product.stock} of "${product.name}" left in stock.`
-              : `"${product.name}" is out of stock.`,
-          );
+        // Units of THIS option: its own count when the seller split stock by option, else the shared pool. Lines of
+        // the same option in one order draw on the same units.
+        const onHand = availableFor(product.stock, product.variantStock, variant === DEFAULT_VARIANT ? null : variant);
+        const already = stockToReserve.filter((r) => r.productId === product.id && r.variant === variant).reduce((t, r) => t + r.qty, 0);
+        if (onHand - already < qty) {
+          const left = Math.max(0, onHand - already);
+          const what = variant === DEFAULT_VARIANT ? `"${product.name}"` : `"${product.name}" (${variant})`;
+          throw new BadRequestException(left > 0 ? `Only ${left} of ${what} left in stock.` : `${what} is out of stock.`);
         }
         name = product.name;
         // A French that is just the English fallback (translation still pending) is not frozen into the order.
@@ -207,9 +236,10 @@ export class OrdersService {
           campaignPct = priced.campaignPct;
           campaignDiscount += (listPrice - price) * qty;
           campaignSales.set(campaignId, (campaignSales.get(campaignId) ?? 0) + price * qty);
+          campaignSpend.set(campaignId, (campaignSpend.get(campaignId) ?? 0) + (listPrice - price) * qty);
         }
-        stockToReserve.push({ productId: product.id, qty, name: product.name });
-        lineDays.push(product.deliveryDays);
+        stockToReserve.push({ productId: product.id, qty, name: product.name, variant });
+        lineDays.push(totalDeliveryDays(product.deliveryDays, store));
       } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
         const p = Number(line.priceUsd);
         if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
@@ -245,17 +275,32 @@ export class OrdersService {
       items.push(item);
     }
 
-    // The zone (and so the fee and the warehouse) follows the delivery address, whatever the app sent.
-    const zoneId = await this.resolveZoneId(input.zoneId, input.shippingAddress);
-    const deliveryFee = await this.resolveDeliveryFee(zoneId, input.deliveryFeeUsd, MAX_DELIVERY_FEE);
+    // The warehouse and the fee follow the map pin of the delivery address and the sellers on the order, whatever
+    // the app sent: the server charges exactly what `delivery:quote` shows.
+    const route = await this.routeFor(input.shippingAddress, items);
+    const deliveryFee = route.feeUsd;
 
     let discount = 0;
     let promoCode: string | null = null;
     if (input.promoCode?.trim()) {
-      const res = await this.promos.validate(input.promoCode.trim(), subtotal, customer.id);
+      // A store coupon needs the lines (it discounts only that store's); a platform code ignores them.
+      const res = await this.promos.validate(
+        input.promoCode.trim(),
+        subtotal,
+        customer.id,
+        items.map((i) => ({ productId: i.productId, sellerId: i.productId.startsWith('ext:') ? null : i.sellerId, priceUsd: i.priceUsd, qty: i.qty })),
+      );
       if (!res.ok) throw new BadRequestException(res.reason ?? 'Invalid promo code.');
       discount = Math.min(Number(res.discount.toFixed(2)), subtotal); // never below zero
       promoCode = res.code ?? null;
+      // A store coupon is paid by the store: each line carries its share, and the commission is charged after it.
+      if (res.lineDiscounts) {
+        items.forEach((item, i) => {
+          const share = res.lineDiscounts![i] ?? 0;
+          item.couponDiscountUsd = share;
+          item.commissionUsd = Number((((item.priceUsd * item.qty - share) * item.commissionPct) / 100).toFixed(2));
+        });
+      }
     }
     const total = Number((subtotal - discount + deliveryFee).toFixed(2));
     if (!(total > 0)) throw new BadRequestException('Order total must be greater than zero.');
@@ -273,13 +318,14 @@ export class OrdersService {
 
     // Take the stock ATOMICALLY (the UPDATE only succeeds while enough is left),
     // so concurrent orders can never oversell. Released again on any failure.
-    const reserved: { productId: string; qty: number }[] = [];
+    const orderId = randomUUID(); // known before the order exists, so the stock ledger can name it
+    const reserved: { productId: string; qty: number; variant: string }[] = [];
     const release = async () => {
-      for (const r of reserved) await this.products.restock(r.productId, r.qty);
+      for (const r of reserved) await this.products.restock(r.productId, r.qty, { variant: r.variant, orderId, reason: 'cancel_restock' });
     };
     try {
       for (const r of stockToReserve) {
-        if (!(await this.products.reserve(r.productId, r.qty))) {
+        if (!(await this.products.reserve(r.productId, r.qty, { variant: r.variant, orderId, reason: 'sale' }))) {
           throw new BadRequestException(`"${r.name}" just sold out or has too little stock left.`);
         }
         reserved.push(r);
@@ -290,6 +336,7 @@ export class OrdersService {
     }
 
     const order = this.orders.create({
+      id: orderId,
       reference: OrdersService.newReference(),
       customerId: customer.id,
       customerName: customer.name,
@@ -301,8 +348,12 @@ export class OrdersService {
       promoCode,
       campaignDiscountUsd: Number(campaignDiscount.toFixed(2)),
       totalUsd: total,
-      zoneId: zoneId ?? null,
-      estimatedDeliveryDate: estimatedDeliveryDate(lineDays),
+      destinationHubId: route.destinationHubId,
+      destinationAreaId: route.destinationAreaId,
+      originHubIds: route.originHubIds,
+      originBySeller: route.originBySeller,
+      routeBySeller: route.routeBySeller,
+      estimatedDeliveryDate: estimatedDeliveryDate(lineDays, new Date(), route.extraDays),
       shippingAddress: input.shippingAddress ?? null,
       items,
     });
@@ -348,10 +399,11 @@ export class OrdersService {
 
     // Campaign engagement counters (best effort: never fail an order over them).
     for (const [campaignId, revenue] of campaignSales) {
-      void this.products.recordCampaignSale(campaignId, revenue).catch(() => undefined);
+      void this.products.recordCampaignSale(campaignId, revenue, campaignSpend.get(campaignId) ?? 0).catch(() => undefined);
     }
 
     this.emitter.toUser(customer.id, 'order:created', saved);
+    void this.alertRouteFallback(saved, route);
     if (awaitingPayment) {
       // Not fulfillable yet: ops hear about it only once the money is in.
       await this.notifications.toUser(customer.id, {
@@ -373,34 +425,15 @@ export class OrdersService {
     return saved;
   }
 
-  /** Make a paid (or COD) order visible to the warehouse, riders and admins. */
+  /** Make a paid (or COD) order visible: the pickup legs are planned, then admins, warehouses and sellers are told. */
   private async openFulfilment(order: Order): Promise<void> {
-    await this.announceFulfilment(order, await this.createFulfilmentTask(order));
+    await this.logistics.planOrder(order);
+    await this.announceOrder(order);
   }
 
-  /** The order's delivery task (unassigned), routed to the warehouse that serves its zone. */
-  private async createFulfilmentTask(order: Order): Promise<DeliveryTask> {
-    return this.deliveries.save(
-      this.deliveries.create({
-        orderId: order.id,
-        orderReference: order.reference,
-        status: 'unassigned',
-        address: order.shippingAddress,
-        zoneId: order.zoneId,
-        hubId: await this.hubForZone(order.zoneId),
-        codAmountUsd: order.paymentMethod === 'cod' ? order.totalUsd : 0,
-        pickupAddress: await this.pickupFor(order),
-        proofCode: String(randomInt(1000, 10000)),
-      }),
-    );
-  }
-
-  /** Tell the warehouse, riders, admins and sellers about a new delivery. */
-  private async announceFulfilment(order: Order, task: DeliveryTask): Promise<void> {
-    // Riders of the task's warehouse hear about the new delivery at once (no polling needed in their apps).
-    this.emitTask(task);
-    this.emitter.toRoles(OPS_ROOMS, 'order:created', order);
-    await this.announceTask(task);
+  /** Tell the warehouse, admins and sellers about a new order. (The pickup tasks tell their own warehouse's staff.) */
+  private async announceOrder(order: Order): Promise<void> {
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:created', order);
     await this.notifications.toAdmins({
       title: 'New order',
       body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
@@ -426,64 +459,65 @@ export class OrdersService {
     }
   }
 
-  /** A task changed: ops pages, plus the riders who may take it (its warehouse's, or every rider). */
-  private emitTask(task: DeliveryTask): void {
-    this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
-    this.emitter.toRiders(task.hubId ?? null, 'delivery:updated', task);
+  /**
+   * The route and fee of an order: nearest warehouse (with riders) to the customer's map pin as the destination, the
+   * origin warehouse of each seller, and base + per-km + transfer fee. With `requirePinnedAddress` on, an address
+   * without a pin is refused; otherwise it falls back to a warehouse of the same city (and admins are alerted).
+   */
+  private async routeFor(shippingAddress: string | undefined, items: OrderItem[]): Promise<Route> {
+    if (!parseAddressPin(shippingAddress).point && (await this.settings.get('requirePinnedAddress')) === 'true') {
+      throw new BadRequestException('Pin your delivery address on the map.');
+    }
+    return this.routing.route({ shippingAddress, sellerIds: items.map((i) => i.sellerId ?? null) });
   }
 
   /**
-   * Tell riders a delivery is waiting to be accepted: saved notice, live socket and a push to their phones. A task
-   * of a warehouse goes to that warehouse's active riders (and riders not tied to one); otherwise to every rider.
+   * The order needs a human's attention: the address has no map pin (the fee uses no distance), or the warehouse that
+   * covers its area (delivery or a seller's pickup) has no active rider and another one stands in, or nobody has a rider.
+   * Admins and the staff of the warehouses involved are told.
    */
-  private async announceTask(task: DeliveryTask): Promise<void> {
+  private async alertRouteFallback(order: Order, route: Route): Promise<void> {
     try {
-      const cod = task.codAmountUsd > 0 ? ` · collect $${task.codAmountUsd.toFixed(2)} cash` : '';
-      const notice = {
-        title: 'New delivery available',
-        body: `${task.orderReference}${cod}. Open the app to accept it.`,
-        type: 'task',
-        entityId: task.id,
-        extra: { orderId: task.orderId, view: 'available' },
+      const tell = async (notice: { title: string; body: string }, hubIds: (string | null)[]) => {
+        const n = { ...notice, type: 'order' as const, entityId: order.id };
+        await this.notifications.toAdmins(n);
+        const staff = new Set<string>();
+        for (const id of new Set(hubIds.filter((x): x is string => !!x))) for (const u of await this.logistics.staffIds(id)) staff.add(u);
+        if (staff.size) await this.notifications.toUsers([...staff], n);
       };
-      if (task.hubId && this.users) {
-        const riders = await this.users.find({
-          where: [
-            { role: 'rider', active: true, hubId: task.hubId },
-            { role: 'rider', active: true, hubId: IsNull() },
-          ],
-          select: ['id'],
-        });
-        await this.notifications.toUsers(riders.map((r) => r.id), notice);
-      } else {
-        await this.notifications.toRole('rider', notice);
+      if (!route.pinned) {
+        await tell(
+          { title: 'Address without a map pin', body: `${order.reference}: the delivery address has no map pin, so it was routed to ${route.destinationHub.name}.` },
+          [route.destinationHubId],
+        );
+      }
+      const stands = [
+        { fallback: route.fallback, hubId: route.destinationHubId, hubName: route.destinationHub.name, coveringId: route.coveringHubId, coveringName: route.coveringHubName },
+        ...route.origins.map((o) => ({ fallback: o.fallback, hubId: o.hubId, hubName: o.hubName, coveringId: o.coveringHubId, coveringName: o.coveringHubName })),
+      ].filter((s) => s.fallback);
+      if (stands.some((s) => s.fallback === 'no_riders')) {
+        const s = stands.find((x) => x.fallback === 'no_riders') as (typeof stands)[number];
+        await tell(
+          { title: 'No warehouse with riders', body: `${order.reference}: no warehouse has an active rider, so it was routed to ${s.hubName}. Add riders there.` },
+          stands.filter((x) => x.fallback === 'no_riders').map((x) => x.hubId),
+        );
+      }
+      // Lanes exist but none connects two of the warehouses the parcels must travel between: they go direct.
+      for (const u of route.unconnected) {
+        await tell(
+          { title: 'Warehouses not connected', body: `${order.reference}: no lane connects ${u.fromHubName} to ${u.toHubName}, so the parcel goes direct.` },
+          [u.fromHubId, u.toHubId],
+        );
+      }
+      for (const s of stands.filter((x) => x.fallback === 'city' || x.fallback === 'nearest')) {
+        await tell(
+          { title: 'Warehouse without riders', body: `${order.reference}: ${s.coveringName ?? 'the covering warehouse'} has no active rider, so ${s.hubName} will handle it. Add riders to ${s.coveringName ?? 'the covering warehouse'}.` },
+          [s.hubId, s.coveringId],
+        );
       }
     } catch {
-      // Best effort: the task is already in the riders' queue.
+      // Best effort.
     }
-  }
-
-  /** The delivery zone of an address: its saved zone when valid, else its commune. Without zones, what was sent. */
-  private async resolveZoneId(sent: string | undefined, shippingAddress: string | undefined): Promise<string | undefined> {
-    const zones = parseZones(await this.settings.get('deliveryZones'));
-    if (!zones.length) return sent;
-    let addr: { commune?: string; city?: string; zone?: string } = {};
-    try {
-      addr = shippingAddress ? (JSON.parse(shippingAddress) as typeof addr) : {};
-    } catch {
-      /* free-text address: only the sent zone can be used */
-    }
-    const zone = zoneForAddress({ zoneId: sent ?? addr.zone, commune: addr.commune, city: addr.city }, zones);
-    return zone?.id ?? sent; // an unknown zone is refused by the fee lookup
-  }
-
-  /** The warehouse that delivers a zone; with none set, the only active warehouse (if there is exactly one). */
-  private async hubForZone(zoneId: string | null): Promise<string | null> {
-    const zone = parseZones(await this.settings.get('deliveryZones')).find((z) => z.id === zoneId);
-    if (zone?.hubId) return zone.hubId;
-    if (!this.hubs) return null;
-    const active = await this.hubs.find({ where: { active: true }, select: ['id'], take: 2 });
-    return active.length === 1 ? active[0].id : null;
   }
 
   /** The user account behind a seller id (the store row's owner; demo data may store the user id directly). */
@@ -505,10 +539,13 @@ export class OrdersService {
 
   /** Send each seller the redacted view (their lines only, first name, no address) of an order. */
   private async pushToSellers(event: string, order: Order): Promise<void> {
+    // Every placement / cancellation of an order passes through here: a coupon it carries has a new use count.
+    if (order?.promoCode) this.coupons?.usageChanged(order.promoCode);
     if (!order?.items?.length) return;
     for (const [sellerId, items] of await this.linesBySeller(order)) {
       const userId = await this.sellerUserId(sellerId); // demo products may store the user id directly
-      this.emitter.toUser(userId, event, OrdersService.sellerView(order, items));
+      const mine = await sellerTracking(this.orders.manager, [order.id], [sellerId, userId]).catch(() => new Map<string, SellerTracking>());
+      this.emitter.toUser(userId, event, OrdersService.sellerView(order, items, { tracking: mine.get(order.id) ?? null }));
     }
   }
 
@@ -522,7 +559,7 @@ export class OrdersService {
    * their subtotal, and their package's own status — on a multi-seller order the
    * other sellers' progress is none of their business.
    */
-  private static sellerView(order: Order, items: OrderItem[]) {
+  static sellerView(order: Order, items: OrderItem[], extra: { tracking?: SellerTracking | null } = {}) {
     const mineIds = new Set(items.map((i) => i.id));
     const live = items.filter((i) => i.fulfilment !== 'cancelled');
     const subtotal = Number(live.reduce((t, i) => t + i.priceUsd * i.qty, 0).toFixed(2));
@@ -535,6 +572,10 @@ export class OrdersService {
       estimatedDeliveryDate: order.estimatedDeliveryDate ?? null,
       createdAt: order.createdAt,
       customerName: (order.customerName ?? '').split(' ')[0],
+      // Coarse place only (the city); the street, the number and the contact stay private.
+      city: cityOf(order.shippingAddress),
+      // The journey of the parcel from the delivery tasks (rider first name, legs, times); null when none exists yet.
+      tracking: extra.tracking ?? null,
       items,
       subtotalUsd: subtotal,
       totalUsd: subtotal,
@@ -558,7 +599,8 @@ export class OrdersService {
     if (!live.length) return 'cancelled';
     if (order.status === 'cancelled' || (order.status === 'pending' && !OrdersService.fulfillable(order))) return order.status;
     if (live.every((i) => i.fulfilment === 'received')) {
-      return ['shipped', 'out_for_delivery', 'delivered', 'returned'].includes(order.status) ? order.status : 'at_hub';
+      // 'shipped' means every parcel is at a warehouse: the package is still "at hub" until the delivery rider is on the road.
+      return ['out_for_delivery', 'delivered', 'returned'].includes(order.status) ? order.status : 'at_hub';
     }
     if (live.every((i) => i.fulfilment !== 'open')) return 'ready';
     return 'to_pack';
@@ -586,31 +628,54 @@ export class OrdersService {
     });
   }
 
-  /** `toUser` view of order events: the rider's contact only for the order's own customer. */
+  /**
+   * What a customer gets of their orders: `withRiders` (the rider's contact while it is on the road), plus the parcel's
+   * journey as `tracking` (the same shape the seller gets, with the warehouses named on each leg: `fromHub` / `toHub`)
+   * and `hubs: { destination, origins, bySeller }` (names, so the app need not infer the route; `bySeller` maps each seller id of the
+   * lines to the warehouse that collects from them, because `origins` follows no line order). `tracking` is null before the
+   * first delivery task exists. Never carries a phone, an address or the handover code of anyone else.
+   */
+  async customerViews(orders: Order[]): Promise<(Order & { rider?: RiderContact; tracking: SellerTracking | null; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
+    const withRider = await this.withRiders(orders);
+    if (!orders.length) return [];
+    const hubIds = [...new Set(orders.flatMap((o) => hubsOfOrder(o)))];
+    const names = new Map<string, HubName>();
+    // Orders placed before `originBySeller` existed: read it back from their pickup legs.
+    const pickups = new Map<string, Record<string, string>>();
+    if (this.hubs) {
+      const taskHubs = await this.orders.manager.find(DeliveryTask, { where: { orderId: In(orders.map((o) => o.id)) }, select: ['id', 'orderId', 'kind', 'sellerId', 'fromHubId', 'toHubId'] }).catch(() => [] as DeliveryTask[]);
+      for (const t of taskHubs) if (t.kind === 'pickup' && t.sellerId && t.toHubId) pickups.set(t.orderId, { ...(pickups.get(t.orderId) ?? {}), [t.sellerId]: t.toHubId });
+      const wanted = new Set([...hubIds, ...Object.values(Object.fromEntries([...pickups].flatMap(([, m]) => Object.entries(m)))), ...taskHubs.flatMap((t) => [t.fromHubId, t.toHubId]).filter((x): x is string => typeof x === 'string')]);
+      if (wanted.size) for (const h of await this.hubs.find({ where: { id: In([...wanted]) } }).catch(() => [] as Hub[])) names.set(h.id, { id: h.id, name: h.name, city: h.city ?? null });
+    }
+    const tracking = await sellerTracking(this.orders.manager, orders.map((o) => o.id), undefined, { hubs: names }).catch(() => new Map<string, SellerTracking>());
+    return withRider.map((o) =>
+      Object.assign(Object.create(Object.getPrototypeOf(o)), o, {
+        tracking: tracking.get(o.id) ?? null,
+        hubs: {
+          destination: (o.destinationHubId && names.get(o.destinationHubId)) || null,
+          origins: (Array.isArray(o.originHubIds) ? o.originHubIds : []).map((id) => names.get(id)).filter((h): h is HubName => !!h),
+          bySeller: Object.fromEntries(
+            Object.entries(o.originBySeller ?? pickups.get(o.id) ?? {})
+              .map(([sellerId, hubId]) => [sellerId, names.get(hubId)] as const)
+              .filter((e): e is [string, HubName] => !!e[1]),
+          ),
+        },
+      }),
+    );
+  }
+
+  /** `toUser` view of order events: the journey and the rider's contact, only for the order's own customer. */
   private customerPush(userId: string, payload: unknown): unknown | Promise<unknown> {
     const o = payload as Order | null;
-    if (!o || o.customerId !== userId || !o.riderId || !RIDER_VISIBLE.includes(o.status)) return payload;
-    return this.withRiders([o]).then(([v]) => v);
+    if (!o || o.customerId !== userId || !o.id) return payload;
+    return this.customerViews([o]).then(([v]) => v);
   }
 
   /** Every id a seller account's listings may carry (the store id, and the user id on demo data). */
   private async sellerKeys(userId: string): Promise<Set<string>> {
     const row = await this.sellers.findOne({ where: { userId } });
     return new Set([userId, ...(row ? [row.id] : [])]);
-  }
-
-  /** Where the rider collects the parcel: the seller(s)' pickup address, else the hub. */
-  private async pickupFor(order: Order): Promise<string> {
-    const lines: string[] = [];
-    const seen = new Set<string>();
-    for (const [sellerId, items] of await this.linesBySeller(order)) {
-      if (seen.has(sellerId) || items.every((i) => i.fulfilment === 'cancelled')) continue;
-      seen.add(sellerId);
-      const seller = (await this.sellers.findOne({ where: { id: sellerId } })) ?? (await this.sellers.findOne({ where: { userId: sellerId } }));
-      lines.push(`${seller?.name ?? items[0].sellerName ?? 'Seller'} — ${seller?.pickupAddress || 'address not provided, contact the seller'}`);
-    }
-    if (lines.length) return lines.join(' | ');
-    return (await this.settings.get('hubAddress')) || 'Somba&Teka hub';
   }
 
   /** The customer's handover code for an order that is on its way (null when none applies). */
@@ -643,20 +708,14 @@ export class OrdersService {
       await this.orders.manager.update(OrderItem, { id: In(open.map((i) => i.id)) }, { fulfilment: 'ready', readyAt: now });
     }
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
-    // The rider/hub is only sent once EVERY seller of the order has packed their part.
+    // This seller's pickup is ready for the warehouse's rider; the other sellers' pickups are independent.
     const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
     const allReady = live.every((i) => i.fulfilment !== 'open');
-    let task: DeliveryTask | null = null;
-    if (allReady) {
-      task = await this.delivery.markReady(orderId);
-      if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
-    } else {
-      task = await this.deliveries.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
-      if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
-    }
+    const task = await this.logistics.markSellerReady(orderId, [...keys]);
+    if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
     const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     await this.notifications.toAdmins({
       title: allReady ? 'Parcel ready for pickup' : 'Seller package ready',
       body: allReady
@@ -723,11 +782,13 @@ export class OrdersService {
         .where("id IN (:...ids) AND fulfilment IN ('open','ready')", { ids: targets.map((i) => i.id) })
         .execute();
       if ((claim.affected ?? 0) !== targets.length) return false;
-      if (prepaid && refund > 0) {
+      if (prepaid && payment && refund > 0) {
         const per = targets.length ? refund / value : 0;
         for (const i of targets) {
           await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
         }
+        // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
+        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: 'seller_cancel', memo: `Refund: seller cancelled part of ${order.reference}` });
         await this.wallet.apply(order.customerId, 'refund', refund, `Refund: seller cancelled part of ${order.reference}`, m);
       }
       if (order.paymentMethod === 'cod' && refund > 0) {
@@ -744,23 +805,17 @@ export class OrdersService {
     });
     if (!done) throw new BadRequestException('These items were just updated. Refresh and try again.');
     for (const i of targets) {
-      if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty);
+      if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty, { variant: i.variant, orderId: order.id, reason: 'cancel_restock' });
     }
 
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
-    // The remaining sellers may all be packed already: the parcel can go now.
-    const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
-    if (live.length && live.every((i) => i.fulfilment !== 'open')) await this.delivery.markReady(order.id);
-    const pickup = await this.pickupFor(saved);
-    await this.deliveries
-      .createQueryBuilder()
-      .update(DeliveryTask)
-      .set({ pickupAddress: pickup })
-      .where("orderId = :id AND status IN ('unassigned','assigned')", { id: order.id })
-      .execute();
+    // A seller with nothing left to send has no parcel to collect; the other parcels may now be complete.
+    if (!(saved.items ?? []).some((i) => mine.some((m) => m.id === i.id) && i.fulfilment !== 'cancelled')) {
+      await this.logistics.onSellerCancelled(order.id, [...keys]);
+    }
 
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     const names = targets.map((i) => i.productName).join(', ');
     await this.notifications.toUser(saved.customerId, {
       title: 'Item cancelled by the seller',
@@ -783,9 +838,21 @@ export class OrdersService {
    * cancelled, the stock released and any prepaid money refunded.
    */
   private async onDeliveryFailed(task: DeliveryTask, reason: string): Promise<void> {
+    // Legs of returns, replacements and exchanges never cancel the order: retry, then hand the case to staff.
+    if (!isOrderFlow(task)) {
+      if (this.logistics.canRetry(task)) await this.logistics.reopen(task);
+      else await this.logistics.alertExhausted(task, reason);
+      return;
+    }
     const order = await this.orders.findOne({ where: { id: task.orderId } });
     if (!order || order.status === 'cancelled' || order.status === 'returned' || order.status === 'delivered') return;
     const max = Number(process.env.DELIVERY_MAX_ATTEMPTS ?? 3);
+    // A transfer between warehouses is not the customer's problem: retry it and call staff after the limit.
+    if (task.kind === 'transfer') {
+      if (this.logistics.canRetry(task)) await this.logistics.reopen(task);
+      else await this.logistics.alertExhausted(task, reason);
+      return;
+    }
     if (task.attempts >= max) {
       const claim = await this.orders
         .createQueryBuilder()
@@ -797,10 +864,11 @@ export class OrdersService {
       const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
       const refunded = await this.payments.refundCancelledOrder(saved);
       for (const item of saved.items ?? []) {
-        if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') await this.products.restock(item.productId, item.qty);
+        if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') await this.products.restock(item.productId, item.qty, { variant: item.variant, orderId: saved.id, reason: 'cancel_restock' });
       }
+      await this.logistics.voidOrderTasks(saved.id);
       this.emitter.toUser(saved.customerId, 'order:updated', saved);
-      this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+      pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
       await this.notifications.toUser(saved.customerId, {
         title: 'Order cancelled',
         body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded > 0 ? ` $${refunded.toFixed(2)} was refunded to your wallet.` : ''}`,
@@ -809,29 +877,13 @@ export class OrdersService {
       });
       return;
     }
+    // Back to "confirmed" (the customer may still cancel; the re-opened leg moves the order forward again).
     order.status = 'confirmed';
     order.riderId = null;
     const saved = await this.orders.save(order);
-    const next = await this.deliveries.save(
-      this.deliveries.create({
-        orderId: order.id,
-        orderReference: order.reference,
-        status: 'unassigned',
-        address: task.address,
-        zoneId: task.zoneId,
-        hubId: task.hubId,
-        codAmountUsd: task.codAmountUsd,
-        pickupAddress: task.pickupAddress,
-        proofCode: await this.delivery.getProofCode(task.id),
-        readyAt: task.readyAt,
-        receivedAt: task.receivedAt,
-        attempts: task.attempts + 1,
-      }),
-    );
+    const next = await this.logistics.reopen(task);
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitTask(next);
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
-    await this.announceTask(next);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Delivery attempt failed',
       body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}). You can also cancel the order.`,
@@ -852,10 +904,10 @@ export class OrdersService {
     if (outcome === 'succeeded') {
       // The delivery task exists before the order reads "confirmed", so whoever sees the confirmed order (the
       // customer, ops, a test) also finds its parcel in the warehouse queue.
-      const task = await this.createFulfilmentTask(order);
+      await this.logistics.planOrder(order);
       order.status = 'confirmed';
       const saved = await this.orders.save(order);
-      await this.announceFulfilment(saved, task);
+      await this.announceOrder(saved);
       this.emitter.toUser(saved.customerId, 'order:updated', saved);
       return;
     }
@@ -865,43 +917,18 @@ export class OrdersService {
     for (const item of saved.items ?? []) {
       // A line the seller already cancelled was restocked then.
       if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
-        await this.products.restock(item.productId, item.qty);
+        await this.products.restock(item.productId, item.qty, { variant: item.variant, orderId: saved.id, reason: 'cancel_restock' });
       }
     }
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
     // Sellers saw the order as awaiting payment: the fanout tells them it is gone.
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
       body: `${saved.reference} was cancelled: ${payment.failureReason ?? 'payment was not completed'}.`,
       type: 'order',
       entityId: saved.id,
     });
-  }
-
-  /**
-   * The delivery fee comes from the admin-configured zones (`deliveryZones`
-   * setting) — the client's number is ignored. Only when no zones are configured
-   * (dev/demo) is a capped client fee accepted.
-   */
-  private async resolveDeliveryFee(zoneId: string | undefined, clientFee: unknown, max: number): Promise<number> {
-    const raw = await this.settings.get('deliveryZones');
-    if (raw) {
-      let zones: { id: string; feeUsd: number }[] = [];
-      try {
-        zones = JSON.parse(raw);
-      } catch {
-        zones = [];
-      }
-      if (zones.length) {
-        const z = zones.find((x) => x.id === zoneId);
-        if (!z) throw new BadRequestException('Choose a valid delivery zone.');
-        return Number(Number(z.feeUsd).toFixed(2));
-      }
-    }
-    const fee = Number(clientFee ?? 0);
-    if (!Number.isFinite(fee) || fee < 0 || fee > max) throw new BadRequestException('Invalid delivery fee.');
-    return fee;
   }
 
   /**
@@ -950,15 +977,14 @@ export class OrdersService {
         task.status = 'delivered';
         task.deliveredAt = new Date();
         await this.deliveries.save(task);
-        this.emitTask(task);
-        if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
+        await this.logistics.emitTask(task);
       }
       await this.payments.markCollected(saved.id);
     }
 
     // Everyone who cares about this order hears about it instantly.
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     if (saved.riderId) {
       this.emitter.toUser(saved.riderId, 'order:updated', saved);
     }
@@ -1034,23 +1060,15 @@ export class OrdersService {
     for (const item of saved.items ?? []) {
       // A line the seller already cancelled was restocked then.
       if (!item.productId.startsWith('ext:') && item.fulfilment !== 'cancelled') {
-        await this.products.restock(item.productId, item.qty);
+        await this.products.restock(item.productId, item.qty, { variant: item.variant, orderId: saved.id, reason: 'cancel_restock' });
       }
     }
 
-    // Void the delivery task.
-    const open = await this.deliveries.find({ where: { orderId: saved.id } });
-    for (const task of open) {
-      if (!['unassigned', 'assigned', 'picked_up', 'in_transit'].includes(task.status)) continue;
-      task.status = 'failed';
-      task.failureReason = 'Order cancelled';
-      await this.deliveries.save(task);
-      this.emitter.toRoles(OPS_ROOMS, 'delivery:updated', task);
-      if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
-    }
+    // Void every open leg of the journey (the warehouses and riders following them are told).
+    await this.logistics.voidOrderTasks(saved.id);
 
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    this.emitter.toRoles(OPS_ROOMS, 'order:updated', saved);
+    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
       body: `${saved.reference} was cancelled${opts.reason ? ` by Somba&Teka support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
@@ -1073,10 +1091,10 @@ export class OrdersService {
    * only the lines of THEIR products (no address, no customer id), everyone else
    * nothing.
    */
-  async list(user: { id: string; role: string }, sellerId?: string, paging?: unknown): Promise<unknown[]> {
+  async list(user: { id: string; role: string }, sellerId?: string, paging?: unknown, hubId?: string | null): Promise<unknown[]> {
     const { take, skip } = pageOf(paging);
     if (user.role === 'customer') {
-      return this.withRiders(await this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take, skip }));
+      return this.customerViews(await this.orders.find({ where: { customerId: user.id }, order: { createdAt: 'DESC' }, take, skip }));
     }
     if (user.role === 'rider') {
       return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' }, take, skip });
@@ -1084,10 +1102,35 @@ export class OrdersService {
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
       // Staff queues have always been the newest 200; an explicit limit/offset pages further back.
       const staff = pageOf(paging, { def: 200 });
+      // Warehouse staff see the orders their own warehouse delivers or collects for; admins (no hub) see all.
+      if (hubId) {
+        const ids = (
+          await this.orders
+            .createQueryBuilder('o')
+            .select('o.id', 'id')
+            .addSelect('o.createdAt', 'createdAt')
+            .where(ORDER_HUB_SQL, orderHubParams(hubId))
+            .orderBy('o.createdAt', 'DESC')
+            .offset(staff.skip)
+            .limit(staff.take)
+            .getRawMany<{ id: string }>()
+        ).map((r) => r.id);
+        if (!ids.length) return [];
+        return this.orders.find({ where: { id: In(ids) }, order: { createdAt: 'DESC' } });
+      }
       return this.orders.find({ order: { createdAt: 'DESC' }, take: staff.take, skip: staff.skip });
     }
+    // The seller's list is paged, searched and filtered in the database (SellerOrdersService registers itself here).
+    if (user.role === 'seller' && this.sellerLister) return this.sellerLister(user, sellerId, paging);
     if (user.role === 'seller') return this.listForSeller([...new Set([sellerId ?? user.id, user.id])], { take: pageOf(paging, { def: 200 }).take, skip });
     return [];
+  }
+
+  private sellerLister: ((user: { id: string; role: string }, sellerId: string | undefined, paging: unknown) => Promise<unknown[]>) | null = null;
+
+  /** The seller order list (see SellerOrdersService) takes over `orders:list` for sellers: `limit`, `offset`, `q`, `status`, `from`, `to`. */
+  registerSellerLister(fn: NonNullable<OrdersService['sellerLister']>): void {
+    this.sellerLister = fn;
   }
 
   private async listForSeller(sellerIds: string[], page: { take: number; skip: number }) {
@@ -1123,7 +1166,7 @@ export class OrdersService {
     return this.orders.findOne({ where: { id } });
   }
 
-  /** Admin/finance refund; delegates to the payments service. */
+  /** Admin/finance refund; delegates to the payments service (which caps it and records it in the refund ledger). */
   refund(orderId: string, toWallet: boolean) {
     return this.payments.refund(orderId, toWallet);
   }

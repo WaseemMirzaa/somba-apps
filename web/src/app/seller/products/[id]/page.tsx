@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,8 +10,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/seller/product-image";
 import { TranslationsPanel } from "@/components/seller/translations-panel";
+import { EngageReviews } from "@/components/seller/engage-reviews";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
-import { useSellerData } from "@/lib/seller";
+import { useSellerAccess, useSellerData } from "@/lib/seller";
+import { assetUrl } from "@/lib/seller-api";
+import { weightLabel } from "@/lib/seller-products";
 import {
   errMessage,
   orderStatusLabel,
@@ -35,6 +38,9 @@ export default function SellerProductDetailPage() {
   const raw = getRawProduct(id);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const access = useSellerAccess();
+  const canEdit = access.can("catalog") && !access.suspended;
 
   if (!product) {
     if (load.error) return <LoadError message={load.error} onRetry={load.retry} />;
@@ -74,7 +80,7 @@ export default function SellerProductDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={product.name}
-        subtitle={`SKU: ${product.sku} · ${productStatusLabel(status, fr)}`}
+        subtitle={`SKU: ${product.skuReal ?? "—"} · ${productStatusLabel(status, fr)}`}
         backHref="/seller/products"
         breadcrumbs={[
           { label: fr ? "Vendeur" : "Seller", href: "/seller" },
@@ -83,18 +89,18 @@ export default function SellerProductDetailPage() {
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/seller/products/${product.id}/edit`} className="rounded-lg border border-sky-200 px-4 py-2 text-sm">{fr ? "Modifier" : "Edit"}</Link>
-            {status === "live" && (
+            {canEdit && <Link href={`/seller/products/${product.id}/edit`} className="rounded-lg border border-sky-200 px-4 py-2 text-sm">{fr ? "Modifier" : "Edit"}</Link>}
+            {canEdit && status === "live" && (
               <button type="button" disabled={busy} onClick={() => run(() => pauseProduct(product.id), fr ? "Produit mis en pause : masqué de la boutique" : "Product paused: hidden from the shop")} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
                 {fr ? "Marquer indisponible" : "Mark unavailable"}
               </button>
             )}
-            {status === "draft" && (
+            {canEdit && status === "draft" && (
               <button type="button" disabled={busy} onClick={() => run(() => publishProduct(product.id), fr ? "Produit remis en ligne" : "Product is live again")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
                 {fr ? "Remettre en ligne" : "Mark live"}
               </button>
             )}
-            {!confirmDelete ? (
+            {!canEdit ? null : !confirmDelete ? (
               <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 disabled:opacity-50">
                 {fr ? "Supprimer" : "Delete"}
               </button>
@@ -121,15 +127,36 @@ export default function SellerProductDetailPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-4">
-        <div className="aspect-square overflow-hidden rounded-xl lg:col-span-1">
-          <ProductImage src={product.image} alt={product.name} />
+        <div className="space-y-2 lg:col-span-1" data-testid="product-gallery">
+          <div className="aspect-square overflow-hidden rounded-xl">
+            <ProductImage src={assetUrl(product.images[Math.min(activePhoto, Math.max(0, product.images.length - 1))] ?? product.image)} alt={product.name} />
+          </div>
+          {product.images.length > 1 && (
+            <ul className="flex flex-wrap gap-2" aria-label={fr ? "Photos du produit" : "Product photos"}>
+              {product.images.map((u, i) => (
+                <li key={u + i}>
+                  <button
+                    type="button"
+                    onClick={() => setActivePhoto(i)}
+                    aria-label={fr ? `Voir la photo ${i + 1}${i === 0 ? " (couverture)" : ""}` : `View photo ${i + 1}${i === 0 ? " (cover)" : ""}`}
+                    aria-current={i === activePhoto}
+                    className={`block h-12 w-12 overflow-hidden rounded-lg border-2 ${i === activePhoto ? "border-[var(--primary)]" : "border-transparent"}`}
+                  >
+                    <ProductImage src={assetUrl(u)} alt="" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <DetailGrid className="lg:col-span-3">
           <DetailGridSection title={fr ? "Informations produit" : "Product Information"} span={3}>
             <InfoGrid items={[
               { label: fr ? "ID produit" : "Product ID", value: product.id },
-              { label: "SKU", value: product.sku },
+              { label: "SKU", value: product.skuReal ?? "—" },
+              { label: fr ? "Marque" : "Brand", value: product.brandName || "—" },
+              { label: fr ? "Poids" : "Weight", value: weightLabel(product.weightGrams, fr) },
               { label: fr ? "Catégorie" : "Category", value: fr ? product.categoryFr : product.category },
               { label: fr ? "Description" : "Description", value: product.description || "—", full: true },
             ]} />
@@ -148,6 +175,24 @@ export default function SellerProductDetailPage() {
               { label: fr ? "Vendus" : "Sold", value: product.soldCount },
               { label: fr ? "Seuil de stock bas" : "Low Stock Threshold", value: product.lowStockThreshold },
             ]} />
+            {product.variantStock && Object.keys(product.variantStock).length > 0 && (
+              <div className="mt-3 text-sm" data-testid="variant-stock">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{fr ? "Stock par option" : "Stock per option"}</p>
+                <ul className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
+                  {Object.entries(product.variantStock).map(([label, n]) => (
+                    <li key={label} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                      <span className="min-w-0 truncate">{label}</span>
+                      <span className={n <= 0 ? "font-semibold text-red-600" : n <= product.lowStockThreshold ? "font-semibold text-amber-700" : "font-medium"}>{n}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-slate-500">
+                  {fr
+                    ? `Stock commun (options sans compteur) : ${Math.max(0, product.availableStock - Object.values(product.variantStock).reduce((t, n) => t + n, 0))}`
+                    : `Shared pool (options without their own count): ${Math.max(0, product.availableStock - Object.values(product.variantStock).reduce((t, n) => t + n, 0))}`}
+                </p>
+              </div>
+            )}
             <div className="mt-4 flex gap-2">
               <Link href={`/seller/inventory/${encodeURIComponent(product.sku)}`} className="btn-primary rounded-lg px-4 py-2 text-sm">{fr ? "Voir l'inventaire" : "View Inventory"}</Link>
             </div>
@@ -203,18 +248,9 @@ export default function SellerProductDetailPage() {
           </DetailGridSection>
 
           <DetailGridSection title={fr ? "Avis" : "Reviews"} span={3}>
-            {product.productReviews.length === 0 && (
-              <p className="text-sm text-slate-500">{fr ? "Aucun avis pour le moment." : "No reviews yet."}</p>
-            )}
-            {product.productReviews.map((r, i) => (
-              <div key={i} className="mb-4 border-b border-[var(--border)] pb-4 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{r.customer}</span>
-                  <span className="text-amber-500">{"★".repeat(r.rating)}</span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600">{r.review}</p>
-              </div>
-            ))}
+            <Suspense fallback={null}>
+              <EngageReviews productId={product.id} />
+            </Suspense>
           </DetailGridSection>
         </DetailGrid>
       </div>

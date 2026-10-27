@@ -1,0 +1,547 @@
+{
+  "CD-BC": {
+    "googleName": "Kongo-Central",
+    "googleNameEn": "Kongo Central",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-BC-MAT": {
+    "googleName": "Matadi",
+    "googleNameEn": "Matadi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-BC-BOM": {
+    "googleName": "Boma",
+    "googleNameEn": "Boma",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-BC-MUA": {
+    "googleName": "Muanda",
+    "googleNameEn": "Muanda",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-BU": {
+    "googleName": "Bas-Uele",
+    "googleNameEn": "Bas-Uele",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-BU-BUT": {
+    "googleName": "Buta",
+    "googleNameEn": "Buta",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-EQ": {
+    "googleName": "Équateur",
+    "googleNameEn": "Equator",
+    "aliases": [
+      "Equateur",
+      "Equator",
+      "Équateur"
+    ],
+    "checked": true,
+    "note": "Google answers in English for this province even with language=fr; both spellings match."
+  },
+  "CD-EQ-MBA": {
+    "googleName": "Mbandaka",
+    "googleNameEn": "Mbandaka",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HK": {
+    "googleName": "Haut-Katanga",
+    "googleNameEn": "Haut-Katanga",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HK-LUB": {
+    "googleName": "Lubumbashi",
+    "googleNameEn": "Lubumbashi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HK-LIK": {
+    "googleName": "Likasi",
+    "googleNameEn": "Likasi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HL": {
+    "googleName": "Haut-Lomami",
+    "googleNameEn": "Haut-Lomami",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HL-KAM": {
+    "googleName": "Kamina",
+    "googleNameEn": "Kamina",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HU": {
+    "googleName": "Haut-Uélé",
+    "googleNameEn": "Haut-Uele",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-HU-ISI": {
+    "googleName": "Isiro",
+    "googleNameEn": "Isiro",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-IT": {
+    "googleName": "Ituri",
+    "googleNameEn": "Ituri",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-IT-BUN": {
+    "googleName": "Bunia",
+    "googleNameEn": "Bunia",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KC": {
+    "googleName": "Kasaï-Central",
+    "googleNameEn": "Kasaï-Central",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KC-KAN": {
+    "googleName": "Kananga",
+    "googleNameEn": "Kananga",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KE": {
+    "googleName": "Kasai Oriental",
+    "googleNameEn": "Kasai Oriental",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KE-MBM": {
+    "googleName": "Mbuji-Mayi",
+    "googleNameEn": "Mbuji-Mayi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KG": {
+    "googleName": "Kwango",
+    "googleNameEn": "Kwango",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KG-KEN": {
+    "googleName": "Kenge",
+    "googleNameEn": "Kenge",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KL": {
+    "googleName": "Kwilu",
+    "googleNameEn": "Kwilu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KL-BAN": {
+    "googleName": "Bandundu",
+    "googleNameEn": "Bandundu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KL-KIK": {
+    "googleName": "Kikwit",
+    "googleNameEn": "Kikwit",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN": {
+    "googleName": "Kinshasa",
+    "googleNameEn": "Kinshasa",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KIN": {
+    "googleName": "Kinshasa",
+    "googleNameEn": "Kinshasa",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-BDL": {
+    "googleName": "Bandalungwa",
+    "googleNameEn": "Bandalungwa",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-BMB": {
+    "googleName": "Bumbu",
+    "googleNameEn": "Bumbu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KLM": {
+    "googleName": "Kalamu",
+    "googleNameEn": "Kalamu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KSV": {
+    "googleName": "Kasa-Vubu",
+    "googleNameEn": "Kasa-Vubu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-MKL": {
+    "googleName": "Makala",
+    "googleNameEn": "Makala",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-NGN": {
+    "googleName": "Ngiri-Ngiri",
+    "googleNameEn": "Ngiri-Ngiri",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-SLM": {
+    "googleName": "Selembao",
+    "googleNameEn": "Selembao",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-BRM": {
+    "googleName": "Barumbu",
+    "googleNameEn": "Barumbu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-GOM": {
+    "googleName": "Gombe",
+    "googleNameEn": "Gombe",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KNS": {
+    "googleName": "Kinshasa",
+    "googleNameEn": "Kinshasa",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KTB": {
+    "googleName": "Kintambo",
+    "googleNameEn": "Kintambo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-LNG": {
+    "googleName": "Lingwala",
+    "googleNameEn": "Lingwala",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-MNG": {
+    "googleName": "Mont Ngafula",
+    "googleNameEn": "Mont Ngafula",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-NGL": {
+    "googleName": "Ngaliema",
+    "googleNameEn": "Ngaliema",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KSN": {
+    "googleName": "Kisenso",
+    "googleNameEn": "Kisenso",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-LMB": {
+    "googleName": "Lemba",
+    "googleNameEn": "Lemba",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-LMT": {
+    "googleName": "Limete",
+    "googleNameEn": "Limete",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-MTT": {
+    "googleName": "Matete",
+    "googleNameEn": "Matete",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-NGB": {
+    "googleName": "Ngaba",
+    "googleNameEn": "Ngaba",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-KMB": {
+    "googleName": "Kimbanseke",
+    "googleNameEn": "Kimbanseke",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-MLK": {
+    "googleName": "Maluku",
+    "googleNameEn": "Maluku",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-MSN": {
+    "googleName": "Masina",
+    "googleNameEn": "Masina",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-NDJ": {
+    "googleName": "Ndjili",
+    "googleNameEn": "Ndjili",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KN-NSL": {
+    "googleName": "Nsele",
+    "googleNameEn": "Nsele",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KS": {
+    "googleName": "Kasaï",
+    "googleNameEn": "Kasai",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-KS-TSH": {
+    "googleName": "Tshikapa",
+    "googleNameEn": "Tshikapa City",
+    "aliases": [
+      "Tshikapa City"
+    ],
+    "checked": true
+  },
+  "CD-LO": {
+    "googleName": "Lomami",
+    "googleNameEn": "Lomami",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-LO-KAB": {
+    "googleName": "Kabinda",
+    "googleNameEn": "Kabinda",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-LO-MWD": {
+    "googleName": "Mwene-Ditu",
+    "googleNameEn": "Mwene-Ditu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-LU": {
+    "googleName": "Lualaba",
+    "googleNameEn": "Lualaba",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-LU-KOL": {
+    "googleName": "Kolwezi",
+    "googleNameEn": "Kolwezi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MA": {
+    "googleName": "Maniema",
+    "googleNameEn": "Maniema",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MA-KIN": {
+    "googleName": "Kindu",
+    "googleNameEn": "Kindu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MN": {
+    "googleName": "Mai-Ndombe",
+    "googleNameEn": "Mai-Ndombe",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MN-INO": {
+    "googleName": "Inongo",
+    "googleNameEn": "Inongo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MO": {
+    "googleName": "Mongala",
+    "googleNameEn": "Mongala",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MO-LIS": {
+    "googleName": "Lisala",
+    "googleNameEn": "Lisala",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-MO-BUM": {
+    "googleName": "Bumba",
+    "googleNameEn": "Bumba",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-NK": {
+    "googleName": "Nord-Kivu",
+    "googleNameEn": "North-Kivu",
+    "aliases": [
+      "Nord Kivu",
+      "North Kivu",
+      "North-Kivu"
+    ],
+    "checked": true,
+    "note": "Google answers in English for this province even with language=fr; both spellings match."
+  },
+  "CD-NK-GOM": {
+    "googleName": "Goma",
+    "googleNameEn": "Goma",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-NK-BEN": {
+    "googleName": "Beni",
+    "googleNameEn": "Beni",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-NK-BTM": {
+    "googleName": "Butembo",
+    "googleNameEn": "Butembo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-NU": {
+    "googleName": "Nord-Ubangi",
+    "googleNameEn": "Nord-Ubangi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-NU-GBA": {
+    "googleName": "Gbadolite",
+    "googleNameEn": "Gbadolite",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SA": {
+    "googleName": "Sankuru",
+    "googleNameEn": "Sankuru",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SA-LUS": {
+    "googleName": "Lusambo",
+    "googleNameEn": "Lusambo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SA-LMV": {
+    "googleName": "Lumumbaville",
+    "googleNameEn": "Lumumbaville",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SK": {
+    "googleName": "Sud-Kivu",
+    "googleNameEn": "South-Kivu",
+    "aliases": [
+      "South Kivu",
+      "South-Kivu",
+      "Sud Kivu"
+    ],
+    "checked": true,
+    "note": "Google answers in English for this province even with language=fr; both spellings match."
+  },
+  "CD-SK-BUK": {
+    "googleName": "Bukavu",
+    "googleNameEn": "Bukavu",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SK-BAR": {
+    "googleName": "Baraka",
+    "googleNameEn": "Baraka",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SU": {
+    "googleName": "Sud-Ubangi",
+    "googleNameEn": "Sud-Ubangi",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SU-GEM": {
+    "googleName": "Gemena",
+    "googleNameEn": "Gemena",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-SU-ZON": {
+    "googleName": "Zongo",
+    "googleNameEn": "Zongo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TA": {
+    "googleName": "Tanganyika",
+    "googleNameEn": "Tanganyika",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TA-KAL": {
+    "googleName": "Kalemie",
+    "googleNameEn": "Kalemie",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TA-KON": {
+    "googleName": "Kongolo",
+    "googleNameEn": "Kongolo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TO": {
+    "googleName": "Tshopo",
+    "googleNameEn": "Tshopo",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TO-KIS": {
+    "googleName": "Kisangani",
+    "googleNameEn": "Kisangani",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TU": {
+    "googleName": "Tshuapa",
+    "googleNameEn": "Tshuapa",
+    "aliases": [],
+    "checked": true
+  },
+  "CD-TU-BOE": {
+    "googleName": "Boende",
+    "googleNameEn": "Boende",
+    "aliases": [],
+    "checked": true
+  }
+}

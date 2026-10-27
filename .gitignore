@@ -45,9 +45,17 @@ coverage/
 *.sqlite-wal
 *.sqlite-shm
 
-# user-uploaded files
+# user-uploaded files (and the private ones: KYC documents, return and support photos)
 /api/uploads/
 /uploads/
+/api/uploads-private/
+/uploads-private/
+
+# Local build helpers: type-check a web build against its own dist folder (see NEXT_TSCONFIG in next.config.ts)
+/web/tsconfig.ci.json
+/web/tsconfig.demo.json
+/web/tsconfig.w2.json
+/web/tsconfig.wa.json
 
 # Demo recordings: large videos plus notes with local account passwords. Kept on this machine only.
 /recordings/

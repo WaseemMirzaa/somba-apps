@@ -6,13 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NoticeBar } from "@/components/admin/notice-bar";
+import { useCampaignDecisions } from "@/components/admin/campaign-decision";
 import { CampaignDetailModal, CampaignPhaseBadge, CampaignScopeLine } from "@/components/admin/campaign-detail";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useLocale } from "@/context/locale-context";
-import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { errMsg, useServerList, type CampaignRow } from "@/lib/admin-live";
-import { socketClient } from "@/lib/realtime/socket-client";
+import { useServerList, type CampaignRow } from "@/lib/admin-live";
 import { formatCurrency } from "@/lib/utils";
 
 const CAMPAIGN_STATUS_FR: Record<string, string> = {
@@ -35,27 +34,11 @@ const VARIANT: Record<string, "success" | "warning" | "danger" | "info" | "defau
 export default function AdminMarketingPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
   const { items: campaigns, setItems, error: loadError, loading, reload } = useServerList<CampaignRow>("campaigns:list", { pushEvents: ["campaign:updated"] });
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = campaigns.find((c) => c.id === detailId) ?? null;
-
-  async function setStatus(c: CampaignRow, status: "active" | "rejected" | "ended") {
-    setBusyId(c.id);
-    try {
-      const updated = await socketClient.request<CampaignRow>("campaigns:setStatus", { id: c.id, status });
-      setItems((cur) => cur.map((x) => (x.id === c.id ? { ...x, ...updated } : x)));
-      toast(
-        status === "active" ? (fr ? "Campagne approuvée" : "Campaign approved") : status === "ended" ? (fr ? "Campagne terminée : les prix reviennent à la normale" : "Campaign ended: prices return to normal") : fr ? "Campagne rejetée" : "Campaign rejected",
-        "success",
-      );
-    } catch (e) {
-      toast(errMsg(e), "error");
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const decide = useCampaignDecisions((u) => setItems((cur) => cur.map((x) => (x.id === u.id ? { ...x, ...u } : x))));
+  const busyId = decide.busyId;
 
   return (
     <div className="space-y-6">
@@ -93,6 +76,14 @@ export default function AdminMarketingPage() {
               <h3 className="mt-3 font-semibold text-slate-900">{fr ? c.nameFr || c.name : c.name}</h3>
               <p className="mt-1 text-sm text-slate-500">{c.sellerName ?? "—"} · {c.discount}% {fr ? "de remise" : "off"} · {formatCurrency(c.budgetUsd, locale)}</p>
               <p className="mt-1 text-xs text-slate-500"><CampaignScopeLine campaign={c} /></p>
+              {c.budgetUsd > 0 && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {fr ? "Remise accordée" : "Discount given"} {formatCurrency(c.spentUsd ?? 0, locale)}
+                  {c.budgetRemainingUsd != null ? ` · ${fr ? "reste" : "left"} ${formatCurrency(c.budgetRemainingUsd, locale)}` : ""}
+                </p>
+              )}
+              {c.status === "rejected" && c.rejectReason && <p className="mt-1 text-xs text-red-600">{fr ? "Motif : " : "Reason: "}{c.rejectReason}</p>}
+              {c.status === "ended" && c.endedReason && <p className="mt-1 text-xs text-slate-500">{fr ? "Terminée : " : "Ended: "}{c.endedReason === "dates" ? (fr ? "dates écoulées" : "dates passed") : c.endedReason === "budget" ? (fr ? "budget épuisé" : "budget used") : c.endedReason === "withdrawn" ? (fr ? "retirée par le vendeur" : "withdrawn by the seller") : fr ? "par un admin" : "by an admin"}</p>}
               <p className="mt-1 text-xs text-slate-400">
                 {c.startDate ?? "—"} → {c.endDate ?? "—"} · {fr ? "Commandes" : "Orders"} {c.orders} · {formatCurrency(c.revenueUsd, locale)}
               </p>
@@ -100,12 +91,12 @@ export default function AdminMarketingPage() {
                 <Button size="sm" variant="secondary" onClick={() => setDetailId(c.id)}>{fr ? "Détails" : "Details"}</Button>
                 {c.status === "pending" && (
                   <>
-                    <Button size="sm" variant="approve" disabled={busyId === c.id} onClick={() => setStatus(c, "active")}>{fr ? "Approuver" : "Approve"}</Button>
-                    <Button size="sm" variant="reject" disabled={busyId === c.id} onClick={() => setStatus(c, "rejected")}>{fr ? "Rejeter" : "Reject"}</Button>
+                    <Button size="sm" variant="approve" disabled={busyId === c.id} onClick={() => void decide.approve(c)}>{fr ? "Approuver" : "Approve"}</Button>
+                    <Button size="sm" variant="reject" disabled={busyId === c.id} onClick={() => decide.reject(c)}>{fr ? "Rejeter" : "Reject"}</Button>
                   </>
                 )}
                 {(c.status === "active" || c.status === "scheduled") && (
-                  <Button size="sm" variant="reject" disabled={busyId === c.id} onClick={() => setStatus(c, "ended")}>{fr ? "Terminer" : "End now"}</Button>
+                  <Button size="sm" variant="reject" disabled={busyId === c.id} onClick={() => void decide.end(c)}>{fr ? "Terminer" : "End now"}</Button>
                 )}
               </div>
             </CardContent>
@@ -114,6 +105,7 @@ export default function AdminMarketingPage() {
       </div>
 
       <CampaignDetailModal campaign={detail} onClose={() => setDetailId(null)} />
+      {decide.modal}
     </div>
   );
 }

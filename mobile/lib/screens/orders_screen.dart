@@ -102,7 +102,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(locale: widget.locale, orderId: o.id)));
 
   Widget _orderCard(OrderDto o, Strings s) {
-    final c = _statusColor(o.status);
+    final c = _statusColor(o.shownStatus);
     return GestureDetector(
       key: ValueKey('order-${o.reference}'),
       onTap: () => _open(o),
@@ -115,7 +115,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               height: 48,
               width: 48,
               decoration: BoxDecoration(color: c.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(14)),
-              child: Icon(_statusIcon(o.status), color: c),
+              child: Icon(_statusIcon(o.shownStatus), color: c),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -127,19 +127,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
-              child: Text(s.orderStatus(o.status), style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w700)),
+              child: Text(s.orderStatus(o.shownStatus), style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w700)),
             ),
           ]),
           const Divider(height: 22),
           Row(children: [
-            Icon(_statusIcon(o.status), size: 16, color: c),
+            Icon(_statusIcon(o.shownStatus), size: 16, color: c),
             const SizedBox(width: 6),
             Expanded(child: Text(_statusHint(o, s), style: const TextStyle(fontSize: 12.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500))),
             TextButton(
               onPressed: () => _open(o),
               style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 8), textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              child: Text(s.details),
+                  foregroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(horizontal: 8)),
+              child: Text(s.details, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             ),
           ]),
           if (o.cancelledLineCount > 0 && o.status != 'cancelled')
@@ -203,6 +203,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   String _statusHint(OrderDto o, Strings s) {
-    return s.has('hint_${o.status}') ? s.t('hint_${o.status}') : s.hintProcessing;
+    return s.has('hint_${o.shownStatus}') ? s.t('hint_${o.shownStatus}') : s.hintProcessing;
   }
 }

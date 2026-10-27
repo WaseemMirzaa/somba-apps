@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'maps_config.dart';
 
+/// One Google address component, normalised from either the Places (New) or the Geocoding shape.
+typedef AddrComponent = ({List<String> types, String long});
+
 /// Address fields a map pick can pre-fill into the form.
 class PickedParts {
   final String? line1, commune, city, region, country, postalCode;
@@ -13,7 +16,11 @@ class PickedPlace {
   final double lat, lng;
   final String? placeId, formatted;
   final PickedParts parts;
-  const PickedPlace({required this.lat, required this.lng, this.placeId, this.formatted, this.parts = const PickedParts()});
+
+  /// Google's address components for the pin, in the language it was looked up in: `geo:resolve` matches them
+  /// against the delivery areas (in either language).
+  final List<AddrComponent> components;
+  const PickedPlace({required this.lat, required this.lng, this.placeId, this.formatted, this.parts = const PickedParts(), this.components = const []});
 
   /// The pin as stored on the address (`geo`); the server validates and encrypts it.
   Map<String, Object> toGeoJson() => {
@@ -28,9 +35,6 @@ class PlaceSuggestion {
   final String placeId, title, subtitle;
   const PlaceSuggestion({required this.placeId, required this.title, required this.subtitle});
 }
-
-/// One Google address component, normalised from either the Places (New) or the Geocoding shape.
-typedef AddrComponent = ({List<String> types, String long});
 
 /// Turn address components into the fields our address form uses.
 PickedParts partsFromComponents(List<AddrComponent> comps) {
@@ -162,6 +166,7 @@ PickedPlace parsePlaceDetails(Map<String, dynamic> body) {
     placeId: body['id'] as String?,
     formatted: body['formattedAddress'] as String?,
     parts: partsFromComponents(comps),
+    components: comps,
   );
 }
 
@@ -179,5 +184,6 @@ PickedPlace parseGeocode(Map<String, dynamic> body, double lat, double lng) {
     placeId: best['place_id'] as String?,
     formatted: best['formatted_address'] as String?,
     parts: partsFromComponents(comps),
+    components: comps,
   );
 }

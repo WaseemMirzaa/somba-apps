@@ -408,3 +408,16 @@ describe('French money: 52,00 $ (comma decimals, non-breaking spaces)', () => {
     }
   });
 });
+
+describe('dispute resolutions in French', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { resolutionFr } = require('./localize') as typeof import('./localize');
+  it('translates the phrases the server writes and leaves an agent\'s own words alone', () => {
+    expect(resolutionFr('Refunded to wallet')).toBe('Remboursé sur le portefeuille');
+    expect(resolutionFr('Partially refunded')).toBe('Remboursement partiel');
+    expect(resolutionFr('Rejected')).toBe('Refusé');
+    expect(resolutionFr('Customer confirmed by phone')).toBe('Customer confirmed by phone');
+    expect(resolutionFr(null)).toBeNull();
+    expect(resolutionFr('')).toBeNull();
+  });
+});

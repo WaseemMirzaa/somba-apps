@@ -61,6 +61,10 @@ export class PayoutStatementLine {
   @Column({ type: 'datetime', nullable: true })
   deliveredAt: Date | null;
 
+  /** Set when the payout this line belongs to is paid (a rejected payout never sets it). */
+  @Column({ type: 'datetime', nullable: true })
+  paidOutAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

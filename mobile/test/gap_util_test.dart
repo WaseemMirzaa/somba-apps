@@ -1,70 +1,14 @@
-// Pure-logic tests for the gap features: delivery zone matching, product variants, delivery estimate and the cart.
+// Pure-logic tests for the gap features: product variants, delivery estimate and the cart.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lipcart/data/catalog_live.dart';
-import 'package:lipcart/data/market_profiles.dart';
 import 'package:lipcart/data/shop_state.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/util/delivery_estimate.dart';
 import 'package:lipcart/util/variants.dart';
-import 'package:lipcart/util/zone_match.dart';
 
 import 'gap_helpers.dart';
 
 void main() {
-  group('zoneForAddress', () {
-    const zones = [
-      Zone(id: 'gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', deliveryFeeUsd: 3),
-      Zone(id: 'limete', name: 'Limete', nameFr: 'Limeté', city: 'Kinshasa', deliveryFeeUsd: 5),
-      Zone(id: 'lubum', name: 'Lubumbashi Centre', nameFr: 'Lubumbashi Centre', city: 'Lubumbashi', deliveryFeeUsd: 7),
-    ];
-
-    test('matches the commune ignoring case, accents and spaces', () {
-      expect(zoneForAddress(commune: 'gombe', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: '  GOMBE ', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: 'Limeté', zones: zones)?.id, 'limete');
-      expect(zoneForAddress(commune: 'LIMETE', zones: zones)?.id, 'limete');
-    });
-
-    test('accepts the "Commune de …" / "Commune d\'…" prefix', () {
-      expect(zoneForAddress(commune: 'Commune de Gombe', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: 'commune de Limeté', zones: zones)?.id, 'limete');
-      expect(zoneForAddress(commune: "Commune d'Gombe", zones: zones)?.id, 'gombe');
-    });
-
-    test('matches the zone id or the French name too', () {
-      expect(zoneForAddress(commune: 'limete', zones: const [Zone(id: 'z9', name: 'Zed', nameFr: 'Limeté', city: '', deliveryFeeUsd: 1)])?.id, 'z9');
-      expect(zoneForAddress(commune: 'z9', zones: const [Zone(id: 'z9', name: 'Zed', nameFr: 'Zèd', city: '', deliveryFeeUsd: 1)])?.id, 'z9');
-    });
-
-    test('a different city does not match; an unknown city is not blocking', () {
-      expect(zoneForAddress(commune: 'Gombe', city: 'Lubumbashi', zones: zones), isNull);
-      expect(zoneForAddress(commune: 'Gombe', city: 'kinshasa', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: 'Gombe', city: '', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: 'Gombe', city: null, zones: zones)?.id, 'gombe');
-    });
-
-    test('the zone id the address carries wins over the commune', () {
-      expect(zoneForAddress(commune: 'Gombe', zoneId: 'limete', zones: zones)?.id, 'limete');
-      expect(zoneForAddress(commune: null, zoneId: 'lubum', zones: zones)?.id, 'lubum');
-    });
-
-    test('a zone id that no longer exists falls back to the commune', () {
-      expect(zoneForAddress(commune: 'Gombe', zoneId: 'gone', zones: zones)?.id, 'gombe');
-      expect(zoneForAddress(commune: 'Ngaliema', zoneId: 'gone', zones: zones), isNull);
-    });
-
-    test('no match → null (we do not deliver there yet)', () {
-      expect(zoneForAddress(commune: 'Ngaliema', zones: zones), isNull);
-      expect(zoneForAddress(commune: '', zones: zones), isNull);
-      expect(zoneForAddress(commune: null, zones: zones), isNull);
-      expect(zoneForAddress(commune: 'Gombe', zones: const []), isNull);
-    });
-
-    test('works on the fallback zones the app ships with', () {
-      expect(zoneForAddress(commune: 'Limete', city: 'Kinshasa', zones: fallbackZones)?.id, 'limete');
-    });
-  });
-
   group('variants', () {
     test('readVariants reads a JSON string', () {
       final g = readVariants('[{"name":"Size","options":["40","41","42"]},{"name":"Colour","options":["Black","White"]}]');
