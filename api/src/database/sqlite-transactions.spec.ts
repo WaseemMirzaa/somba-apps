@@ -123,4 +123,21 @@ describe('serializeSqliteTransactions', () => {
     expect(serializeSqliteTransactions(mysql as never)).toBe(mysql);
     expect(mysql.manager.transaction).toBe(transaction);
   });
+
+  it('a plain write from another request waits for the open transaction, so that one\'s rollback cannot undo it', async () => {
+    ds = await sqlite(true);
+    await ds.getRepository(Probe).insert({ label: 'stock' });
+    const failing = ds.transaction(async (m) => {
+      await m.insert(Probe, { label: 'doomed' });
+      await tick();
+      await tick();
+      throw new Error('declined');
+    });
+    await tick(); // the transaction is open now
+    const plain = ds.getRepository(Probe).update({ label: 'stock' }, { label: 'released' });
+    await expect(failing).rejects.toThrow('declined');
+    await plain;
+    const labels = (await ds.getRepository(Probe).find()).map((p) => p.label);
+    expect(labels).toEqual(['released']);
+  });
 });

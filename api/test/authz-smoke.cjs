@@ -145,7 +145,8 @@ const register = async (label, role = 'customer') => {
   const cost = 30 + fee;
   ok(wins === 1, `10 simultaneous wallet orders for $${cost} with $50 → exactly 1 succeeds (got ${wins})`);
   ok(Math.abs(bal - (50 - cost)) < 0.011 && bal >= 0, `balance is $${(50 - cost).toFixed(2)}, never negative (got $${bal})`);
-  ok((await req(admin.sock, 'products:get', { id: cheap.id })).data.stock === 99, 'only the winning order reserved stock (failed ones released it)');
+  const cheapStock = (await req(admin.sock, 'products:get', { id: cheap.id })).data.stock;
+  ok(cheapStock === 99, `only the winning order reserved stock (failed ones released it) (got ${cheapStock})`);
 
   const scarce = (await req(admin.sock, 'products:create', { name: `Scarce ${tag}`, price: 5, category: 'Electronics', stock: 3 })).data;
   const rush = await Promise.all(Array.from({ length: 10 }, (_, i) =>
