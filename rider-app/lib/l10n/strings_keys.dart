@@ -108,8 +108,11 @@ extension StringsKeys on Strings {
   String get codeConfirm => t('code_confirm');
   String get codeChecking => t('code_checking');
   String get yourEarnings => t('your_earnings');
-  String fromDeliveriesOne(Object? n) => t('from_deliveries_one', {'n': n});
-  String fromDeliveriesMany(Object? n) => t('from_deliveries_many', {'n': n});
+  String fromTasksOne(Object? n) => t('from_tasks_one', {'n': n});
+  String fromTasksMany(Object? n) => t('from_tasks_many', {'n': n});
+  String get tasksDone => t('tasks_done');
+  String get earnByKind => t('earn_by_kind');
+  String earnRateNote(Object? rate) => t('earn_rate_note', {'rate': rate});
   String get delivered => t('delivered');
   String get inProgress => t('in_progress');
   String get cashCollected => t('cash_collected');

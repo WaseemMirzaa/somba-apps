@@ -75,7 +75,13 @@ class NotificationsScreen extends StatelessWidget {
         final unread = store.unreadCount;
         return Scaffold(
           appBar: backAppBar(context, unread > 0 ? s.notificationsN(unread) : s.notifications, actions: [
-            TextButton(onPressed: unread == 0 ? null : () => store.markAllRead(), child: Text(s.markAll)),
+            // An icon with a tooltip, not the words: "Tout marquer comme lu" took the room of the title in French.
+            IconButton(
+              key: const ValueKey('mark-all-read'),
+              tooltip: s.markAll,
+              icon: const Icon(Icons.done_all_rounded),
+              onPressed: unread == 0 ? null : () => store.markAllRead(),
+            ),
           ]),
           body: items.isEmpty
               ? Center(child: Text(s.allCaughtUp, style: const TextStyle(color: AppColors.muted)))

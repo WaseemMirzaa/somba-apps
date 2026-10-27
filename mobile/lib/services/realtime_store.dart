@@ -69,6 +69,10 @@ class RealtimeStore extends ChangeNotifier {
   /// before checkout instead of letting the server refuse).
   bool requirePinnedAddress = false;
 
+  /// Public setting `codEnabled`: the checkout offers cash on delivery only while the platform allows it.
+  /// (`codCapUsd` is not read: the server only raises a fraud alert above the cap, it never refuses the order.)
+  bool codEnabled = false;
+
   /// True when the app should send the user to verification instead of the server refusing the order/top-up.
   bool get needsVerification {
     final u = user;
@@ -360,10 +364,7 @@ class RealtimeStore extends ChangeNotifier {
     });
     _socket.on('addresses:updated', (_) => unawaited(_loadAddresses()));
     _socket.on('settings:updated', (d) {
-      final m = _map(d);
-      fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
-      if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
-      if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
+      applySettings(_map(d));
       notifyListeners();
     });
     _socket.on('me:updated', (d) {
@@ -384,6 +385,16 @@ class RealtimeStore extends ChangeNotifier {
     }
   }
 
+  /// Reads the public settings the app acts on: the answer of `settings:get` and the `settings:updated` push.
+  /// A key the server did not send keeps its value.
+  @visibleForTesting
+  void applySettings(Map<String, dynamic> m) {
+    fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
+    if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
+    if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
+    if (m.containsKey('codEnabled')) codEnabled = '${m['codEnabled']}' == 'true';
+  }
+
   Future<void> _hydrate() async {
     // Independent loads: one failing must not blank the others.
     await Future.wait([
@@ -399,12 +410,7 @@ class RealtimeStore extends ChangeNotifier {
         ..clear()
         ..addAll((d as List).map((e) => e.toString()))),
       _load('me:get', (d) => user = BackendUser.fromJson(_map(d))),
-      _load('settings:get', (d) {
-        final m = _map(d);
-        fxRate = double.tryParse('${m['fxRate'] ?? ''}');
-        requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
-        requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
-      }),
+      _load('settings:get', (d) => applySettings(_map(d))),
       _load('me:prefs', (d) => prefs = {...prefs, ..._map(d)}),
       _load('cart:get', (d) => serverCart.value = _map(d)),
       _load('cms:list', (d) {

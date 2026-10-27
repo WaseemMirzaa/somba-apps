@@ -641,20 +641,44 @@ class DeliveryTaskDto {
   }
 }
 
+/// How many tasks of one kind (a delivery, a seller pickup, a transfer…) the rider completed, and what they paid.
+class EarningsKind {
+  final String kind;
+  final int count;
+  final double earningsUsd;
+
+  const EarningsKind({required this.kind, required this.count, required this.earningsUsd});
+
+  factory EarningsKind.fromJson(Map<String, dynamic> j) => EarningsKind(
+        kind: j['kind'] as String? ?? '',
+        count: (j['count'] as num?)?.toInt() ?? 0,
+        earningsUsd: (j['earningsUsd'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+/// The server's earnings: the pay is flat per COMPLETED task of any kind, so [completed] (`delivered` on the wire)
+/// counts every finished leg, not only customer deliveries; [byKind] is the breakdown and adds up to [earningsUsd].
 class EarningsDto {
   final int totalTasks;
-  final int delivered;
+  final int completed;
   final int active;
   final double codCollectedUsd;
   final double earningsUsd;
+  final double perTaskUsd;
+  final List<EarningsKind> byKind;
 
-  const EarningsDto({this.totalTasks = 0, this.delivered = 0, this.active = 0, this.codCollectedUsd = 0, this.earningsUsd = 0});
+  const EarningsDto({this.totalTasks = 0, this.completed = 0, this.active = 0, this.codCollectedUsd = 0, this.earningsUsd = 0, this.perTaskUsd = 0, this.byKind = const []});
 
   factory EarningsDto.fromJson(Map<String, dynamic> j) => EarningsDto(
         totalTasks: (j['totalTasks'] as num?)?.toInt() ?? 0,
-        delivered: (j['delivered'] as num?)?.toInt() ?? 0,
+        completed: (j['delivered'] as num?)?.toInt() ?? 0,
         active: (j['active'] as num?)?.toInt() ?? 0,
         codCollectedUsd: (j['codCollectedUsd'] as num?)?.toDouble() ?? 0,
         earningsUsd: (j['earningsUsd'] as num?)?.toDouble() ?? 0,
+        perTaskUsd: (j['perTaskUsd'] as num?)?.toDouble() ?? 0,
+        byKind: [
+          for (final k in (j['byKind'] as List?) ?? const [])
+            if (k is Map) EarningsKind.fromJson(k.map((a, b) => MapEntry(a.toString(), b))),
+        ],
       );
 }

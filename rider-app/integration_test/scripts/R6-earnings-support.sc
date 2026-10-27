@@ -2,9 +2,12 @@
 act riderClear
 include rsetup.sc
 flash
-say "Earnings: the total, deliveries completed and cash collected||Gains : le total, les livraisons effectuées et les espèces encaissées" 3.6
 tap "icon:account_balance_wallet_rounded#last" 1.6
-wait 2.6
+say "Earnings: the total and the number of tasks done, not only deliveries||Gains : le total et le nombre de tâches terminées, pas seulement les livraisons" 3.8
+scroll 250
+say "By kind of task: deliveries, pickups, transfers, each paid the same flat rate||Par type de tâche : livraisons, collectes, transferts, chacun payé au même tarif" 4
+scroll 300
+wait 1
 say "Cash from cash-on-delivery is handed over at the warehouse, which records it||Les espèces sont remises à l'entrepôt, qui les enregistre" 3.6
 tap "icon:two_wheeler_rounded#last" 1.4
 tap key:tab-1 1.6

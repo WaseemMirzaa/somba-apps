@@ -31,6 +31,10 @@ export interface RiderEarnings {
   active: number;
   codCollectedUsd: number;
   earningsUsd: number;
+  /** The flat pay of one completed task, whatever its kind. */
+  perTaskUsd?: number;
+  /** Completed tasks by kind (a delivery, a seller pickup, a transfer...) with the money they earned; sums to `earningsUsd`. */
+  byKind?: { kind: LegKind; count: number; earningsUsd: number }[];
 }
 
 export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";

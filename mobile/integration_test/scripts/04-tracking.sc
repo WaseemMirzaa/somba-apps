@@ -36,11 +36,15 @@ wait 2.6
 cap "Out for delivery: the rider, a Call button and your 4-digit code||En livraison : le livreur, un bouton Appeler et votre code à 4 chiffres" 3.6
 act life step=out ref=$ord
 wait 3.6
-act ping lat=-4.3850 lng=15.3860
-cap "The rider shares a live position on the map||Le livreur partage sa position en direct sur la carte" 3
+act ping lat=-4.3790 lng=15.3950
+cap "The rider shares a live position: how far away they are, and how fresh it is||Le livreur partage sa position : sa distance et la fraîcheur de l'information" 3.6
+wait 3.6
+act ping lat=-4.3745 lng=15.3950
+cap "The distance shrinks as the rider gets closer||La distance diminue à mesure que le livreur approche" 3
 wait 3
-act ping lat=-4.3838 lng=15.3896
-wait 2.4
+act ping lat=-4.3706 lng=15.3950
+cap "Very close: the map is still there, with Open in maps||Tout près : la carte reste affichée, avec Ouvrir dans une application de cartes" 3.2
+wait 3.2
 cap "The rider types the code at the door: delivered||Le livreur saisit le code à la porte : livré" 3
 act life step=deliver ref=$ord
 wait 3.4

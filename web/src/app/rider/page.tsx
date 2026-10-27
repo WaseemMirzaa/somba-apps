@@ -49,7 +49,7 @@ export default function RiderDashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <Kpi title={t("activeTasks")} value={String(activeCount)} icon={Bike} />
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
-        <Kpi title={fr ? "Livrées" : "Delivered"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
+        <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
         <Kpi title={t("earnings")} value={formatCurrency(earnings?.earningsUsd ?? 0, locale)} icon={DollarSign} />
         <Kpi title={fr ? "COD encaissé" : "COD collected"} value={formatCurrency(earnings?.codCollectedUsd ?? 0, locale)} icon={Banknote} />
       </div>

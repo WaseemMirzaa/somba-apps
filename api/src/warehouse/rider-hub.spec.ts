@@ -57,6 +57,32 @@ describe('riders, warehouses and tasks', () => {
     expect(Object.keys(a)).toEqual(['hub']);
   });
 
+  it('earnings: the pay is flat per completed task of any kind, and the breakdown by kind adds up to it', async () => {
+    const h1 = await mkHub('H1');
+    const [me, other] = [await mkRider(h1.id), await mkRider(h1.id)];
+    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', kind: 'delivery', codAmountUsd: 40, hubId: h1.id });
+    await mkTask({ orderId: 'o2', riderId: me.id, status: 'delivered', kind: 'delivery', codAmountUsd: 10, hubId: h1.id });
+    await mkTask({ orderId: 'o3', riderId: me.id, status: 'delivered', kind: 'pickup', hubId: h1.id });
+    await mkTask({ orderId: 'o4', riderId: me.id, status: 'delivered', kind: 'transfer', hubId: h1.id });
+    await mkTask({ orderId: 'o5', riderId: me.id, status: 'in_transit', kind: 'delivery', codAmountUsd: 99, hubId: h1.id });
+    await mkTask({ orderId: 'o6', riderId: me.id, status: 'failed', kind: 'delivery', hubId: h1.id });
+    await mkTask({ orderId: 'o7', riderId: other.id, status: 'delivered', kind: 'delivery', hubId: h1.id });
+    const e = await svc.earnings(me.id);
+    expect(e).toMatchObject({ totalTasks: 6, delivered: 4, active: 1, codCollectedUsd: 50, perTaskUsd: 2.5, earningsUsd: 10 });
+    expect(e.byKind).toEqual([
+      { kind: 'pickup', count: 1, earningsUsd: 2.5 },
+      { kind: 'transfer', count: 1, earningsUsd: 2.5 },
+      { kind: 'delivery', count: 2, earningsUsd: 5 },
+    ]);
+    expect(e.byKind.reduce((s, k) => s + k.earningsUsd, 0)).toBe(e.earningsUsd);
+    expect(e.byKind.reduce((s, k) => s + k.count, 0)).toBe(e.delivered);
+  });
+
+  it('earnings: a rider with nothing done has an empty breakdown', async () => {
+    const me = await mkRider(null);
+    expect(await svc.earnings(me.id)).toEqual({ totalTasks: 0, delivered: 0, active: 0, codCollectedUsd: 0, perTaskUsd: 2.5, byKind: [], earningsUsd: 0 });
+  });
+
   it("a warehouse's task filter covers the legs it manages, sends or receives", () => {
     expect(tasksOfHub({ status: 'unassigned' }, 'H1')).toEqual([
       { status: 'unassigned', hubId: 'H1' },

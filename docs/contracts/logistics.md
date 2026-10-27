@@ -196,7 +196,7 @@ a staff member's list holds their own hub only).
   customer (pickup, transfer, return_to_seller) `shippingAddress` is null and the name is the first name only.
 - `delivery:accept` → `{ok:false, error:"Your warehouse assigns your tasks. You cannot accept a task yourself."}`.
 - `delivery:unassigned` for a rider → `[]`.
-- `delivery:list` (rider) = my tasks. `rider:earnings` counts every delivered leg.
+- `delivery:list` (rider) = my tasks. `rider:earnings` -> `{ totalTasks, delivered, active, codCollectedUsd, perTaskUsd, byKind: [{ kind, count, earningsUsd }], earningsUsd }`. The pay is flat (`perTaskUsd`, $2.50) per COMPLETED task of any kind, so `delivered` counts every finished leg (customer deliveries, seller pickups, transfers, return legs), not only customer deliveries; `byKind` (kinds with at least one) says how many of each and `earningsUsd` is its sum. Screens must call them tasks, not deliveries.
 
 ## 8. Calling logistics from other modules (after-sale)
 

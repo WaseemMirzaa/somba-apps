@@ -56,3 +56,23 @@ until msg:trackOrder 20
 say "Paid from the wallet: confirmed at once||Payé par le portefeuille : confirmé aussitôt" 3
 tap msg:trackOrder 2.5
 wait 1.5
+tohome
+say "Order 3: cash on delivery, offered because the platform allows it||Commande 3 : paiement à la livraison, proposé car la plateforme l'autorise" 3.6
+tap icon:home_rounded 0.8
+tap msg:search 1.2
+type field:0 "instant"
+wait 1.5
+tap "textc:Instant Pot" 2.4
+tap key:pd-buy-now 2.4
+tap key:pay-cod 1
+say "Cash on delivery: you pay the rider in cash, no phone number needed||Paiement à la livraison : on paie le livreur en espèces, sans numéro de téléphone" 3.6
+scroll 600
+tap key:place-order 0.5
+until msg:trackOrder 20
+say "Confirmed at once: nothing to approve on a phone||Confirmée aussitôt : rien à approuver sur un téléphone" 3
+tap msg:trackOrder 2.2
+tohome
+tap icon:receipt_long_rounded 1.5
+tap "keyp:order-SOM#0" 2
+say "The order page reads Pay on delivery, and the order is already being prepared||La page commande indique À payer à la livraison, et la commande est déjà en préparation" 3.8
+wait 1

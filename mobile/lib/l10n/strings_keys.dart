@@ -69,6 +69,7 @@ extension StringsKeys on Strings {
   String get statusReturned => t('status_returned');
   String get payStripeCard => t('pay_stripe_card');
   String get payCod => t('pay_cod');
+  String get payCodNote => t('pay_cod_note');
   String get payWallet => t('pay_wallet');
   String get send => t('send');
   String get close => t('close');
@@ -534,6 +535,7 @@ extension StringsKeys on Strings {
   String get orderHelp => t('order_help');
   String get orderPaid => t('order_paid');
   String get orderAwaiting => t('order_awaiting');
+  String get orderPayOnDelivery => t('order_pay_on_delivery');
   String get orderRefunded => t('order_refunded');
   String get orderPayFailed => t('order_pay_failed');
   String get trackPlaced => t('track_placed');
@@ -544,9 +546,13 @@ extension StringsKeys on Strings {
   String get trackNotYet => t('track_not_yet');
   String get trackDone => t('track_done');
   String get trackDoneHint => t('track_done_hint');
-  String trackLivePos(Object? lat, Object? lng) => t('track_live_pos', {'lat': lat, 'lng': lng});
+  String get trackRiderNear => t('track_rider_near');
+  String trackRiderAway(String dist) => t('track_rider_away', {'dist': dist});
+  String get trackRiderLive => t('track_rider_live');
+  String get trackUpdatedNow => t('track_updated_now');
+  String trackUpdatedS(int n) => t('track_updated_s', {'n': n});
+  String trackUpdatedM(int n) => t('track_updated_m', {'n': n});
   String get trackLiveHint => t('track_live_hint');
-  String trackRiderPos(Object? lat, Object? lng) => t('track_rider_pos', {'lat': lat, 'lng': lng});
   String get trackOpenMaps => t('track_open_maps');
   String get trackMapsFail => t('track_maps_fail');
   String get trackYourRider => t('track_your_rider');

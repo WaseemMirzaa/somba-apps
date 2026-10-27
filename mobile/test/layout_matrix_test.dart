@@ -2,6 +2,7 @@
 // the app's real fonts and Congolese-franc prices (the longest amounts). Fails on any overflow or layout error, a
 // button label that wraps or is cut, a price cut short, or a button or text drawn over other text.
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -23,6 +24,7 @@ import 'package:lipcart/screens/orders_screen.dart';
 import 'package:lipcart/screens/payment_pending_screen.dart';
 import 'package:lipcart/screens/product_detail_screen.dart';
 import 'package:lipcart/screens/wallet_screen.dart';
+import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/services/models.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/theme/app_theme.dart';
@@ -178,6 +180,7 @@ Future<void> _seed(String lang) async {
         'read': true,
       }),
     ]);
+  store.codEnabled = true; // the checkout offers cash on delivery
   store.debugCallRequest = (event, [body]) async => switch (event) {
         'reviews:list' => [
             {
@@ -214,6 +217,7 @@ void main() {
       ..banners.clear()
       ..payments.clear()
       ..notifications.clear()
+      ..codEnabled = false
       ..riderLocations.clear();
     gapTearDown();
   });
@@ -263,4 +267,47 @@ void main() {
       expect(found, isEmpty, reason: found.join('\n'));
     });
   }
+
+  // The title and the "mark all as read" action both fit: in French the action's words used to take the title's room
+  // ("Notifications (…"). The action is an icon with a tooltip now.
+  testWidgets('notifications: the title is not cut and the mark-all action is there (360 and 402 pt, 1.0 and 1.3, EN and FR)', (tester) async {
+    addTearDown(tester.view.reset);
+    final found = <String>[];
+    for (final c in layoutConfigs) {
+      await _seed(c.lang);
+      RealtimeStore.instance.notifications
+        ..clear()
+        ..addAll([
+          for (var i = 0; i < 128; i++)
+            NotificationDto.fromJson({'id': 'n$i', 'title': 'Order $i', 'titleFr': 'Commande $i', 'body': 'On its way', 'bodyFr': 'En route', 'type': 'order', 'createdAt': '2026-10-24T09:30:00Z'}),
+        ]);
+      final locale = Locale(c.lang);
+      final app = MaterialApp(
+        theme: AppTheme.light(),
+        locale: locale,
+        supportedLocales: const [Locale('en'), Locale('fr')],
+        localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
+        builder: scaleText(c),
+        home: NotificationsScreen(locale: locale),
+      );
+      found.addAll((await layoutProblems(tester, c, app)).map((p) => '[$c] $p'));
+      final s = Strings(c.lang);
+      final title = find.descendant(of: find.byType(AppBar), matching: find.text(s.notificationsN(128)));
+      if (title.evaluate().isEmpty) {
+        found.add('[$c] no title "${s.notificationsN(128)}"');
+      } else {
+        final p = tester.renderObject<RenderParagraph>(find.descendant(of: title, matching: find.byType(RichText)).first);
+        if (p.didExceedMaxLines) found.add('[$c] the title is cut: "${s.notificationsN(128)}"');
+      }
+      final action = find.byKey(const ValueKey('mark-all-read'));
+      if (action.evaluate().isEmpty) {
+        found.add('[$c] no mark-all action');
+      } else {
+        expect(tester.widget<IconButton>(action).tooltip, s.markAll, reason: 'the words are in the tooltip');
+        final r = tester.getRect(action);
+        if (r.right > c.size.width || r.left < 0 || r.width < 40) found.add('[$c] the mark-all action is not fully on screen or too small: $r');
+      }
+    }
+    expect(found, isEmpty, reason: found.join('\n'));
+  });
 }

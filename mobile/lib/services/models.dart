@@ -646,6 +646,16 @@ class OrderDto {
     this.routeBySeller = const {},
   });
 
+  /// Cash on delivery: the server keeps the order `pending` until the rider collects the money, but it is already
+  /// being prepared (nothing to approve on a phone), so the app treats it like a confirmed order.
+  bool get isCod => paymentMethod == 'cod';
+
+  /// Waiting for the customer to pay online (mobile money): `pending` and not cash on delivery.
+  bool get awaitsOnlinePayment => status == 'pending' && !isCod;
+
+  /// The status to show: a cash-on-delivery order that is still `pending` reads as confirmed.
+  String get shownStatus => status == 'pending' && isCod ? 'confirmed' : status;
+
   Map<String, dynamic>? get _shipping {
     final raw = shippingRaw;
     if (raw == null || raw.isEmpty) return null;
@@ -952,7 +962,10 @@ class RiderLocationDto {
   final double lat;
   final double lng;
 
-  RiderLocationDto({required this.orderId, required this.lat, required this.lng});
+  /// When the app received this position (the server's push carries no time): "Updated 12 s ago".
+  final DateTime at;
+
+  RiderLocationDto({required this.orderId, required this.lat, required this.lng, DateTime? at}) : at = at ?? DateTime.now();
 
   factory RiderLocationDto.fromJson(Map<String, dynamic> j) => RiderLocationDto(
         orderId: j['orderId'] as String? ?? '',

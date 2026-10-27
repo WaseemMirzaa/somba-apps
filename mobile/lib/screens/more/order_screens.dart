@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/catalog_live.dart';
@@ -8,6 +9,7 @@ import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../util/delivery_estimate.dart';
+import '../../util/geo_distance.dart';
 import '../../util/journey.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
@@ -36,7 +38,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(s.orderCancelQ),
-        content: Text(o.status == 'pending' ? s.orderCancelUnpaid : s.orderCancelRefund),
+        content: Text(o.awaitsOnlinePayment ? s.orderCancelUnpaid : s.orderCancelRefund),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.orderKeep)),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(s.cancelOrder)),
@@ -67,8 +69,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
         final payment = store.paymentForOrder(o.id);
         final cancellable = o.status == 'pending' || o.status == 'confirmed';
-        final trackable = const {'confirmed', 'processing', 'shipped', 'out_for_delivery'}.contains(o.status);
-        final c = switch (o.status) {
+        final trackable = const {'confirmed', 'processing', 'shipped', 'out_for_delivery'}.contains(o.shownStatus);
+        final c = switch (o.shownStatus) {
           'delivered' => AppColors.success,
           'cancelled' || 'returned' => AppColors.danger,
           'out_for_delivery' || 'shipped' => AppColors.primary,
@@ -91,13 +93,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(s.orderStatus(o.status), key: const ValueKey('order-status'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      Text(s.orderStatus(o.shownStatus), key: const ValueKey('order-status'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                       const SizedBox(height: 2),
                       if (o.createdAt != null)
                         Text(s.orderPlacedWhen(s.when(o.createdAt!)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                     ]),
                   ),
-                  if (o.status == 'pending' && payment != null && payment.isPending)
+                  if (o.awaitsOnlinePayment && payment != null && payment.isPending)
                     FilledButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentPendingScreen(locale: widget.locale, orderId: o.id))),
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 14)),
@@ -153,7 +155,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${_paymentState(s, payment)} · ${s.paymentLabel(o.paymentMethod)}',
+                        '${_paymentState(s, payment, cod: o.isCod)} · ${s.paymentLabel(o.paymentMethod)}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                     ),
@@ -248,11 +250,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  static String _paymentState(Strings s, PaymentDto? p) {
+  static String _paymentState(Strings s, PaymentDto? p, {bool cod = false}) {
     if (p == null) return s.orderPaid;
     return switch (p.status) {
       'succeeded' => s.orderPaid,
-      'pending' => s.orderAwaiting,
+      'pending' => cod ? s.orderPayOnDelivery : s.orderAwaiting,
       'refunded' => s.orderRefunded,
       _ => s.orderPayFailed,
     };
@@ -467,7 +469,7 @@ class OrderTrackingScreen extends StatelessWidget {
                       o.status == 'delivered'
                           ? s.trackDoneHint
                           : loc != null
-                              ? s.trackLivePos(loc.lat.toStringAsFixed(4), loc.lng.toStringAsFixed(4))
+                              ? (riderDistanceText(s, (lat: loc.lat, lng: loc.lng), o.destination) ?? s.trackRiderLive)
                               : s.trackLiveHint,
                       style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
                     ),
@@ -500,8 +502,8 @@ class OrderTrackingScreen extends StatelessWidget {
                     RiderMap(rider: (lat: loc.lat, lng: loc.lng), destination: o.destination),
                     const SizedBox(height: 10),
                   ],
-                  Text(s.trackRiderPos(loc.lat.toStringAsFixed(5), loc.lng.toStringAsFixed(5)),
-                      key: const ValueKey('rider-coords'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  // Not the coordinates: how long ago the position came (it ticks on its own).
+                  UpdatedAgo(at: loc.at, key: const ValueKey('rider-updated')),
                   const SizedBox(height: 10),
                   OutlinedButton(
                     key: const ValueKey('open-maps'),
@@ -518,6 +520,37 @@ class OrderTrackingScreen extends StatelessWidget {
       },
     );
   }
+}
+
+/// "Updated 12 s ago" under the rider's map: re-reads the clock every few seconds so the age keeps counting.
+class UpdatedAgo extends StatefulWidget {
+  final DateTime at;
+  const UpdatedAgo({super.key, required this.at});
+
+  @override
+  State<UpdatedAgo> createState() => _UpdatedAgoState();
+}
+
+class _UpdatedAgoState extends State<UpdatedAgo> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(updatedAgoText(Strings.of(context), widget.at), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5));
 }
 
 /// One row of the parcel's journey: what happened, where (the warehouse's name) and when.
