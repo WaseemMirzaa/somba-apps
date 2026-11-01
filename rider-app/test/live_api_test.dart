@@ -1,7 +1,7 @@
 // End-to-end test of the REAL rider client (AuthService + RiderStore + socket
 // protocol) against a RUNNING backend. Skipped unless LIVE_TEST=true.
 //
-//   cd api && npm run seed && node dist/main.js
+//   cd api && npm run seed && node dist/main.js   (needs the warehouse, admin, customer and rider demo accounts)
 //   cd rider-app && flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
 //     --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 import 'dart:async';
@@ -10,7 +10,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/services/auth_service.dart';
+import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/rider_store.dart';
+import 'package:somba_rider/services/support_store.dart';
 import 'package:somba_rider/services/socket_service.dart';
 
 const live = bool.fromEnvironment('LIVE_TEST');
@@ -44,18 +46,20 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('rider: sign in, claim, deliver, GPS push reaches the customer', () async {
+  test('rider: the warehouse assigns a pickup; the rider moves it but cannot deliver or accept it; staff scan it in', () async {
     final admin = Actor();
     await admin.connect('admin@somba.app', 'Somba@2026');
     final customer = Actor();
     await customer.connect('customer@somba.app', 'Somba@2026');
+    final staff = Actor();
+    await staff.connect('warehouse@somba.app', 'Somba@2026');
     final store = RiderStore.instance;
 
     // Wrong password is a readable error, not an offline entry.
     await expectLater(store.login('rider@somba.app', 'wrong-password'), throwsA(anything));
     expect(store.isSignedIn, isFalse);
 
-    // COD is off by default; enable for this run, then the customer orders cash-on-delivery.
+    // COD is off by default; enable for this run, then the customer orders cash-on-delivery (pinned in Gombe).
     await admin.call('settings:set', {'key': 'codEnabled', 'value': 'true'});
     final products = ((await customer.call('products:list')) as List).where((p) => ((p['stock'] as num?) ?? 0) > 5).toList();
     final order = await customer.call('orders:create', {
@@ -63,39 +67,40 @@ void main() {
         {'productId': products.first['id'], 'qty': 1}
       ],
       'paymentMethod': 'cod',
-      'deliveryFeeUsd': 3,
-      'zoneId': 'gombe',
-      'shippingAddress': '{"city":"Kinshasa","line1":"12 Ave du Commerce"}',
+      'shippingAddress': '{"city":"Kinshasa","line1":"12 Ave du Commerce","geo":{"lat":-4.3105,"lng":15.3136}}',
     });
 
     await store.login('rider@somba.app', 'Somba@2026');
     await until(() => store.isConnected && store.loaded, what: 'rider hydrated');
     expect(store.user!.role, 'rider');
-    await until(() => store.pool.any((t) => t.orderId == order['id']), what: 'task in pool');
-    final task = store.pool.firstWhere((t) => t.orderId == order['id']);
+    await until(() => store.assignment?.hasHub == true, what: 'home warehouse');
+    // docs/contracts/areas.md: rider:assignment carries hub.areaId and hub.coverage (the seeded Entrepôt Kinshasa covers
+    // CD-KN); the rider's runs are listed with the additive Run fields.
+    await until(() => store.assignment?.coverage != null, what: 'the warehouse coverage');
+    expect(store.assignment!.areas, isNotEmpty);
+    expect(await store.request('rider:runs'), isA<List>());
 
-    await store.accept(task.id);
-    expect(store.active.any((t) => t.id == task.id), isTrue);
-    expect(store.pool.any((t) => t.id == task.id), isFalse);
+    // The rider sees nothing until the warehouse assigns, cannot accept, and has no open pool.
+    expect(store.myTasks.any((t) => t.orderId == order['id']), isFalse);
+    expect(await store.request('delivery:unassigned'), isEmpty);
+
+    final queue = await staff.call('logistics:queue', {'kind': 'pickup'}) as Map;
+    final row = (queue['tasks'] as List).firstWhere((t) => t['orderId'] == order['id']) as Map;
+    await expectLater(store.request('delivery:accept', {'taskId': row['id']}), throwsA(predicate((e) => e.toString().contains('warehouse assigns'))));
+    await staff.call('logistics:assign', {'taskId': row['id'], 'riderId': store.user!.id});
+    await until(() => store.myTasks.any((t) => t.id == row['id']), what: 'assigned pickup (task:updated push)');
+    final task = store.myTasks.firstWhere((t) => t.id == row['id']);
+    expect(task.kind, LegKind.pickup);
+    expect(task.endsAtHub, isTrue);
+    expect(task.from?.type, 'seller');
+    expect(task.to?.type, 'hub');
 
     await store.advance(task.id, 'picked_up');
     await store.advance(task.id, 'in_transit');
-
-    final located = Completer<Map>();
-    customer.socket.socket!.on('delivery:location', (d) {
-      if (!located.isCompleted) located.complete(d as Map);
-    });
-    await store.sendLocation(task.id, -4.325, 15.322);
-    final loc = await located.future.timeout(const Duration(seconds: 6));
-    expect(loc['lat'], -4.325);
-
-    await store.advance(task.id, 'delivered');
-    await until(() => store.finished.any((t) => t.id == task.id), what: 'task finished');
-    expect(store.earnings.delivered, greaterThan(0));
-    expect(store.earnings.codCollectedUsd, greaterThan(0));
-
-    // Server rule: cannot skip or redo a finished delivery.
-    await expectLater(store.advance(task.id, 'picked_up'), throwsA(anything));
+    // Server rule: a leg that ends at a warehouse is finished by the staff scan, never by the rider.
+    await expectLater(store.advance(task.id, 'delivered'), throwsA(predicate((e) => e.toString().contains('warehouse staff scan'))));
+    await staff.call('logistics:scanIn', {'taskId': task.id});
+    await until(() => store.finished.any((t) => t.id == task.id), what: 'scanned in');
 
     await store.logout();
     expect(store.isSignedIn, isFalse);
@@ -103,77 +108,33 @@ void main() {
     await admin.call('settings:set', {'key': 'codEnabled', 'value': 'false'});
     admin.close();
     customer.close();
+    staff.close();
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');
 
-  test('rider: fail with a reason (re-queued as attempt 2) and deliver with the customer code', () async {
+  test('rider: a support ticket with a reply from an agent, live', () async {
     final admin = Actor();
     await admin.connect('admin@somba.app', 'Somba@2026');
-    final customer = Actor();
-    await customer.connect('customer@somba.app', 'Somba@2026');
     final store = RiderStore.instance;
-    final products = ((await customer.call('products:list')) as List).where((p) => ((p['stock'] as num?) ?? 0) > 5).toList();
-
-    Future<Map> order() async => Map<String, dynamic>.from(await customer.call('orders:create', {
-          'items': [
-            {'productId': products.first['id'], 'qty': 1}
-          ],
-          'paymentMethod': 'stripe_card',
-          'zoneId': 'gombe',
-          'shippingAddress': '{"city":"Kinshasa","line1":"3 Ave Livre"}',
-        }));
-
+    final support = SupportStore.instance;
     await store.login('rider@somba.app', 'Somba@2026');
     await until(() => store.isConnected && store.loaded, what: 'rider hydrated');
 
-    // ---- failed delivery from `assigned` with a reason -> new task, attempt 2
-    final o1 = await order();
-    // The server does not push new pool items to riders, so re-read like pull-to-refresh.
-    await store.refresh();
-    await until(() => store.pool.any((t) => t.orderId == o1['id']), what: 'task in pool');
-    final t1 = store.pool.firstWhere((t) => t.orderId == o1['id']);
-    expect(t1.attempts, 1);
-    await store.accept(t1.id);
-    await store.advance(t1.id, 'failed', reason: 'Customer unreachable');
-    await until(() => store.finished.any((t) => t.id == t1.id), what: 'failed task in Done');
-    final failed = store.finished.firstWhere((t) => t.id == t1.id);
-    expect(failed.status, 'failed');
-    expect(failed.failureReason, startsWith('Customer unreachable'));
-    await until(() => store.pool.any((t) => t.orderId == o1['id']), what: 're-queued task');
-    final again = store.pool.firstWhere((t) => t.orderId == o1['id']);
-    expect(again.id, isNot(t1.id));
-    expect(again.attempts, 2);
+    final t = await support.open(subject: 'Live test ticket', message: 'Bonjour, test.', category: 'delivery');
+    expect(t.status, 'open');
+    expect(t.messages.single.text, 'Bonjour, test.');
+    await support.load();
+    expect(support.tickets.any((x) => x.id == t.id), isTrue);
 
-    // ---- proof of delivery: wrong code refused, right code delivers
-    await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'true'});
-    try {
-      await store.refresh();
-      expect(store.requireDeliveryCode, isTrue);
-      final o2 = await order();
-      await store.refresh();
-      await until(() => store.pool.any((t) => t.orderId == o2['id']), what: 'second task in pool');
-      final t2 = store.pool.firstWhere((t) => t.orderId == o2['id']);
-      await store.accept(t2.id);
-      await store.advance(t2.id, 'picked_up');
-      await store.advance(t2.id, 'in_transit');
-      final info = await customer.call('orders:deliveryCode', {'orderId': o2['id']}) as Map;
-      expect(info['required'], isTrue);
-      final code = info['code'] as String;
-      expect(code, matches(RegExp(r'^\d{4}$')));
+    await admin.call('support:reply', {'id': t.id, 'text': 'Reçu.'});
+    await until(() => support.byId(t.id)?.messages.length == 2, what: 'support:updated push');
+    expect(support.byId(t.id)!.userUnread, 1);
+    await support.markRead(t.id);
+    expect(support.byId(t.id)!.userUnread, 0);
 
-      await expectLater(store.advance(t2.id, 'delivered'), throwsA(anything));
-      final wrong = code == '1234' ? '4321' : '1234';
-      await expectLater(store.advance(t2.id, 'delivered', code: wrong), throwsA(predicate((e) => e.toString().contains('Wrong delivery code'))));
-      await store.advance(t2.id, 'delivered', code: code);
-      await until(() => store.finished.any((t) => t.id == t2.id && t.status == 'delivered'), what: 'delivered with code');
-    } finally {
-      await admin.call('settings:set', {'key': 'requireDeliveryCode', 'value': 'false'});
-    }
-    await store.refresh();
-    expect(store.requireDeliveryCode, isFalse);
-
+    await admin.call('support:setStatus', {'id': t.id, 'status': 'closed'});
+    await until(() => support.byId(t.id)?.isClosed == true, what: 'closed');
     await store.logout();
     admin.close();
-    customer.close();
   }, skip: live ? false : 'set --dart-define=LIVE_TEST=true');
 
   test('rider: push device registration (devices:register as the rider app) and removal on sign-out', () async {

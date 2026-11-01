@@ -116,11 +116,10 @@ class _SearchScreenState extends State<SearchScreen> {
         // Products / Stores toggle
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-          child: Row(children: [
-            _seg(tr.products, 0), const SizedBox(width: 8), _seg(tr.tabStores, 1),
-            const Spacer(),
-            if (_tab == 0)
-              _filterButton(tr),
+          // Wrap: with long labels or large text the filter button moves under the toggle instead of overflowing.
+          child: Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, runSpacing: 8, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [_seg(tr.products, 0), const SizedBox(width: 8), _seg(tr.tabStores, 1)]),
+            if (_tab == 0) _filterButton(tr),
           ]),
         ),
         if (_tab == 0) _quickSortRow(tr),

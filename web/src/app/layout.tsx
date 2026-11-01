@@ -5,10 +5,7 @@ import { LocaleProvider } from "@/context/locale-context";
 import { AuthProvider } from "@/context/auth-context";
 import { ToastProvider } from "@/context/toast-context";
 import { ShopProvider } from "@/context/shop-context";
-import { WarehouseAdminProvider } from "@/context/warehouse-admin-context";
-import { WarehouseStaffProvider } from "@/context/warehouse-staff-context";
 import { MarketProvider } from "@/context/market-context";
-import { ReviewsProvider } from "@/context/reviews-context";
 import { RealtimeProvider } from "@/context/realtime-context";
 import { LocaleAccountSync } from "@/components/layout/locale-account-sync";
 
@@ -41,21 +38,15 @@ export default function RootLayout({
         <LocaleProvider>
           <RealtimeProvider>
             <MarketProvider>
-              <WarehouseStaffProvider>
-                <AuthProvider>
-                  <WarehouseAdminProvider>
-                    <ReviewsProvider>
-                      <ShopProvider>
+                              <AuthProvider>
+                                                            <ShopProvider>
                         <ToastProvider>
                           <LocaleAccountSync />
                           {children}
                         </ToastProvider>
                       </ShopProvider>
-                    </ReviewsProvider>
-                  </WarehouseAdminProvider>
-                </AuthProvider>
-              </WarehouseStaffProvider>
-            </MarketProvider>
+                                                      </AuthProvider>
+                          </MarketProvider>
           </RealtimeProvider>
         </LocaleProvider>
       </body>

@@ -13,6 +13,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { tasksOf, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const NEW_PW = 'Gap-Pass-2026';
@@ -105,7 +106,7 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
       return r;
     };
     const stockOf = async (id) => (await req(buyer.sock, 'products:get', { id })).data?.stock;
-    const order = (items, extra = {}) => req(buyer.sock, 'orders:create', { items, paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS, ...extra });
+    const order = (items, extra = {}) => req(buyer.sock, 'orders:create', { items, paymentMethod: 'stripe_card', shippingAddress: ADDRESS, ...extra });
     const trackOrder = (r) => { if (r.ok) cleanupOrders.push(r.data.id); return r; };
 
     // =======================================================================
@@ -231,6 +232,8 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
     ok((await req(admin.sock, 'orders:list')).data.find((o) => o.id === estOrder.id)?.estimatedDeliveryDate === expected, 'admin sees it');
     ok((await req(seller.sock, 'orders:list')).data.find((o) => o.id === estOrder.id)?.estimatedDeliveryDate === expected, 'the seller\'s order view shows it');
     if (rider) {
+      const pk = await until(async () => (await tasksOf(admin, estOrder.id)).find((t) => t.kind === 'pickup'));
+      await req(admin.sock, 'logistics:assign', { taskId: pk.id, riderId: rider.user.id });
       const task = await until(async () => (await req(rider.sock, 'rider:tasks')).data?.find((t) => t.orderId === estOrder.id));
       ok(task?.order?.estimatedDeliveryDate === expected, 'the rider queue snapshot carries the estimate', JSON.stringify(task?.order && { est: task.order.estimatedDeliveryDate }));
     } else {
@@ -274,16 +277,20 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
       const oid = shipOrder.data.id;
       const mine = async () => (await req(buyer.sock, 'orders:list')).data.find((o) => o.id === oid);
       ok(!('rider' in (await mine())), 'confirmed: no rider field for the customer');
-      const task = await until(async () => (await req(rider.sock, 'rider:tasks')).data?.find((t) => t.orderId === oid));
-      ok(!!task, 'the delivery task is open');
+      const pickup = await until(async () => (await tasksOf(admin, oid)).find((t) => t.kind === 'pickup'));
+      ok(!!pickup, 'the pickup task is open');
       const dir = (await req(admin.sock, 'warehouse:riders')).data?.find((x) => x.id === rider.user.id);
-      const accepted = await req(rider.sock, 'delivery:accept', { taskId: task.id });
-      ok(accepted.ok, 'a rider accepts the delivery', accepted.error ?? '');
+      const accepted = await req(admin.sock, 'logistics:assign', { taskId: pickup.id, riderId: rider.user.id });
+      ok(accepted.ok, 'the warehouse gives the pickup to a rider', accepted.error ?? '');
       let o = await mine();
-      ok(o.status === 'processing' && o.riderId === rider.user.id && !('rider' in o), 'processing (rider assigned): the contact is not shared yet', JSON.stringify({ s: o.status, rider: o.rider }));
+      ok(o.status === 'processing' && !('rider' in o), 'processing (pickup assigned): the contact is not shared, and the pickup rider is never the order rider', JSON.stringify({ s: o.status, rider: o.rider }));
+      const task = await toDelivery(admin, rider, oid); // pickup scanned in at the hub, delivery given to the rider
+      o = await mine();
+      ok(o.riderId === rider.user.id, 'the delivery rider is recorded on the order');
 
       const step = (status, code) => req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status, ...(code ? { code } : {}) });
-      const sawPush = (status) => until(() => buyerPushes.find((p) => p.id === oid && p.status === status) ?? null);
+      // While the parcel is on the road the customer's push carries the rider (the order was already 'shipped' at the hub, before the rider was known).
+      const sawPush = (status) => until(() => buyerPushes.find((p) => p.id === oid && p.status === status && (status === 'delivered' || p.rider)) ?? null);
 
       let s = await step('picked_up');
       ok(s.ok, 'the rider picks up the parcel (order: shipped)', s.error ?? '');

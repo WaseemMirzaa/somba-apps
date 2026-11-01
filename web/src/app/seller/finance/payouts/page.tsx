@@ -64,6 +64,11 @@ export default function SellerPayoutsPage() {
         )},
         { key: "date", label: t("date") },
         { key: "providerRef", label: fr ? "Réf. de virement" : "Transfer ref.", render: (row) => String(row.providerRef ?? "—") },
+        {
+          key: "note",
+          label: fr ? "Note de la finance" : "Finance note",
+          render: (row) => (row.note ? <span className={row.status === "rejected" ? "text-red-700" : "text-slate-600"}>{String(row.note)}</span> : "—"),
+        },
         { key: "actions", label: t("action"), render: (row) => (
           <div className="flex flex-col gap-1">
             <Link href={`/seller/finance/payouts/${row.id}`} className="text-sm text-[var(--primary)] hover:underline">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeftRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -50,7 +51,7 @@ export default function WarehouseExchangeDetailPage() {
           { label: fr ? "Échanges" : "Exchanges", href: listHref },
           { label: exc.reference },
         ]}
-        actions={<Badge variant={exc.status === "dispatched" ? "success" : exc.status === "rejected" ? "danger" : "warning"}>{statusLabel}</Badge>}
+        actions={<Badge variant={exc.status === "dispatched" || exc.status === "delivered" ? "success" : exc.status === "rejected" ? "danger" : "warning"}>{statusLabel}</Badge>}
       />
 
       <DetailGrid>
@@ -62,7 +63,17 @@ export default function WarehouseExchangeDetailPage() {
             { label: fr ? "Statut" : "Status", value: statusLabel },
             { label: fr ? "Motif" : "Reason", value: exc.reason ?? "—", full: true },
             { label: fr ? "Différence de prix" : "Price difference", value: priceDiffLabel },
+            { label: fr ? "Quantité" : "Quantity", value: exc.qty ?? 1 },
+            { label: fr ? "Livré le" : "Delivered", value: exc.deliveredAt ? shortDate(exc.deliveredAt, locale) : "—" },
+            ...(exc.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: exc.sellerReason, full: true }] : []),
           ]} />
+          {exc.deliveryTaskId ? (
+            <Link href={ops(`/tasks/${exc.deliveryTaskId}`)} className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">
+              {fr ? "Suivre les trajets de livraison (le statut suit le trajet) →" : "Follow the delivery legs (the status follows the leg) →"}
+            </Link>
+          ) : exc.status === "approved" ? (
+            <p className="mt-3 text-xs text-slate-500">{fr ? "Le trajet de livraison est créé à l'approbation." : "The delivery leg is created on approval."}</p>
+          ) : null}
         </DetailGridSection>
 
         <DetailGridSection title={t("customer")}>
@@ -89,8 +100,8 @@ export default function WarehouseExchangeDetailPage() {
           <div className="grid gap-6 lg:grid-cols-[1fr_auto_1fr]">
             <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fr ? "Article retourné" : "Item being returned"}</p>
-              <p className="font-medium text-slate-900">{exc.fromName}</p>
-              <p className="text-xs text-slate-500">SKU: {exc.fromSku}</p>
+              <p className="font-medium text-slate-900">{fr && exc.fromNameFr ? exc.fromNameFr : exc.fromName}</p>
+              <p className="text-xs text-slate-500">SKU: {exc.fromSku}{exc.fromVariant ? ` · ${exc.fromVariant}` : ""}</p>
             </div>
             <div className="flex items-center justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-600">
@@ -99,8 +110,8 @@ export default function WarehouseExchangeDetailPage() {
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fr ? "Nouvel article" : "Replacement item"}</p>
-              <p className="font-medium text-slate-900">{exc.toName}</p>
-              <p className="text-xs text-slate-500">SKU: {exc.toSku}</p>
+              <p className="font-medium text-slate-900">{fr && exc.toNameFr ? exc.toNameFr : exc.toName}</p>
+              <p className="text-xs text-slate-500">SKU: {exc.toSku}{exc.toVariant ? ` · ${exc.toVariant}` : ""}</p>
             </div>
           </div>
         </DetailGridSection>

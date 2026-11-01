@@ -9,6 +9,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { ErrorNote } from "@/components/admin/modal";
+import { useCampaignDecisions } from "@/components/admin/campaign-decision";
 import { CampaignDetailModal, CampaignPhaseBadge, CampaignScopeLine } from "@/components/admin/campaign-detail";
 import { SectionError } from "@/components/admin/query-state";
 import { Tag, Clock, CheckCircle2, XCircle } from "lucide-react";
@@ -49,6 +50,7 @@ export default function AdminPromotionsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = campaigns.find((c) => c.id === detailId) ?? null;
+  const decide = useCampaignDecisions((u) => setCampaigns((cur) => cur.map((x) => (x.id === u.id ? { ...x, ...u } : x))));
   const [form, setForm] = useState(EMPTY_PROMO);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,19 +59,6 @@ export default function AdminPromotionsPage() {
   const approved = campaigns.filter((c) => c.status === "active" || c.status === "scheduled").length;
   const rejected = campaigns.filter((c) => c.status === "rejected").length;
   const shown = filter === "all" ? campaigns : campaigns.filter((c) => c.status === filter);
-
-  async function decide(c: CampaignRow, status: "active" | "rejected") {
-    setBusyId(c.id);
-    try {
-      const updated = await socketClient.request<CampaignRow>("campaigns:setStatus", { id: c.id, status });
-      setCampaigns((cur) => cur.map((x) => (x.id === c.id ? { ...x, ...updated } : x)));
-      toast(status === "active" ? (fr ? "Campagne approuvée" : "Campaign approved") : fr ? "Campagne rejetée" : "Campaign rejected", "success");
-    } catch (e) {
-      toast(errMsg(e), "error");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   async function setPromoActive(p: PromoRow, active: boolean) {
     setBusyId(p.id);
@@ -143,6 +132,7 @@ export default function AdminPromotionsPage() {
             tabs={[
               { id: "pending", label: fr ? "En attente" : "Pending" },
               { id: "active", label: fr ? "Actives" : "Active" },
+              { id: "scheduled", label: fr ? "Planifiées" : "Scheduled" },
               { id: "rejected", label: fr ? "Rejetées" : "Rejected" },
               { id: "all", label: fr ? "Toutes" : "All" },
             ]}
@@ -184,8 +174,8 @@ export default function AdminPromotionsPage() {
                       <div className="flex flex-wrap gap-2">
                         <button onClick={() => setDetailId(c.id)} className="text-sm font-medium text-[var(--primary)] hover:underline">{fr ? "Détails" : "Details"}</button>
                         {c.status === "pending" && (<>
-                        <button disabled={busyId === c.id} onClick={() => decide(c, "active")} className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50">{fr ? "Approuver" : "Approve"}</button>
-                        <button disabled={busyId === c.id} onClick={() => decide(c, "rejected")} className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50">{fr ? "Rejeter" : "Reject"}</button>
+                        <button disabled={decide.busyId === c.id} onClick={() => void decide.approve(c)} className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50">{fr ? "Approuver" : "Approve"}</button>
+                        <button disabled={decide.busyId === c.id} onClick={() => decide.reject(c)} className="text-sm font-medium text-red-600 hover:underline disabled:opacity-50">{fr ? "Rejeter" : "Reject"}</button>
                         </>)}
                       </div>
                     );
@@ -198,6 +188,7 @@ export default function AdminPromotionsPage() {
       )}
 
       <CampaignDetailModal campaign={detail} onClose={() => setDetailId(null)} />
+      {decide.modal}
 
       {tab === "codes" && (
         <>

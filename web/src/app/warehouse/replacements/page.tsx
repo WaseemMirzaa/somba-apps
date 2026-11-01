@@ -26,7 +26,7 @@ export default function WarehouseReplacementsPage() {
   return (
     <WarehouseListPage
       title={t("replacements")}
-      subtitle={fr ? "Remplacements en direct — inspection, allocation d'une nouvelle unité, expédition" : "Live replacements — inspect, allocate a new unit, dispatch"}
+      subtitle={fr ? "Remplacements en direct — approuvés, livrés par un livreur de l'entrepôt (l'ancienne unité revient lors du même trajet)" : "Live replacements — approved, delivered by a warehouse rider (the old unit comes back on the same trip)"}
       breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("replacements") }]}
       filters={
         <div className="space-y-3">
@@ -49,7 +49,7 @@ export default function WarehouseReplacementsPage() {
         { key: "productName", label: fr ? "Produit" : "Product" },
         { key: "customerName", label: t("customer") },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "dispatched" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
+          <Badge variant={row.status === "dispatched" || row.status === "delivered" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
             {pick(REPLACEMENT_STATUS[String(row.status)], fr, String(row.status))}
           </Badge>
         )},

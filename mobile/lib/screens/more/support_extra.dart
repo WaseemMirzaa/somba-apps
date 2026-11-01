@@ -1,11 +1,13 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/mobile_money.dart';
-import '../../util/zone_match.dart';
-import '../../util/format.dart';
+import '../../widgets/feedback.dart';
+import '../../services/area_selection.dart';
+import '../../services/auth_service.dart' show ApiException;
+import '../../services/geo_directory.dart';
+import '../../services/geo_models.dart';
 import '../../services/models.dart';
-import '../../data/market_profiles.dart';
 import '../../services/places_client.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
@@ -13,6 +15,11 @@ import '../../services/maps_config.dart';
 import '../location_picker_screen.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
+import 'area_picker.dart';
+
+// The ticket screens (list, detail, new ticket) live in support_screens.dart; imports of this file still see them.
+import 'support_screens.dart';
+export 'support_screens.dart';
 
 /// Add or edit a delivery address (saved on the server, encrypted at rest). With [existing] it edits that address.
 class AddressFormScreen extends StatefulWidget {
@@ -41,18 +48,44 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   bool _busy = false;
   String? _lineErr, _cityErr, _phoneErr, _pinErr;
 
+  /// The delivery area (province > city > commune > quartier): filled from the pin, corrected with the pickers.
+  final _sel = AreaSelection();
+
+  /// The geography loaded: the pickers replace the typed city and commune. Off for an older server (typed fields only).
+  bool _areaMode = false;
+
+  /// The picker level whose areas are being fetched, and whether the pin is being matched to an area.
+  String? _areaBusy;
+  bool _resolving = false;
+  int _resolveSeq = 0;
+
   AddressDto? get _existing => widget.existing;
+
+  /// The typed city and commune fields are shown: no geography on the server, or the pin matched no area.
+  bool get _showTyped => !_areaMode || (_sel.typed && _sel.city == null);
 
   @override
   void initState() {
     super.initState();
-    // The zone line follows what is typed.
-    _commune.addListener(_refresh);
-    _city.addListener(_refresh);
+    final e = _existing;
+    if (e != null) {
+      if (e.areaChain.isNotEmpty) {
+        _sel.setChain(e.areaChain);
+      } else {
+        _sel.typed = true; // an address saved before areas: its typed city and commune stand until an area is chosen
+      }
+    }
+    final cached = GeoDirectory.instance.cached(null);
+    _areaMode = cached != null && cached.isNotEmpty;
+    if (!_areaMode) unawaited(_loadAreas());
   }
 
-  void _refresh() {
-    if (mounted) setState(() {});
+  /// Is there a geography on this server? A quiet probe: an older server simply keeps the typed fields.
+  Future<void> _loadAreas() async {
+    try {
+      final provinces = await GeoDirectory.instance.provinces();
+      if (mounted && provinces.isNotEmpty) setState(() => _areaMode = true);
+    } catch (_) {/* older server: typed fields */}
   }
 
   @override
@@ -122,9 +155,100 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     if ((p.parts.line1 ?? '').isNotEmpty) _line1.text = p.parts.line1!;
     if ((p.parts.commune ?? '').isNotEmpty) _commune.text = p.parts.commune!;
     if ((p.parts.city ?? '').isNotEmpty) _city.text = p.parts.city!;
+    if (_areaMode) unawaited(_resolveArea(p));
   }
 
-  Zone? get _zone => zoneForAddress(commune: _commune.text, city: _city.text, zones: activeZones);
+  /// Which delivery area the pin falls in: the server matches Google's address components (in either language).
+  Future<void> _resolveArea(PickedPlace p) async {
+    final seq = ++_resolveSeq;
+    setState(() => _resolving = true);
+    try {
+      final r = await GeoDirectory.instance.resolve(
+        components: p.components,
+        text: {
+          if ((p.parts.commune ?? '').isNotEmpty) 'commune': p.parts.commune!,
+          if ((p.parts.city ?? '').isNotEmpty) 'city': p.parts.city!,
+          if ((p.parts.region ?? '').isNotEmpty) 'province': p.parts.region!,
+        },
+        pin: (lat: p.lat, lng: p.lng),
+      );
+      if (!mounted || seq != _resolveSeq) return;
+      setState(() {
+        if (r != null && r.found) {
+          _sel.setResolution(r);
+        } else {
+          _sel
+            ..clear()
+            ..typed = true;
+        }
+        _cityErr = null;
+      });
+    } catch (e) {
+      if (!mounted || seq != _resolveSeq) return;
+      // The pin is kept; the areas can be chosen by hand.
+      setState(() => _sel.typed = _sel.isEmpty);
+      showSnack(context, e is ApiException ? e.toString() : Strings.of(context).areaLoadFailed);
+    } finally {
+      if (mounted && seq == _resolveSeq) setState(() => _resolving = false);
+    }
+  }
+
+  AreaDto? _chosen(String level) => switch (level) {
+        AreaLevel.province => _sel.province,
+        AreaLevel.city => _sel.city,
+        AreaLevel.quartier => _sel.quartier,
+        _ => _sel.commune,
+      };
+
+  /// The areas a picker offers for [level], under what is already chosen above it.
+  Future<List<AreaOption>> _optionsFor(String level) async {
+    final dir = GeoDirectory.instance;
+    switch (level) {
+      case AreaLevel.province:
+        return [for (final a in await dir.provinces()) (area: a, group: null)];
+      case AreaLevel.city:
+        return [for (final a in await dir.children(_sel.province!.id)) if (a.level == AreaLevel.city) (area: a, group: null)];
+      case AreaLevel.commune:
+        return [for (final c in await dir.communesOf(_sel.city!)) (area: c.area, group: c.district)];
+      default:
+        return [for (final a in await dir.children(_sel.commune!.id)) (area: a, group: null)];
+    }
+  }
+
+  Future<void> _pickArea(String level) async {
+    if (_areaBusy != null) return;
+    setState(() => _areaBusy = level);
+    final List<AreaOption> options;
+    try {
+      options = await _optionsFor(level);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _areaBusy = null);
+        showSnack(context, e is ApiException ? e.toString() : Strings.of(context).areaLoadFailed);
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _areaBusy = null);
+    final chosen = await showAreaSheet(context, level: level, options: options, selected: _chosen(level));
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _sel.choose(chosen.area, district: chosen.group);
+      _cityErr = null;
+    });
+    if (level == AreaLevel.province) unawaited(_autoCity());
+  }
+
+  /// A province with a single city (Kinshasa is both) needs no second tap.
+  Future<void> _autoCity() async {
+    final province = _sel.province;
+    if (province == null) return;
+    try {
+      final cities = (await GeoDirectory.instance.children(province.id)).where((a) => a.level == AreaLevel.city).toList();
+      if (!mounted || _sel.province?.id != province.id || _sel.city != null) return;
+      if (cities.length == 1 && cities.single.selectable) setState(() => _sel.choose(cities.single));
+    } catch (_) {/* the city picker fetches, and reports, again */}
+  }
 
   Future<void> _save() async {
     final s = Strings.of(context);
@@ -133,7 +257,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       // With maps available the exact spot is mandatory: the rider goes to the pin.
       _pinErr = MapsConfig.enabled && _pin == null ? s.addrPinRequired : null;
       _lineErr = streetAddressError(_line1.text, s);
-      _cityErr = _city.text.trim().isEmpty ? s.addrErrCity : null;
+      _cityErr = (_showTyped ? _city.text.trim().isEmpty : _sel.city == null) ? s.addrErrCity : null;
       _phoneErr = phone.isEmpty ? null : validateMobileNumber(phone, s);
     });
     final messenger = ScaffoldMessenger.of(context);
@@ -144,15 +268,18 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       return;
     }
     setState(() => _busy = true);
-    final zone = _zone;
+    // Picked areas travel with the address (`areaId`) and are also written as text, in Google's spelling.
+    final picked = !_showTyped;
+    final communeArea = _sel.commune ?? _sel.quartier;
     final body = <String, dynamic>{
       'label': _label.text.trim().isEmpty ? s.addrLabelDefault : _label.text.trim(),
       'line1': _line1.text.trim(),
       'line2': _landmark.text.trim().isEmpty ? null : _landmark.text.trim(),
-      'commune': _commune.text.trim().isEmpty ? null : _commune.text.trim(),
-      'city': _city.text.trim(),
+      'commune': picked ? communeArea?.googleName : (_commune.text.trim().isEmpty ? null : _commune.text.trim()),
+      'city': picked ? _sel.city!.googleName : _city.text.trim(),
+      if (picked && _sel.province != null) 'region': _sel.province!.googleName,
+      if (picked && _sel.areaId != null) 'areaId': _sel.areaId,
       'phone': phone.isEmpty ? null : phone,
-      'zoneId': zone?.id,
       if (_default) 'isDefault': true,
       if (_pick != null) 'geo': _pick!.toGeoJson() else if (_pinCleared) 'geo': null,
     };
@@ -170,6 +297,84 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       if (mounted) setState(() => _busy = false);
       messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(err))));
     }
+  }
+
+  /// Province > city > commune > quartier pickers, then what the server says about the chosen area.
+  Widget _areaSection(Strings s) {
+    final city = _sel.city, commune = _sel.commune;
+    return Column(key: const ValueKey('area-section'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(s.areaTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+      const SizedBox(height: 10),
+      AreaPickerField(
+          key: const ValueKey('area-field-province'),
+          level: AreaLevel.province,
+          value: _sel.province,
+          busy: _areaBusy == AreaLevel.province,
+          onTap: () => _pickArea(AreaLevel.province)),
+      const SizedBox(height: 12),
+      AreaPickerField(
+          key: const ValueKey('area-field-city'),
+          level: AreaLevel.city,
+          value: city,
+          busy: _areaBusy == AreaLevel.city,
+          error: _showTyped ? null : _cityErr,
+          onTap: _sel.province == null ? null : () => _pickArea(AreaLevel.city)),
+      if (city != null && city.hasChildren) ...[
+        const SizedBox(height: 12),
+        AreaPickerField(
+            key: const ValueKey('area-field-commune'),
+            level: AreaLevel.commune,
+            value: commune,
+            busy: _areaBusy == AreaLevel.commune,
+            onTap: () => _pickArea(AreaLevel.commune)),
+      ],
+      if (commune != null && commune.hasChildren) ...[
+        const SizedBox(height: 12),
+        AreaPickerField(
+            key: const ValueKey('area-field-quartier'),
+            level: AreaLevel.quartier,
+            value: _sel.quartier,
+            busy: _areaBusy == AreaLevel.quartier,
+            onTap: () => _pickArea(AreaLevel.quartier)),
+      ],
+      _areaNotice(s),
+    ]);
+  }
+
+  Widget _areaNotice(Strings s) {
+    final deepest = _sel.deepest;
+    Widget line(String key, String text, {Color color = AppColors.muted, FontWeight weight = FontWeight.w500}) => Padding(
+          padding: const EdgeInsets.only(top: 8, left: 2),
+          child: Text(text, key: ValueKey(key), style: TextStyle(color: color, fontSize: 12.5, fontWeight: weight, height: 1.35)),
+        );
+    if (_resolving) {
+      return const Padding(
+        key: ValueKey('area-resolving'),
+        padding: EdgeInsets.only(top: 10),
+        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (deepest == null) return _sel.typed && _pick != null ? line('area-no-match', s.areaNoMatch) : const SizedBox.shrink();
+    if (_sel.needsMoreDetail) return line('area-partial', s.areaPartialHint(deepest.nameFor(s.lang)));
+    if (_sel.notServed) {
+      return Container(
+        key: const ValueKey('area-not-served'),
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(12)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(s.areaNotServed(deepest.nameFor(s.lang)),
+              style: const TextStyle(color: AppColors.dangerStrong, fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.35)),
+          const SizedBox(height: 2),
+          Text(s.areaNotServedSave, style: const TextStyle(color: AppColors.dangerStrong, fontSize: 12.5, height: 1.35)),
+        ]),
+      );
+    }
+    final hub = _sel.hubName;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (hub != null) line('area-hub', s.checkoutFromHub(hub), color: AppColors.success, weight: FontWeight.w600),
+      if (_sel.fromPin) line('area-from-pin', s.areaFromPin),
+    ]);
   }
 
   /// Without a Maps key: a notice, and the address is typed by hand. With one: the card that opens the picker.
@@ -246,8 +451,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
-    final zone = _zone;
-    final hasCommune = _commune.text.trim().isNotEmpty;
     return Scaffold(
       appBar: backAppBar(context, _existing == null ? s.addrTitle : s.addrEditTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 24), children: [
@@ -272,23 +475,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             icon: Icons.signpost_outlined,
             controller: _landmark),
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: AppField(label: s.addrCommune, hint: s.addrCommuneHint, controller: _commune)),
-          const SizedBox(width: 12),
-          Expanded(child: AppField(label: s.addrCity, hint: s.addrCityHint, controller: _city, error: _cityErr)),
-        ]),
-        if (hasCommune) ...[
-          const SizedBox(height: 10),
-          Row(key: const ValueKey('address-zone'), crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(zone != null ? Icons.local_shipping_outlined : Icons.info_outline_rounded,
-                size: 18, color: zone != null ? AppColors.success : const Color(0xFFB45309)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                zone != null ? s.addrZoneOk(zone.deliveryFeeUsd == 0 ? s.free : money(zone.deliveryFeeUsd)) : s.addrZoneNone,
-                style: TextStyle(fontSize: 12.5, height: 1.35, color: zone != null ? AppColors.success : const Color(0xFFB45309), fontWeight: FontWeight.w600),
-              ),
-            ),
+        if (_areaMode) _areaSection(s),
+        if (_showTyped) ...[
+          if (_areaMode) const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: AppField(label: s.addrCommune, hint: s.addrCommuneHint, controller: _commune)),
+            const SizedBox(width: 12),
+            Expanded(child: AppField(label: s.addrCity, hint: s.addrCityHint, controller: _city, error: _cityErr)),
           ]),
         ],
         const SizedBox(height: 16),
@@ -306,153 +499,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           child: _busy ? const ButtonSpinner() : Text(s.addrSave),
         ),
       ]),
-    );
-  }
-}
-
-/// A support ticket as returned by `support:list` (messages is a JSON array).
-class TicketView {
-  final String id;
-  final String reference;
-  final String subject;
-  final String status;
-  final List<({String from, String role, String text})> messages;
-
-  TicketView({required this.id, required this.reference, required this.subject, required this.status, required this.messages});
-
-  factory TicketView.fromJson(Map<String, dynamic> j) {
-    List<dynamic> raw = const [];
-    try {
-      raw = jsonDecode((j['messages'] as String?) ?? '[]') as List;
-    } catch (_) {}
-    return TicketView(
-      id: j['id'] as String,
-      reference: j['reference'] as String? ?? '',
-      subject: j['subject'] as String? ?? '',
-      status: j['status'] as String? ?? 'open',
-      messages: raw
-          .map((m) => (from: (m['from'] ?? '').toString(), role: (m['role'] ?? '').toString(), text: (m['text'] ?? '').toString()))
-          .toList(),
-    );
-  }
-
-  Color get color => switch (status) {
-        'resolved' || 'closed' => AppColors.success,
-        'pending' => AppColors.primary,
-        _ => AppColors.amber,
-      };
-  String labelFor(Strings s) => switch (status) { 'pending' => s.ticketInprogress, 'resolved' => s.ticketResolved, 'closed' => s.ticketClosed, _ => s.ticketOpen };
-}
-
-class SupportListScreen extends StatefulWidget {
-  final Locale locale;
-  const SupportListScreen({super.key, this.locale = const Locale('en')});
-  @override
-  State<SupportListScreen> createState() => _SupportListScreenState();
-}
-
-class _SupportListScreenState extends State<SupportListScreen> {
-  late Future<List<TicketView>> _future = _load();
-
-  @override
-  void initState() {
-    super.initState();
-    RealtimeStore.instance.supportRevision.addListener(_onPush);
-  }
-
-  @override
-  void dispose() {
-    RealtimeStore.instance.supportRevision.removeListener(_onPush);
-    super.dispose();
-  }
-
-  /// Staff replied or changed a ticket: reload the list.
-  void _onPush() {
-    if (mounted) setState(() => _future = _load());
-  }
-
-  Future<List<TicketView>> _load() async => ((await RealtimeStore.instance.call('support:list')) as List)
-      .map((e) => TicketView.fromJson((e as Map).map((k, v) => MapEntry(k.toString(), v))))
-      .toList();
-
-  Future<void> _newTicket() async {
-    final s = Strings.of(context);
-    final subject = TextEditingController();
-    final message = TextEditingController();
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(s.ticketNewTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'PlusJakartaSans')),
-          const SizedBox(height: 12),
-          TextField(key: const ValueKey('ticket-subject'), controller: subject, decoration: InputDecoration(labelText: s.ticketSubject)),
-          const SizedBox(height: 10),
-          TextField(key: const ValueKey('ticket-message'), controller: message, maxLines: 4, decoration: InputDecoration(labelText: s.ticketHowHelp)),
-          const SizedBox(height: 14),
-          FilledButton(
-            key: const ValueKey('ticket-submit'),
-            onPressed: () async {
-              final nav = Navigator.of(ctx);
-              final messenger = ScaffoldMessenger.of(context);
-              try {
-                await RealtimeStore.instance.call('support:open', {'subject': subject.text, 'message': message.text});
-                nav.pop(true);
-              } catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
-              }
-            },
-            child: Text(s.send),
-          ),
-        ]),
-      ),
-    );
-    if (created == true && mounted) setState(() => _future = _load());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Strings.of(context);
-    return Scaffold(
-      appBar: backAppBar(context, s.support),
-      body: FutureBuilder<List<TicketView>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-          if (snap.hasError) return Center(child: Text('${snap.error}', style: const TextStyle(color: AppColors.muted)));
-          final tickets = snap.data ?? const <TicketView>[];
-          return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-            if (tickets.isEmpty) Panel(child: Text(s.ticketNone, style: const TextStyle(color: AppColors.muted))),
-            ...tickets.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: GestureDetector(
-                  onTap: () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticket: t)));
-                    if (mounted) setState(() => _future = _load());
-                  },
-                  child: Panel(
-                    child: Row(children: [
-                      Container(
-                          height: 44,
-                          width: 44,
-                          decoration: BoxDecoration(color: t.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                          child: Icon(Icons.confirmation_number_outlined, color: t.color)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(t.subject, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                        Text(t.reference, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-                      ])),
-                      Pill(t.labelFor(s), color: t.color.withValues(alpha: 0.14), textColor: t.color, fontSize: 10.5),
-                    ]),
-                  ),
-                ))),
-            const SizedBox(height: 4),
-            PrimaryButton(s.ticketNew, onPressed: _newTicket),
-          ]);
-        },
-      ),
     );
   }
 }
@@ -587,135 +633,6 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
             )),
         const SizedBox(height: 10),
         SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.maybePop(context), child: Text(s.delaccKeep))),
-      ]),
-    );
-  }
-}
-
-// Support ticket conversation (loaded from the server; replies are sent live).
-class SupportTicketDetailScreen extends StatefulWidget {
-  final TicketView ticket;
-  const SupportTicketDetailScreen({super.key, required this.ticket});
-  @override
-  State<SupportTicketDetailScreen> createState() => _SupportTicketDetailScreenState();
-}
-
-class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
-  final _ctrl = TextEditingController();
-  late TicketView _t = widget.ticket;
-  bool _sending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    RealtimeStore.instance.supportRevision.addListener(_onPush);
-  }
-
-  /// A staff reply to THIS ticket appears without reopening the screen.
-  void _onPush() {
-    final j = RealtimeStore.instance.lastSupportTicket;
-    if (j == null || j['id'] != _t.id || !mounted) return;
-    setState(() => _t = TicketView.fromJson(j));
-  }
-
-  @override
-  void dispose() {
-    RealtimeStore.instance.supportRevision.removeListener(_onPush);
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _sending = true);
-    try {
-      final res = await RealtimeStore.instance.call('support:reply', {'id': _t.id, 'text': text});
-      _t = TicketView.fromJson((res as Map).map((k, v) => MapEntry(k.toString(), v)));
-      _ctrl.clear();
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Strings.of(context);
-    return Scaffold(
-      appBar: backAppBar(context, _t.reference),
-      body: Column(children: [
-        Container(
-          width: double.infinity,
-          color: AppColors.surface,
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-          child: Row(children: [
-            Expanded(child: Text(_t.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-            Pill(_t.labelFor(s), color: _t.color.withValues(alpha: 0.14), textColor: _t.color, fontSize: 10.5),
-          ]),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            itemCount: _t.messages.length,
-            itemBuilder: (_, i) {
-              final m = _t.messages[i];
-              final mine = !m.role.startsWith('admin');
-              return Align(
-                alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-                  decoration: BoxDecoration(
-                    color: mine ? AppColors.primary : AppColors.surface,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(mine ? 16 : 4),
-                      bottomRight: Radius.circular(mine ? 4 : 16),
-                    ),
-                    boxShadow: mine ? null : AppShadow.card,
-                  ),
-                  child: Text(m.text, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
-                ),
-              );
-            },
-          ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _ctrl,
-                  onSubmitted: (_) => _send(),
-                  decoration: InputDecoration(
-                    hintText: s.ticketReplyHint,
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(100), borderSide: const BorderSide(color: AppColors.line)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Material(
-                color: AppColors.primary,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _sending ? null : _send,
-                  child: const Padding(padding: EdgeInsets.all(13), child: Icon(Icons.send_rounded, color: Colors.white, size: 22)),
-                ),
-              ),
-            ]),
-          ),
-        ),
       ]),
     );
   }

@@ -51,6 +51,8 @@ class MobileMoneyPicker extends StatelessWidget {
           errorText: phoneError,
           prefixIcon: const Icon(Icons.smartphone_rounded, size: 20),
           helperText: s.mmHelper,
+          helperMaxLines: 2,
+          errorMaxLines: 2,
         ),
       ),
     ]);

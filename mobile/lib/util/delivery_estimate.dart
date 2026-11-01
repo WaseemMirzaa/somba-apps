@@ -5,20 +5,25 @@ const deliveryDaysMin = 1;
 const deliveryDaysMax = 30;
 const deliveryDaysFallback = 3;
 
-int deliveryDaysOf(Object? value) {
+/// A product's total (its delivery time plus the store's handling time, up to 14 days) can pass [deliveryDaysMax].
+const deliveryTotalDaysMax = 45;
+
+int deliveryDaysOf(Object? value, {int maxDays = deliveryDaysMax}) {
   final n = value is num ? value : num.tryParse('$value');
   if (n == null || !n.isFinite || n < deliveryDaysMin) return deliveryDaysFallback;
-  return n.round().clamp(deliveryDaysMin, deliveryDaysMax);
+  return n.round().clamp(deliveryDaysMin, maxDays);
 }
 
 /// The Kinshasa calendar day (YYYY-MM-DD) `plusDays` from now.
 String localDayPlus(int plusDays, [DateTime? now]) =>
     (now ?? DateTime.now()).toUtc().add(Duration(hours: 1, days: plusDays)).toIso8601String().substring(0, 10);
 
-/// Expected day for lines taking these delivery times (the slowest wins).
-String estimateFor(Iterable<Object?> days, [DateTime? now]) {
-  final list = days.map(deliveryDaysOf).toList();
-  return localDayPlus(list.isEmpty ? deliveryDaysFallback : list.reduce((a, b) => a > b ? a : b), now);
+/// Expected day for lines taking these delivery times (the slowest wins), plus [extraDays] when the parcels travel
+/// between warehouses (the lanes' transit times).
+String estimateFor(Iterable<Object?> days, [DateTime? now, int maxDays = deliveryDaysMax, int extraDays = 0]) {
+  final list = days.map((d) => deliveryDaysOf(d, maxDays: maxDays)).toList();
+  final extra = extraDays > 0 ? extraDays : 0;
+  return localDayPlus((list.isEmpty ? deliveryDaysFallback : list.reduce((a, b) => a > b ? a : b)) + extra, now);
 }
 
 /// "Mon 26 Oct" / "lun. 26 oct." for a YYYY-MM-DD day, without locale data; null when missing or malformed.

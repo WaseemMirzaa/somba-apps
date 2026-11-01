@@ -9,7 +9,9 @@ import {
   loadGoogleMaps,
   partsFromComponents,
   reverseGeocode,
+  toGeoComponents,
   type AddressGeo,
+  type PickedMeta,
   type PickedParts,
 } from "@/lib/google-maps";
 
@@ -35,12 +37,14 @@ export function AddressMapPicker({
   fr,
 }: {
   value: AddressGeo | null;
-  onPick: (geo: AddressGeo, parts: PickedParts) => void;
+  /** `meta.components` are Google's raw address components (in the UI language), for `geo:resolve`. */
+  onPick: (geo: AddressGeo, parts: PickedParts, meta: PickedMeta) => void;
   fr: boolean;
 }) {
   const mapDiv = useRef<HTMLDivElement>(null);
   const searchDiv = useRef<HTMLDivElement>(null);
   const onPickRef = useRef(onPick);
+  const frRef = useRef(fr);
   const startRef = useRef(value);
   const commitRef = useRef<((pos: LatLng) => void) | null>(null);
   const [status, setStatus] = useState<Status>(MAPS_KEY ? "loading" : "nokey");
@@ -49,7 +53,8 @@ export function AddressMapPicker({
 
   useEffect(() => {
     onPickRef.current = onPick;
-  }, [onPick]);
+    frRef.current = fr;
+  }, [onPick, fr]);
 
   useEffect(() => {
     if (!MAPS_KEY) {
@@ -87,16 +92,16 @@ export function AddressMapPicker({
           map.panTo(pos);
           if ((map.getZoom() ?? 0) < 15) map.setZoom(16);
         };
-        const report = (geo: AddressGeo, parts: PickedParts) => {
+        const report = (geo: AddressGeo, parts: PickedParts, meta: PickedMeta = { components: [] }) => {
           setPinned(geo);
-          onPickRef.current(geo, parts);
+          onPickRef.current(geo, parts, meta);
         };
         /** A pin from a click / drag / geolocation: reverse-geocode it into address parts. */
         const commit = async (pos: LatLng) => {
           show(pos);
           try {
-            const r = await reverseGeocode(maps, pos);
-            report({ ...pos, placeId: r.placeId, formatted: r.formatted }, r.parts);
+            const r = await reverseGeocode(maps, pos, frRef.current ? "fr" : "en");
+            report({ ...pos, placeId: r.placeId, formatted: r.formatted }, r.parts, { components: r.components });
           } catch (e) {
             console.warn("[address-map] reverse geocoding failed (is the Geocoding API enabled?)", e);
             report(pos, {});
@@ -121,10 +126,8 @@ export function AddressMapPicker({
           const loc = place.location?.toJSON();
           if (!loc) return;
           show(loc);
-          report(
-            { ...loc, placeId: place.id, formatted: place.formattedAddress ?? undefined },
-            partsFromComponents((place.addressComponents ?? []).map((c) => ({ types: c.types, long: c.longText ?? "", short: c.shortText ?? "" }))),
-          );
+          const comps = (place.addressComponents ?? []).map((c) => ({ types: c.types, long: c.longText ?? "", short: c.shortText ?? "" }));
+          report({ ...loc, placeId: place.id, formatted: place.formattedAddress ?? undefined }, partsFromComponents(comps), { components: toGeoComponents(comps) });
         };
         // `gmp-select` is the current event; `gmp-placeselect` is the older name some versions still emit.
         ac.addEventListener("gmp-select", (ev: Event) => {
@@ -164,15 +167,7 @@ export function AddressMapPicker({
   }
 
   if (status === "nokey" || status === "error") {
-    return (
-      <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <span className="inline-flex items-center gap-2 font-medium">
-          <MapPin className="h-4 w-4" />
-          {fr ? "La sélection sur la carte est indisponible pour le moment." : "Picking a location on the map is unavailable right now."}
-        </span>
-        <p className="mt-1 text-xs">{fr ? "Saisissez votre adresse ci-dessous." : "Please type your address below."}</p>
-      </div>
-    );
+    return <ManualPin value={pinned} onPick={(g) => { setPinned(g); onPick(g, {}, { components: [] }); }} fr={fr} />;
   }
 
   return (
@@ -200,6 +195,65 @@ export function AddressMapPicker({
             ? "Cherchez, touchez la carte ou faites glisser l'épingle : les champs ci-dessous se remplissent."
             : "Search, tap the map or drag the pin — the fields below fill in for you."}
       </p>
+    </div>
+  );
+}
+
+/**
+ * Fallback when Google Maps cannot load: the shopper can still pin the address with the device location or by typing
+ * the coordinates (e.g. copied from a maps app), so a delivery never gets blocked by the map being down.
+ */
+function ManualPin({ value, onPick, fr }: { value: AddressGeo | null; onPick: (geo: AddressGeo) => void; fr: boolean }) {
+  const [lat, setLat] = useState(value ? String(value.lat) : "");
+  const [lng, setLng] = useState(value ? String(value.lng) : "");
+  const [err, setErr] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  function apply() {
+    const a = Number(lat.replace(",", "."));
+    const b = Number(lng.replace(",", "."));
+    if (!lat.trim() || !lng.trim() || !Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) {
+      setErr(fr ? "Saisissez une latitude (-90 à 90) et une longitude (-180 à 180) valides." : "Enter a valid latitude (-90 to 90) and longitude (-180 to 180).");
+      return;
+    }
+    setErr(null);
+    onPick({ lat: a, lng: b });
+  }
+  function locate() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        setLat(p.coords.latitude.toFixed(6));
+        setLng(p.coords.longitude.toFixed(6));
+        onPick({ lat: p.coords.latitude, lng: p.coords.longitude });
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+  return (
+    <div role="group" aria-label={fr ? "Épingler l'adresse" : "Pin the address"} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <span className="inline-flex items-center gap-2 font-medium">
+        <MapPin className="h-4 w-4" />
+        {fr ? "La carte est indisponible : épinglez votre adresse avec votre position ou des coordonnées." : "The map is unavailable: pin your address with your location or coordinates."}
+      </span>
+      <div className="grid grid-cols-2 gap-2">
+        <input aria-label={fr ? "Latitude" : "Latitude"} className="input-premium w-full px-3 py-2 text-sm text-slate-900" placeholder="-4.3224" value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" />
+        <input aria-label={fr ? "Longitude" : "Longitude"} className="input-premium w-full px-3 py-2 text-sm text-slate-900" placeholder="15.3070" value={lng} onChange={(e) => setLng(e.target.value)} inputMode="decimal" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={apply} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+          {fr ? "Épingler ces coordonnées" : "Pin these coordinates"}
+        </button>
+        <button type="button" onClick={locate} disabled={locating} className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">
+          <LocateFixed className="h-3.5 w-3.5" />
+          {locating ? (fr ? "Localisation…" : "Locating…") : fr ? "Ma position" : "Use my location"}
+        </button>
+      </div>
+      {err && <p role="alert" className="text-xs text-red-700">{err}</p>}
+      {value && !err && <p className="text-xs">{fr ? "Position épinglée" : "Pinned"}: {value.lat.toFixed(5)}, {value.lng.toFixed(5)}</p>}
     </div>
   );
 }

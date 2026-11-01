@@ -8,12 +8,15 @@ import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { TwoFaService } from './twofa.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([VerificationToken]),
     UsersModule,
+    NotificationsModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -27,7 +30,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, VerificationService],
-  exports: [AuthService, VerificationService],
+  providers: [AuthService, JwtStrategy, VerificationService, TwoFaService],
+  exports: [AuthService, VerificationService, TwoFaService],
 })
 export class AuthModule {}

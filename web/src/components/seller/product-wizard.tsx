@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DetailSection } from "@/components/ui/info-grid";
@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { MAX_GROUPS, MAX_OPTIONS, readVariants, type VariantGroup } from "@/lib/variants";
 import { DELIVERY_DAYS } from "@/lib/delivery-estimate";
 import { ProductImage } from "@/components/seller/product-image";
+import { ProductGalleryEditor } from "@/components/seller/product-gallery-editor";
+import { MAX_IMAGES, gramsToKgText, optionCombos, parseKg, skuProblem, sumUnits } from "@/lib/seller-products";
+import { assetUrl } from "@/lib/seller-api";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -20,7 +23,7 @@ import { TranslationBadge } from "@/components/seller/translation-badge";
 
 const STEPS = [
   { en: "Basic Info", fr: "Infos de base" },
-  { en: "Photo", fr: "Photo" },
+  { en: "Photos", fr: "Photos" },
   { en: "Pricing & stock", fr: "Prix et stock" },
   { en: "Review", fr: "Vérification" },
 ];
@@ -39,7 +42,16 @@ type FormState = {
   stock: string;
   /** The seller's delivery time for this product, in days. */
   deliveryDays: string;
-  image: string;
+  /** The gallery, cover first (max 8). */
+  images: string[];
+  sku: string;
+  brand: string;
+  /** Weight in kilograms, as typed. */
+  weightKg: string;
+  /** Stock is split per option (each combination has its own count; the rest is the shared pool). */
+  splitStock: boolean;
+  /** Units per option label, as typed (empty = uses the shared pool). */
+  optionStock: Record<string, string>;
   /** Option types; `values` is the comma-separated list the seller types. */
   options: { name: string; values: string }[];
 };
@@ -82,14 +94,19 @@ function initialForm(p: SellerProductRow | null | undefined, categoryValue: stri
     originalPrice: compare ? String(compare) : "",
     stock: p ? String(p.stock) : "",
     deliveryDays: String(p?.deliveryDays ?? DELIVERY_DAYS.fallback),
-    image: p?.image ?? "",
+    images: p?.images && p.images.length ? [...p.images] : p?.image ? [p.image] : [],
+    sku: p?.sku ?? "",
+    brand: p?.brand ?? "",
+    weightKg: gramsToKgText(p?.weightGrams),
+    splitStock: !!p?.variantStock && Object.keys(p.variantStock).length > 0,
+    optionStock: Object.fromEntries(Object.entries(p?.variantStock ?? {}).map(([k, v]) => [k, String(v)])),
     options: readVariants(p?.variants).map((g) => ({ name: g.name, values: g.options.join(", ") })),
   };
 }
 
 /** The validated fields, and the step each one lives on. */
-type FieldKey = "title" | "category" | "price" | "originalPrice" | "stock" | "deliveryDays" | "options";
-const FIELD_STEP: Record<FieldKey, number> = { title: 0, category: 0, price: 2, originalPrice: 2, stock: 2, deliveryDays: 2, options: 2 };
+type FieldKey = "title" | "category" | "price" | "originalPrice" | "stock" | "deliveryDays" | "options" | "sku" | "brand" | "weight" | "optionStock";
+const FIELD_STEP: Record<FieldKey, number> = { title: 0, category: 0, price: 2, originalPrice: 2, stock: 2, deliveryDays: 2, options: 2, sku: 2, brand: 2, weight: 2, optionStock: 2 };
 const FIELD_KEYS = Object.keys(FIELD_STEP) as FieldKey[];
 
 /**
@@ -103,7 +120,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const { toast } = useToast();
   const { locale } = useLocale();
   const { categories } = useRealtime();
-  const { createProduct, updateProduct, uploadImage } = useSellerData();
+  const { createProduct, updateProduct } = useSellerData();
   const { plan, used, max, atLimit } = useSellerPlan();
   const fr = locale === "fr";
   const editing = !!product;
@@ -125,7 +142,6 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const [initial] = useState<FormState>(() => initialForm(product, product ? categoryValueOf(product, categories) : ""));
   const [form, setForm] = useState<FormState>(initial);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [created, setCreated] = useState<Product | null>(null);
@@ -137,7 +153,6 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const touchTitle = (e: React.FocusEvent<HTMLInputElement>, other: string) => {
     if ((e.relatedTarget as HTMLElement | null)?.id !== other) touch("title");
   };
-  const fileRef = useRef<HTMLInputElement>(null);
 
   // A legacy `name:<English name>` value (the category list had not arrived yet) is mapped to its row once it has.
   const resolveCategory = (value: string): string => {
@@ -171,6 +186,28 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
     return "";
   })();
 
+  // Stock per option: only the options currently typed count (a renamed option's old count is dropped).
+  const combos = useMemo(() => optionCombos(groups), [groups]);
+  const splitActive = form.splitStock && combos.length > 0;
+  const entries: Record<string, number> = {};
+  let optionStockError = "";
+  if (splitActive) {
+    for (const label of combos) {
+      const raw = (form.optionStock[label] ?? "").trim();
+      if (raw === "") continue;
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0 || n > 1_000_000) {
+        optionStockError = fr ? `Le stock de « ${label} » doit être un nombre entier de 0 à 1 000 000.` : `Stock for "${label}" must be a whole number from 0 to 1,000,000.`;
+        break;
+      }
+      entries[label] = n;
+    }
+    const sum = sumUnits(entries);
+    if (!optionStockError && Number.isInteger(stockNum) && stockNum < sum) {
+      optionStockError = fr ? `Le stock total (${stockNum}) est inférieur au stock défini par option (${sum}).` : `Total stock (${stockNum}) is below the stock set per option (${sum}).`;
+    }
+  }
+  const weightNum = parseKg(form.weightKg);
   const titleEn = form.title.trim();
   const titleFr = form.titleFr.trim();
   const descEn = form.description.trim();
@@ -201,36 +238,26 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
         ? (fr ? `Le délai de livraison doit être un nombre entier de ${DELIVERY_DAYS.min} à ${DELIVERY_DAYS.max} jours.` : `Delivery time must be a whole number of days from ${DELIVERY_DAYS.min} to ${DELIVERY_DAYS.max}.`)
         : "",
     options: optionsError,
+    sku: skuProblem(form.sku, fr) ?? "",
+    brand: form.brand.trim().length > 80 ? (fr ? "80 caractères maximum." : "80 characters maximum.") : "",
+    weight:
+      weightNum !== null && (Number.isNaN(weightNum) || weightNum < 0.001 || weightNum > 1000)
+        ? (fr ? "Le poids doit être entre 0,001 et 1000 kg." : "Weight must be between 0.001 and 1000 kg.")
+        : "",
+    optionStock: optionStockError,
   };
   const stepValid = [
     !errors.title && !errors.category,
     !uploading,
-    !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options,
+    !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options && !errors.sku && !errors.brand && !errors.weight && !errors.optionStock,
     true,
   ];
-  const allValid = !errors.title && !errors.category && !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options && !uploading;
+  const allValid = FIELD_KEYS.every((k) => !errors[k]) && !uploading;
 
   /** The error of a field, or "" while it is untouched and its step has not been attempted. */
   const show = (k: FieldKey) => (touched[k] || tried[FIELD_STEP[k]] ? errors[k] : "");
   const fieldErr = (k: FieldKey) =>
     show(k) ? <p role="alert" className="mt-1 text-xs text-red-600">{show(k)}</p> : null;
-
-  async function onFile(file: File | undefined) {
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const url = await uploadImage(file);
-      set({ image: url });
-    } catch (e) {
-      const msg = errMessage(e);
-      setUploadError(msg);
-      toast(msg, "error");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
 
   async function submit() {
     if (!allValid || submitting) return;
@@ -259,7 +286,16 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           patch.category = chosen?.name ?? category;
           if (categoryId) patch.categoryId = categoryId;
         }
-        if (form.image !== before.image) patch.image = form.image;
+        if (JSON.stringify(form.images) !== JSON.stringify(before.images)) patch.images = form.images;
+        if (form.sku.trim() !== before.sku.trim()) patch.sku = form.sku.trim() || null;
+        if (form.brand.trim() !== before.brand.trim()) patch.brand = form.brand.trim() || null;
+        if (form.weightKg.trim() !== before.weightKg.trim()) patch.weightKg = weightNum;
+        const stockSplit = splitActive ? entries : null;
+        const beforeSplit = before.splitStock ? Object.fromEntries(Object.entries(before.optionStock).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)])) : null;
+        if (JSON.stringify(stockSplit && Object.keys(stockSplit).length ? stockSplit : null) !== JSON.stringify(beforeSplit && Object.keys(beforeSplit).length ? beforeSplit : null)) {
+          patch.variantStock = stockSplit && Object.keys(stockSplit).length ? stockSplit : null;
+          patch.stock = stockNum;
+        }
         if (priceNum !== Number(before.price)) patch.price = priceNum;
         if (form.originalPrice.trim() !== before.originalPrice.trim()) {
           patch.originalPrice = form.originalPrice.trim() ? origNum : null;
@@ -285,7 +321,11 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           ...(categoryId ? { categoryId } : {}),
           stock: stockNum,
           deliveryDays: daysNum,
-          image: form.image || undefined,
+          ...(form.images.length ? { images: form.images, image: form.images[0] } : {}),
+          ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
+          ...(form.brand.trim() ? { brand: form.brand.trim() } : {}),
+          ...(weightNum ? { weightKg: weightNum } : {}),
+          ...(splitActive && Object.keys(entries).length ? { variantStock: entries } : {}),
           variants: groups,
         };
         const res = await createProduct(payload);
@@ -344,6 +384,19 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
     );
   }
 
+  // A live listing goes back to moderation when its gallery or brand changes (docs/contracts/commerce.md §4).
+  const sensitiveChange =
+    editing && product?.status === "live" && (JSON.stringify(form.images) !== JSON.stringify(initial.images) || form.brand.trim() !== initial.brand.trim());
+  const moderationNote =
+    editing && product?.status === "live"
+      ? sensitiveChange
+        ? fr
+          ? "Si la modération est active, changer les photos ou la marque d'une annonce en ligne la renvoie en modération : elle est masquée aux clients jusqu'à l'approbation d'un modérateur."
+          : "When moderation is on, changing the photos or the brand of a live listing sends it back to moderation: shoppers will not see it until a moderator approves it."
+        : fr
+          ? "Attention : si la modération est active, modifier les photos ou la marque d'une annonce en ligne la renvoie en modération."
+          : "Heads-up: when moderation is on, changing the photos or the brand of a live listing sends it back to moderation."
+      : "";
   const input = "input-premium w-full px-4 py-2.5 text-sm";
   const label = "mb-1 block text-xs font-medium text-slate-600";
 
@@ -481,30 +534,12 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
       )}
 
       {step === 1 && (
-        <DetailSection title={fr ? "Étape 2 : Photo du produit" : "Step 2: Product photo"}>
-          <div className="flex flex-wrap items-start gap-4">
-            <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-[var(--border)] text-sm text-slate-400">
-              {form.image ? <ProductImage src={form.image} alt="" /> : uploading ? (fr ? "Envoi…" : "Uploading…") : (fr ? "Aucune photo" : "No photo")}
-            </div>
-            <div className="space-y-2 text-sm">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={uploading}
-                onChange={(e) => void onFile(e.target.files?.[0])}
-                className="text-sm"
-              />
-              <p className="text-xs text-slate-500">{fr ? "JPEG, PNG ou WebP, 5 Mo maximum." : "JPEG, PNG or WebP, 5 MB maximum."}</p>
-              {form.image && !uploading && (
-                <button type="button" onClick={() => set({ image: "" })} className="text-xs text-red-600 hover:underline">
-                  {fr ? "Retirer la photo" : "Remove photo"}
-                </button>
-              )}
-              {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
-              <p className="text-xs text-slate-500">{fr ? "La photo est facultative mais fortement recommandée." : "A photo is optional but strongly recommended."}</p>
-            </div>
-          </div>
+        <DetailSection title={fr ? "Étape 2 : Photos du produit" : "Step 2: Product photos"}>
+          <ProductGalleryEditor value={form.images} onChange={(images) => set({ images })} onBusy={setUploading} />
+          <p className="mt-3 text-xs text-slate-500">{fr ? "Les photos sont facultatives mais fortement recommandées." : "Photos are optional but strongly recommended."}</p>
+          {moderationNote && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" data-testid="moderation-note">{moderationNote}</p>
+          )}
         </DetailSection>
       )}
 
@@ -536,12 +571,31 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               </p>
             </div>
           </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className={label} htmlFor="pw-sku">SKU</label>
+              <input id="pw-sku" className={input} value={form.sku} maxLength={60} placeholder="TSH-001" aria-invalid={!!show("sku")} onChange={(e) => set({ sku: e.target.value })} onBlur={() => touch("sku")} />
+              {fieldErr("sku")}
+              <p className="mt-1 text-xs text-slate-500">{fr ? "Facultatif, unique dans votre boutique." : "Optional, unique within your store."}</p>
+            </div>
+            <div>
+              <label className={label} htmlFor="pw-brand">{fr ? "Marque" : "Brand"}</label>
+              <input id="pw-brand" className={input} value={form.brand} maxLength={80} aria-invalid={!!show("brand")} onChange={(e) => set({ brand: e.target.value })} onBlur={() => touch("brand")} />
+              {fieldErr("brand")}
+            </div>
+            <div>
+              <label className={label} htmlFor="pw-weight">{fr ? "Poids (kg)" : "Weight (kg)"}</label>
+              <input id="pw-weight" inputMode="decimal" className={input} value={form.weightKg} placeholder="0.25" aria-invalid={!!show("weight")} onChange={(e) => set({ weightKg: e.target.value })} onBlur={() => touch("weight")} />
+              {fieldErr("weight")}
+              <p className="mt-1 text-xs text-slate-500">{fr ? "Utilisé pour la livraison." : "Used for delivery."}</p>
+            </div>
+          </div>
           <div className="mt-5 rounded-xl border border-[var(--border)] p-4" data-testid="variant-options">
             <p className="text-sm font-semibold">{fr ? "Options (facultatif)" : "Options (optional)"}</p>
             <p className="mb-3 text-xs text-slate-500">
               {fr
-                ? "Ex. Taille : 39, 40, 41 — Couleur : Noir, Blanc. Le client devra choisir avant d'acheter. Le stock est commun à toutes les options."
-                : "E.g. Size: 39, 40, 41 — Colour: Black, White. Shoppers must choose before buying. Stock is shared by all options."}
+                ? "Ex. Taille : 39, 40, 41 — Couleur : Noir, Blanc. Le client devra choisir avant d'acheter. Par défaut le stock est commun à toutes les options."
+                : "E.g. Size: 39, 40, 41 — Colour: Black, White. Shoppers must choose before buying. By default stock is shared by all options."}
               {" "}
               {fr ? "Les noms et valeurs sont traduits automatiquement pour les clients." : "Names and values are translated automatically for shoppers."}
             </p>
@@ -583,6 +637,49 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               </button>
             )}
             {fieldErr("options")}
+            {combos.length > 0 && !optionsError && (
+              <div className="mt-4 border-t border-[var(--border)] pt-4" data-testid="option-stock">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" checked={form.splitStock} onChange={(e) => set({ splitStock: e.target.checked })} />
+                  {fr ? "Définir le stock par option" : "Set stock per option"}
+                </label>
+                {form.splitStock && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-slate-500">
+                      {fr
+                        ? "Le stock total ci-dessus = la somme des options + le stock commun. Une option laissée vide puise dans le stock commun."
+                        : "Total stock above = the sum of the options + the shared pool. An option left empty draws on the shared pool."}
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {combos.map((c) => (
+                        <label key={c} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm">
+                          <span className="min-w-0 truncate" title={c}>{c}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            aria-label={c}
+                            className="input-premium w-24 px-2 py-1 text-sm"
+                            value={form.optionStock[c] ?? ""}
+                            placeholder={fr ? "commun" : "shared"}
+                            onChange={(e) => set({ optionStock: { ...form.optionStock, [c]: e.target.value } })}
+                            onBlur={() => touch("optionStock")}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-600" data-testid="pool-note">
+                      {(() => {
+                        const sum = sumUnits(entries);
+                        const pool = Number.isInteger(stockNum) ? Math.max(0, stockNum - sum) : 0;
+                        return fr ? `Réparti par option : ${sum} · stock commun : ${pool}` : `Set per option: ${sum} · shared pool: ${pool}`;
+                      })()}
+                    </p>
+                    {fieldErr("optionStock")}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {promo && (
             <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800" data-testid="promo-note">
@@ -614,6 +711,11 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               [fr ? "Prix barré" : "Compare-at", form.originalPrice ? formatCurrency(origNum, locale) : ""],
               [fr ? "Stock" : "Stock", form.stock],
               [fr ? "Délai de livraison" : "Delivery time", form.deliveryDays ? daysLabel(Number(form.deliveryDays), fr) : ""],
+              ["SKU", form.sku.trim()],
+              [fr ? "Marque" : "Brand", form.brand.trim()],
+              [fr ? "Poids" : "Weight", weightNum ? `${weightNum} kg` : ""],
+              [fr ? "Photos" : "Photos", form.images.length ? `${form.images.length}/${MAX_IMAGES}` : ""],
+              ...(splitActive ? Object.entries(entries).map(([k, v]) => [k, String(v)]) : []),
               ...groups.map((g) => [g.name, g.options.join(", ")]),
             ].filter(([, v]) => v).map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 border-b border-[var(--border)] py-2">
@@ -622,8 +724,15 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               </div>
             ))}
           </dl>
-          {form.image && (
-            <div className="mt-3 h-24 w-24 overflow-hidden rounded-lg"><ProductImage src={form.image} alt="" /></div>
+          {form.images.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {form.images.map((u, i) => (
+                <div key={u + i} className={`h-20 w-20 overflow-hidden rounded-lg border-2 ${i === 0 ? "border-[var(--primary)]" : "border-transparent"}`}><ProductImage src={assetUrl(u)} alt="" /></div>
+              ))}
+            </div>
+          )}
+          {moderationNote && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{moderationNote}</p>
           )}
           {!editing && (
             <p className="mt-4 text-xs text-amber-700">

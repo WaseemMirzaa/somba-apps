@@ -160,11 +160,11 @@ export default function AdminCategoriesPage() {
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-4">
+            <div className="flex flex-wrap items-center gap-2 p-4">
               <span className="text-xl">{c.icon}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-slate-900">{c.name}</p>
-                <p className="truncate text-xs text-slate-500">{frOf(c) || (fr ? "Français : traduction automatique" : "French: automatic translation")}</p>
+              <div className="min-w-[9rem] flex-1">
+                <p className="break-words font-semibold text-slate-900">{c.name}</p>
+                <p className="break-words text-xs text-slate-500">{frOf(c) || (fr ? "Français : traduction automatique" : "French: automatic translation")}</p>
               </div>
               {typeof (c.usedBy ?? c.productCount) === "number" && (
                 <Link

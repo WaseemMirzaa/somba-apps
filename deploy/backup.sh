@@ -7,11 +7,14 @@ set -euo pipefail
 DEST="${BACKUP_DIR:-/var/backups/somba}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
 UPLOAD_DIR="${UPLOAD_DIR:-/opt/somba/uploads}"
+PRIVATE_UPLOAD_DIR="${PRIVATE_UPLOAD_DIR:-/opt/somba/uploads-private}"
 STAMP="$(date +%Y%m%d)"
 umask 077
 mkdir -p "$DEST"
 mysqldump --single-transaction --routines --no-tablespaces somba | gzip -9 > "$DEST/db-$STAMP.sql.gz.tmp"
 mv "$DEST/db-$STAMP.sql.gz.tmp" "$DEST/db-$STAMP.sql.gz"
 [ -d "$UPLOAD_DIR" ] && tar -czf "$DEST/uploads-$STAMP.tgz" "$UPLOAD_DIR" 2>/dev/null || true
-find "$DEST" -type f \( -name 'db-*.sql.gz' -o -name 'uploads-*.tgz' \) -mtime +"$KEEP_DAYS" -delete
+# KYC documents (private): same retention, kept out of the public archive.
+[ -d "$PRIVATE_UPLOAD_DIR" ] && tar -czf "$DEST/uploads-private-$STAMP.tgz" "$PRIVATE_UPLOAD_DIR" 2>/dev/null || true
+find "$DEST" -type f \( -name 'db-*.sql.gz' -o -name 'uploads-*.tgz' -o -name 'uploads-private-*.tgz' \) -mtime +"$KEEP_DAYS" -delete
 echo "backup ok: $(ls -1 "$DEST" | wc -l) files in $DEST"

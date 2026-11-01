@@ -13,6 +13,14 @@ describe('delivery estimate', () => {
     expect(estimatedDeliveryDate([1, 4, 2], lateEvening)).toBe('2026-10-27');
   });
 
+  it('adds the days parcels spend travelling between cities / over lanes, never beyond the maximum', () => {
+    expect(estimatedDeliveryDate([1, 4, 2], lateEvening, 3)).toBe('2026-10-30'); // 4 + 3
+    expect(estimatedDeliveryDate([2], lateEvening, 0)).toBe(estimatedDeliveryDate([2], lateEvening));
+    expect(estimatedDeliveryDate([2], lateEvening, -4)).toBe(estimatedDeliveryDate([2], lateEvening));
+    expect(estimatedDeliveryDate([2], lateEvening, NaN)).toBe(estimatedDeliveryDate([2], lateEvening));
+    expect(estimatedDeliveryDate([28], lateEvening, 10)).toBe(localDay(lateEvening, DELIVERY_DAYS.max));
+  });
+
   it('falls back for missing or broken values and caps very long ones', () => {
     expect(deliveryDaysOf(undefined)).toBe(DELIVERY_DAYS.fallback);
     expect(deliveryDaysOf(0)).toBe(DELIVERY_DAYS.fallback);

@@ -4,6 +4,7 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import { useLocale } from "@/context/locale-context";
 import { cn } from "@/lib/utils";
+import { sellerErrorText } from "@/lib/seller-errors";
 
 /** A failed read: the server's own message and a retry button. Never an endless spinner. */
 export function LoadError({
@@ -28,7 +29,7 @@ export function LoadError({
       <span className="flex min-w-0 items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span className="min-w-0 break-words">
-          <strong>{fr ? "Impossible de charger ces données." : "Could not load this data."}</strong> {message}
+          <strong>{fr ? "Impossible de charger ces données." : "Could not load this data."}</strong> {sellerErrorText(message, fr)}
         </span>
       </span>
       {onRetry && (

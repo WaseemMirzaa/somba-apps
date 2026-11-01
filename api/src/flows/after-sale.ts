@@ -6,19 +6,21 @@ import { linesBySeller, sellerUserId, type ListingSellerLookup } from '../orders
 /** Allowed status steps (mirrors the warehouse buttons in web/src/lib/warehouse-live.ts). */
 export const REPLACEMENT_NEXT: Record<ReplacementStatus, ReplacementStatus[]> = {
   requested: ['approved', 'rejected'],
-  approved: ['received', 'rejected'],
+  approved: ['received', 'dispatched', 'rejected'],
   received: ['allocated'],
   allocated: ['dispatched'],
-  dispatched: [],
+  dispatched: ['delivered'],
+  delivered: [],
   rejected: [],
 };
 
 export const EXCHANGE_NEXT: Record<ExchangeStatus, ExchangeStatus[]> = {
   requested: ['approved', 'rejected'],
-  approved: ['received', 'rejected'],
+  approved: ['received', 'dispatched', 'rejected'],
   received: ['ready'],
   ready: ['dispatched'],
-  dispatched: [],
+  dispatched: ['delivered'],
+  delivered: [],
   rejected: [],
 };
 

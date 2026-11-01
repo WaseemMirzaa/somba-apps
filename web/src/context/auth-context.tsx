@@ -1,16 +1,10 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { INITIAL_WAREHOUSES, warehousePersonaId } from "@/lib/warehouses-admin";
-import {
-  WAREHOUSE_STAFF_ROLE_LABELS,
-  WAREHOUSE_STAFF_ROLE_LABELS_FR,
-  warehouseStaffPersonaId,
-} from "@/lib/admin-entities";
-import { useWarehouseStaff } from "@/context/warehouse-staff-context";
 import { useRealtime } from "@/context/realtime-context";
 import type { AdminDepartment } from "@/lib/admin-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
+import { TIER_LABEL } from "@/lib/logistics";
 
 export type Persona = {
   id: string;
@@ -142,6 +136,73 @@ const STATIC_PERSONAS: Persona[] = [
     nameFr: "Jean Rider",
     email: "rider@somba.app",
     portal: "/rider",
+    subRole: "Kinshasa Hub",
+    subRoleFr: "Hub de Kinshasa",
+  },
+  {
+    id: "rider-limete",
+    role: "rider",
+    name: "Limete Rider",
+    nameFr: "Livreur Limete",
+    email: "rider.limete@somba.app",
+    portal: "/rider",
+    subRole: "Limete Hub",
+    subRoleFr: "Hub de Limete",
+  },
+  {
+    id: "rider-paris",
+    role: "rider",
+    name: "Paris Rider",
+    nameFr: "Livreur Paris",
+    email: "rider.paris@somba.app",
+    portal: "/rider",
+    subRole: "Paris Hub",
+    subRoleFr: "Hub de Paris",
+  },
+  // Warehouse staff: the seeded accounts. Their tier comes from the API (`warehouseTier`), not from this list.
+  {
+    id: "wh-kin-manager",
+    role: "warehouse",
+    name: "Kinshasa Manager",
+    nameFr: "Responsable Kinshasa",
+    email: "warehouse@somba.app",
+    portal: "/warehouse",
+    subRole: "Kinshasa Hub · Manager",
+    subRoleFr: "Hub de Kinshasa · Responsable",
+    warehouseRole: "manager",
+  },
+  {
+    id: "wh-kin-operator",
+    role: "warehouse",
+    name: "Kinshasa Operator",
+    nameFr: "Opérateur Kinshasa",
+    email: "operator@somba.app",
+    portal: "/warehouse",
+    subRole: "Kinshasa Hub · Operator",
+    subRoleFr: "Hub de Kinshasa · Opérateur",
+    warehouseRole: "operator",
+  },
+  {
+    id: "wh-limete-supervisor",
+    role: "warehouse",
+    name: "Limete Supervisor",
+    nameFr: "Superviseur Limete",
+    email: "warehouse.limete@somba.app",
+    portal: "/warehouse",
+    subRole: "Limete Hub · Supervisor",
+    subRoleFr: "Hub de Limete · Superviseur",
+    warehouseRole: "supervisor",
+  },
+  {
+    id: "wh-paris-manager",
+    role: "warehouse",
+    name: "Paris Manager",
+    nameFr: "Responsable Paris",
+    email: "warehouse.paris@somba.app",
+    portal: "/warehouse",
+    subRole: "Paris Hub · Manager",
+    subRoleFr: "Hub de Paris · Responsable",
+    warehouseRole: "manager",
   },
 ];
 
@@ -165,23 +226,8 @@ export function getPersonaDisplaySubRole(persona: Persona, fr: boolean) {
   return fr ? labels.fr : labels.en;
 }
 
-function buildWarehouseManagerPersonas(): Persona[] {
-  return INITIAL_WAREHOUSES.filter((w) => w.status === "active").map((w) => ({
-    id: warehousePersonaId(w.id),
-    role: "warehouse" as const,
-    name: w.managerName,
-    nameFr: w.managerName,
-    email: w.portalEmail,
-    portal: "/warehouse",
-    subRole: `${w.name} Manager`,
-    subRoleFr: `Responsable — ${w.name}`,
-    warehouseId: w.id,
-    warehouseRole: "manager" as const,
-  }));
-}
-
 /** Static fallback for modules that import PERSONAS before provider mounts */
-export const PERSONAS: Persona[] = [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas()];
+export const PERSONAS: Persona[] = STATIC_PERSONAS;
 
 type AuthContextType = {
   persona: Persona;
@@ -242,37 +288,20 @@ function backendEmailFor(persona: Persona): string | null {
     case "admin":
       return "admin@somba.app";
     case "warehouse":
-      return "warehouse@somba.app";
     case "rider":
-      return "rider@somba.app";
+      return persona.email || null;
     default:
       return null;
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { staff } = useWarehouseStaff();
   const rt = useRealtime();
   const [persona, setPersona] = useState<Persona>(STATIC_PERSONAS[0]);
   const [authReady, setAuthReady] = useState(false);
   const [realSession, setRealSession] = useState(false);
 
-  const personas = useMemo(() => {
-    const staffPersonas: Persona[] = staff
-      .filter((s) => s.status === "active")
-      .map((s) => ({
-        id: warehouseStaffPersonaId(s.id),
-        role: "warehouse" as const,
-        name: s.name,
-        email: s.email,
-        portal: "/warehouse",
-        subRole: WAREHOUSE_STAFF_ROLE_LABELS[s.role],
-        subRoleFr: WAREHOUSE_STAFF_ROLE_LABELS_FR[s.role],
-        warehouseId: s.warehouseId,
-        warehouseRole: s.role,
-      }));
-    return [...STATIC_PERSONAS, ...buildWarehouseManagerPersonas(), ...staffPersonas];
-  }, [staff]);
+  const personas = STATIC_PERSONAS;
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -352,13 +381,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Permissions come from the role's persona; identity comes from the real
   // signed-in user — including after a full reload (persona is restored by id).
-  const shownPersona = useMemo<Persona>(
-    () =>
-      realSession && rt.user
-        ? { ...persona, name: rt.user.name, nameFr: rt.user.name, email: rt.user.email }
-        : persona,
-    [persona, realSession, rt.user],
-  );
+  const shownPersona = useMemo<Persona>(() => {
+    let p: Persona = persona;
+    const u = rt.user;
+    // Identity comes from the signed-in account; for warehouse staff the tier and hub come from the API too.
+    if (u && (realSession || u.email === persona.email)) {
+      p = realSession ? { ...p, name: u.name, nameFr: u.name, email: u.email } : p;
+      if (p.role === "warehouse" && u.role === "warehouse_staff") {
+        const tier = (u.warehouseTier ?? "operator") as WarehouseStaffRole;
+        p = {
+          ...p,
+          warehouseRole: tier,
+          warehouseId: u.hubId ?? p.warehouseId,
+          subRole: TIER_LABEL[tier].en,
+          subRoleFr: TIER_LABEL[tier].fr,
+        };
+      }
+    }
+    return p;
+  }, [persona, realSession, rt.user]);
 
   const switchPersona = login;
 

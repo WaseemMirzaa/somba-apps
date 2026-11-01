@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- KYC documents live on the API host */
 import { localDateTime, localDay } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { KycDocuments } from "@/components/admin/kyc-documents";
 import { SellerStatusActions } from "@/components/admin/status-actions";
 import { PeriodTabs, type PeriodDays } from "@/components/admin/period-tabs";
 import { DailyBarChart } from "@/components/admin/series-charts";
@@ -143,19 +143,7 @@ export default function AdminSellerDetailPage() {
               ]} />
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{fr ? "Documents" : "Documents"}</p>
-                {(seller.documentUrls?.length ?? 0) === 0 ? (
-                  <p className="text-sm text-slate-500">{fr ? "Aucun document." : "No documents."}</p>
-                ) : (
-                  <ul className="flex flex-wrap gap-3">
-                    {seller.documentUrls?.map((url, i) => (
-                      <li key={url}>
-                        <a href={url} target="_blank" rel="noopener noreferrer" aria-label={fr ? `Ouvrir le document ${i + 1}` : `Open document ${i + 1}`}>
-                          <img src={url} alt={fr ? `Document ${i + 1}` : `Document ${i + 1}`} className="h-24 w-24 rounded-lg border border-slate-200 bg-slate-50 object-cover hover:opacity-90" />
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <KycDocuments urls={seller.documentUrls ?? []} fr={fr} />
               </div>
             </div>
           ) : (

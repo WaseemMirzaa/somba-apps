@@ -12,6 +12,15 @@ import 'strings.dart';
     'Order cancelled' => 'Commande annulée',
     'New delivery available' => 'Nouvelle livraison disponible',
     'New delivery assigned to you' => 'Nouvelle livraison pour vous',
+    'New task assigned to you' => 'Nouvelle tâche qui vous est assignée',
+    'Task needs attention' => 'Tâche à vérifier',
+    'Task to assign' => 'Tâche à confier à un livreur',
+    'Support reply' => 'Réponse de l’assistance',
+    'New reply on a ticket' => 'Nouvelle réponse sur un ticket',
+    'Ticket assigned to you' => 'Ticket qui vous est assigné',
+    'Ticket resolved' => 'Ticket résolu',
+    'Ticket closed' => 'Ticket clôturé',
+    'Ticket reopened' => 'Ticket rouvert',
     _ => _assignedMany(title) ?? title,
   };
   var b = body;
@@ -47,7 +56,22 @@ String _usdFr(String raw) {
   return v == null ? '$raw \$' : const Strings('fr').usd(v);
 }
 
+/// A leg kind as the server writes it in a notice ("return to seller") in French.
+String _legFr(String kind) => switch (kind) {
+      'pickup' => 'la collecte',
+      'transfer' => 'le transfert',
+      'delivery' => 'la livraison',
+      'return pickup' => 'la collecte du retour',
+      'return transfer' => 'le transfert du retour',
+      'return to seller' => 'le retour au vendeur',
+      'replacement delivery' => 'la livraison du remplacement',
+      _ => kind,
+    };
+
 final List<(RegExp, String Function(RegExpMatch))> _bodies = [
+  (RegExp(r'^(\S+): (.+) is now in your tasks\.$'), (m) => '${m[1]} : ${_legFr(m[2]!)} est maintenant dans vos tâches.'),
+  (RegExp(r'^(\S+): (.+) failed after (\d+) attempts \((.*)\)\.$'), (m) => '${m[1]} : ${_legFr(m[2]!)} a échoué après ${m[3]} tentatives (${m[4]}).'),
+  (RegExp(r'^(\S+): (.+) needs a rider\.$'), (m) => '${m[1]} : ${_legFr(m[2]!)} attend un livreur.'),
   (RegExp(r'^(\S+) is packed and ready\.$'), (m) => '${m[1]} est emballé et prêt.'),
   (RegExp(r'^(\S+) · \$([\d.]+) from (.+)$'), (m) => '${m[1]} · ${_usdFr(m[2]!)} de ${m[3]}'),
   (RegExp(r'^(\S+) was cancelled\.$'), (m) => '${m[1]} a été annulée.'),

@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Ban, Clock, Store } from "lucide-react";
+import { Ban, Clock, Store, Users } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { localDateTime } from "@/lib/dates";
 import { useRealtime } from "@/context/realtime-context";
+import { useAuth } from "@/context/auth-context";
 import { PageLoader } from "@/components/ui/loader";
 import { useStoreGate } from "@/lib/seller";
 
@@ -35,13 +36,16 @@ export function SellerStoreGate({ children }: { children: React.ReactNode }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const rt = useRealtime();
-  const { state, seller } = useStoreGate();
+  const { state, seller, removedFrom } = useStoreGate();
+  const { logout } = useAuth();
 
   // A store opened before KYC existed: complete it before waiting for approval.
   const needsKyc = state === "pending" && !!seller && !seller.kycSubmittedAt;
 
   const redirectTo =
-    state === "none"
+    state === "removed"
+      ? null
+      : state === "none"
       ? "/seller/register"
       : needsKyc
         ? onPath(pathname, KYC_OK) ? null : "/seller/resubmit"
@@ -59,6 +63,33 @@ export function SellerStoreGate({ children }: { children: React.ReactNode }) {
 
   if (rt.user?.role !== "seller" || state === "loading") return <PageLoader locale={locale} />;
   if (redirectTo && redirectTo !== pathname) return <PageLoader locale={locale} />;
+
+  // The owner took this account off the team: say so (the portal's data is gone), then offer the next steps.
+  if (state === "removed") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-6">
+        <div className="max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm" data-testid="team-removed">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+            <Users className="h-7 w-7 text-slate-600" />
+          </span>
+          <h1 className="text-xl font-bold text-slate-900">{fr ? "Vous ne faites plus partie de l'équipe" : "You are no longer on the team"}</h1>
+          <p className="text-sm text-slate-600">
+            {fr
+              ? `Le propriétaire de « ${removedFrom || "la boutique"} » a retiré votre accès. Vos données personnelles restent sur votre compte.`
+              : `The owner of "${removedFrom || "the store"}" removed your access. Your personal data stays on your account.`}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={() => logout()} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white">
+              {fr ? "Se déconnecter" : "Sign out"}
+            </button>
+            <Link href="/seller/register" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">
+              {fr ? "Ouvrir ma propre boutique" : "Open my own store"}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if ((state === "rejected" && !onPath(pathname, REJECTED_OK)) || (state === "suspended" && !onPath(pathname, SUSPENDED_OK))) {
     const suspended = state === "suspended";

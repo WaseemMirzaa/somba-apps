@@ -25,7 +25,10 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'return') return pick(`/shop/returns/${id}`, '/shop/returns');
       if (t === 'dispute') return pick(`/shop/disputes/${id}`, '/shop/returns');
       if (t === 'support') return pick(`/shop/support/${id}`, '/shop/support');
-      if (t === 'exchange' || t === 'replacement') return '/shop/returns';
+      if (t === 'exchange') return pick(`/shop/exchanges/${id}`, '/shop/returns');
+      if (t === 'replacement') return pick(`/shop/replacements/${id}`, '/shop/returns');
+      if (t === 'question') return pick(`/shop/products/${id}`, '/shop/notifications'); // entityId is the product
+      if (t === 'chat') return pick(`/shop/messages/${id}`, '/shop/messages'); // entityId is the conversation
       return '/shop/notifications';
     case 'seller':
       if (t === 'order') return pick(`/seller/orders/${id}`, '/seller/orders');
@@ -33,11 +36,19 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'moderation') return pick(`/seller/products/${id}`, '/seller/products');
       if (t === 'payout') return '/seller/finance/payouts';
       if (t === 'campaign') return pick(`/seller/promotions/${id}`, '/seller/promotions');
+      if (t === 'flash') return '/seller/flash-sales';
+      if (t === 'stock') return '/seller/inventory';
+      if (t === 'finance') return '/seller/finance/tax';
       if (t === 'support') return pick(`/seller/support/${id}`, '/seller/support');
       if (t === 'return') return pick(`/seller/returns/${id}`, '/seller/returns');
       if (t === 'dispute') return pick(`/seller/disputes/${id}`, '/seller/disputes');
       if (t === 'replacement') return pick(`/seller/replacements/${id}`, '/seller/replacements');
       if (t === 'exchange') return pick(`/seller/exchanges/${id}`, '/seller/exchanges');
+      if (t === 'question') return pick(`/seller/questions?focus=${id}`, '/seller/questions');
+      if (t === 'review') return pick(`/seller/reviews?focus=${id}`, '/seller/reviews');
+      if (t === 'chat') return pick(`/seller/messages/${id}`, '/seller/messages');
+      if (t === 'team') return '/seller/team';
+      if (t === 'security') return '/seller/settings';
       return '/seller/notifications';
     case 'admin':
       if (t === 'order' || t === 'delivery') return pick(`/admin/orders/${id}`, '/admin/orders');
@@ -49,17 +60,22 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'return') return pick(`/admin/returns/${id}`, '/admin/returns');
       if (t === 'dispute') return pick(`/admin/disputes/${id}`, '/admin/disputes');
       if (t === 'campaign') return '/admin/marketing';
-      if (t === 'exchange') return pick(`/admin/fulfillment/exchanges/${id}`, '/admin/fulfillment/exchanges');
-      if (t === 'replacement') return pick(`/admin/fulfillment/replacements/${id}`, '/admin/fulfillment/replacements');
+      if (t === 'flash') return '/admin/marketing';
+      if (t === 'stock') return '/admin/products';
+      if (t === 'review' || t === 'question') return pick(`/admin/reviews?focus=${id}`, '/admin/reviews');
+      if (t === 'exchange') return pick(`/admin/exchanges/${id}`, '/admin/exchanges');
+      if (t === 'replacement') return pick(`/admin/replacements/${id}`, '/admin/replacements');
       return '/admin/notifications';
     case 'warehouse':
       if (t === 'return' || t === 'dispute') return pick(`/warehouse/returns/${id}`, '/warehouse/returns');
       if (t === 'exchange') return pick(`/warehouse/exchanges/${id}`, '/warehouse/exchanges');
       if (t === 'replacement') return pick(`/warehouse/replacements/${id}`, '/warehouse/replacements');
       if (t === 'order' || t === 'delivery') return '/warehouse/deliveries';
-      return '/warehouse';
+      if (t === 'support') return pick(`/warehouse/support/${id}`, '/warehouse/support');
+      return '/warehouse/notifications';
     case 'rider':
       if (t === 'task') return pick(`/rider/tasks/${id}`, '/rider/tasks');
+      if (t === 'support') return pick(`/rider/support/${id}`, '/rider/support');
       return '/rider/notifications';
   }
 }

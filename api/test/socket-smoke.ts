@@ -2,7 +2,7 @@
 /**
  * End-to-end smoke test proving the real-time interconnection:
  *   customer places order  →  admin dashboard + warehouse see it live
- *   rider accepts + advances delivery  →  customer order status updates live
+ *   warehouse assigns the rider, who advances the legs  →  customer order status updates live
  *   rider streams location  →  customer receives live position
  *
  * Requires the API running (npm run start:dev) and a seeded DB (npm run seed).
@@ -11,6 +11,8 @@ import { io, Socket } from 'socket.io-client';
 
 const API = process.env.SMOKE_API ?? 'http://localhost:3001';
 const PASSWORD = 'Somba@2026';
+// Delivery needs an address in a served area: a plain Kinshasa address resolves to the city, which Entrepôt Kinshasa covers.
+const ADDRESS = JSON.stringify({ city: 'Kinshasa', line1: '12 Ave du Commerce' });
 
 async function login(email: string): Promise<{ token: string; id: string }> {
   const res = await fetch(`${API}/api/v1/auth/login`, {
@@ -46,13 +48,20 @@ function emit<T>(socket: Socket, event: string, body?: unknown): Promise<T> {
   });
 }
 
-function waitFor<T>(socket: Socket, event: string, ms = 5000): Promise<T> {
+/** The next `event` (optionally the next one that passes `pred`: a leg that moves also re-sends the order, so wait for the status you mean). */
+function waitFor<T>(socket: Socket, event: string, pred: (p: T) => boolean = () => true, ms = 5000): Promise<T> {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`timeout waiting for ${event}`)), ms);
-    socket.once(event, (payload: T) => {
+    const t = setTimeout(() => {
+      socket.off(event, h);
+      reject(new Error(`timeout waiting for ${event}`));
+    }, ms);
+    const h = (payload: T) => {
+      if (!pred(payload)) return;
       clearTimeout(t);
+      socket.off(event, h);
       resolve(payload);
-    });
+    };
+    socket.on(event, h);
   });
 }
 
@@ -79,14 +88,24 @@ async function main() {
   const products = await emit<any[]>(cSock, 'products:list');
   check(`customer fetched ${products.length} products over socket`, products.length > 0);
 
+  // The journey below runs through the Kinshasa warehouse (rider@somba.app works there), so the basket must come from
+  // seller@somba.app's store (pickup in Gombe, which Entrepôt Kinshasa covers). Never take `products[0]`: the seed also
+  // has a Limete wholesaler whose listing picks up from Entrepôt Limete (another warehouse's riders), and the catalogue
+  // order does not say whose listing comes first (on SQLite every seeded row shares one createdAt second, so the id
+  // tie-break is random per seed).
+  const seller = await login('seller@somba.app');
+  const sSock = await connect(seller.token);
+  const ownListings = await emit<any[]>(sSock, 'products:list');
+  const product = ownListings.find((p) => p.status === 'live');
+  check("seller@somba.app has a live listing of their own to buy", !!product && products.some((p) => p.id === product.id));
+
   // COD is off by default (client scope: codEnabled=false) — refused until an admin enables it.
   let codRefused = false;
   try {
     await emit(cSock, 'orders:create', {
-      items: [{ productId: products[0].id, qty: 1 }],
+      items: [{ productId: product.id, qty: 1 }],
       paymentMethod: 'cod',
-      deliveryFeeUsd: 0,
-    zoneId: 'zone-a',
+      shippingAddress: ADDRESS,
     });
   } catch {
     codRefused = true;
@@ -97,31 +116,35 @@ async function main() {
   // Admin dashboard listens for the new order pushed in real time.
   const adminSawOrder = waitFor<any>(aSock, 'order:created');
   const created = await emit<any>(cSock, 'orders:create', {
-    items: [{ productId: products[0].id, qty: 2 }],
+    items: [{ productId: product.id, qty: 2 }],
     paymentMethod: 'cod',
-    deliveryFeeUsd: 3,
-    zoneId: 'gombe',
-    shippingAddress: JSON.stringify({ city: 'Kinshasa', line1: '12 Ave du Commerce' }),
+    shippingAddress: ADDRESS,
   });
   check('order created + acked to customer', !!created.id && created.status === 'pending');
   const pushed = await adminSawOrder;
   check('admin dashboard received order:created LIVE', pushed.id === created.id);
 
-  // Rider claims and advances the delivery; customer status follows live.
-  const unassigned = await emit<any[]>(rSock, 'delivery:unassigned');
-  const task = unassigned.find((t) => t.orderId === created.id);
-  check('rider sees the unassigned delivery task', !!task);
+  // The warehouse gives the journey to the rider (riders never take tasks); the customer's status follows live.
+  const unassigned = await emit<any[]>(aSock, 'delivery:unassigned');
+  const pickup = unassigned.find((t) => t.orderId === created.id);
+  check('the warehouse queue holds the order\'s pickup task', !!pickup && pickup.kind === 'pickup');
 
-  const custStatusUpdate = waitFor<any>(cSock, 'order:updated');
-  await emit(rSock, 'delivery:accept', { taskId: task.id });
-  const afterAccept = await custStatusUpdate;
-  check('customer got order:updated when rider accepted', afterAccept.id === created.id);
+  const custStatusUpdate = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'processing');
+  await emit(aSock, 'logistics:assign', { taskId: pickup.id, riderId: rider.id });
+  const afterAssign = await custStatusUpdate;
+  check('customer got order:updated when the pickup was assigned', afterAssign.id === created.id && afterAssign.status === 'processing');
+  await emit(rSock, 'delivery:updateStatus', { taskId: pickup.id, status: 'picked_up' });
+  await emit(rSock, 'delivery:updateStatus', { taskId: pickup.id, status: 'in_transit' });
 
-  const custShipped = waitFor<any>(cSock, 'order:updated');
-  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'picked_up' });
+  const custShipped = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'shipped');
+  const scanned = await emit<any>(aSock, 'logistics:scanIn', { taskId: pickup.id });
   const shipped = await custShipped;
-  check('customer order → shipped live', shipped.status === 'shipped');
-  const custOutForDelivery = waitFor<any>(cSock, 'order:updated');
+  check('customer order → shipped live (parcel at the warehouse)', shipped.status === 'shipped');
+  const task = scanned.next.find((t: any) => t.kind === 'delivery');
+  check('scanning the parcel in creates the delivery leg', !!task);
+  await emit(aSock, 'logistics:assign', { taskId: task.id, riderId: rider.id });
+  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'picked_up' });
+  const custOutForDelivery = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'out_for_delivery');
   await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'in_transit' });
   const ofd = await custOutForDelivery;
   check('customer order → out_for_delivery live', ofd.status === 'out_for_delivery');
@@ -139,12 +162,11 @@ async function main() {
       { name: 'Samsung Galaxy S24 Ultra', priceUsd: 1199, qty: 1, variant: 'Titanium' },
     ],
     paymentMethod: 'stripe_card',
-    deliveryFeeUsd: 0,
-    zoneId: 'zone-a',
+    shippingAddress: ADDRESS,
   });
   check(
     'snapshot-line order created (no productId)',
-    !!snapOrder.id && snapOrder.totalUsd === 1199,
+    !!snapOrder.id && snapOrder.subtotalUsd === 1199 && snapOrder.totalUsd === 1199 + snapOrder.deliveryFeeUsd,
   );
   const snapPushed = await adminSawSnapshot;
   check('admin saw snapshot order LIVE', snapPushed.id === snapOrder.id);
@@ -163,12 +185,11 @@ async function main() {
   const walletOrder = await emit<any>(cSock, 'orders:create', {
     items: [{ name: 'Wallet Item', priceUsd: 40, qty: 1 }],
     paymentMethod: 'wallet',
-    deliveryFeeUsd: 0,
-    zoneId: 'zone-a',
+    shippingAddress: ADDRESS,
   });
   check('wallet order confirmed immediately', walletOrder.status === 'confirmed');
   const afterDebit = await walletDebited;
-  check('wallet debited live on payment', afterDebit.balance === afterTopup.balance - 40);
+  check('wallet debited live on payment', Math.abs(afterDebit.balance - (afterTopup.balance - walletOrder.totalUsd)) < 0.011);
 
   const payments = await emit<any[]>(cSock, 'payments:list');
   check(`customer has ${payments.length} payment records`, payments.length >= 1);
@@ -177,7 +198,7 @@ async function main() {
   const walletRefunded = waitFor<{ balance: number }>(cSock, 'wallet:updated');
   await emit(aSock, 'orders:refund', { orderId: walletOrder.id, toWallet: true });
   const afterRefund = await walletRefunded;
-  check('refund credited wallet live', afterRefund.balance === afterDebit.balance + 40);
+  check('refund credited wallet live', Math.abs(afterRefund.balance - (afterDebit.balance + walletOrder.totalUsd)) < 0.011);
 
   // Insufficient-funds guard.
   let rejected = false;
@@ -185,8 +206,7 @@ async function main() {
     await emit(cSock, 'orders:create', {
       items: [{ name: 'Too expensive', priceUsd: 999999, qty: 1 }],
       paymentMethod: 'wallet',
-      deliveryFeeUsd: 0,
-    zoneId: 'zone-a',
+      shippingAddress: ADDRESS,
     });
   } catch {
     rejected = true;
@@ -195,11 +215,9 @@ async function main() {
 
   // ---- Payouts (seller ⇄ finance) ----
   // A payout can only draw on DELIVERED sales, so complete the first delivery.
-  const sold = waitFor<any>(cSock, 'order:updated');
+  const sold = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'delivered');
   await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
   check('rider completes the delivery → order delivered', (await sold).status === 'delivered');
-  const seller = await login('seller@somba.app');
-  const sSock = await connect(seller.token);
   const avail = await emit<{ available: number }>(sSock, 'payouts:available');
   check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);
   const financeSawPayout = waitFor<any>(aSock, 'payout:created');

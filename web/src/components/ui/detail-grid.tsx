@@ -10,7 +10,7 @@ export function DetailGrid({
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-4 md:grid-cols-2 xl:grid-cols-3", className)}>
+    <div className={cn("grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3", className)}>
       {children}
     </div>
   );
@@ -35,6 +35,7 @@ export function DetailGridSection({
       title={title}
       action={action}
       className={cn(
+        "min-w-0",
         span === 2 && "md:col-span-2",
         span === 3 && "md:col-span-2 xl:col-span-3",
         className

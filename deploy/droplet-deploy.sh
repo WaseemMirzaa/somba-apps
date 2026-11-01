@@ -119,6 +119,7 @@ CORS_ORIGINS=$BASE_URL
 WEB_URL=$BASE_URL
 PUBLIC_API_URL=$BASE_URL
 UPLOAD_DIR=$APP_DIR/uploads
+PRIVATE_UPLOAD_DIR=$APP_DIR/uploads-private
 JWT_SECRET=$JWT_SECRET
 JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
 DATA_ENCRYPTION_KEY=$DATA_ENCRYPTION_KEY
@@ -133,6 +134,8 @@ EOF
   cat "$EXTRA"
 } > "$APP_DIR/api/.env"
 mkdir -p "$APP_DIR/uploads"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads"
+# Store KYC documents live here, NOT in the public uploads folder (served only through the authenticated API).
+mkdir -p "$APP_DIR/uploads-private"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads-private"; chmod 700 "$APP_DIR/uploads-private"
 
 # NEXT_PUBLIC_* are baked into the web bundle at BUILD time.
 cat > "$APP_DIR/web/.env.local" <<EOF
@@ -175,7 +178,7 @@ nginx -t && systemctl reload nginx
 # ── 9b. Nightly backups + automatic security updates ────────────────────────
 log "Backups (daily 03:15, 14 days kept) and unattended security updates"
 install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/bin/somba-backup
-printf 'UPLOAD_DIR=%s/uploads\n15 3 * * * root /usr/local/bin/somba-backup >> /var/log/somba-backup.log 2>&1\n' "$APP_DIR" > /etc/cron.d/somba-backup
+printf 'UPLOAD_DIR=%s/uploads\nPRIVATE_UPLOAD_DIR=%s/uploads-private\n15 3 * * * root /usr/local/bin/somba-backup >> /var/log/somba-backup.log 2>&1\n' "$APP_DIR" "$APP_DIR" > /etc/cron.d/somba-backup
 chmod 644 /etc/cron.d/somba-backup
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 /usr/local/bin/somba-backup >/dev/null 2>&1 || printf '\033[1;33m⚠ first backup failed — run somba-backup by hand to see why\033[0m\n'

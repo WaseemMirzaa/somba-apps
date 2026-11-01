@@ -8,6 +8,8 @@ import { errMsg, type PaymentCapabilities } from "@/lib/admin-live";
 import { useSocketQuery } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/payment-methods";
+import { refundFigures, refundNote } from "@/lib/refunds";
 
 const MOBILE_MONEY = new Set(["airtel_money", "orange_money", "vodacom_mpesa"]);
 
@@ -16,11 +18,16 @@ export interface RefundTarget {
   orderReference: string | null;
   amountUsd: number;
   method: string;
+  /** The payment's status and what it already gave back: the refund is limited to what is left. */
+  status?: string;
+  refundedUsd?: number | null;
+  refundableUsd?: number | null;
 }
 
 /**
  * Refund an order (`orders:refund`): to the customer's wallet (instant), or — for a mobile-money payment while
- * pawaPay is connected — back to the phone that paid. The server never pays back lines a seller already refunded.
+ * pawaPay is connected — back to the phone that paid. It refunds what is LEFT on the payment (amount paid - already
+ * refunded, returns and seller cancellations included): the dialog says how much, and the server refuses any more.
  */
 export function RefundDialog({
   target,
@@ -41,6 +48,9 @@ export function RefundDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const phoneOk = !!target && MOBILE_MONEY.has(target.method) && !!caps.data?.phoneRefunds;
+  const figures = target ? refundFigures({ amountUsd: target.amountUsd, status: target.status ?? "succeeded", refundedUsd: target.refundedUsd, refundableUsd: target.refundableUsd }) : null;
+  const note = target ? refundNote({ amountUsd: target.amountUsd, status: target.status ?? "succeeded", refundedUsd: target.refundedUsd, refundableUsd: target.refundableUsd }, fr, (n) => formatCurrency(n, locale)) : null;
+  const left = figures?.refundableUsd ?? 0;
 
   function close() {
     if (busy) return;
@@ -80,15 +90,20 @@ export function RefundDialog({
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={close} disabled={busy}>{fr ? "Annuler" : "Cancel"}</Button>
-          <Button variant="danger" size="sm" onClick={() => void refund()} disabled={busy}>{busy ? "…" : fr ? "Rembourser" : "Refund"}</Button>
+          <Button variant="danger" size="sm" onClick={() => void refund()} disabled={busy || left < 0.01}>
+            {busy ? "…" : left >= 0.01 ? `${fr ? "Rembourser" : "Refund"} ${formatCurrency(left, locale)}` : fr ? "Rembourser" : "Refund"}
+          </Button>
         </>
       }
     >
       {target && (
         <>
           <p>
-            {target.orderReference} · {formatCurrency(target.amountUsd, locale)} · {target.method.replace(/_/g, " ")}
+            {target.orderReference} · {fr ? "payé" : "paid"} {formatCurrency(target.amountUsd, locale)} · {paymentMethodLabel(target.method, fr)}
           </p>
+          {note && (
+            <p data-testid="refund-limit" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{note}</p>
+          )}
           <fieldset className="space-y-2">
             <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{fr ? "Rembourser vers" : "Refund to"}</legend>
             <label className="flex items-start gap-2">
@@ -113,7 +128,9 @@ export function RefundDialog({
             </label>
           </fieldset>
           <p className="text-xs text-slate-500">
-            {fr ? "Les articles déjà remboursés par un vendeur ne sont pas remboursés deux fois." : "Items a seller already refunded are not paid back twice."}
+            {fr
+              ? "Seul le reste du paiement est remboursé : ce qui l'a déjà été (retour, annulation par un vendeur) ne l'est jamais deux fois."
+              : "Only what is left of the payment is refunded: what already went back (a return, a seller's cancellation) is never paid twice."}
           </p>
           <ErrorNote message={error} />
         </>

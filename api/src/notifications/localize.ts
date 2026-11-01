@@ -12,6 +12,7 @@
  */
 
 import { paymentMethodId } from '../common/payment-method';
+import { COMMERCE_BODIES, COMMERCE_TITLES } from './localize-commerce';
 
 export interface NoticeText {
   title: string;
@@ -85,6 +86,7 @@ const AFTER_SALE_STEPS: Record<string, string> = {
   ready: 'prêt',
   allocated: 'attribué',
   dispatched: 'expédié',
+  delivered: 'livré',
 };
 
 /** Campaign states; "live" is the wording of the "campaign started" notice. */
@@ -114,6 +116,32 @@ const PRODUCT_STATUSES: Record<string, string> = {
 };
 
 const pick = (table: Record<string, string>, key: string): string => table[key] ?? key;
+
+/** Team roles and store badges in French (seller platform notices). */
+const TEAM_ROLES: Record<string, string> = {
+  owner: 'propriétaire',
+  manager: 'gestionnaire',
+  catalog: 'catalogue',
+  orders: 'commandes',
+  finance: 'finances',
+  support: 'support client',
+};
+const BADGES: Record<string, string> = { bronze: 'bronze', silver: 'argent', gold: 'or', somba_assured: 'Somba Assuré' };
+
+/** The legs of a parcel's journey, as the server names them in notices ("return to seller"). */
+const LEGS_FR: Record<string, string> = {
+  pickup: 'enlèvement',
+  transfer: 'transfert',
+  delivery: 'livraison',
+  'return pickup': 'retour client',
+  'return transfer': 'transfert retour',
+  'return to seller': 'retour au vendeur',
+  'replacement delivery': 'livraison de remplacement',
+};
+const legFr = (leg: string): string => pick(LEGS_FR, leg);
+
+/** "de" before a place name, elided before a vowel or a mute h: "d’Entrepôt Limete", "de Kinshasa Hub". */
+const deFr = (name: string): string => (/^[aeiouyhàâäéèêëîïôöùûü]/i.test(name) ? `d’${name}` : `de ${name}`);
 
 /** "2026-11-24" → "24/11/2026"; anything else as is. */
 function dateFr(s: string): string {
@@ -159,11 +187,24 @@ const RESOLUTIONS: Record<string, string> = {
   'Refunded to wallet': 'Remboursé sur le portefeuille',
   Resolved: 'Résolu',
   Rejected: 'Refusé',
+  'Partially refunded': 'Remboursement partiel',
+  'Replacement approved': 'Remplacement approuvé',
+  'Cancelled by the customer': 'Annulé par le client',
 };
+/**
+ * A dispute's resolution in French: the stock phrases the server writes ("Refunded to wallet"…) are translated; text an
+ * agent typed is theirs, so it comes back as it is (or null when there is none).
+ */
+export function resolutionFr(resolution: string | null | undefined): string | null {
+  if (resolution == null || resolution === '') return null;
+  return RESOLUTIONS[resolution] ?? resolution;
+}
+const RESOLUTION_RE = new RegExp(`^(\\S+)( · \\S+)?: (${Object.keys(RESOLUTIONS).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`);
 
 // ── Titles ───────────────────────────────────────────────────────────────
 
 const TITLES: Record<string, string> = {
+  ...COMMERCE_TITLES,
   // The customer app's own list
   'Approve your payment': 'Validez votre paiement',
   'Order placed': 'Commande enregistrée',
@@ -190,6 +231,19 @@ const TITLES: Record<string, string> = {
   'New delivery available': 'Nouvelle livraison disponible',
   'New delivery assigned to you': 'Nouvelle livraison qui vous est assignée',
   'Parcel ready for pickup': 'Colis prêt pour l’enlèvement',
+  // The three-leg journey (pickup -> transfer -> delivery) and its warehouse desk
+  'Task to assign': 'Tâche à confier à un livreur',
+  'New task assigned to you': 'Nouvelle tâche qui vous est assignée',
+  'Pickup scheduled': 'Enlèvement programmé',
+  'Package at the warehouse': 'Colis à l’entrepôt',
+  'Address without a map pin': 'Adresse sans repère sur la carte',
+  'No warehouse with riders': 'Aucun entrepôt avec des livreurs',
+  'Warehouse without riders': 'Entrepôt sans livreurs',
+  'Warehouses not connected': 'Entrepôts non reliés',
+  'Transfer run assigned': 'Tournée de transfert assignée',
+  'Transfer run on its way': 'Tournée de transfert en route',
+  'Parcel missing from run': 'Colis manquant dans une tournée',
+  'Task needs attention': 'Tâche à vérifier',
   'Seller package ready': 'Colis vendeur prêt',
   'Item cancelled by the seller': 'Article annulé par le vendeur',
   'Seller cancelled items': 'Articles annulés par le vendeur',
@@ -199,6 +253,15 @@ const TITLES: Record<string, string> = {
   'Returned goods received': 'Articles retournés reçus',
   'Return resolved': 'Retour résolu',
   'Return closed': 'Retour clôturé',
+  'Return accepted': 'Retour accepté',
+  'Return approved': 'Retour approuvé',
+  'Return rejected': 'Retour refusé',
+  'Return escalated': 'Retour transmis à l’assistance',
+  'Return reply': 'Réponse au retour',
+  'Dispute reply': 'Réponse au litige',
+  'Seller did not respond': 'Le vendeur n’a pas répondu',
+  'Returned goods graded': 'Articles retournés contrôlés',
+  'Return refund failed': 'Échec du remboursement du retour',
   'Exchange requested on your item': 'Échange demandé sur votre article',
   'Replacement requested on your item': 'Remplacement demandé sur votre article',
   // Payments and payouts
@@ -213,6 +276,21 @@ const TITLES: Record<string, string> = {
   'New support ticket': 'Nouveau ticket d’assistance',
   'Support reply': 'Réponse de l’assistance',
   'The seller replied to your review': 'Le vendeur a répondu à votre avis',
+  'New reply on a ticket': 'Nouvelle réponse sur un ticket',
+  'Ticket assigned to you': 'Ticket qui vous est assigné',
+  'Ticket resolved': 'Ticket résolu',
+  'Ticket closed': 'Ticket clôturé',
+  'Ticket reopened': 'Ticket rouvert',
+  // Reviews and product questions
+  'New review on your product': 'Nouvel avis sur votre produit',
+  'Review reported': 'Avis signalé',
+  'Your review was hidden': 'Votre avis a été masqué',
+  'Your review is visible again': 'Votre avis est de nouveau visible',
+  'A review on your product was hidden': 'Un avis sur votre produit a été masqué',
+  'A review on your product is visible again': 'Un avis sur votre produit est de nouveau visible',
+  'New question on your product': 'Nouvelle question sur votre produit',
+  'New product question': 'Nouvelle question sur un produit',
+  'Your question was answered': 'Votre question a reçu une réponse',
   // Sellers, products, campaigns
   'Plan activated': 'Abonnement activé',
   'New seller application': 'Nouvelle candidature vendeur',
@@ -228,6 +306,18 @@ const TITLES: Record<string, string> = {
   'Campaign started': 'Campagne démarrée',
   // Settings → "Send a test push"
   'Test notification': 'Notification de test',
+  // Seller platform: team, chat, security, storefront
+  'Team invitation': 'Invitation à rejoindre l’équipe',
+  'Team member joined': 'Nouveau membre dans l’équipe',
+  'Team member left': 'Un membre a quitté l’équipe',
+  'Team role changed': 'Rôle modifié dans l’équipe',
+  'Removed from store team': 'Retrait de l’équipe boutique',
+  'New customer message': 'Nouveau message client',
+  'New message from the seller': 'Nouveau message du vendeur',
+  'Two-factor authentication enabled': 'Authentification à deux facteurs activée',
+  'Two-factor authentication disabled': 'Authentification à deux facteurs désactivée',
+  'Vacation mode ended': 'Fin du mode vacances',
+  'Seller badge updated': 'Badge vendeur mis à jour',
 };
 
 function titlePattern(title: string): string | null {
@@ -245,6 +335,55 @@ function titlePattern(title: string): string | null {
 // ── Bodies (first match wins: keep the specific patterns above the general ones) ──
 
 const BODIES: Rule[] = [
+  // Commerce notices (stock, flash sales, invoices…): before the general "X is now Y." rule below
+  ...COMMERCE_BODIES,
+  // Seller platform: team, security, storefront
+  [/^(.+) invited you to join their store team \((\w+)\)\.$/, (m) => `${m[1]} vous invite à rejoindre l’équipe de sa boutique (${pick(TEAM_ROLES, m[2])}).`],
+  [/^(.+) joined your store team as (\w+)\.$/, (m) => `${m[1]} a rejoint l’équipe de votre boutique en tant que ${pick(TEAM_ROLES, m[2])}.`],
+  [/^Your role in "(.+)" is now (\w+)\.$/, (m) => `Votre rôle dans « ${m[1]} » est maintenant : ${pick(TEAM_ROLES, m[2])}.`],
+  [/^You no longer have access to "(.+)"\.$/, (m) => `Vous n’avez plus accès à « ${m[1]} ».`],
+  [/^(.+) left your store team\.$/, (m) => `${m[1]} a quitté l’équipe de votre boutique.`],
+  [/^Signing in to your account now asks for a code from your authenticator app\.$/, () => 'La connexion à votre compte demande maintenant un code de votre application d’authentification.'],
+  [/^Two-factor authentication was turned off on your account\.$/, () => 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
+  [/^Your store is open again and takes new orders\.$/, () => 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.'],
+  [/^Your store badge is now (\w+) \(was (\w+)\)\.$/, (m) => `Le badge de votre boutique est maintenant ${pick(BADGES, m[1])} (avant : ${pick(BADGES, m[2])}).`],
+  // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins
+  [/^(\S+): ([a-z ]+) needs a rider\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » à confier à un livreur.`],
+  [/^(\S+): ([a-z ]+) is now in your tasks\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ajoutée à vos tâches.`],
+  [/^(\S+): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
+  [/^(\S+): your package reached the warehouse\.$/, (m) => `${m[1]} : votre colis est arrivé à l’entrepôt.`],
+  [
+    /^(\S+): the delivery address has no map pin, so it was routed to (.+)\.$/,
+    (m) => `${m[1]} : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers ${m[2]}.`,
+  ],
+  [
+    /^(\S+): no warehouse has an active rider, so it was routed to (.+)\. Add riders there\.$/,
+    (m) => `${m[1]} : aucun entrepôt n’a de livreur actif, la commande a été dirigée vers ${m[2]}. Ajoutez-y des livreurs.`,
+  ],
+  // Transfer runs: one parcel or several ("parcel(s)" is how notices stored before the singular was used read).
+  [/^(\S+): 1 parcel to (.+) is now in your tasks\.$/, (m) => `${m[1]} : 1 colis à destination ${deFr(m[2])} est ajouté à vos tâches.`],
+  [/^(\S+): (\d+) parcel(?:s|\(s\)) to (.+) are now in your tasks\.$/, (m) => `${m[1]} : ${m[2]} colis à destination ${deFr(m[3])} sont ajoutés à vos tâches.`],
+  [/^(\S+): 1 parcel from (.+) is on its way to your warehouse\.$/, (m) => `${m[1]} : 1 colis en provenance ${deFr(m[2])} est en route vers votre entrepôt.`],
+  [/^(\S+): (\d+) parcel(?:s|\(s\)) from (.+) are on their way to your warehouse\.$/, (m) => `${m[1]} : ${m[2]} colis en provenance ${deFr(m[3])} sont en route vers votre entrepôt.`],
+  [/^(\S+): 1 parcel did not arrive from (.+) at (.+)\.$/, (m) => `${m[1]} : 1 colis envoyé ${deFr(m[2])} n’est pas arrivé à ${m[3]}.`],
+  [/^(\S+): (\d+) parcel(?:s|\(s\)) did not arrive from (.+) at (.+)\.$/, (m) => `${m[1]} : ${m[2]} colis envoyés ${deFr(m[3])} ne sont pas arrivés à ${m[4]}.`],
+  [
+    /^(\S+): no lane connects (.+) to (.+), so the parcel goes direct\.$/,
+    (m) => `${m[1]} : aucune ligne ne relie ${m[2]} à ${m[3]}, le colis part en direct.`,
+  ],
+  [
+    /^(\S+): (.+) has no active rider, so (.+) will handle it\. Add riders to (.+)\.$/,
+    (m) => `${m[1]} : ${m[2]} n’a aucun livreur actif, ${m[3]} s’en charge. Ajoutez des livreurs à ${m[4]}.`,
+  ],
+  [
+    /^(\S+): ([a-z ]+) was scanned in but the next leg could not be created\.$/,
+    (m) => `${m[1]} : tâche « ${legFr(m[2])} » scannée à l’entrepôt, mais l’étape suivante n’a pas pu être créée.`,
+  ],
+  [
+    /^(\S+): ([a-z ]+) failed after (\d+) attempts \((.+)\)\.$/,
+    (m) => `${m[1]} : tâche « ${legFr(m[2])} » échouée après ${m[3]} tentatives (${translateReason(m[4])}).`,
+  ],
+
   // Orders and deliveries
   [/^(\S+) reached the Somba&Teka warehouse and will be on its way soon\.$/, (m) => `${m[1]} est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.`],
   [/^Approve the (.+) request on your phone to confirm (\S+)\.$/, (m) => `Validez la demande ${methodFr(m[1])} sur votre téléphone pour confirmer ${m[2]}.`],
@@ -363,7 +502,7 @@ const BODIES: Rule[] = [
     /^(\S+) · (\S+): the warehouse received the returned goods\.$/,
     (m) => `${m[1]} · ${m[2]} : l’entrepôt a reçu les articles retournés.`,
   ],
-  [/^(\S+)( · \S+)?: (Refunded to wallet|Resolved|Rejected)$/, (m) => `${m[1]}${m[2] ?? ''} : ${pick(RESOLUTIONS, m[3])}`],
+  [RESOLUTION_RE, (m) => `${m[1]}${m[2] ?? ''} : ${pick(RESOLUTIONS, m[3])}`],
   [/^Your review: ([\s\S]*)$/, (m) => `Votre avis : ${m[1]}`],
 
   // Settings → "Send a test push"
@@ -414,7 +553,12 @@ const WALLET_LINES: Rule[] = [
   [/^Wallet top-up via (.+)$/, (m) => `Recharge du portefeuille via ${methodFr(m[1])}`],
   [/^Refund for cancelled order (\S+)$/, (m) => `Remboursement de la commande annulée ${m[1]}`],
   [/^Refund for (\S+) \(phone refund failed\)$/, (m) => `Remboursement de ${m[1]} (échec du remboursement mobile)`],
+  [/^Refund for (\S+) \(returned items\)$/, (m) => `Remboursement de ${m[1]} (articles retournés)`],
+  [/^Refund for (\S+) \(dispute\)$/, (m) => `Remboursement de ${m[1]} (litige)`],
   [/^Refund for (\S+)$/, (m) => `Remboursement de ${m[1]}`],
+  [/^Exchange (\S+): price difference$/, (m) => `Échange ${m[1]} : différence de prix`],
+  [/^Exchange (\S+): price difference refunded$/, (m) => `Échange ${m[1]} : différence de prix remboursée`],
+  [/^Exchange (\S+) rejected: price difference returned$/, (m) => `Échange ${m[1]} refusé : différence de prix restituée`],
   [/^Refund: seller cancelled part of (\S+)$/, (m) => `Remboursement : le vendeur a annulé une partie de ${m[1]}`],
   [/^Payout (\S+)$/, (m) => `Versement ${m[1]}`],
   [/^Seller plan (\S+)$/, (m) => `Abonnement vendeur ${m[1]}`],

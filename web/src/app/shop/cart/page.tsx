@@ -1,7 +1,7 @@
 "use client";
 
 import { pickText } from "@/lib/i18n-fields";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,8 +11,11 @@ import { useShop, useCartLines } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
-import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
+import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue, SellerAreaNotice } from "@/components/shop/delivery-quote";
+import { chainText } from "@/lib/areas";
 import { formatCurrency } from "@/lib/utils";
+import { useCatalog } from "@/lib/catalog";
 import { variantDisplay } from "@/components/shop/order-products";
 
 function qtyOptions(qty: number, stock: number | null): number[] {
@@ -24,17 +27,35 @@ export default function ShopCartPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const rt = useRealtime();
-  const { updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, applyPromo, removePromo, zoneId, setZoneId } = useShop();
-  const { lines, subtotal, hasUnavailable, savings } = useCartLines();
-  const settings = usePublicSettings();
+  const { updateQty, removeFromCart, moveToWishlist, promoCode, promoDiscount, promoSellerId, applyPromo, removePromo } = useShop();
+  const { lines, subtotal, hasUnavailable, hasVacation, savings } = useCartLines();
   const { toast } = useToast();
+  const catalog = useCatalog();
+  const promoStore = promoSellerId ? catalog.find((p) => p.sellerId === promoSellerId)?.seller ?? null : null;
   const [promoInput, setPromoInput] = useState("");
   const [promoBusy, setPromoBusy] = useState(false);
 
-  const zones = settings.deliveryZones;
-  const zone = zones.find((z) => z.id === zoneId) ?? null;
   const discount = Math.min(promoDiscount, subtotal);
-  const delivery = zone?.feeUsd ?? 0;
+
+  // The delivery fee is quoted by the server from the address (nearest warehouse + distance): never guessed here.
+  const [pickedAddress, setPickedAddress] = useState<string | null>(null);
+  const addresses = rt.addresses;
+  const addressId = useMemo(() => {
+    if (pickedAddress && addresses.some((a) => a.id === pickedAddress)) return pickedAddress;
+    return (addresses.find((a) => a.isDefault) ?? addresses[0])?.id ?? null;
+  }, [pickedAddress, addresses]);
+  const address = addresses.find((a) => a.id === addressId) ?? null;
+  const pinned = !!addressPin(address);
+  const quoteLines = useMemo(() => lines.filter((l) => !l.unavailable).map((l) => ({ productId: l.id, qty: l.qty })), [lines]);
+  const { quote, loading: quoteLoading, error: quoteError, notServed: quoteNotServed, sellerBlocked } = useDeliveryQuote({
+    addressId: address?.id ?? null,
+    lines: quoteLines,
+    enabled: !!address && pinned,
+  });
+  // An address outside every served area: no fee, and checkout stays closed until another address is chosen.
+  const deepestArea = address?.areaChain?.[address.areaChain.length - 1] ?? null;
+  const notServed = quoteNotServed ?? (address && address.served === false ? { area: deepestArea?.name ?? address.commune ?? address.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
+  const delivery = quote?.feeUsd ?? 0;
   const total = Math.max(0, subtotal - discount) + delivery;
 
   const grouped = lines.reduce<Record<string, typeof lines>>((acc, item) => {
@@ -82,6 +103,14 @@ export default function ShopCartPage() {
         </div>
       )}
 
+      {hasVacation && (
+        <div role="alert" data-testid="cart-vacation" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {fr
+            ? "Une boutique de votre panier est en vacances : retirez ses articles ou gardez-les pour plus tard avant de passer à la caisse."
+            : "A store in your cart is on vacation: remove its items or save them for later before you check out."}
+        </div>
+      )}
+
       {Object.entries(grouped).map(([seller, items]) => (
         <DetailSection key={seller} title={`${fr ? "Vendu par" : "Sold by"} ${seller}`}>
           <div className="space-y-4">
@@ -97,6 +126,11 @@ export default function ShopCartPage() {
                   <p className="text-xs text-slate-500">{variantDisplay(item.variant, fr ? item.variantFr : item.variantEn, fr)}</p>
                   {item.unavailable && (
                     <p className="text-xs font-medium text-red-600">{fr ? "Indisponible" : "Unavailable"}</p>
+                  )}
+                  {item.onVacation && (
+                    <p className="text-xs font-medium text-amber-700" data-testid="line-vacation">
+                      {(fr ? item.vacationNotice?.fr : item.vacationNotice?.en) || (fr ? "La boutique est en vacances." : "The store is on vacation.")}
+                    </p>
                   )}
                   {!item.unavailable && item.livePrice !== item.price && (
                     <p className="text-xs text-amber-700">{fr ? "Le prix a changé" : "Price has changed"}</p>
@@ -162,30 +196,64 @@ export default function ShopCartPage() {
             </button>
           )}
         </div>
-        {promoCode && <p className="mt-1 text-xs text-emerald-600">{promoCode} {fr ? "appliqué" : "applied"}</p>}
+        {promoCode && (
+          <p className="mt-1 text-xs text-emerald-600" data-testid="promo-applied">
+            {promoCode} {fr ? "appliqué" : "applied"}
+            {promoSellerId && (promoStore ? (fr ? ` · valable uniquement sur les produits de ${promoStore}` : ` · applies to ${promoStore} products only`) : fr ? " · coupon boutique" : " · store coupon")}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-slate-500">{fr ? "Un seul code : code Somba ou coupon d'une boutique." : "One code only: a Somba code or a store coupon."}</p>
       </div>
 
-      <div className="card-premium p-4">
-        <p className="mb-2 text-sm font-medium">{fr ? "Zone de livraison" : "Delivery zone"}</p>
-        {zones.length === 0 ? (
+      <div className="card-premium space-y-3 p-4">
+        <p className="text-sm font-medium">{fr ? "Livraison" : "Delivery"}</p>
+        {!rt.user ? (
           <p className="text-xs text-slate-500">
-            {settings.loaded
-              ? (fr ? "Les frais de livraison seront calculés par le serveur à la commande." : "Delivery fees are calculated by the server when you place the order.")
-              : (fr ? "Chargement des zones…" : "Loading zones…")}
+            {fr
+              ? "Les frais de livraison sont calculés à partir de votre adresse épinglée. Connectez-vous pour les voir."
+              : "The delivery fee is worked out from your pinned address. Sign in to see it."}{" "}
+            <Link href="/shop/login?next=/shop/cart" className="font-medium text-[var(--primary)] hover:underline">{fr ? "Se connecter" : "Sign in"}</Link>
+          </p>
+        ) : addresses.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            {fr ? "Ajoutez une adresse épinglée sur la carte pour connaître les frais de livraison." : "Add an address pinned on the map to see your delivery fee."}{" "}
+            <Link href="/shop/checkout" className="font-medium text-[var(--primary)] hover:underline">{fr ? "Ajouter une adresse" : "Add an address"}</Link>
           </p>
         ) : (
-          <select
-            className="input-premium w-full px-3 py-2 text-sm"
-            value={zoneId ?? ""}
-            onChange={(e) => setZoneId(e.target.value || null)}
-          >
-            <option value="">{fr ? "Choisir une zone" : "Choose a zone"}</option>
-            {zones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {zoneLabel(z, fr)} — {z.city} ({z.feeUsd === 0 ? (fr ? "gratuit" : "free") : formatCurrency(z.feeUsd, locale)})
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              className="input-premium w-full px-3 py-2 text-sm"
+              aria-label={fr ? "Adresse de livraison" : "Delivery address"}
+              value={addressId ?? ""}
+              onChange={(e) => setPickedAddress(e.target.value)}
+            >
+              {addresses.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label} — {[a.line1, a.commune, a.city].filter(Boolean).join(", ")}
+                  {addressPin(a) ? "" : fr ? " (sans épingle)" : " (not pinned)"}
+                  {a.served === false ? (fr ? " (non desservie)" : " (not served)") : ""}
+                </option>
+              ))}
+            </select>
+            {!pinned && (
+              <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {fr ? "Placez votre adresse de livraison sur la carte." : "Pin your delivery address on the map."}{" "}
+                <Link href="/shop/checkout" className="font-semibold underline">{fr ? "Ajouter une épingle" : "Add a pin"}</Link>
+              </p>
+            )}
+            {notServed ? (
+              <NotServedNotice notServed={notServed} areaObj={deepestArea} fr={fr}>
+                <Link href="/shop/account/addresses" className="font-semibold underline">{fr ? "Gérer mes adresses" : "Manage my addresses"}</Link>
+              </NotServedNotice>
+            ) : sellerBlocked ? (
+              <SellerAreaNotice fr={fr} />
+            ) : (
+              <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} />
+            )}
+            {address?.areaChain && address.areaChain.length > 0 && !notServed && (
+              <p className="text-xs text-slate-500">{chainText(address.areaChain, fr, { skipLevels: ["district"] })}</p>
+            )}
+          </>
         )}
       </div>
 
@@ -203,18 +271,16 @@ export default function ShopCartPage() {
             </div>
           )}
           <div className="flex justify-between">
-            <span>{fr ? "Livraison (zone)" : "Delivery (zone)"}</span>
-            {!zone ? (
-              <span className="text-slate-500">{fr ? "Choisissez une zone" : "Choose a zone"}</span>
-            ) : delivery === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={delivery} />}
+            <span>{fr ? "Livraison" : "Delivery"}</span>
+            <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={fr ? "Selon votre adresse" : "Based on your address"} />
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">
             <span>Total</span>
             <DualCurrency amount={total} className="text-blue-700" />
           </div>
         </div>
-        {hasUnavailable ? (
-          <button disabled className="btn-primary mt-4 block w-full py-3 text-center opacity-50">
+        {hasUnavailable || hasVacation || notServed || sellerBlocked ? (
+          <button disabled className="btn-primary mt-4 block w-full py-3 text-center opacity-50" data-testid="checkout-blocked">
             {fr ? "Passer à la caisse" : "Continue to Checkout"}
           </button>
         ) : (

@@ -61,6 +61,8 @@ interface RealtimeValue {
   loadMoreDeliveries: () => Promise<void>;
 
   login: (email: string, password: string) => Promise<BackendUser>;
+  /** Second step of a sign-in on an account with two-factor authentication (`login` throws `TwoFactorRequired`). */
+  login2fa: (challenge: string, code: string) => Promise<BackendUser>;
   register: (input: {
     email: string;
     password: string;
@@ -80,12 +82,11 @@ interface RealtimeValue {
       variant?: string;
     }[];
     paymentMethod: Order["paymentMethod"];
-    deliveryFeeUsd?: number;
-    zoneId?: string;
     shippingAddress?: string;
+    promoCode?: string;
+    notes?: string;
   }) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
-  acceptDelivery: (taskId: string) => Promise<void>;
   updateDeliveryStatus: (taskId: string, status: DeliveryStatus) => Promise<void>;
   sendLocation: (taskId: string, lat: number, lng: number) => Promise<void>;
   markRead: (id: string) => Promise<void>;
@@ -210,9 +211,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // Server pushes — no polling.
     s.on("order:created", (o: Order) => setOrders((cur) => upsert(cur, o)));
     s.on("order:updated", (o: Order) => setOrders((cur) => upsert(cur, o)));
-    s.on("delivery:updated", (d: DeliveryTask) =>
-      setDeliveries((cur) => upsert(cur, d)),
-    );
+    // One leg of a journey changed (`task:updated`; older servers also send it as `delivery:updated`).
+    // A rider only keeps the legs assigned to them: a reassigned leg leaves their list.
+    const onTask = (d: DeliveryTask) =>
+      setDeliveries((cur) => {
+        if (userRoleRef.current === "rider" && d.riderId !== userIdRef.current) return cur.filter((x) => x.id !== d.id);
+        return upsert(cur, d);
+      });
+    s.on("task:updated", onTask);
+    s.on("delivery:updated", onTask);
     s.on("delivery:location", (loc: RiderLocation) =>
       setRiderLocations((cur) => ({ ...cur, [loc.orderId]: loc })),
     );
@@ -225,6 +232,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("product:updated", (p: Product) =>
       setProducts((cur) => upsert(cur, p)),
     );
+    // A store goes on / off vacation: every listing of it (product page, cards, lists, cart) follows at once.
+    // `sellerIds` holds both the store id and its owner's id (listings may carry either).
+    s.on("store:vacation", (v: { sellerId?: string; ownerId?: string; sellerIds?: string[]; onVacation: boolean; vacationUntil?: string | null; notice?: { en: string; fr: string } | null }) => {
+      const ids = new Set([...(v.sellerIds ?? []), v.sellerId, v.ownerId].filter((x): x is string => !!x));
+      if (ids.size === 0) return;
+      setProducts((cur) =>
+        cur.map((p) =>
+          p.sellerId && ids.has(p.sellerId)
+            ? {
+                ...p,
+                sellerOnVacation: !!v.onVacation,
+                sellerVacationUntil: v.onVacation ? (v.vacationUntil ?? null) : null,
+                sellerVacationNotice: v.onVacation ? (v.notice ?? p.sellerVacationNotice ?? null) : null,
+              }
+            : p,
+        ),
+      );
+    });
     // The category list is pushed whole (a rename, a new translation, a product count change).
     s.on("categories:updated", (c: Category[]) => {
       if (Array.isArray(c)) setCategories(c);
@@ -405,6 +430,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [connectWith],
   );
 
+  const login2fa = useCallback(
+    async (challenge: string, code: string) => {
+      setError(null);
+      const result = await authApi.login2fa(challenge, code);
+      authApi.saveTokens(result);
+      await connectWith(result.accessToken, result.user);
+      return result.user;
+    },
+    [connectWith],
+  );
+
   const register = useCallback(
     async (input: {
       email: string;
@@ -469,16 +505,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
-
-  const acceptDelivery = useCallback(async (taskId: string) => {
-    await socketClient.request("delivery:accept", { taskId });
-    const del = await socketClient
-      .request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE })
-      .catch(() => []);
-    setDeliveries(del);
-    fetched.current.deliveries = del.length;
-    setHasMoreDeliveries(del.length >= PAGE_SIZE);
-  }, []);
 
   const reloadLists = useCallback(() => hydrateRef.current(), []);
 
@@ -636,11 +662,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       loadMoreOrders,
       loadMoreDeliveries,
       login,
+      login2fa,
       register,
       logout,
       placeOrder,
       updateOrderStatus,
-      acceptDelivery,
       updateDeliveryStatus,
       sendLocation,
       markRead,
@@ -683,11 +709,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       loadMoreOrders,
       loadMoreDeliveries,
       login,
+      login2fa,
       register,
       logout,
       placeOrder,
       updateOrderStatus,
-      acceptDelivery,
       updateDeliveryStatus,
       sendLocation,
       markRead,

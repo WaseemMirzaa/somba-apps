@@ -34,7 +34,7 @@ function make(rows: Row[]) {
     toRole: async (_role: string, n: { title: string }) => void roleNotices.push(n.title),
   };
   const emitter = { toRoles: () => undefined, toUser: () => undefined };
-  const products = { broadcastCampaignPrices: jest.fn(async () => undefined) };
+  const products = { broadcastCampaignPrices: jest.fn(async () => undefined), onCampaignSale: () => undefined };
   // Translations: every campaign reads as "done", with its stored name in both languages.
   const translations = {
     registerRepublisher: () => undefined,

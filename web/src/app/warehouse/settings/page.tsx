@@ -12,8 +12,6 @@ import { errorMessage, isOpsRole } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 
-type Zone = { id: string; name: string; city?: string; feeUsd?: number };
-
 /** Read-only view of the platform settings that matter on the hub floor. Changing them is an admin job. */
 export default function WarehouseSettingsPage() {
   const { t, locale } = useLocale();
@@ -31,18 +29,19 @@ export default function WarehouseSettingsPage() {
       .request<Record<string, string>>("settings:get")
       .then((s) => alive && setSettings(s))
       .catch((e) => alive && setError(errorMessage(e)));
+    // Live: the admin changes a setting, the page follows (the push carries the whole settings object).
+    const sock = socketClient.current;
+    const onUpdate = (all: Record<string, string>) => {
+      if (all && typeof all === "object") setSettings(all);
+    };
+    sock?.on("settings:updated", onUpdate);
     return () => {
       alive = false;
+      sock?.off("settings:updated", onUpdate);
     };
   }, [rt.status, rt.user?.role]);
 
-  let zones: Zone[] = [];
-  try {
-    const parsed = JSON.parse(settings?.deliveryZones ?? "[]") as unknown;
-    if (Array.isArray(parsed)) zones = parsed as Zone[];
-  } catch {
-    zones = [];
-  }
+  const money = (v: string | undefined) => (settings ? (v != null && v !== "" ? formatCurrency(Number(v), locale) : "—") : "…");
   const yes = fr ? "Oui" : "Yes";
   const no = fr ? "Non" : "No";
 
@@ -52,7 +51,7 @@ export default function WarehouseSettingsPage() {
         title={t("settings")}
         subtitle={fr ? "Paramètres de la plateforme utiles à l'entrepôt (lecture seule)" : "Platform settings that matter on the hub floor (read-only)"}
         breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("settings") }]}
-        actions={<Link href={ops("/hubs")} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50">{fr ? "Voir les hubs" : "View hubs"}</Link>}
+        actions={<Link href={ops("/hubs")} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50">{fr ? "Mon entrepôt" : "My warehouse"}</Link>}
       />
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
@@ -65,15 +64,14 @@ export default function WarehouseSettingsPage() {
         ]} />
       </DetailSection>
 
-      <DetailSection title={fr ? "Zones de livraison" : "Delivery zones"}>
-        {zones.length === 0 ? (
-          <p className="text-sm text-slate-500">{settings ? (fr ? "Aucune zone configurée." : "No zones configured.") : "…"}</p>
-        ) : (
-          <InfoGrid items={zones.map((z) => ({
-            label: z.name,
-            value: `${z.city ?? ""}${z.feeUsd != null ? ` · ${formatCurrency(z.feeUsd, locale)}` : ""}`.replace(/^ · /, ""),
-          }))} />
-        )}
+      <DetailSection title={fr ? "Frais de livraison" : "Delivery fees"}>
+        <InfoGrid items={[
+          { label: fr ? "Frais de base" : "Base fee", value: money(settings?.deliveryBaseUsd) },
+          { label: fr ? "Par kilomètre (entrepôt → client)" : "Per km (warehouse → customer)", value: money(settings?.deliveryPerKmUsd) },
+          { label: fr ? "Plafond (base + distance)" : "Cap (base + distance)", value: money(settings?.deliveryMaxUsd) },
+          { label: fr ? "Supplément transfert entre entrepôts" : "Warehouse-to-warehouse transfer fee", value: money(settings?.deliveryTransferUsd) },
+          { label: fr ? "Adresse localisée obligatoire" : "Map pin required", value: settings ? (settings.requirePinnedAddress === "true" ? yes : no) : "…" },
+        ]} />
       </DetailSection>
 
       <p className="text-xs text-slate-500">

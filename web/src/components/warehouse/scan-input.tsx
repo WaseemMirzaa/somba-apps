@@ -3,22 +3,23 @@
 import { useRef, useState } from "react";
 import { ScanLine } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
-import { findParcel, type Parcel } from "@/lib/warehouse";
+import { findLeg, type DeskTask } from "@/lib/warehouse";
 
 /**
- * Parcel lookup by typed / scanned code. USB and Bluetooth barcode scanners act
- * as keyboards ("keyboard wedge"): they type the code into the focused input and
- * press Enter. Accepts a parcel id (PKG-…), barcode (BC-…), order reference or
- * delivery id and hands back the matching real parcel.
+ * Parcel lookup by typed / scanned code. USB and Bluetooth barcode scanners act as keyboards ("keyboard wedge"):
+ * they type the code into the focused input and press Enter. Accepts a parcel code (PKG-…), barcode (BC-…),
+ * order reference or leg id and hands back the matching real leg.
  */
 export function ScanInput({
-  parcels,
+  legs,
   onFound,
   autoFocus = false,
+  buttonLabel,
 }: {
-  parcels: Parcel[];
-  onFound: (parcel: Parcel) => void;
+  legs: DeskTask[];
+  onFound: (leg: DeskTask) => void | Promise<void>;
   autoFocus?: boolean;
+  buttonLabel?: string;
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
@@ -26,15 +27,15 @@ export function ScanInput({
   const [message, setMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const value = code.trim();
     if (!value) return;
-    const hit = findParcel(parcels, value);
+    const hit = findLeg(legs, value);
     if (hit) {
       setMessage(null);
       setCode("");
-      onFound(hit);
+      await onFound(hit);
     } else {
       setMessage(fr ? `Aucun colis ne correspond à « ${value} ».` : `No parcel matches "${value}".`);
       inputRef.current?.select();
@@ -54,13 +55,13 @@ export function ScanInput({
               setCode(e.target.value);
               if (message) setMessage(null);
             }}
-            className="input-premium w-64 py-2 pl-9 pr-3 text-sm"
+            className="input-premium w-72 max-w-full py-2 pl-9 pr-3 text-sm"
             placeholder={fr ? "Scanner / saisir colis ou commande" : "Scan or type parcel / order"}
             aria-label={fr ? "Code du colis" : "Parcel code"}
           />
         </div>
         <button type="submit" className="btn-primary rounded-lg px-3 py-2 text-sm font-medium">
-          {fr ? "Ouvrir" : "Open"}
+          {buttonLabel ?? (fr ? "Ouvrir" : "Open")}
         </button>
       </div>
       {message && (

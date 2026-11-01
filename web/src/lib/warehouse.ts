@@ -1,124 +1,143 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import type { DeliveryTask, Order, Product } from "@/lib/realtime/types";
-import { useOpsQuery, type WarehouseRider, type InventoryRow } from "@/lib/warehouse-live";
+import {
+  isHubBound,
+  useWarehouseSelf,
+  type DeskFlags,
+  type DeskQueue,
+  type TaskView,
+} from "@/lib/logistics";
+import { useOpsQuery, type InventoryRow, type WarehouseRider } from "@/lib/warehouse-live";
 
 /**
- * Live warehouse data layer. A "parcel" is a delivery task joined with its
- * order. The hub stage is driven by the hub's own `receivedAt` scan, not by the
- * rider's progress:
- *
- *   unassigned & no receivedAt  → inbound      (waiting to be scanned in)
- *   unassigned & receivedAt     → received     (at the hub, waiting for a rider)
- *   assigned                    → sorting      (a rider is attached)
- *   picked_up                   → ready
- *   in_transit                  → dispatched
- *   delivered                   → delivered
- *   failed                      → exception
+ * Warehouse data layer on top of the legs model (`docs/contracts/logistics.md`).
+ * A "parcel" on the floor is one LEG of a journey (`TaskView`); the hub desk (`logistics:queue`) lists the legs the
+ * warehouse manages, sends or receives. Everything refreshes on the `task:updated` push.
  */
 
-export type ParcelStage =
-  | "inbound"
-  | "received"
-  | "sorting"
-  | "ready"
-  | "dispatched"
-  | "delivered"
-  | "exception";
+export type DeskTask = TaskView & { desk: DeskFlags };
 
-/** The delivery task as the server sends it today (fields added after the shared type was written). */
-export type LiveTask = DeliveryTask & {
-  attempts?: number;
-  failureReason?: string | null;
-  pickupAddress?: string | null;
-  readyAt?: string | null;
-  receivedAt?: string | null;
-  address?: string | null;
-};
+// ───────────────────────── hub scope (admins pick a warehouse, staff have their own) ─────────────────────────
 
-export const STAGES: ParcelStage[] = [
-  "inbound",
-  "received",
-  "sorting",
-  "ready",
-  "dispatched",
-  "delivered",
-  "exception",
-];
+const SCOPE_KEY = "somba-ops-hub";
+const scopeListeners = new Set<() => void>();
+let scopeMemory = "";
 
-export const STAGE_LABEL: Record<ParcelStage, { en: string; fr: string }> = {
-  inbound: { en: "Inbound", fr: "Entrant" },
-  received: { en: "Received", fr: "Reçu" },
-  sorting: { en: "Sorting", fr: "Tri" },
-  ready: { en: "Ready", fr: "Prêt" },
-  dispatched: { en: "Dispatched", fr: "Expédié" },
-  delivered: { en: "Delivered", fr: "Livré" },
-  exception: { en: "Exception", fr: "Exception" },
-};
-
-export const STAGE_OPTIONS = STAGES.map((s) => ({
-  value: s,
-  label: STAGE_LABEL[s].en,
-  labelFr: STAGE_LABEL[s].fr,
-}));
-
-export function stageVariant(s: string): "success" | "warning" | "info" | "danger" | "default" {
-  switch (s) {
-    case "inbound":
-      return "warning";
-    case "received":
-    case "ready":
-      return "info";
-    case "sorting":
-      return "warning";
-    case "dispatched":
-    case "delivered":
-      return "success";
-    case "exception":
-      return "danger";
-    default:
-      return "default";
+function readScope(): string {
+  try {
+    return window.localStorage.getItem(SCOPE_KEY) ?? scopeMemory;
+  } catch {
+    return scopeMemory;
   }
 }
-
-export function parcelStage(t: LiveTask): ParcelStage {
-  switch (t.status) {
-    case "unassigned":
-      return t.receivedAt ? "received" : "inbound";
-    case "assigned":
-      return "sorting";
-    case "picked_up":
-      return "ready";
-    case "in_transit":
-      return "dispatched";
-    case "delivered":
-      return "delivered";
-    case "failed":
-      return "exception";
-    default:
-      return "inbound";
+function setScope(id: string) {
+  scopeMemory = id;
+  try {
+    if (id) window.localStorage.setItem(SCOPE_KEY, id);
+    else window.localStorage.removeItem(SCOPE_KEY);
+  } catch {
+    /* storage blocked: the in-memory copy keeps it for this tab */
   }
+  scopeListeners.forEach((fn) => fn());
+}
+function subscribeScope(fn: () => void) {
+  scopeListeners.add(fn);
+  window.addEventListener("storage", fn);
+  return () => {
+    scopeListeners.delete(fn);
+    window.removeEventListener("storage", fn);
+  };
 }
 
-const PAYMENT_LABEL: Record<string, string> = {
-  cod: "Cash on Delivery",
-  stripe_card: "Card",
-  airtel_money: "Mobile Money",
-  wallet: "Wallet",
+/**
+ * Which warehouse the pages are about. Staff: their own (the server decides, nothing is sent).
+ * Admins: the warehouse picked in the hub selector, or all of them (`hubId` undefined).
+ */
+export function useHubScope() {
+  const self = useWarehouseSelf();
+  const picked = useSyncExternalStore(subscribeScope, readScope, () => "");
+  const hubId = self.isAdmin ? picked || undefined : undefined;
+  return {
+    /** Send this as `hubId` in requests (undefined for staff and for "all warehouses"). */
+    hubId,
+    /** The warehouse whose legs "leave" / "arrive" in the tabs (staff: own hub, admin: the picked one). */
+    effectiveHubId: self.isAdmin ? picked || null : self.hubId,
+    isAdmin: self.isAdmin,
+    picked,
+    setPicked: setScope,
+    tier: self.tier,
+    canAssign: self.canAssign,
+    canManage: self.canManage,
+  };
+}
+
+// ───────────────────────── queue ─────────────────────────
+
+/** The hub desk: every leg the warehouse manages, sends or receives (`logistics:queue`), live. */
+export function useDeskQueue(opts: { status?: string; kind?: string; limit?: number } = {}) {
+  const { hubId } = useHubScope();
+  const q = useOpsQuery<DeskQueue | null>("logistics:queue", {
+    initial: null,
+    body: { ...(hubId ? { hubId } : {}), status: opts.status ?? "open", ...(opts.kind ? { kind: opts.kind } : {}), limit: opts.limit ?? 500 },
+    push: ["task:updated", "hub:updated"],
+  });
+  const tasks = useMemo(() => (q.data?.tasks ?? []) as DeskTask[], [q.data]);
+  return { ...q, tasks, counts: q.data?.counts ?? null, hubId: q.data?.hubId ?? null };
+}
+
+export interface DeskActions {
+  assign: (taskId: string, riderId: string) => Promise<TaskView>;
+  scanIn: (taskId: string) => Promise<{ task: TaskView; next: TaskView[] }>;
+  scanOut: (taskId: string) => Promise<TaskView>;
+}
+
+export const deskActions: DeskActions = {
+  assign: (taskId, riderId) => socketClient.request<TaskView>("logistics:assign", { taskId, riderId }),
+  scanIn: (taskId) => socketClient.request<{ task: TaskView; next: TaskView[] }>("logistics:scanIn", { taskId }),
+  scanOut: (taskId) => socketClient.request<TaskView>("logistics:dispatchTransfer", { taskId }),
 };
 
-/** The rider column as built by `buildParcels` ("Unassigned" / "Rider ab12cd" / a name), in the viewer's language. */
-export function riderName(rider: string, fr: boolean): string {
-  if (!fr) return rider;
-  if (rider === "Unassigned") return "Non assigné";
-  return rider.startsWith("Rider ") ? `Livreur ${rider.slice(6)}` : rider;
-}
+// ───────────────────────── helpers ─────────────────────────
 
 export function shortId(id: string) {
   return id.replace(/-/g, "").slice(0, 6).toUpperCase();
+}
+
+/** What staff see on the parcel label and type into the scan field. */
+export const parcelCode = (t: Pick<TaskView, "id">) => `PKG-${shortId(t.id)}`;
+
+export const isOpenLeg = (t: Pick<TaskView, "status">) => t.status !== "delivered" && t.status !== "failed";
+
+export function legAgeHours(t: Pick<TaskView, "createdAt">, now = Date.now()): number {
+  const c = new Date(t.createdAt).getTime();
+  return Number.isNaN(c) ? 0 : Math.max(0, (now - c) / 3_600_000);
+}
+
+/** Match a typed / scanned code against loaded legs (keyboard-wedge scanners type into inputs). */
+export function findLeg<T extends TaskView>(legs: T[], raw: string): T | undefined {
+  const code = raw.trim().toLowerCase();
+  if (!code) return undefined;
+  const short = code.replace(/^(pkg|bc)-?/, "").toUpperCase();
+  const hits = legs.filter(
+    (t) =>
+      t.id.toLowerCase() === code ||
+      parcelCode(t).toLowerCase() === code ||
+      `bc-${shortId(t.id)}`.toLowerCase() === code ||
+      t.orderReference.toLowerCase() === code ||
+      t.orderId.toLowerCase() === code ||
+      (short.length === 6 && shortId(t.id) === short),
+  );
+  // An order ref matches several legs: prefer the one waiting at the desk.
+  return hits.find((t) => t.desk?.scanIn) ?? hits.find((t) => t.desk?.scanOut) ?? hits.find((t) => isOpenLeg(t)) ?? hits[0];
+}
+
+/** "Rider ab12" for an unassigned or unnamed leg, in the viewer's language. */
+export function riderLabel(t: Pick<TaskView, "riderId" | "riderName">, fr: boolean): string {
+  if (t.riderName) return t.riderName;
+  return t.riderId ? (fr ? "Livreur" : "Rider") : fr ? "Non assigné" : "Unassigned";
 }
 
 /** Address text from either a JSON address object or plain text. */
@@ -126,234 +145,64 @@ export function addressText(raw: string | null | undefined): string {
   if (!raw) return "—";
   try {
     const a = JSON.parse(raw) as { line1?: string; commune?: string; city?: string };
-    if (a && typeof a === "object") {
-      return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "—";
-    }
+    if (a && typeof a === "object") return [a.line1, a.commune, a.city].filter(Boolean).join(", ") || "—";
   } catch {
     /* plain text */
   }
   return raw;
 }
 
-function phoneOf(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  try {
-    const a = JSON.parse(raw) as { phone?: string };
-    return a?.phone ? String(a.phone) : null;
-  } catch {
-    return null;
-  }
+/** What a leg is waiting for, as `logistics:custody` words it (`other_parcels`, `next_leg`, `<kind>:<status>`). */
+export function waitingForText(w: string | null | undefined, fr: boolean): string {
+  if (!w) return "—";
+  if (w === "other_parcels") return fr ? "Attend les autres colis de la commande" : "Waiting for the order's other parcels";
+  if (w === "next_leg") return fr ? "Prochain trajet à créer" : "Next leg to be created";
+  const [kind, status] = w.split(":");
+  const k: Record<string, { en: string; fr: string }> = {
+    pickup: { en: "pickup", fr: "collecte" },
+    transfer: { en: "transfer", fr: "transfert" },
+    delivery: { en: "delivery", fr: "livraison" },
+    return_transfer: { en: "return transfer", fr: "transfert de retour" },
+    return_to_seller: { en: "return to seller", fr: "retour au vendeur" },
+    replacement_delivery: { en: "replacement delivery", fr: "livraison de remplacement" },
+  };
+  const s: Record<string, { en: string; fr: string }> = {
+    unassigned: { en: "no rider yet", fr: "pas encore de livreur" },
+    assigned: { en: "rider assigned", fr: "livreur assigné" },
+    picked_up: { en: "picked up", fr: "collecté" },
+    in_transit: { en: "on the way", fr: "en route" },
+    delivered: { en: "done", fr: "terminé" },
+    failed: { en: "failed", fr: "échoué" },
+  };
+  const kk = k[kind];
+  const ss = s[status];
+  const kt = kk ? (fr ? kk.fr : kk.en) : kind;
+  const st = ss ? (fr ? ss.fr : ss.en) : status;
+  return fr ? `Prochain : ${kt} (${st})` : `Next: ${kt} (${st})`;
 }
 
-export interface ParcelItem {
-  productId: string;
-  sku: string;
-  name: string;
-  /** French name snapshotted on the order line (equals `name` when there is none). */
-  nameFr: string;
-  variant: string;
-  /** French options snapshotted on the order line. */
-  variantFr: string | null;
-  qty: number;
-}
+export { isHubBound };
 
-export interface Parcel {
-  /** PKG-XXXXXX — what staff see and scan. */
-  id: string;
-  taskId: string;
-  barcode: string;
-  /** Order reference (e.g. ORD-…). */
-  orderId: string;
-  orderUuid: string;
-  status: ParcelStage;
-  rawStatus: string;
-  seller: string;
-  customer: string;
-  customerPhone: string | null;
-  customerAddress: string;
-  pickupAddress: string;
-  zone: string;
-  /** ISO timestamps */
-  createdAt: string;
-  updatedAt: string;
-  receivedAt: string | null;
-  readyAt: string | null;
-  attempts: number;
-  failureReason: string | null;
-  lat: number | null;
-  lng: number | null;
-  riderId: string | null;
-  rider: string;
-  paymentLabel: string;
-  /** The raw method id (cod, wallet…): pages turn it into a label in the viewer's language. */
-  paymentMethod: string;
-  codAmountUsd: number;
-  totalUsd: number;
-  items: ParcelItem[];
-  itemsCount: number;
-  ageHours: number;
-  timeline: { time: string; label: string; labelFr: string; done: boolean }[];
-}
-
-function fmt(iso: string | null | undefined) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
-}
-
-export function buildParcels(
-  tasks: LiveTask[],
-  orders: Order[],
-  products: Product[],
-  riders: WarehouseRider[],
-): Parcel[] {
-  const orderById = new Map(orders.map((o) => [o.id, o]));
-  const productById = new Map(products.map((p) => [p.id, p]));
-  const riderById = new Map(riders.map((r) => [r.id, r]));
-  const now = Date.now();
-
-  return tasks.map((t) => {
-    const o = orderById.get(t.orderId);
-    const stage = parcelStage(t);
-    const items: ParcelItem[] = (o?.items ?? []).map((it) => ({
-      productId: it.productId,
-      sku: `SKU-${shortId(it.productId)}`,
-      name: it.productName,
-      nameFr: it.productNameFr?.trim() || it.productName,
-      variant: it.variant || "Default",
-      variantFr: it.variantFr?.trim() || null,
-      qty: it.qty,
-    }));
-    const firstProduct = o?.items?.[0] ? productById.get(o.items[0].productId) : undefined;
-    const seller = firstProduct?.sellerName ?? "—";
-    const rider = t.riderId ? riderById.get(t.riderId)?.name ?? `Rider ${shortId(t.riderId)}` : "Unassigned";
-    const created = new Date(t.createdAt).getTime();
-    const past = (s: ParcelStage) => STAGES.indexOf(stage) >= STAGES.indexOf(s) && stage !== "exception";
-    return {
-      id: `PKG-${shortId(t.id)}`,
-      taskId: t.id,
-      barcode: `BC-${shortId(t.id)}`,
-      orderId: o?.reference ?? t.orderReference,
-      orderUuid: t.orderId,
-      status: stage,
-      rawStatus: t.status,
-      seller,
-      customer: o?.customerName ?? "—",
-      customerPhone: phoneOf(t.address) ?? phoneOf(o?.shippingAddress),
-      customerAddress: addressText(t.address ?? o?.shippingAddress),
-      pickupAddress: addressText(t.pickupAddress),
-      zone: t.zoneId ?? "—",
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      receivedAt: t.receivedAt ?? null,
-      readyAt: t.readyAt ?? null,
-      attempts: t.attempts ?? 1,
-      failureReason: t.failureReason ?? null,
-      lat: t.lat ?? null,
-      lng: t.lng ?? null,
-      riderId: t.riderId,
-      rider,
-      paymentLabel: PAYMENT_LABEL[o?.paymentMethod ?? ""] ?? "—",
-      paymentMethod: o?.paymentMethod ?? "",
-      codAmountUsd: t.codAmountUsd,
-      totalUsd: o?.totalUsd ?? 0,
-      items,
-      itemsCount: items.reduce((s, it) => s + it.qty, 0),
-      ageHours: Number.isNaN(created) ? 0 : Math.max(0, (now - created) / 3_600_000),
-      timeline: [
-        { time: fmt(t.createdAt), label: "Order paid, delivery created", labelFr: "Commande payée, livraison créée", done: true },
-        { time: fmt(t.readyAt), label: "Seller marked ready", labelFr: "Vendeur: colis prêt", done: !!t.readyAt },
-        { time: fmt(t.receivedAt), label: "Received at hub", labelFr: "Reçu au hub", done: !!t.receivedAt },
-        { time: t.riderId ? fmt(t.updatedAt) : "—", label: "Rider assigned", labelFr: "Livreur assigné", done: !!t.riderId },
-        { time: past("ready") ? fmt(t.updatedAt) : "—", label: "Picked up by rider", labelFr: "Collecté par le livreur", done: past("ready") },
-        { time: past("dispatched") ? fmt(t.updatedAt) : "—", label: "On the way", labelFr: "En route", done: past("dispatched") },
-        stage === "exception"
-          ? { time: fmt(t.updatedAt), label: `Delivery failed${t.failureReason ? `: ${t.failureReason}` : ""}`, labelFr: `Livraison échouée${t.failureReason ? ` : ${t.failureReason}` : ""}`, done: true }
-          : { time: stage === "delivered" ? fmt(t.updatedAt) : "—", label: "Delivered", labelFr: "Livré", done: stage === "delivered" },
-      ],
-    };
-  });
-}
-
-/** Match a typed / scanned code against real parcels (keyboard-wedge scanners type into inputs). */
-export function findParcel(parcels: Parcel[], raw: string): Parcel | undefined {
-  const code = raw.trim().toLowerCase();
-  if (!code) return undefined;
-  const short = code.replace(/^(pkg|bc)-?/, "").toUpperCase();
-  return parcels.find(
-    (p) =>
-      p.id.toLowerCase() === code ||
-      p.barcode.toLowerCase() === code ||
-      p.taskId.toLowerCase() === code ||
-      p.orderId.toLowerCase() === code ||
-      p.orderUuid.toLowerCase() === code ||
-      (short.length === 6 && p.taskId.replace(/-/g, "").slice(0, 6).toUpperCase() === short),
-  );
-}
+// ───────────────────────── riders + inventory ─────────────────────────
 
 export function useWarehouseData() {
+  const { hubId } = useHubScope();
   const rt = useRealtime();
   const ridersQ = useOpsQuery<WarehouseRider[]>("warehouse:riders", {
     initial: [] as WarehouseRider[],
-    push: ["delivery:updated"],
+    body: hubId ? { hubId } : {},
+    push: ["task:updated"],
   });
   const inventoryQ = useOpsQuery<InventoryRow[]>("warehouse:inventory", {
     initial: [] as InventoryRow[],
     push: ["product:updated"],
   });
-
-  const parcels = useMemo(
-    () => buildParcels(rt.deliveries as LiveTask[], rt.orders, rt.products, ridersQ.data),
-    [rt.deliveries, rt.orders, rt.products, ridersQ.data],
-  );
-
-  const getParcel = useCallback(
-    (key: string) => findParcel(parcels, decodeURIComponent(key)),
-    [parcels],
-  );
-
-  const stats = useMemo(() => {
-    const by = (s: ParcelStage) => parcels.filter((p) => p.status === s).length;
-    const open = parcels.filter((p) => p.status !== "delivered" && p.status !== "exception");
-    return {
-      total: parcels.length,
-      inbound: by("inbound"),
-      received: by("received"),
-      sorting: by("sorting"),
-      ready: by("ready"),
-      dispatched: by("dispatched"),
-      delivered: by("delivered"),
-      exception: by("exception"),
-      aged24h: open.filter((p) => p.ageHours >= 24).length,
-      activeRiders: ridersQ.data.filter((r) => r.activeTasks > 0).length,
-      riders: ridersQ.data.length,
-    };
-  }, [parcels, ridersQ.data]);
-
-  // ── Writes: every one resolves on the server before the caller shows success ──
-  const receive = useCallback(
-    (taskId: string) => socketClient.request<LiveTask>("warehouse:receive", { taskId }),
-    [],
-  );
-  const assign = useCallback(
-    (taskId: string, riderId: string) =>
-      socketClient.request<LiveTask>("delivery:assign", { taskId, riderId }),
-    [],
-  );
   const buildBatch = useCallback(
     (taskIds: string[], riderId: string, riderName?: string) =>
-      socketClient.request<{ id: string; reference: string }>("warehouse:buildBatch", {
-        taskIds,
-        riderId,
-        riderName,
-      }),
+      socketClient.request<{ id: string; reference: string }>("warehouse:buildBatch", { taskIds, riderId, riderName }),
     [],
   );
-
   return {
-    parcels,
-    getParcel,
-    stats,
     riders: ridersQ.data,
     ridersLoading: ridersQ.loading,
     ridersError: ridersQ.error,
@@ -361,10 +210,7 @@ export function useWarehouseData() {
     inventory: inventoryQ.data,
     inventoryLoading: inventoryQ.loading,
     inventoryError: inventoryQ.error,
-    receive,
-    assign,
     buildBatch,
+    connected: rt.status === "connected",
   };
 }
-
-export type WarehouseData = ReturnType<typeof useWarehouseData>;

@@ -39,6 +39,26 @@ export function localizedNotice(
   return { title: localized(n, "title", fr) || n.title, body: localized(n, "body", fr) || n.body };
 }
 
+/** The stock decisions the server writes on a return / dispute, in French (an agent's own words stay as typed). */
+const RESOLUTION_FR: Record<string, string> = {
+  "Refunded to wallet": "Remboursé sur le portefeuille",
+  "Partially refunded": "Remboursement partiel",
+  "Replacement approved": "Remplacement approuvé",
+  Rejected: "Refusé",
+  Resolved: "Résolu",
+  "Cancelled by the customer": "Annulé par le client",
+};
+
+/**
+ * A return/dispute decision in the viewer's language. The API sends `resolutionFr` (the French of the stock phrases);
+ * an old server does not, so a known English phrase is mapped here, and anything an agent typed is shown as it is.
+ */
+export function resolutionText(d: { resolution?: string | null; resolutionFr?: string | null } | null | undefined, fr: boolean): string {
+  const en = str(d?.resolution);
+  if (!fr) return en;
+  return str(d?.resolutionFr) || RESOLUTION_FR[en] || en;
+}
+
 const SUPPORT_CATEGORIES: Record<string, { en: string; fr: string }> = {
   general: { en: "General", fr: "Général" },
   orders: { en: "Orders", fr: "Commandes" },
@@ -92,6 +112,15 @@ const NOTICE_TYPES: Record<string, { en: string; fr: string }> = {
   campaign: { en: "Campaign", fr: "Campagne" },
   marketing: { en: "Marketing", fr: "Marketing" },
   review: { en: "Review", fr: "Avis" },
+  question: { en: "Question", fr: "Question" },
+  chat: { en: "Message", fr: "Message" },
+  message: { en: "Message", fr: "Message" },
+  stock: { en: "Stock", fr: "Stock" },
+  flash: { en: "Flash sale", fr: "Vente flash" },
+  promo: { en: "Promotion", fr: "Promotion" },
+  finance: { en: "Finance", fr: "Finance" },
+  security: { en: "Security", fr: "Sécurité" },
+  team: { en: "Team", fr: "Équipe" },
   system: { en: "System", fr: "Système" },
 };
 

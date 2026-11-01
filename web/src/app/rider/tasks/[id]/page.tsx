@@ -1,6 +1,7 @@
 "use client";
 
 import { mapsLinkTo } from "@/lib/google-maps";
+import { LEG_KIND, pickL, fmtDateTime } from "@/lib/logistics";
 import { useParams } from "next/navigation";
 import { Phone, Navigation, Store } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -45,13 +46,24 @@ export default function RiderTaskDetailPage() {
         <Badge variant={riderStatusVariant(task.status)}>{statusLabel}</Badge>
         {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts} sur 3` : `Attempt ${task.attempts} of 3`}</Badge>}
         {task.codAmount > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
-        <Badge>{task.zone}</Badge>
+        <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
       </div>
 
       {task.failureReason && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <strong>{fr ? "Motif d'échec : " : "Failure reason: "}</strong>
           {task.failureReason}
+        </div>
+      )}
+
+      {task.collectOld && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">
+          {fr ? "Pendant cette livraison, reprenez l'ancien article chez le client et rapportez-le à l'entrepôt." : "On this delivery, collect the old unit from the customer and bring it back to the warehouse."}
+        </div>
+      )}
+      {task.hubBound && task.status !== "delivered" && task.status !== "failed" && (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-sm text-indigo-900">
+          {fr ? `Ce trajet se termine à l'entrepôt : le personnel de ${task.toName} scanne le colis à l'arrivée.` : `This leg ends at the warehouse: the staff at ${task.toName} scan the parcel in.`}
         </div>
       )}
 
@@ -63,23 +75,27 @@ export default function RiderTaskDetailPage() {
         </div>
       )}
       {task.status === "delivered" && (
-        <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{fr ? "Livraison terminée." : "Delivery completed."}</p>
+        <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{task.hubBound ? (fr ? "Colis scanné à l'entrepôt : trajet terminé." : "Parcel scanned in at the warehouse: leg done.") : fr ? "Trajet terminé." : "Leg completed."}</p>
       )}
 
-      <DetailSection title={fr ? "Collecte" : "Pickup"}>
+      <DetailSection title={fr ? "Départ" : "From"}>
         <InfoGrid
           items={[
-            { label: fr ? "Adresse de collecte" : "Pickup address", value: (
+            { label: task.fromName, value: (
               <span className="inline-flex items-start gap-1.5"><Store className="mt-0.5 h-3.5 w-3.5 shrink-0" />{task.pickupAddress}</span>
             ), full: true },
-            { label: fr ? "Vendeur prêt" : "Seller ready", value: task.readyAt ? new Date(task.readyAt).toLocaleString() : (fr ? "Pas encore" : "Not yet") },
-            { label: fr ? "Reçu au hub" : "Received at hub", value: task.receivedAt ? new Date(task.receivedAt).toLocaleString() : "—" },
+            ...(task.kind === "pickup"
+              ? [
+                  { label: fr ? "Vendeur prêt" : "Seller ready", value: task.readyAt ? new Date(task.readyAt).toLocaleString() : (fr ? "Pas encore" : "Not yet") },
+                  { label: fr ? "Scanné à l'entrepôt" : "Scanned in at the warehouse", value: task.receivedAt ? fmtDateTime(task.receivedAt, fr) : "—" },
+                ]
+              : []),
           ]}
         />
         {task.pickupAddress !== "—" && (
           <a href={mapsUrl(task.pickupAddress)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline">
             <Navigation className="h-3.5 w-3.5" />
-            {fr ? "Naviguer vers la collecte" : "Navigate to pickup"}
+            {fr ? "Naviguer vers le départ" : "Navigate to the start"}
           </a>
         )}
       </DetailSection>
@@ -96,10 +112,10 @@ export default function RiderTaskDetailPage() {
         />
       </DetailSection>
 
-      <DetailSection title={t("customer")}>
+      <DetailSection title={task.hubBound || task.kind === "return_to_seller" ? (fr ? "Destination" : "Destination") : t("customer")}>
         <InfoGrid
           items={[
-            { label: fr ? "Nom" : "Name", value: task.customer },
+            { label: fr ? "Destinataire" : "Recipient", value: task.hubBound || task.kind === "return_to_seller" ? task.toName : task.customer },
             {
               label: fr ? "Téléphone" : "Phone",
               value: task.phone ? (
@@ -110,7 +126,6 @@ export default function RiderTaskDetailPage() {
               ) : "—",
             },
             { label: fr ? "Adresse" : "Address", value: task.address, full: true },
-            { label: t("zone"), value: task.zone },
           ]}
         />
       </DetailSection>
@@ -135,7 +150,15 @@ export default function RiderTaskDetailPage() {
       </DetailSection>
 
       <DetailSection title={fr ? "Suivi" : "Timeline"}>
-        <ActivityTimeline events={task.timeline} />
+        <ActivityTimeline
+          events={[
+            { time: fmtDateTime(task.createdAt, fr), label: fr ? "Tâche assignée" : "Task created", done: true },
+            { time: fmtDateTime(task.pickedUpAt, fr), label: fr ? "Colis récupéré" : "Picked up", done: !!task.pickedUpAt },
+            task.status === "failed"
+              ? { time: fmtDateTime(task.updatedAt, fr), label: `${fr ? "Échec" : "Failed"}${task.failureReason ? `: ${task.failureReason}` : ""}`, done: true }
+              : { time: fmtDateTime(task.deliveredAt ?? task.receivedAt, fr), label: task.hubBound ? (fr ? "Scanné à l'entrepôt" : "Scanned in at the warehouse") : fr ? "Remis" : "Handed over", done: task.status === "delivered" },
+          ]}
+        />
       </DetailSection>
 
       <div className="grid grid-cols-2 gap-3">
@@ -143,7 +166,7 @@ export default function RiderTaskDetailPage() {
           <a href={`tel:${task.phone.replace(/\s/g, "")}`} className="contents">
             <Button variant="secondary" className="w-full">
               <Phone className="h-4 w-4" />
-              {fr ? "Appeler client" : "Call customer"}
+              {task.hubBound ? (fr ? "Appeler" : "Call") : fr ? "Appeler client" : "Call customer"}
             </Button>
           </a>
         ) : (

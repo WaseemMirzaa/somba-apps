@@ -15,11 +15,11 @@ const SRC = join(__dirname, '..');
 const TITLE_TEMPLATES: Record<string, string[]> = {
   '{} resolved': ['Dispute resolved', 'Return resolved'],
   '{} closed': ['Dispute closed', 'Return closed'],
-  'Exchange {}': ['requested', 'approved', 'received', 'ready', 'dispatched', 'rejected'].map((s) => `Exchange ${s}`),
-  'Replacement {}': ['requested', 'approved', 'received', 'allocated', 'dispatched', 'rejected'].map((s) => `Replacement ${s}`),
+  'Exchange {}': ['requested', 'approved', 'received', 'ready', 'dispatched', 'delivered', 'rejected'].map((s) => `Exchange ${s}`),
+  'Replacement {}': ['requested', 'approved', 'received', 'allocated', 'dispatched', 'delivered', 'rejected'].map((s) => `Replacement ${s}`),
+  '{} reply': ['Dispute reply', 'Return reply'],
   'Campaign {}': ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'].map((s) => `Campaign ${s}`),
   'Store {}': ['pending', 'approved', 'rejected', 'suspended'].map((s) => `Store ${s}`),
-  '{} deliveries assigned to you': ['3 deliveries assigned to you'],
 };
 
 /**
@@ -39,15 +39,67 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['Approve the airtel money request on your phone to confirm SOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1001.'],
   ],
   '{} is handling {}.': [['Amadou is handling SOM-1001.', 'Amadou s’occupe de SOM-1001.']],
-  '{} is now in your deliveries.': [['SOM-1001 is now in your deliveries.', 'SOM-1001 est maintenant dans vos livraisons.']],
   '{} reached the Somba&Teka warehouse and will be on its way soon.': [
     ['SOM-1001 reached the Somba&Teka warehouse and will be on its way soon.', 'SOM-1001 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'],
   ],
-  '{}{}. Open the app to accept it.': [
-    ['SOM-1001. Open the app to accept it.', 'SOM-1001. Ouvrez l’application pour l’accepter.'],
-    ['SOM-1001 · collect $40.00 cash. Open the app to accept it.', 'SOM-1001 · à encaisser : 40,00\u00A0$ en espèces. Ouvrez l’application pour l’accepter.'],
+  // The three-leg journey: warehouse desk, riders, sellers, routing alerts
+  '{}: {} needs a rider.': [
+    ['SOM-1001: pickup needs a rider.', 'SOM-1001 : tâche « enlèvement » à confier à un livreur.'],
+    ['SOM-1001: transfer needs a rider.', 'SOM-1001 : tâche « transfert » à confier à un livreur.'],
+    ['SOM-1001: delivery needs a rider.', 'SOM-1001 : tâche « livraison » à confier à un livreur.'],
+    ['SOM-1001: return pickup needs a rider.', 'SOM-1001 : tâche « retour client » à confier à un livreur.'],
+    ['SOM-1001: return transfer needs a rider.', 'SOM-1001 : tâche « transfert retour » à confier à un livreur.'],
+    ['SOM-1001: return to seller needs a rider.', 'SOM-1001 : tâche « retour au vendeur » à confier à un livreur.'],
+    ['SOM-1001: replacement delivery needs a rider.', 'SOM-1001 : tâche « livraison de remplacement » à confier à un livreur.'],
   ],
-  '{}{} — collect them at the warehouse.': [['SOM-1, SOM-2… — collect them at the warehouse.', 'SOM-1, SOM-2… — à récupérer à l’entrepôt.']],
+  '{}: {} is now in your tasks.': [
+    ['SOM-1001: pickup is now in your tasks.', 'SOM-1001 : tâche « enlèvement » ajoutée à vos tâches.'],
+    ['SOM-1001: return to seller is now in your tasks.', 'SOM-1001 : tâche « retour au vendeur » ajoutée à vos tâches.'],
+  ],
+  '{}: a rider will collect your package.': [['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.']],
+  '{}: your package reached the warehouse.': [['SOM-1001: your package reached the warehouse.', 'SOM-1001 : votre colis est arrivé à l’entrepôt.']],
+  '{}: the delivery address has no map pin, so it was routed to {}.': [
+    ['SOM-1001: the delivery address has no map pin, so it was routed to Limete Hub.', 'SOM-1001 : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers Limete Hub.'],
+  ],
+  '{}: no warehouse has an active rider, so it was routed to {}. Add riders there.': [
+    ['SOM-1001: no warehouse has an active rider, so it was routed to Limete Hub. Add riders there.', 'SOM-1001 : aucun entrepôt n’a de livreur actif, la commande a été dirigée vers Limete Hub. Ajoutez-y des livreurs.'],
+  ],
+  '{}: 1 parcel to {} is now in your tasks.': [['TR-0042: 1 parcel to Entrepôt Limete is now in your tasks.', 'TR-0042 : 1 colis à destination d’Entrepôt Limete est ajouté à vos tâches.']],
+  '{}: {} parcels to {} are now in your tasks.': [
+    ['TR-0042: 18 parcels to Entrepôt Limete are now in your tasks.', 'TR-0042 : 18 colis à destination d’Entrepôt Limete sont ajoutés à vos tâches.'],
+    ['TR-0042: 3 parcels to Kinshasa Hub are now in your tasks.', 'TR-0042 : 3 colis à destination de Kinshasa Hub sont ajoutés à vos tâches.'],
+    // stored before the singular was used
+    ['TR-0042: 18 parcel(s) to Entrepôt Limete are now in your tasks.', 'TR-0042 : 18 colis à destination d’Entrepôt Limete sont ajoutés à vos tâches.'],
+  ],
+  '{}: 1 parcel from {} is on its way to your warehouse.': [
+    ['TR-0042: 1 parcel from Entrepôt Kinshasa is on its way to your warehouse.', 'TR-0042 : 1 colis en provenance d’Entrepôt Kinshasa est en route vers votre entrepôt.'],
+  ],
+  '{}: {} parcels from {} are on their way to your warehouse.': [
+    ['TR-0042: 18 parcels from Entrepôt Kinshasa are on their way to your warehouse.', 'TR-0042 : 18 colis en provenance d’Entrepôt Kinshasa sont en route vers votre entrepôt.'],
+    ['TR-0042: 18 parcel(s) from Entrepôt Kinshasa are on their way to your warehouse.', 'TR-0042 : 18 colis en provenance d’Entrepôt Kinshasa sont en route vers votre entrepôt.'],
+  ],
+  '{}: 1 parcel did not arrive from {} at {}.': [
+    ['TR-0042: 1 parcel did not arrive from Entrepôt Kinshasa at Entrepôt Limete.', 'TR-0042 : 1 colis envoyé d’Entrepôt Kinshasa n’est pas arrivé à Entrepôt Limete.'],
+  ],
+  '{}: {} parcels did not arrive from {} at {}.': [
+    ['TR-0042: 2 parcels did not arrive from Entrepôt Kinshasa at Entrepôt Limete.', 'TR-0042 : 2 colis envoyés d’Entrepôt Kinshasa ne sont pas arrivés à Entrepôt Limete.'],
+    ['TR-0042: 2 parcel(s) did not arrive from Kinshasa Hub at Entrepôt Limete.', 'TR-0042 : 2 colis envoyés de Kinshasa Hub ne sont pas arrivés à Entrepôt Limete.'],
+  ],
+  '{}: no lane connects {} to {}, so the parcel goes direct.': [
+    ['SOM-1001: no lane connects Entrepôt Limete to Entrepôt Kikwit, so the parcel goes direct.', 'SOM-1001 : aucune ligne ne relie Entrepôt Limete à Entrepôt Kikwit, le colis part en direct.'],
+  ],
+  '{}: {} has no active rider, so {} will handle it. Add riders to {}.': [
+    [
+      'SOM-1001: Entrepôt Limete has no active rider, so Entrepôt Kinshasa will handle it. Add riders to Entrepôt Limete.',
+      'SOM-1001 : Entrepôt Limete n’a aucun livreur actif, Entrepôt Kinshasa s’en charge. Ajoutez des livreurs à Entrepôt Limete.',
+    ],
+  ],
+  '{}: {} was scanned in but the next leg could not be created.': [
+    ['SOM-1001: pickup was scanned in but the next leg could not be created.', 'SOM-1001 : tâche « enlèvement » scannée à l’entrepôt, mais l’étape suivante n’a pas pu être créée.'],
+  ],
+  '{}: {} failed after {} attempts ({}).': [
+    ['SOM-1001: transfer failed after 3 attempts (Customer not reachable).', 'SOM-1001 : tâche « transfert » échouée après 3 tentatives (Client injoignable).'],
+  ],
   '{} · ${} from {}': [['SOM-1001 · $12.50 from Jean Mukendi', 'SOM-1001 · 12,50\u00A0$ de Jean Mukendi']],
   '{}: {} item(s) to pack — ${}': [['SOM-1001: 2 item(s) to pack — $40.00', 'SOM-1001 : 2 article(s) à préparer — 40,00\u00A0$']],
   '{} is packed and ready.': [['SOM-1001 is packed and ready.', 'SOM-1001 : colis emballé et prêt.']],
@@ -181,6 +233,57 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['Sneakers is now live.', 'Sneakers est maintenant en ligne.'],
     ['Sneakers is now rejected.', 'Sneakers est maintenant refusé.'],
   ],
+
+  // Seller platform: team, security, storefront
+  '{} invited you to join their store team ({}).': [
+    ['TechZone invited you to join their store team (finance).', 'TechZone vous invite à rejoindre l’équipe de sa boutique (finances).'],
+    ['TechZone invited you to join their store team (support).', 'TechZone vous invite à rejoindre l’équipe de sa boutique (support client).'],
+  ],
+  '{} joined your store team as {}.': [['Amina joined your store team as orders.', 'Amina a rejoint l’équipe de votre boutique en tant que commandes.']],
+  'Your role in "{}" is now {}.': [['Your role in "TechZone" is now manager.', 'Votre rôle dans « TechZone » est maintenant : gestionnaire.']],
+  'You no longer have access to "{}".': [['You no longer have access to "TechZone".', 'Vous n’avez plus accès à « TechZone ».']],
+  '{} left your store team.': [['Amina left your store team.', 'Amina a quitté l’équipe de votre boutique.']],
+  'Signing in to your account now asks for a code from your authenticator app.': [
+    ['Signing in to your account now asks for a code from your authenticator app.', 'La connexion à votre compte demande maintenant un code de votre application d’authentification.'],
+  ],
+  'Two-factor authentication was turned off on your account.': [
+    ['Two-factor authentication was turned off on your account.', 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
+  ],
+  'Your store is open again and takes new orders.': [['Your store is open again and takes new orders.', 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.']],
+  'Your store badge is now {} (was {}).': [
+    ['Your store badge is now gold (was silver).', 'Le badge de votre boutique est maintenant or (avant : argent).'],
+    ['Your store badge is now somba_assured (was bronze).', 'Le badge de votre boutique est maintenant Somba Assuré (avant : bronze).'],
+  ],
+
+  // Stock, flash sales, campaign budget, invoices, bulk import (localize-commerce.ts)
+  '{} is down to {} (alert at {}). Restock soon.': [
+    ['Phone case (Size: M) is down to 4 (alert at 10). Restock soon.', 'Phone case (Size: M) : plus que 4 en stock (alerte à 10). Pensez à réapprovisionner.'],
+  ],
+  '{} is out of stock. Shoppers cannot buy it until you restock.': [
+    ['Phone case is out of stock. Shoppers cannot buy it until you restock.', 'Phone case est en rupture de stock. Les clients ne peuvent plus l’acheter tant que vous ne réapprovisionnez pas.'],
+  ],
+  '{} from {} is out of stock.': [['Phone case from TechZone is out of stock.', 'Phone case de TechZone est en rupture de stock.']],
+  '{} from {} is down to {}.': [['Phone case from TechZone is down to 4.', 'Phone case de TechZone : plus que 4 en stock.']],
+  '"{}" used its ${} budget; prices are back to normal.': [
+    ['"Spring Sale" used its $50.00 budget; prices are back to normal.', '« Spring Sale » a utilisé tout son budget de 50,00\u00A0$ ; les prix sont revenus à la normale.'],
+  ],
+  '"{}" was rejected: {}': [['"Spring Sale" was rejected: Discount too deep', '« Spring Sale » a été refusée : Discount too deep']],
+  '{} goes on flash sale at ${} from {}.': [
+    ['Phone case goes on flash sale at $4.50 from 2026-10-26 10:00 UTC.', 'Phone case passe en vente flash à 4,50\u00A0$ à partir du 26/10/2026 10:00 UTC.'],
+  ],
+  '{} is now on flash sale at ${}.': [['Phone case is now on flash sale at $4.50.', 'Phone case est maintenant en vente flash à 4,50\u00A0$.']],
+  '{}: the flash sale has ended; the price is back to normal.': [
+    ['Phone case: the flash sale has ended; the price is back to normal.', 'Phone case : la vente flash est terminée ; le prix est revenu à la normale.'],
+  ],
+  '{} proposes {} at ${}.': [['TechZone proposes Phone case at $4.50.', 'TechZone propose Phone case à 4,50\u00A0$.']],
+  'Your flash sale for {} was approved.': [['Your flash sale for Phone case was approved.', 'Votre vente flash pour Phone case a été approuvée.']],
+  'Your flash sale for {} was declined: {}': [
+    ['Your flash sale for Phone case was declined: Price too close to normal', 'Votre vente flash pour Phone case a été refusée : Price too close to normal'],
+  ],
+  'Your commission invoice {} for {} is ready.': [
+    ['Your commission invoice CI-202610-4F3A2B1C for 2026-10 is ready.', 'Votre facture de commission CI-202610-4F3A2B1C pour octobre 2026 est disponible.'],
+  ],
+  '{} products imported by {} need moderation.': [['12 products imported by TechZone need moderation.', '12 produits importés par TechZone sont à modérer.']],
 
   // Settings → "Send a test push"
   'Notifications reach this account. If push is set up, your devices show this too.': [

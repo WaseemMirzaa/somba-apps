@@ -8,7 +8,6 @@ import {
   type MarketProfile,
   MARKET_PROFILES,
   DEFAULT_MARKET_PROFILE,
-  getZoneFee,
   usdToCdf,
 } from "@/lib/market-profiles";
 
@@ -16,7 +15,6 @@ type MarketContextType = {
   profileId: MarketProfileId;
   profile: MarketProfile;
   setProfileId: (id: MarketProfileId) => void;
-  getZoneFee: (zoneId: string) => number;
   usdToCdf: (usd: number) => number;
   showDualCurrency: boolean;
   /** USD -> CDF rate from the public `fxRate` setting (null until the server answers or when unset). */
@@ -68,7 +66,6 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         profileId,
         profile,
         setProfileId,
-        getZoneFee: (zoneId) => getZoneFee(profileId, zoneId),
         usdToCdf: (usd) => (fxRate ? Math.round(usd * fxRate) : usdToCdf(usd, profileId)),
         showDualCurrency: !!fxRate,
         fxRate,

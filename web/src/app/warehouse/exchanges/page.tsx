@@ -27,7 +27,7 @@ export default function WarehouseExchangesPage() {
   return (
     <WarehouseListPage
       title={t("exchanges")}
-      subtitle={fr ? "Demandes d'échange en direct — ancien article retourné, nouvel article expédié" : "Live exchange requests — old item returned, new item dispatched"}
+      subtitle={fr ? "Demandes d'échange en direct — ancien article repris, nouvel article livré par un livreur de l'entrepôt" : "Live exchange requests — old item collected, new item delivered by a warehouse rider"}
       breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("exchanges") }]}
       filters={
         <div className="space-y-3">
@@ -51,7 +51,7 @@ export default function WarehouseExchangesPage() {
         { key: "toSku", label: fr ? "Nouveau SKU" : "New SKU" },
         { key: "priceDiffUsd", label: fr ? "Diff. prix" : "Price Diff", render: (row) => formatCurrency(Number(row.priceDiffUsd), locale) },
         { key: "status", label: t("status"), render: (row) => (
-          <Badge variant={row.status === "dispatched" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
+          <Badge variant={row.status === "dispatched" || row.status === "delivered" ? "success" : row.status === "rejected" ? "danger" : "warning"}>
             {pick(EXCHANGE_STATUS[String(row.status)], fr, String(row.status))}
           </Badge>
         )},

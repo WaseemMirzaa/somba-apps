@@ -16,9 +16,13 @@ export function localDayPlus(plusDays: number, now = new Date()): string {
   return new Date(now.getTime() + 60 * 60_000 + plusDays * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Expected day for lines taking these delivery times (the slowest wins). */
-export function estimateFor(days: unknown[], now = new Date()): string {
-  return localDayPlus(days.length ? Math.max(...days.map(deliveryDaysOf)) : DELIVERY_DAYS.fallback, now);
+/**
+ * Expected day for lines taking these delivery times (the slowest wins). `extraDays` is what the route between
+ * warehouses adds (the quote's `extraDays`: the lanes' transit rounded up, or the inter-city allowance).
+ */
+export function estimateFor(days: unknown[], now = new Date(), extraDays = 0): string {
+  const extra = Number.isFinite(extraDays) && extraDays > 0 ? Math.ceil(extraDays) : 0;
+  return localDayPlus((days.length ? Math.max(...days.map(deliveryDaysOf)) : DELIVERY_DAYS.fallback) + extra, now);
 }
 
 /** "Mon 26 Oct" / "lun. 26 oct." for a stored YYYY-MM-DD day; null when missing or malformed. */

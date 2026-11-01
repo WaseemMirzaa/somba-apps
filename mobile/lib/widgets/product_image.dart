@@ -31,15 +31,20 @@ class ProductImage extends StatelessWidget {
   final Product product;
   final double? iconSize;
 
+  /// A picture other than the cover (a gallery page). The product still gives the placeholder glyph.
+  final String? url;
+
   const ProductImage({
     super.key,
     required this.product,
     this.iconSize,
+    this.url,
   });
 
   @override
   Widget build(BuildContext context) {
     final glyph = categoryIcon(product.category);
+    final src = url ?? product.image;
 
     return LayoutBuilder(
       builder: (context, c) {
@@ -61,10 +66,10 @@ class ProductImage extends StatelessWidget {
             // Real product photo (white-background studio shot).
             Padding(
               padding: EdgeInsets.all(pad),
-              child: product.image.isEmpty
+              child: src.isEmpty
                   ? Center(child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.42)))
                   : CachedNetworkImage(
-                      imageUrl: product.image,
+                      imageUrl: src,
                       fit: BoxFit.contain,
                       placeholder: (_, __) => Center(
                         child: Icon(glyph, size: size, color: AppColors.primary.withValues(alpha: 0.2)),

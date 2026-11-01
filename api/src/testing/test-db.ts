@@ -27,6 +27,7 @@ export function recordingEmitter() {
     registerUserView: () => undefined,
     toRoles: (roles: string[], event: string, payload: unknown) => void sent.push({ to: roles.join(','), event, payload }),
     toRole: (role: string, event: string, payload: unknown) => void sent.push({ to: role, event, payload }),
+    toHub: (hubId: string, event: string, payload: unknown) => void sent.push({ to: `hub:${hubId}`, event, payload }),
     toUser: (id: string, event: string, payload: unknown) => void sent.push({ to: `user:${id}`, event, payload }),
   };
 }

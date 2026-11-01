@@ -11,6 +11,7 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
+import { campaignActions } from "@/lib/seller-promo";
 import { autoTranslateHint } from "@/lib/i18n-fields";
 
 const MAX_PRODUCTS = 200;
@@ -18,6 +19,8 @@ const MAX_PRODUCTS = 200;
 /** The saved values an edit starts from. */
 export interface CampaignFormInitial {
   id: string;
+  /** draft | pending | rejected: a draft stays a draft until it is submitted. */
+  status?: string;
   name: string;
   /** French name, when there is one. */
   nameFr?: string;
@@ -36,21 +39,21 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
   const router = useRouter();
   const { toast } = useToast();
   const { locale } = useLocale();
-  const { createCampaign, updateCampaign, sellerProductList, commissionPct, load } = useSellerData();
+  const { sellerProductList, commissionPct, load } = useSellerData();
   const fr = locale === "fr";
   const editing = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     nameFr: initial?.nameFr ?? "",
     discount: initial ? String(initial.discount) : "",
-    start: initial?.startDate ?? "",
-    end: initial?.endDate ?? "",
+    start: initial?.startDate?.slice(0, 10) ?? "",
+    end: initial?.endDate?.slice(0, 10) ?? "",
     budget: initial && initial.budget > 0 ? String(initial.budget) : "",
   });
   const [scope, setScope] = useState<"all" | "selected">(initial && initial.productIds.length > 0 ? "selected" : "all");
   const [picked, setPicked] = useState<string[]>(initial?.productIds ?? []);
   const [q, setQ] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Only listings that can ever be sold: not rejected by moderation.
@@ -68,9 +71,10 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
 
   const toggle = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
-  async function submit() {
+  /** `draft`: keep it with me (nothing reaches marketing); `submit`: send it for approval. */
+  async function save(mode: "draft" | "submit") {
     if (problems.length || busy) return;
-    setBusy(true);
+    setBusy(mode);
     setError(null);
     try {
       const fields = {
@@ -88,20 +92,36 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
           ...(nameFr !== (initial.nameFr ?? "").trim() ? { nameFr } : {}),
         };
         // An empty list means "the whole store" on the server.
-        await updateCampaign(initial.id, { ...fields, ...names, budgetUsd: form.budget ? Number(form.budget) : 0, productIds: scope === "selected" ? picked : [] });
-        toast(fr ? "Modifications envoyées pour approbation" : "Changes sent for approval");
+        await campaignActions.update(initial.id, { ...fields, ...names, budgetUsd: form.budget ? Number(form.budget) : 0, productIds: scope === "selected" ? picked : [] });
+        // An edited draft stays a draft; sending it is a separate step.
+        if (initial.status === "draft" && mode === "submit") await campaignActions.submit(initial.id);
+        toast(
+          mode === "draft"
+            ? fr ? "Brouillon enregistré" : "Draft saved"
+            : fr ? "Modifications envoyées pour approbation" : "Changes sent for approval",
+        );
         router.push(`/seller/promotions/${initial.id}`);
       } else {
         // A language left empty is not sent: the platform translates it from the other one.
-        await createCampaign({ ...fields, ...(nameEn ? { name: nameEn } : {}), ...(nameFr ? { nameFr } : {}), productIds: scope === "selected" ? picked : undefined });
-        toast(fr ? "Campagne soumise pour approbation" : "Campaign submitted for approval");
+        await campaignActions.create({
+          ...fields,
+          ...(nameEn ? { name: nameEn } : {}),
+          ...(nameFr ? { nameFr } : {}),
+          productIds: scope === "selected" ? picked : undefined,
+          ...(mode === "draft" ? { draft: true } : {}),
+        });
+        toast(
+          mode === "draft"
+            ? fr ? "Brouillon enregistré : soumettez-le quand vous êtes prêt" : "Draft saved: submit it when you are ready"
+            : fr ? "Campagne soumise pour approbation" : "Campaign submitted for approval",
+        );
         router.push("/seller/promotions");
       }
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
       toast(msg, "error");
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -196,9 +216,16 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
         <ul className="space-y-1 text-xs text-red-600">{problems.map((p) => <li key={p}>{p}</li>)}</ul>
       )}
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      <button onClick={() => void submit()} disabled={busy || problems.length > 0} className="btn-primary rounded-lg px-6 py-2 text-sm disabled:opacity-50">
-        {busy ? (fr ? "Envoi…" : "Sending…") : editing ? (fr ? "Enregistrer et soumettre" : "Save and Submit") : fr ? "Soumettre pour approbation" : "Submit for Approval"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        {(!editing || initial?.status === "draft") && (
+          <button onClick={() => void save("draft")} disabled={!!busy || problems.length > 0} className="rounded-lg border border-[var(--border-strong)] bg-white px-6 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+            {busy === "draft" ? (fr ? "Enregistrement…" : "Saving…") : fr ? "Enregistrer en brouillon" : "Save as draft"}
+          </button>
+        )}
+        <button onClick={() => void save("submit")} disabled={!!busy || problems.length > 0} className="btn-primary rounded-lg px-6 py-2 text-sm disabled:opacity-50">
+          {busy === "submit" ? (fr ? "Envoi…" : "Sending…") : editing ? (fr ? "Enregistrer et soumettre" : "Save and Submit") : fr ? "Soumettre pour approbation" : "Submit for Approval"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -50,6 +50,11 @@ export class WarehouseException {
   @Column({ type: 'varchar', nullable: true })
   hub: string | null;
 
+  /** The warehouse the incident belongs to (staff of other warehouses never see it). Null = not tied to one. */
+  @Index('IDX_warehouse_exceptions_hubId')
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  hubId: string | null;
+
   @Column({ type: 'text' })
   notes: string;
 

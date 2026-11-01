@@ -137,6 +137,27 @@ export function CampaignDetailBody({ campaign: c }: { campaign: CampaignRow }) {
           <dt className="text-xs text-slate-400">Budget</dt>
           <dd className="font-semibold text-slate-900">{formatCurrency(c.budgetUsd, locale)}</dd>
         </div>
+        {c.budgetUsd > 0 && (
+          <div>
+            <dt className="text-xs text-slate-400">{fr ? "Remise accordée" : "Discount given"}</dt>
+            <dd className="text-slate-800">
+              {formatCurrency(c.spentUsd ?? 0, locale)}
+              {c.budgetRemainingUsd != null ? ` · ${fr ? "reste" : "left"} ${formatCurrency(c.budgetRemainingUsd, locale)}` : ""}
+            </dd>
+          </div>
+        )}
+        {c.rejectReason && (
+          <div className="col-span-2">
+            <dt className="text-xs text-slate-400">{fr ? "Motif du rejet" : "Rejection reason"}</dt>
+            <dd className="text-red-700">{c.rejectReason}</dd>
+          </div>
+        )}
+        {c.endedReason && (
+          <div>
+            <dt className="text-xs text-slate-400">{fr ? "Fin" : "Ended because"}</dt>
+            <dd className="text-slate-800">{c.endedReason === "dates" ? (fr ? "dates écoulées" : "dates passed") : c.endedReason === "budget" ? (fr ? "budget épuisé" : "budget used") : c.endedReason === "withdrawn" ? (fr ? "retirée par le vendeur" : "withdrawn by the seller") : fr ? "par un admin" : "by an admin"}</dd>
+          </div>
+        )}
         <div>
           <dt className="text-xs text-slate-400">{fr ? "Début" : "Starts"}</dt>
           <dd className="text-slate-800">{dateLabel(c.startDate, fr)}</dd>

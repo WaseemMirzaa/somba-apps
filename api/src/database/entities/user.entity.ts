@@ -90,7 +90,10 @@ export class User {
   @Column({ type: 'float', default: 0 })
   walletBalance: number;
 
-  /** Rider/warehouse availability toggle. */
+  /**
+   * Account switched on by an admin. Off: no sign-in for customers, sellers, riders and warehouse staff
+   * (`customers:setActive` / `staff:setActive`), and an inactive rider is never offered or counted by the routing.
+   */
   @Column({ type: 'boolean', default: true })
   active: boolean;
 
@@ -99,9 +102,29 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   hubId: string | null;
 
-  /** JSON list of zone ids a rider prefers (their tasks are offered first). */
+  /** @deprecated Zones are gone; kept so old rows survive. Never read or written. */
   @Column({ type: 'text', nullable: true })
   preferredZones: string | null;
+
+  /** Warehouse staff tier: operator (scan in/out), supervisor (+ assign riders), manager (+ hub settings and staff). */
+  @Column({ type: 'varchar', length: 12, nullable: true })
+  warehouseTier: 'operator' | 'supervisor' | 'manager' | null;
+
+  // ── Two-factor authentication (TOTP, RFC 6238) ───────────────────────────
+  /** Base32 shared secret (encrypted at rest). Set by `auth:2fa:setup`, live once `twofaEnabled`. */
+  @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
+  twofaSecret: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  twofaEnabled: boolean;
+
+  /** JSON array (string) of sha256 hashes of the unused recovery codes. */
+  @Column({ type: 'text', nullable: true })
+  twofaRecovery: string | null;
+
+  /** The last accepted 30-second TOTP step: a code can be used once (replay protection). */
+  @Column({ type: 'int', default: 0 })
+  twofaLastStep: number;
 
   /**
    * Bumped to invalidate all previously issued tokens ("log out everywhere").

@@ -9,6 +9,7 @@ import { useLocale } from "@/context/locale-context";
 import { useShop } from "@/context/shop-context";
 import { cn } from "@/lib/utils";
 import { daysLabel, pickText } from "@/lib/i18n-fields";
+import { trackCampaign, useCampaignView } from "@/lib/shop-engage";
 
 interface ProductCardProps {
   product: {
@@ -27,6 +28,9 @@ interface ProductCardProps {
     reviews: number;
     image: string;
     deliveryDays?: number;
+    /** A promoted product reports a campaign view when shown and a click when opened. */
+    campaignId?: string | null;
+    sellerOnVacation?: boolean;
   };
 }
 
@@ -37,6 +41,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const name = fr ? product.nameFr : product.name;
   const view = priceView(product);
   const wished = isInWishlist(String(product.id));
+  useCampaignView(product.campaignId);
 
   return (
     <article className="card-premium group relative overflow-hidden">
@@ -57,7 +62,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <Heart className={cn("h-4 w-4", wished && "fill-red-500")} aria-hidden="true" />
       </button>
 
-      <Link href={`/shop/products/${product.id}`} className="block">
+      <Link href={`/shop/products/${product.id}`} className="block" onClick={() => trackCampaign(product.campaignId, "click")}>
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/50">
           <Image
             src={product.image || "/brand/logo-stack.png"}
@@ -69,6 +74,11 @@ export function ProductCard({ product }: ProductCardProps) {
           {view.pct > 0 && (
             <span className="absolute left-3 top-3 rounded-lg bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-lg">
               -{view.pct}%
+            </span>
+          )}
+          {product.sellerOnVacation && (
+            <span className="absolute right-3 bottom-3 rounded-lg bg-slate-700/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              {fr ? "En vacances" : "On vacation"}
             </span>
           )}
           {view.source !== "base" && (

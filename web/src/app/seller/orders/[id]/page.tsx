@@ -9,7 +9,8 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/seller/product-image";
-import { useSellerData } from "@/lib/seller";
+import { useSellerAccess, useSellerData } from "@/lib/seller";
+import { buildJourney, shippingStep, shippingStepLabel, useSellerShipments } from "@/lib/seller-orders";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
 import {
@@ -21,7 +22,6 @@ import {
   packageStatusLabel,
   packageStatusVariant,
   paymentMethodLabel,
-  shippingStatusLabel,
   txnStatusLabel,
 } from "@/lib/seller-labels";
 import { canMarkReady, cancellableLines, waitingForOtherSellers } from "@/lib/seller-packages";
@@ -37,9 +37,11 @@ export default function SellerOrderDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, getShipmentByOrderId, sellerReady, load } = useSellerData();
+  const { getSellerOrder, sellerReady, load } = useSellerData();
+  const { getByOrder } = useSellerShipments();
+  const access = useSellerAccess();
   const order = getSellerOrder(id);
-  const shipment = order ? getShipmentByOrderId(order.id) : undefined;
+  const shipment = order ? getByOrder(order.id) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -54,6 +56,7 @@ export default function SellerOrderDetailPage() {
   const shared = order.sellerCount > 1;
   const waiting = waitingForOtherSellers(order) && order.orderStatus !== "processing";
   const otherSellers = order.sellerCount - 1;
+  const step = shippingStep({ orderStatus: order.orderStatus, packageStatus: order.packageStatus, tracking: order.tracking });
 
   async function markReady() {
     if (!order) return;
@@ -87,7 +90,7 @@ export default function SellerOrderDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {showReady && (
-              <button type="button" disabled={busy} onClick={() => void markReady()} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
+              <button type="button" disabled={busy || access.suspended} onClick={() => void markReady()} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
                 {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Confirmer colis prêt" : "Package Ready"}
               </button>
             )}
@@ -97,7 +100,7 @@ export default function SellerOrderDetailPage() {
             {waiting && (
               <span className="text-sm text-amber-600">{fr ? "En attente des autres vendeurs" : "Waiting for the other sellers"}</span>
             )}
-            {cancellable.length > 0 && (
+            {cancellable.length > 0 && !access.suspended && (
               <button type="button" onClick={() => setCancelOpen(true)} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
                 {fr ? "Annuler des articles" : "Cancel items"}
               </button>
@@ -117,6 +120,14 @@ export default function SellerOrderDetailPage() {
         </p>
       )}
 
+      {access.suspended && (
+        <p role="note" className="rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          {fr
+            ? "Votre boutique est suspendue : vous pouvez consulter cette commande mais pas la modifier."
+            : "Your store is suspended: you can view this order but not change it."}
+        </p>
+      )}
+
       {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
 
       <DetailGrid>
@@ -126,7 +137,7 @@ export default function SellerOrderDetailPage() {
             { label: fr ? "Date de commande" : "Order Date", value: order.date },
             { label: fr ? "Votre colis" : "Your package", value: <Badge variant={packageStatusVariant(order.packageStatus)}>{packageStatusLabel(order.packageStatus, fr)}</Badge> },
             { label: fr ? "Statut de commande" : "Order Status", value: <Badge variant={orderStatusVariant(order.orderStatus)}>{orderStatusLabel(order.orderStatus, fr)}</Badge> },
-            { label: fr ? "Expédition" : "Shipping", value: shippingStatusLabel(order.shippingStatus, fr) },
+            { label: fr ? "Expédition" : "Shipping", value: shippingStepLabel(step, fr) },
             { label: fr ? "À livrer avant le" : "Deliver by", value: dayLabel(order.estimatedDeliveryDate, fr) ?? "—" },
             ...(shared ? [{ label: fr ? "Vendeurs" : "Sellers", value: fr ? `Commande partagée · ${order.sellerCount} vendeurs` : `Shared order · ${order.sellerCount} sellers` }] : []),
             { label: fr ? "Montant (vos articles)" : "Amount (your items)", value: formatCurrency(order.amount, locale) },
@@ -195,6 +206,13 @@ export default function SellerOrderDetailPage() {
                     <Badge variant={lineStateVariant(item.state)}>{lineStateLabel(item.state, fr)}</Badge>
                   </div>
                   <p className="text-xs text-slate-500">{item.variant ? `${item.variant} · ` : ""}{item.sku}</p>
+                  {!cancelled && (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {fr ? "Commission" : "Commission"}: {formatCurrency(item.commissionUsd, locale)}
+                      {typeof item.commissionPct === "number" ? ` (${item.commissionPct}%)` : ""}
+                      {item.couponDiscountUsd > 0 && ` · ${fr ? "Coupon boutique" : "Store coupon"}: −${formatCurrency(item.couponDiscountUsd, locale)}`}
+                    </p>
+                  )}
                   {cancelled && (
                     <p className="mt-1 text-xs text-red-700">
                       {fr ? "Motif" : "Reason"}: {item.cancelReason || "—"}
@@ -213,12 +231,10 @@ export default function SellerOrderDetailPage() {
 
         <DetailGridSection title={fr ? "Chronologie" : "Timeline"} span={3}>
           <ActivityTimeline
-            events={order.timeline.map((event) => ({
-              time: event.time,
-              label: fr ? event.labelFr : event.label,
-              detail: fr ? event.detailFr ?? event.detail : event.detail,
-              done: event.done,
-            }))}
+            events={buildJourney(
+              { orderStatus: order.orderStatus, packageStatus: order.packageStatus, tracking: order.tracking, createdAt: order.createdAt, readyAt: order.readyAt },
+              fr,
+            )}
           />
         </DetailGridSection>
       </DetailGrid>

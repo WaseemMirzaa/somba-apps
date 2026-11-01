@@ -36,10 +36,32 @@ BackendUser gapUser({String phone = '', String id = 'u1', String role = 'custome
       'emailVerified': true,
     });
 
-const gapZones = [
-  Zone(id: 'zone-gombe', name: 'Gombe', nameFr: 'Gombe', city: 'Kinshasa', deliveryFeeUsd: 3),
-  Zone(id: 'zone-limete', name: 'Limete', nameFr: 'Limete', city: 'Kinshasa', deliveryFeeUsd: 5),
-];
+/// The server's answer to `delivery:quote` (a pinned address in Gombe unless told otherwise).
+Map<String, dynamic> gapQuoteJson({double fee = 3, bool pinned = true, String hub = 'Kinshasa Hub', double transfer = 0, String? fallback}) => {
+      'feeUsd': fee,
+      'deliveryUsd': fee - transfer,
+      'transferUsd': transfer,
+      'distanceKm': 2.5,
+      'destinationHubId': 'hub-kin',
+      'destinationHub': {'id': 'hub-kin', 'name': hub, 'city': 'Kinshasa'},
+      'originHubIds': ['hub-kin'],
+      'transfer': transfer > 0,
+      'pinned': pinned,
+      'fallback': fallback,
+    };
+
+/// A fake socket for screens that quote the delivery: `delivery:quote` answers [quote], every other read is empty,
+/// and [extra] answers more events (event -> body -> data).
+Future<dynamic> Function(String event, [Map<String, dynamic>? body]) gapCalls({
+  Map<String, dynamic> Function(Map<String, dynamic>? body)? quote,
+  Map<String, dynamic Function(Map<String, dynamic>? body)> extra = const {},
+}) =>
+    (event, [body]) async {
+      final custom = extra[event];
+      if (custom != null) return custom(body);
+      if (event == 'delivery:quote') return (quote ?? (_) => gapQuoteJson())(body);
+      return const <dynamic>[];
+    };
 
 Widget gapApp(Widget home, {String lang = 'en'}) => MaterialApp(
       theme: AppTheme.light(),
@@ -61,13 +83,12 @@ Future<void> gapReset({List<ProductDto>? products, String lang = 'en'}) async {
     ..addAll(products ?? [gapDto('p1'), gapDto('p2', stock: 2)]);
   store.hydrated = true;
   store.user = gapUser();
-  store.zones = [];
+  store.debugCallRequest = gapCalls();
   store.addresses.clear();
   final shop = ShopState.instance;
   shop.cart.clear();
   shop.savedForLater.clear();
   shop.stockNotices.clear();
-  shop.selectedZoneId = null;
   shop.selectedAddressId = null;
   shop.appliedPromo = null;
 }
@@ -77,18 +98,17 @@ void gapTearDown() {
   store.products.clear();
   store.addresses.clear();
   store.orders.clear();
-  store.zones = [];
   store.user = null;
   store.hydrated = false;
   store.walletBalance = 0;
   store.requireVerifiedForCheckout = false;
   store.debugPlaceOrderRequest = null;
   store.debugAddressRequest = null;
+  store.debugCallRequest = null;
   final shop = ShopState.instance;
   shop.cart.clear();
   shop.savedForLater.clear();
   shop.stockNotices.clear();
-  shop.selectedZoneId = null;
   shop.selectedAddressId = null;
   marketNotifier.value = MarketProfileId.drc;
 }

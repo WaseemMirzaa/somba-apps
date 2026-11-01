@@ -39,4 +39,12 @@ export class Promo {
   /** Listed in the app's Coupons screen? Private codes are handed out directly. */
   @Column({ type: 'boolean', default: true })
   isPublic: boolean;
+
+  /**
+   * The store that issued the coupon (null = a platform code). A store coupon discounts only that store's lines
+   * and the store pays for it (it comes off the seller's earnings, see order_items.couponDiscountUsd).
+   */
+  @Index('IDX_promos_seller')
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  sellerId: string | null;
 }

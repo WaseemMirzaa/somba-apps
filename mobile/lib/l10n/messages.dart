@@ -1,8 +1,14 @@
 // Generated copy of the UI strings: every key has an English and a French text.
 // ignore_for_file: prefer_single_quote_strings
+import 'messages_aftersale.dart';
+import 'messages_areas.dart';
+import 'messages_engage.dart';
+import 'messages_logistics.dart';
+import 'messages_social.dart';
 
 /// key -> (English, French). Placeholders are written {name}.
-const Map<String, (String, String)> kMessages = {
+/// The map is split by feature: this file holds the core texts; the others add theirs (see `kMessages` at the end).
+const Map<String, (String, String)> _kMessagesBase = {
   'home': ('Home', 'Accueil'),
   'categories': ('Categories', 'Catégories'),
   'deals': ('Deals', 'Offres'),
@@ -70,6 +76,7 @@ const Map<String, (String, String)> kMessages = {
   'status_returned': ('Returned', 'Retournée'),
   'pay_stripe_card': ('Credit / Debit Card', 'Carte bancaire'),
   'pay_cod': ('Cash on Delivery', 'Paiement à la livraison'),
+  'pay_cod_note': ('You pay the rider in cash when the parcel arrives.', 'Vous payez en espèces au livreur à la réception.'),
   'pay_wallet': ('Somba&Teka wallet', 'Portefeuille Somba&Teka'),
   'send': ('Send', 'Envoyer'),
   'close': ('Close', 'Fermer'),
@@ -96,11 +103,6 @@ const Map<String, (String, String)> kMessages = {
   'addr_updated': ('Address updated', 'Adresse mise à jour'),
   'addr_landmark': ('Landmark / directions for the rider', 'Repère / indications pour le livreur'),
   'addr_landmark_hint': ('Blue gate, opposite the church', 'Portail bleu, en face de l’église'),
-  'addr_zone_ok': ('Delivery to this address: {fee}', 'Livraison à cette adresse : {fee}'),
-  'addr_zone_none': (
-    'We don’t deliver to this commune yet. You can save the address, but orders can’t be delivered there for now.',
-    'Nous ne livrons pas encore cette commune. Vous pouvez enregistrer l’adresse, mais les commandes ne peuvent pas encore y être livrées.'
-  ),
   'addr_edit': ('Edit', 'Modifier'),
   'addr_make_default': ('Set as default', 'Par défaut'),
   'addr_default_done': ('Default address updated', 'Adresse par défaut mise à jour'),
@@ -298,7 +300,7 @@ const Map<String, (String, String)> kMessages = {
   'wishlist_empty': ('Tap the heart on a product to save it here.', 'Touchez le cœur d’un produit pour l’enregistrer ici.'),
   'notifications': ('Notifications', 'Notifications'),
   'notifications_n': ('Notifications ({n})', 'Notifications ({n})'),
-  'mark_all': ('Mark all', 'Tout marquer comme lu'),
+  'mark_all': ('Mark all as read', 'Tout marquer comme lu'),
   'all_caught_up': ('You are all caught up.', 'Vous êtes à jour.'),
   'ago_now': ('now', 'à l’instant'),
   'ago_m': ('{n}m', '{n} min'),
@@ -333,10 +335,8 @@ const Map<String, (String, String)> kMessages = {
   'checkout_no_address': ('No saved address yet', 'Aucune adresse enregistrée'),
   'add': ('Add', 'Ajouter'),
   'change': ('Change', 'Modifier'),
-  'checkout_need_commune': ('Add the commune to this address so we can work out the delivery fee.', 'Ajoutez la commune à cette adresse pour que nous puissions calculer les frais de livraison.'),
   'checkout_edit_address': ('Edit this address', 'Modifier cette adresse'),
   'checkout_change_address': ('Choose another address', 'Choisir une autre adresse'),
-  'checkout_not_served': ('We don’t deliver to this address yet.', 'Nous ne livrons pas encore à cette adresse.'),
   'mm_number': ('Mobile money number', 'Numéro mobile money'),
   'mm_helper': ('You will get an approval request on this number.', 'Vous recevrez une demande de confirmation sur ce numéro.'),
   'mm_invalid': ('Enter a valid number, e.g. +243 81 234 5678', 'Saisissez un numéro valide, par ex. +243 81 234 5678'),
@@ -376,7 +376,7 @@ const Map<String, (String, String)> kMessages = {
   'pp_failed_title': ('Payment did not go through', 'Paiement non abouti'),
   'pp_approve_title': ('Approve on your phone', 'Validez sur votre téléphone'),
   'pp_order_cancelled': ('The order was cancelled.', 'La commande a été annulée.'),
-  'pp_request_sent': ('A {method} request for {amount} was sent. Enter your PIN to confirm.', 'Une demande {method} de {amount} a été envoyée. Saisissez votre code PIN pour confirmer.'),
+  'pp_request_sent': ('We sent you a payment request for {amount} by {method}. Enter your PIN to confirm.', 'Une demande {method} de {amount} a été envoyée. Saisissez votre code PIN pour confirmer.'),
   'cancel_order': ('Cancel order', 'Annuler la commande'),
   'pp_check': ('Check payment status', 'Vérifier le paiement'),
   'pp_continue': ('Continue shopping — I’ll confirm later', 'Continuer mes achats — je confirmerai plus tard'),
@@ -387,6 +387,7 @@ const Map<String, (String, String)> kMessages = {
   'estimated_delivery': ('Estimated delivery', 'Livraison estimée'),
   'delivery_estimate_hint': ('Based on each seller’s delivery time for these products.', 'Selon le délai de livraison fixé par chaque vendeur pour ces produits.'),
   'pd_delivery_days': ('Delivery in {days} days · expected {day}', 'Livraison en {days} jours · prévue le {day}'),
+  'pd_delivery_day_one': ('Delivery in 1 day · expected {day}', 'Livraison en 1 jour · prévue le {day}'),
   'pd_delivery_info': ('Fee depends on your address — shown at checkout', 'Frais calculés selon votre adresse, affichés à la caisse'),
   'pd_unavailable': ('Unavailable', 'Indisponible'),
   'pd_out_of_stock': ('Out of stock', 'Rupture de stock'),
@@ -494,18 +495,24 @@ const Map<String, (String, String)> kMessages = {
   'order_help': ('Help', 'Aide'),
   'order_paid': ('Paid', 'Payé'),
   'order_awaiting': ('Awaiting payment', 'En attente de paiement'),
+  'order_pay_on_delivery': ('Pay on delivery', 'À payer à la livraison'),
   'order_refunded': ('Refunded', 'Remboursé'),
   'order_pay_failed': ('Payment failed', 'Paiement échoué'),
   'track_placed': ('Order placed', 'Commande passée'),
   'track_current': ('Current status', 'Statut actuel'),
+  'journey_next': ('Up next', 'Prochaine étape'),
   'track_onway': ('Your rider is on the way', 'Votre livreur est en route'),
   'track_heading': ('Rider is heading to you', 'Le livreur se dirige vers vous'),
   'track_not_yet': ('Rider not on the road yet', 'Le livreur n’est pas encore en route'),
   'track_done': ('Your parcel was delivered', 'Votre colis a été livré'),
   'track_done_hint': ('The rider handed over your parcel. Thank you for your order.', 'Le livreur vous a remis votre colis. Merci pour votre commande.'),
-  'track_live_pos': ('Live position: {lat}, {lng}', 'Position en direct : {lat}, {lng}'),
+  'track_rider_near': ('Your rider is very close', 'Votre livreur est tout près'),
+  'track_rider_away': ('Your rider is {dist} away', 'Votre livreur est à {dist}'),
+  'track_rider_live': ('Your rider is sharing their position', 'Votre livreur partage sa position'),
+  'track_updated_now': ('Updated just now', 'Mis à jour à l’instant'),
+  'track_updated_s': ('Updated {n} s ago', 'Mis à jour il y a {n} s'),
+  'track_updated_m': ('Updated {n} min ago', 'Mis à jour il y a {n} min'),
   'track_live_hint': ('Live location appears here once the rider starts the delivery.', 'La position en direct s’affichera ici dès que le livreur commencera la livraison.'),
-  'track_rider_pos': ('Rider position: {lat}, {lng}', 'Position du livreur : {lat}, {lng}'),
   'track_open_maps': ('Open in maps', 'Ouvrir dans une application de cartes'),
   'track_your_rider': ('Your rider', 'Votre livreur'),
   'track_call_rider': ('Call {name}', 'Appeler {name}'),
@@ -608,4 +615,14 @@ const Map<String, (String, String)> kMessages = {
   'see_translation': ('See translation', 'Voir la traduction'),
   'see_original': ('See original', 'Voir l’original'),
   'translate_same': ('Already in your language.', 'Déjà dans votre langue.'),
+};
+
+/// Every UI text: the core map plus the per-feature maps (a key lives in exactly one of them).
+const Map<String, (String, String)> kMessages = {
+  ..._kMessagesBase,
+  ...kMessagesLogistics,
+  ...kMessagesAfterSale,
+  ...kMessagesSocial,
+  ...kMessagesEngage,
+  ...kMessagesAreas,
 };

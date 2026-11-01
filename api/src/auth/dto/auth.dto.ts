@@ -93,3 +93,11 @@ export class PhoneLoginDto {
   @IsString()
   code: string;
 }
+
+export class TwoFaLoginDto {
+  @IsString()
+  challenge: string;
+
+  @IsString()
+  code: string;
+}

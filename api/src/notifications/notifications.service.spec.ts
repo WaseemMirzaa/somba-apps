@@ -17,6 +17,7 @@ function make(users: Record<string, { role: string; prefs: string | null; locale
   const emitter = {
     toUser: (id: string, ev: string, p: Payload) => (emits.push(['user', id, ev]), payloads.push(p)),
     toRole: (role: string, ev: string, p: Payload) => (emits.push(['role', role, ev]), payloads.push(p)),
+    toRoles: (roles: string[], ev: string, p: Payload) => (emits.push(['roles', roles.join(','), ev]), payloads.push(p)),
   };
   const push = {
     enabled: false,
@@ -48,7 +49,8 @@ describe('NotificationsService', () => {
     const { svc, payloads, rows } = make({ u1: { role: 'seller', prefs: null } });
     await svc.toUser('u1', { title: 'T', body: 'B', type: 'exchange', entityId: 'x1' });
     await svc.toRole('admin_support', { title: 'T', body: 'B', type: 'support', entityId: 't1' });
-    expect(payloads.map((p) => p.link)).toEqual(['/seller/exchanges/x1', '/admin/support/t1']);
+    // the super admin hears an admin role's notice too
+    expect(payloads.map((p) => p.link)).toEqual(['/seller/exchanges/x1', '/admin/support/t1', '/admin/support/t1']);
     rows.push({ id: 'a', type: 'order', entityId: 'o1' }, { id: 'b', type: 'marketing', entityId: null });
     expect((await svc.listForUser('u1', 'seller')).map((n) => n.link)).toEqual(['/seller/orders/o1', '/seller/notifications']);
   });
@@ -79,7 +81,10 @@ describe('NotificationsService', () => {
     await svc.toRole('admin_support', { title: 'T', body: 'B', type: 'support', entityId: 't1' });
     await svc.toRole('rider', { title: 'New', body: 'B', type: 'task', entityId: 'k1', extra: { view: 'available' } });
     await tick();
-    const [staff, rider] = push.sendToRole.mock.calls as unknown as [string, { link: string }, { apps?: string[]; skipUserIds: Set<string> }][];
+    const calls = push.sendToRole.mock.calls as unknown as [string, { link: string }, { apps?: string[]; skipUserIds: Set<string> }][];
+    const staff = calls.find((c) => c[0] === 'admin_support')!;
+    const rider = calls.find((c) => c[0] === 'rider')!;
+    expect(calls.map((c) => c[0])).toContain('admin'); // and the super admin's devices
     expect(staff[0]).toBe('admin_support');
     expect(staff[1].link).toBe('/admin/support/t1');
     expect(staff[2].apps).toEqual(['web']);
@@ -173,11 +178,12 @@ describe('NotificationsService', () => {
       await svc.toRole('customer', { title: 'Sale', body: 'All 20% off', type: 'marketing', fr: { title: 'Soldes', body: 'Tout à -20 %' } });
       await svc.toRole('customer', { title: 'Hello', body: 'World', type: 'marketing' });
       await tick();
-      const calls = push.sendToRole.mock.calls as unknown as [string, { title: string; fr?: { title: string; body: string } }][];
+      const calls = (push.sendToRole.mock.calls as unknown as [string, { title: string; fr?: { title: string; body: string } }][]).filter((c) => c[0] !== 'admin');
       expect(calls[0][1].fr).toEqual({ title: 'Versement demandé', body: 'PO-1 · TechZone · $40.00' });
       expect(calls[1][1]).toMatchObject({ title: 'Sale', fr: { title: 'Soldes', body: 'Tout à -20 %' } });
       expect(calls[2][1].fr).toBeUndefined();
-      expect(payloads.map((p) => p.titleFr)).toEqual(['Versement demandé', 'Soldes', null]);
+      // the super admin gets a copy of the admin_finance notice, in its own payload
+      expect(payloads.map((p) => p.titleFr)).toEqual(['Versement demandé', 'Versement demandé', 'Soldes', null]);
     });
 
     it('passes an authored French version through toUsers and toAdmins', async () => {
@@ -185,7 +191,8 @@ describe('NotificationsService', () => {
       const fr = { title: 'Soldes', body: 'Tout à -20 %' };
       await svc.toUsers(['a', 'b', 'a'], { title: 'Sale', body: 'All 20% off', type: 'marketing', fr });
       await svc.toAdmins({ title: 'Sale', body: 'All 20% off', type: 'marketing', fr });
-      expect(payloads).toHaveLength(2 + 6);
+      // two user notices, and ONE admin notice every admin role sees (not one per role)
+      expect(payloads).toHaveLength(2 + 1);
       expect(payloads.every((p) => p.titleFr === 'Soldes')).toBe(true);
     });
 

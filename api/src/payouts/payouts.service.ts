@@ -9,7 +9,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { Order, OrderItem, Payout, PayoutStatementLine, Product, Seller } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -19,6 +19,8 @@ import { PaymentsService } from '../payments/payments.service';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayUnavailableError } from '../payments/pawapay.provider';
 
 const FINANCE_ROOMS = ['admin', 'admin_finance'];
+/** Order states whose money is not earned yet (the parcel is still on its way). */
+const IN_PROGRESS = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery'];
 /** A payout in any of these states has "used" the lines on its statement (a rejected one releases them). */
 const LIVE_PAYOUT = ['requested', 'sending', 'paid'] as const;
 const MAX_BATCH = 100;
@@ -33,7 +35,18 @@ export interface SellerBalance {
   commissionPct: number;
   /** Commission already deducted from `earned` (sum of the amounts stored on the lines). */
   commissionUsd: number;
+  /** The platform's minimum payout, and how long delivered money is held before it can be withdrawn. */
+  minPayoutUsd: number;
+  holdHours: number;
+  /** Delivered, but still inside the hold (net of commission): it becomes withdrawable at `nextClearanceAt`. */
+  clearingUsd: number;
+  nextClearanceAt: Date | null;
+  /** Net of orders still on their way (not earned yet). */
+  inProgressUsd: number;
 }
+
+/** What one line is worth to the seller: price x qty, less its share of a store coupon (the seller pays for it). */
+export const lineGross = (i: Pick<OrderItem, 'priceUsd' | 'qty' | 'couponDiscountUsd'>): number => round2(i.priceUsd * i.qty - (Number(i.couponDiscountUsd) || 0));
 
 export interface StatementTotals {
   grossUsd: number;
@@ -130,23 +143,37 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     const sellerIds = [userId, ...(seller ? [seller.id] : [])];
     const mine = new Set((await this.products.find({ where: { sellerId: In(sellerIds) }, select: { id: true } })).map((p) => p.id));
     const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12)));
-    const holdHours = Number((await this.settings.get('payoutClearanceHours')) ?? process.env.PAYOUT_CLEARANCE_HOURS ?? (process.env.NODE_ENV === 'production' ? 48 : 0));
+    const holdHours = await this.holdHours();
+    const minPayoutUsd = Number((await this.settings.get('minPayoutUsd')) ?? 10);
     const cutoff = new Date(Date.now() - holdHours * 3_600_000);
     const eligible: { order: Order; item: OrderItem }[] = [];
     let gross = 0;
     let commission = 0;
+    let clearing = 0;
+    let nextClearanceAt: Date | null = null;
+    let inProgress = 0;
     if (mine.size) {
       const rows = await this.orders
         .createQueryBuilder('o')
         .innerJoinAndSelect('o.items', 'i')
-        .where("o.status = 'delivered' AND o.updatedAt <= :cutoff AND i.productId IN (:...ids)", { cutoff, ids: [...mine] })
+        .where("(o.status = 'delivered' OR o.status IN (:...open)) AND i.productId IN (:...ids)", { open: IN_PROGRESS, ids: [...mine] })
         .getMany();
       for (const o of rows) {
         for (const i of o.items ?? []) {
           if (!mine.has(i.productId) || i.fulfilment === 'cancelled') continue;
-          eligible.push({ order: o, item: i });
-          gross += i.priceUsd * i.qty;
-          commission += Number(i.commissionUsd) || 0;
+          const net = round2(lineGross(i) - (Number(i.commissionUsd) || 0));
+          if (o.status !== 'delivered') {
+            inProgress += net;
+          } else if (o.updatedAt > cutoff) {
+            // Delivered, still inside the hold: counted, not yet withdrawable.
+            clearing += net;
+            const at = new Date(o.updatedAt.getTime() + holdHours * 3_600_000);
+            if (!nextClearanceAt || at < nextClearanceAt) nextClearanceAt = at;
+          } else {
+            eligible.push({ order: o, item: i });
+            gross += lineGross(i);
+            commission += Number(i.commissionUsd) || 0;
+          }
         }
       }
     }
@@ -154,7 +181,25 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     const open = await this.payouts.find({ where: { sellerId: userId, status: In([...LIVE_PAYOUT]) } });
     const committed = round2(open.reduce((t, p) => t + p.amountUsd, 0));
     const available = round2(earned - committed);
-    return { earned, committed, available, owedUsd: Math.max(0, round2(-available)), commissionPct, commissionUsd: round2(commission), eligible };
+    return {
+      earned,
+      committed,
+      available,
+      owedUsd: Math.max(0, round2(-available)),
+      commissionPct,
+      commissionUsd: round2(commission),
+      minPayoutUsd,
+      holdHours,
+      clearingUsd: round2(clearing),
+      nextClearanceAt,
+      inProgressUsd: round2(inProgress),
+      eligible,
+    };
+  }
+
+  /** Hours delivered money is held before it can be withdrawn (setting, else env, else 48 in production / 0 otherwise). */
+  async holdHours(): Promise<number> {
+    return Number((await this.settings.get('payoutClearanceHours')) ?? process.env.PAYOUT_CLEARANCE_HOURS ?? (process.env.NODE_ENV === 'production' ? 48 : 0));
   }
 
   async request(
@@ -210,12 +255,14 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       });
       this.emitter.toUser(seller.id, 'payout:created', payout);
       this.emitter.toRoles(FINANCE_ROOMS, 'payout:created', payout);
-      await this.notifications.toRole('admin_finance', {
+      const notice = {
         title: 'Payout requested',
         body: `${payout.reference} · ${seller.name} · $${amountUsd.toFixed(2)}`,
         type: 'payout',
         entityId: payout.id,
-      });
+      };
+      await this.notifications.toRole('admin_finance', notice);
+      await this.notifications.toRole('admin', notice);
       return payout;
     });
   }
@@ -246,7 +293,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
 
     for (const { order, item } of eligible) {
       if (sold.has(item.id)) continue;
-      const grossUsd = round2(item.priceUsd * item.qty);
+      const grossUsd = lineGross(item);
       const commissionUsd = round2(Number(item.commissionUsd) || 0);
       lines.push(
         m.create(PayoutStatementLine, {
@@ -397,8 +444,10 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     });
     if (!won) throw new BadRequestException('This payout is no longer awaiting approval.');
     const saved = (await this.payouts.findOne({ where: { id: payoutId } }))!;
+    await this.markLinesPaid(saved.id);
     this.emitter.toUser(saved.sellerId, 'payout:updated', saved);
     this.emitter.toRoles(FINANCE_ROOMS, 'payout:updated', saved);
+    await this.tellSuperAdmin('Payout settled', saved, 'was paid');
     await this.notifications.toUser(saved.sellerId, {
       title: 'Payout paid',
       body: `${saved.reference} · $${saved.amountUsd.toFixed(2)} ${saved.method === 'wallet' ? 'credited to your wallet' : `sent to your ${saved.method === 'bank' ? 'bank account' : 'mobile-money number'} (ref ${saved.providerRef})`}.`,
@@ -482,8 +531,10 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       .execute();
     if (!res.affected) return;
     const saved = (await this.payouts.findOne({ where: { id: payout.id } }))!;
+    if (s.succeeded) await this.markLinesPaid(saved.id);
     this.publish(saved);
     if (s.succeeded) {
+      await this.tellSuperAdmin('Payout settled', saved, 'was paid through pawaPay');
       await this.notifications.toUser(saved.sellerId, {
         title: 'Payout paid',
         body: `${saved.reference} · $${saved.amountUsd.toFixed(2)} sent to your mobile-money number${saved.receiptRef ? ` (receipt ${saved.receiptRef})` : ''}.`,
@@ -491,12 +542,14 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
         entityId: saved.id,
       });
     } else {
-      await this.notifications.toRole('admin_finance', {
+      const failed = {
         title: 'pawaPay payout failed',
         body: `${saved.reference} · ${saved.sellerName}: ${s.failureMessage ?? 'the transfer failed'}. It is back in the queue.`,
         type: 'payout',
         entityId: saved.id,
-      });
+      };
+      await this.notifications.toRole('admin_finance', failed);
+      await this.notifications.toRole('admin', failed);
     }
   }
 
@@ -504,6 +557,16 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
   async reconcileSending(): Promise<void> {
     const rows = await this.payouts.find({ where: { status: 'sending' }, take: 25 });
     for (const p of rows) if (p.providerRef) await this.reconcilePawapay(p.providerRef);
+  }
+
+  /** A paid payout settles the lines on its statement: they are `paid out` from now on. */
+  private async markLinesPaid(payoutId: string): Promise<void> {
+    await this.statementLines.update({ payoutId, paidOutAt: IsNull() }, { paidOutAt: new Date() });
+  }
+
+  /** The super admin hears how each payout ends (finance staff already see the queue). */
+  private async tellSuperAdmin(title: string, p: Payout, what: string): Promise<void> {
+    await this.notifications.toRole('admin', { title, body: `${p.reference} · ${p.sellerName} · $${p.amountUsd.toFixed(2)} ${what}.`, type: 'payout', entityId: p.id });
   }
 
   private publish(saved: Payout) {
@@ -524,6 +587,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     const saved = (await this.payouts.findOne({ where: { id: payoutId } }))!;
     this.emitter.toUser(saved.sellerId, 'payout:updated', saved);
     this.emitter.toRoles(FINANCE_ROOMS, 'payout:updated', saved);
+    await this.tellSuperAdmin('Payout declined', saved, `was rejected${note?.trim() ? ` (${note.trim().slice(0, 100)})` : ''}`);
     await this.notifications.toUser(saved.sellerId, {
       title: 'Payout rejected',
       body: `${saved.reference}${note ? ` — ${note}` : ''}.`,

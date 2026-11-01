@@ -22,8 +22,12 @@ import {
   BarChart3,
   Settings,
   Boxes,
-  Truck,
   Banknote,
+  ScanLine,
+  Bell,
+  Headphones,
+  Warehouse,
+  Truck,
 } from "lucide-react";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 
@@ -55,16 +59,22 @@ const T = { operator: 1, supervisor: 2, manager: 3 } as const;
  */
 const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse", label: "dashboard", icon: LayoutDashboard, tier: T.operator, nav: true },
-  { href: "/warehouse/inbound", label: "inbound", icon: Inbox, tier: T.operator, nav: true },
-  { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck, tier: T.operator, nav: true },
-  { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown, tier: T.operator, nav: true },
-  { href: "/warehouse/batch-builder", label: "batchBuilder", icon: Send, tier: T.operator, nav: true },
-  { href: "/warehouse/dispatch", label: "dispatch", icon: Send, tier: T.operator, nav: true },
+  { href: "/warehouse/desk", label: "desk", icon: ScanLine, tier: T.operator, nav: true },
+  { href: "/warehouse/custody", label: "custody", icon: Boxes, tier: T.operator, nav: true },
+  { href: "/warehouse/runs", label: "transferRuns", icon: Truck, tier: T.operator, nav: true },
+  { href: "/warehouse/tasks", label: "parcels", icon: Boxes, tier: T.operator, nav: false },
   { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: false },
+  { href: "/warehouse/notifications", label: "notifications", icon: Bell, tier: T.operator, nav: true },
+  { href: "/warehouse/support", label: "support", icon: Headphones, tier: T.operator, nav: true },
+  // Retired pages that only redirect to the desk: reachable by everyone so old links keep working.
+  { href: "/warehouse/inbound", label: "inbound", icon: Inbox, tier: T.operator, nav: false },
+  { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck, tier: T.operator, nav: false },
+  { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown, tier: T.operator, nav: false },
+  { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin, tier: T.operator, nav: false },
   { href: "/warehouse/parcels", label: "parcels", icon: Boxes, tier: T.operator, nav: false },
+  { href: "/warehouse/dispatch", label: "dispatch", icon: Send, tier: T.supervisor, nav: false },
+  { href: "/warehouse/batch-builder", label: "batchBuilder", icon: Send, tier: T.supervisor, nav: true },
   { href: "/warehouse/riders", label: "riders", icon: Bike, tier: T.supervisor, nav: true },
-  { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin, tier: T.supervisor, nav: true },
-  { href: "/warehouse/transfers", label: "transfers", icon: Truck, tier: T.supervisor, nav: true },
   { href: "/warehouse/returns", label: "returns", icon: RotateCcw, tier: T.supervisor, nav: true },
   { href: "/warehouse/replacements", label: "replacements", icon: RefreshCw, tier: T.supervisor, nav: true },
   { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, tier: T.supervisor, nav: true },
@@ -72,7 +82,7 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle, tier: T.supervisor, nav: true },
   { href: "/warehouse/reconcile", label: "COD cash", plainLabel: true, icon: Banknote, tier: T.supervisor, nav: true },
   { href: "/warehouse/analytics", label: "analytics", icon: BarChart3, tier: T.manager, nav: true },
-  { href: "/warehouse/hubs", label: "hubs", icon: Boxes, tier: T.manager, nav: false },
+  { href: "/warehouse/hubs", label: "myWarehouse", icon: Warehouse, tier: T.manager, nav: true },
   { href: "/warehouse/settings", label: "settings", icon: Settings, tier: T.manager, nav: true },
 ];
 

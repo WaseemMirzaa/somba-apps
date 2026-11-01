@@ -10,7 +10,8 @@ import {
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
-import { campaignWindow } from '../products/pricing';
+import { budgetSpent, campaignRunning, campaignWindow } from '../products/pricing';
+import { approvedStatus, canMoveCampaign } from './campaign-state';
 import { TranslationService } from '../translation/translation.service';
 import type { TranslationStatus } from '../translation/translation.service';
 import { planWrite } from '../translation/translatable';
@@ -18,10 +19,24 @@ import type { WritePlan, WriteState } from '../translation/translatable';
 import { isLocale } from '../translation/translator.provider';
 
 /** A campaign as clients receive it: `name` / `nameFr`, and the store name joined in (never stored: it went stale). */
-export type ServedCampaign = Campaign & { nameFr: string; sellerName: string | null; machineTranslated: string[]; translationStatus: TranslationStatus };
+export type ServedCampaign = Campaign & {
+  nameFr: string;
+  sellerName: string | null;
+  machineTranslated: string[];
+  translationStatus: TranslationStatus;
+  /** What is left of the budget (null = no budget set). */
+  budgetRemainingUsd: number | null;
+};
 
 /** How often campaigns are started and ended on their dates (CAMPAIGN_SWEEP_MS, 0 turns it off). */
-const SWEEP_MS = Number(process.env.CAMPAIGN_SWEEP_MS ?? 5 * 60_000);
+const SWEEP_MS = Number(process.env.CAMPAIGN_SWEEP_MS ?? 30_000);
+
+/** One shopper counts at most this many view/click events a minute, and the same event on one campaign once per window. */
+export const TRACK_PER_MINUTE = 60;
+export const TRACK_SAME_WINDOW_MS = 10_000;
+
+/** The owning seller's screens follow views / clicks within this long (a burst of events makes one push; 0 = at once). */
+const STATS_PUSH_MS = () => Number(process.env.CAMPAIGN_STATS_PUSH_MS ?? 3000);
 
 /**
  * Marketing campaigns: sellers propose, marketing/admins approve. An approved
@@ -46,6 +61,103 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       const c = await this.campaigns.findOne({ where: { id } });
       if (c) await this.publish(c, null, { prices: false });
     });
+    // A sale used some of the campaign's budget: end it when it is all spent, and show the seller the new numbers.
+    this.products.onCampaignSale((id) => this.afterSale(id));
+  }
+
+  private readonly trackLog = new Map<string, number[]>();
+  private readonly trackSame = new Map<string, number>();
+
+  /**
+   * A shopper saw (`view`) or opened (`click`) a promoted product. Counted only while the campaign is really
+   * discounting, and rate-limited per shopper: {@link TRACK_PER_MINUTE} events a minute, and the same event on the
+   * same campaign once per {@link TRACK_SAME_WINDOW_MS}. Returns whether it was counted.
+   */
+  async track(who: string, campaignId: string, kind: unknown, now = Date.now()): Promise<{ counted: boolean }> {
+    if (kind !== 'view' && kind !== 'click') throw new BadRequestException('Kind must be "view" or "click".');
+    const id = String(campaignId ?? '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return { counted: false };
+    const recent = (this.trackLog.get(who) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length >= TRACK_PER_MINUTE) {
+      this.trackLog.set(who, recent);
+      return { counted: false };
+    }
+    const sameKey = `${who}|${id}|${kind}`;
+    const last = this.trackSame.get(sameKey);
+    if (last !== undefined && now - last < TRACK_SAME_WINDOW_MS) return { counted: false };
+    const campaign = await this.campaigns.findOne({ where: { id } });
+    if (!campaign || !campaignRunning(campaign, now)) return { counted: false };
+    recent.push(now);
+    this.trackLog.set(who, recent);
+    this.trackSame.set(sameKey, now);
+    if (this.trackSame.size > 20_000) for (const [k, t] of this.trackSame) if (now - t > TRACK_SAME_WINDOW_MS) this.trackSame.delete(k);
+    await this.campaigns
+      .createQueryBuilder()
+      .update(Campaign)
+      .set(kind === 'view' ? { views: () => 'views + 1' } : { clicks: () => 'clicks + 1' })
+      .where('id = :id', { id })
+      .execute();
+    this.statsChanged(id);
+    return { counted: true };
+  }
+
+  private readonly statsDirty = new Set<string>();
+  private statsTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Views / clicks of a campaign moved: tell its seller, at most once per window however many events came in. */
+  private statsChanged(id: string): void {
+    this.statsDirty.add(id);
+    if (this.statsTimer) return;
+    const wait = STATS_PUSH_MS();
+    if (wait <= 0) {
+      void this.flushStatsPushes();
+      return;
+    }
+    this.statsTimer = setTimeout(() => void this.flushStatsPushes(), wait);
+    this.statsTimer.unref();
+  }
+
+  /** Send the pending `campaign:updated` pushes now (the throttle's timer calls this; tests call it too). */
+  async flushStatsPushes(): Promise<void> {
+    if (this.statsTimer) clearTimeout(this.statsTimer);
+    this.statsTimer = null;
+    const ids = [...this.statsDirty];
+    this.statsDirty.clear();
+    for (const id of ids) {
+      try {
+        const c = await this.campaigns.findOne({ where: { id } });
+        if (!c) continue;
+        const owner = await this.ownerUserId(c);
+        if (!owner) continue;
+        this.emitter.toUser(owner, 'campaign:updated', (await this.present([c]))[0]);
+      } catch {
+        // The push is a courtesy: the numbers are in the database either way.
+      }
+    }
+  }
+
+  /** After a sale: tell the seller and marketing the numbers moved, and stop a campaign that spent its budget. */
+  private async afterSale(id: string): Promise<void> {
+    const c = await this.campaigns.findOne({ where: { id } });
+    if (!c) return;
+    if (budgetSpent(c) && (c.status === 'active' || c.status === 'scheduled')) {
+      const claim = await this.campaigns
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({ status: 'ended', endedReason: 'budget' })
+        .where('id = :id AND status = :from', { id, from: c.status })
+        .execute();
+      if (claim.affected) {
+        const saved = (await this.campaigns.findOne({ where: { id } }))!;
+        const shown = (await this.present([saved]))[0];
+        await this.publish(saved, {
+          title: 'Campaign budget used',
+          body: `"${shown.name}" used its $${saved.budgetUsd.toFixed(2)} budget; prices are back to normal.`,
+        });
+        return;
+      }
+    }
+    await this.publish(c, null, { prices: false });
   }
 
   /** Campaigns as served: both names, the store name joined, translation state. */
@@ -69,6 +181,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
         sellerName: r.sellerId ? (nameOf.get(r.sellerId) ?? null) : null,
         machineTranslated: t.machineTranslated,
         translationStatus: t.translationStatus,
+        budgetRemainingUsd: r.budgetUsd > 0 ? Math.max(0, Number((r.budgetUsd - (r.spentUsd ?? 0)).toFixed(2))) : null,
       }) as ServedCampaign;
     });
   }
@@ -82,36 +195,48 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy(): void {
     if (this.sweeper) clearInterval(this.sweeper);
+    if (this.statsTimer) clearTimeout(this.statsTimer);
+    this.statsTimer = null;
   }
 
   /**
-   * Move campaigns along their dates: an approved campaign whose end date has passed is `ended`, and a `scheduled`
-   * one whose start date has passed becomes `active`. Prices were already right (pricing reads the dates); this keeps
-   * the stored status, the seller's screens and shoppers' prices in step, and tells the seller.
+   * Move campaigns along their dates: an approved campaign whose end date has passed is `ended`, a `scheduled` one
+   * whose start date has passed becomes `active`, and an `active` one whose start is still ahead goes back to
+   * `scheduled` (so the status always says what the prices are doing). Prices already follow the dates; this keeps
+   * the stored status, the seller's screens and shoppers' screens in step (it re-announces the prices of every
+   * product the campaign covers), and tells the seller.
    */
   async sweep(now = Date.now()): Promise<number> {
     let moved = 0;
     for (const c of await this.campaigns.find({ where: { status: In(['active', 'scheduled']) } })) {
       const { from, to } = campaignWindow(c);
       let next: CampaignStatus | null = null;
-      if (to !== null && now > to) next = 'ended';
-      else if (c.status === 'scheduled' && from !== null && now >= from) next = 'active';
+      let reason: string | null = null;
+      if (to !== null && now > to) {
+        next = 'ended';
+        reason = 'dates';
+      } else if (c.status === 'scheduled' && from !== null && now >= from) next = 'active';
+      else if (c.status === 'active' && from !== null && now < from) next = 'scheduled';
       if (!next) continue;
       // Conditional, so two API instances sweeping at once move each campaign only once.
       const claim = await this.campaigns
         .createQueryBuilder()
         .update(Campaign)
-        .set({ status: next })
+        .set(reason ? { status: next, endedReason: reason } : { status: next })
         .where('id = :id AND status = :from', { id: c.id, from: c.status })
         .execute();
       if (!claim.affected) continue;
       moved++;
       const saved = (await this.campaigns.findOne({ where: { id: c.id } }))!;
       const shown = (await this.present([saved]))[0];
-      await this.publish(saved, {
-        title: next === 'ended' ? 'Campaign ended' : 'Campaign started',
-        body: next === 'ended' ? `"${shown.name}" reached its end date; prices are back to normal.` : `"${shown.name}" is now live.`,
-      });
+      await this.publish(
+        saved,
+        next === 'ended'
+          ? { title: 'Campaign ended', body: `"${shown.name}" reached its end date; prices are back to normal.` }
+          : next === 'active'
+            ? { title: 'Campaign started', body: `"${shown.name}" is now live.` }
+            : null,
+      );
     }
     return moved;
   }
@@ -143,7 +268,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     const claim = await this.campaigns
       .createQueryBuilder()
       .update(Campaign)
-      .set({ status: 'ended' })
+      .set({ status: 'ended', endedReason: 'withdrawn' })
       .where('id = :id AND status = :from', { id, from: campaign.status })
       .execute();
     if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
@@ -196,6 +321,8 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       startDate?: string;
       endDate?: string;
       productIds?: string[];
+      /** Save without sending to marketing yet (`campaigns:submit` sends it). */
+      draft?: boolean;
     },
   ): Promise<ServedCampaign> {
     const seller = await this.sellers.findOne({ where: { userId: user.id } });
@@ -221,7 +348,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
           ...(fields as Partial<Campaign>),
           name: plan.base.name ?? '',
           sourceLang: plan.sourceLang,
-          status: 'pending',
+          status: input.draft === true ? 'draft' : 'pending',
         }),
       );
       await this.translations.applyPlan(m, 'campaign', row.id, plan, { name: row.name });
@@ -231,11 +358,37 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     const shown = (await this.present([campaign]))[0];
     this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
     if (seller?.userId) this.emitter.toUser(seller.userId, 'campaign:updated', shown);
+    if (campaign.status === 'pending') {
+      await this.notifications.toRole('admin_marketing', {
+        title: 'New campaign request',
+        body: `${shown.name} · ${campaign.discount}% off`,
+        type: 'campaign',
+        entityId: campaign.id,
+      });
+    }
+    return shown;
+  }
+
+  /** The seller sends a saved draft to marketing. */
+  async submit(user: { id: string; role: string }, id: string): Promise<ServedCampaign> {
+    const campaign = await this.campaigns.findOne({ where: { id } });
+    if (!campaign || !(await this.owns(user, campaign))) throw new NotFoundException('Campaign not found.');
+    if (campaign.status !== 'draft' && campaign.status !== 'rejected') throw new BadRequestException('Only a draft or a rejected campaign can be sent to marketing.');
+    const claim = await this.campaigns
+      .createQueryBuilder()
+      .update(Campaign)
+      .set({ status: 'pending', rejectReason: null })
+      .where('id = :id AND status = :from', { id, from: campaign.status })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
+    const saved = (await this.campaigns.findOne({ where: { id } }))!;
+    await this.publish(saved, null, { prices: false });
+    const shown = (await this.present([saved]))[0];
     await this.notifications.toRole('admin_marketing', {
       title: 'New campaign request',
-      body: `${shown.name} · ${campaign.discount}% off`,
+      body: `${shown.name} · ${saved.discount}% off`,
       type: 'campaign',
-      entityId: campaign.id,
+      entityId: saved.id,
     });
     return shown;
   }
@@ -283,13 +436,46 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     return ids;
   }
 
-  async setStatus(id: string, status: CampaignStatus): Promise<ServedCampaign> {
+  /**
+   * Marketing / admins decide a campaign. Only the moves of {@link CAMPAIGN_TRANSITIONS} are allowed. Approving
+   * (`scheduled` or `active`, either is accepted) picks the right one from the start date; rejecting needs a
+   * reason the seller will read.
+   */
+  async setStatus(id: string, wanted: CampaignStatus, reasonRaw?: unknown): Promise<ServedCampaign> {
     const campaign = await this.campaigns.findOne({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found.');
-    campaign.status = status;
-    const saved = await this.campaigns.save(campaign);
+    const reason = typeof reasonRaw === 'string' ? reasonRaw.trim().slice(0, 300) : '';
+    let status = wanted;
+    if (wanted === 'rejected' && reason.length < 3) throw new BadRequestException('Give the seller a reason for rejecting this campaign (at least 3 characters).');
+    if ((wanted === 'scheduled' || wanted === 'active') && campaign.status === 'pending') {
+      const { from, to } = campaignWindow(campaign);
+      if (to !== null && Date.now() > to) throw new BadRequestException('The end date of this campaign has already passed: ask the seller to change the dates.');
+      status = approvedStatus(from);
+    }
+    if (status !== campaign.status && !canMoveCampaign(campaign.status, status)) {
+      throw new BadRequestException(`A campaign that is ${campaign.status} cannot become ${status}.`);
+    }
+    const patch: Partial<Campaign> = { status };
+    if (status === 'rejected') patch.rejectReason = reason;
+    else if (status !== campaign.status) patch.rejectReason = null;
+    if (status === 'ended' && campaign.status !== 'ended') patch.endedReason = 'admin';
+    const claim = await this.campaigns
+      .createQueryBuilder()
+      .update(Campaign)
+      .set(patch)
+      .where('id = :id AND status = :from', { id, from: campaign.status })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
+    const saved = (await this.campaigns.findOne({ where: { id } }))!;
     const shown = (await this.present([saved]))[0];
-    await this.publish(saved, { title: `Campaign ${status}`, body: `"${shown.name}" is now ${status}.` });
+    await this.publish(
+      saved,
+      status === campaign.status
+        ? null
+        : status === 'rejected'
+          ? { title: 'Campaign rejected', body: `"${shown.name}" was rejected: ${reason}` }
+          : { title: `Campaign ${status}`, body: `"${shown.name}" is now ${status}.` },
+    );
     return shown;
   }
 
@@ -327,7 +513,11 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       fields.sourceLang = plan.sourceLang;
     }
     Object.assign(campaign, fields);
-    if (!admin) campaign.status = 'pending'; // an edit needs re-approval
+    // A seller's edit needs (re-)approval; a draft stays a draft until it is sent.
+    if (!admin && campaign.status !== 'draft') {
+      campaign.status = 'pending';
+      campaign.rejectReason = null;
+    }
     const saved = await this.campaigns.manager.transaction(async (m) => {
       const row = await m.save(campaign);
       if (plan) await this.translations.applyPlan(m, 'campaign', row.id, plan, { name: row.name });

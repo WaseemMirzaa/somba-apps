@@ -253,6 +253,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         lng: _center.longitude,
         placeId: p?.placeId,
         formatted: p?.formatted,
+        components: p?.components ?? const [],
         parts: PickedParts(
           line1: _street.text.trim(),
           commune: parts.commune,

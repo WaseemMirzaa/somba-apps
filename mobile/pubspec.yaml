@@ -22,9 +22,12 @@ dependencies:
   google_maps_flutter: ^2.19.0
   geolocator: ^14.1.1
   share_plus: ^13.3.1
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.1

@@ -13,10 +13,11 @@ import { InfoGrid } from "@/components/ui/info-grid";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { riderName, useWarehouseData } from "@/lib/warehouse";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
+import { LEG_KIND, LEG_KINDS, LEG_STATUS, pickL } from "@/lib/logistics";
+import { isOpenLeg, riderLabel, useDeskQueue, useHubScope } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { usePublicSettings, zoneLabel } from "@/lib/shop-live";
 import {
   BATCH_STATUS,
   EXCEPTION_TYPE,
@@ -35,28 +36,22 @@ export default function WarehouseAnalyticsPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
-  const { stats, parcels } = useWarehouseData();
-  const analyticsQ = useWarehouseAnalytics();
+  const { hubId } = useHubScope();
+  const parcels = useDeskQueue({ status: "all" }).tasks;
+  const analyticsQ = useWarehouseAnalytics(hubId);
   const an = analyticsQ.data;
   const excQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const { returns, error: returnsError, reload: reloadReturns } = useReturns();
-  const settings = usePublicSettings();
-
-  const zoneName = (id: string | null) => {
-    if (!id) return fr ? "Sans zone" : "No zone";
-    const z = settings.deliveryZones.find((x) => x.id === id);
-    return z ? zoneLabel(z, fr) : id;
-  };
 
   // Rider table: computed from the parcels the server returned (delivered / failed per rider).
   const riderRows = useMemo(() => {
     const m = new Map<string, { id: string; name: string; delivered: number; failed: number; open: number }>();
     for (const p of parcels) {
       if (!p.riderId) continue;
-      const r = m.get(p.riderId) ?? { id: p.riderId, name: riderName(p.rider, fr), delivered: 0, failed: 0, open: 0 };
+      const r = m.get(p.riderId) ?? { id: p.riderId, name: riderLabel(p, fr), delivered: 0, failed: 0, open: 0 };
       if (p.status === "delivered") r.delivered += 1;
-      else if (p.status === "exception") r.failed += 1;
+      else if (p.status === "failed") r.failed += 1;
       else r.open += 1;
       m.set(p.riderId, r);
     }
@@ -102,11 +97,12 @@ export default function WarehouseAnalyticsPage() {
         title={t("analytics")}
         subtitle={
           fr
-            ? "Chiffres calculés par le serveur à partir des livraisons, lots, exceptions et retours réels"
-            : "Figures computed by the server from real deliveries, batches, exceptions and returns"
+            ? "Chiffres de votre entrepôt calculés par le serveur à partir des trajets, lots, exceptions et retours réels"
+            : "Your warehouse's figures, computed by the server from real legs, batches, exceptions and returns"
         }
-        breadcrumbs={[{ label: fr ? "Entrepôt" : "Warehouse", href: base }, { label: t("analytics") }]}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base }, { label: t("analytics") }]}
       />
+      <HubScopeBar />
 
       {analyticsQ.error && <OpsError message={analyticsQ.error} onRetry={() => void analyticsQ.reload()} />}
 
@@ -149,7 +145,7 @@ export default function WarehouseAnalyticsPage() {
               height={220}
               days={an.throughput.map((d) => d.date)}
               series={[
-                { label: fr ? "Reçus" : "Received", color: "#94a3b8", values: an.throughput.map((d) => d.received) },
+                { label: fr ? "Scannés à l'arrivée" : "Scanned in", color: "#94a3b8", values: an.throughput.map((d) => d.received) },
                 { label: fr ? "Collectés" : "Picked up", color: "#3b82f6", values: an.throughput.map((d) => d.pickedUp) },
                 { label: fr ? "Livrés" : "Delivered", color: "#16a34a", values: an.throughput.map((d) => d.delivered) },
               ]}
@@ -163,35 +159,36 @@ export default function WarehouseAnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Par zone de livraison (30 jours)" : "By delivery zone (30 days)"}</h2>
-            <p className="text-xs text-slate-500">{fr ? "Zone de livraison du colis, pas l'entrepôt" : "The parcel's delivery zone, not the warehouse"}</p>
+            <h2 className="font-semibold text-slate-900">{fr ? "Trajets ouverts par type" : "Open legs by kind"}</h2>
+            <p className="text-xs text-slate-500">{fr ? "Ce qui attend l'entrepôt maintenant" : "What is waiting on the warehouse now"}</p>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
-              emptyMessage={fr ? "Aucun colis sur 30 jours." : "No parcels in the last 30 days."}
+              emptyMessage={fr ? "Aucun trajet ouvert." : "No open legs."}
               columns={[
-                { key: "zone", label: fr ? "Zone" : "Zone" },
-                { key: "parcels", label: fr ? "Colis" : "Parcels" },
-                { key: "delivered", label: fr ? "Livrés" : "Delivered" },
-                { key: "failed", label: fr ? "Échecs" : "Failed", render: (row) => <Badge variant={Number(row.failed) > 0 ? "warning" : "default"}>{String(row.failed)}</Badge> },
+                { key: "kind", label: fr ? "Type de trajet" : "Leg type" },
+                { key: "open", label: fr ? "Ouverts" : "Open" },
               ]}
-              data={(an?.byZone ?? []).map((z) => ({ ...z, zone: zoneName(z.zoneId) })) as unknown as Record<string, unknown>[]}
+              data={LEG_KINDS.map((k) => ({ kind: pickL(LEG_KIND[k], fr), open: an?.byKind?.[k] ?? 0 })).filter((r) => r.open > 0) as unknown as Record<string, unknown>[]}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Lots d'expédition par entrepôt (30 jours)" : "Dispatch batches per hub (30 days)"}</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Par entrepôt (30 jours)" : "By warehouse (30 days)"}</h2>
             <p className="text-xs text-slate-500">
-              {fr ? "Les colis ne sont pas rattachés à un entrepôt : seuls les lots le sont" : "Parcels are not tied to a hub: only dispatch batches are"}
+              {fr ? "Trajets gérés par chaque entrepôt" : "Legs managed by each warehouse"}
             </p>
           </CardHeader>
           <CardContent className="p-0">
             <DataTable
-              emptyMessage={fr ? "Aucun lot créé sur 30 jours." : "No batches built in the last 30 days."}
+              emptyMessage={fr ? "Aucun trajet sur 30 jours." : "No legs in the last 30 days."}
               columns={[
-                { key: "hub", label: fr ? "Entrepôt" : "Hub" },
+                { key: "hub", label: fr ? "Entrepôt" : "Warehouse" },
+                { key: "parcels", label: fr ? "Trajets" : "Legs" },
+                { key: "delivered", label: fr ? "Terminés" : "Done" },
+                { key: "failed", label: fr ? "Échecs" : "Failed", render: (row) => <Badge variant={Number(row.failed) > 0 ? "warning" : "default"}>{String(row.failed)}</Badge> },
                 { key: "batches30", label: fr ? "Lots" : "Batches" },
               ]}
               data={(an?.byHub ?? []) as unknown as Record<string, unknown>[]}
@@ -228,7 +225,7 @@ export default function WarehouseAnalyticsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h2 className="font-semibold text-slate-900">{fr ? "Lots récents" : "Recent batches"}</h2>
-            <NavLinkButton href={ops("/dispatch")}>{t("viewAll")}</NavLinkButton>
+            <NavLinkButton href={ops("/batch-builder")}>{t("viewAll")}</NavLinkButton>
           </CardHeader>
           <CardContent className="p-0">
             {batchesQ.error ? (
@@ -237,7 +234,7 @@ export default function WarehouseAnalyticsPage() {
               <DataTable
                 emptyMessage={fr ? "Aucun lot pour l'instant." : "No batches yet."}
                 columns={[
-                  { key: "reference", label: fr ? "Lot" : "Batch", render: (row) => <Link href={ops(`/dispatch/${row.id}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.reference)}</Link> },
+                  { key: "reference", label: fr ? "Lot" : "Batch", render: (row) => <span className="font-medium text-slate-900">{String(row.reference)}</span> },
                   { key: "parcels", label: fr ? "Colis" : "Parcels" },
                   { key: "riderName", label: fr ? "Livreur" : "Rider", render: (row) => String(row.riderName ?? "—") },
                   { key: "createdAt", label: fr ? "Créé le" : "Created", render: (row) => shortDate(String(row.createdAt), locale) },
@@ -298,20 +295,18 @@ export default function WarehouseAnalyticsPage() {
       <Card>
         <CardHeader>
           <h2 className="font-semibold text-slate-900">{fr ? "En direct maintenant" : "Live right now"}</h2>
-          <p className="text-xs text-slate-500">{fr ? "Étape actuelle de chaque colis" : "Current stage of every parcel"}</p>
+          <p className="text-xs text-slate-500">{fr ? "Statut actuel de chaque trajet" : "Current status of every leg"}</p>
         </CardHeader>
         <CardContent>
           <InfoGrid
             columns={4}
             items={[
-              { label: fr ? "Entrants" : "Inbound", value: stats.inbound },
-              { label: fr ? "Reçus" : "Received", value: stats.received },
-              { label: fr ? "Tri" : "Sorting", value: stats.sorting },
-              { label: fr ? "Prêts" : "Ready", value: stats.ready },
-              { label: fr ? "Expédiés" : "Dispatched", value: stats.dispatched },
-              { label: fr ? "Livrés" : "Delivered", value: stats.delivered },
-              { label: fr ? "Exceptions" : "Exceptions", value: stats.exception },
-              { label: fr ? "Ouverts > 24 h" : "Open > 24 h", value: stats.aged24h },
+              ...(["unassigned", "assigned", "picked_up", "in_transit", "delivered", "failed"] as const).map((st) => ({
+                label: pickL(LEG_STATUS[st], fr),
+                value: an?.byStatus?.[st] ?? 0,
+              })),
+              { label: fr ? "Ouverts > 24 h" : "Open > 24 h", value: an?.agedOver24h ?? 0 },
+              { label: fr ? "Ouverts (liste)" : "Open (list)", value: parcels.filter(isOpenLeg).length },
             ]}
           />
         </CardContent>
@@ -319,8 +314,8 @@ export default function WarehouseAnalyticsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { href: "/inbound", label: fr ? "Réception" : "Inbound", icon: Package },
-          { href: "/dispatch", label: fr ? "Expédition" : "Dispatch", icon: Send },
+          { href: "/desk", label: fr ? "Bureau" : "Desk", icon: Package },
+          { href: "/batch-builder", label: fr ? "Lots" : "Batches", icon: Send },
           { href: "/returns", label: fr ? "Retours" : "Returns", icon: RotateCcw },
           { href: "/exceptions", label: fr ? "Exceptions" : "Exceptions", icon: AlertTriangle },
         ].map((link) => (

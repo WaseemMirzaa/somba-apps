@@ -9,17 +9,21 @@ import {
   Order,
   OrderItem,
   Payment,
+  PaymentRefund,
   Payout,
   Product,
   ProductView,
   Review,
   Seller,
+  TransferRun,
   User,
   WarehouseBatch,
 } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
 import { CategoriesService } from '../catalog/categories.service';
 import { ProductsService } from '../products/products.service';
+import { GeoService } from '../geo/geo.service';
+import { financeVersion } from '../finance/finance-version';
 import {
   AdminAlert,
   clampDays,
@@ -73,6 +77,7 @@ export class AnalyticsService {
     private readonly settings: SettingsService,
     private readonly categoriesSvc: CategoriesService,
     private readonly productsSvc: ProductsService,
+    private readonly geo?: GeoService,
   ) {}
 
   // ── dialect helpers ────────────────────────────────────────────────────────
@@ -146,7 +151,9 @@ export class AnalyticsService {
       this.payments
         .createQueryBuilder('p')
         .select("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'revenue')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
+        // C-refund: refunds come from the ledger (the same figure as the finance overview), not from `refunded` payments:
+        // a return or a partial refund leaves the payment `succeeded`.
+        .addSelect(`(SELECT COALESCE(SUM(r.amountUsd), 0) FROM payment_refunds r)`, 'refunds')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'plan' THEN p.amountUsd ELSE 0 END), 0)", 'plans')
         .getRawOne<Record<string, string>>(),
       this.gmvByCategory(),
@@ -243,7 +250,9 @@ export class AnalyticsService {
       this.payouts.count({ where: { status: 'requested' } }),
       this.products
         .createQueryBuilder('p')
-        .where("p.status = 'live' AND p.stock > 0 AND p.stock < :low", { low: LOW_STOCK_BELOW })
+        // Each store sets its own line (default 10, `sellers.lowStockThreshold`); a store with none uses the default.
+        .leftJoin(Seller, 'ls', 'ls.id = p.sellerId')
+        .where("p.status = 'live' AND p.stock > 0 AND p.stock <= COALESCE(ls.lowStockThreshold, :low)", { low: LOW_STOCK_BELOW })
         .getCount(),
       this.products.count({ where: { status: 'live', stock: 0 } }),
       this.products.count({ where: { status: 'pending' } }),
@@ -257,7 +266,7 @@ export class AnalyticsService {
       a('open_disputes', disputes >= 10 ? 'critical' : 'warning', disputes, `${disputes} open dispute${s(disputes)} / return${s(disputes)} to resolve`, `${disputes} litige${s(disputes)} / retour${s(disputes)} à traiter`),
       a('payout_requests', 'warning', payoutReqs, `${payoutReqs} seller payout${s(payoutReqs)} waiting for finance`, `${payoutReqs} paiement${s(payoutReqs)} vendeur en attente de la finance`),
       a('out_of_stock', 'warning', outOfStock, `${outOfStock} live product${s(outOfStock)} out of stock`, `${outOfStock} produit${s(outOfStock)} en ligne en rupture de stock`),
-      a('low_stock', 'info', lowStock, `${lowStock} live product${s(lowStock)} with fewer than ${LOW_STOCK_BELOW} units left`, `${lowStock} produit${s(lowStock)} en ligne avec moins de ${LOW_STOCK_BELOW} unités`),
+      a('low_stock', 'info', lowStock, `${lowStock} live product${s(lowStock)} at or below the store's low-stock alert`, `${lowStock} produit${s(lowStock)} en ligne au niveau ou sous le seuil d’alerte de la boutique`),
       a('products_pending_moderation', 'info', pendingProducts, `${pendingProducts} product${s(pendingProducts)} awaiting moderation`, `${pendingProducts} produit${s(pendingProducts)} en attente de modération`),
       a('sellers_pending', 'info', pendingSellers, `${pendingSellers} seller application${s(pendingSellers)} to review`, `${pendingSellers} demande${s(pendingSellers)} vendeur à examiner`),
     ]);
@@ -299,7 +308,7 @@ export class AnalyticsService {
     const { keys, from } = lastDays(30);
     const commissionPct = await this.commissionPct();
 
-    const [orderAgg, payAgg, payoutRows, seriesGmv, seriesPay, receivableRows, codRow, wallets] = await Promise.all([
+    const [orderAgg, payAgg, refundAgg, payoutRows, seriesGmv, seriesPay, seriesRefunds, receivableRows, codRow, wallets] = await Promise.all([
       // Merchandise value of delivered vs still-open orders (the commission base: item prices, no delivery fee).
       this.orders
         .createQueryBuilder('o')
@@ -310,9 +319,14 @@ export class AnalyticsService {
       this.payments
         .createQueryBuilder('p')
         .select("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'collected')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN 1 ELSE 0 END), 0)", 'refundCount')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'plan' THEN p.amountUsd ELSE 0 END), 0)", 'plans')
+        .getRawOne<Record<string, string>>(),
+      // C-refund: refunds are what the ledger recorded, whatever path made them (a return's refund leaves the payment `succeeded`).
+      this.ds
+        .getRepository(PaymentRefund)
+        .createQueryBuilder('r')
+        .select('COALESCE(SUM(r.amountUsd), 0)', 'refunds')
+        .addSelect('COUNT(DISTINCT r.paymentId)', 'refundCount')
         .getRawOne<Record<string, string>>(),
       this.payouts
         .createQueryBuilder('x')
@@ -333,10 +347,17 @@ export class AnalyticsService {
         .createQueryBuilder('p')
         .select(AnalyticsService.day('p.createdAt'), 'day')
         .addSelect("COALESCE(SUM(CASE WHEN p.status = 'succeeded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'revenue')
-        .addSelect("COALESCE(SUM(CASE WHEN p.status = 'refunded' AND p.purpose = 'order' THEN p.amountUsd ELSE 0 END), 0)", 'refunds')
         .where('p.createdAt > :from', { from })
         .groupBy('day')
-        .getRawMany<{ day: string; revenue: string; refunds: string }>(),
+        .getRawMany<{ day: string; revenue: string }>(),
+      this.ds
+        .getRepository(PaymentRefund)
+        .createQueryBuilder('r')
+        .select(AnalyticsService.day('r.createdAt'), 'day')
+        .addSelect('COALESCE(SUM(r.amountUsd), 0)', 'refunds')
+        .where('r.createdAt > :from', { from })
+        .groupBy('day')
+        .getRawMany<{ day: string; refunds: string }>(),
       // Mobile-money charges waiting for the subscriber / for finance to confirm.
       this.payments
         .createQueryBuilder('p')
@@ -373,7 +394,8 @@ export class AnalyticsService {
       keys,
       mergeByDay([
         seriesGmv.map((r) => ({ day: r.day, gmv: n(r.gmv), orders: n(r.orders) })),
-        seriesPay.map((r) => ({ day: r.day, revenue: n(r.revenue), refunds: n(r.refunds) })),
+        seriesPay.map((r) => ({ day: r.day, revenue: n(r.revenue) })),
+        seriesRefunds.map((r) => ({ day: r.day, refunds: n(r.refunds) })),
       ]),
       { gmv: 0, orders: 0, revenue: 0, refunds: 0 },
     );
@@ -388,8 +410,8 @@ export class AnalyticsService {
       commissionEarnedUsd: base.delivered,
       commissionExpectedUsd: base.open,
       subscriptionRevenueUsd: round2(n(payAgg?.plans)),
-      refundsUsd: round2(n(payAgg?.refunds)),
-      refundsCount: n(payAgg?.refundCount),
+      refundsUsd: round2(n(refundAgg?.refunds)),
+      refundsCount: n(refundAgg?.refundCount),
       payouts: {
         paidUsd: round2(n(payoutBy('paid')?.amount)),
         paidCount: n(payoutBy('paid')?.n),
@@ -408,103 +430,126 @@ export class AnalyticsService {
       codOutstandingCount: n(codRow?.n),
       walletLiabilityUsd: round2(n(wallets?.total)),
       series30: series,
+      // Changes whenever an order, payment or payout does: lets a screen that refreshes on status changes skip a no-op.
+      ...(await financeVersion(this.ds.manager)),
       // Mobile-money fees are not recorded by the platform, so no fee total is reported.
     };
   }
 
   // ── warehouse ──────────────────────────────────────────────────────────────
-  async warehouseStats() {
+  /** Warehouse figures; with `hubId` only the tasks that warehouse manages, sends or receives. */
+  async warehouseStats(hubId?: string | null) {
     const week = lastDays(7);
+    const scope = <T extends { andWhere: (c: string, p?: Record<string, unknown>) => T }>(qb: T, alias = 't'): T =>
+      hubId ? qb.andWhere(`(${alias}.hubId = :scopeHub OR ${alias}.fromHubId = :scopeHub OR ${alias}.toHubId = :scopeHub)`, { scopeHub: hubId }) : qb;
     const d30 = new Date(startOfUtcDay(new Date()).getTime() - 29 * 86_400_000 - 1);
     const delivered = 'COALESCE(t.deliveredAt, t.updatedAt)';
 
-    const [statusRows, received, deliveredRows, pickedUp, timing, window30, zones, hubRows, aged] = await Promise.all([
-      this.deliveries
-        .createQueryBuilder('t')
+    const [statusRows, received, deliveredRows, pickedUp, timing, window30, perHub, hubRows, aged, perArea] = await Promise.all([
+      scope(this.deliveries.createQueryBuilder('t'))
         .select('t.status', 'status')
+        .addSelect('t.kind', 'kind')
         .addSelect('COUNT(*)', 'n')
         .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'cod')
         .groupBy('t.status')
-        .getRawMany<{ status: string; n: string; cod: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
+        .addGroupBy('t.kind')
+        .getRawMany<{ status: string; kind: string; n: string; cod: string }>(),
+      scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day('t.receivedAt'), 'day')
         .addSelect('COUNT(*)', 'received')
-        .where('t.receivedAt IS NOT NULL AND t.receivedAt > :from', { from: week.from })
+        .andWhere('t.receivedAt IS NOT NULL AND t.receivedAt > :from', { from: week.from })
         .groupBy('day')
         .getRawMany<{ day: string; received: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
+      scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day(delivered), 'day')
         .addSelect('COUNT(*)', 'delivered')
-        .where(`t.status = 'delivered' AND ${delivered} > :from`, { from: week.from })
+        .andWhere(`t.status = 'delivered' AND t.kind = 'delivery' AND ${delivered} > :from`, { from: week.from })
         .groupBy('day')
         .getRawMany<{ day: string; delivered: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
+      scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day('t.pickedUpAt'), 'day')
         .addSelect('COUNT(*)', 'pickedUp')
-        .where('t.pickedUpAt IS NOT NULL AND t.pickedUpAt > :from', { from: week.from })
+        .andWhere("t.kind = 'delivery' AND t.pickedUpAt IS NOT NULL AND t.pickedUpAt > :from", { from: week.from })
         .groupBy('day')
         .getRawMany<{ day: string; pickedUp: string }>(),
       // Only parcels with both stamps (recorded since this feature shipped) count towards the average.
-      this.deliveries
-        .createQueryBuilder('t')
+      scope(this.deliveries.createQueryBuilder('t'))
         .select(`AVG(${this.hoursBetween('t.deliveredAt', 't.pickedUpAt')}) * 60`, 'minutes')
         .addSelect('COUNT(*)', 'samples')
-        .where("t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL AND t.deliveredAt > :d30", { d30 })
+        .andWhere("t.kind = 'delivery' AND t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL AND t.deliveredAt > :d30", { d30 })
         .getRawOne<{ minutes: string | null; samples: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
+      scope(this.deliveries.createQueryBuilder('t'))
         .select("COALESCE(SUM(CASE WHEN t.status = 'delivered' THEN 1 ELSE 0 END), 0)", 'delivered')
         .addSelect("COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0)", 'failed')
-        .where('t.createdAt > :d30', { d30 })
+        .andWhere("t.kind = 'delivery' AND t.createdAt > :d30", { d30 })
         .getRawOne<{ delivered: string; failed: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
-        .select("COALESCE(t.zoneId, 'unknown')", 'zoneId')
+      scope(this.deliveries.createQueryBuilder('t'))
+        .select("COALESCE(t.hubId, 'unknown')", 'hubId')
         .addSelect('COUNT(*)', 'parcels')
         .addSelect("COALESCE(SUM(CASE WHEN t.status = 'delivered' THEN 1 ELSE 0 END), 0)", 'delivered')
         .addSelect("COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0)", 'failed')
-        .where('t.createdAt > :d30', { d30 })
-        .groupBy('zoneId')
+        .andWhere('t.createdAt > :d30', { d30 })
+        .groupBy('t.hubId')
         .orderBy('parcels', 'DESC')
         .limit(30)
-        .getRawMany<{ zoneId: string; parcels: string; delivered: string; failed: string }>(),
-      this.batches
-        .createQueryBuilder('b')
+        .getRawMany<{ hubId: string; parcels: string; delivered: string; failed: string }>(),
+      (hubId ? this.batches.createQueryBuilder('b').andWhere('b.hubId = :scopeHub', { scopeHub: hubId }) : this.batches.createQueryBuilder('b'))
         .leftJoin(Hub, 'h', 'h.id = b.hubId')
         .select('b.hubId', 'hubId')
         .addSelect('MAX(h.name)', 'hub')
         .addSelect('COUNT(*)', 'batches')
-        .where('b.createdAt > :d30', { d30 })
+        .andWhere('b.createdAt > :d30', { d30 })
         .groupBy('b.hubId')
         .getRawMany<{ hubId: string | null; hub: string | null; batches: string }>(),
-      this.deliveries
-        .createQueryBuilder('t')
-        .where("t.status NOT IN ('delivered','failed') AND t.createdAt < :c", { c: new Date(Date.now() - 24 * 3_600_000) })
+      scope(this.deliveries.createQueryBuilder('t'))
+        .andWhere("t.status NOT IN ('delivered','failed') AND t.createdAt < :c", { c: new Date(Date.now() - 24 * 3_600_000) })
         .getCount(),
+      // Customer deliveries by the area of the order's address (rolled up to communes below).
+      scope(this.deliveries.createQueryBuilder('t'))
+        .innerJoin(Order, 'o', 'o.id = t.orderId')
+        .select('o.destinationAreaId', 'areaId')
+        .addSelect('COUNT(DISTINCT t.orderId)', 'orders')
+        .addSelect("COALESCE(SUM(CASE WHEN t.status = 'delivered' THEN 1 ELSE 0 END), 0)", 'delivered')
+        .addSelect("COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0)", 'failed')
+        .addSelect(
+          `AVG(CASE WHEN t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL THEN ${this.hoursBetween('t.deliveredAt', 't.pickedUpAt')} * 60 END)`,
+          'minutes',
+        )
+        .andWhere("t.kind = 'delivery' AND t.createdAt > :d30", { d30 })
+        .groupBy('o.destinationAreaId')
+        .getRawMany<{ areaId: string | null; orders: string; delivered: string; failed: string; minutes: string | null }>(),
     ]);
 
     const by: Record<string, number> = {};
+    const byKind: Record<string, number> = {};
     let total = 0;
     let cod = 0;
+    let deliveredParcels = 0;
     for (const r of statusRows) {
-      by[r.status] = n(r.n);
+      by[r.status] = (by[r.status] ?? 0) + n(r.n);
       total += n(r.n);
-      if (r.status !== 'delivered' && r.status !== 'failed') cod += n(r.cod);
+      const open = r.status !== 'delivered' && r.status !== 'failed';
+      if (open) {
+        cod += n(r.cod);
+        byKind[r.kind ?? 'delivery'] = (byKind[r.kind ?? 'delivery'] ?? 0) + n(r.n);
+      }
+      if (r.status === 'delivered' && (r.kind ?? 'delivery') === 'delivery') deliveredParcels += n(r.n);
     }
     const done = n(window30?.delivered);
     const failed = n(window30?.failed);
     const samples = n(timing?.samples);
     return {
       // — existing fields —
+      // Every task (leg) counts: a two-seller order is two pickups, maybe a transfer, and one delivery.
       totalParcels: total,
       unassigned: by['unassigned'] ?? 0,
       inTransit: by['in_transit'] ?? 0,
-      delivered: by['delivered'] ?? 0,
+      // Customer deliveries completed; `byStatus` counts every leg (a pickup scanned in is "delivered" at its warehouse).
+      delivered: deliveredParcels,
       codToCollect: round2(cod),
       byStatus: by,
+      // Legs still open, by kind (pickup, transfer, delivery, return_*, replacement_delivery).
+      byKind,
       // — additions —
       throughput: fillDays(
         week.keys,
@@ -521,10 +566,109 @@ export class AnalyticsService {
       failed30: failed,
       delivered30: done,
       agedOver24h: aged,
-      byZone: zones.map((z) => ({ zoneId: z.zoneId, parcels: n(z.parcels), delivered: n(z.delivered), failed: n(z.failed) })),
-      // Parcels are not tied to a hub in the data; what is real per hub is the dispatch batches built there.
-      byHub: hubRows.map((h) => ({ hubId: h.hubId, hub: h.hub ?? 'Unassigned', batches30: n(h.batches) })),
+      // Parcels (tasks) per managing warehouse over the last 30 days, with the dispatch batches built there.
+      byHub: await this.byHub(hubId, perHub, hubRows),
+      // Customer deliveries per commune (a quartier counts in its commune, a city-level address in its city) over 30 days:
+      // orders, delivered, failed, failure rate, average pickup-to-delivery minutes, and the warehouse that serves it now.
+      byCommune: await this.byCommune(perArea),
+      // Transfer runs over the last 30 days: per lane (sending -> receiving warehouse) runs, parcels, average transit and missing parcels.
+      runs: await this.runStats(hubId, d30),
     };
+  }
+
+  private async runStats(hubId: string | null | undefined, since: Date) {
+    const repo = this.ds.getRepository(TransferRun);
+    const qb = repo.createQueryBuilder('r').where('r.createdAt > :since', { since });
+    if (hubId) qb.andWhere('(r.fromHubId = :h OR r.toHubId = :h)', { h: hubId });
+    const runs = await qb.getMany();
+    if (!runs.length) return { total: 0, byLane: [] as unknown[] };
+    const counts = await this.deliveries
+      .createQueryBuilder('t')
+      .select('t.runId', 'runId')
+      .addSelect('COUNT(*)', 'parcels')
+      .addSelect("COALESCE(SUM(CASE WHEN t.status = 'failed' AND t.failureReason LIKE 'Parcel missing%' THEN 1 ELSE 0 END), 0)", 'missing')
+      .where('t.runId IN (:...ids)', { ids: runs.map((r) => r.id) })
+      .groupBy('t.runId')
+      .getRawMany<{ runId: string; parcels: string; missing: string }>();
+    const byRun = new Map(counts.map((c) => [c.runId, c]));
+    const names = new Map((await this.hubs.find()).map((h) => [h.id, h.name]));
+    const lanes = new Map<string, { fromHubId: string; from: string; toHubId: string; to: string; runs: number; parcels: number; missing: number; minutes: number[] }>();
+    for (const r of runs) {
+      const key = `${r.fromHubId}>${r.toHubId}`;
+      const lane = lanes.get(key) ?? { fromHubId: r.fromHubId, from: names.get(r.fromHubId) ?? r.fromHubId, toHubId: r.toHubId, to: names.get(r.toHubId) ?? r.toHubId, runs: 0, parcels: 0, missing: 0, minutes: [] };
+      lane.runs++;
+      lane.parcels += n(byRun.get(r.id)?.parcels);
+      lane.missing += n(byRun.get(r.id)?.missing);
+      if (r.dispatchedAt && r.arrivedAt) lane.minutes.push((new Date(r.arrivedAt).getTime() - new Date(r.dispatchedAt).getTime()) / 60_000);
+      lanes.set(key, lane);
+    }
+    return {
+      total: runs.length,
+      byLane: [...lanes.values()].map(({ minutes, ...l }) => ({ ...l, parcelsPerRun: l.runs ? round1(l.parcels / l.runs) : 0, avgTransitMinutes: minutes.length ? Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length) : null })),
+    };
+  }
+
+  private async byCommune(rows: { areaId: string | null; orders: string; delivered: string; failed: string; minutes: string | null }[]) {
+    if (!this.geo) return [];
+    const ix = await this.geo.index();
+    const out = new Map<string, { areaId: string | null; area: string; areaEn: string | null; level: string | null; hubId: string | null; hub: string | null; orders: number; delivered: number; failed: number; minutesSum: number; minutesN: number }>();
+    for (const r of rows) {
+      const area = r.areaId ? ix.get(r.areaId) : null;
+      // Roll a quartier up into its commune; otherwise the area itself.
+      const shown = area ? (ix.ancestorAt(area.id, 'commune') ?? area) : null;
+      const key = shown?.id ?? 'unknown';
+      const row = out.get(key) ?? { areaId: shown?.id ?? null, area: shown?.name ?? 'Unknown area', areaEn: shown?.nameEn ?? shown?.name ?? null, level: shown?.level ?? null, hubId: null, hub: null, orders: 0, delivered: 0, failed: 0, minutesSum: 0, minutesN: 0 };
+      row.orders += n(r.orders);
+      row.delivered += n(r.delivered);
+      row.failed += n(r.failed);
+      if (r.minutes != null) {
+        row.minutesSum += n(r.minutes) * Math.max(1, n(r.delivered));
+        row.minutesN += Math.max(1, n(r.delivered));
+      }
+      out.set(key, row);
+    }
+    const cov = await this.geo.coveringMany([...out.values()].map((r) => r.areaId).filter((x): x is string => !!x));
+    return [...out.values()]
+      .map((r) => {
+        const c = r.areaId ? cov.get(r.areaId) : null;
+        return {
+          areaId: r.areaId,
+          area: r.area,
+          areaEn: r.areaEn,
+          level: r.level,
+          hubId: c?.hubId ?? null,
+          hub: c?.hubName ?? null,
+          orders: r.orders,
+          delivered: r.delivered,
+          failed: r.failed,
+          failureRatePct: pct(r.failed, r.delivered + r.failed),
+          avgDeliveryMinutes: r.minutesN > 0 ? Math.round(r.minutesSum / r.minutesN) : null,
+        };
+      })
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 60);
+  }
+
+  /** Per-warehouse rows: parcels / delivered / failed (30 days) joined with the warehouse name and its batches. */
+  private async byHub(
+    hubId: string | null | undefined,
+    perHub: { hubId: string; parcels: string; delivered: string; failed: string }[],
+    batchRows: { hubId: string | null; hub: string | null; batches: string }[],
+  ) {
+    const hubs = new Map((await this.hubs.find()).map((h) => [h.id, h.name]));
+    const rows = new Map<string, { hubId: string | null; hub: string; parcels: number; delivered: number; failed: number; batches30: number }>();
+    for (const r of perHub) {
+      if (hubId && r.hubId !== hubId) continue; // a warehouse's figures list that warehouse only
+      const id = r.hubId === 'unknown' ? null : r.hubId;
+      rows.set(r.hubId, { hubId: id, hub: id ? (hubs.get(id) ?? id) : 'Unassigned', parcels: n(r.parcels), delivered: n(r.delivered), failed: n(r.failed), batches30: 0 });
+    }
+    for (const b of batchRows) {
+      const key = b.hubId ?? 'unknown';
+      const row = rows.get(key) ?? { hubId: b.hubId, hub: b.hub ?? 'Unassigned', parcels: 0, delivered: 0, failed: 0, batches30: 0 };
+      row.batches30 = n(b.batches);
+      rows.set(key, row);
+    }
+    return [...rows.values()];
   }
 
   // ── seller ─────────────────────────────────────────────────────────────────

@@ -30,6 +30,29 @@ export default function SellerStorefrontPreviewPage() {
         {localized(seller, "description", fr) && (
           <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{localized(seller, "description", fr)}</p>
         )}
+        {seller?.onVacation && seller.vacationUntil && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {fr
+              ? `En vacances jusqu'au ${new Date(seller.vacationUntil).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })} : les clients ne peuvent pas commander.`
+              : `On vacation until ${new Date(seller.vacationUntil).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })}: shoppers cannot order.`}
+          </p>
+        )}
+        {(seller?.handlingDays ?? 0) > 0 && (
+          <p className="mt-2 text-xs text-slate-600">
+            {fr ? `Préparation : ${seller?.handlingDays} jour(s) avant la remise du colis.` : `Handling time: ${seller?.handlingDays} day(s) before the parcel is handed over.`}
+          </p>
+        )}
+        {(["returnsPolicy", "shippingPolicy"] as const).map((k) => {
+          const text = localized(seller, k, fr);
+          return text ? (
+            <div key={k} className="mt-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                {k === "returnsPolicy" ? (fr ? "Politique de retour" : "Returns policy") : fr ? "Politique d'expédition" : "Shipping policy"}
+              </h3>
+              <p className="whitespace-pre-line text-sm text-slate-700">{text}</p>
+            </div>
+          ) : null;
+        })}
         {hidden > 0 && (
           <p className="mt-2 text-xs text-amber-700">
             {fr ? `${hidden} produit(s) non visible(s) par les clients (en attente, en pause ou refusés).` : `${hidden} product(s) are not visible to shoppers (pending, paused or rejected).`}

@@ -21,6 +21,10 @@ export interface ShopProduct {
   rating: number;
   reviews: number;
   image: string;
+  /** The whole gallery, cover first (always at least the cover when there is one). */
+  images: string[];
+  sku: string | null;
+  brand: string | null;
   category: string;
   categoryFr: string;
   /** The category row (filters compare ids: renaming or translating a category never moves its products). */
@@ -34,9 +38,17 @@ export interface ShopProduct {
   /** The stored listing price (before any flash sale / campaign). */
   basePrice: number;
   campaignPct: number;
+  campaignId: string | null;
   campaignName: string | null;
   campaignNameFr: string | null;
   priceSource: "base" | "flash" | "campaign";
+  /** The store is away: no new orders until it is back. */
+  sellerOnVacation: boolean;
+  sellerVacationUntil: string | null;
+  sellerVacationNotice: { en: string; fr: string } | null;
+  /** `deliveryDays` plus the store's handling time. */
+  totalDeliveryDays: number;
+  sellerHandlingDays: number;
   /** Options the shopper must choose (empty = none). These labels are the purchase keys. */
   variants: VariantGroup[];
   /** Display labels of the options per language (null = show the canonical labels). */
@@ -100,6 +112,9 @@ export function toShopProduct(p: Product): ShopProduct {
     rating: p.rating ?? 0,
     reviews: p.reviewsCount ?? 0,
     image: p.image ?? "",
+    images: Array.isArray(p.images) && p.images.length ? p.images : p.image ? [p.image] : [],
+    sku: p.sku ?? null,
+    brand: p.brand ?? null,
     category: p.category,
     categoryFr: pickText(true, p.category, p.categoryFr),
     categoryId: p.categoryId ?? null,
@@ -111,9 +126,15 @@ export function toShopProduct(p: Product): ShopProduct {
     descriptionFr: pickText(true, p.description, p.descriptionFr),
     basePrice: p.basePrice ?? p.price,
     campaignPct: p.campaignPct ?? 0,
+    campaignId: p.campaignId ?? null,
     campaignName: p.campaignName ?? null,
     campaignNameFr: p.campaignNameFr ?? null,
     priceSource: p.priceSource ?? "base",
+    sellerOnVacation: !!p.sellerOnVacation,
+    sellerVacationUntil: p.sellerVacationUntil ?? null,
+    sellerVacationNotice: p.sellerVacationNotice ?? null,
+    totalDeliveryDays: p.totalDeliveryDays ?? p.deliveryDays ?? 3,
+    sellerHandlingDays: p.sellerHandlingDays ?? 0,
     variants: readVariants(p.variants),
     variantLabels: readVariantLabels(p.variantLabels),
     sourceLang: p.sourceLang === "fr" ? "fr" : "en",
@@ -184,9 +205,18 @@ export function productDetailFrom(p: ShopProduct) {
     discount: p.discount,
     basePrice: p.basePrice,
     campaignPct: p.campaignPct,
+    campaignId: p.campaignId,
     campaignName: p.campaignName,
     campaignNameFr: p.campaignNameFr,
     priceSource: p.priceSource,
+    sellerOnVacation: p.sellerOnVacation,
+    sellerVacationUntil: p.sellerVacationUntil,
+    sellerVacationNotice: p.sellerVacationNotice,
+    totalDeliveryDays: p.totalDeliveryDays,
+    sellerHandlingDays: p.sellerHandlingDays,
+    sku: p.sku,
+    brand: p.brand,
+    images: p.images,
     rating: p.rating,
     reviews: p.reviews,
     stock: p.stock,

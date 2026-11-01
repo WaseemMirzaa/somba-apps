@@ -12,6 +12,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { hubId } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const NEW_PW = 'P0-Pass-2026';
@@ -60,7 +61,7 @@ const register = async (label, role = 'customer') => {
 const staffLogin = async (admin, email, envPw, role) => {
   try { return await login(email, envPw ?? PW); } catch {}
   const fresh = `${role.replace('_', '')}${tag}@smoke.test`;
-  const r = await req(admin.sock, 'roles:createStaff', { email: fresh, name: `Smoke ${role}`, role });
+  const r = await req(admin.sock, 'roles:createStaff', { email: fresh, name: `Smoke ${role}`, role, hubId: await hubId(admin) });
   if (!r.ok) throw new Error(`could not sign in ${email} nor create a ${role}: ${r.error}`);
   console.log(`  (${email} not usable here: using a fresh ${role} ${fresh})`);
   return login(fresh, r.data.tempPassword);
@@ -112,7 +113,7 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 
     const stockOf = async (id) => (await req(cust.sock, 'products:get', { id })).data.stock;
     const wallet = async () => (await req(cust.sock, 'wallet:get')).data.balance;
-    const order = async (items, extra = {}) => req(cust.sock, 'orders:create', { items, paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS, ...extra });
+    const order = async (items, extra = {}) => req(cust.sock, 'orders:create', { items, paymentMethod: 'stripe_card', shippingAddress: ADDRESS, ...extra });
     const view = async (id) => (await req(cust.sock, 'orders:list')).data.find((o) => o.id === id);
     const taskOf = (id) => until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === id));
     const taskNow = async (id) => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === id);
@@ -204,8 +205,8 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
       a = await order([{ productId: prodA.id, qty: 1 }]);
       const o3 = a.data;
       const t3 = await taskOf(o3.id);
-      a = await req(rider.sock, 'delivery:accept', { taskId: t3.id });
-      ok(a.ok && (await view(o3.id)).status === 'processing', 'setup: a rider accepted the delivery (processing)', a.error ?? '');
+      a = await req(ops.sock, 'logistics:assign', { taskId: t3.id, riderId: rider.user.id });
+      ok(a.ok && (await view(o3.id)).status === 'processing', 'setup: a rider was given the pickup (processing)', a.error ?? '');
       a = await req(ops.sock, 'orders:adminCancel', { orderId: o3.id, reason: 'Wrong address given' });
       ok(a.ok && a.data.status === 'cancelled', 'cancel works while the rider has NOT collected the parcel', a.error ?? '');
       ok((await taskNow(o3.id))?.status === 'failed', '…and the rider\'s task is voided');
@@ -213,13 +214,13 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
       a = await order([{ productId: prodA.id, qty: 1 }]);
       const o4 = a.data;
       const t4 = await taskOf(o4.id);
-      await req(rider.sock, 'delivery:accept', { taskId: t4.id });
+      await req(ops.sock, 'logistics:assign', { taskId: t4.id, riderId: rider.user.id });
       a = await req(rider.sock, 'delivery:updateStatus', { taskId: t4.id, status: 'picked_up' });
       ok(a.ok, 'setup: the rider collected the parcel', a.error ?? '');
       a = await req(ops.sock, 'orders:adminCancel', { orderId: o4.id, reason: 'Too late now' });
       ok(!a.ok && /no longer be cancelled/.test(a.error ?? ''), 'cancel is refused once the rider has collected it', a.error);
       // a hand delivery also closes a task that a rider already holds
-      a = await walk(ops, o4.id, ['out_for_delivery', 'delivered']);
+      a = await walk(ops, o4.id, ['shipped', 'out_for_delivery', 'delivered']);
       ok(a.ok && (await taskNow(o4.id))?.status === 'delivered', 'delivering by hand closes a rider-held task too', a.error ?? '');
     } else {
       ok(false, 'rider login (set RIDER_PW) — rider-collected checks skipped');
@@ -425,11 +426,11 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 
     // =======================================================================
     section('8. A seller cannot buy their own listing');
-    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS });
+    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
     ok(!a.ok && a.error === 'You cannot buy your own listing.', 'seller A is refused their own product', a.error ?? 'order was created');
-    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodB.id, qty: 1 }, { productId: prodA.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS });
+    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodB.id, qty: 1 }, { productId: prodA.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
     ok(!a.ok && a.error === 'You cannot buy your own listing.', 'a mixed cart containing their own listing is refused whole', a.error ?? 'order was created');
-    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodB.id, qty: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: ADDRESS });
+    a = await req(shopA.sock, 'orders:create', { items: [{ productId: prodB.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
     ok(a.ok, 'but they can buy another seller\'s product', a.error ?? '');
     if (a.ok) await req(shopA.sock, 'orders:cancel', { orderId: a.data.id });
 

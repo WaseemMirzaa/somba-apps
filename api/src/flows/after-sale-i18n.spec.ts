@@ -18,6 +18,9 @@ let exchanges: ExchangesService;
 
 const notifications = { toRole: async () => undefined, toUser: async () => undefined, toUsers: async () => undefined };
 const admin = { id: 'a1', name: 'Admin', role: 'admin' };
+const settings = { get: async () => null };
+const wallet = { apply: async () => undefined };
+const logistics = { returnPickup: async () => null, replacementDelivery: async () => null };
 
 beforeEach(async () => {
   ds = await testDb();
@@ -43,8 +46,21 @@ beforeEach(async () => {
     emitter as never,
     products,
     names,
+    settings as never,
+    logistics as never,
   );
-  exchanges = new ExchangesService(ds.getRepository(Exchange), ds.getRepository(Order), ds.getRepository(Seller), notifications as never, emitter as never, products, names);
+  exchanges = new ExchangesService(
+    ds.getRepository(Exchange),
+    ds.getRepository(Order),
+    ds.getRepository(Seller),
+    notifications as never,
+    emitter as never,
+    products,
+    names,
+    wallet as never,
+    settings as never,
+    logistics as never,
+  );
 });
 afterEach(async () => ds.destroy());
 
@@ -66,7 +82,7 @@ const french = (entityType: 'product' | 'order_item', entityId: string, field: s
   ds.getRepository(Translation).insert({ entityType, entityId, field, locale: 'fr', value, origin: entityType === 'order_item' ? 'snapshot' : 'author', sourceLang: null, sourceHash: null });
 
 async function product(name: string, nameFr?: string) {
-  const p = await addProduct(ds, { name });
+  const p = await addProduct(ds, { name, stock: 50 });
   if (nameFr) await french('product', p.id, 'name', nameFr);
   return p;
 }

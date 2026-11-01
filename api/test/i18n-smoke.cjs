@@ -9,6 +9,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? process.env.SMOKE_API ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -238,7 +239,7 @@ const settled = async (sock, id) => until(async () => {
   void wallet;
   const placed = await req(demo.sock, 'orders:create', {
     items: [{ productId: prod.id, qty: 1, variant: 'Colour: Black · Size: XL' }],
-    paymentMethod: 'wallet', deliveryFeeUsd: 3, zoneId: 'gombe',
+    paymentMethod: 'wallet',
     shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
   });
   ok(placed.ok, 'the customer orders the product with options', placed.error);
@@ -252,6 +253,7 @@ const settled = async (sock, id) => until(async () => {
   ok(frozen.items[0].productNameFr === prod.nameFr, 'a later rename never rewrites the order (snapshot)', frozen.items[0].productNameFr);
   const sellerOrders = (await req(sellerU.sock, 'orders:list')).data.find((o) => o.id === placed.data.id);
   ok(sellerOrders?.items[0].productNameFr === prod.nameFr, "the seller's redacted order view carries it too");
+  await toDelivery(admin, rider, placed.data.id); // the warehouse gives the journey to the rider
   const tasks = (await req(rider.sock, 'rider:tasks')).data;
   const task = tasks.find((t) => t.orderId === placed.data.id) ?? tasks.find((t) => t.order?.items?.length);
   ok(task && task.order.items.every((i) => typeof i.productNameFr === 'string' && (i.variant === 'Default' ? i.variantFr === null : typeof i.variantFr === 'string')), 'rider:tasks lines carry productNameFr and variantFr (null for a product without options)', JSON.stringify(task?.order?.items?.[0]));
@@ -390,7 +392,7 @@ const settled = async (sock, id) => until(async () => {
   await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
   const plain = await settled(sellerU.sock, fr1.id);
   const airtel = await req(demo.sock, 'orders:create', {
-    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, deliveryFeeUsd: 3, zoneId: 'gombe',
+    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE,
     shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
   });
   ok(airtel.ok, 'the customer orders a product that has no options (Airtel Money)', airtel.error);
@@ -413,13 +415,16 @@ const settled = async (sock, id) => until(async () => {
   const topup = txs.find((t) => /^Wallet top-up via Orange Money$/.test(t.description));
   ok(topup && topup.descriptionFr === 'Recharge du portefeuille via Orange Money', 'the wallet line names the method ("Orange Money") in both languages', JSON.stringify(txs.slice(0, 2)));
   const cod = await req(demo.sock, 'orders:create', {
-    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'cod', deliveryFeeUsd: 3, zoneId: 'gombe',
+    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'cod',
     shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
   });
   ok(cod.ok, 'the customer places a cash-on-delivery order', cod.error);
-  const collect = await until(async () => (await req(rider.sock, 'notifications:list')).data.find((n) => n.body.includes(`${cod.data?.reference} · collect $`)), 8000);
-  const cash = cod.data ? `${String(cod.data.totalUsd.toFixed(2)).replace('.', ',')}${NBSP}$` : '';
-  ok(collect && collect.bodyFr === `${cod.data.reference} · à encaisser : ${cash} en espèces. Ouvrez l’application pour l’accepter.`, 'the rider\'s French notice says "à encaisser : NN,NN $ en espèces"', JSON.stringify(collect));
+  await toDelivery(admin, rider, cod.data.id); // the warehouse gives the pickup, then the delivery, to the rider
+  const taskNotes = await until(async () => {
+    const all = (await req(rider.sock, 'notifications:list')).data.filter((n) => n.title === 'New task assigned to you' && n.body.startsWith(`${cod.data.reference}:`));
+    return all.length >= 2 ? all : null;
+  }, 8000);
+  ok(taskNotes && taskNotes.some((n) => n.body === `${cod.data.reference}: pickup is now in your tasks.` && n.bodyFr === `${cod.data.reference} : tâche « enlèvement » ajoutée à vos tâches.`) && taskNotes.some((n) => n.bodyFr === `${cod.data.reference} : tâche « livraison » ajoutée à vos tâches.` && n.titleFr === 'Nouvelle tâche qui vous est assignée'), "the rider's task notices come in French (\"tâche « livraison » ajoutée à vos tâches\")", JSON.stringify(taskNotes?.map((n) => n.bodyFr)));
   await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
 
   section('Replacements and exchanges carry French names');

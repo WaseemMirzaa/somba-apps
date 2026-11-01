@@ -58,6 +58,7 @@ export function useOpsQuery<T>(
 
   useEffect(() => {
     if (!enabled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     const s = socketClient.current;
     const names = pushKey ? pushKey.split("|") : [];
@@ -85,27 +86,29 @@ export interface WarehouseAnalytics {
   delivered: number;
   /** COD of parcels not delivered and not failed. */
   codToCollect: number;
+  /** Every leg by status. */
   byStatus: Record<string, number>;
-  /** Last 7 UTC days, oldest first. */
+  /** Open legs per kind (pickup, transfer, delivery, ...). */
+  byKind: Record<string, number>;
+  /** Last 7 UTC days, oldest first. `received` counts scan-ins; the rest count customer deliveries. */
   throughput: { date: string; received: number; pickedUp: number; delivered: number }[];
-  /** Average minutes rider pickup to delivery (parcels delivered in the last 30 days); null = no sample. */
+  /** Average minutes rider pickup to delivery (customer deliveries of the last 30 days); null = no sample. */
   avgPickupToDeliveryMinutes: number | null;
   pickupToDeliverySamples: number;
   failureRatePct: number | null;
   failed30: number;
   delivered30: number;
   agedOver24h: number;
-  /** Per delivery zone, last 30 days. */
-  byZone: { zoneId: string | null; parcels: number; delivered: number; failed: number }[];
-  /** Dispatch batches built per hub in the last 30 days (parcels are not assigned to hubs). */
-  byHub: { hubId: string; hub: string; batches30: number }[];
+  /** Legs managed by each warehouse (30 days); a staff member's list holds their own hub only. */
+  byHub: { hubId: string; hub: string; parcels: number; delivered: number; failed: number; batches30: number }[];
 }
 
-/** Real warehouse figures from the server (`analytics:warehouse`), refreshed when deliveries or batches change. */
-export function useWarehouseAnalytics() {
+/** Real warehouse figures from the server (`analytics:warehouse`), scoped to the hub (admins: all, or one with `hubId`). */
+export function useWarehouseAnalytics(hubId?: string) {
   return useOpsQuery<WarehouseAnalytics | null>("analytics:warehouse", {
     initial: null,
-    push: ["delivery:updated", "batch:updated"],
+    body: hubId ? { hubId } : {},
+    push: ["task:updated", "batch:updated"],
   });
 }
 
@@ -125,6 +128,7 @@ export interface WarehouseRider {
   id: string;
   name: string;
   phone: string | null;
+  hubId?: string | null;
   activeTasks: number;
 }
 
@@ -177,7 +181,16 @@ export interface ExchangeRow {
   toName: string;
   priceDiffUsd: number;
   reason: string | null;
-  status: "requested" | "approved" | "received" | "ready" | "dispatched" | "rejected";
+  status: "requested" | "approved" | "received" | "ready" | "dispatched" | "delivered" | "rejected";
+  qty?: number;
+  fromVariant?: string | null;
+  toVariant?: string | null;
+  fromNameFr?: string | null;
+  toNameFr?: string | null;
+  heldUsd?: number;
+  sellerReason?: string | null;
+  deliveryTaskId?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -192,8 +205,16 @@ export interface ReplacementRow {
   productName: string;
   reason: string | null;
   condition: string | null;
-  status: "requested" | "approved" | "received" | "allocated" | "dispatched" | "rejected";
+  status: "requested" | "approved" | "received" | "allocated" | "dispatched" | "delivered" | "rejected";
   dispatchStatus: string | null;
+  qty?: number;
+  variant?: string | null;
+  productNameFr?: string | null;
+  attachments?: string[];
+  sellerReason?: string | null;
+  deliveryTaskId?: string | null;
+  deliveredAt?: string | null;
+  disputeId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -217,8 +238,9 @@ export interface HubRow {
   country: string | null;
   address?: string | null;
   capacity: number;
-  /** Inactive hubs are listed but cannot take transfers. */
   active?: boolean;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface ReconcileRow {
@@ -249,6 +271,7 @@ export interface ReturnDispute {
   reason: string;
   status: "open" | "resolved" | "rejected";
   resolution: string | null;
+  resolutionFr?: string | null;
   receivedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -311,7 +334,8 @@ export const EXCHANGE_STATUS: Record<string, L> = {
   approved: { en: "Approved", fr: "Approuvé" },
   received: { en: "Old item received", fr: "Ancien article reçu" },
   ready: { en: "New item ready", fr: "Nouvel article prêt" },
-  dispatched: { en: "Dispatched", fr: "Expédié" },
+  dispatched: { en: "On its way", fr: "En route" },
+  delivered: { en: "Delivered", fr: "Livré" },
   rejected: { en: "Rejected", fr: "Rejeté" },
 };
 
@@ -320,7 +344,8 @@ export const REPLACEMENT_STATUS: Record<string, L> = {
   approved: { en: "Approved", fr: "Approuvé" },
   received: { en: "Faulty item received", fr: "Article défectueux reçu" },
   allocated: { en: "New unit allocated", fr: "Nouvelle unité allouée" },
-  dispatched: { en: "Dispatched", fr: "Expédié" },
+  dispatched: { en: "On its way", fr: "En route" },
+  delivered: { en: "Delivered", fr: "Livré" },
   rejected: { en: "Rejected", fr: "Rejeté" },
 };
 
@@ -347,19 +372,21 @@ export function severityVariant(s: string): "danger" | "warning" | "default" {
 /** Next steps the server accepts for a replacement (any status is allowed; these are the sensible ones). */
 export const REPLACEMENT_NEXT: Record<string, { to: string; danger?: boolean }[]> = {
   requested: [{ to: "approved" }, { to: "rejected", danger: true }],
-  approved: [{ to: "received" }, { to: "rejected", danger: true }],
+  approved: [{ to: "received" }],
   received: [{ to: "allocated" }],
-  allocated: [{ to: "dispatched" }],
+  allocated: [],
   dispatched: [],
+  delivered: [],
   rejected: [],
 };
 
 export const EXCHANGE_NEXT: Record<string, { to: string; danger?: boolean }[]> = {
   requested: [{ to: "approved" }, { to: "rejected", danger: true }],
-  approved: [{ to: "received" }, { to: "rejected", danger: true }],
+  approved: [{ to: "received" }],
   received: [{ to: "ready" }],
-  ready: [{ to: "dispatched" }],
+  ready: [],
   dispatched: [],
+  delivered: [],
   rejected: [],
 };
 

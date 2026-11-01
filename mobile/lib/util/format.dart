@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../data/market_profiles.dart';
-import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../services/realtime_store.dart';
 
@@ -33,20 +32,6 @@ double? get _fxRate {
   if (currentMarket.fxRateUsdCdf == null) return null; // user chose USD display
   return RealtimeStore.instance.fxRate ?? currentMarket.fxRateUsdCdf;
 }
-
-/// Delivery zones: the server's list (source of truth for fees), else the fallback.
-List<Zone> get activeZones => RealtimeStore.instance.zones.isNotEmpty ? RealtimeStore.instance.zones : fallbackZones;
-
-/// The customer's currently selected delivery zone (defaults to the first
-/// zone of the active market).
-Zone get selectedZone {
-  final zones = activeZones;
-  final id = ShopState.instance.selectedZoneId;
-  return zones.firstWhere((z) => z.id == id, orElse: () => zones.first);
-}
-
-/// Delivery fee (USD) for the selected zone in the active market.
-double get deliveryFeeUsd => selectedZone.deliveryFeeUsd;
 
 /// Secondary-currency line for dual display. In the DRC market prices show in
 /// CDF (primary via [money]) with the USD equivalent underneath; France is

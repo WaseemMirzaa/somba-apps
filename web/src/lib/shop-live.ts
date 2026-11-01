@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Review } from "@/lib/realtime/types";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 /** Subscribe to a server push on the CURRENT socket (re-binds after reconnect/login). */
 export function useSocketEvent<T = unknown>(event: string, handler: (payload: T) => void) {
@@ -28,14 +29,6 @@ export function useSocketEvent<T = unknown>(event: string, handler: (payload: T)
   }, [event, rt.status, rt.user?.id]);
 }
 
-export interface DeliveryZone {
-  id: string;
-  name: string;
-  nameFr?: string;
-  city: string;
-  feeUsd: number;
-}
-
 export interface PublicSettings {
   loaded: boolean;
   codEnabled: boolean;
@@ -44,8 +37,17 @@ export interface PublicSettings {
   requireDeliveryCode: boolean;
   /** Orders and wallet top-ups need a verified phone or email. */
   requireVerifiedForCheckout: boolean;
-  deliveryZones: DeliveryZone[];
-  /** Delivery windows offered at checkout ("HH:MM-HH:MM"). */
+  /** Days after delivery a return can be opened (0 = returns closed). */
+  returnWindowDays: number;
+  /** Hours a seller has to answer a return. */
+  sellerResponseHours: number;
+  /** Delivery fee rules (base + per km, capped, plus a transfer fee between warehouses). */
+  deliveryBaseUsd: number;
+  deliveryPerKmUsd: number;
+  deliveryMaxUsd: number;
+  deliveryTransferUsd: number;
+  /** An address with no map pin cannot check out. */
+  requirePinnedAddress: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -55,27 +57,21 @@ const EMPTY_SETTINGS: PublicSettings = {
   fxRate: null,
   requireDeliveryCode: false,
   requireVerifiedForCheckout: false,
-  deliveryZones: [],
+  returnWindowDays: 7,
+  sellerResponseHours: 48,
+  deliveryBaseUsd: 2,
+  deliveryPerKmUsd: 0.5,
+  deliveryMaxUsd: 15,
+  deliveryTransferUsd: 1.5,
+  requirePinnedAddress: false,
+};
+
+const num = (v: string | undefined, d: number) => {
+  const n = Number(v);
+  return v !== undefined && v !== "" && Number.isFinite(n) ? n : d;
 };
 
 function parseSettings(raw: Record<string, string>): PublicSettings {
-  let zones: DeliveryZone[] = [];
-  try {
-    const parsed = JSON.parse(raw.deliveryZones ?? "[]");
-    if (Array.isArray(parsed)) {
-      zones = parsed
-        .filter((z) => z && typeof z.id === "string")
-        .map((z) => ({
-          id: String(z.id),
-          name: String(z.name ?? z.id),
-          nameFr: z.nameFr ? String(z.nameFr) : undefined,
-          city: String(z.city ?? ""),
-          feeUsd: Number(z.feeUsd) || 0,
-        }));
-    }
-  } catch {
-    zones = [];
-  }
   return {
     loaded: true,
     codEnabled: raw.codEnabled === "true",
@@ -83,11 +79,17 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     fxRate: raw.fxRate ? Number(raw.fxRate) : null,
     requireDeliveryCode: raw.requireDeliveryCode === "true",
     requireVerifiedForCheckout: raw.requireVerifiedForCheckout === "true",
-    deliveryZones: zones,
+    returnWindowDays: num(raw.returnWindowDays, 7),
+    sellerResponseHours: num(raw.sellerResponseHours, 48),
+    deliveryBaseUsd: num(raw.deliveryBaseUsd, 2),
+    deliveryPerKmUsd: num(raw.deliveryPerKmUsd, 0.5),
+    deliveryMaxUsd: num(raw.deliveryMaxUsd, 15),
+    deliveryTransferUsd: num(raw.deliveryTransferUsd, 1.5),
+    requirePinnedAddress: raw.requirePinnedAddress === "true",
   };
 }
 
-/** Public platform settings (COD flag, delivery zones...) — live via `settings:updated`. */
+/** Public platform settings (COD flag, return window, delivery fee rules...) — live via `settings:updated`. */
 export function usePublicSettings(): PublicSettings {
   const rt = useRealtime();
   const [settings, setSettings] = useState<PublicSettings>(EMPTY_SETTINGS);
@@ -101,7 +103,7 @@ export function usePublicSettings(): PublicSettings {
         if (alive) setSettings(parseSettings(raw));
       })
       .catch(() => {
-        /* keep defaults; checkout will surface the server error if a zone is invalid */
+        /* keep defaults; checkout will surface the server's error if something is invalid */
       });
     return () => {
       alive = false;
@@ -109,27 +111,31 @@ export function usePublicSettings(): PublicSettings {
   }, [rt.status, rt.user?.id]);
 
   useSocketEvent<Record<string, string>>("settings:updated", (raw) => {
-    setSettings((cur) => parseSettings({
-      deliveryZones: raw.deliveryZones ?? JSON.stringify(cur.deliveryZones),
-      codEnabled: raw.codEnabled ?? String(cur.codEnabled),
-      codCapUsd: raw.codCapUsd ?? String(cur.codCapUsd),
-      fxRate: raw.fxRate ?? (cur.fxRate ? String(cur.fxRate) : ""),
-      requireDeliveryCode: raw.requireDeliveryCode ?? String(cur.requireDeliveryCode),
-      requireVerifiedForCheckout: raw.requireVerifiedForCheckout ?? String(cur.requireVerifiedForCheckout),
-    }));
+    setSettings((cur) => {
+      const str = (k: keyof PublicSettings) => String(cur[k] ?? "");
+      return parseSettings({
+        codEnabled: raw.codEnabled ?? str("codEnabled"),
+        codCapUsd: raw.codCapUsd ?? str("codCapUsd"),
+        fxRate: raw.fxRate ?? (cur.fxRate ? String(cur.fxRate) : ""),
+        requireDeliveryCode: raw.requireDeliveryCode ?? str("requireDeliveryCode"),
+        requireVerifiedForCheckout: raw.requireVerifiedForCheckout ?? str("requireVerifiedForCheckout"),
+        returnWindowDays: raw.returnWindowDays ?? str("returnWindowDays"),
+        sellerResponseHours: raw.sellerResponseHours ?? str("sellerResponseHours"),
+        deliveryBaseUsd: raw.deliveryBaseUsd ?? str("deliveryBaseUsd"),
+        deliveryPerKmUsd: raw.deliveryPerKmUsd ?? str("deliveryPerKmUsd"),
+        deliveryMaxUsd: raw.deliveryMaxUsd ?? str("deliveryMaxUsd"),
+        deliveryTransferUsd: raw.deliveryTransferUsd ?? str("deliveryTransferUsd"),
+        requirePinnedAddress: raw.requirePinnedAddress ?? str("requirePinnedAddress"),
+      });
+    });
   });
 
   return settings;
 }
 
-export function zoneLabel(z: DeliveryZone, fr: boolean): string {
-  return fr && z.nameFr ? z.nameFr : z.name;
-}
-
 /** The full shipping address the server stores (and the rider sees). */
 export function addressToShipping(
-  a: { label: string; line1: string; line2?: string | null; geo?: { lat: number; lng: number; placeId?: string } | null; city: string; commune?: string | null; phone?: string | null; zoneId?: string | null },
-  zoneId: string | null,
+  a: { label: string; line1: string; line2?: string | null; geo?: { lat: number; lng: number; placeId?: string } | null; city: string; commune?: string | null; region?: string | null; areaId?: string | null; phone?: string | null },
 ): string {
   return JSON.stringify({
     label: a.label,
@@ -137,8 +143,10 @@ export function addressToShipping(
     ...(a.line2 ? { line2: a.line2 } : {}),
     city: a.city,
     commune: a.commune ?? "",
+    ...(a.region ? { region: a.region } : {}),
+    // The delivery area decides the warehouse (docs/contracts/areas.md): send it with the order.
+    ...(a.areaId ? { areaId: a.areaId } : {}),
     phone: a.phone ?? "",
-    zone: zoneId ?? a.zoneId ?? "",
     // The pin travels with the order so the rider can navigate to the exact spot.
     ...(a.geo ? { geo: { lat: a.geo.lat, lng: a.geo.lng, ...(a.geo.placeId ? { placeId: a.geo.placeId } : {}) } } : {}),
   });
@@ -173,15 +181,7 @@ export function isMobileMoneyMethod(m: string): boolean {
 }
 
 export function paymentMethodName(m: string, fr: boolean): string {
-  const map: Record<string, string> = {
-    wallet: fr ? "Portefeuille Somba" : "Somba wallet",
-    cod: fr ? "Paiement à la livraison" : "Cash on delivery",
-    airtel_money: "Airtel Money",
-    orange_money: "Orange Money",
-    vodacom_mpesa: "Vodacom M-Pesa",
-    stripe_card: fr ? "Carte" : "Card",
-  };
-  return map[m] ?? m;
+  return paymentMethodLabel(m, fr);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,10 +189,14 @@ export function paymentMethodName(m: string, fr: boolean): string {
 // ---------------------------------------------------------------------------
 
 export interface SupportMessage {
+  id?: string;
   from: string;
+  fromId?: string;
   role: string;
   text: string;
   at: string;
+  /** Photos (platform upload URLs). */
+  attachments?: string[];
 }
 
 export interface SupportTicketRow {
@@ -204,6 +208,10 @@ export interface SupportTicketRow {
   status: "open" | "pending" | "resolved" | "closed";
   /** JSON array as stored by the server. */
   messages: string;
+  /** Staff messages the customer has not read yet. */
+  userUnread?: number;
+  staffUnread?: number;
+  assigneeName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

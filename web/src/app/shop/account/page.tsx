@@ -16,6 +16,7 @@ import {
   Zap,
   Wallet,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -28,12 +29,14 @@ import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { localized } from "@/lib/i18n-fields";
 import { formatCurrency } from "@/lib/utils";
-import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
+import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useSupportTickets, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
+import { useChatUnread } from "@/lib/shop-engage";
 import type { BackendUser, Payment } from "@/lib/realtime/types";
 
 const menuItems = [
   { href: "/shop/orders", icon: Package, title: { en: "My orders", fr: "Mes commandes" }, desc: { en: "Track & manage orders", fr: "Suivre et gérer les commandes" } },
-  { href: "/shop/returns", icon: RotateCcw, title: { en: "My returns", fr: "Mes retours" }, desc: { en: "Return requests and their status", fr: "Demandes de retour et leur statut" } },
+  { href: "/shop/returns", icon: RotateCcw, title: { en: "Returns & exchanges", fr: "Retours et échanges" }, desc: { en: "Returns, disputes, replacements and exchanges", fr: "Retours, litiges, remplacements et échanges" } },
+  { href: "/shop/messages", icon: MessageCircle, title: { en: "Messages", fr: "Messages" }, desc: { en: "Chat with sellers", fr: "Discuter avec les vendeurs" } },
   { href: "/shop/wishlist", icon: Heart, title: { en: "Wishlist", fr: "Liste de souhaits" }, desc: { en: "Saved items", fr: "Articles enregistrés" } },
   { href: "/shop/account/addresses", icon: MapPin, title: { en: "Addresses", fr: "Adresses" }, desc: { en: "Your delivery addresses", fr: "Vos adresses de livraison" } },
   { href: "/shop/notifications", icon: Bell, title: { en: "Notifications", fr: "Notifications" }, desc: { en: "Order and account updates", fr: "Mises à jour de commandes et de compte" } },
@@ -80,13 +83,13 @@ function ProfileCard() {
 
   return (
     <div className="card-premium p-6">
-      <div className="flex items-center gap-5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
           <User className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">{user.name}</h2>
-          <p className="truncate text-sm text-slate-500">{user.email}{user.phone ? ` · ${user.phone}` : ""}</p>
+          <p className="break-words text-sm text-slate-500">{user.email}{user.phone ? ` · ${user.phone}` : ""}</p>
         </div>
         {!editing && (
           <Button variant="secondary" size="sm" onClick={() => { setName(user.name); setPhone(user.phone ?? ""); setLang(user.locale ?? "en"); setEditing(true); }}>
@@ -218,6 +221,9 @@ function AccountContent() {
   const fr = locale === "fr";
   const { logout } = useAuth();
   const router = useRouter();
+  const chatUnread = useChatUnread();
+  const { tickets } = useSupportTickets();
+  const ticketUnread = tickets.reduce((n, tk) => n + (tk.userUnread ?? 0), 0);
 
   return (
     <div className="space-y-8">
@@ -234,7 +240,9 @@ function AccountContent() {
       <WalletCard />
 
       <div className="grid gap-3">
-        {menuItems.map((item) => (
+        {menuItems.map((item) => {
+          const badge = item.href === "/shop/messages" ? chatUnread : item.href === "/shop/support" ? ticketUnread : 0;
+          return (
           <Link
             key={item.href}
             href={item.href}
@@ -247,9 +255,13 @@ function AccountContent() {
               <p className="font-semibold text-slate-900">{fr ? item.title.fr : item.title.en}</p>
               <p className="text-sm text-slate-500">{fr ? item.desc.fr : item.desc.en}</p>
             </div>
+            {badge > 0 && (
+              <span data-testid={`badge-${item.href.split("/").pop()}`} className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white" aria-label={fr ? `${badge} non lu(s)` : `${badge} unread`}>{badge}</span>
+            )}
             <ChevronRight className="h-5 w-5 text-slate-400" />
           </Link>
-        ))}
+          );
+        })}
       </div>
 
       <Button

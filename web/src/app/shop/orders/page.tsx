@@ -20,11 +20,7 @@ function OrdersList() {
 
   const statusLabel = (status: string) => orderStatusLabel(status, fr);
 
-  // formatPaymentMethod only translates "COD"; map the remaining "Card" value locally.
   const cancelledLines = (orderId: string) => cancelledCount(rt.orders.find((o) => o.id === orderId)?.items ?? []);
-
-  const paymentMethodLabel = (method: string) =>
-    fr && method === "Card" ? "Carte" : formatPaymentMethod(method, locale);
 
   return (
     <div className="space-y-6">
@@ -46,7 +42,7 @@ function OrdersList() {
           { key: "date", label: fr ? "Date" : "Date" },
           { key: "itemsCount", label: fr ? "Articles" : "Items" },
           { key: "amount", label: fr ? "Montant" : "Amount", render: (row) => formatCurrency(row.amount as number, locale) },
-          { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => paymentMethodLabel(String(row.paymentMethod)) },
+          { key: "paymentMethod", label: fr ? "Paiement" : "Payment", render: (row) => formatPaymentMethod(String(row.paymentMethodId ?? row.paymentMethod), locale) },
           { key: "status", label: fr ? "Statut" : "Status", render: (row) => {
             const n = row.status === "cancelled" ? 0 : cancelledLines(String(row.id));
             return (

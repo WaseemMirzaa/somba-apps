@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import '../data/catalog_live.dart' show productByUuid;
+import '../services/aftersale_store.dart';
+import '../services/chat_store.dart';
 import '../services/realtime_store.dart';
 import 'more/account_more.dart';
+import 'more/aftersale_status.dart';
+import 'more/chat_inbox.dart';
+import 'more/chat_thread.dart';
 import 'more/order_screens.dart';
 import 'more/returns_extra.dart';
 import 'more/support_extra.dart';
+import 'deals_screen.dart';
+import 'product_detail_screen.dart';
 import 'wallet_screen.dart';
 
 /// Where a notification takes the customer.
-enum NoticeDest { order, tracking, wallet, returnStatus, returns, ticket, support, notifications }
+enum NoticeDest { product, deals, order, tracking, wallet, returnStatus, replacementStatus, exchangeStatus, returns, ticket, support, chat, messages, notifications }
 
 class NoticeRoute {
   const NoticeRoute(this.dest, [this.id]);
@@ -37,11 +45,20 @@ NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(S
     case 'return':
     case 'dispute':
       return id != null ? NoticeRoute(NoticeDest.returnStatus, id) : const NoticeRoute(NoticeDest.returns);
-    case 'exchange':
     case 'replacement':
-      return const NoticeRoute(NoticeDest.returns);
+      return id != null ? NoticeRoute(NoticeDest.replacementStatus, id) : const NoticeRoute(NoticeDest.returns);
+    case 'exchange':
+      return id != null ? NoticeRoute(NoticeDest.exchangeStatus, id) : const NoticeRoute(NoticeDest.returns);
     case 'support':
       return id != null ? NoticeRoute(NoticeDest.ticket, id) : const NoticeRoute(NoticeDest.support);
+    case 'question':
+      // "Your question was answered": the entityId is the PRODUCT id.
+      return id != null ? NoticeRoute(NoticeDest.product, id) : const NoticeRoute(NoticeDest.notifications);
+    case 'flash':
+      return const NoticeRoute(NoticeDest.deals);
+    case 'chat':
+      // The notice's entityId is the conversation id.
+      return id != null ? NoticeRoute(NoticeDest.chat, id) : const NoticeRoute(NoticeDest.messages);
     default:
       return const NoticeRoute(NoticeDest.notifications);
   }
@@ -65,6 +82,11 @@ Future<void> openNotice(
   final route = noticeRoute(type, entityId, hasOrder: (id) => store.orderById(id) != null);
   Widget? screen;
   switch (route.dest) {
+    case NoticeDest.product:
+      final product = productByUuid(route.id!);
+      screen = product != null ? ProductDetailScreen(product: product, locale: locale) : (fromInbox ? null : NotificationsScreen(locale: locale));
+    case NoticeDest.deals:
+      screen = DealsScreen(locale: locale);
     case NoticeDest.order:
       screen = OrderDetailScreen(locale: locale, orderId: route.id!);
     case NoticeDest.tracking:
@@ -72,15 +94,26 @@ Future<void> openNotice(
     case NoticeDest.wallet:
       screen = WalletScreen(locale: locale);
     case NoticeDest.returnStatus:
-      final r = await _find('disputes:list', route.id!, ReturnView.fromJson);
+      final r = await AfterSaleStore.instance.tryFetchDispute(route.id!);
       screen = r != null ? ReturnStatusScreen(locale: locale, returnRequest: r) : ReturnsListScreen(locale: locale);
+    case NoticeDest.replacementStatus:
+      final r = await AfterSaleStore.instance.tryFetchReplacement(route.id!);
+      screen = r != null ? ReplacementDetailScreen(locale: locale, replacement: r) : ReturnsListScreen(locale: locale, initialTab: 1);
+    case NoticeDest.exchangeStatus:
+      final x = await AfterSaleStore.instance.tryFetchExchange(route.id!);
+      screen = x != null ? ExchangeDetailScreen(locale: locale, exchange: x) : ReturnsListScreen(locale: locale, initialTab: 2);
     case NoticeDest.returns:
       screen = ReturnsListScreen(locale: locale);
     case NoticeDest.ticket:
       final t = await _find('support:list', route.id!, TicketView.fromJson);
-      screen = t != null ? SupportTicketDetailScreen(ticket: t) : SupportListScreen(locale: locale);
+      screen = t != null ? SupportTicketDetailScreen(ticket: t, locale: locale) : SupportListScreen(locale: locale);
     case NoticeDest.support:
       screen = SupportListScreen(locale: locale);
+    case NoticeDest.chat:
+      final c = await ChatStore.instance.conversationById(route.id!);
+      screen = c != null ? ChatThreadScreen(conversation: c, locale: locale) : ChatInboxScreen(locale: locale);
+    case NoticeDest.messages:
+      screen = ChatInboxScreen(locale: locale);
     case NoticeDest.notifications:
       // Already on the list: nothing more to open.
       screen = fromInbox ? null : NotificationsScreen(locale: locale);

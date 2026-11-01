@@ -10,7 +10,10 @@ import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { errMessage } from "@/lib/seller-labels";
-import { ArrowLeftRight, Bell, Megaphone, PackageCheck, RefreshCw, RotateCcw, ShieldAlert, ShieldCheck, LifeBuoy, Truck, Wallet, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight, Bell, Boxes, CreditCard, Landmark, Lock, Megaphone, MessageCircle, MessageSquareQuote, PackageCheck, RefreshCw, RotateCcw,
+  ShieldAlert, ShieldCheck, LifeBuoy, Star, Tag, Truck, Users, Wallet, Zap, type LucideIcon,
+} from "lucide-react";
 import { noticeHref } from "@/lib/notice-links";
 import { localizedNotice, noticeTypeLabel } from "@/lib/i18n-fields";
 
@@ -30,7 +33,24 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   dispute: ShieldAlert,
   exchange: ArrowLeftRight,
   replacement: RefreshCw,
+  question: MessageSquareQuote,
+  chat: MessageCircle,
+  message: MessageCircle,
+  review: Star,
+  stock: Boxes,
+  flash: Zap,
+  promo: Tag,
+  finance: Landmark,
+  payment: CreditCard,
+  security: Lock,
+  team: Users,
 };
+
+/** Every notice type a store can receive (the filter lists the ones present first). */
+const ALL_TYPES = [
+  "order", "delivery", "return", "dispute", "replacement", "exchange", "question", "review", "chat", "stock", "campaign", "flash",
+  "promo", "payout", "finance", "payment", "moderation", "support", "team", "security",
+];
 
 export default function SellerNotificationsPage() {
   const { notifications, markRead, markAllRead } = useRealtime();
@@ -38,6 +58,7 @@ export default function SellerNotificationsPage() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const [type, setType] = useState("");
 
   const items = useMemo(
     () =>
@@ -47,14 +68,19 @@ export default function SellerNotificationsPage() {
     [notifications, fr]
   );
 
+  const typesPresent = useMemo(() => {
+    const seen = new Set(items.map((n) => n.type));
+    return [...ALL_TYPES.filter((x) => seen.has(x)), ...[...seen].filter((x) => !ALL_TYPES.includes(x))];
+  }, [items]);
+
   const filtered = useMemo(
     () =>
-      applyListFilters(items, filters, {
+      applyListFilters(type ? items.filter((n) => n.type === type) : items, filters, {
         searchFields: ["title", "body", "titleFr", "bodyFr", "type", "state"],
         dateField: "createdAt",
         statusField: "state",
       }),
-    [items, filters]
+    [items, filters, type]
   );
 
   const unreadCount = items.filter((n) => !n.read).length;
@@ -91,12 +117,29 @@ export default function SellerNotificationsPage() {
         ) : undefined
       }
       filters={
-        <ListFilters
-          values={filters}
-          onChange={setFilters}
-          statusOptions={READ_STATUS_OPTIONS}
-          searchPlaceholder={fr ? "Titre, type, contenu…" : "Title, type, content…"}
-        />
+        <div className="space-y-3">
+          <ListFilters
+            values={filters}
+            onChange={setFilters}
+            statusOptions={READ_STATUS_OPTIONS}
+            searchPlaceholder={fr ? "Titre, type, contenu…" : "Title, type, content…"}
+          />
+          {typesPresent.length > 1 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={fr ? "Filtrer par type" : "Filter by type"}>
+              {["", ...typesPresent].map((x) => (
+                <button
+                  key={x || "all"}
+                  type="button"
+                  onClick={() => setType(x)}
+                  aria-pressed={type === x}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${type === x ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
+                >
+                  {x ? noticeTypeLabel(x, fr) : fr ? "Tous" : "All"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       }
       columns={[
         {

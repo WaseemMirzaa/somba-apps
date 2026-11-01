@@ -20,6 +20,14 @@ export interface CampaignLike {
   startDate: string | null;
   endDate: string | null;
   productIds?: string[] | null;
+  /** Most the campaign may give away in discounts (0 / missing = no limit) and what it has given so far. */
+  budgetUsd?: number | null;
+  spentUsd?: number | null;
+}
+
+/** Has the campaign given away all its budget? (No budget set = never.) */
+export function budgetSpent(c: Pick<CampaignLike, 'budgetUsd' | 'spentUsd'>): boolean {
+  return (c.budgetUsd ?? 0) > 0 && (c.spentUsd ?? 0) >= (c.budgetUsd ?? 0);
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,12 +45,13 @@ export function campaignWindow(c: Pick<CampaignLike, 'startDate' | 'endDate'>): 
 
 /**
  * Is the campaign giving discounts right now?
+ *  - a campaign whose budget is used up never discounts again.
  *  - 'active'    (approved by marketing): inside its dates; a missing bound means open-ended.
  *  - 'scheduled' (approved, waiting for its start): only once its start date has passed.
  *  - draft / pending / rejected / ended never discount.
  */
 export function campaignRunning(c: CampaignLike, now = Date.now()): boolean {
-  if (!(c.discount > 0)) return false;
+  if (!(c.discount > 0) || budgetSpent(c)) return false;
   const { from, to } = campaignWindow(c);
   if (c.status === 'active') return !(from !== null && now < from) && !(to !== null && now > to);
   if (c.status === 'scheduled') return from !== null && now >= from && !(to !== null && now > to);

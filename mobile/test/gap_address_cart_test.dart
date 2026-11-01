@@ -1,4 +1,4 @@
-// Address form (landmark, delivery-zone line, edit mode, phone check) and the cart screen
+// Address form (landmark, no zone line, edit mode, phone check) and the cart screen
 // (remove with Undo, save for later, low stock, price change) in English and French.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,54 +47,16 @@ void main() {
         expect(find.text('Blue gate'), findsOneWidget);
       });
 
-      testWidgets('no zone line until a commune is typed ($lang)', (tester) async {
+      testWidgets('there is no delivery-zone line, whatever commune is typed ($lang)', (tester) async {
         await open(tester, lang);
         expect(find.byKey(const ValueKey('address-zone')), findsNothing);
-      });
-
-      testWidgets('commune Gombe shows the zone name and its fee ($lang)', (tester) async {
-        await open(tester, lang);
         await tester.enterText(field(4), 'Gombe');
         await tester.pump();
-        expect(find.byKey(const ValueKey('address-zone')), findsOneWidget);
-        expect(find.descendant(of: find.byKey(const ValueKey('address-zone')), matching: find.text(s.addrZoneOk(money(3)))), findsOneWidget);
-        expect(find.text(s.addrZoneNone), findsNothing);
-      });
-
-      testWidgets('the zone matches "Commune de Limete" and ignores case/accents ($lang)', (tester) async {
-        await open(tester, lang);
-        await tester.enterText(field(4), 'COMMUNE DE LIMETÉ');
-        await tester.pump();
-        expect(find.text(s.addrZoneOk(money(5))), findsOneWidget, reason: 'Limete is priced; the zone itself is not named');
-        expect(find.text(s.addrZoneNone), findsNothing);
-      });
-
-      testWidgets('an unknown commune says we do not deliver there ($lang)', (tester) async {
-        await open(tester, lang);
+        expect(find.byKey(const ValueKey('address-zone')), findsNothing, reason: 'delivery is routed from the map pin, not a zone');
         await tester.enterText(field(4), 'Narnia');
         await tester.pump();
-        expect(find.byKey(const ValueKey('address-zone')), findsOneWidget);
-        expect(find.text(s.addrZoneNone), findsOneWidget);
-        expect(find.textContaining('Zone'), findsNothing, reason: 'no zone name is claimed');
-      });
-
-      testWidgets('a commune in another city than the zone is not matched ($lang)', (tester) async {
-        await open(tester, lang);
-        await tester.enterText(field(4), 'Gombe');
-        await tester.enterText(field(5), 'Lubumbashi');
-        await tester.pump();
-        expect(find.text(s.addrZoneNone), findsOneWidget);
-      });
-
-      testWidgets('zones from the server replace the fallback ones ($lang)', (tester) async {
-        RealtimeStore.instance.zones = [gapZones.last];
-        await open(tester, lang);
-        await tester.enterText(field(4), 'Gombe');
-        await tester.pump();
-        expect(find.text(s.addrZoneNone), findsOneWidget, reason: 'Gombe is not in the server list');
-        await tester.enterText(field(4), 'Limete');
-        await tester.pump();
-        expect(find.text(s.addrZoneOk(money(5))), findsOneWidget);
+        expect(find.byKey(const ValueKey('address-zone')), findsNothing);
+        expect(find.textContaining('Zone'), findsNothing);
       });
 
       testWidgets('an invalid phone shows a snackbar and nothing is saved ($lang)', (tester) async {
@@ -136,7 +98,6 @@ void main() {
         final values = [for (var i = 0; i < 6; i++) tester.widget<TextField>(field(i)).controller!.text];
         expect(values, ['Office', '+243 81 234 5678', '5 Rue du Marché', 'Near the pharmacy', 'Limete', 'Kinshasa']);
         expect(tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value, isTrue);
-        expect(find.text(s.addrZoneOk(money(5))), findsOneWidget, reason: 'zone line is live from the first frame');
       });
 
       testWidgets('create mode uses the add title and a default label ($lang)', (tester) async {

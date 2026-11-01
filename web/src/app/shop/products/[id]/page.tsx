@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { missingPick, variantLabel } from "@/lib/variants";
 import { useParams, useRouter } from "next/navigation";
-import { Star, Truck, Share2, ShoppingCart } from "lucide-react";
+import { Star, Truck, Share2, ShoppingCart, Palmtree } from "lucide-react";
 import { MobileAppPurchaseCta } from "@/components/shop/mobile-app-purchase-cta";
 import { DualCurrency } from "@/components/ui/dual-currency";
 import { PageHeader } from "@/components/ui/page-header";
@@ -19,7 +19,10 @@ import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSocketEvent, usePublicSettings, useProductReviews, zoneLabel } from "@/lib/shop-live";
+import { useSocketEvent, usePublicSettings, useProductReviews } from "@/lib/shop-live";
+import { useCampaignView } from "@/lib/shop-engage";
+import { ProductFeeCheck } from "@/components/shop/product-fee-check";
+import { ContactSeller } from "@/components/shop/contact-seller";
 import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
 import { TranslatableText } from "@/components/shop/translatable-text";
@@ -47,7 +50,7 @@ export default function ShopProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [pickError, setPickError] = useState<string | null>(null);
-  const [zonePick, setZonePick] = useState("");
+  const [activeImage, setActiveImage] = useState(0);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
@@ -58,6 +61,9 @@ export default function ShopProductDetailPage() {
   useEffect(() => {
     if (product) addRecentlyViewed(product.id);
   }, [product, addRecentlyViewed]);
+
+  // A promoted product counts one campaign view per session.
+  useCampaignView(product?.campaignId);
 
   const loadQuestions = useCallback(() => {
     if (!productId) return;
@@ -72,10 +78,14 @@ export default function ShopProductDetailPage() {
     loadQuestions();
   }, [productId, rt.status, loadQuestions]);
 
-  // The seller's answer arrives live.
+  // A new question and the seller's answer arrive live (no reload).
+  useSocketEvent<ProductQuestion>("question:created", (q) => {
+    if (q.productId !== productId) return;
+    setQuestions((cur) => (cur.some((x) => x.id === q.id) ? cur : [q, ...cur]));
+  });
   useSocketEvent<ProductQuestion>("question:updated", (q) => {
     if (q.productId !== productId) return;
-    setQuestions((cur) => cur.map((x) => (x.id === q.id ? q : x)));
+    setQuestions((cur) => (cur.some((x) => x.id === q.id) ? cur.map((x) => (x.id === q.id ? q : x)) : [q, ...cur]));
   });
 
   async function submitQuestion() {
@@ -133,10 +143,14 @@ export default function ShopProductDetailPage() {
     .slice(0, 4);
   const maxQty = Math.max(1, Math.min(10, product.stock));
   const inCart = cart.filter((c) => c.id === product.id).reduce((s, c) => s + c.qty, 0);
-  const zone = settings.deliveryZones.find((z) => z.id === zonePick);
+  const gallery = product.images.length ? product.images : [product.image || "/brand/logo-stack.png"];
+  const shownImage = gallery[Math.min(activeImage, gallery.length - 1)];
+  const onVacation = product.sellerOnVacation;
+  const vacationNotice = product.sellerVacationNotice ? (fr ? product.sellerVacationNotice.fr : product.sellerVacationNotice.en) : null;
+  const canBuy = product.inStock && !onVacation;
 
   function add(goToCart: boolean) {
-    if (!product || !product.inStock) return;
+    if (!product || !product.inStock || product.sellerOnVacation) return;
     const missing = missingPick(product.variants, picks);
     if (missing) {
       setPickError(missing.name);
@@ -170,8 +184,27 @@ export default function ShopProductDetailPage() {
       />
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-2xl bg-blue-50">
-          <Image src={product.image || "/brand/logo-stack.png"} alt={name} fill className="object-cover" priority />
+        <div className="space-y-3">
+          <div className="relative aspect-square overflow-hidden rounded-2xl bg-blue-50" data-testid="product-gallery">
+            <Image src={shownImage} alt={name} fill className="object-cover" priority />
+          </div>
+          {gallery.length > 1 && (
+            <div className="flex flex-wrap gap-2" role="list" aria-label={fr ? "Photos du produit" : "Product photos"}>
+              {gallery.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  role="listitem"
+                  onClick={() => setActiveImage(i)}
+                  aria-label={`Photo ${i + 1}`}
+                  aria-current={i === activeImage}
+                  className={`relative h-16 w-16 overflow-hidden rounded-lg border-2 bg-blue-50 ${i === activeImage ? "border-[var(--primary)]" : "border-transparent hover:border-slate-300"}`}
+                >
+                  <Image src={src} alt="" fill className="object-cover" sizes="64px" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -215,6 +248,12 @@ export default function ShopProductDetailPage() {
                   : (fr ? "En stock" : "In stock")
                 : (fr ? "Rupture de stock" : "Out of stock")}
             </p>
+            {onVacation && (
+              <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="vacation-notice">
+                <Palmtree className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{vacationNotice ?? (fr ? "Cette boutique est en vacances et ne prend pas de nouvelles commandes." : "This store is on vacation and is not taking new orders.")}</span>
+              </div>
+            )}
             {groups.map((g) => (
               <div key={g.name} data-testid={`variant-${g.name}`}>
                 <p className={`mb-1.5 text-sm font-medium ${pickError === g.name ? "text-red-600" : "text-slate-700"}`}>
@@ -242,7 +281,7 @@ export default function ShopProductDetailPage() {
                 </div>
               </div>
             ))}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className={`flex flex-wrap items-center gap-3 ${onVacation ? "hidden" : ""}`}>
               <label className="text-sm text-slate-600" htmlFor="qty">{fr ? "Quantité" : "Quantity"}</label>
               <select
                 id="qty"
@@ -253,9 +292,10 @@ export default function ShopProductDetailPage() {
               >
                 {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
+              {!onVacation && (<>
               <button
                 onClick={() => add(false)}
-                disabled={!product.inStock}
+                disabled={!canBuy}
                 className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50"
               >
                 <ShoppingCart className="h-4 w-4" />
@@ -263,11 +303,12 @@ export default function ShopProductDetailPage() {
               </button>
               <button
                 onClick={() => add(true)}
-                disabled={!product.inStock}
+                disabled={!canBuy}
                 className="rounded-xl border border-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary)] disabled:opacity-50"
               >
                 {fr ? "Acheter maintenant" : "Buy now"}
               </button>
+              </>)}
             </div>
             {inCart > 0 && (
               <p className="text-xs text-slate-500">
@@ -278,30 +319,25 @@ export default function ShopProductDetailPage() {
           </div>
 
           <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-            {settings.deliveryZones.length > 0 && (
-              <>
-                <select className="input-premium w-full px-3 py-2 text-sm" value={zonePick} onChange={(e) => setZonePick(e.target.value)}>
-                  <option value="">{fr ? "Vérifier les frais de livraison par zone" : "Check delivery fee by zone"}</option>
-                  {settings.deliveryZones.map((z) => <option key={z.id} value={z.id}>{zoneLabel(z, fr)} — {z.city}</option>)}
-                </select>
-                {zone && (
-                  <p className="text-xs text-emerald-700">
-                    {zoneLabel(zone, fr)}: {zone.feeUsd === 0 ? (fr ? "livraison gratuite" : "free delivery") : formatCurrency(zone.feeUsd, locale)}
-                  </p>
-                )}
-              </>
-            )}
+            <ProductFeeCheck productId={product.id} fr={fr} locale={locale} />
             <div className="flex items-center gap-2 text-sm">
               <Truck className="h-4 w-4 text-[var(--primary)]" />
               <span data-testid="product-delivery-estimate">
                 {fr
-                  ? `Livraison en ${daysLabel(product.deliveryDays, true)} · prévue le ${dayLabel(estimateFor([product.deliveryDays]), fr)}`
-                  : `Delivery in ${daysLabel(product.deliveryDays, false)} · expected ${dayLabel(estimateFor([product.deliveryDays]), fr)}`}
+                  ? `Livraison en ${daysLabel(product.totalDeliveryDays, true)} · prévue le ${dayLabel(estimateFor([product.totalDeliveryDays]), fr)}`
+                  : `Delivery in ${daysLabel(product.totalDeliveryDays, false)} · expected ${dayLabel(estimateFor([product.totalDeliveryDays]), fr)}`}
               </span>
             </div>
-            <div className="flex gap-4 text-xs text-slate-600">
-              <span>✓ {fr ? `Retours sous ${product.returnWindow} jours` : `${product.returnWindow}-day returns`}</span>
-            </div>
+            {product.sellerHandlingDays > 0 && (
+              <p className="text-xs text-slate-500">
+                {fr ? `Dont ${product.sellerHandlingDays} j de préparation par le vendeur` : `Includes ${product.sellerHandlingDays} day${product.sellerHandlingDays === 1 ? "" : "s"} for the seller to prepare it`}
+              </p>
+            )}
+            {settings.returnWindowDays > 0 && (
+              <div className="flex gap-4 text-xs text-slate-600">
+                <span>✓ {fr ? `Retours sous ${settings.returnWindowDays} jours` : `${settings.returnWindowDays}-day returns`}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border border-blue-100 p-4">
@@ -322,6 +358,8 @@ export default function ShopProductDetailPage() {
               {isFollowingStore(product.seller) ? (fr ? "Suivi" : "Following") : (fr ? "Suivre" : "Follow")}
             </button>
           </div>
+
+          <ContactSeller sellerId={product.sellerId} productId={product.id} fr={fr} returnTo={`/shop/products/${product.id}`} />
 
           <button onClick={shareProduct} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-blue-50">
             <Share2 className="h-4 w-4" />
@@ -351,7 +389,7 @@ export default function ShopProductDetailPage() {
                 ? <Link href={`/shop/stores/${product.sellerId}`} className="text-[var(--primary)] hover:underline">{product.seller}</Link>
                 : product.seller,
             },
-            { label: fr ? "Délai de livraison" : "Delivery time", value: daysLabel(product.deliveryDays, fr) },
+            { label: fr ? "Délai de livraison" : "Delivery time", value: daysLabel(product.totalDeliveryDays, fr) },
           ]} />
         </DetailGridSection>
 

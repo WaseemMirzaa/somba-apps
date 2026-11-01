@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../data/market_profiles.dart';
 import '../util/format.dart' show marketNotifier;
 import 'auth_service.dart';
+import 'feature_hooks.dart';
 import 'models.dart';
 import 'push_service.dart';
 import 'socket_service.dart';
@@ -37,7 +38,6 @@ class RealtimeStore extends ChangeNotifier {
   /// Bumped when the server pushes a support-ticket / return change, so open
   /// list screens reload themselves (their data is fetched on demand).
   final ValueNotifier<int> supportRevision = ValueNotifier(0);
-  final ValueNotifier<int> disputeRevision = ValueNotifier(0);
 
   /// The ticket carried by the latest `support:updated` push (open conversations follow it).
   Map<String, dynamic>? lastSupportTicket;
@@ -55,9 +55,7 @@ class RealtimeStore extends ChangeNotifier {
   /// Home-page banners published by the admin (CMS blocks of type `banner`).
   final List<BannerDto> banners = [];
 
-  /// Delivery zones + USD→CDF rate from the server's public settings.
-  List<Zone> zones = [];
-
+  /// USD→CDF rate from the server's public settings.
 
   /// The account cart as the server last sent it ({lines, saved}); ShopState merges / applies it.
   final ValueNotifier<Map<String, dynamic>?> serverCart = ValueNotifier(null);
@@ -66,6 +64,14 @@ class RealtimeStore extends ChangeNotifier {
   /// Public setting: with it on, an account needs a verified phone OR email to
   /// place an order or top up the wallet.
   bool requireVerifiedForCheckout = false;
+
+  /// Public setting: with it on, an order needs a delivery address pinned on the map (the app asks for the pin
+  /// before checkout instead of letting the server refuse).
+  bool requirePinnedAddress = false;
+
+  /// Public setting `codEnabled`: the checkout offers cash on delivery only while the platform allows it.
+  /// (`codCapUsd` is not read: the server only raises a fraud alert above the cap, it never refuses the order.)
+  bool codEnabled = false;
 
   /// True when the app should send the user to verification instead of the server refusing the order/top-up.
   bool get needsVerification {
@@ -83,6 +89,9 @@ class RealtimeStore extends ChangeNotifier {
   /// True once the first full download after sign-in finished (UI shows a
   /// loader instead of an empty catalogue until then).
   bool hydrated = false;
+
+  /// Called each time the session finished loading (sign-in, and every reconnect): the profile is then authoritative.
+  VoidCallback? onHydrated;
 
   /// Called when the server ends the session (revoked, suspended, deleted).
   /// Receives an optional strings key for a friendly message to show on the sign-in screen.
@@ -186,12 +195,14 @@ class RealtimeStore extends ChangeNotifier {
     status = ConnStatus.disconnected;
     hydrated = false;
     banners.clear();
-    zones = [];
     for (final l in [products, categories, orders, notifications, walletTransactions, payments, addresses]) {
       l.clear();
     }
     failedTopups.clear();
     wishlistIds.clear();
+    for (final h in buildFeatureHooks()) {
+      h.reset?.call();
+    }
     _translations.clear();
     riderLocations.clear();
     walletBalance = 0;
@@ -277,7 +288,7 @@ class RealtimeStore extends ChangeNotifier {
     socket.on('ready', (_) {
       status = ConnStatus.connected;
       notifyListeners();
-      unawaited(_hydrate());
+      unawaited(_hydrate().then((_) => onHydrated?.call()));
       // Push: asks for the permission and registers this device (no-op without Firebase).
       unawaited(PushService.instance.start(
         register: (token, platform) => registerDevice(token, platform: platform),
@@ -330,7 +341,6 @@ class RealtimeStore extends ChangeNotifier {
       lastSupportTicket = d is Map ? _map(d) : null;
       supportRevision.value++;
     });
-    _socket.on('dispute:updated', (_) => disputeRevision.value++);
     _socket.on('review:updated', (_) => reviewRevision.value++);
     _socket.on('payment:created', _upsertPayment);
     _socket.on('payment:updated', _upsertPayment);
@@ -354,20 +364,35 @@ class RealtimeStore extends ChangeNotifier {
     });
     _socket.on('addresses:updated', (_) => unawaited(_loadAddresses()));
     _socket.on('settings:updated', (d) {
-      final m = _map(d);
-      fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
-      if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
-      try {
-        if (m['deliveryZones'] != null) {
-          zones = (jsonDecode(m['deliveryZones'] as String) as List).map((z) => Zone.fromJson(_map(z))).toList();
-        }
-      } catch (_) {}
+      applySettings(_map(d));
       notifyListeners();
     });
     _socket.on('me:updated', (d) {
       user = BackendUser.fromJson(_map(d));
       notifyListeners();
     });
+    // Feature modules (chat, support, after-sale…) bind their own pushes.
+    for (final h in buildFeatureHooks()) {
+      h.pushes.forEach(_socket.on);
+    }
+  }
+
+  /// Tests: deliver a feature push (the socket is not connected in tests).
+  @visibleForTesting
+  void debugEmit(String event, dynamic data) {
+    for (final h in buildFeatureHooks()) {
+      h.pushes[event]?.call(data);
+    }
+  }
+
+  /// Reads the public settings the app acts on: the answer of `settings:get` and the `settings:updated` push.
+  /// A key the server did not send keeps its value.
+  @visibleForTesting
+  void applySettings(Map<String, dynamic> m) {
+    fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
+    if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
+    if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
+    if (m.containsKey('codEnabled')) codEnabled = '${m['codEnabled']}' == 'true';
   }
 
   Future<void> _hydrate() async {
@@ -385,16 +410,7 @@ class RealtimeStore extends ChangeNotifier {
         ..clear()
         ..addAll((d as List).map((e) => e.toString()))),
       _load('me:get', (d) => user = BackendUser.fromJson(_map(d))),
-      _load('settings:get', (d) {
-        final m = _map(d);
-        fxRate = double.tryParse('${m['fxRate'] ?? ''}');
-        requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
-        try {
-          zones = (jsonDecode((m['deliveryZones'] ?? '[]') as String) as List).map((z) => Zone.fromJson(_map(z))).toList();
-        } catch (_) {
-          zones = [];
-        }
-      }),
+      _load('settings:get', (d) => applySettings(_map(d))),
       _load('me:prefs', (d) => prefs = {...prefs, ..._map(d)}),
       _load('cart:get', (d) => serverCart.value = _map(d)),
       _load('cms:list', (d) {
@@ -405,6 +421,13 @@ class RealtimeStore extends ChangeNotifier {
               .where((b) => b['type'] == 'banner' && b['active'] != false)
               .map(BannerDto.fromJson));
       }),
+    ]);
+    await Future.wait([
+      for (final h in buildFeatureHooks())
+        if (h.hydrate != null)
+          h.hydrate!(this).catchError((Object e) {
+            if (kDebugMode) debugPrint('hydrate ${h.name} failed: $e');
+          }),
     ]);
     // The saved "Prices shown in" choice is only known now (the first read at
     // sign-in happens before the preferences were downloaded).
@@ -447,18 +470,14 @@ class RealtimeStore extends ChangeNotifier {
     required List<Map<String, dynamic>> items,
     required String paymentMethod,
     String? paymentPhone,
-    double deliveryFeeUsd = 0,
     Map<String, dynamic>? address,
-    String? zoneId,
     String? promoCode,
   }) async {
     final res = await (debugPlaceOrderRequest ?? _socket.request)('orders:create', {
       'items': items,
       'paymentMethod': paymentMethod,
-      'deliveryFeeUsd': deliveryFeeUsd,
       if (promoCode != null && promoCode.isNotEmpty) 'promoCode': promoCode,
       if (paymentPhone != null && paymentPhone.isNotEmpty) 'paymentPhone': paymentPhone,
-      if (zoneId != null) 'zoneId': zoneId,
       if (address != null) 'shippingAddress': jsonEncode(address),
     });
     final order = OrderDto.fromJson(_map(res));
@@ -535,8 +554,9 @@ class RealtimeStore extends ChangeNotifier {
   }
 
   /// Server-side promo check for a subtotal (preview only; the order re-validates).
-  Future<Map<String, dynamic>> validatePromo(String code, double subtotalUsd) async =>
-      _map(await _socket.request('promos:validate', {'code': code, 'subtotalUsd': subtotalUsd}));
+  /// [items] (the lines being bought) lets the server preview a STORE coupon, which only discounts that store's lines.
+  Future<Map<String, dynamic>> validatePromo(String code, double subtotalUsd, {List<Map<String, dynamic>>? items}) async => _map(await call(
+      'promos:validate', {'code': code, 'subtotalUsd': subtotalUsd, if (items != null && items.isNotEmpty) 'items': items}));
 
   Future<List<Map<String, dynamic>>> listPromos() async =>
       ((await _socket.request('promos:list')) as List).map((e) => _map(e)).toList();
@@ -575,8 +595,19 @@ class RealtimeStore extends ChangeNotifier {
     return AddressDto.fromJson(_map(res));
   }
 
+  /// Read the address book again (a warehouse gained or lost an area: each address's "served" may have changed).
+  Future<void> refreshAddresses() => _loadAddresses();
+
   /// Edit an address (or make it the default with `{'isDefault': true}`); the server clears the other defaults.
   Future<AddressDto> updateAddress(String id, Map<String, dynamic> patch) async {
+    final hook = debugAddressRequest;
+    if (hook != null) {
+      final a = AddressDto.fromJson(_map(await hook('addresses:update', {'id': id, 'patch': patch})));
+      final i = addresses.indexWhere((x) => x.id == id);
+      i == -1 ? addresses.add(a) : addresses[i] = a;
+      notifyListeners();
+      return a;
+    }
     final res = await _socket.request('addresses:update', {'id': id, 'patch': patch});
     await _loadAddresses();
     return AddressDto.fromJson(_map(res));
@@ -588,7 +619,7 @@ class RealtimeStore extends ChangeNotifier {
   }
 
   Future<void> updateProfile({String? name, String? phone, String? locale}) async {
-    final res = await _socket.request('me:update', {
+    final res = await call('me:update', {
       if (name != null) 'name': name,
       if (phone != null) 'phone': phone,
       if (locale != null) 'locale': locale,
@@ -653,7 +684,7 @@ class RealtimeStore extends ChangeNotifier {
   Future<dynamic> call(String event, [Map<String, dynamic>? body]) => (debugCallRequest ?? _socket.request)(event, body);
 
   Future<List<ReviewDto>> reviewsFor(String productId) async =>
-      ((await _socket.request('reviews:list', {'productId': productId})) as List)
+      ((await call('reviews:list', {'productId': productId})) as List)
           .map((e) => ReviewDto.fromJson(_map(e)))
           .toList();
 
@@ -661,7 +692,7 @@ class RealtimeStore extends ChangeNotifier {
       ReviewDto.fromJson(_map(await _socket.request('reviews:create', {'productId': productId, 'rating': rating, 'text': text})));
 
   Future<List<QuestionDto>> questionsFor(String productId) async =>
-      ((await _socket.request('questions:list', {'productId': productId})) as List)
+      ((await call('questions:list', {'productId': productId})) as List)
           .map((e) => QuestionDto.fromJson(_map(e)))
           .toList();
 

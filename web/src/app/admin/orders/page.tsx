@@ -16,15 +16,9 @@ import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { formatCurrency } from "@/lib/utils";
 import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL, orderStatusLabel, useFeedState } from "@/lib/admin-live";
 import { orderSellers, sellerSummary, type SellerRef } from "@/lib/order-packages";
+import { PAYMENT_METHOD_IDS, paymentMethodLabel } from "@/lib/payment-methods";
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABEL).map(([value, l]) => ({ value, label: l.en, labelFr: l.fr }));
-
-const PAYMENT_METHOD_LABEL: Record<string, { en: string; fr: string }> = {
-  stripe_card: { en: "Card", fr: "Carte" },
-  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
-  airtel_money: { en: "Mobile money", fr: "Mobile money" },
-  wallet: { en: "Wallet", fr: "Portefeuille" },
-};
 
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
@@ -101,8 +95,8 @@ export default function AdminOrdersPage() {
           onChange={(e) => setMethodFilter(e.target.value)}
         >
           <option value="">{fr ? "Tous les modes" : "All methods"}</option>
-          {Object.entries(PAYMENT_METHOD_LABEL).map(([value, l]) => (
-            <option key={value} value={value}>{fr ? l.fr : l.en}</option>
+          {PAYMENT_METHOD_IDS.map((value) => (
+            <option key={value} value={value}>{paymentMethodLabel(value, fr)}</option>
           ))}
         </select>
       </div>
@@ -161,7 +155,7 @@ export default function AdminOrdersPage() {
               {
                 key: "paymentMethod",
                 label: fr ? "Paiement" : "Payment",
-                render: (row) => (PAYMENT_METHOD_LABEL[String(row.paymentMethod)]?.[fr ? "fr" : "en"] ?? String(row.paymentMethod)),
+                render: (row) => paymentMethodLabel(String(row.paymentMethod), fr),
               },
               {
                 key: "status",

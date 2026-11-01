@@ -11,11 +11,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/rider_shell.dart';
+import 'package:somba_rider/screens/support_screen.dart';
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/push_service.dart';
 import 'package:somba_rider/services/rider_focus.dart';
 import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
+
+import 'task_fixtures.dart';
 
 class _FakeBackend implements PushBackend {
   _FakeBackend({this.configured = true, this.allowed = true, this.launchedBy});
@@ -52,20 +55,18 @@ class _FakeBackend implements PushBackend {
 }
 
 PushMessage _task(String taskId, String view) => PushMessage(
-      title: 'New delivery available',
-      body: 'SOM-77 · Gombe',
+      title: 'New task assigned to you',
+      body: 'SOM-77: pickup is now in your tasks.',
       data: {'type': 'task', 'entityId': taskId, 'orderId': 'o-77', 'view': view, 'notificationId': 'n-$taskId', 'link': '/rider/tasks/$taskId'},
     );
 
-DeliveryTaskDto _dto(String id, String status, {String? zoneName, bool preferred = false}) => DeliveryTaskDto(
+DeliveryTaskDto _dto(String id, String status) => DeliveryTaskDto(
       id: id,
       orderId: 'o-$id',
       orderReference: 'SOM-$id',
       status: status,
       codAmountUsd: 0,
       customerName: 'Marie Dubois',
-      zoneName: zoneName,
-      preferred: preferred,
     );
 
 void main() {
@@ -84,21 +85,21 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(registered, ['tok-1@android', 'tok-2@android']);
 
-      backend.messages.add(_task('t1', 'available'));
+      backend.messages.add(_task('t1', 'active'));
       await Future<void>.delayed(Duration.zero);
       expect(pushes, 1);
 
       await service.stop();
       expect(service.active, isFalse);
       backend.refreshes.add('tok-3');
-      backend.messages.add(_task('t2', 'available'));
+      backend.messages.add(_task('t2', 'active'));
       await Future<void>.delayed(Duration.zero);
       expect(registered, hasLength(2), reason: 'nothing happens after sign-out');
       expect(pushes, 1);
     });
 
     test('a background tap and the tap that launched the app are held for the app', () async {
-      final backend = _FakeBackend(launchedBy: _task('t9', 'available'));
+      final backend = _FakeBackend(launchedBy: _task('t9', 'active'));
       final service = PushService(backend);
       await service.start(register: (t, p) async {}, onMessage: (_) {});
       expect(service.takeTap()?.entityId, 't9');
@@ -142,21 +143,23 @@ void main() {
   });
 
   group('where a notification opens', () {
-    bool mine(String id) => id == 'mine';
-
-    test('a new delivery opens Available; an assigned one opens Active', () {
-      expect(riderFocusFor('task', entityId: 't1', view: 'available', isMine: mine), const RiderFocus.deliveries(RiderFocus.available, taskId: 't1'));
-      expect(riderFocusFor('task', entityId: 't1', view: 'active', isMine: mine), const RiderFocus.deliveries(RiderFocus.active, taskId: 't1'));
+    test('a task notice ("New task assigned to you") opens the Active list, with the task', () {
+      expect(riderFocusFor('task', entityId: 't1'), const RiderFocus.deliveries(RiderFocus.active, taskId: 't1'));
+      expect(riderFocusFor('delivery', entityId: 'o1').deliveriesTab, RiderFocus.active);
+      expect(riderFocusFor('order', entityId: 'o1').tab, RiderFocus.deliveriesIndex);
     });
 
-    test('from the in-app list (no view) it depends on whether the task is already the rider\'s', () {
-      expect(riderFocusFor('task', entityId: 'mine', isMine: mine).deliveriesTab, RiderFocus.active);
-      expect(riderFocusFor('task', entityId: 'open', isMine: mine).deliveriesTab, RiderFocus.available);
+    test('a support notice opens the support screen on that ticket (link /rider/support/<id>)', () {
+      final f = riderFocusFor('support', entityId: 'tk1');
+      expect(f, const RiderFocus.support('tk1'));
+      expect(f.supportOpen, isTrue);
+      expect(f.supportId, 'tk1');
+      expect(f.tab, RiderFocus.profileIndex);
+      expect(riderFocusFor('support').supportId, isNull, reason: 'no id: the list');
     });
 
     test('anything else opens the profile, where the notifications are', () {
-      expect(riderFocusFor('payout', isMine: mine), const RiderFocus.profile());
-      expect(riderFocusFor('delivery', entityId: 'o1', isMine: mine).tab, RiderFocus.deliveriesIndex);
+      expect(riderFocusFor('payout'), const RiderFocus.profile());
     });
   });
 
@@ -177,19 +180,17 @@ void main() {
       store.myTasks
         ..clear()
         ..add(_dto('mine', 'assigned'));
-      store.pool
-        ..clear()
-        ..add(_dto('open', 'unassigned', zoneName: 'Gombe', preferred: true));
-      store.assignment = const RiderAssignment(hubName: 'Kinshasa Hub', hubCity: 'Kinshasa', preferredZones: ['Gombe'], hubZones: ['Gombe', 'Limete']);
+      store.assignment = const RiderAssignment(hubName: 'Kinshasa Hub', hubCity: 'Kinshasa', hubAddress: 'Boulevard du 30 Juin 8');
+      fakeSupport(tickets: [ticket('tk1', unread: 1)]);
       t.view.physicalSize = const Size(360 * 3, 740 * 3);
       t.view.devicePixelRatio = 3;
       addTearDown(t.view.reset);
       addTearDown(() {
         store.user = null;
         store.myTasks.clear();
-        store.pool.clear();
         store.assignment = null;
         store.focus.value = null;
+        resetSupport();
       });
       await t.pumpWidget(MaterialApp(
         locale: Locale(lang),
@@ -202,9 +203,8 @@ void main() {
     }
 
     for (final lang in ['en', 'fr']) {
-      testWidgets('a "new delivery" tap from the profile tab opens Available, with the zone shown ($lang)', (t) async {
+      testWidgets('a "new task" tap from the profile tab opens the Active list ($lang)', (t) async {
         await show(t, lang);
-        final s = Strings(lang);
         // Start on Profile, where the warehouse is shown.
         RiderStore.instance.focus.value = const RiderFocus.profile();
         await t.pump(const Duration(milliseconds: 600));
@@ -212,21 +212,26 @@ void main() {
         expect(find.textContaining('Kinshasa Hub'), findsOneWidget);
         expect(RiderStore.instance.focus.value, isNull, reason: 'the shell clears a profile request');
 
-        RiderStore.instance.openNotice(type: 'task', entityId: 'open', view: 'available');
+        RiderStore.instance.openNotice(type: 'task', entityId: 'mine');
         await t.pump(const Duration(milliseconds: 600));
-        expect(find.byKey(const ValueKey('pool-SOM-open')), findsOneWidget);
-        expect(find.byKey(const ValueKey('your-zone-SOM-open')), findsOneWidget);
-        expect(find.text(s.zoneLabel('Gombe')), findsOneWidget);
+        expect(find.byKey(const ValueKey('task-mine')), findsOneWidget);
         expect(RiderStore.instance.focus.value, isNull, reason: 'cleared once shown');
         expect(t.takeException(), isNull);
       });
 
-      testWidgets('an "assigned to you" tap opens Active ($lang)', (t) async {
+      testWidgets('a support tap opens the ticket thread on top of the profile ($lang)', (t) async {
         await show(t, lang);
-        RiderStore.instance.openNotice(type: 'task', entityId: 'mine', view: 'active');
+        RiderStore.instance.openNotice(type: 'support', entityId: 'tk1');
         await t.pump(const Duration(milliseconds: 600));
-        expect(find.byKey(const ValueKey('task-SOM-mine')), findsOneWidget);
-        expect(find.byKey(const ValueKey('pool-SOM-open')), findsNothing);
+        await t.pumpAndSettle();
+        expect(find.byType(SupportScreen, skipOffstage: false), findsOneWidget);
+        expect(find.byKey(const ValueKey('thread-subject')), findsOneWidget);
+        expect(RiderStore.instance.focus.value, isNull);
+        // A second tap while it is open replaces the screens, never stacks them.
+        RiderStore.instance.openNotice(type: 'support', entityId: 'tk1');
+        await t.pumpAndSettle();
+        expect(find.byType(SupportScreen, skipOffstage: false), findsOneWidget);
+        expect(find.byKey(const ValueKey('thread-subject')), findsOneWidget);
         expect(t.takeException(), isNull);
       });
     }

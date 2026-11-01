@@ -19,8 +19,12 @@ export function deliveryDaysOf(value: unknown): number {
   return Math.min(DELIVERY_DAYS.max, Math.round(n));
 }
 
-/** The day an order with lines taking `days` is expected (YYYY-MM-DD): order day + the slowest line. */
-export function estimatedDeliveryDate(days: unknown[], now = new Date()): string {
+/**
+ * The day an order with lines taking `days` is expected (YYYY-MM-DD): order day + the slowest line (+ `extraDays` when the
+ * parcels travel between two cities), never more than {@link DELIVERY_DAYS}.max in total.
+ */
+export function estimatedDeliveryDate(days: unknown[], now = new Date(), extraDays = 0): string {
   const slowest = days.length ? Math.max(...days.map(deliveryDaysOf)) : DELIVERY_DAYS.fallback;
-  return localDay(now, slowest);
+  const extra = Number.isFinite(extraDays) && extraDays > 0 ? Math.round(extraDays) : 0;
+  return localDay(now, Math.min(DELIVERY_DAYS.max, slowest + extra));
 }

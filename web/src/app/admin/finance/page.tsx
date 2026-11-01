@@ -16,11 +16,13 @@ import { NoAccess, SectionError, SectionLoading } from "@/components/admin/query
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { canMoveMoney, canSeeFinance, errMsg, useRole, type PaymentCapabilities, type PaymentRow } from "@/lib/admin-live";
+import { canMoveMoney, canSeeFinance, errMsg, useFinanceVersion, useRole, type PaymentCapabilities, type PaymentRow } from "@/lib/admin-live";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { ageLabel, useSocketQuery, type FinanceStats } from "@/lib/admin-stats";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/payment-methods";
+import { refundFigures } from "@/lib/refunds";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 
 const PAY_STATUS_FR: Record<string, string> = { succeeded: "Réussi", pending: "En attente", failed: "Échoué", refunded: "Remboursé" };
@@ -38,18 +40,7 @@ function ChartCard({ title, subtitle, children, className }: { title: string; su
   );
 }
 
-const METHOD_LABEL: Record<string, { en: string; fr: string }> = {
-  airtel_money: { en: "Airtel Money", fr: "Airtel Money" },
-  orange_money: { en: "Orange Money", fr: "Orange Money" },
-  vodacom_mpesa: { en: "Vodacom M-Pesa", fr: "Vodacom M-Pesa" },
-  stripe_card: { en: "Card", fr: "Carte" },
-  wallet: { en: "Wallet", fr: "Portefeuille" },
-  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
-};
-function methodLabel(m: string, fr: boolean) {
-  const l = METHOD_LABEL[m];
-  return l ? (fr ? l.fr : l.en) : m.replace(/_/g, " ");
-}
+const methodLabel = paymentMethodLabel;
 
 export default function AdminFinancePage() {
   const { t, locale } = useLocale();
@@ -59,7 +50,8 @@ export default function AdminFinancePage() {
   const { toast } = useToast();
   const mayDecide = canMoveMoney(role);
   const allowed = canSeeFinance(role);
-  const refreshKey = `${rt.payments.length}:${rt.payouts.length}:${rt.orders.length}`;
+  // The server pushes `finance:changed` after any order / payment / payout save: refresh on that, not on list lengths.
+  const refreshKey = useFinanceVersion(allowed);
   const fin = useSocketQuery<FinanceStats>("analytics:finance", undefined, { enabled: allowed, refreshKey });
   const caps = useSocketQuery<PaymentCapabilities>("payments:provider", undefined, { enabled: allowed });
   const payments = (rt.payments as PaymentRow[]).filter((p) => p.purpose !== "topup");
@@ -161,7 +153,7 @@ export default function AdminFinancePage() {
             <StatCard title={fr ? "GMV brut (hors annulées)" : "Gross GMV (excl. cancelled)"} value={formatCurrency(f.grossGmvUsd, locale)} icon={DollarSign} trend={`${fr ? "dont livraison" : "incl. delivery"} ${formatCurrency(f.deliveryFeesUsd, locale)}`} />
             <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)"} />
             <StatCard title={fr ? "Commission gagnée" : "Commission earned"} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)} · ${fr ? "taux actuel" : "current rate"} ${f.commissionPct}%`} />
-            <StatCard title={fr ? "Remboursements" : "Refunds"} value={formatCurrency(f.refundsUsd, locale)} icon={Receipt} trend={`${f.refundsCount} ${fr ? "paiement(s)" : "payment(s)"}`} />
+            <StatCard title={fr ? "Remboursements" : "Refunds"} value={formatCurrency(f.refundsUsd, locale)} icon={Receipt} trend={`${f.refundsCount} ${fr ? "paiement(s) · retours inclus" : "payment(s) · returns included"}`} />
             <StatCard title={fr ? "Versements payés" : "Payouts paid"} value={formatCurrency(f.payouts.paidUsd, locale)} icon={Wallet} trend={`${f.payouts.paidCount} ${fr ? "versement(s)" : "payout(s)"}`} />
             <StatCard title={fr ? "Versements à payer" : "Payouts owed"} value={formatCurrency(f.payouts.pendingUsd, locale)} icon={PiggyBank} trend={`${f.payouts.requestedCount} ${fr ? "à examiner" : "to review"} · ${f.payouts.pendingCount} ${fr ? "en cours" : "open"}`} />
             <StatCard title={fr ? "Mobile money en attente" : "Mobile money receivable"} value={formatCurrency(f.receivables.amountUsd, locale)} icon={Smartphone} trend={`${f.receivables.count} ${fr ? "paiement(s)" : "payment(s)"}${f.receivables.count ? ` · ${fr ? "plus ancien" : "oldest"} ${ageLabel(f.receivables.oldestMinutes, fr)}` : ""}`} />
@@ -226,9 +218,22 @@ export default function AdminFinancePage() {
                     { key: "orderReference", label: fr ? "Objet" : "For", render: (row) => <PaymentSubject row={row as unknown as PaymentRow} fr={fr} /> },
                     { key: "method", label: t("type"), render: (row) => <span>{methodLabel(String(row.method), fr)}</span> },
                     { key: "amountUsd", label: t("amount"), render: (row) => <span className={row.status === "refunded" ? "text-red-600" : "text-emerald-600"}>{formatCurrency(Number(row.amountUsd), locale)}</span> },
-                    { key: "status", label: t("status"), render: (row) => (
-                      <Badge variant={PAY_STATUS_VARIANT[String(row.status)] ?? "default"}>{fr ? (PAY_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}</Badge>
-                    )},
+                    {
+                      key: "refundedUsd",
+                      label: fr ? "Remboursé" : "Refunded",
+                      render: (row) => {
+                        const f = refundFigures(row as unknown as PaymentRow);
+                        return f.refundedUsd > 0 ? <span className="text-red-600">−{formatCurrency(f.refundedUsd, locale)}</span> : <span className="text-slate-400">—</span>;
+                      },
+                    },
+                    { key: "status", label: t("status"), render: (row) => {
+                      const partly = refundFigures(row as unknown as PaymentRow).state === "partial";
+                      return (
+                        <Badge variant={partly ? "warning" : (PAY_STATUS_VARIANT[String(row.status)] ?? "default")}>
+                          {partly ? (fr ? "Remboursé en partie" : "Partly refunded") : fr ? (PAY_STATUS_FR[String(row.status)] ?? String(row.status)) : String(row.status)}
+                        </Badge>
+                      );
+                    }},
                     { key: "createdAt", label: t("date"), render: (row) => <span>{localDay(String(row.createdAt))}</span> },
                   ]}
                   data={payments.slice(0, 15) as unknown as Record<string, unknown>[]}

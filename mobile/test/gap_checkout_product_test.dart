@@ -1,4 +1,4 @@
-// Checkout (estimated delivery from the sellers' delivery times, zone matched from the address) and the product page (variant choice).
+// Checkout (estimated delivery from the sellers' delivery times, fee quoted for the address's map pin) and the product page (variant choice).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -8,6 +8,7 @@ import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/screens/checkout_screen.dart';
 import 'package:lipcart/screens/more/support_extra.dart';
 import 'package:lipcart/screens/product_detail_screen.dart';
+import 'package:lipcart/services/auth_service.dart' show ApiException;
 import 'package:lipcart/services/models.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/util/delivery_estimate.dart';
@@ -22,8 +23,19 @@ Future<dynamic> _fakeServer(String event, [Map<String, dynamic>? body]) async {
   return {'id': 'o-${_sent.length}', 'reference': 'SOM-${_sent.length}', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
 }
 
-AddressDto _address({String? commune, String? zoneId, String id = 'a1', String city = 'Kinshasa'}) =>
-    AddressDto(id: id, label: 'Home', line1: '12 Avenue de la Paix', city: city, commune: commune, zoneId: zoneId, isDefault: true);
+/// A saved address; pinned on the map unless [pinned] is false.
+AddressDto _address({String? commune, String id = 'a1', String city = 'Kinshasa', bool pinned = true}) => AddressDto(
+    id: id,
+    label: 'Home',
+    line1: '12 Avenue de la Paix',
+    city: city,
+    commune: commune,
+    isDefault: true,
+    geo: pinned ? (lat: -4.31, lng: 15.31, placeId: null, formatted: null) : null);
+
+/// Gombe (a1) costs 3, Limete (a2) 5.
+Map<String, dynamic> _quoteFor(Map<String, dynamic>? body) =>
+    gapQuoteJson(fee: body?['addressId'] == 'a2' ? 5 : 3, hub: body?['addressId'] == 'a2' ? 'Limete Hub' : 'Kinshasa Hub');
 
 void main() {
   setUpAll(() async {
@@ -32,15 +44,15 @@ void main() {
   });
   tearDown(gapTearDown);
 
-  group('Checkout · delivery time and zone', () {
+  group('Checkout · delivery time and fee', () {
     setUp(() async {
       await gapReset();
       _sent.clear();
       final store = RealtimeStore.instance;
       store.walletBalance = 1000;
-      store.zones = List.of(gapZones);
       store.addresses.add(_address(commune: 'Gombe'));
       store.debugPlaceOrderRequest = _fakeServer;
+      store.debugCallRequest = gapCalls(quote: _quoteFor);
       ShopState.instance.addToCart(productByUuid('p1')!);
     });
 
@@ -78,9 +90,9 @@ void main() {
       await gapReset(products: [gapDto('fast', deliveryDays: 1), gapDto('slow', deliveryDays: 6)]);
       final store = RealtimeStore.instance;
       store.walletBalance = 1000;
-      store.zones = List.of(gapZones);
       store.addresses.add(_address(commune: 'Gombe'));
       store.debugPlaceOrderRequest = _fakeServer;
+      store.debugCallRequest = gapCalls(quote: _quoteFor);
       ShopState.instance.addToCart(productByUuid('fast')!);
       await open(tester);
       expect(tester.widget<Text>(find.byKey(const ValueKey('delivery-estimate'))).data, dayLabel(estimateFor([1]), 'en'));
@@ -97,89 +109,72 @@ void main() {
       expect(_sent.single.containsKey('estimatedDeliveryDate'), isFalse);
     });
 
-    group('zone from the delivery address (never shown to the shopper)', () {
+    group('delivery fee from the server quote (no zone is ever shown)', () {
       Finder snack(String text) => find.descendant(of: find.byType(SnackBar), matching: find.text(text));
 
       for (final lang in ['en', 'fr']) {
         final s = Strings(lang);
 
-        testWidgets('commune Limete is priced and sent as the Limete zone, with no zone shown ($lang)', (tester) async {
-          RealtimeStore.instance.addresses
-            ..clear()
-            ..add(_address(commune: 'Limete'));
+        testWidgets('the quoted fee and warehouse are shown, no zone anywhere ($lang)', (tester) async {
           await open(tester, lang: lang);
-          expect(ShopState.instance.selectedZoneId, 'zone-limete');
           expect(find.textContaining('Gombe · Kinshasa'), findsNothing, reason: 'no zone list');
-          expect(find.textContaining('Limete · Kinshasa'), findsNothing);
           expect(find.text(lang == 'en' ? 'Delivery zone' : 'Zone de livraison'), findsNothing);
-          expect(find.text(s.delivery), findsOneWidget, reason: 'the summary row says "Delivery", not the zone');
-          expect(find.byKey(const ValueKey('address-not-served')), findsNothing);
+          expect(find.text(s.delivery), findsOneWidget, reason: 'the summary row says "Delivery"');
+          expect(find.text(s.checkoutFromHub('Kinshasa Hub')), findsOneWidget);
+          expect(find.byKey(const ValueKey('address-needs-pin')), findsNothing);
           await place(tester);
-          expect(_sent.single['zoneId'], 'zone-limete');
-          expect(_sent.single['deliveryFeeUsd'], 5);
-          expect(_sent.single['shippingAddress'], contains('"zone":"zone-limete"'));
+          expect(_sent.single.containsKey('zoneId'), isFalse);
+          expect(_sent.single.containsKey('deliveryFeeUsd'), isFalse);
         });
 
-        testWidgets('a commune outside every zone blocks the order with "we don\'t deliver here" ($lang)', (tester) async {
-          RealtimeStore.instance.addresses
-            ..clear()
-            ..add(_address(commune: 'Narnia'));
+        testWidgets('an unpinned address blocks the order and asks for the pin ($lang)', (tester) async {
+          RealtimeStore.instance
+            ..requirePinnedAddress = true
+            ..addresses.clear()
+            ..addresses.add(_address(commune: 'Gombe', pinned: false));
+          addTearDown(() => RealtimeStore.instance.requirePinnedAddress = false);
           await open(tester, lang: lang);
-          expect(find.byKey(const ValueKey('address-not-served')), findsOneWidget);
-          expect(find.descendant(of: find.byKey(const ValueKey('address-not-served')), matching: find.text(s.checkoutNotServed)), findsOneWidget);
-          expect(find.text(s.checkoutChangeAddress), findsOneWidget);
+          expect(find.descendant(of: find.byKey(const ValueKey('address-needs-pin')), matching: find.text(s.checkoutNeedPin)), findsOneWidget);
+          expect(find.text(s.checkoutPinCta), findsOneWidget);
+          await place(tester);
+          expect(_sent, isEmpty);
+          expect(snack(s.checkoutNeedPin), findsOneWidget);
+        });
+
+        testWidgets('a refused quote is explained in the user\'s language and can be retried ($lang)', (tester) async {
+          RealtimeStore.instance.debugCallRequest = (event, [body]) async {
+            if (event == 'delivery:quote') throw ApiException('Delivery is not available right now: no warehouse is open.');
+            return const <dynamic>[];
+          };
+          await open(tester, lang: lang);
+          expect(find.text(s.checkoutQuoteFailed), findsOneWidget);
+          expect(find.text(s.retry), findsOneWidget);
           expect(find.text('—'), findsOneWidget, reason: 'no fee to show');
           await place(tester);
           expect(_sent, isEmpty);
-          expect(snack(s.checkoutNotServed), findsOneWidget);
-        });
-
-        testWidgets('an address without a commune asks for it and blocks the order ($lang)', (tester) async {
-          RealtimeStore.instance.addresses
-            ..clear()
-            ..add(_address());
-          await open(tester, lang: lang);
-          expect(find.descendant(of: find.byKey(const ValueKey('address-not-served')), matching: find.text(s.checkoutNeedCommune)), findsOneWidget);
-          expect(find.text(s.checkoutEditAddress), findsOneWidget);
-          await place(tester);
-          expect(_sent, isEmpty);
-          expect(snack(s.checkoutNeedCommune), findsOneWidget);
+          expect(snack(s.checkoutQuoteFailed), findsOneWidget);
+          expect(s.serverError('Delivery is not available right now: no warehouse is open.'),
+              lang == 'fr' ? contains('aucun entrepôt') : contains('no warehouse'));
         });
       }
 
-      testWidgets('the match ignores accents, case and the "Commune de" prefix', (tester) async {
-        RealtimeStore.instance.addresses
-          ..clear()
-          ..add(_address(commune: 'Commune de LIMETÉ'));
+      testWidgets('without the pin requirement an unpinned address is still quoted and ordered (old servers)', (tester) async {
+        RealtimeStore.instance
+          ..addresses.clear()
+          ..addresses.add(_address(commune: 'Gombe', pinned: false));
+        RealtimeStore.instance.debugCallRequest = gapCalls(quote: (_) => gapQuoteJson(pinned: false, fallback: 'city'));
         await open(tester);
-        expect(ShopState.instance.selectedZoneId, 'zone-limete');
-        expect(find.byKey(const ValueKey('address-not-served')), findsNothing);
-      });
-
-      testWidgets('the zone id saved on the address wins over the commune', (tester) async {
-        RealtimeStore.instance.addresses
-          ..clear()
-          ..add(_address(commune: 'Gombe', zoneId: 'zone-limete'));
-        await open(tester);
-        expect(ShopState.instance.selectedZoneId, 'zone-limete');
+        expect(find.byKey(const ValueKey('address-needs-pin')), findsNothing);
         await place(tester);
-        expect(_sent.single['zoneId'], 'zone-limete');
+        expect(_sent, hasLength(1));
       });
 
-      testWidgets('a commune of another city is not served', (tester) async {
-        RealtimeStore.instance.addresses
-          ..clear()
-          ..add(_address(commune: 'Limete', city: 'Lubumbashi'));
-        await open(tester);
-        expect(find.byKey(const ValueKey('address-not-served')), findsOneWidget);
-        await place(tester);
-        expect(_sent, isEmpty);
-      });
-
-      testWidgets('"Edit this address" opens the address form for that address', (tester) async {
-        RealtimeStore.instance.addresses
-          ..clear()
-          ..add(_address());
+      testWidgets('"Pin on the map" opens the address form for that address', (tester) async {
+        RealtimeStore.instance
+          ..requirePinnedAddress = true
+          ..addresses.clear()
+          ..addresses.add(_address(commune: 'Gombe', pinned: false));
+        addTearDown(() => RealtimeStore.instance.requirePinnedAddress = false);
         await open(tester);
         await tester.tap(find.byKey(const ValueKey('fix-address')));
         await tester.pump();
@@ -187,20 +182,18 @@ void main() {
         expect(find.byType(AddressFormScreen), findsOneWidget);
       });
 
-      testWidgets('a different delivery address re-applies its own zone and fee', (tester) async {
+      testWidgets('a different delivery address is quoted again with its own fee', (tester) async {
         final store = RealtimeStore.instance;
         store.addresses
           ..clear()
           ..addAll([_address(commune: 'Limete', id: 'a1'), _address(commune: 'Gombe', id: 'a2')]);
         await open(tester);
-        expect(ShopState.instance.selectedZoneId, 'zone-limete');
+        expect(find.text(const Strings('en').checkoutFromHub('Kinshasa Hub')), findsOneWidget);
         ShopState.instance.selectedAddressId = 'a2';
         store.notifyListeners();
         await tester.pump();
-        expect(ShopState.instance.selectedZoneId, 'zone-gombe');
-        await place(tester);
-        expect(_sent.single['zoneId'], 'zone-gombe');
-        expect(_sent.single['deliveryFeeUsd'], 3);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text(const Strings('en').checkoutFromHub('Limete Hub')), findsOneWidget);
       });
     });
   });
@@ -214,7 +207,6 @@ void main() {
         gapDto('plain', stock: 8),
       ]);
       final store = RealtimeStore.instance;
-      store.zones = List.of(gapZones);
       store.debugPlaceOrderRequest = _fakeServer;
       _sent.clear();
     });

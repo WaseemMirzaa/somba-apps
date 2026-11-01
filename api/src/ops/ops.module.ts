@@ -32,6 +32,8 @@ import { CustomersService } from './customers.service';
 import { BroadcastsService } from './broadcasts.service';
 import { UsersModule } from '../users/users.module';
 import { RolesService } from './roles.service';
+import { LogisticsModule } from '../logistics/logistics.module';
+import { GeoModule } from '../geo/geo.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { RolesService } from './roles.service';
     ProductsModule,
     CatalogModule,
     UsersModule,
+    LogisticsModule,
+    GeoModule,
   ],
   providers: [
     SellersService,

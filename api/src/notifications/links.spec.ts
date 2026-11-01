@@ -21,6 +21,21 @@ describe('linkFor', () => {
     expect(linkFor('rider', 'task', 'k1')).toBe('/rider/tasks/k1');
   });
 
+  it('opens exchanges, replacements, questions, reviews and support on every portal', () => {
+    expect(linkFor('customer', 'exchange', 'e1')).toBe('/shop/exchanges/e1');
+    expect(linkFor('customer', 'replacement', 'r1')).toBe('/shop/replacements/r1');
+    expect(linkFor('customer', 'exchange', null)).toBe('/shop/returns');
+    expect(linkFor('customer', 'question', 'p1')).toBe('/shop/products/p1');
+    expect(linkFor('seller', 'question', 'q1')).toBe('/seller/questions?focus=q1');
+    expect(linkFor('seller', 'question', null)).toBe('/seller/questions');
+    expect(linkFor('seller', 'review', 'v1')).toBe('/seller/reviews?focus=v1');
+    expect(linkFor('admin_moderation', 'review', 'v1')).toBe('/admin/reviews?focus=v1');
+    expect(linkFor('admin', 'question', 'q1')).toBe('/admin/reviews?focus=q1');
+    expect(linkFor('rider', 'support', 't1')).toBe('/rider/support/t1');
+    expect(linkFor('rider', 'support', null)).toBe('/rider/support');
+    expect(linkFor('warehouse_staff', 'support', 't1')).toBe('/warehouse/support/t1');
+  });
+
   it('falls back to a list or the inbox', () => {
     expect(linkFor('customer', 'order', null)).toBe('/shop/orders');
     expect(linkFor('customer', 'marketing', null)).toBe('/shop/notifications');

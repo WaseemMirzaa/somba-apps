@@ -31,12 +31,16 @@
     "smoke:flows": "node test/flows-smoke.cjs",
     "smoke:race": "node test/race-smoke.cjs",
     "smoke:coverage": "node test/coverage-smoke.cjs",
-    "smoke:zones": "node test/warehouse-zones-smoke.cjs",
+    "smoke:routing": "node test/warehouse-routing-smoke.cjs",
+    "smoke:areas": "node test/warehouse-areas-smoke.cjs",
     "check:prod": "node test/prod-check.cjs",
     "i18n:migrate-synced-db": "node scripts/i18n-migrate-synced-db.cjs",
     "translate:backfill": "ts-node -r tsconfig-paths/register src/translation/backfill.ts",
     "translate:backfill:prod": "node dist/translation/backfill.js",
-    "smoke:i18n": "node test/i18n-smoke.cjs"
+    "smoke:i18n": "node test/i18n-smoke.cjs",
+    "smoke:commerce": "node test/commerce-smoke.cjs",
+    "smoke:aftersale": "node test/after-sale-smoke.cjs",
+    "smoke:sellerplatform": "node test/seller-platform-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

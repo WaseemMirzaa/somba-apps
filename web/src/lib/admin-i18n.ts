@@ -82,7 +82,3 @@ export { t, type Locale } from "./i18n";
 export function customerColumnLabel(locale: Locale) {
   return t(locale, "customer");
 }
-
-export function zoneColumnLabel(locale: Locale) {
-  return t(locale, "zone");
-}

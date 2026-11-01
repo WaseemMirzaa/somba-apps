@@ -16,6 +16,16 @@ export class AuthApiError extends Error {
   }
 }
 
+/**
+ * The account has two-factor authentication on: the password was right, now ask for the 6-digit code (or a
+ * recovery code) and finish with `authApi.login2fa(challenge, code)`. The challenge is valid for 5 minutes.
+ */
+export class TwoFactorRequired extends Error {
+  constructor(readonly challenge: string) {
+    super("Two-factor authentication code required.");
+  }
+}
+
 async function post<T>(
   path: string,
   body: unknown,
@@ -47,8 +57,15 @@ async function post<T>(
 export const authApi = {
   apiUrl: API_URL,
 
-  login(email: string, password: string): Promise<AuthResult> {
-    return post<AuthResult>("/api/v1/auth/login", { email, password });
+  async login(email: string, password: string): Promise<AuthResult> {
+    const res = await post<AuthResult | { needs2fa: true; challenge: string }>("/api/v1/auth/login", { email, password });
+    if ("needs2fa" in res && res.needs2fa) throw new TwoFactorRequired(res.challenge);
+    return res as AuthResult;
+  },
+
+  /** Second step of a sign-in on an account with two-factor authentication on. */
+  login2fa(challenge: string, code: string): Promise<AuthResult> {
+    return post<AuthResult>("/api/v1/auth/login/2fa", { challenge, code });
   },
 
   register(input: {

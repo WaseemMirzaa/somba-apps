@@ -70,7 +70,6 @@ void main() {
     final store = RiderStore.instance;
     store.user = null;
     store.myTasks.clear();
-    store.pool.clear();
     store.notifications.clear();
   });
 
@@ -86,6 +85,21 @@ void main() {
       expect(t.items[1].displayName('fr'), 'Charger', reason: 'old order / old server: the stored name');
       expect(t.items[0].text('fr'), '2× Coque de téléphone');
       expect(t.items[1].text('en'), '1× Charger');
+    });
+
+    test('a leg carries its own cargo with the French name next to the base name (no order snapshot)', () {
+      // what the API sends since the cargo of a leg keeps `nameFr`: a transfer or a pickup has no order block
+      final t = DeliveryTaskDto.fromJson({
+        'id': 't',
+        'orderReference': 'SOM-1',
+        'kind': 'pickup',
+        'items': [
+          {'name': 'Blue Cotton T-Shirt', 'nameFr': 'T-shirt bleu en coton', 'qty': 1},
+          {'name': 'Dyson V15 Vacuum', 'qty': 2}, // a leg made before the French name was kept
+        ],
+      });
+      expect(t.items.map((i) => i.text('fr')), ['1× T-shirt bleu en coton', '2× Dyson V15 Vacuum']);
+      expect(t.items.map((i) => i.text('en')), ['1× Blue Cotton T-Shirt', '2× Dyson V15 Vacuum']);
     });
 
     test('an old payload (no order, no items) still parses', () {
@@ -156,10 +170,10 @@ void main() {
       expect(find.textContaining('Coque'), findsNothing);
     });
 
-    testWidgets('an available delivery (the pool) shows the French names too', (tester) async {
-      RiderStore.instance.pool
+    testWidgets('a finished delivery (Done tab) shows the French names too', (tester) async {
+      RiderStore.instance.myTasks
         ..clear()
-        ..add(_task('unassigned', items: lines));
+        ..add(_task('delivered', items: lines));
       await show(tester, 'fr', const Scaffold(body: DeliveriesScreen()));
       await tester.tap(find.byKey(const ValueKey('tab-1')));
       await tester.pump(const Duration(milliseconds: 300));

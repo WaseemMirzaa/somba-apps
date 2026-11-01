@@ -73,7 +73,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     _open(PushService.instance.takeTap()!);
   }
 
-  void _open(PushMessage m) => RiderStore.instance.openNotice(type: m.type, entityId: m.entityId, view: m.data['view'], notificationId: m.notificationId);
+  void _open(PushMessage m) => RiderStore.instance.openNotice(type: m.type, entityId: m.entityId, notificationId: m.notificationId);
 
   /// A push while the app is open: a banner with "Open" (the lists refresh on their own).
   void _showForegroundPush(PushMessage m) {

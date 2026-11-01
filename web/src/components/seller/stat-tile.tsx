@@ -22,7 +22,7 @@ export function StatTile({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-1 truncate font-[family-name:var(--font-display)] text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
+          <p className="mt-1 break-words font-[family-name:var(--font-display)] text-xl font-bold leading-tight text-slate-900 sm:text-2xl">{value}</p>
           {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
         </div>
         <div className="grid justify-items-end gap-2">

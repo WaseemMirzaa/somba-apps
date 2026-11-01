@@ -34,7 +34,11 @@ export const TRANSLATABLE: Partial<Record<TranslationEntityType, Record<string, 
     variants: { column: 'variants', max: 4000, label: 'Options', json: true },
   },
   category: { name: { column: 'name', max: 100, label: 'Name', primary: true } },
-  seller: { description: { column: 'description', max: 1000, label: 'Description' } },
+  seller: {
+    description: { column: 'description', max: 1000, label: 'Description' },
+    returnsPolicy: { column: 'returnsPolicy', max: 2000, label: 'Returns policy' },
+    shippingPolicy: { column: 'shippingPolicy', max: 2000, label: 'Shipping policy' },
+  },
   campaign: { name: { column: 'name', max: 150, label: 'Campaign name', primary: true } },
   flash_sale: { title: { column: 'title', max: 150, label: 'Title', primary: true } },
   cms_block: {

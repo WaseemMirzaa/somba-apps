@@ -6,10 +6,13 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { hubId: demoHubId, tasksOf, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
 const PHONE = '+243812345678';
+// Delivery needs an address in a served area: a plain Kinshasa address resolves to the city, which Entrepôt Kinshasa covers.
+const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 
 let pass = 0;
 const fails = [];
@@ -135,35 +138,38 @@ const register = async (label, role = 'customer') => {
   const priceOf = (await req(buyer.sock, 'products:get', { id: prodA.id })).data.price; // $100
   const cheap = (await req(admin.sock, 'products:create', { name: `Cheap ${tag}`, price: 30, category: 'Electronics', stock: 100 })).data;
   const burst = await Promise.all(Array.from({ length: 10 }, () =>
-    req(buyer.sock, 'orders:create', { items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' })));
+    req(buyer.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })));
   const wins = burst.filter((r) => r.ok).length;
   const bal = (await req(buyer.sock, 'wallet:get')).data.balance;
-  ok(wins === 1, `10 simultaneous wallet orders for $33 with $50 → exactly 1 succeeds (got ${wins})`);
-  ok(Math.abs(bal - 17) < 0.011 && bal >= 0, `balance is $17.00, never negative (got $${bal})`);
-  ok((await req(admin.sock, 'products:get', { id: cheap.id })).data.stock === 99, 'only the winning order reserved stock (failed ones released it)');
+  const fee = burst.find((r) => r.ok)?.data.deliveryFeeUsd ?? 2; // an unpinned address pays the base delivery fee
+  const cost = 30 + fee;
+  ok(wins === 1, `10 simultaneous wallet orders for $${cost} with $50 → exactly 1 succeeds (got ${wins})`);
+  ok(Math.abs(bal - (50 - cost)) < 0.011 && bal >= 0, `balance is $${(50 - cost).toFixed(2)}, never negative (got $${bal})`);
+  const cheapStock = (await req(admin.sock, 'products:get', { id: cheap.id })).data.stock;
+  ok(cheapStock === 99, `only the winning order reserved stock (failed ones released it) (got ${cheapStock})`);
 
   const scarce = (await req(admin.sock, 'products:create', { name: `Scarce ${tag}`, price: 5, category: 'Electronics', stock: 3 })).data;
   const rush = await Promise.all(Array.from({ length: 10 }, (_, i) =>
-    req((i % 2 ? cust : cust2).sock, 'orders:create', { items: [{ productId: scarce.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, zoneId: 'gombe' })));
+    req((i % 2 ? cust : cust2).sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: scarce.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, })));
   ok(rush.filter((r) => r.ok).length === 3, `10 buyers race for 3 units → exactly 3 orders (got ${rush.filter((r) => r.ok).length})`);
   ok((await req(admin.sock, 'products:get', { id: scarce.id })).data.stock === 0, 'stock ends at exactly 0, never negative');
 
   // refunds happen once even if cancel is hammered
-  const wo = (await req(buyer.sock, 'orders:create', { items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet' , zoneId: 'gombe' }));
+  const wo = (await req(buyer.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet' , }));
   ok(!wo.ok, 'a wallet order beyond the remaining balance is refused');
   await req(buyer.sock, 'wallet:topup', { amountUsd: 40, method: 'airtel_money', phone: PHONE });
   await until(async () => (await req(buyer.sock, 'wallet:get')).data.balance >= 57);
-  const paid = (await req(buyer.sock, 'orders:create', { items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' })).data;
+  const paid = (await req(buyer.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })).data;
   const before = (await req(buyer.sock, 'wallet:get')).data.balance; // 57 - 33 = 24
   const cancels = await Promise.all(Array.from({ length: 6 }, () => req(buyer.sock, 'orders:cancel', { orderId: paid.id })));
   const after = (await req(buyer.sock, 'wallet:get')).data.balance;
   ok(cancels.filter((r) => r.ok).length === 1, 'six simultaneous cancels → exactly one succeeds');
-  ok(Math.abs(after - (before + 33)) < 0.011, `…and the refund is paid once (+$33): $${before} → $${after}`);
+  ok(Math.abs(after - (before + paid.totalUsd)) < 0.011, `…and the refund is paid once (+$${paid.totalUsd}): $${before} → $${after}`);
   ok((await req(admin.sock, 'orders:refund', { orderId: paid.id })).ok === false, 'a cancelled order cannot be refunded a second time');
 
   // ---- orders: who can see / change what -----------------------------------
   section('Orders: visibility and status changes');
-  const o1 = (await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: 'SECRET STREET 9', city: 'Kinshasa' }) })).data;
+  const o1 = (await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'orange_money', paymentPhone: PHONE, shippingAddress: JSON.stringify({ line1: 'SECRET STREET 9', city: 'Kinshasa' }) })).data;
   await until(async () => (await req(cust.sock, 'orders:list')).data.find((o) => o.id === o1.id)?.status === 'confirmed');
   const sellerView = (await req(sellerA.sock, 'orders:list')).data;
   const mine = sellerView.find((o) => o.id === o1.id);
@@ -194,17 +200,21 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(sellerA.sock, 'delivery:list')).ok, 'a seller cannot list delivery tasks');
   ok(!(await req(cust.sock, 'rider:tasks')).ok, 'a customer cannot read the rider queue');
   ok(!(await req(cust.sock, 'delivery:unassigned')).ok, 'a customer cannot list unassigned deliveries');
-  const task = (await req(rider.sock, 'delivery:unassigned')).data.find((x) => x.orderId === o1.id);
-  ok(!!task, 'the rider sees the paid order as an available delivery');
+  ok(((await req(rider.sock, 'delivery:unassigned')).data ?? []).length === 0, 'a rider has no open pool: nothing is offered to them');
+  const task = await until(async () => (await tasksOf(admin, o1.id)).find((x) => x.kind === 'pickup'));
+  ok(!!task, 'the paid order has a pickup task in the warehouse queue');
+  ok(!((await req(rider.sock, 'rider:tasks')).data ?? []).some((x) => x.id === task.id), 'and a rider does not see it before being assigned');
   const rider2 = await register('rider2');
-  await req(admin.sock, 'roles:setRole', { id: rider2.user.id, role: 'rider' });
+  a = await req(admin.sock, 'roles:setRole', { id: rider2.user.id, role: 'rider' });
+  ok(!a.ok, 'a rider needs a warehouse: roles:setRole without one is refused', a.error ?? '');
+  await req(admin.sock, 'roles:setRole', { id: rider2.user.id, role: 'rider', hubId: await demoHubId(admin) });
   const rider2s = await login(`rider2${tag}@authz.test`, 'Authz-Pass-2026').catch(() => null);
   a = await req(rider.sock, 'delivery:accept', { taskId: task.id });
-  ok(a.ok, 'a rider claims the task');
+  ok(!a.ok, 'a rider cannot claim a task themselves');
+  a = await req(warehouse.sock, 'logistics:assign', { taskId: task.id, riderId: rider.user.id });
+  ok(a.ok, 'the warehouse assigns the task to a rider', a.error ?? '');
   a = await req(rider.sock, 'delivery:accept', { taskId: task.id });
-  ok(!a.ok, 'the same task cannot be claimed twice');
-  const claimants = await Promise.all([rider.sock, rider.sock].map((s) => req(s, 'delivery:accept', { taskId: task.id })));
-  ok(claimants.every((r) => !r.ok), 'a task already on the road cannot be stolen');
+  ok(!a.ok, 'an assigned task cannot be claimed either');
   a = await req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
   ok(!a.ok, 'a delivery cannot jump from assigned straight to delivered');
   a = await req(rider.sock, 'delivery:updateStatus', { taskId: task.id, status: 'teleported' });
@@ -233,7 +243,7 @@ const register = async (label, role = 'customer') => {
 
   // ---- disputes ------------------------------------------------------------
   section('Disputes and refunds');
-  const pend = (await req(cust2.sock, 'orders:create', { items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, zoneId: 'gombe' })).data;
+  const pend = (await req(cust2.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, })).data;
   a = await req(cust2.sock, 'disputes:open', { orderId: pend.id, type: 'dispute', reason: 'not paid yet' });
   ok(!a.ok, 'cannot open a dispute on an order that is not paid yet');
   await until(async () => (await req(cust2.sock, 'orders:list')).data.find((o) => o.id === pend.id)?.status === 'confirmed');
@@ -273,7 +283,7 @@ const register = async (label, role = 'customer') => {
   ok(!('maxUses' in (await req(cust.sock, 'promos:list')).data[0]) && !('id' in (await req(cust.sock, 'promos:list')).data[0]), 'internal promo fields are not exposed');
   ok(!(await req(admin.sock, 'promos:create', { code: 'BAD', type: 'percent', value: 100 })).ok, 'a 100% promo is rejected');
   ok(!(await req(admin.sock, 'promos:create', { code: `ONCE${tag}`, type: 'fixed', value: 5 })).ok, 'duplicate codes are rejected');
-  const line = { items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, zoneId: 'gombe' };
+  const line = { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, };
   const pr = await req(cust.sock, 'orders:create', { ...line, promoCode: code('ONCE') });
   ok(pr.ok && pr.data.discountUsd === 5, 'a promo is applied');
   ok(!(await req(cust.sock, 'orders:create', { ...line, promoCode: code('ONCE') })).ok, 'a per-customer limit of 1 blocks reuse');
@@ -287,9 +297,10 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(cust.sock, 'settings:set', { key: 'fxRate', value: '1' })).ok, 'a customer cannot change settings');
   ok(!(await req(admin.sock, 'settings:set', { key: 'jwtSecret', value: 'x' })).ok, 'unknown setting keys are rejected');
   ok(!(await req(admin.sock, 'settings:set', { key: 'commissionPct', value: '999' })).ok, 'out-of-range commission is rejected');
-  ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryZones', value: '[{"id":"x","name":"x","feeUsd":9999}]' })).ok, 'an absurd zone fee is rejected');
+  ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryBaseUsd', value: 9999 })).ok, 'an absurd delivery fee is rejected');
+  ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryZones', value: '[]' })).ok, 'delivery zones can no longer be written');
   const pubSettings = (await req(cust.sock, 'settings:get')).data;
-  ok('deliveryZones' in pubSettings && !('commissionPct' in pubSettings), 'customers read only the public settings');
+  ok('deliveryBaseUsd' in pubSettings && 'deliveryPerKmUsd' in pubSettings && !('commissionPct' in pubSettings), 'customers read only the public settings (delivery fee numbers included)');
   ok('commissionPct' in (await req(finance.sock, 'settings:get')).data, 'finance reads all settings');
   ok(!(await req(finance.sock, 'roles:staff')).ok, 'only the super admin lists staff accounts');
   ok(!(await req(finance.sock, 'roles:setRole', { id: cust.user.id, role: 'admin' })).ok, 'only the super admin changes roles');
@@ -360,7 +371,7 @@ const register = async (label, role = 'customer') => {
 
   section('Seller analytics: own data only');
   const prodB = (await req(sellerB.sock, 'products:create', { name: `B Gadget ${tag}`, price: 30, category: 'Electronics', stock: 20 })).data;
-  const payIt = (c, pid, qty) => req(c.sock, 'orders:create', { items: [{ productId: pid, qty }], paymentMethod: 'stripe_card', zoneId: 'gombe', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  const payIt = (c, pid, qty) => req(c.sock, 'orders:create', { items: [{ productId: pid, qty }], paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   await payIt(cust, prodA.id, 1);
   await payIt(cust2, prodB.id, 3);
   const aA = (await req(sellerA.sock, 'analytics:seller', { days: 30 })).data;
@@ -398,8 +409,7 @@ const register = async (label, role = 'customer') => {
   section('Reviews: reply and moderation boundaries');
   const rprod = (await req(sellerA.sock, 'products:create', { name: `A Reviewed ${tag}`, price: 20, category: 'Electronics', stock: 10 })).data;
   const ro = (await payIt(cust, rprod.id, 1)).data;
-  const rt = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === ro.id));
-  await req(rider.sock, 'delivery:accept', { taskId: rt.id });
+  const rt = await toDelivery(admin, rider, ro.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider.sock, 'delivery:updateStatus', { taskId: rt.id, status: st });
   const rv = (await req(cust.sock, 'reviews:create', { productId: rprod.id, rating: 3, text: 'Average product' })).data;
   ok(rv && rv.status === 'visible', 'setup: a delivered buyer reviews');
@@ -446,7 +456,7 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(sellerA.sock, 'campaigns:create', { name: 'Steal A', discount: 30, productIds: [prodC.id] })).ok, "or put the first store's product into theirs");
   a = await payIt(cust, prodC.id, 1);
   ok(a.ok && a.data.items[0].priceUsd === baseA, 'checkout charges the database price', JSON.stringify(a));
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodC.id, qty: 1, priceUsd: 1, campaignPct: 90, listPriceUsd: 1 }], paymentMethod: 'stripe_card', zoneId: 'gombe', campaignDiscountUsd: 999, shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodC.id, qty: 1, priceUsd: 1, campaignPct: 90, listPriceUsd: 1 }], paymentMethod: 'stripe_card', campaignDiscountUsd: 999, shippingAddress: JSON.stringify({ line1: '1 Test', city: 'Kinshasa' }) });
   ok(a.ok && a.data.items[0].priceUsd === baseA && a.data.campaignDiscountUsd === 0 && a.data.items[0].campaignPct === 0 && a.data.items[0].listPriceUsd === baseA, 'client-sent priceUsd / campaignPct / campaignDiscountUsd on an order are ignored');
   await req(admin.sock, 'campaigns:setStatus', { id: hack.id, status: 'ended' });
 
@@ -456,10 +466,10 @@ const register = async (label, role = 'customer') => {
   try {
     a = await payIt(un, prodA.id, 1);
     ok(!a.ok && /verify/i.test(a.error ?? ''), 'an unverified customer cannot check out when the policy is on', a.error ?? '');
-    a = await req(un.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet', zoneId: 'gombe' });
+    a = await req(un.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet', });
     ok(!a.ok && /verify/i.test(a.error ?? ''), 'whatever the payment method');
     ok(!(await req(un.sock, 'wallet:topup', { amountUsd: 5, method: 'airtel_money', phone: PHONE })).ok, 'or top up');
-    ok(!(await req(guest.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet' })).ok, 'a guest never can');
+    ok(!(await req(guest.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: prodA.id, qty: 1 }], paymentMethod: 'wallet' })).ok, 'a guest never can');
   } finally {
     await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
   }

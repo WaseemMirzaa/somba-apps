@@ -6,6 +6,7 @@
  */
 import { packageStatusTone, lineStateTone } from "./seller-packages";
 import type { LineState } from "./seller-packages";
+import { portalIsFrench, sellerErrorText } from "./seller-errors";
 
 export type BadgeVariant = "default" | "primary" | "success" | "warning" | "danger" | "purple" | "info";
 type Labels = Record<string, { en: string; fr: string; variant: BadgeVariant }>;
@@ -250,19 +251,12 @@ export function downloadCsv(filename: string, rows: (string | number)[][]): void
 }
 
 export function errMessage(e: unknown, fallback = "Something went wrong."): string {
-  if (e instanceof Error && e.message) return e.message;
-  if (typeof e === "string" && e) return e;
-  return fallback;
+  // The server answers in English; known texts are shown in French when the portal is in French (seller-errors.ts).
+  if (e instanceof Error && e.message) return sellerErrorText(e);
+  if (typeof e === "string" && e) return sellerErrorText(e);
+  return portalIsFrench() && fallback === "Something went wrong." ? "Une erreur est survenue. Réessayez." : fallback;
 }
 
 // ─── Payment methods on orders (orders.paymentMethod) ────────────────────────
-const ORDER_PAYMENT: Record<string, { en: string; fr: string }> = {
-  wallet: { en: "Somba wallet", fr: "Portefeuille Somba" },
-  cod: { en: "Cash on delivery", fr: "Paiement à la livraison" },
-  airtel_money: { en: "Airtel Money", fr: "Airtel Money" },
-  orange_money: { en: "Orange Money", fr: "Orange Money" },
-  vodacom_mpesa: { en: "Vodacom M-Pesa", fr: "Vodacom M-Pesa" },
-  stripe_card: { en: "Card", fr: "Carte" },
-};
-export const paymentMethodLabel = (m: string, fr: boolean) =>
-  ORDER_PAYMENT[m] ? (fr ? ORDER_PAYMENT[m].fr : ORDER_PAYMENT[m].en) : m;
+// One shared map for every portal: see lib/payment-methods.ts.
+export { paymentMethodLabel } from "@/lib/payment-methods";

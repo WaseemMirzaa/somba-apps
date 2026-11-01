@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { NoticeBar } from "@/components/admin/notice-bar";
@@ -12,7 +11,7 @@ import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { PlansEditor } from "@/components/admin/plans-editor";
 import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
-import { errMsg, type ZoneSetting } from "@/lib/admin-live";
+import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 
 type Values = Record<string, string>;
@@ -25,6 +24,8 @@ interface TextField {
   hint: string;
   hintFr: string;
   inputMode?: "decimal" | "numeric" | "text";
+  /** Client-side range check (the server checks again and its message is shown). */
+  range?: { min: number; max: number; integer?: boolean };
 }
 interface ToggleField {
   key: string;
@@ -51,6 +52,27 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     fields: [
       { key: "minPayoutUsd", kind: "text", label: "Minimum payout (USD)", labelFr: "Versement minimum (USD)", hint: "Sellers cannot request less.", hintFr: "Les vendeurs ne peuvent pas demander moins.", inputMode: "decimal" },
       { key: "payoutClearanceHours", kind: "text", label: "Clearance hours", labelFr: "Heures de compensation", hint: "Whole hours (0 to 720) before earnings become withdrawable.", hintFr: "Heures entières (0 à 720) avant que les gains soient retirables.", inputMode: "numeric" },
+    ],
+  },
+  {
+    title: "Delivery fee",
+    titleFr: "Frais de livraison",
+    fields: [
+      { key: "deliveryBaseUsd", kind: "text", label: "Base fee (USD)", labelFr: "Frais de base (USD)", hint: "0 to 100. Charged on every delivery.", hintFr: "0 à 100. Facturés sur chaque livraison.", inputMode: "decimal", range: { min: 0, max: 100 } },
+      { key: "deliveryPerKmUsd", kind: "text", label: "Fee per km (USD)", labelFr: "Frais par km (USD)", hint: "0 to 50. Distance from the destination warehouse to the customer's pin.", hintFr: "0 à 50. Distance entre l'entrepôt de destination et le point du client.", inputMode: "decimal", range: { min: 0, max: 50 } },
+      { key: "deliveryMaxUsd", kind: "text", label: "Cap on base + distance (USD)", labelFr: "Plafond base + distance (USD)", hint: "0 to 500. The distance part never goes above this.", hintFr: "0 à 500. La part distance ne dépasse jamais ce montant.", inputMode: "decimal", range: { min: 0, max: 500 } },
+      { key: "deliveryTransferUsd", kind: "text", label: "Transfer fee between warehouses (USD)", labelFr: "Frais de transfert entre entrepôts (USD)", hint: "0 to 100. Added when a parcel travels from its origin to the destination warehouse.", hintFr: "0 à 100. Ajoutés quand un colis voyage de l'entrepôt d'origine à l'entrepôt de destination.", inputMode: "decimal", range: { min: 0, max: 100 } },
+      { key: "requirePinnedAddress", kind: "toggle", label: "Require a map pin on delivery addresses", labelFr: "Exiger un point sur la carte pour les adresses", hint: "On: checkout refuses an address without a pin (Pin your delivery address on the map).", hintFr: "Activé : le paiement refuse une adresse sans point sur la carte." },
+      { key: "requireSellerPickupPin", kind: "toggle", label: "Require a pickup pin to list products", labelFr: "Exiger un point de collecte pour publier", hint: "On: a seller cannot list a new product until the store has a pickup pin.", hintFr: "Activé : un vendeur ne peut publier un produit qu'après avoir placé son point de collecte." },
+    ],
+  },
+  {
+    title: "Returns and sellers",
+    titleFr: "Retours et vendeurs",
+    fields: [
+      { key: "returnWindowDays", kind: "text", label: "Return window (days)", labelFr: "Délai de retour (jours)", hint: "Whole days 0 to 90 after delivery. 0 closes returns.", hintFr: "Jours entiers de 0 à 90 après la livraison. 0 ferme les retours.", inputMode: "numeric", range: { min: 0, max: 90, integer: true } },
+      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, the customer may escalate to Somba support.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader au support Somba.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
+      { key: "seller2faRequired", kind: "toggle", label: "Require two-factor authentication for store owners", labelFr: "Exiger l'authentification à deux facteurs pour les propriétaires", hint: "On: store owners without 2FA can only open Settings > Security until they turn it on.", hintFr: "Activé : un propriétaire sans 2FA ne peut ouvrir que Paramètres > Sécurité tant qu'il ne l'a pas activée." },
     ],
   },
   {
@@ -104,6 +126,28 @@ export default function AdminSettingsPage() {
     if (rt.status === "connected") void load();
   }, [rt.status, load]);
 
+  // Another admin (or a sweep) changed a setting: take the new values, but never overwrite what is being typed.
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
+  useEffect(() => {
+    if (rt.status !== "connected") return;
+    const sock = socketClient.current;
+    const onUpdate = (all: Values) => {
+      if (!all || typeof all !== "object") return;
+      const before = savedRef.current;
+      setSaved(all);
+      setDraft((d) => {
+        const next = { ...d };
+        for (const k of Object.keys(all)) if ((d[k] ?? "") === (before[k] ?? "")) next[k] = all[k];
+        return next;
+      });
+    };
+    sock?.on("settings:updated", onUpdate);
+    return () => {
+      sock?.off("settings:updated", onUpdate);
+    };
+  }, [rt.status]);
+
   const dirty = (key: string) => (draft[key] ?? "") !== (saved[key] ?? "");
 
   async function saveKey(key: string): Promise<boolean> {
@@ -113,6 +157,20 @@ export default function AdminSettingsPage() {
       delete n[key];
       return n;
     });
+    const field = GROUPS.flatMap((g) => g.fields).find((f) => f.key === key);
+    if (field?.kind === "text" && field.range) {
+      const raw = (draftRef.current[key] ?? "").trim();
+      const n = Number(raw.replace(",", "."));
+      const { min, max, integer } = field.range;
+      if (!raw || !Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
+        setErrors((er) => ({
+          ...er,
+          [key]: fr ? `Saisissez ${integer ? "un nombre entier" : "un nombre"} entre ${min} et ${max}.` : `Enter ${integer ? "a whole number" : "a number"} between ${min} and ${max}.`,
+        }));
+        setSavingKey(null);
+        return false;
+      }
+    }
     try {
       const all = await socketClient.request<Values>("settings:set", { key, value: draftRef.current[key] ?? "" });
       setSaved(all);
@@ -143,14 +201,6 @@ export default function AdminSettingsPage() {
     const failed = keys.length - ok;
     if (failed === 0) toast(fr ? `${ok} paramètre(s) enregistré(s)` : `${ok} setting(s) saved`, "success");
     else toast(fr ? `${ok} enregistré(s), ${failed} en erreur — voir les champs` : `${ok} saved, ${failed} failed — see the fields`, "error");
-  }
-
-  let zones: ZoneSetting[] = [];
-  try {
-    const parsed = saved.deliveryZones ? (JSON.parse(saved.deliveryZones) as ZoneSetting[]) : [];
-    zones = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    zones = [];
   }
 
   const anyDirty = GROUPS.some((g) => g.fields.some((f) => dirty(f.key)));
@@ -222,27 +272,6 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           ))}
-
-          <div className="card-premium space-y-3 p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-semibold">{fr ? "Zones de livraison" : "Delivery zones"}</h3>
-              <Link href="/admin/zones" className="text-sm font-medium text-[var(--primary)] hover:underline">
-                {fr ? "Modifier les zones" : "Edit zones"}
-              </Link>
-            </div>
-            {zones.length === 0 ? (
-              <p className="text-sm text-slate-400">{fr ? "Aucune zone enregistrée." : "No zones saved yet."}</p>
-            ) : (
-              <div className="space-y-2">
-                {zones.map((z) => (
-                  <div key={z.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                    <span>{z.name} ({z.city})</span>
-                    <span>${z.feeUsd} USD</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           <div className="card-premium space-y-3 p-6">
             <h3 className="font-semibold">{fr ? "Formules d'abonnement vendeur" : "Seller subscription plans"}</h3>

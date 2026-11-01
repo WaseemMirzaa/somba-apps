@@ -12,7 +12,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
-import { DISPUTE_STATUS_BADGE, DISPUTE_STATUS_LABEL, type DisputeRow } from "@/lib/admin-live";
+import { DISPUTE_CATEGORY_LABEL, DISPUTE_STAGE_BADGE, DISPUTE_STAGE_LABEL, DISPUTE_STATUS_BADGE, DISPUTE_STATUS_LABEL, lab, type DisputeRow } from "@/lib/admin-live";
 
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
@@ -27,12 +27,12 @@ export default function AdminReturnsPage() {
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const returns = (rt.disputes as DisputeRow[])
     .filter((d) => d.type === "return")
-    .map((d) => ({ ...d, date: localDay(d.createdAt), received: d.receivedAt ? "yes" : "no" }));
+    .map((d) => ({ ...d, date: localDay(d.createdAt), stageKey: d.status === "open" ? (d.stage ?? "awaiting_seller") : "closed" }));
 
   const filtered = useMemo(
     () =>
       applyListFilters(returns, filters, {
-        searchFields: ["reference", "orderReference", "customerName", "reason"],
+        searchFields: ["reference", "orderReference", "customerName", "reason", "category"],
         dateField: "date",
         statusField: "status",
       }),
@@ -68,8 +68,9 @@ export default function AdminReturnsPage() {
               )},
               { key: "customerName", label: t("customer") },
               { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="line-clamp-2 max-w-[16rem] font-medium text-amber-700">{String(row.reason)}</span> },
-              { key: "received", label: fr ? "Reçu à l'entrepôt" : "Received at warehouse", render: (row) => (
-                <Badge variant={row.received === "yes" ? "success" : "default"}>{row.received === "yes" ? (fr ? "Oui" : "Yes") : fr ? "Non" : "No"}</Badge>
+              { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => <span className="text-slate-600">{row.category ? lab(DISPUTE_CATEGORY_LABEL, String(row.category), fr) : "—"}</span> },
+              { key: "stageKey", label: fr ? "Étape" : "Stage", render: (row) => (
+                <Badge variant={DISPUTE_STAGE_BADGE[String(row.stageKey)] ?? "default"}>{lab(DISPUTE_STAGE_LABEL, String(row.stageKey), fr)}</Badge>
               )},
               { key: "status", label: t("status"), render: (row) => (
                 <Badge variant={DISPUTE_STATUS_BADGE[String(row.status)] ?? "default"}>{DISPUTE_STATUS_LABEL[String(row.status)]?.[fr ? "fr" : "en"] ?? String(row.status)}</Badge>

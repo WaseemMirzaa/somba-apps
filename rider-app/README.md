@@ -7,9 +7,9 @@ earnings.
 ## Realtime backend connection
 
 The whole app runs on live data (no mock tasks): it connects to the NestJS backend (`../api`) over a single
-authenticated **Socket.IO** connection (services in `lib/services/`). The rider
-accepts tasks from the unassigned pool, advances delivery status, and streams
-GPS — each action pushes live to the customer app and the web dashboards.
+authenticated **Socket.IO** connection (services in `lib/services/`). The rider's warehouse
+assigns the tasks (pickup, transfer, delivery, returns, replacements; there is no self-accept); the rider
+advances each leg's status and streams GPS — each action pushes live to the customer app and the web dashboards.
 
 Configure the endpoint with `--dart-define` (defaults target the Android
 emulator loopback `10.0.2.2`). `API_URL` is enough: the socket follows it, and
@@ -23,16 +23,17 @@ Seeded dev login (`npm run seed` in `api/` only): `rider@somba.app` / `Somba@202
 are created by the fleet team in the admin panel. The sign-in screen never pre-fills credentials and
 never lets anyone in offline.
 
-Tabs: **Deliveries** (Active / Available / Done; claim → picked up → in transit → delivered, with a
-cash-collected confirmation for COD), **Earnings** (server-computed totals + cash to hand over),
-**Profile** (notifications, language, sign out). While a delivery is on the road the app streams the
+Tabs: **Deliveries** (Active / Done; picked up → in transit → delivered, with a cash-collected confirmation
+for COD and the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff),
+**Earnings** (server-computed totals + cash to hand over), **Profile** (home warehouse, **Support** tickets
+with photos, notifications, language, sign out). While a delivery is on the road the app streams the
 real GPS position (`geolocator`; permission declared in the Android manifest) as `delivery:location`.
 
 ### Tests
 
 ```bash
 flutter analyze && flutter test                      # widget tests
-# live end-to-end against a seeded, running API (sign in, claim, deliver, GPS, earnings):
+# live end-to-end against a seeded, running API (sign in, warehouse assigns a pickup, support ticket round trip):
 flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```

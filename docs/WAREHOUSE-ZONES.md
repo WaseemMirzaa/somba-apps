@@ -1,5 +1,10 @@
 # Warehouses, zones and riders
 
+> **Superseded (2026-10-25).** Delivery zones are gone. Orders now go to the **nearest warehouse that has riders** (by map
+> pin), through three legs (seller -> origin warehouse -> destination warehouse -> customer). See
+> [`contracts/logistics.md`](contracts/logistics.md) and `WAREHOUSE-SELLER-FLOWS-PLAN.md` §6. The text below is kept for
+> history; `npm run smoke:zones` was replaced by `npm run smoke:routing`.
+
 How a delivery finds its rider. Each **zone** (a commune, or a group of them) belongs to one **warehouse**. Each **rider** and **warehouse employee** has a home warehouse. A new delivery goes to the warehouse that serves the customer's zone, and only that warehouse's riders see it and are told about it.
 
 ```

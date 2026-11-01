@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../data/market_profiles.dart';
 import '../../l10n/strings.dart';
+import '../../services/notify_prefs.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
 import 'auth_screens.dart' show OtpScreen, VerifyEmailScreen;
 import 'support_extra.dart';
@@ -17,7 +19,7 @@ class CustomerSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([RealtimeStore.instance, marketNotifier]),
+      listenable: Listenable.merge([RealtimeStore.instance, marketNotifier, NotifyPrefs.instance]),
       builder: (context, _) {
         final s = Strings.of(context);
         final store = RealtimeStore.instance;
@@ -29,6 +31,20 @@ class CustomerSettingsScreen extends StatelessWidget {
               _toggle(Icons.notifications_active_rounded, s.settingsPush, s.settingsPushSub, pref('push'), (v) => store.setPref('push', v)),
               _toggle(Icons.mail_outline_rounded, s.settingsEmail, s.settingsEmailSub, pref('email'), (v) => store.setPref('email', v)),
               _toggle(Icons.sms_outlined, s.settingsSms, s.settingsSmsSub, pref('sms'), (v) => store.setPref('sms', v)),
+            ]),
+            const SizedBox(height: 14),
+            // Per-category push switches (me:setPrefs { notify: { order: false } }): a kind that is off still shows in the list.
+            _group(s.notifCatTitle, [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                child: Text(s.notifCatIntro, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.35)),
+              ),
+              _notifyToggle(context, 'order', Icons.receipt_long_rounded, s.notifOrder, s.notifOrderSub),
+              _notifyToggle(context, 'message', Icons.chat_bubble_outline_rounded, s.notifMessage, s.notifMessageSub),
+              _notifyToggle(context, 'question', Icons.help_outline_rounded, s.notifQuestion, s.notifQuestionSub),
+              _notifyToggle(context, 'review', Icons.star_outline_rounded, s.notifReview, s.notifReviewSub),
+              _notifyToggle(context, 'product', Icons.inventory_2_outlined, s.notifProduct, s.notifProductSub),
+              _notifyToggle(context, 'promo', Icons.campaign_outlined, s.notifPromo, s.notifPromoSub),
             ]),
             const SizedBox(height: 14),
             _group(s.settingsPricesIn, [
@@ -115,8 +131,31 @@ class CustomerSettingsScreen extends StatelessWidget {
 
   Widget _group(String title, List<Widget> rows) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.fromLTRB(4, 0, 4, 8), child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
-        Panel(padding: EdgeInsets.zero, child: Column(children: rows)),
+        // A Material over the card colour, so the rows' press highlight shows (and the ListTiles have one to paint on).
+        Panel(padding: EdgeInsets.zero, child: Material(type: MaterialType.transparency, child: Column(children: rows))),
       ]);
+
+  /// One notification category: shown at once, put back with a snackbar when the server refuses it.
+  Widget _notifyToggle(BuildContext context, String kind, IconData icon, String title, String sub) {
+    final prefs = NotifyPrefs.instance;
+    return SwitchListTile(
+      key: ValueKey('notify-$kind'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      activeThumbColor: AppColors.primary,
+      value: prefs.isOn(kind),
+      onChanged: (v) async {
+        try {
+          await prefs.set(kind, v);
+          if (context.mounted) showSnack(context, Strings.of(context).notifSaved);
+        } catch (e) {
+          if (context.mounted) showError(context, e);
+        }
+      },
+      secondary: _icon(icon),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12.5)),
+    );
+  }
 
   Widget _toggle(IconData icon, String title, String sub, bool v, ValueChanged<bool> onCh) => SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),

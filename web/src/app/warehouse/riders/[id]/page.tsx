@@ -8,7 +8,8 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
-import { STAGE_LABEL, stageVariant, useWarehouseData, type ParcelStage } from "@/lib/warehouse";
+import { LEG_KIND, LEG_STATUS, endpointName, legStatusVariant, pickL } from "@/lib/logistics";
+import { isOpenLeg, parcelCode, useDeskQueue, useWarehouseData } from "@/lib/warehouse";
 import { BATCH_STATUS, batchTaskIds, pick, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
@@ -20,7 +21,8 @@ export default function WarehouseRiderDetailPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
-  const { riders, parcels, ridersLoading } = useWarehouseData();
+  const { riders, ridersLoading } = useWarehouseData();
+  const parcels = useDeskQueue({ status: "all" }).tasks;
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const rider = riders.find((r) => r.id === id);
 
@@ -33,9 +35,9 @@ export default function WarehouseRiderDetailPage() {
   }
 
   const mine = parcels.filter((p) => p.riderId === rider.id);
-  const active = mine.filter((p) => p.status !== "delivered" && p.status !== "exception");
+  const active = mine.filter(isOpenLeg);
   const delivered = mine.filter((p) => p.status === "delivered");
-  const failed = mine.filter((p) => p.status === "exception");
+  const failed = mine.filter((p) => p.status === "failed");
   const cod = delivered.reduce((s, p) => s + p.codAmountUsd, 0);
   const batches = batchesQ.data.filter((b) => b.riderId === rider.id);
   const listHref = ops("/riders");
@@ -86,7 +88,7 @@ export default function WarehouseRiderDetailPage() {
             emptyMessage={fr ? "Aucun lot." : "No batches."}
             columns={[
               { key: "reference", label: fr ? "Lot" : "Batch", render: (row) => (
-                <Link href={ops(`/dispatch/${row.id}`)} className="text-[var(--primary)] hover:underline">{String(row.reference)}</Link>
+                <span className="font-medium">{String(row.reference)}</span>
               )},
               { key: "count", label: fr ? "Colis" : "Parcels" },
               { key: "status", label: fr ? "Statut" : "Status", render: (row) => <Badge>{pick(BATCH_STATUS[String(row.status)], fr, String(row.status))}</Badge> },
@@ -95,21 +97,20 @@ export default function WarehouseRiderDetailPage() {
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Livraisons de ce livreur" : "This rider's deliveries"} span={3}>
+        <DetailGridSection title={fr ? "Trajets de ce livreur" : "This rider's legs"} span={3}>
           <DataTable
-            emptyMessage={fr ? "Aucune livraison." : "No deliveries."}
+            emptyMessage={fr ? "Aucun trajet." : "No legs."}
             columns={[
-              { key: "id", label: fr ? "ID colis" : "Parcel ID", render: (row) => (
-                <Link href={ops(`/parcels/${row.id}`)} className="text-[var(--primary)] hover:underline">{String(row.id)}</Link>
+              { key: "id", label: fr ? "Colis" : "Parcel", render: (row) => (
+                <Link href={ops(`/tasks/${row.id}`)} className="text-[var(--primary)] hover:underline">{parcelCode(row as never)}</Link>
               )},
-              { key: "orderId", label: fr ? "ID commande" : "Order ID" },
-              { key: "customer", label: t("customer") },
-              { key: "customerAddress", label: fr ? "Adresse" : "Address" },
+              { key: "orderReference", label: fr ? "Commande" : "Order" },
+              { key: "kind", label: fr ? "Type" : "Type", render: (row) => pickL(LEG_KIND[row.kind as keyof typeof LEG_KIND], fr) },
+              { key: "route", label: fr ? "Trajet" : "Route", render: (row) => `${endpointName(row.from as never, fr)} → ${endpointName(row.to as never, fr)}` },
               { key: "attempts", label: fr ? "Tentatives" : "Attempts" },
-              { key: "status", label: t("status"), render: (row) => {
-                const s = String(row.status) as ParcelStage;
-                return <Badge variant={stageVariant(s)}>{fr ? STAGE_LABEL[s].fr : STAGE_LABEL[s].en}</Badge>;
-              }},
+              { key: "status", label: t("status"), render: (row) => (
+                <Badge variant={legStatusVariant(String(row.status))}>{pickL(LEG_STATUS[row.status as keyof typeof LEG_STATUS], fr)}</Badge>
+              )},
             ]}
             data={mine as unknown as Record<string, unknown>[]}
           />

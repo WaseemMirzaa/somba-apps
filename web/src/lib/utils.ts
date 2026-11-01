@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -17,8 +18,8 @@ export function formatCurrency(amount: number, locale = "en") {
   }).format(amount);
 }
 
-export function formatPaymentMethod(method: string, _locale: "en" | "fr" = "en") {
-  return method;
+export function formatPaymentMethod(method: string, locale: "en" | "fr" = "en") {
+  return paymentMethodLabel(method, locale === "fr");
 }
 
 export function formatCdf(amount: number, locale = "en") {

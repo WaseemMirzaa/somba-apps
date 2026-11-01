@@ -27,19 +27,54 @@ class AuthResult {
 /// A failure from the API, safe to show to the user. [message] is what the
 /// server (or the client) said in English; printing the exception gives the
 /// text in the user's language (see Strings.serverError).
+///
+/// A refusal that carries more than a message (the `code` and the extra fields of the ack, for example the area a
+/// delivery was refused for) keeps them in [code] and [details], so a screen can word it itself.
 class ApiException implements Exception {
   final String message;
   final int? status;
   final String? localKey;
   final Map<String, Object?>? args;
+
+  /// The machine-readable `code` of a refusal (`not_served`…); null when the server sent only a message.
+  final String? code;
+
+  /// The other fields of the refusal's ack (everything but `ok`, `error` and `code`); empty when there are none.
+  final Map<String, Object?> details;
+
   ApiException(this.message, [this.status])
+      : localKey = null,
+        args = null,
+        code = null,
+        details = const {};
+
+  /// A refusal with its structured fields (see [ApiException.fromAck]).
+  ApiException.refusal(this.message, {this.status, this.code, this.details = const {}})
       : localKey = null,
         args = null;
 
   /// A client-side failure (offline, timeout…): the text comes from the strings layer.
   ApiException.local(String key, {this.status, this.args})
       : localKey = key,
-        message = const Strings('en').t(key, args);
+        message = const Strings('en').t(key, args),
+        code = null,
+        details = const {};
+
+  /// The failure of an ack `{ ok: false, error, code?, ...fields }`: the message plus every structured field the
+  /// server added. An ack without an `error` is a generic failure.
+  factory ApiException.fromAck(Map<dynamic, dynamic> ack) {
+    final error = ack['error'];
+    if (error == null) return ApiException.local('err_generic');
+    final code = ack['code'];
+    return ApiException.refusal(
+      error.toString(),
+      code: code is String && code.trim().isNotEmpty ? code.trim() : null,
+      details: {
+        for (final e in ack.entries)
+          if (!const {'ok', 'error', 'code'}.contains(e.key)) e.key.toString(): e.value,
+      },
+    );
+  }
 
   @override
   String toString() => localKey != null ? Strings.current.t(localKey!, args) : Strings.current.serverError(message);

@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.M
 const {
   pickText, localized, localizedNotice, foldText, matchesSearch, labeledGroups, localizeVariantText,
   isMachineText, fieldOrigin, ownText, frInForm,
-  noticeTypeLabel, variantDisplay, localizeVariant, daysLabel, categoryLabel, productNameFor,
+  noticeTypeLabel, variantDisplay, localizeVariant, daysLabel, categoryLabel, productNameFor, resolutionText,
 } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 test("pickText falls back to the other language when one is empty", () => {
@@ -26,6 +26,18 @@ test("localized reads <key> / <key>Fr", () => {
   assert.equal(localized(line, "productName", false), "Black shoes");
   assert.equal(localized(line, "variant", true), "Colour: Black"); // no variantFr: falls back
   assert.equal(localized(null, "x", true), "");
+});
+
+test("the seller ledger and the chat header chip pick the viewer's language (bugs 2 and 5)", () => {
+  const txn = { description: "1 × Lightweight running shoes", descriptionFr: "1 × Baskets de running légères" };
+  assert.equal(localized(txn, "description", true), "1 × Baskets de running légères");
+  assert.equal(localized(txn, "description", false), "1 × Lightweight running shoes");
+  const chat = { productName: "Dyson V15 Vacuum", productNameFr: "Aspirateur Dyson V15" };
+  assert.equal(localized(chat, "productName", true), "Aspirateur Dyson V15");
+  assert.equal(localized(chat, "productName", false), "Dyson V15 Vacuum");
+  // a row from before the fix has no French field: the base name is shown, never nothing
+  assert.equal(localized({ description: "1 × Lamp" }, "description", true), "1 × Lamp");
+  assert.equal(localized({ productName: "Lamp", productNameFr: null }, "productName", true), "Lamp");
 });
 
 test("localizedNotice uses titleFr / bodyFr and falls back to English", () => {
@@ -127,4 +139,14 @@ test("categoryLabel / productNameFor read the other language from the list by En
   const prods = [{ id: "p1", name: "Dyson V15 Vacuum", nameFr: "Aspirateur Dyson V15" }];
   assert.equal(productNameFor(prods, "p1", "x", true), "Aspirateur Dyson V15");
   assert.equal(productNameFor(prods, "p2", "Fallback", true), "Fallback");
+});
+
+test("resolutionText: the API's French first, known stock phrases mapped, an agent's own words untouched", () => {
+  assert.equal(resolutionText({ resolution: "Refunded to wallet", resolutionFr: "Remboursé sur le portefeuille" }, true), "Remboursé sur le portefeuille");
+  assert.equal(resolutionText({ resolution: "Refunded to wallet" }, true), "Remboursé sur le portefeuille");
+  assert.equal(resolutionText({ resolution: "Partially refunded" }, true), "Remboursement partiel");
+  assert.equal(resolutionText({ resolution: "Refunded to wallet", resolutionFr: "Remboursé sur le portefeuille" }, false), "Refunded to wallet");
+  assert.equal(resolutionText({ resolution: "Item was damaged, refunded in full" }, true), "Item was damaged, refunded in full");
+  assert.equal(resolutionText({ resolution: null }, true), "");
+  assert.equal(resolutionText(null, false), "");
 });

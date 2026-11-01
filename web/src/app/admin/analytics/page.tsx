@@ -17,17 +17,11 @@ import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { categoryLabel } from "@/lib/i18n-fields";
-import { useServerList, orderStatusLabel } from "@/lib/admin-live";
+import { useServerList, orderStatusLabel, useLiveKey } from "@/lib/admin-live";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { rankSellers, shortDate, useSocketQuery, type AdminStatsFull, type RevenuePoint, type WarehouseStats } from "@/lib/admin-stats";
 import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-
-interface Zone {
-  id: string;
-  name: string;
-  nameFr?: string;
-}
 
 function minutesLabel(m: number | null): string {
   if (m === null) return "—";
@@ -40,23 +34,11 @@ export default function AdminAnalyticsPage() {
   const fr = locale === "fr";
   const rt = useRealtime();
   const [days, setDays] = useState<PeriodDays>(30);
-  const refreshKey = `${rt.orders.length}:${rt.deliveries.length}:${rt.disputes.length}`;
+  const refreshKey = useLiveKey();
   const stats = useSocketQuery<AdminStatsFull>("analytics:admin", undefined, { refreshKey });
   const series = useSocketQuery<RevenuePoint[]>("analytics:revenue", { days }, { refreshKey });
   const wh = useSocketQuery<WarehouseStats>("analytics:warehouse", undefined, { refreshKey });
-  const settings = useSocketQuery<Record<string, string>>("settings:get");
   const sellers = useServerList<Seller>("sellers:list", { pushEvents: ["seller:updated"] });
-
-  const zoneName = useMemo(() => {
-    const m = new Map<string, string>();
-    try {
-      const zones = JSON.parse(settings.data?.deliveryZones ?? "[]") as Zone[];
-      for (const z of zones) m.set(z.id, fr ? z.nameFr || z.name : z.name);
-    } catch {
-      /* zone names are a nicety: ids are shown when the setting is unreadable */
-    }
-    return m;
-  }, [settings.data, fr]);
 
   const s = stats.data;
   const w = wh.data;
@@ -168,17 +150,17 @@ export default function AdminAnalyticsPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold text-slate-900">{fr ? "Colis par zone de livraison" : "Parcels by delivery zone"}</h2>
+            <h2 className="font-semibold text-slate-900">{fr ? "Colis par entrepôt" : "Parcels by warehouse"}</h2>
             <p className="text-xs text-slate-500">{fr ? "30 derniers jours" : "Last 30 days"}</p>
           </CardHeader>
           <CardContent>
             {!w ? (
               wh.error ? <SectionError message={wh.error} onRetry={wh.reload} /> : <SectionLoading />
-            ) : w.byZone.length === 0 ? (
+            ) : w.byHub.length === 0 ? (
               <EmptyState>{fr ? "Aucun colis sur la période." : "No parcels in the period."}</EmptyState>
             ) : (
               <HorizontalBarChart
-                items={w.byZone.map((z) => ({ name: `${zoneName.get(z.zoneId) ?? z.zoneId} · ${z.delivered} ${fr ? "livrés" : "delivered"}, ${z.failed} ${fr ? "échecs" : "failed"}`, parcels: z.parcels }))}
+                items={w.byHub.map((z) => ({ name: `${z.hub} · ${z.delivered} ${fr ? "livrés" : "delivered"}, ${z.failed} ${fr ? "échecs" : "failed"}`, parcels: z.parcels }))}
                 valueKey="parcels"
                 labelKey="name"
                 maxBars={10}

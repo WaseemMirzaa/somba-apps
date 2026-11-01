@@ -29,7 +29,11 @@ import {
   Star,
   Megaphone,
   Send,
-  MapPin,
+  RefreshCw,
+  ArrowLeftRight,
+  Bell,
+  Globe2,
+  Route,
 } from "lucide-react";
 
 export type AdminDepartment =
@@ -65,6 +69,7 @@ const SUPER_SECTION: AdminNavSection = {
   items: [
     { href: "/admin", label: "dashboard", icon: LayoutDashboard, i18n: true },
     { href: "/admin/roles", label: "roles", icon: Users, i18n: true },
+    { href: "/admin/notifications", label: "notifications", icon: Bell, i18n: true },
     { href: "/admin/audit", label: "auditLog", icon: FileText, i18n: true },
     { href: "/admin/settings", label: "settings", icon: Settings, i18n: true },
   ],
@@ -91,9 +96,12 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
     items: [
       { href: "/admin/orders", label: "orders", icon: ShoppingCart, i18n: true },
       { href: "/admin/fulfillment", label: "fulfillmentOps", icon: Truck, i18n: true },
+      { href: "/admin/fulfillment/desk", label: "adminWarehouseDesk", icon: Send, i18n: true },
+      { href: "/admin/geography", label: "geography", icon: Globe2, i18n: true },
       { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
-      { href: "/admin/zones", label: "zones", icon: MapPin, i18n: true },
+      { href: "/admin/replacements", label: "replacements", icon: RefreshCw, i18n: true },
+      { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
     ],
   },
   {
@@ -102,6 +110,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
     titleFr: "Admin entrepôt",
     items: [
       { href: "/admin/warehouses", label: "warehouses", icon: Boxes, i18n: true },
+      { href: "/admin/geography", label: "geography", icon: Globe2, i18n: true },
+      { href: "/admin/warehouses/lanes", label: "lanes", icon: Route, i18n: true },
       { href: "/admin/warehouses/staff", label: "warehouseStaff", icon: Users, i18n: true },
       { href: "/admin/fulfillment/inventory", label: "inventory", icon: Boxes, i18n: true },
       { href: "/admin/fulfillment/dispatch", label: "dispatch", icon: Send, i18n: true },
@@ -137,10 +147,23 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
     titleFr: "Support",
     items: [
       { href: "/admin/support", label: "support", icon: Headphones, i18n: true },
+      { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
+      { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
     ],
   },
 ];
+
+/** Every department reaches its notices (the bell's "see all" page). */
+const NOTIFICATIONS_SECTION: AdminNavSection = {
+  id: "super",
+  titleEn: "Account",
+  titleFr: "Compte",
+  items: [{ href: "/admin/notifications", label: "notifications", icon: Bell, i18n: true }],
+};
+
+/** Pages open to every department. */
+const SHARED_PATHS = ["/admin/notifications"];
 
 const SECTION_BY_ID = new Map<AdminDepartment, AdminNavSection>(
   DEPARTMENT_SECTIONS.map((s) => [s.id, s])
@@ -152,9 +175,15 @@ const SECTION_BY_ID = new Map<AdminDepartment, AdminNavSection>(
  * manager sees only their own section.
  */
 export function getAdminSections(dept: AdminDepartment): AdminNavSection[] {
-  if (dept === "super") return [SUPER_SECTION, ...DEPARTMENT_SECTIONS];
+  if (dept === "super") {
+    // Geography belongs to both Operations and Warehouse Admin; the Super Admin lists it once, next to Warehouses.
+    const sections = DEPARTMENT_SECTIONS.map((section) =>
+      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography") } : section,
+    );
+    return [SUPER_SECTION, ...sections];
+  }
   const section = SECTION_BY_ID.get(dept);
-  return section ? [section] : [];
+  return section ? [section, NOTIFICATIONS_SECTION] : [NOTIFICATIONS_SECTION];
 }
 
 /** Where a department lands after login. */
@@ -167,7 +196,7 @@ export function getAdminHome(dept: AdminDepartment): string {
 function allowedPrefixes(dept: AdminDepartment): string[] {
   if (dept === "super") return ["/admin"];
   const section = SECTION_BY_ID.get(dept);
-  return section ? section.items.map((i) => i.href) : [];
+  return [...SHARED_PATHS, ...(section ? section.items.map((i) => i.href) : [])];
 }
 
 /**

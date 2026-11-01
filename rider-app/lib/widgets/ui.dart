@@ -70,8 +70,9 @@ class SectionHeader extends StatelessWidget {
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary, textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-            child: Text(actionLabel!),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            // Size on the Text, not the button's textStyle (that would drop the theme font).
+            child: Text(actionLabel!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
           ),
       ]),
     );
@@ -112,6 +113,14 @@ class PrimaryButton extends StatelessWidget {
                 ]),
         ),
       );
+}
+
+/// A button label kept on one line: a long label (French, a price, large text) shrinks to fit rather than wrapping.
+class ButtonLabel extends StatelessWidget {
+  final String text;
+  const ButtonLabel(this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1));
 }
 
 /// Replaces a button's label while its action runs: label height, in the button's text colour.
@@ -171,4 +180,12 @@ class LanguageToggle extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// The app's one way to tell the rider an outcome (a completed action or a handled failure): a floating snackbar
+/// that replaces the one on screen.
+void showSnack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }

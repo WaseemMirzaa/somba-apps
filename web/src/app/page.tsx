@@ -32,6 +32,7 @@ import { PortalOverviewCards } from "@/components/landing/portal-premium";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
 import { CategoryImage } from "@/components/shop/category-image";
+import { FlashTile } from "@/components/shop/flash-tile";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -256,23 +257,8 @@ export default function HomePage() {
               </Link>
               )}
 
-              {/* Offer tile */}
-              <Link
-                href="/shop/products"
-                className="showcase-card group relative flex flex-col justify-between bg-gradient-to-br from-[var(--primary)] to-[var(--primary-dark)] p-5 text-white"
-              >
-                <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-white/25">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-red)] animate-pulse" />
-                  {fr ? "Offres flash" : "Flash deals"}
-                </span>
-                <div>
-                  <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold">{fr ? "Offres du moment" : "Today's deals"}</p>
-                  <p className="text-sm text-white/80">{fr ? "sur une sélection" : "on selected items"}</p>
-                  <span className="mt-2 inline-flex items-center gap-1 text-sm font-bold">
-                    {fr ? "Voir" : "Shop"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </span>
-                </div>
-              </Link>
+              {/* Offer tile: real flash sales */}
+              <FlashTile fr={fr} />
             </div>
 
           </div>

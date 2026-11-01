@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Boxes, Power, Pencil, CheckCircle2, PauseCircle } from "lucide-react";
+import { Plus, Boxes, Power, Pencil, CheckCircle2, MapPinOff, Globe2, Route } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,9 @@ import { StatCard } from "@/components/ui/stat-card";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { Modal, ErrorNote } from "@/components/admin/modal";
 import { HubFormModal } from "@/components/admin/hub-form";
+import { GapsPanel } from "@/components/admin/coverage-editor";
+import { CoverageMap } from "@/components/geo/coverage-map";
+import { areaName, chainFromTree, chainText, useFootprint, type Area } from "@/lib/areas";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
@@ -20,7 +23,6 @@ import { useLocale } from "@/context/locale-context";
 import { canManageHubs, errMsg, useRole, useServerList } from "@/lib/admin-live";
 import type { HubRow } from "@/lib/admin-stats";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { countryName } from "@/lib/countries";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active", labelFr: "Actif" },
@@ -28,7 +30,21 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AdminWarehousesPage() {
-  const hubs = useServerList<HubRow>("warehouse:hubs", { pushEvents: ["hub:updated"] });
+  const hubs = useServerList<HubRow>("hubs:list");
+  const reloadHubs = hubs.reload;
+  // A hub changed (position, active flag, riders): ask again so the rider and staff counts stay right.
+  useEffect(() => {
+    const sock = socketClient.current;
+    const h = () => void reloadHubs();
+    sock?.on("hub:updated", h);
+    // Coverage moved between warehouses (this tab or another): the coverage column must follow.
+    sock?.on("coverage:updated", h);
+    return () => {
+      sock?.off("hub:updated", h);
+      sock?.off("coverage:updated", h);
+    };
+  }, [reloadHubs]);
+  const footprint = useFootprint();
   const { toast } = useToast();
   const { locale } = useLocale();
   const role = useRole();
@@ -42,23 +58,41 @@ export default function AdminWarehousesPage() {
   const [busy, setBusy] = useState(false);
 
   const rows = useMemo(
-    () => hubs.items.map((h) => ({ ...h, status: h.active ? "active" : "inactive" })).sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      hubs.items
+        .map((h) => ({
+          ...h,
+          status: h.active ? "active" : "inactive",
+          // Searchable text: where it sits and what it covers (both languages).
+          areaText: [h.area?.name, h.area?.nameEn, ...(h.coverage ?? []).flatMap((a) => [a.name, a.nameEn])].filter(Boolean).join(" "),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [hubs.items],
   );
+  const locationText = (h: HubRow): string => {
+    if (!h.area) return h.city;
+    const chain = chainFromTree(h.area, footprint.root);
+    return chainText(chain.length ? chain : [h.area], fr, { skipLevels: ["district"] }) || areaName(h.area, fr);
+  };
+  const coverageText = (list: Area[] | undefined): string => {
+    const names = (list ?? []).map((a) => areaName(a, fr));
+    return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} +${names.length - 3}`;
+  };
   const filtered = useMemo(
-    () => applyListFilters(rows, filters, { searchFields: ["name", "city", "country", "address"], statusField: "status" }),
+    () => applyListFilters(rows, filters, { searchFields: ["name", "city", "country", "address", "areaText"], statusField: "status" }),
     [rows, filters],
   );
   const activeCount = rows.filter((h) => h.active).length;
   const totalCapacity = rows.filter((h) => h.active).reduce((s, h) => s + h.capacity, 0);
+  const unplaced = rows.filter((h) => h.placed === false || h.lat == null || h.lng == null).length;
 
   async function confirmToggle() {
     if (!toggle) return;
     setBusy(true);
     setToggleError(null);
     try {
-      const saved = await socketClient.request<HubRow>("warehouse:setHubActive", { id: toggle.id, active: !toggle.active });
-      hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? saved : h)));
+      const saved = await socketClient.request<HubRow>("hubs:setActive", { id: toggle.id, active: !toggle.active });
+      hubs.setItems((cur) => cur.map((h) => (h.id === saved.id ? { ...h, ...saved } : h)));
       toast(
         saved.active ? (fr ? "Hub activé" : "Hub activated") : fr ? "Hub désactivé" : "Hub deactivated",
         "success",
@@ -75,10 +109,16 @@ export default function AdminWarehousesPage() {
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Entrepôts : annuaire des hubs" : "Warehouses: hub directory"}
-        subtitle={fr ? "Les hubs enregistrés sur le serveur ; ils servent aux transferts de stock et aux lots d'expédition" : "Hubs stored on the server; they are used for stock transfers and dispatch batches"}
+        subtitle={fr ? "Chaque zone est desservie par un seul entrepôt : créez l'entrepôt, puis assignez-lui les zones qu'il couvre" : "Each area is served by one warehouse: create the warehouse, then assign the areas it covers"}
         breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: fr ? "Entrepôts" : "Warehouses" }]}
         actions={
           <>
+            <Link href="/admin/warehouses/lanes">
+              <Button variant="secondary" size="sm" data-testid="open-lanes"><Route className="h-4 w-4" />{fr ? "Liaisons" : "Lanes"}</Button>
+            </Link>
+            <Link href="/admin/geography">
+              <Button variant="secondary" size="sm"><Globe2 className="h-4 w-4" />{fr ? "Géographie" : "Geography"}</Button>
+            </Link>
             <Link href="/admin/warehouses/staff">
               <Button variant="secondary" size="sm">{fr ? "Personnel d'entrepôt" : "Warehouse Staff"}</Button>
             </Link>
@@ -99,11 +139,22 @@ export default function AdminWarehousesPage() {
         </NoticeBar>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title={fr ? "Total hubs" : "Total hubs"} value={rows.length} icon={Boxes} />
         <StatCard title={fr ? "Actifs" : "Active"} value={activeCount} icon={CheckCircle2} trend={`${totalCapacity.toLocaleString()} ${fr ? "colis de capacité" : "parcels capacity"}`} />
-        <StatCard title={fr ? "Inactifs" : "Inactive"} value={rows.length - activeCount} icon={PauseCircle} />
+        <StatCard title={fr ? "Villes desservies" : "Served cities"} value={footprint.ready ? footprint.cities.length : "…"} icon={Globe2} trend={footprint.cities.map((c) => areaName(c, fr)).join(", ") || undefined} />
+        <StatCard title={fr ? "Hors carte" : "Not on the map"} value={unplaced} icon={MapPinOff} trend={unplaced ? (fr ? "Absents de la carte de couverture" : "Missing from the coverage map") : undefined} />
       </div>
+
+      <NoticeBar>
+        {activeCount <= 1
+          ? fr
+            ? "Mode entrepôt unique : un seul entrepôt actif dessert toute la zone, donc aucun transfert entre entrepôts. Ajoutez un entrepôt avec une couverture plus précise et les transferts s'activent automatiquement."
+            : "Single-warehouse mode: one active warehouse serves the whole area, so parcels never transfer. Add a warehouse with a more specific coverage and transfers switch on automatically."
+          : fr
+            ? `Mode multi-entrepôts : ${activeCount} entrepôts actifs. Un colis est transféré quand le vendeur et le client sont dans des zones d'entrepôts différents.`
+            : `Multi-warehouse mode: ${activeCount} active warehouses. A parcel transfers when the seller and the customer sit in different warehouses' areas.`}
+      </NoticeBar>
 
       <ListFilters
         values={filters}
@@ -127,9 +178,26 @@ export default function AdminWarehousesPage() {
                   { key: "name", label: fr ? "Hub" : "Hub", render: (row) => (
                     <Link href={`/admin/warehouses/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">{String(row.name)}</Link>
                   )},
-                  { key: "city", label: fr ? "Ville" : "City" },
-                  { key: "country", label: fr ? "Pays" : "Country", render: (row) => countryName(row.country as string | null, fr, true) || "—" },
-                  { key: "address", label: fr ? "Adresse" : "Address", render: (row) => String(row.address ?? "—") },
+                  { key: "location", label: fr ? "Emplacement" : "Location", render: (row) => <span data-testid="hub-location">{locationText(row as unknown as HubRow)}</span> },
+                  { key: "coverage", label: fr ? "Zones couvertes" : "Areas covered", render: (row) => {
+                    const h = row as unknown as HubRow;
+                    const n = h.coverage?.length ?? 0;
+                    return n === 0
+                      ? <Badge variant={h.active ? "warning" : "default"}>{fr ? "Aucune zone" : "No area yet"}</Badge>
+                      : <span data-testid="hub-coverage" title={(h.coverage ?? []).map((a) => areaName(a, fr)).join(", ")}><strong>{n}</strong> · <span className="text-slate-600">{coverageText(h.coverage)}</span></span>;
+                  }},
+                  { key: "position", label: fr ? "Position" : "Position", render: (row) => {
+                    const h = row as unknown as HubRow;
+                    return h.lat != null && h.lng != null
+                      ? <span className="font-mono text-xs text-slate-600">{h.lat.toFixed(4)}, {h.lng.toFixed(4)}</span>
+                      : <Badge variant="warning">{fr ? "Hors carte : jamais choisi" : "Not on the map: never chosen"}</Badge>;
+                  }},
+                  { key: "activeRiders", label: fr ? "Livreurs" : "Riders", render: (row) => {
+                    const h = row as unknown as HubRow;
+                    const active = h.activeRiders ?? h.riders ?? 0;
+                    return h.riders != null && h.riders !== active ? `${active} / ${h.riders}` : String(active);
+                  }},
+                  { key: "staffCount", label: fr ? "Personnel" : "Staff", render: (row) => String((row as unknown as HubRow).staffCount ?? (row as unknown as HubRow).staff ?? 0) },
                   { key: "capacity", label: fr ? "Capacité" : "Capacity", render: (row) => Number(row.capacity).toLocaleString() },
                   { key: "status", label: fr ? "Statut" : "Status", render: (row) => (
                     <Badge variant={row.active ? "success" : "default"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge>
@@ -157,6 +225,26 @@ export default function AdminWarehousesPage() {
               />
             )
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3">
+          <h2 className="font-semibold text-slate-900">{fr ? "Carte de la couverture" : "Coverage map"}</h2>
+          <p className="text-xs text-slate-500">
+            {fr ? "Un point par commune (ou ville), coloré par l'entrepôt qui la dessert. Gris : pas encore desservie." : "A dot per commune (or city), coloured by the warehouse that serves it. Grey: not served yet."}
+          </p>
+          <CoverageMap fr={fr} hubs={rows} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3">
+          <h2 className="font-semibold text-slate-900">{fr ? "Trous de couverture" : "Coverage gaps"}</h2>
+          <p className="text-xs text-slate-500">
+            {fr ? "Zones d'une ville desservie qu'aucun entrepôt ne couvre : les commandes vers ces zones sont refusées." : "Areas inside a served city that no warehouse covers: orders to them are refused."}
+          </p>
+          <GapsPanel fr={fr} hubs={rows} mayManage={mayManage} />
         </CardContent>
       </Card>
 
@@ -203,8 +291,8 @@ export default function AdminWarehousesPage() {
             </p>
             <p className="text-slate-500">
               {toggle.active
-                ? fr ? "Un hub désactivé reste dans l'annuaire mais ne peut plus recevoir de transferts de stock. Le dernier hub actif ne peut pas être désactivé." : "A deactivated hub stays in the directory but cannot take new stock transfers. The last active hub cannot be deactivated."
-                : fr ? "Le hub pourra de nouveau recevoir des transferts de stock." : "The hub will be able to take stock transfers again."}
+                ? fr ? "Un hub désactivé reste dans l'annuaire, mais ses zones deviennent « non desservies » tant qu'un autre entrepôt actif ne couvre pas une zone parente. Le dernier hub actif ne peut pas être désactivé." : "A deactivated hub stays in the directory, but its areas count as unserved unless another active warehouse covers a parent area. The last active hub cannot be deactivated."
+                : fr ? "Le hub redevient le choix du routage pour les zones qu'il couvre." : "The hub serves the areas it covers again."}
             </p>
             <ErrorNote message={toggleError} />
           </>

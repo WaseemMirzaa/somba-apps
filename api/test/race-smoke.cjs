@@ -8,6 +8,7 @@
  */
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
+const { hubId, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -51,14 +52,14 @@ const register = async (label, role = 'customer') => {
   return { token: r.json.accessToken, user: r.json.user, sock: await connect(r.json.accessToken) };
 };
 const addr = JSON.stringify({ line1: '1 Race St', city: 'Kinshasa' });
-const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: method, zoneId: 'gombe', shippingAddress: addr });
+const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: method, shippingAddress: addr });
 
 (async () => {
   const admin = await login('admin@somba.app');
   const finance = await login('finance@somba.app');
   const warehouse = await login('warehouse@somba.app');
   const rider1 = await login('rider@somba.app');
-  const mk = await req(admin.sock, 'roles:createStaff', { email: `rider2${tag}@race.test`, name: 'Second Rider', role: 'rider' });
+  const mk = await req(admin.sock, 'roles:createStaff', { email: `rider2${tag}@race.test`, name: 'Second Rider', role: 'rider', hubId: await hubId(admin) });
   const rider2 = await login(`rider2${tag}@race.test`, mk.data.tempPassword);
   const sellerU = await register('seller', 'seller');
   const store = (await req(sellerU.sock, 'sellers:register', kyc(`Race Store ${tag}`))).data;
@@ -112,13 +113,16 @@ const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'or
   ok(rfTx.length === 1, 'the wallet is credited once');
 
   // ---- two riders, one delivery ----------------------------------------------------------------------
-  section('Two riders claim the same delivery');
+  section('Two supervisors give the same delivery to two riders at once');
   const o3 = (await order(buyers[2], canc.id, 1)).data;
-  const t3 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o3.id));
-  const claims = await Promise.all([req(rider1.sock, 'delivery:accept', { taskId: t3.id }), req(rider2.sock, 'delivery:accept', { taskId: t3.id }), req(rider1.sock, 'delivery:accept', { taskId: t3.id })]);
-  ok(claims.filter((c) => c.ok).length === 1, 'exactly one claim wins');
-  const winner = claims.findIndex((c) => c.ok) === 1 ? rider2 : rider1;
+  const t3 = await toDelivery(admin, rider1, o3.id, { assign: false });
+  const claims = await Promise.all([req(admin.sock, 'logistics:assign', { taskId: t3.id, riderId: rider1.user.id }), req(warehouse.sock, 'logistics:assign', { taskId: t3.id, riderId: rider2.user.id }), req(admin.sock, 'logistics:assign', { taskId: t3.id, riderId: rider1.user.id })]);
+  ok(claims.some((c) => c.ok), 'the assignments are accepted');
+  const owner = (await req(admin.sock, 'delivery:list', { limit: 500 })).data.find((t) => t.id === t3.id).riderId;
+  ok([rider1.user.id, rider2.user.id].includes(owner), 'the task ends up with exactly one rider');
+  const winner = owner === rider2.user.id ? rider2 : rider1;
   const loser = winner === rider1 ? rider2 : rider1;
+  ok(!(await req(rider1.sock, 'delivery:accept', { taskId: t3.id })).ok, 'riders cannot claim a task themselves');
   ok(!(await req(loser.sock, 'delivery:updateStatus', { taskId: t3.id, status: 'picked_up' })).ok, "the losing rider cannot move someone else's delivery");
   const pu = await Promise.all([1, 2, 3].map(() => req(winner.sock, 'delivery:updateStatus', { taskId: t3.id, status: 'picked_up' })));
   ok(pu.filter((c) => c.ok).length === 1, 'a double-tap on "picked up" is applied once');
@@ -136,8 +140,7 @@ const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'or
   a = await req(sellerU.sock, 'products:create', { name: `Payout Item ${tag}`, price: 100, category: 'Electronics', stock: 20 });
   const pay = a.data;
   const o4 = (await order(buyers[3], pay.id, 5)).data;
-  const t4 = await until(async () => (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.orderId === o4.id));
-  await req(rider1.sock, 'delivery:accept', { taskId: t4.id });
+  const t4 = await toDelivery(admin, rider1, o4.id);
   for (const st of ['picked_up', 'in_transit', 'delivered']) await req(rider1.sock, 'delivery:updateStatus', { taskId: t4.id, status: st });
   const avail = (await req(sellerU.sock, 'payouts:available')).data;
   ok(avail.available >= 400, 'delivered sales become available to the seller', `available=${avail.available}`);

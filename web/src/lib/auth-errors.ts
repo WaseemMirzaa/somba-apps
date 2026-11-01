@@ -27,6 +27,10 @@ const FR: Record<string, string> = {
   "incorrect or expired code": "Code incorrect ou expiré.",
   "add a phone number to your profile first": "Ajoutez d'abord un numéro de téléphone à votre profil.",
   "enter a valid phone number": "Saisissez un numéro de téléphone valide.",
+  "that code is not right. check the time on your phone and try again": "Ce code n'est pas correct. Vérifiez l'heure de votre téléphone et réessayez.",
+  "this sign-in expired. enter your password again": "Cette connexion a expiré. Saisissez à nouveau votre mot de passe.",
+  "too many wrong codes. try again in a few minutes": "Trop de codes erronés. Réessayez dans quelques minutes.",
+  "two-factor authentication code required": "Saisissez le code de vérification à 6 chiffres.",
 };
 
 const EN_FRIENDLY = {

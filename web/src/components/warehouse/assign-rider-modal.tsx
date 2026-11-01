@@ -5,9 +5,13 @@ import { Search, Bike } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { errorMessage, useOpsQuery, type WarehouseRider } from "@/lib/warehouse-live";
+import { useHubs } from "@/lib/logistics";
+import { useHubScope } from "@/lib/warehouse";
 
 type AssignRiderModalProps = {
   open: boolean;
+  /** Ask the riders that may run THIS leg (`logistics:riders`); without it, the warehouse's riders (batches). */
+  taskId?: string;
   title?: string;
   subtitle?: string;
   selectedRiderId?: string | null;
@@ -29,6 +33,7 @@ export function AssignRiderModal(props: AssignRiderModalProps) {
 function AssignRiderModalBody({
   title,
   subtitle,
+  taskId,
   selectedRiderId = null,
   onClose,
   onConfirm,
@@ -36,9 +41,12 @@ function AssignRiderModalBody({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const resolvedTitle = title ?? (fr ? "Assigner un livreur" : "Assign rider");
-  const ridersQ = useOpsQuery<WarehouseRider[]>("warehouse:riders", {
+  const { hubId } = useHubScope();
+  const { byId: hubById } = useHubs();
+  const ridersQ = useOpsQuery<WarehouseRider[]>(taskId ? "logistics:riders" : "warehouse:riders", {
     initial: [] as WarehouseRider[],
-    push: ["delivery:updated"],
+    body: taskId ? { taskId } : hubId ? { hubId } : {},
+    push: ["task:updated"],
   });
   const [query, setQuery] = useState("");
   const [pickedId, setPickedId] = useState<string | null>(selectedRiderId);
@@ -127,7 +135,10 @@ function AssignRiderModalBody({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-slate-900">{rider.name}</p>
-                            <p className="text-xs text-slate-500">{rider.phone ?? "—"}</p>
+                            <p className="text-xs text-slate-500">
+                              {rider.phone ?? "—"}
+                              {rider.hubId && hubById.get(rider.hubId) ? ` · ${hubById.get(rider.hubId)?.name}` : ""}
+                            </p>
                           </div>
                           <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
                             {rider.activeTasks} {fr ? "actives" : "active"}

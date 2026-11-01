@@ -15,12 +15,7 @@ import {
   Settings,
   Truck,
   Inbox,
-  ArrowUpDown,
-  Send,
   Boxes,
-  ClipboardCheck,
-  Bike,
-  MapPin,
   RefreshCw,
   ArrowLeftRight,
   AlertTriangle,
@@ -45,6 +40,7 @@ import { getAdminSections, getDepartmentLabel } from "@/lib/admin-access";
 import type { AdminDepartment } from "@/lib/admin-access";
 import { getWarehouseNav, getWarehouseRoleLabel } from "@/lib/warehouse-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
+import { useHubs } from "@/lib/logistics";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -52,6 +48,10 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   i18n?: boolean;
+  /** French label for items that are not in the shared translation table (`i18n` false). */
+  labelFr?: string;
+  /** Live count shown at the end of the row (unread / waiting). */
+  badge?: number;
 };
 
 const portalConfigs = {
@@ -86,22 +86,12 @@ const portalConfigs = {
   warehouse: {
     title: "warehousePortal" as const,
     accent: "from-red-500 to-red-700",
+    // The live sidebar comes from `getWarehouseNav(tier)` (lib/warehouse-access.ts); this is only the typed fallback.
     nav: [
       { href: "/warehouse", label: "dashboard", icon: LayoutDashboard, i18n: true },
-      { href: "/warehouse/inbound", label: "inbound", icon: Inbox, i18n: true },
-      { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck, i18n: true },
-      { href: "/warehouse/sorting", label: "sorting", icon: ArrowUpDown, i18n: true },
-      { href: "/warehouse/batch-builder", label: "batchBuilder", icon: Send, i18n: true },
-      { href: "/warehouse/dispatch", label: "dispatch", icon: Send, i18n: true },
-      { href: "/warehouse/riders", label: "riders", icon: Bike, i18n: true },
-      { href: "/warehouse/deliveries", label: "deliveries", icon: MapPin, i18n: true },
-      { href: "/warehouse/returns", label: "returns", icon: RotateCcw, i18n: true },
-      { href: "/warehouse/replacements", label: "replacements", icon: RefreshCw, i18n: true },
-      { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
-      { href: "/warehouse/aged", label: "agedParcels", icon: AlertTriangle, i18n: true },
-      { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle, i18n: true },
-      { href: "/warehouse/analytics", label: "analytics", icon: BarChart3, i18n: true },
-      { href: "/warehouse/settings", label: "settings", icon: Settings, i18n: true },
+      { href: "/warehouse/desk", label: "desk", icon: Inbox, i18n: true },
+      { href: "/warehouse/custody", label: "custody", icon: Boxes, i18n: true },
+      { href: "/warehouse/notifications", label: "notifications", icon: Megaphone, i18n: true },
     ] as NavItem[],
   },
   seller: {
@@ -130,6 +120,14 @@ const portalConfigs = {
 };
 
 const sidebarScrollPositions = new Map<string, number>();
+
+/** "Kinshasa Hub · Manager" for the signed-in warehouse member: their hub and tier, straight from the API. */
+function WarehouseIdentity({ roleLabel, fallback }: { roleLabel: string; fallback: string }) {
+  const { persona } = useAuth();
+  const { byId } = useHubs();
+  const hub = persona.warehouseId ? byId.get(persona.warehouseId) : undefined;
+  return <>{hub ? `${hub.name} · ${roleLabel}` : `${fallback} · ${roleLabel}`}</>;
+}
 
 function usePersistedSidebarScroll(portal: string) {
   const navRef = useRef<HTMLElement>(null);
@@ -161,9 +159,12 @@ function usePersistedSidebarScroll(portal: string) {
 export function DashboardLayout({
   portal,
   children,
+  navItems: navOverride,
 }: {
   portal: keyof typeof portalConfigs;
   children: React.ReactNode;
+  /** Replaces the portal's fixed menu (the seller portal passes the items its role may open). */
+  navItems?: NavItem[];
 }) {
   const pathname = usePathname();
   const { t, locale, setLocale } = useLocale();
@@ -187,7 +188,7 @@ export function DashboardLayout({
   // on an exact match, so it never lights up alongside a sub-page.
   const navItems = adminSections
     ? adminSections.flatMap((section) => section.items)
-    : (warehouseNav ?? config.nav);
+    : (navOverride ?? warehouseNav ?? config.nav);
   const portalRoot = `/${portal}`;
   let activeHref: string | null = null;
   for (const item of navItems) {
@@ -218,7 +219,14 @@ export function DashboardLayout({
         )}
       >
         <item.icon className={cn("h-4 w-4", active && "text-red-400")} />
-        {item.i18n ? t(item.label as Parameters<typeof t>[0]) : item.label}
+        <span className="min-w-0 flex-1 truncate">
+          {item.i18n ? t(item.label as Parameters<typeof t>[0]) : locale === "fr" && item.labelFr ? item.labelFr : item.label}
+        </span>
+        {item.badge ? (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[11px] font-bold text-white">
+            {item.badge > 99 ? "99+" : item.badge}
+          </span>
+        ) : null}
       </Link>
     );
   };
@@ -238,7 +246,7 @@ export function DashboardLayout({
               {portal === "admin"
                 ? getDepartmentLabel(department, locale === "fr")
                 : portal === "warehouse"
-                  ? `${t(config.title)} · ${getWarehouseRoleLabel(warehouseRole, locale === "fr")}`
+                  ? <WarehouseIdentity roleLabel={getWarehouseRoleLabel(warehouseRole, locale === "fr")} fallback={t(config.title)} />
                   : t(config.title)}
             </p>
           </div>
@@ -263,7 +271,7 @@ export function DashboardLayout({
                   {section.items.map(renderNavItem)}
                 </div>
               ))
-            : (warehouseNav ?? config.nav).map(renderNavItem)}
+            : (navOverride ?? warehouseNav ?? config.nav).map(renderNavItem)}
         </nav>
 
         <div className="shrink-0 border-t border-white/5 p-4">
