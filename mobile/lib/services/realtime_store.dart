@@ -73,6 +73,11 @@ class RealtimeStore extends ChangeNotifier {
   /// (`codCapUsd` is not read: the server only raises a fraud alert above the cap, it never refuses the order.)
   bool codEnabled = false;
 
+  /// Public setting `cardPayments`: `"stripe"` when the server has bank-card payments configured, else `"off"`
+  /// (computed server-side from its keys, not a stored setting). The checkout offers the card tile only on `"stripe"`.
+  String cardPayments = 'off';
+  bool get cardPaymentsEnabled => cardPayments == 'stripe';
+
   /// True when the app should send the user to verification instead of the server refusing the order/top-up.
   bool get needsVerification {
     final u = user;
@@ -393,6 +398,7 @@ class RealtimeStore extends ChangeNotifier {
     if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
     if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
     if (m.containsKey('codEnabled')) codEnabled = '${m['codEnabled']}' == 'true';
+    if (m.containsKey('cardPayments')) cardPayments = '${m['cardPayments']}' == 'stripe' ? 'stripe' : 'off';
   }
 
   Future<void> _hydrate() async {
@@ -537,6 +543,18 @@ class RealtimeStore extends ChangeNotifier {
     final res = await _socket.request('payments:status', {'reference': reference});
     _upsertPayment(res);
     return PaymentDto.fromJson(_map(res));
+  }
+
+  /// Asks the server for the card sheet of the caller's own pending card payment (`payments:card-sheet`), by order
+  /// id or by payment reference. The answer carries the PaymentIntent client secret and the publishable key: they go
+  /// straight to the sheet and are never logged, stored or kept on the store.
+  Future<CardSheetDto> cardSheet({String? orderId, String? reference}) async {
+    assert(orderId != null || reference != null, 'cardSheet needs an order id or a payment reference');
+    final res = await call('payments:card-sheet', {
+      if (orderId != null) 'orderId': orderId,
+      if (reference != null) 'reference': reference,
+    });
+    return CardSheetDto.fromJson(_map(res));
   }
 
   OrderDto? orderById(String id) {

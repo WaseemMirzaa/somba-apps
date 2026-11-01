@@ -4,6 +4,7 @@ import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
 import '../data/promos.dart';
+import '../services/card_checkout.dart';
 import '../services/delivery_quote.dart';
 import '../services/maps_config.dart';
 import '../services/models.dart';
@@ -205,7 +206,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _toast(s.checkoutWalletLow);
       return;
     }
+    if (payment == 'stripe_card' && !store.cardPaymentsEnabled) {
+      // Switched off while the shopper was on this screen (the server also refuses it): back to a method that works.
+      setState(() => payment = 'airtel_money');
+      _toast(s.serverError('Card payments are not available.'));
+      return;
+    }
     var retryAfterVerify = false;
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _placing = true);
     try {
       final order = await store.placeOrder(
@@ -231,6 +239,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         shop.appliedPromo = null;
       } else {
         shop.clearCart();
+      }
+      // A card order is paid in Stripe's sheet right away; the pending screen then waits for the server's word.
+      // Completed, canceled (reopen it there) or failed (retry there): the shopper lands on the pending screen either way.
+      if (order.isCard && order.awaitsOnlinePayment) {
+        final result = await payOrderByCard(order.id);
+        announceCardResult(messenger, Strings.current, result);
       }
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -416,9 +430,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
+          // Bank card (Stripe): offered only while the server has card payments configured. Card data is typed into
+          // Stripe's own sheet after the order is placed; there is nothing to enter here.
+          if (store.cardPaymentsEnabled) ...[
+            if (isMobileMoney(payment)) const SizedBox(height: 10),
+            _methodTile('stripe_card', Icons.credit_card_rounded, s.payStripeCard),
+          ],
           // Below the mobile-money number field, which belongs to the mobile-money tiles above it.
           if (store.codEnabled) ...[
-            if (isMobileMoney(payment)) const SizedBox(height: 10),
+            if (isMobileMoney(payment) && !store.cardPaymentsEnabled) const SizedBox(height: 10),
             _methodTile('cod', Icons.payments_rounded, s.payCod),
             if (payment == 'cod')
               Padding(

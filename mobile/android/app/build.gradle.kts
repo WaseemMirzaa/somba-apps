@@ -33,6 +33,8 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // flutter_stripe's R8 rules (the payment sheet classes must survive shrinking).
+            proguardFiles("proguard-rules.pro")
         }
     }
 }

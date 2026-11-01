@@ -653,6 +653,9 @@ class OrderDto {
   /// Waiting for the customer to pay online (mobile money): `pending` and not cash on delivery.
   bool get awaitsOnlinePayment => status == 'pending' && !isCod;
 
+  /// Paid with a bank card (Stripe): the customer confirms in the card sheet, not on a phone.
+  bool get isCard => paymentMethod == 'stripe_card';
+
   /// The status to show: a cash-on-delivery order that is still `pending` reads as confirmed.
   String get shownStatus => status == 'pending' && isCod ? 'confirmed' : status;
 
@@ -955,6 +958,41 @@ class PaymentDto {
         status: j['status'] as String? ?? 'pending',
         failureReason: j['failureReason'] as String?,
       );
+}
+
+/// What the server hands out to open the card sheet for one payment (`payments:card-sheet`).
+/// [clientSecret] and [publishableKey] are for the sheet only: [toString] hides them so a log line cannot leak them.
+class CardSheetDto {
+  final String reference;
+  final String clientSecret;
+  final String publishableKey;
+  final double amountUsd;
+  final String currency;
+  final String merchantName;
+
+  const CardSheetDto({
+    required this.reference,
+    required this.clientSecret,
+    required this.publishableKey,
+    this.amountUsd = 0,
+    this.currency = 'usd',
+    this.merchantName = 'Somba & Teka',
+  });
+
+  factory CardSheetDto.fromJson(Map<String, dynamic> j) => CardSheetDto(
+        reference: j['reference'] as String? ?? '',
+        clientSecret: j['clientSecret'] as String? ?? '',
+        publishableKey: j['publishableKey'] as String? ?? '',
+        amountUsd: (j['amountUsd'] as num?)?.toDouble() ?? 0,
+        currency: j['currency'] as String? ?? 'usd',
+        merchantName: (j['merchantName'] as String?)?.trim().isNotEmpty == true ? j['merchantName'] as String : 'Somba & Teka',
+      );
+
+  /// A usable answer carries both keys.
+  bool get isUsable => clientSecret.isNotEmpty && publishableKey.isNotEmpty;
+
+  @override
+  String toString() => 'CardSheetDto($reference, $amountUsd $currency)';
 }
 
 class RiderLocationDto {
