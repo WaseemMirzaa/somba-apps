@@ -411,6 +411,17 @@ void main() {
           'message': msgJson('m1', convId: 'new', side: 'buyer', text: b['text'] as String),
         };
 
+    testWidgets('the message box has the buttons\' corner radius, not a pill', (tester) async {
+      await open(tester, const ChatComposeScreen(sellerId: 's1', storeName: 'Mama Tech'));
+      final box = tester.widget<TextField>(find.byKey(const ValueKey('compose-text')));
+      final theme = Theme.of(tester.element(find.byKey(const ValueKey('compose-text'))));
+      final buttonRadius = ((theme.filledButtonTheme.style!.shape!.resolve({}) as RoundedRectangleBorder).borderRadius as BorderRadius).topLeft.x;
+      for (final border in [box.decoration!.border, box.decoration!.enabledBorder, box.decoration!.focusedBorder, box.decoration!.errorBorder]) {
+        expect(((border! as OutlineInputBorder).borderRadius).topLeft.x, buttonRadius);
+      }
+      expect(buttonRadius, lessThan(30));
+    });
+
     testWidgets('starting from a product sends the product and the first message, then continues in the thread', (tester) async {
       started();
       server.handlers['chat:messages'] = (b) => {

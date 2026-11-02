@@ -447,7 +447,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
           onChanged: (_) {
             if (_replyError != null) setState(() => _replyError = null);
           },
-          decoration: InputDecoration(hintText: s.asReplyHint, errorText: _replyError),
+          decoration: AppInput.multiline(hint: s.asReplyHint, error: _replyError),
         ),
         const SizedBox(height: AppSpace.md),
         PhotoPickerField(attachments: _photos),
