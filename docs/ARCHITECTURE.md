@@ -218,6 +218,7 @@ flowchart TB
 | POST | `/api/v1/auth/phone/send` · `/phone/verify` | Phone OTP (10 min, 5 attempts, 30 s cooldown) | Bearer |
 | POST | `/api/v1/uploads` | Image upload (≤ 5 MB, image types only) → public URL | Bearer |
 | POST | `/api/v1/payments/webhook/mobile-money` | Aggregator callback; HMAC signature over the raw body (`MM_WEBHOOK_SECRET`) | signature |
+| POST | `/api/v1/payments/webhook/stripe` | Stripe events (cards); `Stripe-Signature` over the raw body (`STRIPE_WEBHOOK_SECRET`), then the object is re-read from Stripe | signature |
 | GET | `/api/v1/health` | `{ status, db, transport }` | — |
 
 **WebSocket (Socket.IO)**
@@ -2034,6 +2035,8 @@ Changed:
 * `notifications:list` rows carry `link`.
 
 REST: `POST /api/v1/payments/webhook/pawapay` (pawaPay callbacks for deposits, refunds and payouts).
+
+Cards (Stripe, `docs/PAYMENTS-STRIPE.md`): `payments:card-sheet` `{ orderId?, reference? }` returns `{ reference, clientSecret, publishableKey, amountUsd, currency, merchantName }` for the caller's own pending card payment; `settings:get` carries `cardPayments: 'stripe' | 'off'`; REST `POST /api/v1/payments/webhook/stripe`.
 
 ### 7.3 Server-pushed events (40)
 

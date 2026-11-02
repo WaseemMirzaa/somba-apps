@@ -118,6 +118,7 @@ final Map<String, String> _exactFr = {
   'Unknown payment method.': 'Moyen de paiement inconnu.',
   'Cash on delivery is not available.': 'Le paiement à la livraison n’est pas disponible.',
   'Card payments are not available.': 'Les paiements par carte ne sont pas disponibles.',
+  'This payment is not waiting for a card.': 'Ce paiement n’attend pas de carte.',
   'Mobile money is not available yet. Please use another method.': 'Le mobile money n’est pas encore disponible. Utilisez un autre moyen de paiement.',
   'Insufficient wallet balance.': 'Solde du portefeuille insuffisant.',
   'Awaiting payment — this order cannot be fulfilled yet.': 'En attente de paiement : cette commande ne peut pas encore être traitée.',

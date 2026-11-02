@@ -421,6 +421,13 @@ extension StringsKeys on Strings {
   String get ppApproveTitle => t('pp_approve_title');
   String get ppOrderCancelled => t('pp_order_cancelled');
   String ppRequestSent(Object? method, Object? amount) => t('pp_request_sent', {'method': method, 'amount': amount});
+  String get ppCardConfirming => t('pp_card_confirming');
+  String ppCardBody(Object? amount) => t('pp_card_body', {'amount': amount});
+  String get ppCardExpiry => t('pp_card_expiry');
+  String get payByCard => t('pay_by_card');
+  String get cardPayDone => t('card_pay_done');
+  String get cardPayFailed => t('card_pay_failed');
+  String get cardPayCanceled => t('card_pay_canceled');
   String get cancelOrder => t('cancel_order');
   String get ppCheck => t('pp_check');
   String get ppContinue => t('pp_continue');

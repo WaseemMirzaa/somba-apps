@@ -9,6 +9,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { EntityManager, In, LessThan, Repository } from 'typeorm';
 import { DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
 import type { RefundKind } from '../database/entities';
@@ -34,6 +35,15 @@ import {
   type WebhookRequest,
 } from './mobile-money.provider';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayRejectedError, PawapayUnavailableError } from './pawapay.provider';
+import {
+  STRIPE_CLIENT,
+  StripeRejectedError,
+  StripeUnavailableError,
+  type StripeClient,
+  type StripePaymentIntent,
+  type StripeRefund,
+  type StripeWebhookEvent,
+} from './stripe.provider';
 import { NOTHING_LEFT_TO_REFUND, recordParkedPayment, recordRefund, refundableUsd, revertRefund } from './refund-ledger';
 
 /** Why a refund is made, when it is not the plain order refund of finance (`orders:refund`). */
@@ -46,8 +56,30 @@ export interface RefundSource {
 /** The payment after a refund, with the ledger row this refund wrote (its `amountUsd` is what THIS refund paid back). */
 export type RefundResult = Payment & { refund: PaymentRefund };
 
-/** A payment as clients see it: the phone masked, and what can still be refunded on it. */
-export type PaymentView = Payment & { refundableUsd: number };
+/** Where "back to the original method" goes for a payment: the paying phone, the card, or nowhere (then: the wallet). */
+export type RefundOriginal = 'phone' | 'card';
+
+/** A payment as clients see it: the phone masked, what can still be refunded on it, and where an original-method refund would go. */
+export type PaymentView = Payment & { refundableUsd: number; refundToOriginal: RefundOriginal | null };
+
+/** What the customer app needs to open Stripe's PaymentSheet for one pending card payment. */
+export interface CardSheet {
+  reference: string;
+  clientSecret: string;
+  publishableKey: string;
+  amountUsd: number;
+  currency: 'usd';
+  merchantName: string;
+}
+
+/** Stripe definitively refused a card refund (not "no answer"): nothing was refunded. */
+export class CardRefundRefusedError extends Error {}
+
+export const CARD_MERCHANT_NAME = 'Somba & Teka';
+/** Prefix of Stripe refund ids. Until we hold one, a card refund is known by the idempotency key we generated. */
+const STRIPE_REFUND_ID = /^re_/;
+/** Stripe forgets an idempotency key after 24 hours: an unanswered refund is only retried with its key well inside that. */
+const REFUND_REPLAY_WINDOW_MS = 20 * 3_600_000;
 
 /** Called when pawaPay reports on a seller payout (set by PayoutsService, which owns payouts). */
 export type PayoutCallbackHandler = (payoutId: string) => Promise<void>;
@@ -89,6 +121,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(DeliveryTask) private readonly deliveries: Repository<DeliveryTask>,
     private readonly products: ProductsService,
     @Optional() @Inject(PAWAPAY_CLIENT) private readonly pawapay: PawapayClient | null = null,
+    @Optional() @Inject(STRIPE_CLIENT) private readonly stripe: StripeClient | null = null,
   ) {}
 
   onModuleInit() {
@@ -97,6 +130,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         ? `Mobile money provider: ${this.mobileMoney.name}`
         : 'Mobile money provider: none (mobile-money payments are refused)',
     );
+    this.logger.log(this.stripe ? `Card payments: Stripe (${this.stripe.mode} mode)` : 'Card payments: none (Stripe is not configured)');
     // Abandoned approvals must not hold stock forever; with an aggregator, missed callbacks are caught up first.
     this.sweeper = setInterval(
       () =>
@@ -146,7 +180,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (method === 'stripe_card') {
-      // No card processor is integrated: allow the mock only outside production
+      if (this.stripe) return;
+      // Stripe is not configured: allow the mock only outside production
       // so production can never "sell" against a card that was never charged.
       if (process.env.NODE_ENV === 'production') {
         throw new BadRequestException('Card payments are not available.');
@@ -168,7 +203,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    * Charge for an order according to its payment method:
    *  - wallet        → debit the balance now (caller pre-checks funds)
    *  - mobile money  → `pending` until the subscriber approves (webhook settles)
-   *  - card          → mock authorize (non-production only)
+   *  - card          → a Stripe PaymentIntent, `pending` until the customer completes the card sheet (the webhook
+   *                    settles it); without Stripe, a mock authorize (non-production only)
    *  - cod           → pending; collected on delivery
    */
   async processForOrder(order: Order, phone?: string): Promise<Payment> {
@@ -181,6 +217,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       normalisedPhone = PaymentsService.normalisePhone(phone);
       status = 'pending';
     }
+    const realCard = order.paymentMethod === 'stripe_card' && !!this.stripe;
+    if (realCard) status = 'pending';
 
     try {
       if (order.paymentMethod === 'wallet') {
@@ -210,6 +248,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     if (status === 'pending' && normalisedPhone) {
       payment = await this.startMobileMoney(payment);
+    } else if (status === 'pending' && realCard) {
+      payment = await this.startCard(payment, order);
     }
 
     this.emitter.toUser(order.customerId, 'payment:created', this.view(payment));
@@ -354,6 +394,38 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return payment;
   }
 
+  /**
+   * Create the Stripe PaymentIntent for a card payment. The amount is OURS (the order total in cents, USD); the client
+   * secret is never stored: the app asks for it with `payments:card-sheet`. A refusal fails the payment (the customer
+   * can try again); an unanswered request fails it too, because nobody holds a client secret for an intent we never saw.
+   */
+  private async startCard(payment: Payment, order: Pick<Order, 'reference'>): Promise<Payment> {
+    try {
+      const pi = await this.stripe!.createPaymentIntent({
+        amountCents: Math.round(payment.amountUsd * 100),
+        currency: 'usd',
+        description: `Somba & Teka order ${order.reference}`,
+        metadata: {
+          reference: payment.reference,
+          orderReference: payment.orderReference ?? '',
+          purpose: payment.purpose,
+          userId: payment.userId,
+        },
+        idempotencyKey: `pi-${payment.reference}`,
+      });
+      payment.providerRef = pi.id;
+      return await this.payments.save(payment);
+    } catch (err) {
+      this.logger.error(`Card payment could not be started for ${payment.reference}: ${(err as Error).message}`);
+      payment.status = 'failed';
+      payment.failureReason =
+        err instanceof StripeUnavailableError
+          ? 'Could not reach the card processor. Please try again.'
+          : 'Could not start the card payment. Please try again.';
+      return this.payments.save(payment);
+    }
+  }
+
   /** Dev convenience: simulate the subscriber approving, through the SAME settle path. */
   private maybeAutoConfirmSandbox(payment: Payment) {
     if (this.mobileMoney?.name !== 'sandbox') return;
@@ -389,6 +461,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       const payment = await this.payments.findOne({ where: { reference } });
       if (!payment) throw new NotFoundException('Payment not found.');
       if (payment.status !== 'pending') throw new BadRequestException(`This payment is already ${payment.status}.`);
+      // A real card is confirmed by Stripe alone: a hand-made "paid" here would sell goods nobody paid for.
+      if (payment.method === 'stripe_card' && payment.providerRef) throw new BadRequestException('Card payments are confirmed by Stripe, not by hand.');
       const done = await this.settle({
         reference,
         outcome,
@@ -434,8 +508,270 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return target;
   }
 
+  // ── Stripe cards ──────────────────────────────────────────────────────────
+
+  /**
+   * What the app needs to open the card sheet for the caller's OWN pending card payment (found by `reference` or by
+   * `orderId`). The PaymentIntent is re-read from Stripe for its client secret, which is never stored or logged. A
+   * payment that Stripe already finished is settled on the spot and reported as no longer waiting.
+   */
+  async cardSheet(userId: string, body: { orderId?: unknown; reference?: unknown }): Promise<CardSheet> {
+    if (!this.stripe) throw new BadRequestException('Card payments are not available.');
+    const reference = typeof body?.reference === 'string' ? body.reference.trim() : '';
+    const orderId = typeof body?.orderId === 'string' ? body.orderId.trim() : '';
+    const payment = reference
+      ? await this.payments.findOne({ where: { reference } })
+      : orderId
+        ? await this.payments.findOne({ where: { orderId, method: 'stripe_card' }, order: { createdAt: 'DESC' } })
+        : null;
+    // Same answer for "missing" and "not yours".
+    if (!payment || payment.userId !== userId || (orderId && payment.orderId !== orderId)) throw new NotFoundException('Payment not found.');
+    const waiting = new BadRequestException('This payment is not waiting for a card.');
+    if (payment.method !== 'stripe_card' || payment.status !== 'pending' || !payment.providerRef) throw waiting;
+    let pi: StripePaymentIntent;
+    try {
+      pi = await this.stripe.retrievePaymentIntent(payment.providerRef);
+    } catch (e) {
+      this.logger.warn(`Card sheet for ${payment.reference}: ${(e as Error).message}`);
+      throw new BadRequestException('Could not reach the card processor. Please try again.');
+    }
+    if (pi.metadata.reference !== payment.reference) throw waiting;
+    if (pi.status === 'succeeded' || pi.status === 'canceled') {
+      await this.applyCardIntent(payment, pi);
+      throw waiting;
+    }
+    if (!pi.clientSecret) throw waiting;
+    return {
+      reference: payment.reference,
+      clientSecret: pi.clientSecret,
+      publishableKey: this.stripe.publishableKey,
+      amountUsd: payment.amountUsd,
+      currency: 'usd',
+      merchantName: CARD_MERCHANT_NAME,
+    };
+  }
+
+  /** Verify a Stripe webhook by its signature over the raw body. Throws when it does not verify. */
+  verifyStripeWebhook(rawBody: Buffer, signature: string | string[] | undefined): StripeWebhookEvent {
+    if (!this.stripe) throw new Error('Stripe is not configured.');
+    return this.stripe.constructWebhookEvent(rawBody, signature);
+  }
+
+  /**
+   * Act on a verified Stripe event. The event is only a hint: the PaymentIntent or Refund is read from Stripe again, and
+   * only that decides. Errors (Stripe unreachable, database) propagate, so Stripe retries the webhook; an event about
+   * something that is not ours is ignored.
+   */
+  async handleStripeEvent(event: StripeWebhookEvent): Promise<void> {
+    if (!this.stripe) return;
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+      case 'payment_intent.payment_failed':
+      case 'payment_intent.canceled': {
+        if (!event.objectId) return;
+        const payment = await this.payments.findOne({ where: { providerRef: event.objectId } });
+        if (!payment) {
+          this.logger.warn(`Stripe ${event.type} for a PaymentIntent that is not ours (${event.objectId})`);
+          return;
+        }
+        const pi = await this.readForEvent(() => this.stripe!.retrievePaymentIntent(event.objectId!));
+        if (pi) await this.applyCardIntent(payment, pi);
+        return;
+      }
+      case 'refund.updated':
+      case 'refund.failed': {
+        if (!event.objectId) return;
+        const refund = await this.readForEvent(() => this.stripe!.retrieveRefund(event.objectId!));
+        if (!refund) return;
+        const payment =
+          (await this.payments.findOne({ where: { refundRef: refund.id } })) ??
+          (refund.metadata.refundRef ? await this.payments.findOne({ where: { refundRef: refund.metadata.refundRef } }) : null);
+        if (!payment) {
+          this.logger.warn(`Stripe ${event.type} for a refund that is not ours (${refund.id})`);
+          return;
+        }
+        await this.reconcileCardRefund(payment, refund);
+        return;
+      }
+      case 'charge.refunded': {
+        // The charge does not name the refund: look at the one we have in flight on that PaymentIntent.
+        const payment = event.paymentIntentId ? await this.payments.findOne({ where: { providerRef: event.paymentIntentId } }) : null;
+        if (payment?.refundTo === 'card') await this.reconcileCardRefund(payment);
+        return;
+      }
+      default:
+        return; // not an event we act on
+    }
+  }
+
+  /** Read an object from Stripe for a webhook. One that does not exist there is not ours: the event is acknowledged, not retried. */
+  private async readForEvent<T>(read: () => Promise<T>): Promise<T | null> {
+    try {
+      return await read();
+    } catch (e) {
+      if (e instanceof StripeRejectedError && e.code === 'resource_missing') return null;
+      throw e;
+    }
+  }
+
+  /**
+   * Apply what Stripe says about a card payment's PaymentIntent:
+   *  - succeeded → settle as paid (the amount and currency Stripe RECEIVED must match what we asked for);
+   *  - canceled  → failed;
+   *  - anything else stays pending. A declined attempt is not final (the customer can try another card in the sheet),
+   *    so only its reason is recorded.
+   */
+  private async applyCardIntent(payment: Payment, pi: StripePaymentIntent): Promise<Payment> {
+    if (pi.status === 'succeeded') {
+      if (pi.currency !== 'usd') {
+        this.logger.error(`Currency mismatch on ${payment.reference}: got ${pi.currency}, expected usd`);
+        await this.notifications.toRole('admin_finance', {
+          title: 'Payment amount mismatch',
+          body: `${payment.reference}: card payment was made in ${pi.currency.toUpperCase()}, expected USD. Review manually.`,
+          type: 'payment',
+          entityId: payment.id,
+        });
+        return payment;
+      }
+      return (await this.settle({ reference: payment.reference, outcome: 'succeeded', providerRef: pi.id, amountUsd: pi.amountReceived / 100 })) ?? payment;
+    }
+    if (pi.status === 'canceled') {
+      return (await this.settle({ reference: payment.reference, outcome: 'failed', providerRef: pi.id, reason: 'The card payment was cancelled.' })) ?? payment;
+    }
+    const reason = pi.lastError?.slice(0, 200) ?? null;
+    if (payment.status === 'pending' && reason && payment.failureReason !== reason) {
+      await this.payments.update({ id: payment.id, status: 'pending' }, { failureReason: reason });
+      const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
+      this.publish(saved);
+      return saved;
+    }
+    return payment;
+  }
+
+  /** Ask Stripe about one pending card payment and apply its answer (no-op while the customer is still paying). */
+  private async reconcileCard(payment: Payment): Promise<Payment> {
+    if (payment.status !== 'pending' || !this.stripe || !payment.providerRef) return payment;
+    try {
+      return await this.applyCardIntent(payment, await this.stripe.retrievePaymentIntent(payment.providerRef));
+    } catch (e) {
+      this.logger.warn(`Status check failed for ${payment.reference}: ${(e as Error).message}`);
+      return payment;
+    }
+  }
+
+  /** Cancel card PaymentIntents nobody completed within the window (default 30 min); one Stripe already completed is settled as paid instead. */
+  private async expireStaleCards(): Promise<number> {
+    if (!this.stripe) return 0;
+    const ttlMin = Number(process.env.STRIPE_PENDING_TTL_MIN) > 0 ? Number(process.env.STRIPE_PENDING_TTL_MIN) : 30;
+    const cutoff = new Date(Date.now() - ttlMin * 60_000);
+    const stale = await this.payments.find({
+      where: { status: 'pending', method: 'stripe_card', createdAt: LessThan(cutoff) },
+      order: { createdAt: 'ASC' },
+      take: 50,
+    });
+    for (const p of stale) {
+      try {
+        if (p.providerRef) {
+          let pi = await this.stripe.retrievePaymentIntent(p.providerRef);
+          if (pi.status !== 'succeeded' && pi.status !== 'canceled') {
+            try {
+              pi = await this.stripe.cancelPaymentIntent(p.providerRef);
+            } catch {
+              pi = await this.stripe.retrievePaymentIntent(p.providerRef); // it may have succeeded in the meantime
+            }
+          }
+          if (pi.status === 'succeeded') {
+            await this.applyCardIntent(p, pi);
+            continue;
+          }
+          if (pi.status !== 'canceled') continue; // still being processed by the bank: leave it to the next sweep
+        }
+        await this.settle({ reference: p.reference, outcome: 'failed', reason: 'Timed out waiting for the card payment.' });
+      } catch (e) {
+        this.logger.warn(`Could not expire ${p.reference}: ${(e as Error).message}`);
+      }
+    }
+    return stale.length;
+  }
+
+  /**
+   * Ask Stripe to refund (part of) a card payment back to the card. `refundRef` is the key the refund is recorded under
+   * until Stripe's own id (re_…) replaces it. Returns that id, or null when Stripe gave no answer (the refund may exist:
+   * the sweep asks again with the same key). Throws [CardRefundRefusedError] when Stripe says no, so the caller undoes it.
+   */
+  async sendCardRefund(payment: Pick<Payment, 'id' | 'reference' | 'orderReference' | 'providerRef'>, amountUsd: number, refundRef: string): Promise<string | null> {
+    try {
+      const refund = await this.stripe!.createRefund({
+        paymentIntentId: payment.providerRef!,
+        amountCents: Math.round(amountUsd * 100),
+        idempotencyKey: refundRef,
+        metadata: { refundRef, reference: payment.reference, orderReference: payment.orderReference ?? '' },
+      });
+      await this.adoptCardRefundId(payment.id, refundRef, refund.id);
+      return refund.id;
+    } catch (e) {
+      if (e instanceof StripeRejectedError) throw new CardRefundRefusedError(e.message);
+      if (e instanceof StripeUnavailableError) {
+        this.logger.warn(`Card refund ${refundRef} for ${payment.reference} unconfirmed: ${e.message}`);
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  static newCardRefundRef(): string {
+    return `rfd_${randomUUID()}`;
+  }
+
+  /** The refund is known by Stripe's id from now on (payment and ledger row). */
+  private async adoptCardRefundId(paymentId: string, from: string, to: string): Promise<void> {
+    if (from === to) return;
+    await this.payments.manager.transaction(async (m) => {
+      await m.update(Payment, { id: paymentId, refundRef: from }, { refundRef: to });
+      await m.update(PaymentRefund, { refundRef: from }, { refundRef: to });
+    });
+  }
+
+  /**
+   * Apply Stripe's word on a card refund in flight: succeeded → completed; failed / canceled → the amount goes to the
+   * wallet instead (once) and finance is told. A refund we only know by our own key (Stripe never answered when we
+   * asked) is asked for again with that key, inside the window Stripe remembers keys for.
+   */
+  private async reconcileCardRefund(payment: Payment, known?: StripeRefund): Promise<void> {
+    if (!this.stripe || payment.refundStatus !== 'sending' || !payment.refundRef) return;
+    let refund = known ?? null;
+    try {
+      if (!refund && STRIPE_REFUND_ID.test(payment.refundRef)) refund = await this.stripe.retrieveRefund(payment.refundRef);
+      if (!refund) {
+        const entry = await this.payments.manager.findOne(PaymentRefund, { where: { refundRef: payment.refundRef } });
+        if (!entry || !payment.providerRef) return;
+        if (Date.now() - entry.createdAt.getTime() > REFUND_REPLAY_WINDOW_MS) {
+          this.logger.error(`Card refund ${payment.refundRef} for ${payment.reference} was never confirmed by Stripe: check it in the Stripe dashboard.`);
+          return;
+        }
+        refund = await this.stripe.createRefund({
+          paymentIntentId: payment.providerRef,
+          amountCents: Math.round(entry.amountUsd * 100),
+          idempotencyKey: payment.refundRef,
+          metadata: { refundRef: payment.refundRef, reference: payment.reference, orderReference: payment.orderReference ?? '' },
+        });
+      }
+    } catch (e) {
+      this.logger.warn(`Refund status check failed for ${payment.refundRef}: ${(e as Error).message}`);
+      return;
+    }
+    let refundRef = payment.refundRef;
+    if (refund.id !== refundRef) {
+      await this.adoptCardRefundId(payment.id, refundRef, refund.id);
+      refundRef = refund.id;
+    }
+    if (refund.status !== 'succeeded' && refund.status !== 'failed' && refund.status !== 'canceled') return; // still in progress
+    await this.finishRefund(payment, refundRef, refund.status === 'succeeded', refund.failureReason ?? undefined, 'card');
+  }
+
   /** Ask the aggregator about one pending charge and apply its final result (no-op while still in progress). */
   private async reconcileOne(payment: Payment): Promise<Payment> {
+    if (payment.method === 'stripe_card') return this.reconcileCard(payment);
     if (payment.status !== 'pending' || !this.mobileMoney?.checkStatus || !payment.providerRef) return payment;
     try {
       const event = await this.mobileMoney.checkStatus({ reference: payment.reference, providerRef: payment.providerRef });
@@ -447,18 +783,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Catch up on callbacks that never arrived: pending charges older than two minutes, plus phone refunds in flight. */
+  /** Catch up on callbacks that never arrived: pending charges older than two minutes (mobile money and cards), plus phone and card refunds in flight. */
   async reconcilePending(): Promise<void> {
-    if (!this.mobileMoney?.checkStatus) return;
     const cutoff = new Date(Date.now() - 120_000);
-    const pending = await this.payments.find({
-      where: { status: 'pending', method: In([...MOBILE_MONEY_METHODS]), createdAt: LessThan(cutoff) },
-      order: { createdAt: 'ASC' },
-      take: 25,
-    });
-    for (const p of pending) await this.reconcileOne(p);
-    const sending = await this.payments.find({ where: { refundStatus: 'sending' }, take: 25 });
-    for (const p of sending) if (p.refundRef) await this.reconcileRefund(p.refundRef);
+    if (this.mobileMoney?.checkStatus) {
+      const pending = await this.payments.find({
+        where: { status: 'pending', method: In([...MOBILE_MONEY_METHODS]), createdAt: LessThan(cutoff) },
+        order: { createdAt: 'ASC' },
+        take: 25,
+      });
+      for (const p of pending) await this.reconcileOne(p);
+    }
+    if (this.stripe) {
+      const cards = await this.payments.find({
+        where: { status: 'pending', method: 'stripe_card', createdAt: LessThan(cutoff) },
+        order: { createdAt: 'ASC' },
+        take: 25,
+      });
+      for (const p of cards) await this.reconcileCard(p);
+    }
+    if (this.pawapay || this.stripe) {
+      const sending = await this.payments.find({ where: { refundStatus: 'sending' }, take: 25 });
+      for (const p of sending) if (p.refundRef) await this.reconcileRefund(p.refundRef);
+    }
   }
 
   /** Move a payment between states ONLY if it is still in one of `from` (atomic). */
@@ -570,7 +917,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
 
-  /** Fail mobile-money charges nobody approved within the window (default 15 min). */
+  /** Fail mobile-money charges nobody approved within the window (default 15 min), and cancel card payments nobody completed (default 30 min). */
   async expireStale(): Promise<number> {
     const ttlMin = Number(process.env.MM_PENDING_TTL_MIN ?? (this.mobileMoney?.name === 'manual' ? 1440 : 15));
     const cutoff = new Date(Date.now() - ttlMin * 60_000);
@@ -583,7 +930,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       if (checked.status !== 'pending') continue;
       await this.settle({ reference: p.reference, outcome: 'failed', reason: 'Timed out waiting for approval.' });
     }
-    return stale.length;
+    return stale.length + (await this.expireStaleCards());
   }
 
   /** The order's payment (latest), if any. */
@@ -609,9 +956,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     const payment = await this.forOrder(order.id);
     if (!payment) return 0;
     if (payment.status === 'pending') {
-      if (isMobileMoney(payment.method)) {
+      if (isMobileMoney(payment.method) || payment.method === 'stripe_card') {
         await this.claim(this.payments.manager, payment.id, ['pending'], 'failed', 'Cancelled by customer.');
         this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
+        if (payment.method === 'stripe_card' && payment.providerRef && this.stripe) {
+          // Nobody should be able to pay a cancelled order. If the customer paid in this very moment the cancel is refused
+          // and the late success is parked in the wallet by [settle], like a late mobile-money approval.
+          await this.stripe.cancelPaymentIntent(payment.providerRef).catch((e) => this.logger.warn(`Could not cancel the card payment of ${payment.reference}: ${(e as Error).message}`));
+        }
       }
       return 0;
     }
@@ -643,15 +995,22 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return Math.max(0, Number((amountUsd - already).toFixed(2)));
   }
 
-  /** Phone refunds go back through pawaPay to the number that paid (mobile-money payments only). */
-  canRefundToPhone(payment: Pick<Payment, 'method' | 'providerRef'>): boolean {
-    return !!this.pawapay && this.mobileMoney?.name === 'pawapay' && isMobileMoney(payment.method) && !!payment.providerRef;
+  /**
+   * Where "back to the original method" can go for a payment: the paying phone through pawaPay (mobile-money payments),
+   * the card through Stripe (a real Stripe card payment: it has a PaymentIntent), or null (then only the wallet).
+   */
+  refundToOriginal(payment: Pick<Payment, 'method' | 'providerRef'>): RefundOriginal | null {
+    if (!payment.providerRef) return null;
+    if (payment.method === 'stripe_card') return this.stripe && payment.providerRef.startsWith('pi_') ? 'card' : null;
+    if (isMobileMoney(payment.method)) return this.pawapay && this.mobileMoney?.name === 'pawapay' ? 'phone' : null;
+    return null;
   }
 
   /**
-   * Refund an order: to the customer's wallet (instant store credit, the default) or, for a pawaPay mobile-money
-   * payment, back to the phone that paid (`toWallet === false`). A phone refund is "sending" until pawaPay confirms
-   * it; if pawaPay fails it, the amount goes to the wallet instead so the customer is never left out.
+   * Refund an order: to the customer's wallet (instant store credit, the default) or, when the payment can go back
+   * where it came from, to the original method (`toWallet === false`): the phone that paid (pawaPay mobile money) or the
+   * card (Stripe). Such a refund is "sending" until the processor confirms it; if it fails, the amount goes to the
+   * wallet instead so the customer is never left out.
    *
    * A parcel that was never delivered is called off: the order becomes `cancelled`, its stock goes back on the
    * shelf and any open delivery is voided. A delivered order becomes `returned`. Never pays back more than what is
@@ -667,11 +1026,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (payment.status !== 'succeeded') {
       throw new BadRequestException('Only a completed payment can be refunded.');
     }
-    if (toWallet === false && !this.canRefundToPhone(payment)) {
+    const original = toWallet === false ? this.refundToOriginal(payment) : null;
+    if (toWallet === false && !original) {
       throw new BadRequestException(
         isMobileMoney(payment.method)
           ? "Refunds to the phone need pawaPay to be connected. Refund to the customer's wallet."
-          : "Only mobile-money payments can be refunded to a phone. Refund to the customer's wallet.",
+          : payment.method === 'stripe_card'
+            ? "Refunds to the card need Stripe to be connected. Refund to the customer's wallet."
+            : "Only mobile-money payments can be refunded to a phone. Refund to the customer's wallet.",
       );
     }
     const order = await this.orders.findOne({ where: { id: orderId } });
@@ -681,25 +1043,24 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     // C-refund (service): refuse with the real figure; recordRefund checks it again in the database, in the transaction.
     const due = refundableUsd(payment, order?.items);
     if (due < 0.01) throw new BadRequestException(NOTHING_LEFT_TO_REFUND);
-    const toPhone = toWallet === false;
-    const refundRef = toPhone ? this.pawapay!.newId() : null;
+    const refundRef = original === 'phone' ? this.pawapay!.newId() : original === 'card' ? PaymentsService.newCardRefundRef() : null;
     // Atomic: of two concurrent refunds exactly one wins.
     const entry = await this.payments.manager.transaction(async (m) => {
       const { entry: recorded } = await recordRefund(m, {
         payment,
         amountUsd: due,
-        to: toPhone ? 'phone' : 'wallet',
+        to: original ?? 'wallet',
         kind: source.kind ?? 'admin',
         memo: `Refund for ${payment.orderReference}`,
         refundRef,
         disputeId: source.disputeId,
         disputeReference: source.disputeReference,
       });
-      if (!toPhone) await this.wallet.apply(payment.userId, 'refund', due, `Refund for ${payment.orderReference}`, m);
+      if (!original) await this.wallet.apply(payment.userId, 'refund', due, `Refund for ${payment.orderReference}`, m);
       return recorded;
     });
 
-    if (toPhone) {
+    if (original === 'phone') {
       try {
         await this.pawapay!.refund({ refundId: refundRef!, depositId: payment.providerRef!, amountUsd: due, reference: payment.reference });
       } catch (e) {
@@ -711,6 +1072,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         // No answer: the refund may exist; the status check settles it.
         this.logger.warn(`Refund ${refundRef} for ${payment.reference} unconfirmed: ${e.message}`);
       }
+    } else if (original === 'card') {
+      try {
+        const stripeId = await this.sendCardRefund(payment, due, refundRef!);
+        if (stripeId) entry.refundRef = stripeId;
+      } catch (e) {
+        if (!(e instanceof CardRefundRefusedError)) throw e;
+        // Stripe said no: undo, so finance can refund to the wallet instead.
+        await this.payments.manager.transaction((m) => revertRefund(m, entry));
+        throw new BadRequestException(`Stripe refused the refund: ${e.message}`);
+      }
     }
 
     const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
@@ -718,9 +1089,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     this.publish(saved);
     await this.notifications.toUser(saved.userId, {
       title: 'Refund issued',
-      body: toPhone
-        ? `$${due.toFixed(2)} for ${saved.orderReference} is on its way back to your mobile-money number.`
-        : `$${due.toFixed(2)} for ${saved.orderReference} → wallet.`,
+      body:
+        original === 'phone'
+          ? `$${due.toFixed(2)} for ${saved.orderReference} is on its way back to your mobile-money number.`
+          : original === 'card'
+            ? `$${due.toFixed(2)} for ${saved.orderReference} is on its way back to your card.`
+            : `$${due.toFixed(2)} for ${saved.orderReference} → wallet.`,
       type: 'payment',
       entityId: orderId,
     });
@@ -758,13 +1132,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Apply pawaPay's final word on a phone refund: completed → done; failed → the amount is credited to the wallet
-   * instead (once), and finance is told.
+   * Apply the processor's final word on a refund in flight (phone: pawaPay, card: Stripe): completed → done; failed →
+   * the amount is credited to the wallet instead (once), and finance is told.
    */
   async reconcileRefund(refundRef: string): Promise<void> {
-    if (!this.pawapay) return;
     const payment = await this.payments.findOne({ where: { refundRef } });
     if (!payment || payment.refundStatus !== 'sending') return;
+    if (payment.refundTo === 'card') return this.reconcileCardRefund(payment);
+    if (!this.pawapay) return;
     let s;
     try {
       s = await this.pawapay.check('refunds', refundRef);
@@ -773,44 +1148,58 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (!s.found || !s.final) return;
-    // This phone refund's own amount (the payment's `refundedUsd` is the running total of all its refunds).
+    await this.finishRefund(payment, refundRef, s.succeeded, s.failureMessage, 'phone');
+  }
+
+  /** A phone or card refund reached its final state: record it and, when it failed, give the money to the wallet (once). */
+  private async finishRefund(payment: Payment, refundRef: string, succeeded: boolean, failureMessage: string | undefined, via: RefundOriginal): Promise<void> {
+    // This refund's own amount (the payment's `refundedUsd` is the running total of all its refunds).
     const entry = await this.payments.manager.findOne(PaymentRefund, { where: { refundRef } });
     const amount = entry?.amountUsd ?? payment.refundedUsd ?? payment.amountUsd;
-    const to = s.succeeded ? 'completed' : 'failed';
+    const to = succeeded ? 'completed' : 'failed';
     const won = await this.payments.manager.transaction(async (m) => {
       const res = await m
         .createQueryBuilder()
         .update(Payment)
-        .set({ refundStatus: to, ...(s.succeeded ? {} : { refundTo: 'wallet' }) })
+        .set({ refundStatus: to, ...(succeeded ? {} : { refundTo: 'wallet' }) })
         .where("id = :id AND refundStatus = 'sending'", { id: payment.id })
         .execute();
       if (!res.affected) return false;
-      // The ledger follows pawaPay's word: a failed phone refund is a wallet refund (the money is still the customer's).
-      if (entry) await m.update(PaymentRefund, { id: entry.id }, { status: to, ...(s.succeeded ? {} : { refundTo: 'wallet' as const }) });
-      if (!s.succeeded && amount > 0) {
-        await this.wallet.apply(payment.userId, 'refund', amount, `Refund for ${payment.orderReference} (phone refund failed)`, m);
+      // The ledger follows the processor's word: a failed phone or card refund is a wallet refund (the money is still the customer's).
+      if (entry) await m.update(PaymentRefund, { id: entry.id }, { status: to, ...(succeeded ? {} : { refundTo: 'wallet' as const }) });
+      if (!succeeded && amount > 0) {
+        await this.wallet.apply(payment.userId, 'refund', amount, `Refund for ${payment.orderReference} (${via} refund failed)`, m);
       }
       return true;
     });
     if (!won) return;
     this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
-    if (s.succeeded) {
+    if (succeeded) {
       await this.notifications.toUser(payment.userId, {
         title: 'Refund sent',
-        body: `$${amount.toFixed(2)} for ${payment.orderReference} was sent to your mobile-money number.`,
+        body:
+          via === 'card'
+            ? `$${amount.toFixed(2)} for ${payment.orderReference} was sent back to your card.`
+            : `$${amount.toFixed(2)} for ${payment.orderReference} was sent to your mobile-money number.`,
         type: 'payment',
         entityId: payment.orderId ?? payment.id,
       });
     } else {
       await this.notifications.toUser(payment.userId, {
         title: 'Refund issued',
-        body: `$${amount.toFixed(2)} for ${payment.orderReference} → wallet (the network could not take it back to your phone).`,
+        body:
+          via === 'card'
+            ? `$${amount.toFixed(2)} for ${payment.orderReference} → wallet (the card refund could not be completed).`
+            : `$${amount.toFixed(2)} for ${payment.orderReference} → wallet (the network could not take it back to your phone).`,
         type: 'payment',
         entityId: payment.orderId ?? payment.id,
       });
       await this.notifications.toRole('admin_finance', {
-        title: 'Phone refund failed',
-        body: `${payment.reference}: pawaPay could not refund $${amount.toFixed(2)}${s.failureMessage ? ` (${s.failureMessage})` : ''}. It was credited to the customer's wallet.`,
+        title: via === 'card' ? 'Card refund failed' : 'Phone refund failed',
+        body:
+          via === 'card'
+            ? `${payment.reference}: Stripe could not refund $${amount.toFixed(2)}${failureMessage ? ` (${failureMessage})` : ''}. It was credited to the customer's wallet.`
+            : `${payment.reference}: pawaPay could not refund $${amount.toFixed(2)}${failureMessage ? ` (${failureMessage})` : ''}. It was credited to the customer's wallet.`,
         type: 'payment',
         entityId: payment.id,
       });
@@ -837,9 +1226,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.view(p);
   }
 
-  /** Never push a full subscriber number to dashboards/sockets. `refundableUsd` is what finance may still refund on it. */
-  private view(p: Payment): PaymentView {
-    return { ...p, phone: mask(p.phone), refundableUsd: refundableUsd(p) };
+  /**
+   * Never push a full subscriber number to dashboards/sockets. `refundableUsd` is what finance may still refund on it and
+   * `refundToOriginal` where a "back to where it came from" refund would go (phone, card, or null: wallet only).
+   */
+  view(p: Payment): PaymentView {
+    return { ...p, phone: mask(p.phone), refundableUsd: refundableUsd(p), refundToOriginal: this.refundToOriginal(p) };
   }
 
   /**

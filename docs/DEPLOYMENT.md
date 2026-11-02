@@ -406,6 +406,8 @@ When you change an entity, generate a migration and commit it (see
 | `MM_PENDING_TTL_MIN` | Minutes before an unpaid intent expires (default 15). |
 | `PAYOUT_CLEARANCE_HOURS` | Hours a delivered sale must age before a seller can be paid out (default 48 in production). |
 
+**Payment keys.** Mobile money through pawaPay is in `docs/PAYMENTS-PAWAPAY.md`; bank cards through Stripe are in `docs/PAYMENTS-STRIPE.md`. Either way, put the keys on the server with `deploy/set-secret.sh` (hidden prompt, or `--stdin`; it writes `/etc/somba/api.extra.env` and `/opt/somba/api/.env` atomically, mode 600, reloads the API and prints only the last 4 characters). Never paste a key into a shell line, a chat or a ticket.
+
 * Cash on delivery is **off** by default (`codEnabled=false`); an admin can enable it in Settings.
 * Delivery fees are server-side: set the `deliveryZones` setting (list of `{id,name,city,feeUsd}`); checkout requires a valid `zoneId`.
 * The nginx config rate-limits `/api/v1/auth/` (10 requests/min/IP, burst 8) on top of the API's own throttling.

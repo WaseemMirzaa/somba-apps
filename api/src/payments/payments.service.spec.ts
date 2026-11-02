@@ -112,8 +112,8 @@ describe('PaymentsService.assertMethodAllowed', () => {
 
 describe('PaymentsService.refund', () => {
   it('refuses a refund to the phone without pawaPay, and for a payment that was not mobile money', async () => {
-    const card = await make({ method: 'stripe_card' });
-    await expect(card.svc.refund(card.order.id, false)).rejects.toThrow(/Only mobile-money payments/);
+    const wallet = await make({ method: 'wallet' });
+    await expect(wallet.svc.refund(wallet.order.id, false)).rejects.toThrow(/Only mobile-money payments/);
     const noPawapay = await make({}, { pawapay: null });
     await expect(noPawapay.svc.refund(noPawapay.order.id, false)).rejects.toThrow(/need pawaPay/);
   });

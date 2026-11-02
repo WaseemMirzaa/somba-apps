@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/catalog_live.dart';
 import '../data/shop_state.dart';
 import '../l10n/strings.dart';
+import '../services/card_checkout.dart';
 import '../services/engage_store.dart';
 import '../services/models.dart';
 import '../services/realtime_store.dart';
@@ -28,6 +29,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
   bool _cancelling = false;
   bool _navigated = false;
   bool _checking = false;
+  bool _paying = false;
 
   void _goSuccess() {
     if (_navigated || !mounted) return;
@@ -47,9 +49,19 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
     }
   }
 
+  /// Reopen the card sheet for this order (a card order the customer closed, or whose card was declined).
+  Future<void> _payByCard() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _paying = true);
+    final result = await payOrderByCard(widget.orderId);
+    announceCardResult(messenger, Strings.current, result);
+    if (mounted) setState(() => _paying = false);
+  }
+
   /// Ask the server for the payment's current state (in case a push was missed).
   Future<void> _check(PaymentDto? payment) async {
     final s = Strings.of(context);
+    final order = RealtimeStore.instance.orderById(widget.orderId);
     if (payment == null) return;
     setState(() => _checking = true);
     try {
@@ -58,7 +70,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
       if (p.isPending) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(s.ppStillWaiting)));
+          ..showSnackBar(SnackBar(content: Text(order?.isCard == true ? s.ppCardConfirming : s.ppStillWaiting)));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
@@ -92,6 +104,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
         final payment = store.paymentForOrder(order.id);
         final s = Strings.of(context);
         final failed = order.status == 'cancelled';
+        final card = order.isCard; // paid in the card sheet: nothing to approve on a phone
 
         return Scaffold(
           body: SafeArea(
@@ -114,7 +127,9 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                 Text(
                   failed
                       ? s.ppFailedTitle
-                      : s.ppApproveTitle,
+                      : card
+                          ? s.ppCardConfirming
+                          : s.ppApproveTitle,
                   key: const ValueKey('pending-title'),
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
@@ -123,13 +138,21 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                 Text(
                   failed
                       ? (payment?.failureReason == null ? s.ppOrderCancelled : s.serverError(payment!.failureReason!))
-                      : s.ppRequestSent(s.paymentLabel(order.paymentMethod), money(order.totalUsd)),
+                      : card
+                          ? s.ppCardBody(money(order.totalUsd))
+                          : s.ppRequestSent(s.paymentLabel(order.paymentMethod), money(order.totalUsd)),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted, fontSize: 14.5, height: 1.4),
                 ),
                 if (!failed) ...[
                   const SizedBox(height: 14),
-                  PaymentExpiryHint(createdAt: order.createdAt),
+                  if (card)
+                    Text(s.ppCardExpiry,
+                        key: const ValueKey('expiry-hint'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600))
+                  else
+                    PaymentExpiryHint(createdAt: order.createdAt),
                 ],
                 const SizedBox(height: 18),
                 Container(
@@ -152,23 +175,43 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     ),
                   ),
                 ] else ...[
+                  // The one filled button of a card order is "Pay by card"; the status check steps down to a text button.
+                  if (card) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const ValueKey('pay-by-card'),
+                        onPressed: _paying || _cancelling ? null : _payByCard,
+                        child: _paying ? const ButtonSpinner() : ButtonLabel(s.payByCard),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
                       key: const ValueKey('cancel-order'),
-                      onPressed: _cancelling ? null : _cancel,
+                      onPressed: _cancelling || _paying ? null : _cancel,
                       child: Text(s.cancelOrder),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
+                  if (card)
+                    TextButton(
                       key: const ValueKey('check-payment'),
-                      onPressed: _checking || payment == null ? null : () => _check(payment),
-                      child: _checking ? const ButtonSpinner() : Text(s.ppCheck),
+                      onPressed: _checking || _paying || payment == null ? null : () => _check(payment),
+                      child: _checking ? const ButtonSpinner() : ButtonLabel(s.ppCheck),
+                    )
+                  else ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        key: const ValueKey('check-payment'),
+                        onPressed: _checking || payment == null ? null : () => _check(payment),
+                        child: _checking ? const ButtonSpinner() : Text(s.ppCheck),
+                      ),
                     ),
-                  ),
+                  ],
                   TextButton(
                     onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
                     child: ButtonLabel(s.ppContinue),

@@ -379,9 +379,11 @@ export class OrdersService {
       throw err;
     }
 
-    // Charge for the order. Wallet/card confirm immediately; COD stays pending
+    // Charge for the order. Wallet confirms immediately; COD stays pending
     // until the rider collects; mobile money stays pending until the subscriber
-    // approves on their phone (the webhook then confirms).
+    // approves on their phone, and a Stripe card until the customer completes
+    // the card sheet (the webhook then confirms). Without Stripe (non-production
+    // only) the card is a mock that confirms at once.
     let payment;
     try {
       payment = await this.payments.processForOrder(saved, input.paymentPhone);
@@ -406,9 +408,13 @@ export class OrdersService {
     void this.alertRouteFallback(saved, route);
     if (awaitingPayment) {
       // Not fulfillable yet: ops hear about it only once the money is in.
+      // A card has no request on a phone: the customer finishes it in the card sheet.
+      const card = payment.method === 'stripe_card';
       await this.notifications.toUser(customer.id, {
-        title: 'Approve your payment',
-        body: `Approve the ${paymentMethodLabel(payment.method)} request on your phone to confirm ${saved.reference}.`,
+        title: card ? 'Complete your payment' : 'Approve your payment',
+        body: card
+          ? `Complete the card payment to confirm ${saved.reference}.`
+          : `Approve the ${paymentMethodLabel(payment.method)} request on your phone to confirm ${saved.reference}.`,
         type: 'order',
         entityId: saved.id,
       });

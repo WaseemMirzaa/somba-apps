@@ -225,6 +225,11 @@ cat <<EOF
     MM_PROVIDER MM_WEBHOOK_SECRET                           → mobile money (without it, mobile
                                                               money is refused; only wallet works)
     Aggregator webhook URL: $BASE_URL/api/v1/payments/webhook/mobile-money
+    pawaPay callback URL:   $BASE_URL/api/v1/payments/webhook/pawapay
+    Stripe webhook URL:     $BASE_URL/api/v1/payments/webhook/stripe
+    Payment keys (Stripe, pawaPay): set them with  bash $APP_DIR/deploy/set-secret.sh NAME
+    (hidden prompt, or --stdin) — never paste them into a shell line, a chat or a file by hand.
+    See docs/PAYMENTS-STRIPE.md and docs/PAYMENTS-PAWAPAY.md.
     Then set the delivery zones/fees: admin Settings → deliveryZones
  Logs:   sudo -u $APP_USER pm2 logs
  Update: re-run this same command (idempotent; a nightly backup also runs: /var/backups/somba).

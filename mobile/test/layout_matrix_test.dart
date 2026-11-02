@@ -86,12 +86,12 @@ Map<String, dynamic> _line(String id, String name, String nameFr, double price, 
       if (cancelReason != null) 'refundedUsd': price * 2,
     };
 
-OrderDto _order(String status, {bool multi = false}) => OrderDto.fromJson({
-      'id': 'o-$status${multi ? '-multi' : ''}',
+OrderDto _order(String status, {bool multi = false, String method = 'airtel_money', String? id}) => OrderDto.fromJson({
+      'id': id ?? 'o-$status${multi ? '-multi' : ''}',
       'reference': 'SOM-104${multi ? 3 : 2}',
       'customerName': 'Aline',
       'status': status,
-      'paymentMethod': 'airtel_money',
+      'paymentMethod': method,
       'subtotalUsd': 358.8,
       'deliveryFeeUsd': 3,
       'discountUsd': 5,
@@ -147,6 +147,7 @@ Future<void> _seed(String lang) async {
     ..clear()
     ..addAll([
       _order('pending'),
+      _order('pending', method: 'stripe_card', id: 'o-pending-card'),
       _order('confirmed'),
       _order('processing', multi: true),
       _order('out_for_delivery'),
@@ -155,8 +156,10 @@ Future<void> _seed(String lang) async {
     ]);
   store.payments
     ..clear()
-    ..add(PaymentDto.fromJson(
-        {'id': 'pay1', 'reference': 'PAY-77', 'orderId': 'o-pending', 'orderReference': 'SOM-1042', 'method': 'airtel_money', 'amountUsd': 356.8}));
+    ..addAll([
+      PaymentDto.fromJson({'id': 'pay1', 'reference': 'PAY-77', 'orderId': 'o-pending', 'orderReference': 'SOM-1042', 'method': 'airtel_money', 'amountUsd': 356.8}),
+      PaymentDto.fromJson({'id': 'pay2', 'reference': 'PAY-78', 'orderId': 'o-pending-card', 'orderReference': 'SOM-1042', 'method': 'stripe_card', 'amountUsd': 356.8}),
+    ]);
   store.riderLocations['o-out_for_delivery'] = RiderLocationDto(orderId: 'o-out_for_delivery', lat: -4.3217, lng: 15.3125);
   store.notifications
     ..clear()
@@ -181,6 +184,7 @@ Future<void> _seed(String lang) async {
       }),
     ]);
   store.codEnabled = true; // the checkout offers cash on delivery
+  store.cardPayments = 'stripe'; // ...and the bank card (the longest list of payment tiles)
   store.debugCallRequest = (event, [body]) async => switch (event) {
         'reviews:list' => [
             {
@@ -218,6 +222,7 @@ void main() {
       ..payments.clear()
       ..notifications.clear()
       ..codEnabled = false
+      ..cardPayments = 'off'
       ..riderLocations.clear();
     gapTearDown();
   });
@@ -232,6 +237,7 @@ void main() {
     'cart': (l) => CartScreen(locale: l),
     'checkout': (l) => CheckoutScreen(locale: l),
     'payment pending': (l) => PaymentPendingScreen(locale: l, orderId: 'o-pending'),
+    'payment pending (card)': (l) => PaymentPendingScreen(locale: l, orderId: 'o-pending-card'),
     'order success': (l) => OrderSuccessScreen(locale: l, orderId: 'o-confirmed'),
     'order list': (l) => OrdersScreen(locale: l),
     'order detail (pending)': (l) => OrderDetailScreen(locale: l, orderId: 'o-pending'),
