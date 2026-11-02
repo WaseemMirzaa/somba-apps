@@ -17,8 +17,8 @@ test("the rider data layer asks for rider:workStats and carries no money but the
 test("the My work page shows no pay, and the old /rider/earnings URL only redirects to /rider/work", () => {
   const work = read("../app/rider/work/page.tsx");
   assert.doesNotMatch(work, /earnings|perTask|per task|rate:/i);
-  assert.match(work, /paid a salary by Somba/);
-  assert.match(work, /Vous êtes salarié de Somba/);
+  assert.match(work, /paid a salary by Somba&Teka\./);
+  assert.match(work, /Vous êtes salarié de Somba&Teka\./);
   const old = read("../app/rider/earnings/page.tsx");
   assert.match(old, /redirect\("\/rider\/work"\)/);
   assert.doesNotMatch(old, /use client|useRiderData/);

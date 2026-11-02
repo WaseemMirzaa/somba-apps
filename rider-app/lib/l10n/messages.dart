@@ -139,7 +139,7 @@ const Map<String, (String, String)> kMessages = {
   'work_failed': ('Failed', 'Échouées'),
   'work_success_rate': ('Success rate', 'Taux de réussite'),
   'work_by_kind': ('Completed by type', 'Terminées par type'),
-  'work_salary_note': ('You are paid a salary by Somba. These numbers show your work, not your pay.', 'Vous êtes salarié de Somba. Ces chiffres montrent votre travail, pas votre paie.'),
+  'work_salary_note': ('You are paid a salary by Somba&Teka. These numbers show your work, not your pay.', 'Vous êtes salarié de Somba&Teka. Ces chiffres montrent votre travail, pas votre paie.'),
   'delivered': ('Delivered', 'Livrées'),
   'in_progress': ('In progress', 'En cours'),
   'cash_amount_label': ('Cash you collected (USD)', 'Espèces encaissées (USD)'),
