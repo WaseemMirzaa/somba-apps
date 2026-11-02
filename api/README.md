@@ -108,7 +108,7 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `audit:list`, `fraud:list/setStatus`, `customers:list/setActive` | admin ops | admin |
 | `broadcasts:list/send`, `roles:defs/staff/setRole` | marketing + roles | admin |
 | `warehouse:hubs/parcels/aged/inventory/batches/buildBatch/reconcile/transfers` | WMS | staff |
-| `rider:earnings` / `rider:tasks` | rider shift summary + enriched queue | rider |
+| `rider:workStats` / `rider:tasks` | rider work stats (tasks done, failed, success rate, by type; no pay, riders are salaried; `rider:earnings` is a deprecated alias) + enriched queue | rider |
 | `campaigns:list/create/update/setStatus` | seller marketing campaigns | seller/admin |
 | `replacements:list/create/setStatus` | item replacements | customer/ops |
 | `exchanges:list/create/setStatus` | item exchanges | customer/ops |

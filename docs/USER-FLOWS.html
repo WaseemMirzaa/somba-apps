@@ -239,7 +239,7 @@ main li { margin-block: 0.2rem; }
 <td>Rider</td>
 <td>Created by the admin (role <code>rider</code>)</td>
 <td>Rider app, rider web</td>
-<td>Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see earnings</td>
+<td>Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see their work stats (riders are salaried, no per-task pay)</td>
 </tr>
 <tr>
 <td>Warehouse staff</td>
@@ -2127,7 +2127,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>Riders (+ detail)</td>
-<td>Riders who have live tasks; earnings derived</td>
+<td>Riders who have live tasks; work stats derived</td>
 <td>Zone A–D per rider (browser), assign (message), call</td>
 <td>LIVE + LOCAL</td>
 </tr>
@@ -2288,7 +2288,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 </tbody></table></div>
 <h2 id="9-rider--mobile-app-flutter-and-web-portal-rider"><a class="anchor" href="#9-rider--mobile-app-flutter-and-web-portal-rider" aria-hidden="true">#</a>9. Rider — mobile app (Flutter) and web portal (<code>/rider</code>)</h2>
-<p>The <strong>mobile app is the complete rider tool</strong> (claim, status updates, live GPS, cash confirmation, earnings). The web rider portal is mostly read-only today.</p>
+<p>The <strong>mobile app is the complete rider tool</strong> (claim, status updates, live GPS, cash confirmation, work stats). The web rider portal is mostly read-only today.</p>
 <h3 id="91-rider-mobile-app--navigation"><a class="anchor" href="#91-rider-mobile-app--navigation" aria-hidden="true">#</a>9.1 Rider mobile app — navigation</h3>
 <div class="diagram"><pre class="mermaid">flowchart TD
   SP([Splash]) --&gt; RS{Saved session and role = rider?}
@@ -2298,7 +2298,7 @@ main li { margin-block: 0.2rem; }
   LG -- "POST /auth/login (role must be rider)" --&gt; SH
   subgraph SH["Rider shell - bottom tabs"]
     DV(["Deliveries: Active · Available · Done"])
-    EA(["Earnings"])
+    EA(["My work"])
     PR(["Profile"])
   end
   PR --&gt;|Sign out| LG</pre></div>
@@ -2320,7 +2320,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>Deliveries</td>
 <td>Greeting, connection pill (Online / Connecting / Error / Offline), tabs with counts</td>
-<td>Pull to refresh (<code>rider:tasks</code>, <code>rider:earnings</code>, <code>notifications:list</code>)</td>
+<td>Pull to refresh (<code>rider:tasks</code>, <code>rider:workStats</code>, <code>notifications:list</code>)</td>
 </tr>
 <tr>
 <td>— Available tab</td>
@@ -2338,8 +2338,8 @@ main li { margin-block: 0.2rem; }
 <td>—</td>
 </tr>
 <tr>
-<td>Earnings</td>
-<td>Total ($2.50 per delivery), delivered, in progress, cash collected</td>
+<td>My work</td>
+<td>Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only); cash in hand. Riders are salaried: no pay is shown</td>
 <td>Pull to refresh</td>
 </tr>
 <tr>
@@ -2354,7 +2354,7 @@ main li { margin-block: 0.2rem; }
   A([Open app]) --&gt; T{Refresh token saved?}
   T -- no --&gt; L([Sign in])
   T -- yes --&gt; RF["POST /auth/refresh"] --&gt; RR{Accepted and role = rider?}
-  RR -- yes --&gt; CN[Live connection → ready → load tasks, earnings, notifications] --&gt; D([Deliveries])
+  RR -- yes --&gt; CN[Live connection → ready → load tasks, work stats, notifications] --&gt; D([Deliveries])
   RR -- "401/403 or other role" --&gt; L
   L --&gt; LP["POST /auth/login"] --&gt; LR{Result}
   LR -- "not a rider" --&gt; LE[This app is for Somba&amp;Teka riders] --&gt; L
@@ -2397,14 +2397,14 @@ main li { margin-block: 0.2rem; }
   LOOP --&gt; EV["delivery:location {taskId, lat, lng}"]
   EV --&gt; CU[⚡ customer and ops see the rider move]
   LOOP --&gt; S</pre></div>
-<h4 id="r-4-earnings-notifications-sign-out"><a class="anchor" href="#r-4-earnings-notifications-sign-out" aria-hidden="true">#</a>R-4 Earnings, notifications, sign out</h4>
+<h4 id="r-4-work-stats-notifications-sign-out"><a class="anchor" href="#r-4-work-stats-notifications-sign-out" aria-hidden="true">#</a>R-4 Work stats, notifications, sign out</h4>
 <div class="diagram"><pre class="mermaid">flowchart TD
-  E([Earnings]) --&gt; ER["rider:earnings"] --&gt; EV[Total $2.50 × delivered, in progress, cash collected to hand over]
+  E([My work]) --&gt; ER["rider:workStats"] --&gt; EV[Completed today / week / all time, in progress, failed, success rate, by type, cash collected to hand over]
   P([Profile]) --&gt; N[Notifications list ⚡ notification:new] --&gt; NR["tap → notifications:markRead"]
   P --&gt; LG[EN / FR]
   P --&gt; SO[Sign out] --&gt; X[Stop GPS, forget tokens, close connection] --&gt; L([Sign in])</pre></div>
 <h3 id="93-rider-web-portal-rider"><a class="anchor" href="#93-rider-web-portal-rider" aria-hidden="true">#</a>9.3 Rider web portal (<code>/rider</code>)</h3>
-<p>Bottom tabs: <strong>Dashboard · Active tasks · My zone · Earnings · My account</strong>. Bell → notifications.</p>
+<p>Bottom tabs: <strong>Dashboard · Active tasks · My zone · My work · My account</strong>. Bell → notifications.</p>
 <div class="table-wrap"><table><thead><tr>
 <th>Page</th>
 <th>Data</th>
@@ -2448,10 +2448,10 @@ main li { margin-block: 0.2rem; }
 <td>LIVE + LOCAL</td>
 </tr>
 <tr>
-<td><code>/rider/earnings</code></td>
-<td>—</td>
-<td>Tab link exists but the page does not</td>
-<td>missing</td>
+<td><code>/rider/work</code></td>
+<td>Work stats (<code>rider:workStats</code>): completed today / this week / all time, completed, in progress, failed, success rate, by type, cash collected. <code>/rider/earnings</code> redirects here</td>
+<td>Refresh</td>
+<td>LIVE</td>
 </tr>
 <tr>
 <td><code>/rider/profile</code></td>
@@ -2514,7 +2514,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>6</td>
-<td>Web rider portal cannot accept or update deliveries; Earnings tab has no page; notifications are demo</td>
+<td>Web rider portal cannot accept or update deliveries; notifications are demo</td>
 </tr>
 <tr>
 <td>7</td>
@@ -2854,15 +2854,15 @@ main li { margin-block: 0.2rem; }
 <td><code>delivery:updateStatus delivered</code>, <code>warehouse:reconcile</code></td>
 </tr>
 <tr>
-<td>Earnings</td>
+<td>Work stats</td>
 <td>—</td>
 <td>—</td>
-<td><span class="st">🟡</span> finance</td>
+<td>—</td>
 <td>—</td>
 <td><span class="st">🟡</span> per rider</td>
 <td><span class="st">✅</span></td>
-<td>— (tab missing)</td>
-<td><code>rider:earnings</code></td>
+<td><span class="st">✅</span></td>
+<td><code>rider:workStats</code> (<code>rider:earnings</code> is a deprecated alias)</td>
 </tr>
 </tbody></table></div>
 <h3 id="101-readiness-by-user"><a class="anchor" href="#101-readiness-by-user" aria-hidden="true">#</a>10.1 Readiness by user</h3>
@@ -3600,10 +3600,10 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>RA-5</td>
-<td>Earnings</td>
-<td>Flat $2.50 per delivery regardless of distance, zone or failed attempts</td>
-<td><span class="st">🟡</span></td>
-<td>Configurable rider pay rules</td>
+<td>Pay</td>
+<td>Riders are salaried: the platform pays nothing per task, and the My work tab shows work stats, not pay</td>
+<td>⚪</td>
+<td>None (by design)</td>
 </tr>
 <tr>
 <td>RA-6</td>
@@ -3644,10 +3644,10 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>RW-4</td>
-<td>Earnings tab</td>
-<td>The tab links to a page that does not exist</td>
-<td>🟠</td>
-<td>Add the page using <code>rider:earnings</code></td>
+<td>Work tab</td>
+<td>Fixed: <code>/rider/work</code> shows the rider's work stats (<code>rider:workStats</code>)</td>
+<td>✅</td>
+<td>—</td>
 </tr>
 <tr>
 <td>RW-5</td>
@@ -3668,7 +3668,7 @@ main li { margin-block: 0.2rem; }
   T([Rider web: task]) --&gt; POD[Proof of delivery: code, name, notes]
   POD --&gt; CF[Confirm delivered] --&gt; OKT[Toast: delivery confirmed]:::bad --&gt; NS[Order still out for delivery]:::bad
   T --&gt; FL[Failed delivery: reason] --&gt; FT[Toast: logged]:::bad --&gt; NS2[Nothing recorded]:::bad
-  NAV([Earnings tab]) --&gt; F404[Page does not exist]:::bad
+  NAV([My work tab]) --&gt; WK[Work stats page]
   classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410</pre></div>
 <h3 id="1111-fix-order-for-broken-flows"><a class="anchor" href="#1111-fix-order-for-broken-flows" aria-hidden="true">#</a>11.11 Fix order for broken flows</h3>
 <ol>

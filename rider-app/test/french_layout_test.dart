@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/deliveries_screen.dart';
-import 'package:somba_rider/screens/earnings_screen.dart';
+import 'package:somba_rider/screens/work_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/profile_screen.dart';
 import 'package:somba_rider/screens/rider_shell.dart';
@@ -109,13 +109,13 @@ void main() {
     expectButtonRules(tester);
   });
 
-  testWidgets('layout: earnings, profile, navigation bar', (tester) async {
-    await show(tester, const Scaffold(body: EarningsScreen()));
+  testWidgets('layout: my work, profile, navigation bar', (tester) async {
+    await show(tester, const Scaffold(body: WorkScreen()));
     expect(overflows, isEmpty);
     await show(tester, Scaffold(body: ProfileScreen(locale: loc, onLocaleChanged: (_) {})));
     expect(overflows, isEmpty);
     await show(tester, RiderShell(locale: loc, onLocaleChanged: (_) {}));
-    for (final icon in [Icons.account_balance_wallet_rounded, Icons.person_rounded, Icons.two_wheeler_rounded]) {
+    for (final icon in [Icons.insights_rounded, Icons.person_rounded, Icons.two_wheeler_rounded]) {
       await tester.tap(find.byIcon(icon).first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));

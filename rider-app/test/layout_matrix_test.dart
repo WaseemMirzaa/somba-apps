@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/deliveries_screen.dart';
-import 'package:somba_rider/screens/earnings_screen.dart';
+import 'package:somba_rider/screens/work_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/profile_screen.dart';
 import 'package:somba_rider/screens/support_screen.dart';
@@ -30,21 +30,23 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean-Pierre Mukendi', role: 'rider', phone: '+243810000000');
   store.loaded = true;
   store.requireDeliveryCode = true;
-  store.earnings = const EarningsDto(
+  store.stats = const WorkStatsDto(
     totalTasks: 128,
     completed: 117,
     active: 2,
+    failed: 9,
+    completedToday: 14,
+    completedLast7Days: 86,
+    successRate: 93,
     codCollectedUsd: 4825.5,
-    earningsUsd: 292.5,
-    perTaskUsd: 2.5,
     byKind: [
-      EarningsKind(kind: 'delivery', count: 60, earningsUsd: 150),
-      EarningsKind(kind: 'pickup', count: 31, earningsUsd: 77.5),
-      EarningsKind(kind: 'transfer', count: 12, earningsUsd: 30),
-      EarningsKind(kind: 'return_pickup', count: 5, earningsUsd: 12.5),
-      EarningsKind(kind: 'return_transfer', count: 4, earningsUsd: 10),
-      EarningsKind(kind: 'return_to_seller', count: 3, earningsUsd: 7.5),
-      EarningsKind(kind: 'replacement_delivery', count: 2, earningsUsd: 5),
+      WorkStatsKind(kind: 'delivery', count: 60),
+      WorkStatsKind(kind: 'pickup', count: 31),
+      WorkStatsKind(kind: 'transfer', count: 12),
+      WorkStatsKind(kind: 'return_pickup', count: 5),
+      WorkStatsKind(kind: 'return_transfer', count: 4),
+      WorkStatsKind(kind: 'return_to_seller', count: 3),
+      WorkStatsKind(kind: 'replacement_delivery', count: 2),
     ]);
   store.assignment = const RiderAssignment(
       hubId: 'h2', hubName: 'Entrepôt de Gombe', hubCity: 'Kinshasa', hubAddress: 'Boulevard du 30 Juin 8, près de la place de la Gare Centrale, Gombe');
@@ -132,7 +134,7 @@ void main() {
     store.notifications.clear();
     store.assignment = null;
     store.requireDeliveryCode = false;
-    store.earnings = const EarningsDto();
+    store.stats = const WorkStatsDto();
     resetSupport();
   });
 
@@ -156,7 +158,7 @@ void main() {
     'profile: covered areas': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.runs),
     'deliveries: nothing assigned': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.empty),
     'profile': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.cards),
-    'earnings': ((l) => const Scaffold(body: EarningsScreen()), null, _Scenario.cards),
+    'my work': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.cards),
     'sign in': ((l) => const RiderLoginScreen(), null, _Scenario.cards),
     'forgot password': ((l) => const ForgotPasswordScreen(), null, _Scenario.cards),
     'failure sheet': ((l) => const Scaffold(body: SingleChildScrollView(child: FailReasonSheet())), null, _Scenario.cards),

@@ -102,7 +102,7 @@ export default function RiderProfilePage() {
       <DetailSection title={fr ? "Liens rapides" : "Quick Links"}>
         <div className="flex flex-wrap gap-4">
           <Link href="/rider/history" className="text-sm text-emerald-600 hover:underline">{fr ? "Historique" : "Task History"}</Link>
-          <Link href="/rider/earnings" className="text-sm text-emerald-600 hover:underline">{t("earnings")}</Link>
+          <Link href="/rider/work" className="text-sm text-emerald-600 hover:underline">{t("myWork")}</Link>
           <Link href="/rider/notifications" className="text-sm text-emerald-600 hover:underline">Notifications</Link>
           <Link href="/rider/support" className="text-sm text-emerald-600 hover:underline">{fr ? "Assistance" : "Support"}</Link>
         </div>

@@ -32,7 +32,7 @@ class RiderStore extends ChangeNotifier {
   /// warehouse staff assign every task.
   final List<DeliveryTaskDto> myTasks = [];
   final List<NotificationDto> notifications = [];
-  EarningsDto earnings = const EarningsDto();
+  WorkStatsDto stats = const WorkStatsDto();
 
   /// Cash in hand: collected on cash-on-delivery orders and not yet handed in at the warehouse.
   CashDto cash = const CashDto();
@@ -166,7 +166,7 @@ class RiderStore extends ChangeNotifier {
     _runsOnRoad.clear();
     notifications.clear();
     SupportStore.instance.clear();
-    earnings = const EarningsDto();
+    stats = const WorkStatsDto();
     cash = const CashDto();
     requireDeliveryCode = false;
     assignment = null;
@@ -402,7 +402,7 @@ class RiderStore extends ChangeNotifier {
   @visibleForTesting
   Future<dynamic> Function(String event, Map<String, dynamic>? body)? transport;
 
-  /// Re-read the rider's queue, earnings and notifications.
+  /// Re-read the rider's queue, work stats and notifications.
   Future<void> refresh({bool light = false}) async {
     // Coalesce bursts of pushes: one read in flight, one more queued at most.
     if (_refreshing) {
@@ -434,14 +434,14 @@ class RiderStore extends ChangeNotifier {
   Completer<void>? _refreshDone;
 
   /// [full] also re-reads notifications and the public settings; a light read
-  /// (after an action or a push) only needs the queue and the earnings.
+  /// (after an action or a push) only needs the queue and the work stats.
   Future<void> _refreshOnce({required bool full}) async {
     try {
       final rows = ((await request('rider:tasks')) as List).map((e) => DeliveryTaskDto.fromJson(_map(e))).toList();
       myTasks
         ..clear()
         ..addAll(rows.where((t) => t.status != 'unassigned')); // an older server may still list its open pool: not ours
-      earnings = EarningsDto.fromJson(_map(await request('rider:earnings')));
+      stats = WorkStatsDto.fromJson(_map(await request('rider:workStats')));
       await _readCash();
       unawaited(_readRuns());
       if (full) {

@@ -83,7 +83,7 @@ flowchart LR
 | Visitor | — | Customer app, web shop | Browse products, categories, deals, stores, reviews; must sign in to buy |
 | Customer | Self sign-up (email + password) | Customer app, web shop | Buy, pay (wallet or mobile money), track deliveries live, cancel, return/dispute, review, support, wallet, addresses, wishlist |
 | Seller | Self sign-up as seller, then store approval by an admin | Seller portal (and the shop) | Store profile, products and stock, orders containing their products, promotions/campaigns, reviews and questions, payouts, analytics |
-| Rider | Created by the admin (role `rider`) | Rider app, rider web | Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see earnings |
+| Rider | Created by the admin (role `rider`) | Rider app, rider web | Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see their work stats (riders are salaried, no per-task pay) |
 | Warehouse staff | Created by the admin (role `warehouse_staff`) | Warehouse portal | Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns, cash reconciliation |
 | Admin (super admin) | Bootstrap account | Admin portal | Everything, including staff roles |
 | Admin — operations | Admin assigns the role | Admin portal | Orders, sellers, catalogue, customers, fulfilment, settings, audit, fraud |
@@ -1171,7 +1171,7 @@ flowchart LR
 | Batch builder | Demo parcels | Add / remove, optimise route (reverses), create batch & assign rider (demo riders) | MOCK |
 | Dispatch (+ batch detail) | Demo batches; rider panel live | Assign / change / auto-assign rider, dispatch — local | MOCK + LOCAL |
 | Inventory (+ SKU) | `warehouse:inventory` | Search; adjust / move / reserve (messages) | LIVE + STUB |
-| Riders (+ detail) | Riders who have live tasks; earnings derived | Zone A–D per rider (browser), assign (message), call | LIVE + LOCAL |
+| Riders (+ detail) | Riders who have live tasks; work stats derived | Zone A–D per rider (browser), assign (message), call | LIVE + LOCAL |
 | Deliveries | Demo parcels by type (local, cross-zone, inter-warehouse, return) | Tabs, expand journey | MOCK |
 | Delivery detail (no link) | Live task | Call rider, escalate (message) | LIVE |
 | Transfers | Demo transfer runs | Mark arrived, receive at hub (messages) | MOCK |
@@ -1274,7 +1274,7 @@ flowchart TD
 
 ## 9. Rider — mobile app (Flutter) and web portal (`/rider`)
 
-The **mobile app is the complete rider tool** (claim, status updates, live GPS, cash confirmation, earnings). The web rider portal is mostly read-only today.
+The **mobile app is the complete rider tool** (claim, status updates, live GPS, cash confirmation, work stats). The web rider portal is mostly read-only today.
 
 ### 9.1 Rider mobile app — navigation
 
@@ -1287,7 +1287,7 @@ flowchart TD
   LG -- "POST /auth/login (role must be rider)" --> SH
   subgraph SH["Rider shell - bottom tabs"]
     DV(["Deliveries: Active · Available · Done"])
-    EA(["Earnings"])
+    EA(["My work"])
     PR(["Profile"])
   end
   PR -->|Sign out| LG
@@ -1297,11 +1297,11 @@ flowchart TD
 |---|---|---|
 | Sign in | Email, password, "accounts are created by the fleet team" | **Sign in** (`POST /auth/login`; non-rider accounts refused) · Forgot password? |
 | Reset password | Email, then code + new password | Send link (`POST /auth/forgot`) · Save (`POST /auth/reset`) |
-| Deliveries | Greeting, connection pill (Online / Connecting / Error / Offline), tabs with counts | Pull to refresh (`rider:tasks`, `rider:earnings`, `notifications:list`) |
+| Deliveries | Greeting, connection pill (Online / Connecting / Error / Offline), tabs with counts | Pull to refresh (`rider:tasks`, `rider:workStats`, `notifications:list`) |
 | — Available tab | Unclaimed deliveries: reference, COD amount, address, items | **Accept this delivery** (`delivery:accept`) |
 | — Active tab | My deliveries: status, customer, address, phone, items, cash banner, GPS status | **Picked up the parcel** → **On my way** → **Delivered** (`delivery:updateStatus`), cash confirmation for COD, **Could not deliver** (confirm) |
 | — Done tab | Delivered and failed | — |
-| Earnings | Total ($2.50 per delivery), delivered, in progress, cash collected | Pull to refresh |
+| My work | Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only); cash in hand. Riders are salaried: no pay is shown | Pull to refresh |
 | Profile | Name, email, phone, language, notifications (15 latest) | EN/FR · tap notification (`notifications:markRead`) · **Sign out** |
 
 ### 9.2 Rider mobile flowcharts
@@ -1313,7 +1313,7 @@ flowchart TD
   A([Open app]) --> T{Refresh token saved?}
   T -- no --> L([Sign in])
   T -- yes --> RF["POST /auth/refresh"] --> RR{Accepted and role = rider?}
-  RR -- yes --> CN[Live connection → ready → load tasks, earnings, notifications] --> D([Deliveries])
+  RR -- yes --> CN[Live connection → ready → load tasks, work stats, notifications] --> D([Deliveries])
   RR -- "401/403 or other role" --> L
   L --> LP["POST /auth/login"] --> LR{Result}
   LR -- "not a rider" --> LE[This app is for Somba&Teka riders] --> L
@@ -1366,11 +1366,11 @@ flowchart TD
   LOOP --> S
 ```
 
-#### R-4 Earnings, notifications, sign out
+#### R-4 Work stats, notifications, sign out
 
 ```mermaid
 flowchart TD
-  E([Earnings]) --> ER["rider:earnings"] --> EV[Total $2.50 × delivered, in progress, cash collected to hand over]
+  E([My work]) --> ER["rider:workStats"] --> EV[Completed today / week / all time, in progress, failed, success rate, by type, cash collected to hand over]
   P([Profile]) --> N[Notifications list ⚡ notification:new] --> NR["tap → notifications:markRead"]
   P --> LG[EN / FR]
   P --> SO[Sign out] --> X[Stop GPS, forget tokens, close connection] --> L([Sign in])
@@ -1378,7 +1378,7 @@ flowchart TD
 
 ### 9.3 Rider web portal (`/rider`)
 
-Bottom tabs: **Dashboard · Active tasks · My zone · Earnings · My account**. Bell → notifications.
+Bottom tabs: **Dashboard · Active tasks · My zone · My work · My account**. Bell → notifications.
 
 | Page | Data | Options | Status |
 |---|---|---|---|
@@ -1388,7 +1388,7 @@ Bottom tabs: **Dashboard · Active tasks · My zone · Earnings · My account**.
 | `/rider/tasks/:id/pod` | OTP, recipient, notes, photo placeholder | Confirm delivered (message only) | STUB |
 | `/rider/tasks/:id/fail` | Reason, notes | Report failed (message only) | STUB |
 | `/rider/zone` | Zone (set by warehouse, stored in browser), zone fee (demo), tasks in / outside zone | Open task | LIVE + LOCAL |
-| `/rider/earnings` | — | Tab link exists but the page does not | missing |
+| `/rider/work` | Work stats (`rider:workStats`): completed today / this week / all time, completed, in progress, failed, success rate, by type, cash collected. `/rider/earnings` redirects here | Refresh | LIVE |
 | `/rider/profile` | Name, id, phone, current deliveries; rating and vehicle demo | Availability toggle (local), history, notifications | LIVE + LOCAL |
 | `/rider/history` | Delivered tasks | Open task | LIVE |
 | `/rider/notifications` | Demo notifications | Mark read (local) | MOCK |
@@ -1415,7 +1415,7 @@ flowchart TD
 | 3 | No background location (tracking pauses when the app is closed); no button to open phone settings when permission is blocked |
 | 4 | No batches, zone, shift / availability or cash hand-over in the app |
 | 5 | App text is English even when French is selected (only system widgets change) |
-| 6 | Web rider portal cannot accept or update deliveries; Earnings tab has no page; notifications are demo |
+| 6 | Web rider portal cannot accept or update deliveries; notifications are demo |
 | 7 | Rider staff onboarding (first password) is not connected |
 
 
@@ -1456,7 +1456,7 @@ flowchart TD
 | Picked up → on the way → delivered / failed | — | — | — | — | — | ✅ | 🧪 | `delivery:updateStatus` |
 | Share live location | — | — | — | — | — | ✅ | — | `delivery:location` |
 | Cash collected (COD, when enabled) | — | — | — | — | 🧪 reconcile (server ready) | ✅ | 🧪 | `delivery:updateStatus delivered`, `warehouse:reconcile` |
-| Earnings | — | — | 🟡 finance | — | 🟡 per rider | ✅ | — (tab missing) | `rider:earnings` |
+| Work stats | — | — | — | — | 🟡 per rider | ✅ | ✅ | `rider:workStats` (`rider:earnings` is a deprecated alias) |
 
 ### 10.1 Readiness by user
 
@@ -1774,7 +1774,7 @@ flowchart TD
 | RA-2 | Delivered | No proof of delivery (customer code, photo, signature) | 🟠 | Customer OTP + photo |
 | RA-3 | GPS when the app is closed | Tracking stops in the background; when permission is blocked there is no button to open settings | 🟡 | Foreground service; "open settings" button |
 | RA-4 | Cash collected | Shown as "hand it over at the warehouse" but there is no hand-over or reconciliation step | 🟡 | Cash hand-over flow with warehouse sign-off |
-| RA-5 | Earnings | Flat $2.50 per delivery regardless of distance, zone or failed attempts | 🟡 | Configurable rider pay rules |
+| RA-5 | Pay | Riders are salaried: the platform pays nothing per task, and the My work tab shows work stats, not pay | ⚪ | None (by design) |
 | RA-6 | Language | Choosing French only changes system widgets; app text stays English | ⚪ | Translate strings |
 
 ### 11.10 Rider web portal
@@ -1784,7 +1784,7 @@ flowchart TD
 | RW-1 | Proof of delivery | "Confirm delivered" shows success but nothing is sent; the order is not delivered | 🔴 | `delivery:updateStatus delivered` with proof |
 | RW-2 | Open pool tasks | Unclaimed tasks are labelled "assigned" with no Accept button | 🟠 | Show the pool separately with Accept |
 | RW-3 | Status changes and GPS | Cannot accept, pick up, start or share location on the web | 🟠 | Same actions as the app, or point riders to the app |
-| RW-4 | Earnings tab | The tab links to a page that does not exist | 🟠 | Add the page using `rider:earnings` |
+| RW-4 | Work tab | Fixed: `/rider/work` shows the rider's work stats (`rider:workStats`) | ✅ | — |
 | RW-5 | Failed delivery | Reason form shows success but sends nothing | 🟡 | Wire to the server |
 | RW-6 | Batches, first password | Unlinked pages; batches render empty | ⚪ | Wire or remove |
 
@@ -1793,7 +1793,7 @@ flowchart TD
   T([Rider web: task]) --> POD[Proof of delivery: code, name, notes]
   POD --> CF[Confirm delivered] --> OKT[Toast: delivery confirmed]:::bad --> NS[Order still out for delivery]:::bad
   T --> FL[Failed delivery: reason] --> FT[Toast: logged]:::bad --> NS2[Nothing recorded]:::bad
-  NAV([Earnings tab]) --> F404[Page does not exist]:::bad
+  NAV([My work tab]) --> WK[Work stats page]
   classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
 ```
 
@@ -1837,7 +1837,7 @@ Every item in section 11 was worked on. This table says what is fixed, what is o
 | Admin (AD) | AD-1 payouts · AD-2 settings and zones saved · AD-3 broadcasts · AD-4/5 order status, cancel, refund; live refunds and pending-payment queue · AD-6 live disputes and returns with "goods received" · AD-7 staff list, role change, staff creation · AD-8 warehouse staff accounts · AD-9 flash sales, promo codes, CMS, categories, campaign decisions · AD-10 suspend / reinstate · AD-12/13 | Hub directory is still local · finance KPIs, analytics charts and the reviews moderation are labelled "demo data" |
 | Warehouse (WH) | WH-1/2 receive and stages · WH-3 assign rider and batches · WH-4 returns received · WH-5 exceptions, exchanges, replacements, transfers live · WH-6 COD reconciliation page · scanner is a typed/scanned code input | Dashboard throughput/goals widgets are demo (labelled) · no cash hand-over sign-off |
 | Rider app (RA) | RA-1 reasons on failure, from `assigned` · RA-2 handover code · pickup address, seller-ready, attempts · RA-3 open phone settings · RA-4 cash note | RA-6 French text for app strings · background location |
-| Rider web (RW) | RW-1…5 accept, picked up, on the way, delivered with code, failed with reason, GPS from the browser, earnings page, live notifications | — |
+| Rider web (RW) | RW-1…5 accept, picked up, on the way, delivered with code, failed with reason, GPS from the browser, work stats page, live notifications | — |
 
 ### 12.3 Bugs found and fixed while verifying
 

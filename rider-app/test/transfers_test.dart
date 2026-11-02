@@ -61,8 +61,8 @@ void main() {
           return serverTasks;
         case 'rider:runs':
           return serverRuns;
-        case 'rider:earnings':
-          return {'totalTasks': 3, 'delivered': 1, 'active': 2, 'codCollectedUsd': 0, 'earningsUsd': 2};
+        case 'rider:workStats':
+          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'codCollectedUsd': 0, 'byKind': []};
         case 'notifications:list':
           return [];
         case 'settings:get':
@@ -232,7 +232,7 @@ void main() {
       expect(store.activeRuns, hasLength(1));
       expect(store.active.map((t) => t.id), ['plain'], reason: 'the parcels of a known run are inside its card');
       expect(store.tasksOfRun(store.runs.single).map((t) => t.id), ['t1', 't2']);
-      expect(store.myTasks, hasLength(3), reason: 'still in the list (the GPS and the earnings need them)');
+      expect(store.myTasks, hasLength(3), reason: 'still in the list (the GPS and the work stats need them)');
     });
 
     test('a closed run is in Done; its parcels do not show twice', () async {

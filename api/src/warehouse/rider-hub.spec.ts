@@ -57,7 +57,7 @@ describe('riders, warehouses and tasks', () => {
     expect(Object.keys(a)).toEqual(['hub']);
   });
 
-  it('earnings: the pay is flat per completed task of any kind, and the breakdown by kind adds up to it', async () => {
+  it('workStats: counts completed, failed and active across every kind, with the breakdown by kind (counts only)', async () => {
     const h1 = await mkHub('H1');
     const [me, other] = [await mkRider(h1.id), await mkRider(h1.id)];
     await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', kind: 'delivery', codAmountUsd: 40, hubId: h1.id });
@@ -67,20 +67,63 @@ describe('riders, warehouses and tasks', () => {
     await mkTask({ orderId: 'o5', riderId: me.id, status: 'in_transit', kind: 'delivery', codAmountUsd: 99, hubId: h1.id });
     await mkTask({ orderId: 'o6', riderId: me.id, status: 'failed', kind: 'delivery', hubId: h1.id });
     await mkTask({ orderId: 'o7', riderId: other.id, status: 'delivered', kind: 'delivery', hubId: h1.id });
-    const e = await svc.earnings(me.id);
-    expect(e).toMatchObject({ totalTasks: 6, delivered: 4, active: 1, codCollectedUsd: 50, perTaskUsd: 2.5, earningsUsd: 10 });
+    const e = await svc.workStats(me.id);
+    expect(e).toMatchObject({ totalTasks: 6, completed: 4, active: 1, failed: 1, codCollectedUsd: 50, successRate: 80, delivered: 4 });
     expect(e.byKind).toEqual([
-      { kind: 'pickup', count: 1, earningsUsd: 2.5 },
-      { kind: 'transfer', count: 1, earningsUsd: 2.5 },
-      { kind: 'delivery', count: 2, earningsUsd: 5 },
+      { kind: 'pickup', count: 1 },
+      { kind: 'transfer', count: 1 },
+      { kind: 'delivery', count: 2 },
     ]);
-    expect(e.byKind.reduce((s, k) => s + k.earningsUsd, 0)).toBe(e.earningsUsd);
-    expect(e.byKind.reduce((s, k) => s + k.count, 0)).toBe(e.delivered);
+    expect(e.byKind.reduce((s, k) => s + k.count, 0)).toBe(e.completed);
   });
 
-  it('earnings: a rider with nothing done has an empty breakdown', async () => {
+  it('workStats: today and the last 7 days follow deliveredAt, in UTC days', async () => {
+    const h1 = await mkHub('H1');
+    const [me, other] = [await mkRider(h1.id), await mkRider(h1.id)];
+    const now = new Date('2026-11-02T12:00:00.000Z');
+    const at = (iso: string) => new Date(iso);
+    const done = (orderId: string, deliveredAt: Date | null, riderId = me.id) => mkTask({ orderId, riderId, status: 'delivered', hubId: h1.id, deliveredAt });
+    await done('a', at('2026-11-02T00:00:00.000Z')); // first second of today
+    await done('b', at('2026-11-02T09:30:00.000Z'));
+    await done('c', at('2026-11-01T23:59:59.000Z')); // yesterday, last second
+    await done('d', at('2026-10-27T00:00:00.000Z')); // 6 days before today: still in the 7 days
+    await done('e', at('2026-10-26T23:59:59.000Z')); // 7 days before: out
+    await done('f', null); // an old row with no timestamp counts as completed but not in any window
+    await done('g', at('2026-11-02T10:00:00.000Z'), other.id); // someone else's
+    await mkTask({ orderId: 'h', riderId: me.id, status: 'failed', hubId: h1.id, deliveredAt: at('2026-11-02T11:00:00.000Z') });
+    const e = await svc.workStats(me.id, now);
+    expect(e).toMatchObject({ completed: 6, completedToday: 2, completedLast7Days: 4, failed: 1 });
+  });
+
+  it('workStats: successRate is a whole percent of finished tasks, null when nothing is finished', async () => {
+    const h1 = await mkHub('H1');
+    const me = await mkRider(h1.id);
+    await mkTask({ orderId: 'o1', riderId: me.id, status: 'assigned', hubId: h1.id });
+    expect((await svc.workStats(me.id)).successRate).toBeNull();
+    await mkTask({ orderId: 'o2', riderId: me.id, status: 'delivered', hubId: h1.id });
+    await mkTask({ orderId: 'o3', riderId: me.id, status: 'delivered', hubId: h1.id });
+    await mkTask({ orderId: 'o4', riderId: me.id, status: 'failed', hubId: h1.id });
+    expect((await svc.workStats(me.id)).successRate).toBe(67); // 2 of 3
+    await mkTask({ orderId: 'o5', riderId: me.id, status: 'failed', hubId: h1.id });
+    expect((await svc.workStats(me.id)).successRate).toBe(50);
+  });
+
+  it('workStats: riders are salaried, so there is no money in the payload but the cash collected', async () => {
+    const h1 = await mkHub('H1');
+    const me = await mkRider(h1.id);
+    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', hubId: h1.id, codAmountUsd: 12 });
+    const e = await svc.workStats(me.id);
+    const json = JSON.stringify(e);
+    expect(json).not.toMatch(/earning|perTask|payUsd|rateUsd/i);
+    expect(Object.keys(e).filter((k) => /usd/i.test(k))).toEqual(['codCollectedUsd']);
+    expect(e.byKind.every((k) => Object.keys(k).sort().join() === 'count,kind')).toBe(true);
+  });
+
+  it('workStats: a rider with nothing done has zeros, no rate and an empty breakdown', async () => {
     const me = await mkRider(null);
-    expect(await svc.earnings(me.id)).toEqual({ totalTasks: 0, delivered: 0, active: 0, codCollectedUsd: 0, perTaskUsd: 2.5, byKind: [], earningsUsd: 0 });
+    expect(await svc.workStats(me.id)).toEqual({
+      totalTasks: 0, completed: 0, active: 0, failed: 0, completedToday: 0, completedLast7Days: 0, successRate: null, byKind: [], codCollectedUsd: 0, delivered: 0,
+    });
   });
 
   it("a warehouse's task filter covers the legs it manages, sends or receives", () => {

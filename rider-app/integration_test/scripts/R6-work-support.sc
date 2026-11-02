@@ -1,11 +1,11 @@
-# Clip R6 - earnings, history and support from the rider app.
+# Clip R6 - my work, history and support from the rider app.
 act riderClear
 include rsetup.sc
 flash
-tap "icon:account_balance_wallet_rounded#last" 1.6
-say "Earnings: the total and the number of tasks done, not only deliveries||Gains : le total et le nombre de tâches terminées, pas seulement les livraisons" 3.8
+tap "icon:insights_rounded#last" 1.6
+say "My work: tasks completed today, this week and all time||Mon travail : les tâches terminées aujourd'hui, cette semaine et au total" 3.8
 scroll 250
-say "By kind of task: deliveries, pickups, transfers, each paid the same flat rate||Par type de tâche : livraisons, collectes, transferts, chacun payé au même tarif" 4
+say "Completed by type: deliveries, pickups, transfers. Riders are salaried, so no pay here||Terminées par type : livraisons, collectes, transferts. Les livreurs sont salariés, aucune paie ici" 4
 scroll 300
 wait 1
 say "Cash from cash-on-delivery is handed over at the warehouse, which records it||Les espèces sont remises à l'entrepôt, qui les enregistre" 3.6

@@ -377,12 +377,16 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   a = await req(warehouse.sock, 'exceptions:list', { status: 'resolved' });
   ok(a.ok && a.data.some((e) => e.id === exc.id), 'exceptions:list filters by status');
 
-  section('Rider earnings');
+  section('Rider work stats');
+  a = await req(rider.sock, 'rider:workStats');
+  ok(a.ok && a.data.completed >= 1 && a.data.delivered === a.data.completed && !('earningsUsd' in a.data), 'rider:workStats counts completed parcels and carries no pay', JSON.stringify(a));
   a = await req(rider.sock, 'rider:earnings');
-  ok(a.ok && a.data.delivered >= 1 && a.data.earningsUsd >= 2.5, 'rider:earnings counts delivered parcels');
+  ok(a.ok && a.data.completed >= 1, 'the old rider:earnings name still answers');
   const late = await register('late');
+  a = await req(late.sock, 'rider:workStats');
+  ok(!a.ok, 'a customer is refused the rider work stats (no data leak)', JSON.stringify(a));
   a = await req(late.sock, 'rider:earnings');
-  ok(a.ok && a.data.delivered === 0, 'a customer sees zero rider earnings (no data leak)', JSON.stringify(a));
+  ok(!a.ok, 'and the old name refuses them too', JSON.stringify(a));
 
   // ======================================================================
   // Real analytics, hub directory, pagination

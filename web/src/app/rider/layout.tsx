@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { List, User, Wallet, Home, LogOut, Bell, Headphones } from "lucide-react";
+import { List, User, BarChart3, Home, LogOut, Bell, Headphones } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { RiderGpsProvider } from "@/lib/rider-gps";
 import { BrandMark } from "@/components/landing/brand-mark";
@@ -15,7 +15,7 @@ import { useOpsTickets } from "@/lib/ops-support";
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
   { href: "/rider/tasks", icon: List, label: "activeTasks" },
-  { href: "/rider/earnings", icon: Wallet, label: "earnings" },
+  { href: "/rider/work", icon: BarChart3, label: "myWork" },
   { href: "/rider/support", icon: Headphones, label: "support" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];

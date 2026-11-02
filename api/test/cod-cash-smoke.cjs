@@ -103,6 +103,8 @@ const register = async (label, role = 'customer') => {
   const before = (await req(rider.sock, 'cash:mine')).data;
   ok(before && typeof before.heldUsd === 'number' && Array.isArray(before.handovers), 'a rider reads their cash in hand', JSON.stringify(before));
   const startHeld = before.heldUsd;
+  const statsBefore = (await req(rider.sock, 'rider:workStats')).data;
+  ok(statsBefore && typeof statsBefore.completed === 'number', 'a rider reads their work stats', JSON.stringify(statsBefore));
 
   section('Collecting the cash at the door');
   const o1 = await placeCod(1);
@@ -140,8 +142,11 @@ const register = async (label, role = 'customer') => {
   section('Cash in hand and the warehouse count sheet');
   const mine = (await req(rider.sock, 'cash:mine')).data;
   ok(Math.abs(mine.heldUsd - money(startHeld + due1)) < 0.011, 'the rider now holds the cash they collected', `${mine.heldUsd} vs ${startHeld + due1}`);
-  const earn = (await req(rider.sock, 'rider:earnings')).data;
-  ok(earn && typeof earn.earningsUsd === 'number', 'the earnings call is unchanged');
+  const stats = (await req(rider.sock, 'rider:workStats')).data;
+  ok(stats && stats.completed === statsBefore.completed + 1 && stats.completedToday === statsBefore.completedToday + 1, 'the delivery shows in the work stats: completed and completed today each went up by one', JSON.stringify([statsBefore, stats]));
+  ok(stats && Math.abs(stats.codCollectedUsd - statsBefore.codCollectedUsd - due1) < 0.011, 'the cash collected in the work stats grew by the amount taken at the door');
+  ok(stats && !/earning|perTask/i.test(JSON.stringify(stats)), 'the work stats carry no pay');
+  ok(JSON.stringify((await req(rider.sock, 'rider:earnings')).data) === JSON.stringify(stats), 'the old rider:earnings name still answers, with the same payload');
   let rec = (await req(mgrK.sock, 'warehouse:reconcile')).data ?? [];
   let row = rec.find((r) => r.riderId === rider.user.id);
   ok(row && Math.abs(row.heldUsd - mine.heldUsd) < 0.011 && row.collectedUsd >= due1, 'the count sheet shows what the rider collected and still holds', JSON.stringify(row));

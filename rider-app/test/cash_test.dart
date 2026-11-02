@@ -9,7 +9,7 @@ import 'package:somba_rider/l10n/messages.dart';
 import 'package:somba_rider/l10n/server_errors.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/deliveries_screen.dart';
-import 'package:somba_rider/screens/earnings_screen.dart';
+import 'package:somba_rider/screens/work_screen.dart';
 import 'package:somba_rider/services/auth_service.dart' show ApiException;
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/rider_store.dart';
@@ -60,8 +60,8 @@ void main() {
           return {'ok': true};
         case 'rider:tasks':
           return [];
-        case 'rider:earnings':
-          return {'totalTasks': 3, 'delivered': 1, 'active': 2, 'codCollectedUsd': 70, 'earningsUsd': 2};
+        case 'rider:workStats':
+          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'codCollectedUsd': 70, 'byKind': []};
         case 'cash:mine':
           return _cashAnswer;
         case 'notifications:list':
@@ -207,7 +207,7 @@ void main() {
     });
   });
 
-  group('the cash in hand on the earnings screen', () {
+  group('the cash in hand on the work screen', () {
     for (final lang in ['en', 'fr']) {
       testWidgets('shows what the rider holds, what was collected and handed in, and each receipt ($lang)', (t) async {
         await Strings.setLang(lang, persist: false);
@@ -221,7 +221,7 @@ void main() {
           supportedLocales: const [Locale('en'), Locale('fr')],
           localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
           theme: AppTheme.light(),
-          home: const Scaffold(body: EarningsScreen()),
+          home: const Scaffold(body: WorkScreen()),
         ));
         await t.pump(const Duration(milliseconds: 400));
         expect(find.text(s.usd(50)), findsOneWidget);
@@ -235,7 +235,7 @@ void main() {
 
     testWidgets('no receipts yet: no receipts card', (t) async {
       await Strings.setLang('en', persist: false);
-      await t.pumpWidget(MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: EarningsScreen())));
+      await t.pumpWidget(MaterialApp(theme: AppTheme.light(), home: const Scaffold(body: WorkScreen())));
       await t.pump(const Duration(milliseconds: 400));
       expect(find.byKey(const ValueKey('cash-handovers')), findsNothing);
       expect(find.text(Strings('en').usd(0)), findsWidgets);

@@ -31,7 +31,7 @@ describe('roles:defs', () => {
     ['admin_marketing', 'Promos, CMS, broadcasts', 'Promotions, contenu (CMS), diffusions'],
     ['admin_moderation', 'Sellers, products, reviews', 'Vendeurs, produits, avis'],
     ['warehouse_staff', 'Hubs, parcels, inventory', 'Entrepôts, colis, inventaire'],
-    ['rider', 'Deliveries, GPS, earnings', 'Livraisons, GPS, gains'],
+    ['rider', 'Deliveries, GPS, work stats', 'Livraisons, GPS, statistiques'],
   ])('%s: "%s" -> "%s"', (key, scope, scopeFr) => {
     expect(ROLE_DEFS.find((d) => d.key === key)).toMatchObject({ scope, scopeFr });
   });

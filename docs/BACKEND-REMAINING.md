@@ -15,7 +15,7 @@ _Companion to `BACKEND-AUDIT.md` and `PRODUCTION-READINESS-AUDIT.md`. Database t
 | Money/stock integrity | Atomic stock reservation, conditional `UPDATE` transitions for cancel / settle / refund / payout approve / delivery accept, server-authoritative prices, promo limits, zone-based delivery fee (`deliveryZones` setting), payouts only from delivered sales after `PAYOUT_CLEARANCE_HOURS`. |
 | Authorization | Every WebSocket handler is role-checked; least-privilege admin sub-roles (operations / finance / warehouse); suspension and role change kick live sockets and revoke tokens; self-registration limited to customer/seller; audit log. 114-assertion authz smoke test in CI. |
 | Flutter customer app (`mobile/`) | Rewritten onto the live backend (no mock catalogue/state, real auth incl. verify/forgot/reset, mobile-money checkout with pending screen, orders, wallet, addresses, wishlist, promos, notifications). `flutter analyze` clean; 3 widget tests + 15 live-API tests; web build loaded and signed in a real browser. |
-| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, active / done deliveries assigned by the warehouse (no accept), picked up -> in transit -> delivered, real GPS stream (`delivery:location`), earnings + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
+| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, active / done deliveries assigned by the warehouse (no accept), picked up -> in transit -> delivered, real GPS stream (`delivery:location`), work stats + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
 | Not verified here | Android/iOS device or emulator builds (no Android SDK in the sandbox), the droplet itself, and any real aggregator / SMTP / SMS / FCM account. |
 
 ## 2. Remaining work (scope vs backend)
@@ -116,7 +116,7 @@ Optional integrations go in `/etc/somba/api.extra.env` (SMTP, Twilio, Firebase, 
 | `broadcasts` | `list`, `send` |
 | `roles` | `defs`, `staff`, `setRole` |
 | `warehouse` | `hubs`, `parcels`, `aged`, `inventory`, `batches`, `buildBatch`, `reconcile`, `transfers`, `createTransfer` |
-| `rider` | `earnings`, `tasks` |
+| `rider` | `workStats` (alias `earnings`), `tasks` |
 | `campaigns` | `list`, `create`, `update`, `setStatus` |
 | `replacements` | `list`, `create`, `setStatus` |
 | `exchanges` | `list`, `create`, `setStatus` |
