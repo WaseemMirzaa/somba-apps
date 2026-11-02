@@ -280,7 +280,29 @@ class RiderField extends StatelessWidget {
   final TextEditingController? controller;
   final TextInputType? keyboard;
   final Key? fieldKey;
-  const RiderField({super.key, this.fieldKey, required this.label, required this.hint, required this.icon, this.obscure = false, this.controller, this.keyboard});
+
+  /// A problem with what was typed, shown under the field.
+  final String? errorText;
+
+  /// Off for passwords, phone numbers and references: the keyboard must not "correct" them.
+  final bool autocorrect;
+  final TextCapitalization capitalization;
+  final TextInputAction? action;
+  final ValueChanged<String>? onChanged;
+  const RiderField(
+      {super.key,
+      this.fieldKey,
+      required this.label,
+      required this.hint,
+      required this.icon,
+      this.obscure = false,
+      this.controller,
+      this.keyboard,
+      this.errorText,
+      this.autocorrect = true,
+      this.capitalization = TextCapitalization.none,
+      this.action,
+      this.onChanged});
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -291,13 +313,21 @@ class RiderField extends StatelessWidget {
         controller: controller,
         obscureText: obscure,
         keyboardType: keyboard,
+        autocorrect: autocorrect,
+        enableSuggestions: autocorrect,
+        textCapitalization: capitalization,
+        textInputAction: action,
+        onChanged: onChanged,
         decoration: InputDecoration(
           hintText: hint,
+          errorText: errorText,
           prefixIcon: Icon(icon, size: 20),
           filled: true,
           fillColor: AppColors.surface,
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.6)),
+          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.danger)),
+          focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.danger, width: 1.6)),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
         ),
       ),

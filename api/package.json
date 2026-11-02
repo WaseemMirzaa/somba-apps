@@ -33,6 +33,7 @@
     "smoke:coverage": "node test/coverage-smoke.cjs",
     "smoke:routing": "node test/warehouse-routing-smoke.cjs",
     "smoke:areas": "node test/warehouse-areas-smoke.cjs",
+    "smoke:rider": "node test/rider-account-smoke.cjs",
     "check:prod": "node test/prod-check.cjs",
     "i18n:migrate-synced-db": "node scripts/i18n-migrate-synced-db.cjs",
     "translate:backfill": "ts-node -r tsconfig-paths/register src/translation/backfill.ts",

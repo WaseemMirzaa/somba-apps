@@ -45,7 +45,7 @@ npm ci && npx next build && npx next start -p 3000
 
 Sign in at `/login` with the seed accounts. With `NEXT_PUBLIC_DEMO_MODE=false` the one-click demo role picker is hidden.
 
-Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; rider accepts → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
+Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; the warehouse assigns the rider → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
 
 ## 4. Flutter apps
 

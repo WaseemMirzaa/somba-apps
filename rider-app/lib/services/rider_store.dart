@@ -19,7 +19,7 @@ class RiderStore extends ChangeNotifier {
   RiderStore._();
   static final RiderStore instance = RiderStore._();
 
-  final _auth = AuthService();
+  AuthService _auth = AuthService();
   final _socket = SocketService();
   /// Reports the GPS position while a delivery is `in_transit` (tests swap in a fake).
   LocationReporter location = LocationReporter();
@@ -43,6 +43,15 @@ class RiderStore extends ChangeNotifier {
   /// A tapped notification asks the app to show a tab and task; the shell and Deliveries follow it, then clear it.
   final ValueNotifier<RiderFocus?> focus = ValueNotifier(null);
 
+  /// Tests: the sign-in calls (refresh, token storage) answered by a fake.
+  @visibleForTesting
+  set debugAuth(AuthService auth) => _auth = auth;
+
+  /// Tests: the check that follows a refused connection (is the account still allowed?).
+  @visibleForTesting
+  Future<void> debugVerifySession() => _verifySession(force: true);
+
+  /// The session is over (revoked, suspended, role changed): the app is back at the sign-in screen when this returns.
   VoidCallback? onSessionEnded;
   String? _access;
   String? _refresh;
@@ -281,6 +290,8 @@ class RiderStore extends ChangeNotifier {
       _pushRefresh();
     });
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
+    // The rider's own account changed (here, or on another phone or the web portal).
+    _socket.on('me:updated', _applyAccount);
     _socket.on('notification:new', (d) {
       notifications.insert(0, NotificationDto.fromJson(_map(d)));
       notifyListeners();
@@ -556,6 +567,35 @@ class RiderStore extends ChangeNotifier {
       notifications[i] = notifications[i].asRead();
       notifyListeners();
     }
+  }
+
+  /// The rider's own name and phone (`me:update`; the server edits the signed-in account only, and never the e-mail, the
+  /// role or the warehouse). A blank phone clears it. Throws what the server refuses with ("Enter a valid phone number.").
+  Future<void> updateProfile({required String name, required String phone}) async {
+    final res = await request('me:update', {'name': name.trim(), 'phone': phone.trim().isEmpty ? null : phone.trim()});
+    _applyAccount(res);
+  }
+
+  /// Change the password (`me:changePassword`). The answer carries FRESH tokens: this phone keeps them (otherwise its next
+  /// refresh would be refused as revoked and the rider signed out); every other phone is signed out by the server.
+  Future<void> changePassword({required String current, required String next}) async {
+    final res = await request('me:changePassword', {'current': current, 'next': next});
+    final r = AuthResult.fromJson(_map(res));
+    await _auth.saveTokens(r);
+    _access = r.accessToken;
+    _refresh = r.refreshToken;
+    _applyAccount(_map(res)['user']);
+  }
+
+  /// A `me:updated` push or the answer of `me:update`: the signed-in rider's own account (another account's is ignored).
+  void _applyAccount(dynamic d) {
+    if (d is! Map || user == null) return;
+    try {
+      final fresh = BackendUser.fromJson(_map(d));
+      if (fresh.id != user!.id || fresh.role != 'rider') return;
+      user = fresh;
+      notifyListeners();
+    } catch (_) {/* malformed push: keep what is known */}
   }
 
   Future<String?> forgotPassword(String email) => _auth.forgotPassword(email);

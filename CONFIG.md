@@ -58,7 +58,7 @@ Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim), COD 
 `/rider/*` — tasks, earnings, profile
 
 ### Rider Flutter (separate app)
-`rider-app/` — tasks, mock maps, COD, open box, earnings, dark mode
+`rider-app/` — tasks assigned by the warehouse, navigation in the maps app, COD, open box, earnings, profile
 
 ## 6. Technical
 

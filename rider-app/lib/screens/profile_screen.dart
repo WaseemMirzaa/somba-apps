@@ -4,6 +4,7 @@ import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/rider_store.dart';
 import '../services/support_store.dart';
+import 'account_screen.dart';
 import 'support_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -64,6 +65,24 @@ class ProfileScreen extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 12),
+              _AccountEntry(
+                key: const ValueKey('edit-profile-entry'),
+                icon: Icons.badge_outlined,
+                title: s.editProfile,
+                subtitle: s.editProfileSub,
+                route: kEditProfileRoute,
+                screen: const EditProfileScreen(),
+              ),
+              const SizedBox(height: 12),
+              _AccountEntry(
+                key: const ValueKey('change-password-entry'),
+                icon: Icons.lock_outline_rounded,
+                title: s.changePassword,
+                subtitle: s.changePasswordSub,
+                route: kChangePasswordRoute,
+                screen: const ChangePasswordScreen(),
+              ),
+              const SizedBox(height: 12),
               _WhereIWork(assignment: store.assignment),
               const SizedBox(height: 12),
               const _SupportEntry(),
@@ -116,6 +135,31 @@ class ProfileScreen extends StatelessWidget {
       },
     );
   }
+}
+
+/// A row that opens one of the account screens (edit profile, change password).
+class _AccountEntry extends StatelessWidget {
+  const _AccountEntry({super.key, required this.icon, required this.title, required this.subtitle, required this.route, required this.screen});
+  final IconData icon;
+  final String title, subtitle, route;
+  final Widget screen;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: RouteSettings(name: route), builder: (_) => screen)),
+        child: Row(children: [
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+        ]),
+      );
 }
 
 /// The home warehouse (name, city, address): its staff assign the rider's tasks.

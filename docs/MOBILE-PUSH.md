@@ -17,7 +17,7 @@ Every push has the same data, so a tap opens the right screen:
 | `entityId` | The order, return, ticket, task… it is about |
 | `notificationId` | The saved notice (the app marks it read on tap) |
 | `link` | The web page it opens for the recipient's portal, e.g. `/seller/returns/{id}`, `/rider/tasks/{id}` (built by `api/src/notifications/links.ts`) |
-| `orderId`, `view` | Rider tasks only: `view` is `available` (a new delivery) or `active` (assigned to you) |
+| `orderId`, `view` | Rider tasks only: `view` is `active` (assigned to you by the warehouse; there is no list of open jobs) |
 
 Android pushes use the channel `somba_default` (created by each app's `MainActivity`), and iOS pushes play the default sound.
 
@@ -42,7 +42,7 @@ Android pushes use the channel `somba_default` (created by each app's `MainActiv
 | `exchange`, `replacement` | Returns and refunds |
 | anything else | Notifications |
 
-**Rider app** (`rider-app/lib/services/rider_focus.dart`): `task` opens Deliveries → *Available* (a new one) or *Active* (yours); `delivery`/`order` opens *Active*; anything else opens Profile, where the notifications are.
+**Rider app** (`rider-app/lib/services/rider_focus.dart`): `task`, `delivery`, `run` and `order` open Deliveries → *Active* (the warehouse assigns the work); anything else opens Profile, where the notifications are.
 
 **Portals:** the bell, the notification pages and desktop alerts follow `link`.
 
