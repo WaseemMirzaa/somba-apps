@@ -1,5 +1,5 @@
 // French dollar amounts need a thousands separator: a cash-on-delivery badge read "1202,00 $".
-// `Strings.usd` is the only money formatter of the app (earnings, cash to collect, the delivery pill).
+// `Strings.usd` is the only money formatter of the app (cash in hand, cash to collect, the delivery pill).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:somba_rider/l10n/notification_text.dart';
 import 'package:somba_rider/l10n/strings.dart';

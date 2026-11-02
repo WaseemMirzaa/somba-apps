@@ -22,7 +22,7 @@ async function main(){
  await shot('01-tasks');
  await tap(206, 360);           // first task card -> bottom sheet
  await shot('02-task-detail');
- // Flow 2: Navigate / Earnings / Profile
+ // Flow 2: Navigate / My work / Profile
  await reload(); await tap(171, navY); await shot('03-navigate');
  await reload(); await tap(257, navY); await shot('04-earnings');
  await reload(); await tap(343, navY); await shot('05-profile');

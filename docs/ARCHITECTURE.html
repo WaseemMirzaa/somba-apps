@@ -647,7 +647,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td><code>rider</code></td>
 <td>Super admin</td>
-<td>Delivery pool, claim, status updates, GPS, earnings</td>
+<td>Assigned tasks, status updates, GPS, work stats</td>
 </tr>
 <tr>
 <td><code>warehouse_staff</code></td>
@@ -5456,10 +5456,16 @@ main li { margin-block: 0.2rem; }
 <th>Behaviour / rules</th>
 </tr>
 </thead><tbody><tr>
+<td><code>rider:workStats</code></td>
+<td>rider (own; other roles refused)</td>
+<td><code>—</code></td>
+<td>Work stats, no pay (riders are salaried): <code>{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], codCollectedUsd, delivered }</code></td>
+</tr>
+<tr>
 <td><code>rider:earnings</code></td>
 <td>rider (own)</td>
 <td><code>—</code></td>
-<td></td>
+<td>Deprecated alias of <code>rider:workStats</code>, same payload</td>
 </tr>
 <tr>
 <td><code>rider:tasks</code></td>
@@ -5882,11 +5888,11 @@ main li { margin-block: 0.2rem; }
 </tr>
 </thead><tbody><tr>
 <td>Screens</td>
-<td><code>RiderLoginScreen</code> (no prefilled credentials, no offline entry), <code>ForgotPasswordScreen</code>, <code>RiderShell</code> with tabs <strong>Deliveries</strong> (Active / Available / Done, claim, next step, fail with confirmation, cash confirmation for COD), <strong>Earnings</strong> (delivered count, active, earnings, cash collected), <strong>Profile</strong> (notifications, language EN/FR, sign out)</td>
+<td><code>RiderLoginScreen</code> (no prefilled credentials, no offline entry), <code>ForgotPasswordScreen</code>, <code>RiderShell</code> with tabs <strong>Deliveries</strong> (Active / Available / Done, claim, next step, fail with confirmation, cash confirmation for COD), <strong>My work</strong> (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type, cash collected; riders are salaried, so no pay is shown), <strong>Profile</strong> (notifications, language EN/FR, sign out)</td>
 </tr>
 <tr>
 <td>State</td>
-<td><code>RiderStore</code> (ChangeNotifier): <code>myTasks</code>, <code>pool</code>, <code>earnings</code>, <code>notifications</code>, connection status</td>
+<td><code>RiderStore</code> (ChangeNotifier): <code>myTasks</code>, <code>pool</code>, <code>stats</code>, <code>notifications</code>, connection status</td>
 </tr>
 <tr>
 <td>Services</td>
@@ -5898,7 +5904,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>Tests</td>
-<td>3 widget tests; live-API test (sign in → claim → picked up → in transit → GPS reaches customer → delivered → earnings → forward-only rule)</td>
+<td>3 widget tests; live-API test (sign in → claim → picked up → in transit → GPS reaches customer → delivered → work stats → forward-only rule)</td>
 </tr>
 </tbody></table></div>
 <p>Gaps: background location (foreground service + <code>ACCESS_BACKGROUND_LOCATION</code>, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the <code>users.active</code> &quot;availability&quot; comment exists but no rider UI), batches view, cash hand-over. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)</p>

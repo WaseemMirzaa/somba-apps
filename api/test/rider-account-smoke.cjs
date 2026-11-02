@@ -58,6 +58,21 @@ const handshake = (token) => new Promise((resolve) => {
   ok(original?.role === 'rider' && original.email === RIDER && original.hubId, 'the rider reads their own account (me:get)', JSON.stringify(original));
 
   try {
+    section('Work stats (riders are salaried: workload, never pay)');
+    let w = await req(me.sock, 'rider:workStats');
+    const keys = ['totalTasks', 'completed', 'active', 'failed', 'completedToday', 'completedLast7Days', 'successRate', 'byKind', 'codCollectedUsd'];
+    ok(w.ok && keys.every((k) => k in w.data), 'a rider reads their work stats (rider:workStats)', JSON.stringify(w));
+    ok(w.ok && !/earning|perTask/i.test(JSON.stringify(w.data)) && Object.keys(w.data).filter((k) => /usd/i.test(k)).join() === 'codCollectedUsd', 'the payload has no pay, only the cash collected');
+    ok(w.ok && w.data.byKind.every((k) => Object.keys(k).sort().join() === 'count,kind' && k.count > 0), 'byKind is counts only');
+    ok(w.ok && w.data.completedToday <= w.data.completedLast7Days && w.data.completedLast7Days <= w.data.completed, 'today <= last 7 days <= all time');
+    ok(w.ok && (w.data.successRate === null || (Number.isInteger(w.data.successRate) && w.data.successRate >= 0 && w.data.successRate <= 100)), 'the success rate is a whole percent or null', String(w.data?.successRate));
+    const old = await req(me.sock, 'rider:earnings');
+    ok(old.ok && JSON.stringify(old.data) === JSON.stringify(w.data), 'the old rider:earnings name returns the same payload');
+    const cust = await login('customer@somba.app').catch(() => null);
+    if (cust) { ok(!(await req(cust.sock, 'rider:workStats')).ok && !(await req(cust.sock, 'rider:earnings')).ok, 'a customer is refused both names'); cust.sock.close(); }
+    const anon = await connect(null).catch(() => null);
+    if (anon) { ok(!(await req(anon, 'rider:workStats')).ok, 'a guest is refused'); anon.close(); }
+
     section('Edit name and phone (me:update)');
     const second = await login(RIDER); // the web portal open at the same time as the app
     const pushed = [];

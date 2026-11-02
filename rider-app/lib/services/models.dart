@@ -654,44 +654,57 @@ class DeliveryTaskDto {
   }
 }
 
-/// How many tasks of one kind (a delivery, a seller pickup, a transfer…) the rider completed, and what they paid.
-class EarningsKind {
+/// How many tasks of one kind (a delivery, a seller pickup, a transfer…) the rider completed.
+class WorkStatsKind {
   final String kind;
   final int count;
-  final double earningsUsd;
 
-  const EarningsKind({required this.kind, required this.count, required this.earningsUsd});
+  const WorkStatsKind({required this.kind, required this.count});
 
-  factory EarningsKind.fromJson(Map<String, dynamic> j) => EarningsKind(
+  factory WorkStatsKind.fromJson(Map<String, dynamic> j) => WorkStatsKind(
         kind: j['kind'] as String? ?? '',
         count: (j['count'] as num?)?.toInt() ?? 0,
-        earningsUsd: (j['earningsUsd'] as num?)?.toDouble() ?? 0,
       );
 }
 
-/// The server's earnings: the pay is flat per COMPLETED task of any kind, so [completed] (`delivered` on the wire)
-/// counts every finished leg, not only customer deliveries; [byKind] is the breakdown and adds up to [earningsUsd].
-class EarningsDto {
+/// The server's work stats for the rider (`rider:workStats`). Riders are salaried: there is no pay in here, only the
+/// workload and [codCollectedUsd], the company's cash the rider took at the door. [completed] counts every finished leg,
+/// not only customer deliveries; [successRate] is a whole percent, null until a task has finished or failed.
+class WorkStatsDto {
   final int totalTasks;
   final int completed;
   final int active;
+  final int failed;
+  final int completedToday;
+  final int completedLast7Days;
+  final int? successRate;
   final double codCollectedUsd;
-  final double earningsUsd;
-  final double perTaskUsd;
-  final List<EarningsKind> byKind;
+  final List<WorkStatsKind> byKind;
 
-  const EarningsDto({this.totalTasks = 0, this.completed = 0, this.active = 0, this.codCollectedUsd = 0, this.earningsUsd = 0, this.perTaskUsd = 0, this.byKind = const []});
+  const WorkStatsDto({
+    this.totalTasks = 0,
+    this.completed = 0,
+    this.active = 0,
+    this.failed = 0,
+    this.completedToday = 0,
+    this.completedLast7Days = 0,
+    this.successRate,
+    this.codCollectedUsd = 0,
+    this.byKind = const [],
+  });
 
-  factory EarningsDto.fromJson(Map<String, dynamic> j) => EarningsDto(
+  factory WorkStatsDto.fromJson(Map<String, dynamic> j) => WorkStatsDto(
         totalTasks: (j['totalTasks'] as num?)?.toInt() ?? 0,
-        completed: (j['delivered'] as num?)?.toInt() ?? 0,
+        completed: ((j['completed'] ?? j['delivered']) as num?)?.toInt() ?? 0,
         active: (j['active'] as num?)?.toInt() ?? 0,
+        failed: (j['failed'] as num?)?.toInt() ?? 0,
+        completedToday: (j['completedToday'] as num?)?.toInt() ?? 0,
+        completedLast7Days: (j['completedLast7Days'] as num?)?.toInt() ?? 0,
+        successRate: (j['successRate'] as num?)?.round(),
         codCollectedUsd: (j['codCollectedUsd'] as num?)?.toDouble() ?? 0,
-        earningsUsd: (j['earningsUsd'] as num?)?.toDouble() ?? 0,
-        perTaskUsd: (j['perTaskUsd'] as num?)?.toDouble() ?? 0,
         byKind: [
           for (final k in (j['byKind'] as List?) ?? const [])
-            if (k is Map) EarningsKind.fromJson(k.map((a, b) => MapEntry(a.toString(), b))),
+            if (k is Map) WorkStatsKind.fromJson(k.map((a, b) => MapEntry(a.toString(), b))),
         ],
       );
 }

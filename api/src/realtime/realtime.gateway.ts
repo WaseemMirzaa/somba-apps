@@ -2051,15 +2051,23 @@ export class RealtimeGateway
     }
   }
 
-  // ---- Rider earnings -----------------------------------------------------
-  @SubscribeMessage('rider:earnings')
-  async riderEarnings(@ConnectedSocket() client: AuthedSocket) {
+  // ---- Rider work stats ---------------------------------------------------
+  /** Riders are salaried: this is their workload (tasks done, failed, success rate), never pay. Riders only. */
+  @SubscribeMessage('rider:workStats')
+  async riderWorkStats(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.rider.earnings(user.id));
+      if (user.role !== 'rider') return fail('Riders only.');
+      return ok(await this.rider.workStats(user.id));
     } catch (e) {
       return fail((e as Error).message);
     }
+  }
+
+  /** Deprecated alias of `rider:workStats` so an older installed app still gets an answer. */
+  @SubscribeMessage('rider:earnings')
+  async riderEarnings(@ConnectedSocket() client: AuthedSocket) {
+    return this.riderWorkStats(client);
   }
 
   /** The rider's delivery queue, enriched with order snapshots. */

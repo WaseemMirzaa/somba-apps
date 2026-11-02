@@ -46,7 +46,7 @@ const ROLE_SCOPE_FR: Record<string, string> = {
   "Promos, CMS, broadcasts": "Promotions, CMS, diffusions",
   "Sellers, products, reviews": "Vendeurs, produits, avis",
   "Hubs, parcels, inventory": "Hubs, colis, inventaire",
-  "Deliveries, GPS, earnings": "Livraisons, GPS, gains",
+  "Deliveries, GPS, work stats": "Livraisons, GPS, statistiques",
 };
 
 const CREATABLE = ["rider", "warehouse_staff", "admin_operations", "admin_finance", "admin_support", "admin_marketing", "admin_moderation"];

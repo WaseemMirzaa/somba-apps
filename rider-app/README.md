@@ -27,7 +27,7 @@ never lets anyone in offline.
 Tabs: **Deliveries** (Active / Done; picked up → in transit → delivered, with a cash-collected confirmation
 for COD and the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff;
 Done can be searched by order reference and narrowed to a range of days),
-**Earnings** (server-computed totals of completed tasks + cash to hand over), **Profile** (edit name and phone,
+**My work** (server-computed work stats: tasks completed today / this week / all time, success rate, completed by type, plus cash to hand over), **Profile** (edit name and phone,
 change password, home warehouse, **Support** tickets with photos, notifications, language, sign out). While a delivery is on the road the app streams the
 real GPS position (`geolocator`; permission declared in the Android manifest) as `delivery:location`.
 
@@ -50,8 +50,9 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   to the server (`ConnStatus`); it does not make the rider available or unavailable. A rider receives work as long
   as the account is active; to stop work, the desk stops assigning or an admin switches the account off (the app then
   signs the rider out).
-- **No payouts.** Riders are salaried. *Earnings* is a record of completed tasks and the cash collected; nothing is
-  paid out or withdrawn through the platform.
+- **No pay per task.** Riders are salaried. *My work* shows their work (tasks done, failed, success rate), never money
+  earned; the only amount on it is the cash collected on delivery, which belongs to the company and is handed over at the
+  warehouse. Nothing is paid out or withdrawn through the platform.
 
 ## Highlights
 
@@ -63,7 +64,8 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
 - **Navigate**: opens turn-by-turn directions in your maps app. Android: Google Maps (the app when installed, else the
   browser). iPhone: **Apple Maps** straight away when Google Maps is not installed (no extra tap); when both are installed a
   small list asks which one to use for this trip. There is no in-app map. No API key is needed.
-- **Earnings**: totals of completed tasks, by kind, and the cash collected to hand over at the warehouse.
+- **My work**: tasks completed today, this week and all time; completed, in progress, failed and success rate; completed by
+  type (counts only); and the cash collected to hand over at the warehouse.
 - **Profile**: edit name and phone, change password (the server signs every other phone out and this phone keeps working),
   home warehouse and the areas it covers, support tickets, notifications, EN/FR toggle, sign out. The e-mail, role and
   warehouse are changed by the fleet team or an admin only.

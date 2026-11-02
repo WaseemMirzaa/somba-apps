@@ -27,7 +27,7 @@ export const ROLE_DEFS: RoleDef[] = [
   { key: 'admin_marketing', label: 'Marketing', scope: 'Promos, CMS, broadcasts', scopeFr: 'Promotions, contenu (CMS), diffusions' },
   { key: 'admin_moderation', label: 'Moderation', scope: 'Sellers, products, reviews', scopeFr: 'Vendeurs, produits, avis' },
   { key: 'warehouse_staff', label: 'Warehouse', scope: 'Hubs, parcels, inventory', scopeFr: 'Entrepôts, colis, inventaire' },
-  { key: 'rider', label: 'Rider', scope: 'Deliveries, GPS, earnings', scopeFr: 'Livraisons, GPS, gains' },
+  { key: 'rider', label: 'Rider', scope: 'Deliveries, GPS, work stats', scopeFr: 'Livraisons, GPS, statistiques' },
 ];
 
 @Injectable()

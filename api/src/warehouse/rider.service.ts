@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import { DELIVERY_KINDS, DeliveryTask, Hub, Order, User } from '../database/entities';
 import { LogisticsService } from '../logistics/logistics.service';
 import { CoverageService } from '../geo/coverage.service';
 
-/** What a rider earns for every completed task, whatever its kind (a delivery, a seller pickup, a transfer…). */
-export const PER_TASK_USD = 2.5;
+const DAY_MS = 24 * 60 * 60 * 1000;
 /** Legs where the rider meets the customer. */
 const CUSTOMER_LEGS: readonly string[] = ['delivery', 'return_pickup', 'replacement_delivery'];
 
@@ -53,11 +52,13 @@ export class RiderService {
   }
 
   /**
-   * Earnings + shift summary for a rider (grouped counts, not every task in memory). The pay is flat per COMPLETED task
-   * of any kind, so `delivered` counts every finished leg (customer deliveries, seller pickups, transfers, return legs)
-   * and `byKind` says how many of each, with the money they earned; `earningsUsd` is the sum of `byKind`.
+   * Work stats for a rider (grouped counts, not every task in memory). Riders are salaried: the platform pays nothing per
+   * task, so there is no money here except `codCollectedUsd`, the company's cash the rider collected at the door.
+   * `completed` counts every finished leg of any kind (customer deliveries, seller pickups, transfers, return legs).
+   * "Today" and "the last 7 days" are UTC calendar days (the API stores and compares dates in UTC): the last 7 days are
+   * today and the 6 days before it. `delivered` repeats `completed` for app versions that predate work stats.
    */
-  async earnings(riderId: string) {
+  async workStats(riderId: string, now: Date = new Date()) {
     const rows = await this.tasks
       .createQueryBuilder('t')
       .select('t.status', 'status')
@@ -68,22 +69,26 @@ export class RiderService {
       .groupBy('t.status')
       .addGroupBy('t.kind')
       .getRawMany<{ status: string; kind: string; n: string; cod: string }>();
-    const total = rows.reduce((s, r) => s + Number(r.n), 0);
+    const sum = (list: { n: string }[]) => list.reduce((s, r) => s + Number(r.n), 0);
     const done = rows.filter((r) => r.status === 'delivered');
-    const delivered = done.reduce((s, r) => s + Number(r.n), 0);
-    const active = rows.filter((r) => r.status !== 'delivered' && r.status !== 'failed').reduce((s, r) => s + Number(r.n), 0);
-    const byKind = DELIVERY_KINDS.map((kind) => {
-      const count = done.filter((r) => r.kind === kind).reduce((s, r) => s + Number(r.n), 0);
-      return { kind, count, earningsUsd: Number((count * PER_TASK_USD).toFixed(2)) };
-    }).filter((k) => k.count > 0);
+    const completed = sum(done);
+    const failed = sum(rows.filter((r) => r.status === 'failed'));
+    const active = sum(rows.filter((r) => r.status !== 'delivered' && r.status !== 'failed'));
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const since = (from: Date) => this.tasks.count({ where: { riderId, status: 'delivered', deliveredAt: MoreThanOrEqual(from) } });
+    const [completedToday, completedLast7Days] = await Promise.all([since(startOfToday), since(new Date(startOfToday.getTime() - 6 * DAY_MS))]);
+    const finished = completed + failed;
     return {
-      totalTasks: total,
-      delivered,
+      totalTasks: sum(rows),
+      completed,
       active,
+      failed,
+      completedToday,
+      completedLast7Days,
+      successRate: finished > 0 ? Math.round((completed / finished) * 100) : null,
+      byKind: DELIVERY_KINDS.map((kind) => ({ kind, count: sum(done.filter((r) => r.kind === kind)) })).filter((k) => k.count > 0),
       codCollectedUsd: Number(done.reduce((s, r) => s + Number(r.cod), 0).toFixed(2)),
-      perTaskUsd: PER_TASK_USD,
-      byKind,
-      earningsUsd: Number((delivered * PER_TASK_USD).toFixed(2)),
+      delivered: completed, // deprecated: old clients read this; drop it one release after the work-stats apps ship
     };
   }
 

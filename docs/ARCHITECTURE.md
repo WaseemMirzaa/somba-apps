@@ -274,7 +274,7 @@ sequenceDiagram
 |---|---|---|
 | `customer` | Self-registration | Shop, pay, track, review, dispute, support, wallet, addresses |
 | `seller` | Self-registration + store approval | Store profile, products, campaigns, own orders (redacted), payouts, Q&A answers, reviews |
-| `rider` | Super admin | Assigned tasks, status updates, GPS, earnings |
+| `rider` | Super admin | Assigned tasks, status updates, GPS, work stats |
 | `warehouse_staff` | Super admin | Parcels, batches, transfers, exceptions, assignment, exchanges/replacements status |
 | `admin` | Bootstrap / super admin | Everything, including staff roles |
 | `admin_operations` | Super admin | config, catalog, people, insight, audit, fraud, seller moderation, ops |
@@ -1942,7 +1942,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `rider:earnings` | rider (own) | `—` |  |
+| `rider:workStats` | rider (own; other roles refused) | `—` | Work stats, no pay (riders are salaried): `{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], codCollectedUsd, delivered }` |
+| `rider:earnings` | rider (own) | `—` | Deprecated alias of `rider:workStats`, same payload |
 | `rider:tasks` | rider | `—` | Own tasks + open pool |
 
 #### `campaigns:*`
@@ -2112,11 +2113,11 @@ Push notifications and push-tap navigation are done (MOBILE-PUSH.md). Gaps: secu
 
 | Layer | Content |
 |---|---|
-| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Done; the warehouse assigns every task, the rider only moves it along: next step, fail with a reason, cash confirmation for COD; Done has a search and a date filter), **Earnings** (completed count, active, cash collected; riders are salaried, no payouts), **Profile** (edit name and phone, change password, notifications, language EN/FR, sign out) |
-| State | `RiderStore` (ChangeNotifier): `myTasks`, `earnings`, `notifications`, connection status |
+| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Done; the warehouse assigns every task, the rider only moves it along: next step, fail with a reason, cash confirmation for COD; Done has a search and a date filter), **My work** (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type, cash collected; riders are salaried, so no pay is shown, no payouts), **Profile** (edit name and phone, change password, notifications, language EN/FR, sign out) |
+| State | `RiderStore` (ChangeNotifier): `myTasks`, `stats`, `notifications`, connection status |
 | Services | `AuthService`, `SocketService` (same as customer app), `LocationReporter` (geolocator stream, high accuracy, 10 m distance filter, max one fix / 4 s, immediate first fix; starts on `picked_up`, stops when no delivery is on the road) |
 | Permissions | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` (Android) |
-| Tests | 3 widget tests; live-API test (sign in → warehouse assigns → picked up → in transit → GPS reaches customer → delivered → earnings → forward-only rule) |
+| Tests | 3 widget tests; live-API test (sign in → warehouse assigns → picked up → in transit → GPS reaches customer → delivered → work stats → forward-only rule) |
 
 Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, battery handling), in-app map (navigation opens Google Maps, or Apple Maps on an iPhone), proof of delivery photo. No availability toggle, accept/refuse or payouts by design: the warehouse assigns, riders are salaried. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)
 

@@ -50,8 +50,8 @@ void main() {
       switch (event) {
         case 'rider:tasks':
           return serverTasks;
-        case 'rider:earnings':
-          return {'totalTasks': 3, 'delivered': 1, 'active': 2, 'codCollectedUsd': 0, 'earningsUsd': 2};
+        case 'rider:workStats':
+          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'codCollectedUsd': 0, 'byKind': []};
         case 'notifications:list':
           return [];
         case 'settings:get':
@@ -415,7 +415,7 @@ void main() {
     test('a refresh reads only my tasks: it never calls the accept or open-pool events', () async {
       serverTasks = [legJson('pickup', id: 'a'), legJson('delivery', id: 'b', status: 'unassigned'), legJson('transfer', id: 'c', status: 'picked_up')];
       await RiderStore.instance.refresh();
-      expect(calls, containsAll(['rider:tasks', 'rider:earnings']));
+      expect(calls, containsAll(['rider:tasks', 'rider:workStats']));
       expect(calls, isNot(contains('delivery:accept')));
       expect(calls, isNot(contains('delivery:unassigned')));
       expect(RiderStore.instance.myTasks.map((t) => t.id), ['a', 'c'], reason: 'an unassigned row (older server pool) is not mine');

@@ -26,16 +26,23 @@ interface RiderQueueRow extends Omit<TaskView, "desk"> {
   } | null;
 }
 
-export interface RiderEarnings {
+/**
+ * `rider:workStats`. Riders are salaried, so there is no pay in here: the workload, and `codCollectedUsd`, the company's
+ * cash the rider collected at the door.
+ */
+export interface RiderWorkStats {
   totalTasks: number;
-  delivered: number;
+  /** Every finished task of any kind (a delivery, a seller pickup, a transfer...). */
+  completed: number;
   active: number;
+  failed: number;
+  completedToday: number;
+  completedLast7Days: number;
+  /** completed / (completed + failed) as a whole percent; null until a task has finished or failed. */
+  successRate: number | null;
+  /** Completed tasks by kind, counts only. */
+  byKind: { kind: LegKind; count: number }[];
   codCollectedUsd: number;
-  earningsUsd: number;
-  /** The flat pay of one completed task, whatever its kind. */
-  perTaskUsd?: number;
-  /** Completed tasks by kind (a delivery, a seller pickup, a transfer...) with the money they earned; sums to `earningsUsd`. */
-  byKind?: { kind: LegKind; count: number; earningsUsd: number }[];
 }
 
 export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
@@ -150,7 +157,7 @@ export type RiderTask = ReturnType<typeof toRiderTask>;
 export function useRiderData() {
   const rt = useRealtime();
   const [queue, setQueue] = useState<RiderQueueRow[]>([]);
-  const [earnings, setEarnings] = useState<RiderEarnings | null>(null);
+  const [stats, setStats] = useState<RiderWorkStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -161,10 +168,10 @@ export function useRiderData() {
     try {
       const [q, e] = await Promise.all([
         socketClient.request<RiderQueueRow[]>("rider:tasks"),
-        socketClient.request<RiderEarnings>("rider:earnings"),
+        socketClient.request<RiderWorkStats>("rider:workStats"),
       ]);
       setQueue(q ?? []);
-      setEarnings(e);
+      setStats(e);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load your tasks.");
@@ -197,24 +204,23 @@ export function useRiderData() {
       name: rt.user?.name ?? "Rider",
       email: rt.user?.email ?? "",
       phone: rt.user?.phone ?? null,
-      deliveriesToday: earnings?.delivered ?? 0,
-      earningsToday: earnings?.earningsUsd ?? 0,
-      codCollected: earnings?.codCollectedUsd ?? 0,
-      activeTasks: earnings?.active ?? active.length,
+      completedToday: stats?.completedToday ?? 0,
+      codCollected: stats?.codCollectedUsd ?? 0,
+      activeTasks: stats?.active ?? active.length,
     };
     return {
       riderProfile,
       /** Every leg assigned to this rider (any status). */
       riderTasks,
       mine,
-      earnings,
+      stats,
       loading,
       error,
       refresh,
       getRiderTask: (id: string) => riderTasks.find((t) => t.id === id || t.orderId === id),
       getActiveRiderTasks: () => active,
     };
-  }, [queue, earnings, rt.user, loading, error, refresh]);
+  }, [queue, stats, rt.user, loading, error, refresh]);
 }
 
 export type RiderData = ReturnType<typeof useRiderData>;

@@ -5,10 +5,11 @@ import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 
-/// Earnings and cash to hand over, computed by the server from finished tasks (the pay is flat per task of any kind,
-/// so the screen says tasks and breaks them down by kind: deliveries, seller pickups, transfers…).
-class EarningsScreen extends StatelessWidget {
-  const EarningsScreen({super.key});
+/// The rider's work (tasks done today, this week, all time; completed, in progress, failed, success rate, completed by type)
+/// and the cash to hand over, all computed by the server. Riders are salaried: the only amounts on this screen are cash
+/// the rider holds for the company, never pay.
+class WorkScreen extends StatelessWidget {
+  const WorkScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +19,7 @@ class EarningsScreen extends StatelessWidget {
       listenable: store,
       builder: (context, _) {
         final s = Strings.of(context);
-        final e = store.earnings;
+        final e = store.stats;
         return RefreshIndicator(
           onRefresh: store.refresh,
           child: ListView(padding: EdgeInsets.zero, children: [
@@ -26,44 +27,63 @@ class EarningsScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, top + 22, 20, 26),
               decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.vertical(bottom: Radius.circular(26))),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(s.yourEarnings, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
+                Text(s.navWork, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
                 const SizedBox(height: 6),
-                Text(s.usd(e.earningsUsd), key: const ValueKey('earnings-total'), style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800)),
-                Text(e.completed == 1 ? s.fromTasksOne(e.completed) : s.fromTasksMany(e.completed), key: const ValueKey('earnings-from'), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                Text('${e.completedToday}', key: const ValueKey('work-today'), style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800)),
+                Text(s.workTodaySub, key: const ValueKey('work-today-sub'), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(s.workWeekAll(e.completedLast7Days, e.completed), key: const ValueKey('work-week-all'), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
               ]),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
               child: Column(children: [
                 Row(children: [
-                  Expanded(child: _tile(Icons.check_circle_rounded, AppColors.success, '${e.completed}', s.tasksDone)),
+                  Expanded(child: _tile(Icons.check_circle_rounded, AppColors.success, '${e.completed}', s.workCompleted, key: const ValueKey('work-completed'))),
                   const SizedBox(width: 12),
-                  Expanded(child: _tile(Icons.two_wheeler_rounded, AppColors.primary, '${e.active}', s.inProgress)),
+                  Expanded(child: _tile(Icons.two_wheeler_rounded, AppColors.primary, '${e.active}', s.inProgress, key: const ValueKey('work-active'))),
+                ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: _tile(Icons.cancel_rounded, AppColors.danger, '${e.failed}', s.workFailed, key: const ValueKey('work-failed'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _tile(Icons.percent_rounded, AppColors.info, e.successRate == null ? '—' : '${e.successRate}%', s.workSuccessRate, key: const ValueKey('work-success-rate'))),
                 ]),
                 const SizedBox(height: 12),
                 if (e.byKind.isNotEmpty) ...[
                   SurfaceCard(
-                    key: const ValueKey('earnings-by-kind'),
+                    key: const ValueKey('work-by-kind'),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(s.earnByKind, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                      Text(s.workByKind, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                       const SizedBox(height: 10),
                       for (final k in e.byKind)
                         Padding(
-                          key: ValueKey('earnings-kind-${k.kind}'),
+                          key: ValueKey('work-kind-${k.kind}'),
                           padding: const EdgeInsets.symmetric(vertical: 5),
                           child: Row(children: [
-                            Expanded(child: Text('${_kindLabel(s, k.kind)} × ${k.count}', style: const TextStyle(fontSize: 13.5))),
-                            Text(s.usd(k.earningsUsd), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                            Expanded(child: Text(_kindLabel(s, k.kind), style: const TextStyle(fontSize: 13.5))),
+                            const SizedBox(width: 12),
+                            Text('${k.count}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                           ]),
                         ),
-                      if (e.perTaskUsd > 0) ...[
-                        const SizedBox(height: 6),
-                        Text(s.earnRateNote(s.usd(e.perTaskUsd)), key: const ValueKey('earnings-rate'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.35)),
-                      ],
                     ]),
                   ),
                   const SizedBox(height: 12),
                 ],
+                SurfaceCard(
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.info_outline_rounded, color: AppColors.muted, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        s.workSalaryNote,
+                        key: const ValueKey('work-salary-note'),
+                        style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.4),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 12),
                 SurfaceCard(
                   child: Row(children: [
                     Container(
@@ -128,7 +148,8 @@ class EarningsScreen extends StatelessWidget {
 
   static String _kindLabel(Strings s, String kind) => s.has('kind_$kind') ? s.t('kind_$kind') : kind.replaceAll('_', ' ');
 
-  Widget _tile(IconData icon, Color color, String value, String label) => SurfaceCard(
+  Widget _tile(IconData icon, Color color, String value, String label, {Key? key}) => SurfaceCard(
+        key: key,
         child: Row(children: [
           Container(height: 42, width: 42, decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color)),
           const SizedBox(width: 12),

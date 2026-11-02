@@ -55,10 +55,10 @@ Moderation, fraud/COD risk, flash sales (date picker), CMS blocks, roles, audit 
 Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim), COD shift reconciliation
 
 ### Rider Web
-`/rider/*` — tasks, earnings, profile
+`/rider/*` — tasks, work stats, profile
 
 ### Rider Flutter (separate app)
-`rider-app/` — tasks assigned by the warehouse, navigation in the maps app, COD, open box, earnings, profile
+`rider-app/` — tasks assigned by the warehouse, navigation in the maps app, COD, open box, work stats, profile
 
 ## 6. Technical
 

@@ -4,7 +4,7 @@ import '../services/rider_focus.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import 'deliveries_screen.dart';
-import 'earnings_screen.dart';
+import 'work_screen.dart';
 import 'profile_screen.dart';
 import 'support_screen.dart';
 
@@ -58,12 +58,12 @@ class _RiderShellState extends State<RiderShell> {
     final s = Strings.of(context);
     final screens = [
       const DeliveriesScreen(),
-      const EarningsScreen(),
+      const WorkScreen(),
       ProfileScreen(locale: widget.locale, onLocaleChanged: widget.onLocaleChanged, onLogout: widget.onLogout),
     ];
     final items = <_NavItem>[
       _NavItem(Icons.two_wheeler_rounded, s.navDeliveries),
-      _NavItem(Icons.account_balance_wallet_rounded, s.navEarnings),
+      _NavItem(Icons.insights_rounded, s.navWork),
       _NavItem(Icons.person_rounded, s.navProfile),
     ];
 

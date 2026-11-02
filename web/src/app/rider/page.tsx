@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bike, CheckCircle, DollarSign, Warehouse, Banknote } from "lucide-react";
+import { Bike, CheckCircle, ListChecks, Warehouse, Banknote } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
@@ -31,7 +31,7 @@ function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon:
 export default function RiderDashboardPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { riderProfile, getActiveRiderTasks, mine, earnings, error, loading } = useRiderData();
+  const { riderProfile, getActiveRiderTasks, mine, stats, error, loading } = useRiderData();
   const rr = useRiderRuns(mine);
   const assignment = useRiderAssignment();
   const { cash } = useRiderCash();
@@ -50,8 +50,8 @@ export default function RiderDashboardPage() {
       <div className="grid grid-cols-2 gap-3">
         <Kpi title={t("activeTasks")} value={String(activeCount)} icon={Bike} />
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
-        <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
-        <Kpi title={t("earnings")} value={formatCurrency(earnings?.earningsUsd ?? 0, locale)} icon={DollarSign} />
+        <Kpi title={t("completedToday")} value={String(stats?.completedToday ?? 0)} icon={CheckCircle} />
+        <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(stats?.completed ?? 0)} icon={ListChecks} />
         <Kpi title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />
       </div>
 
