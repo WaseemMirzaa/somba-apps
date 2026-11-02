@@ -26,7 +26,7 @@ import 'button_rules.dart';
 import 'gap_helpers.dart';
 
 // Look like the real thing without being one: the test-mode prefixes only. Never a real key.
-const _publishableKey = 'pk_' + 'test_FAKE_publishable_key_for_tests';
+const _publishableKey = 'pk_' 'test_FAKE_publishable_key_for_tests';
 const _clientSecret = 'pi_FAKE123_secret_FAKE456';
 
 /// The Stripe sheet, faked: records what it was opened with and ends as [next] says (or waits on [gate]).
