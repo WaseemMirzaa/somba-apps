@@ -29,9 +29,9 @@ API_ENV="${SOMBA_API_ENV:-/opt/somba/api/.env}"
 APP_USER=somba
 PM2_APP=somba-api
 
-ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES"
+ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON"
 # Names whose value is a credential: the confirmation shows its last 4 characters.
-SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN "
+SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON "
 
 die() { printf 'set-secret: %s\n' "$*" >&2; exit 1; }
 
@@ -71,6 +71,10 @@ valid_value() {
     PAWAPAY_CURRENCY) [[ "$value" =~ ^(USD|CDF)$ ]] ;;
     PAWAPAY_FX_RATE) [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] ;;
     PAWAPAY_VERIFY_SIGNATURES) [[ "$value" =~ ^(true|false)$ ]] ;;
+    TRANSLATE_PROVIDER) [[ "$value" =~ ^(google|fake|off)$ ]] ;;
+    GOOGLE_TRANSLATE_API_KEY) [[ "$value" =~ ^AIza[0-9A-Za-z_-]{30,}$ ]] ;;
+    TRANSLATE_DAILY_CHAR_LIMIT) [[ "$value" =~ ^[1-9][0-9]{0,8}$ ]] ;;
+    FIREBASE_SERVICE_ACCOUNT_JSON) [[ "$value" =~ ^(\{.+\}|[A-Za-z0-9+/=]{100,})$ ]] ;;
     *) return 1 ;;
   esac
 }
@@ -87,6 +91,10 @@ why_invalid() {
     PAWAPAY_CURRENCY) echo "must be USD or CDF" ;;
     PAWAPAY_FX_RATE) echo "must be a number (CDF per USD)" ;;
     PAWAPAY_VERIFY_SIGNATURES) echo "must be true or false" ;;
+    TRANSLATE_PROVIDER) echo "must be one of: google, fake, off" ;;
+    GOOGLE_TRANSLATE_API_KEY) echo "must look like AIza… (a Google API key, restricted to Cloud Translation)" ;;
+    TRANSLATE_DAILY_CHAR_LIMIT) echo "must be a whole number of characters, 1 to 999999999" ;;
+    FIREBASE_SERVICE_ACCOUNT_JSON) echo "must be the service-account JSON, or its base64 on one line" ;;
   esac
 }
 
