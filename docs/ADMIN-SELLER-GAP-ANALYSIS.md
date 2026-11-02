@@ -65,7 +65,7 @@ Somba is a general marketplace with a hub (Jumia model), so it keeps the multi-s
 | A-B7 | Coupons could not be paused; flash sales could not be ended or listed once over | gateway, `promotions`, `flash-sales` pages | ✅ |
 | A-B8 | Fraud "Block" blocks nothing; alert raised after fulfilment opens | `ops/fraud.service.ts` | ⬜ P1 |
 | A-B9 | Broadcast "all" notifies customers only; no confirm; not audited | `ops/broadcasts.service.ts` | ⬜ P1 |
-| A-B10 | Nav vs server permissions disagree (Support can't open disputes; Moderation can't save categories) | `lib/admin-access.ts`, gateway `GROUPS` | ⬜ P1 |
+| A-B10 | Nav vs server permissions disagree (Support can't open disputes; Moderation can't save categories) | `lib/admin-access.ts`, gateway `GROUPS`, `common/role-groups.ts` | ✅ product moderation, campaign decisions, support tickets and the warehouse supervisor/manager pages are enforced per role/tier on the server; Categories moved from the Moderation menu to Marketing (server group `catalog`) |
 | A-B11 | Super Admin gets no alert for payouts, disputes, seller applications, tickets | role-targeted notifications | ⬜ P1 |
 | A-B12 | Refunds, dispute decisions, product takedowns, campaigns, broadcasts not audited; audit page has no filter | gateway, `audit.service.ts` | 🔶 refunds / admin cancel / coupon & flash-sale actions audited |
 | A-B13 | Reinstating a seller does not restore listings; no reason stored | `ops/sellers.service.ts` | ✅ reject/suspend need a reason the seller sees; reinstating restores the listings the suspension drafted |

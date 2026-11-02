@@ -3,6 +3,7 @@ import { AfterSaleGateway } from '../flows/after-sale.gateway';
 import { EngagementGateway } from '../content/engagement.gateway';
 import { SupportGateway } from '../content/support.gateway';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { StaffTierService } from '../logistics/staff-tier.service';
 
 // The team-aware "my store" resolver: a seller account is the store; a 'customer' never gets here.
 jest.mock('../sellers/seller-context', () => ({
@@ -15,6 +16,11 @@ jest.mock('../sellers/seller-context', () => ({
 const client = (role: string, id = 'u1', name = 'User One') => ({ data: { user: { id, role, name } } }) as never;
 const guest = { data: { user: { id: 'guest', role: 'guest', name: 'Guest' } } } as never;
 
+/** Warehouse staff by user id: the tier a person holds in the database (no entry = no tier set = operator). */
+const STAFF_TIER: Record<string, string> = { 'op-1': 'operator', 'sup-1': 'supervisor', 'mgr-1': 'manager' };
+const tiers = () => new StaffTierService({ findOne: jest.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, warehouseTier: STAFF_TIER[where.id] ?? null })) } as never);
+const SUP = 'Only supervisors and managers can do this.';
+
 const echo = () => jest.fn(async (...a: unknown[]) => ({ args: a }));
 
 function disputes() {
@@ -23,7 +29,7 @@ function disputes() {
     sellerRespond: echo(), adminDecideReturn: echo(), decide: echo(), resolve: echo(), markReceived: echo(), grade: echo(), reject: echo(),
   };
   const audit = { record: jest.fn(async () => undefined) };
-  return { svc, audit, gw: new DisputesGateway(svc as never, audit as never) };
+  return { svc, audit, gw: new DisputesGateway(svc as never, audit as never, tiers()) };
 }
 
 describe('DisputesGateway', () => {
@@ -79,12 +85,26 @@ describe('DisputesGateway', () => {
       expect(await gw.markReceived(client(role), { disputeId: 'd' })).toEqual({ ok: false, error: 'Ops only.' });
       expect(await gw.grade(client(role), { id: 'd', grades: [] })).toEqual({ ok: false, error: 'Ops only.' });
     }
-    await gw.markReceived(client('warehouse_staff'), { disputeId: 'd', restock: false });
+    await gw.markReceived(client('warehouse_staff', 'sup-1'), { disputeId: 'd', restock: false });
     expect(svc.markReceived).toHaveBeenCalledWith('d', false);
     await gw.markReceived(client('admin_support'), { disputeId: 'd' });
     expect(svc.markReceived).toHaveBeenLastCalledWith('d', true);
-    await gw.grade(client('warehouse_staff'), { id: 'd', grades: [{ itemId: 'i', condition: 'resellable' }], note: 'fine' });
+    await gw.grade(client('warehouse_staff', 'mgr-1'), { id: 'd', grades: [{ itemId: 'i', condition: 'resellable' }], note: 'fine' });
     expect(svc.grade).toHaveBeenCalledWith(expect.objectContaining({ role: 'warehouse_staff' }), 'd', [{ itemId: 'i', condition: 'resellable' }], 'fine');
+  });
+
+  it('the returns queue is a supervisor page: an operator (or staff with no tier set) can neither receive nor grade; supervisors, managers and admins can', async () => {
+    const { gw, svc } = disputes();
+    for (const id of ['op-1', 'no-tier']) {
+      expect(await gw.markReceived(client('warehouse_staff', id), { disputeId: 'd' })).toEqual({ ok: false, error: SUP });
+      expect(await gw.grade(client('warehouse_staff', id), { id: 'd', grades: [] })).toEqual({ ok: false, error: SUP });
+    }
+    expect(svc.markReceived).not.toHaveBeenCalled();
+    expect(svc.grade).not.toHaveBeenCalled();
+    for (const [role, id] of [['warehouse_staff', 'sup-1'], ['warehouse_staff', 'mgr-1'], ['admin', 'a1']] as const) {
+      expect((await gw.markReceived(client(role, id), { disputeId: 'd' })).ok).toBe(true);
+      expect((await gw.grade(client(role, id), { id: 'd', grades: [] })).ok).toBe(true);
+    }
   });
 
   it('the old admin buttons: resolve with a refund needs admin or finance; force only for the super admin; reject for admins', async () => {
@@ -110,7 +130,7 @@ describe('AfterSaleGateway', () => {
   function make() {
     const rep = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
     const exc = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
-    return { rep, exc, gw: new AfterSaleGateway(rep as never, exc as never) };
+    return { rep, exc, gw: new AfterSaleGateway(rep as never, exc as never, tiers()) };
   }
 
   it('the desk steps are ops only; a bad status is refused before it reaches the service', async () => {
@@ -119,11 +139,31 @@ describe('AfterSaleGateway', () => {
       expect(await gw.replacementsSetStatus(client(role), { id: 'r', status: 'approved' })).toEqual({ ok: false, error: 'Ops only.' });
       expect(await gw.exchangesSetStatus(client(role), { id: 'e', status: 'approved' })).toEqual({ ok: false, error: 'Ops only.' });
     }
-    expect((await gw.replacementsSetStatus(client('warehouse_staff'), { id: 'r', status: 'nonsense' as never })).ok).toBe(false);
-    expect((await gw.replacementsSetStatus(client('warehouse_staff'), { id: 'r', status: 'delivered' })).ok).toBe(true);
+    expect((await gw.replacementsSetStatus(client('warehouse_staff', 'sup-1'), { id: 'r', status: 'nonsense' as never })).ok).toBe(false);
+    expect((await gw.replacementsSetStatus(client('warehouse_staff', 'sup-1'), { id: 'r', status: 'delivered' })).ok).toBe(true);
     expect((await gw.exchangesSetStatus(client('admin'), { id: 'e', status: 'ready' })).ok).toBe(true);
     expect(rep.setStatus).toHaveBeenCalledTimes(1);
     expect(exc.setStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('replacements and exchanges are supervisor pages: an operator is refused the list, the detail and the status; supervisors, managers and admins are not; customers and sellers keep their own views', async () => {
+    const { gw, rep, exc } = make();
+    for (const id of ['op-1', 'no-tier']) {
+      const op = client('warehouse_staff', id);
+      expect(await gw.replacementsList(op, {})).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
+      expect(await gw.replacementsGet(op, { id: 'r' })).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
+      expect(await gw.exchangesList(op, {})).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
+      expect(await gw.exchangesGet(op, { id: 'e' })).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
+      expect(await gw.replacementsSetStatus(op, { id: 'r', status: 'approved' })).toEqual({ ok: false, error: SUP });
+      expect(await gw.exchangesSetStatus(op, { id: 'e', status: 'approved' })).toEqual({ ok: false, error: SUP });
+    }
+    for (const fn of [rep.list, rep.get, rep.setStatus, exc.list, exc.get, exc.setStatus]) expect(fn).not.toHaveBeenCalled();
+    for (const [role, id] of [['warehouse_staff', 'sup-1'], ['warehouse_staff', 'mgr-1'], ['admin', 'a1'], ['admin_operations', 'a2'], ['customer', 'c1'], ['seller', 's1']] as const) {
+      expect((await gw.replacementsList(client(role, id), {})).ok).toBe(true);
+      expect((await gw.exchangesList(client(role, id), {})).ok).toBe(true);
+    }
+    expect((await gw.replacementsSetStatus(client('warehouse_staff', 'mgr-1'), { id: 'r', status: 'approved' })).ok).toBe(true);
+    expect((await gw.exchangesSetStatus(client('warehouse_staff', 'sup-1'), { id: 'e', status: 'approved' })).ok).toBe(true);
   });
 
   it('respond: sellers (as their store) and admins; customers, riders and the warehouse cannot', async () => {
@@ -210,6 +250,21 @@ describe('EngagementGateway', () => {
 });
 
 describe('SupportGateway and NotificationsGateway', () => {
+  it('support agents are the Super Admin and the Support department: other admin roles cannot change a status or assign', async () => {
+    const svc = { list: echo(), get: echo(), open: echo(), reply: echo(), setStatus: echo(), markRead: echo(), assign: echo() };
+    const gw = new SupportGateway(svc as never);
+    for (const role of ['admin_finance', 'admin_operations', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'seller', 'customer', 'rider']) {
+      expect(await gw.setStatus(client(role), { id: 't', status: 'closed' })).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.assign(client(role), { id: 't', assigneeId: 'a' })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(svc.setStatus).not.toHaveBeenCalled();
+    expect(svc.assign).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_support']) {
+      expect((await gw.setStatus(client(role), { id: 't', status: 'closed' })).ok).toBe(true);
+      expect((await gw.assign(client(role), { id: 't', assigneeId: 'a' })).ok).toBe(true);
+    }
+  });
+
   it('support: only admins change status, mark-assign; anyone signed in opens, replies and reads', async () => {
     const svc = { list: echo(), get: echo(), open: echo(), reply: echo(), setStatus: echo(), markRead: echo(), assign: echo() };
     const gw = new SupportGateway(svc as never);

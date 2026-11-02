@@ -30,10 +30,10 @@ export default function WarehouseLegDetailPage() {
   const isAdmin = base.startsWith("/admin");
   const q = useDeskQueue({ status: "all" });
   const [showIncident, setShowIncident] = useState(false);
-  const exceptionsQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
-
   const key = decodeURIComponent(id);
   const task = findLeg(q.tasks, key);
+  // This parcel's incidents only: the whole incident list is a supervisor page (the server refuses an operator it).
+  const exceptionsQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], body: { taskId: task?.id ?? "" }, push: ["exception:updated"], enabled: !!task });
 
   if (!task) {
     return q.loading ? (

@@ -53,10 +53,11 @@ export class WarehouseService {
 
   // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
   /** Incidents, newest first. `hubId` (warehouse staff) limits them to that warehouse; null/undefined = all (admins). */
-  listExceptions(status?: string, hubId?: string | null): Promise<WarehouseException[]> {
+  listExceptions(status?: string, hubId?: string | null, taskId?: string | null): Promise<WarehouseException[]> {
     const where: FindOptionsWhere<WarehouseException> = {};
     if (status && status !== 'all') where.status = status as ExceptionStatus;
     if (hubId) where.hubId = hubId;
+    if (taskId) where.taskId = taskId;
     return this.exceptions.find({ where, order: { createdAt: 'DESC' }, take: 200 });
   }
 

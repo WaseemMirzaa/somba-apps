@@ -474,6 +474,116 @@ const register = async (label, role = 'customer') => {
     await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
   }
 
+  section('Least privilege: admin sub-roles only do what their web menu offers');
+  // A department account per sub-role (the seed has finance and ops): register, promote with roles:setRole, sign in again.
+  const subRole = async (label, role) => {
+    const u = await register(label);
+    a = await req(admin.sock, 'roles:setRole', { id: u.user.id, role });
+    if (!a.ok) throw new Error(`setRole ${role}: ${a.error}`);
+    u.sock.close();
+    return login(`${label}${tag}@authz.test`, 'Authz-Pass-2026');
+  };
+  const moderation = await subRole('mod', 'admin_moderation');
+  const marketing = await subRole('mkt2', 'admin_marketing');
+  const support = await subRole('sup', 'admin_support');
+  const notModerators = { finance, ops, support, marketing };
+  const notMarketing = { finance, ops, support, moderation };
+  const notSupport = { finance, ops, marketing, moderation };
+
+  // Product moderation (Moderation department): approve / reject / block / un-remove.
+  const modProd = (await req(sellerA.sock, 'products:create', { name: `A Moderated ${tag}`, price: 25, category: 'Electronics', stock: 4 })).data;
+  const statusOf = async (id) => (await req(admin.sock, 'products:get', { id })).data?.status;
+  const modStart = await statusOf(modProd.id);
+  for (const [name, u] of Object.entries(notModerators)) {
+    const tries = [];
+    for (const status of ['rejected', 'removed', 'live']) tries.push(await req(u.sock, 'products:update', { id: modProd.id, patch: { status } }));
+    ok(tries.every((t) => !t.ok), `${name} admin cannot approve / reject / block a listing`, tries.map((t) => t.error).join(' | '));
+    ok(!(await req(u.sock, 'products:update', { id: modProd.id, patch: { price: 1 } })).ok, `${name} admin cannot edit another seller's listing either`);
+    ok(!(await req(u.sock, 'products:delete', { id: modProd.id })).ok, `${name} admin cannot remove another seller's listing`);
+  }
+  ok((await statusOf(modProd.id)) === modStart, 'so the listing is exactly as the seller left it');
+  a = await req(moderation.sock, 'products:update', { id: modProd.id, patch: { status: 'rejected' } });
+  ok(a.ok && a.data.status === 'rejected', 'the moderation admin rejects it');
+  a = await req(ops.sock, 'products:update', { id: modProd.id, patch: { status: 'live' } });
+  ok(!a.ok && (await statusOf(modProd.id)) === 'rejected', 'and operations cannot put it back on sale');
+  a = await req(admin.sock, 'products:update', { id: modProd.id, patch: { status: 'live' } });
+  ok(a.ok && a.data.status === 'live', 'the super admin still approves');
+  ok((await req(ops.sock, 'products:list', {})).ok && (await req(finance.sock, 'products:get', { id: modProd.id })).ok, 'other admin roles keep reading listings');
+
+  // Campaign decisions (Marketing department).
+  a = await req(sellerB.sock, 'campaigns:create', { name: `Decision ${tag}`, discount: 10, productIds: [prodC.id] });
+  ok(a.ok && a.data.status === 'pending', 'setup: a seller campaign waits for a decision');
+  const camp = a.data;
+  for (const [name, u] of Object.entries(notMarketing)) {
+    ok(!(await req(u.sock, 'campaigns:setStatus', { id: camp.id, status: 'active' })).ok, `${name} admin cannot approve a campaign`);
+    ok(!(await req(u.sock, 'campaigns:create', { name: `As ${name} ${tag}`, discount: 5 })).ok, `${name} admin cannot run campaigns as the platform`);
+  }
+  ok((await req(admin.sock, 'campaigns:list')).data.find((c) => c.id === camp.id)?.status === 'pending', 'so the campaign is still pending');
+  ok((await req(ops.sock, 'campaigns:list')).ok, 'other admin roles keep reading campaigns');
+  a = await req(marketing.sock, 'campaigns:setStatus', { id: camp.id, status: 'rejected', reason: 'Not this month' });
+  ok(a.ok && a.data.status === 'rejected', 'the marketing admin decides');
+  await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: 'ended' });
+
+  // Categories (the Moderation menu no longer lists them: the server group is the Super Admin, Operations and Marketing).
+  ok(!(await req(moderation.sock, 'categories:create', { name: `Mod Cat ${tag}` })).ok && !(await req(support.sock, 'categories:create', { name: `Sup Cat ${tag}` })).ok && !(await req(finance.sock, 'categories:create', { name: `Fin Cat ${tag}` })).ok, 'moderation, support and finance admins cannot create categories');
+  a = await req(marketing.sock, 'categories:create', { name: `Mkt Cat ${tag}`, icon: '📦' });
+  ok(a.ok, 'the marketing admin (whose menu now lists Categories) can', a.error ?? '');
+  if (a.ok) {
+    ok(!(await req(moderation.sock, 'categories:update', { id: a.data.id, patch: { name: 'Hijacked' } })).ok && !(await req(moderation.sock, 'categories:remove', { id: a.data.id })).ok, 'and moderation cannot rename or delete it');
+    ok((await req(marketing.sock, 'categories:remove', { id: a.data.id })).ok, 'marketing cleans up');
+  }
+
+  // Support tickets (Support department): agents are the Super Admin and support.
+  a = await req(cust.sock, 'support:open', { subject: `Least privilege ${tag}`, message: 'Please look at my order' });
+  ok(a.ok, 'setup: a customer opens a ticket', a.error ?? '');
+  const tkt = a.data;
+  for (const [name, u] of Object.entries(notSupport)) {
+    ok(!((await req(u.sock, 'support:list')).data ?? []).some((t) => t.id === tkt.id), `${name} admin does not see other people's tickets`);
+    ok(!(await req(u.sock, 'support:get', { id: tkt.id })).ok, `${name} admin cannot open the ticket`);
+    ok(!(await req(u.sock, 'support:reply', { id: tkt.id, text: 'Let me step in' })).ok, `${name} admin cannot answer it`);
+    ok(!(await req(u.sock, 'support:setStatus', { id: tkt.id, status: 'closed' })).ok && !(await req(u.sock, 'support:assign', { id: tkt.id, assigneeId: u.user.id })).ok, `${name} admin cannot close or assign it`);
+  }
+  ok((await req(admin.sock, 'support:get', { id: tkt.id })).data?.status === 'open' && JSON.parse((await req(admin.sock, 'support:get', { id: tkt.id })).data.messages).length === 1, 'the ticket is untouched');
+  ok(((await req(support.sock, 'support:list')).data ?? []).some((t) => t.id === tkt.id), 'a support admin sees it');
+  a = await req(support.sock, 'support:assign', { id: tkt.id, assigneeId: support.user.id });
+  ok(a.ok && a.data.assigneeId === support.user.id, 'and takes it');
+  ok((await req(support.sock, 'support:setStatus', { id: tkt.id, status: 'resolved' })).ok, 'and resolves it');
+  ok(!(await req(support.sock, 'support:assign', { id: tkt.id, assigneeId: finance.user.id })).ok, 'a finance admin cannot be made its agent');
+
+  // Warehouse tiers: what the web hides from an operator is refused by the server.
+  section('Least privilege: warehouse tiers are enforced on the server');
+  const operator = await login('operator@somba.app');
+  const supervisor = await login('warehouse.limete@somba.app');
+  const manager = warehouse; // warehouse@somba.app is the Kinshasa manager
+  const tierRefusal = /supervisors and managers|managers can/;
+  const supervisorEvents = ['warehouse:aged', 'warehouse:reconcile', 'exceptions:list', 'replacements:list', 'exchanges:list'];
+  for (const ev of supervisorEvents) {
+    a = await req(operator.sock, ev, {});
+    ok(!a.ok && tierRefusal.test(a.error ?? ''), `${ev}: an operator is refused`, a.error ?? '');
+    ok((await req(supervisor.sock, ev, {})).ok && (await req(manager.sock, ev, {})).ok && (await req(admin.sock, ev, {})).ok, `${ev}: a supervisor, a manager and the super admin are not`);
+  }
+  a = await req(operator.sock, 'analytics:warehouse', {});
+  ok(!a.ok && /managers/.test(a.error ?? ''), 'analytics:warehouse: an operator is refused', a.error ?? '');
+  a = await req(supervisor.sock, 'analytics:warehouse', {});
+  ok(!a.ok && /managers/.test(a.error ?? ''), 'analytics:warehouse: a supervisor is refused too (managers only)', a.error ?? '');
+  ok((await req(manager.sock, 'analytics:warehouse', {})).ok && (await req(admin.sock, 'analytics:warehouse', {})).ok, 'analytics:warehouse: the manager and the super admin are not');
+  for (const [ev, body] of [['exceptions:setStatus', { id: 'x', status: 'resolved' }], ['replacements:setStatus', { id: 'x', status: 'approved' }], ['exchanges:setStatus', { id: 'x', status: 'approved' }], ['returns:grade', { id: 'x', grades: [] }], ['disputes:markReceived', { disputeId: 'x' }]]) {
+    a = await req(operator.sock, ev, body);
+    ok(!a.ok && /supervisors and managers/.test(a.error ?? ''), `${ev}: an operator is refused`, a.error ?? '');
+    a = await req(supervisor.sock, ev, body);
+    ok(!a.ok && !/supervisors and managers|Ops only/.test(a.error ?? ''), `${ev}: a supervisor passes the tier check (then the record is not found)`, a.error ?? '');
+  }
+  a = await req(operator.sock, 'exceptions:create', { notes: `Operator raises an incident ${tag}`, type: 'damaged' });
+  ok(a.ok, 'an operator can still raise an incident', a.error ?? '');
+  const excId = a.data?.id;
+  const excTask = (await req(manager.sock, 'warehouse:parcels', { limit: 1 })).data?.[0];
+  if (excTask) ok((await req(operator.sock, 'exceptions:list', { taskId: excTask.id })).ok, "and read one parcel's incidents (its detail screen)");
+  ok(!(await req(operator.sock, 'exceptions:list', { status: 'all' })).ok, 'but not the whole list');
+  if (excId) ok((await req(supervisor.sock, 'exceptions:setStatus', { id: excId, status: 'resolved' })).ok === false, "a supervisor of another warehouse still cannot touch this warehouse's incident");
+  ok((await req(manager.sock, 'exceptions:setStatus', { id: excId, status: 'resolved', resolution: 'Smoke' })).ok, 'the warehouse manager resolves it');
+  ok(!(await req(rider.sock, 'warehouse:aged', {})).ok && !(await req(cust.sock, 'warehouse:reconcile', {})).ok, 'riders and customers never');
+  for (const u of [moderation, marketing, support, operator, supervisor]) u.sock.close();
+
   section('List limits cannot be abused');
   ok((await req(cust.sock, 'orders:list', { limit: 1e12, offset: -5 })).ok && (await req(cust.sock, 'products:list', { limit: 'DROP', offset: {} })).ok, 'absurd limit / offset values are normalised, not errors');
   ok((await req(cust.sock, 'products:list', { limit: 2 })).data.length === 2, 'a small limit is honoured');
