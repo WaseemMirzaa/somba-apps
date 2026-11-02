@@ -59,6 +59,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'support') return pick(`/admin/support/${id}`, '/admin/support');
       if (t === 'return') return pick(`/admin/returns/${id}`, '/admin/returns');
       if (t === 'dispute') return pick(`/admin/disputes/${id}`, '/admin/disputes');
+      if (t === 'fraud') return '/admin/fraud';
       if (t === 'campaign') return '/admin/marketing';
       if (t === 'flash') return '/admin/marketing';
       if (t === 'stock') return '/admin/products';

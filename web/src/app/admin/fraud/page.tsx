@@ -15,8 +15,11 @@ import { useAdminData } from "@/lib/admin";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
+import { ErrorNote, Modal } from "@/components/admin/modal";
 import { useToast } from "@/context/toast-context";
+import { useRealtime } from "@/context/realtime-context";
 import { errMsg } from "@/lib/admin-live";
+import { canSuspendAccounts, fraudDialogText, type FraudDialogMode } from "@/lib/fraud-block";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
@@ -46,18 +49,41 @@ export default function AdminFraudPage() {
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Block / unblock suspends / reactivates the account, so it waits for a confirmation.
+  const [pending, setPending] = useState<{ id: string; customer: string; status: "open" | "reviewed" | "blocked"; mode: FraudDialogMode } | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const canSuspend = canSuspendAccounts(useRealtime().user?.role);
   const avgScore = fraudAlerts.length ? Math.round(fraudAlerts.reduce((s, a) => s + a.score, 0) / fraudAlerts.length) : 0;
 
-  async function setStatus(id: string, status: "open" | "reviewed" | "blocked") {
+  async function setStatus(id: string, status: "open" | "reviewed" | "blocked", opts?: { confirm?: boolean; done?: string }) {
     setBusyId(id);
     try {
-      await setFraudStatus(id, status);
-      toast(fr ? "Statut de l'alerte mis à jour" : "Alert status updated", "success");
+      await setFraudStatus(id, status, opts?.confirm === true);
+      toast(opts?.done ?? (fr ? "Statut de l'alerte mis à jour" : "Alert status updated"), "success");
+      return true;
     } catch (e) {
       toast(errMsg(e), "error");
+      setDialogError(errMsg(e));
+      return false;
     } finally {
       setBusyId(null);
     }
+  }
+
+  /** A change that touches the account (blocking, or moving a blocked alert on) asks first. */
+  function change(r: { id: string; customer: string; status: string }, status: "open" | "reviewed" | "blocked") {
+    if (status === "blocked" || r.status === "blocked") {
+      setDialogError(null);
+      setPending({ id: r.id, customer: r.customer, status, mode: status === "blocked" ? "block" : "unblock" });
+    } else {
+      void setStatus(r.id, status);
+    }
+  }
+
+  async function confirmPending() {
+    if (!pending) return;
+    const text = fraudDialogText(pending.mode, pending.customer, fr);
+    if (await setStatus(pending.id, pending.status, { confirm: true, done: text.done })) setPending(null);
   }
 
   const filtered = useMemo(
@@ -72,7 +98,7 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — vous les examinez ou les bloquez" : "Alerts raised by the server (e.g. COD orders above the cap) — review or block them"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server (e.g. COD orders above the cap) — review them; blocking suspends the customer's account"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />
@@ -109,11 +135,14 @@ export default function AdminFraudPage() {
                 render: (r) => {
                   const id = String(r.id);
                   const st = String(r.status);
+                  const row = { id, customer: String(r.customer), status: st };
+                  // Moving a blocked alert on lifts the block, which only a role that may suspend accounts can do.
+                  const mayMove = st !== "blocked" || canSuspend;
                   return (
                     <div className="flex flex-wrap gap-2">
-                      {st !== "reviewed" && <Button size="sm" variant="approve" disabled={busyId === id} onClick={() => setStatus(id, "reviewed")}>{fr ? "Marquer examiné" : "Mark reviewed"}</Button>}
-                      {st !== "blocked" && <Button size="sm" variant="reject" disabled={busyId === id} onClick={() => setStatus(id, "blocked")}>{fr ? "Bloquer" : "Block"}</Button>}
-                      {st !== "open" && <Button size="sm" variant="secondary" disabled={busyId === id} onClick={() => setStatus(id, "open")}>{fr ? "Rouvrir" : "Reopen"}</Button>}
+                      {st !== "reviewed" && mayMove && <Button size="sm" variant="approve" disabled={busyId === id} onClick={() => change(row, "reviewed")}>{fr ? "Marquer examiné" : "Mark reviewed"}</Button>}
+                      {st !== "blocked" && canSuspend && <Button size="sm" variant="reject" disabled={busyId === id} onClick={() => change(row, "blocked")}>{fr ? "Bloquer" : "Block"}</Button>}
+                      {st !== "open" && mayMove && <Button size="sm" variant="secondary" disabled={busyId === id} onClick={() => change(row, "open")}>{fr ? "Rouvrir" : "Reopen"}</Button>}
                     </div>
                   );
                 },
@@ -125,6 +154,29 @@ export default function AdminFraudPage() {
         </CardContent>
       </Card>
       )}
+
+      {!canSuspend && (
+        <p className="text-xs text-slate-500">
+          {fr ? "Seul un super admin ou un admin support peut bloquer un compte ; vous pouvez marquer les alertes comme examinées." : "Only a super admin or support admin can block an account; you can mark alerts as reviewed."}
+        </p>
+      )}
+
+      <Modal
+        open={!!pending}
+        onClose={() => { if (!busyId) setPending(null); }}
+        title={pending ? fraudDialogText(pending.mode, pending.customer, fr).title : ""}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setPending(null)} disabled={!!busyId}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="danger" size="sm" onClick={() => void confirmPending()} disabled={!!busyId}>
+              {busyId ? "…" : pending ? fraudDialogText(pending.mode, pending.customer, fr).confirm : ""}
+            </Button>
+          </>
+        }
+      >
+        <p>{pending ? fraudDialogText(pending.mode, pending.customer, fr).body : ""}</p>
+        <ErrorNote message={dialogError} />
+      </Modal>
     </div>
   );
 }

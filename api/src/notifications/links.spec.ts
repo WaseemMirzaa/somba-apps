@@ -19,6 +19,7 @@ describe('linkFor', () => {
     expect(linkFor('admin_support', 'support', 't1')).toBe('/admin/support/t1');
     expect(linkFor('warehouse_staff', 'replacement', 'r1')).toBe('/warehouse/replacements/r1');
     expect(linkFor('rider', 'task', 'k1')).toBe('/rider/tasks/k1');
+    expect(linkFor('admin', 'fraud', 'u1')).toBe('/admin/fraud');
   });
 
   it('opens exchanges, replacements, questions, reviews and support on every portal', () => {

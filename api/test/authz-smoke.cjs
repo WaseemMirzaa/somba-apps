@@ -327,7 +327,8 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(sellerB.sock, 'campaigns:update', { id: c.data.id, patch: { name: 'hijack' } })).ok, "a seller cannot edit another seller's campaign");
   const edited = await req(sellerA.sock, 'campaigns:update', { id: c.data.id, patch: { status: 'active', sellerId: 'x', name: 'Summer 2' } });
   ok(edited.ok && edited.data.status === 'pending' && edited.data.name === 'Summer 2', 'a seller cannot self-approve or reassign a campaign');
-  await req(admin.sock, 'campaigns:setStatus', { id: c.data.id, status: 'active' });
+  await req(admin.sock, 'campaigns:setStatus', { id: c.data.id, status: 'active', reason: 'Looks fine' });
+  ok(((await req(admin.sock, 'audit:list', { action: 'campaign.active', q: c.data.id })).data ?? []).length === 1, 'a campaign decision is in the audit log');
   ok(!(await req(sellerA.sock, 'campaigns:update', { id: c.data.id, patch: { discount: 90 } })).ok, 'an approved campaign can no longer be edited by the seller');
   ok(!(await req(admin.sock, 'campaigns:setStatus', { id: c.data.id, status: 'hacked' })).ok, 'an invalid campaign status is rejected');
   ok(!(await req(cust.sock, 'campaigns:list')).data.length, 'customers do not see campaigns');

@@ -18,13 +18,16 @@ import { errMsg, useServerList, type BroadcastServerRow } from "@/lib/admin-live
 import { socketClient } from "@/lib/realtime/socket-client";
 import { autoTranslateHint, localized } from "@/lib/i18n-fields";
 
-// The server targets a role room; "all" only reaches customers in practice, so it is not offered.
+// The server targets a role room. "all" (older broadcasts and API callers) means every customer, the same people as
+// "Customers", so it is only named in the history and not offered as a second choice.
 const AUDIENCES: { id: string; label: string; labelFr: string }[] = [
   { id: "customer", label: "Customers", labelFr: "Clients" },
   { id: "seller", label: "Sellers", labelFr: "Vendeurs" },
   { id: "rider", label: "Riders", labelFr: "Livreurs" },
   { id: "warehouse_staff", label: "Warehouse staff", labelFr: "Personnel entrepôt" },
 ];
+
+const ALL_CUSTOMERS = { label: "All customers", labelFr: "Tous les clients" };
 
 export default function AdminBroadcastsPage() {
   const { t, locale } = useLocale();
@@ -43,7 +46,7 @@ export default function AdminBroadcastsPage() {
 
   const totalRecipients = items.reduce((s, b) => s + (b.recipients ?? 0), 0);
   const audLabel = (id: string) => {
-    const a = AUDIENCES.find((x) => x.id === id);
+    const a = id === "all" ? ALL_CUSTOMERS : AUDIENCES.find((x) => x.id === id);
     return a ? (fr ? a.labelFr : a.label) : id;
   };
 

@@ -63,13 +63,13 @@ Somba is a general marketplace with a hub (Jumia model), so it keeps the multi-s
 | A-B5 | Refund forced `returned`, never restocked, left the rider delivering | `payments.service.ts refund` | ✅ |
 | A-B6 | Percent coupons rounded to whole dollars | `content/promos.service.ts` | ✅ |
 | A-B7 | Coupons could not be paused; flash sales could not be ended or listed once over | gateway, `promotions`, `flash-sales` pages | ✅ |
-| A-B8 | Fraud "Block" blocks nothing; alert raised after fulfilment opens | `ops/fraud.service.ts` | ⬜ P1 |
-| A-B9 | Broadcast "all" notifies customers only; no confirm; not audited | `ops/broadcasts.service.ts` | ⬜ P1 |
+| A-B8 | Fraud "Block" blocks nothing; alert raised after fulfilment opens | `ops/fraud.service.ts` | 🔶 Block now suspends the account (confirmed, audited, noticed; super admin / support right) and unblock reactivates; the alert is still raised after the order is placed, and the only rule is the COD cap |
+| A-B9 | Broadcast "all" notifies customers only; no confirm; not audited | `ops/broadcasts.service.ts` | 🔶 "all" means all customers: count, label and delivery agree; audited with audience and recipient count; unknown audiences refused. No send confirmation yet |
 | A-B10 | Nav vs server permissions disagree (Support can't open disputes; Moderation can't save categories) | `lib/admin-access.ts`, gateway `GROUPS` | ⬜ P1 |
 | A-B11 | Super Admin gets no alert for payouts, disputes, seller applications, tickets | role-targeted notifications | ⬜ P1 |
-| A-B12 | Refunds, dispute decisions, product takedowns, campaigns, broadcasts not audited; audit page has no filter | gateway, `audit.service.ts` | 🔶 refunds / admin cancel / coupon & flash-sale actions audited |
+| A-B12 | Refunds, dispute decisions, product takedowns, campaigns, broadcasts not audited; audit page has no filter | gateway, `audit.service.ts` | ✅ refunds / admin cancel / coupon & flash-sale actions audited; product takedowns and status changes, campaign decisions, broadcasts, payout rejections, dispute rejections, categories, CMS and flash-sale creation now audited; `/admin/audit` filters by action, role, actor, text and dates with server paging |
 | A-B13 | Reinstating a seller does not restore listings; no reason stored | `ops/sellers.service.ts` | ✅ reject/suspend need a reason the seller sees; reinstating restores the listings the suspension drafted |
-| A-B14 | Customer wallet not shown; no wallet adjust; Suspend shown to roles that can't | `admin/customers/[id]` | ⬜ P1 |
+| A-B14 | Customer wallet not shown; no wallet adjust; Suspend shown to roles that can't | `admin/customers/[id]` | 🔶 read-only wallet panel (balance + transactions) added; Suspend hidden from roles that cannot use it; still no wallet adjustment (by decision) |
 | A-B15 / S-B16 | Commission is one live global %, never stored per order → history rewrites itself | `payouts.service.ts` | ✅ stored per order line (`commissionPct`/`commissionUsd`); per-payout settlement statements + CSV + batch approve |
 | A-B16 | Admin lists silently capped (200–500 rows), client-side search | `realtime-context.tsx`, list endpoints | ⬜ P1 |
 | A-B17 / S-B1 | A seller could edit a live listing (title, image, price) with no re-review | gateway `products:update` | ✅ back to review when moderation is on |
