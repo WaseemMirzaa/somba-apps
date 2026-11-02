@@ -143,7 +143,9 @@ const register = async (label, role = 'customer') => {
   const mine = (await req(rider.sock, 'cash:mine')).data;
   ok(Math.abs(mine.heldUsd - money(startHeld + due1)) < 0.011, 'the rider now holds the cash they collected', `${mine.heldUsd} vs ${startHeld + due1}`);
   const stats = (await req(rider.sock, 'rider:workStats')).data;
-  ok(stats && stats.completed === statsBefore.completed + 1 && stats.completedToday === statsBefore.completedToday + 1, 'the delivery shows in the work stats: completed and completed today each went up by one', JSON.stringify([statsBefore, stats]));
+  // Getting the parcel to the road also has this rider complete its seller pickup, so `completed` rises by the pickup too: check the delivery by its kind.
+  const nOf = (st, kind) => (st.byKind.find((k) => k.kind === kind) ?? { count: 0 }).count;
+  ok(stats && nOf(stats, 'delivery') === nOf(statsBefore, 'delivery') + 1 && stats.completed > statsBefore.completed && stats.completedToday - statsBefore.completedToday === stats.completed - statsBefore.completed, 'the delivery shows in the work stats: completed, completed today and the delivery count all went up', JSON.stringify([statsBefore, stats]));
   ok(stats && Math.abs(stats.codCollectedUsd - statsBefore.codCollectedUsd - due1) < 0.011, 'the cash collected in the work stats grew by the amount taken at the door');
   ok(stats && !/earning|perTask/i.test(JSON.stringify(stats)), 'the work stats carry no pay');
   ok(JSON.stringify((await req(rider.sock, 'rider:earnings')).data) === JSON.stringify(stats), 'the old rider:earnings name still answers, with the same payload');
