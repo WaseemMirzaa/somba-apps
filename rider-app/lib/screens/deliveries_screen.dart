@@ -746,7 +746,7 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
           controller: _other,
           maxLength: 200,
           onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(labelText: s.failDetails, border: const OutlineInputBorder()),
+          decoration: AppInput.multiline(label: s.failDetails).copyWith(counterText: null),
         ),
         SizedBox(
           width: double.infinity,

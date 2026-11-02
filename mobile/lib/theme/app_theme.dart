@@ -67,6 +67,30 @@ class AppRadius {
   static const BorderRadius pill = BorderRadius.all(Radius.circular(100));
 }
 
+/// Text fields. The theme gives every field a full pill, which suits one line; a field that grows to several lines
+/// takes the buttons' corner radius instead, so a tall box does not turn into a stadium.
+class AppInput {
+  AppInput._();
+
+  static OutlineInputBorder _border(Color color, [double width = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  static InputDecoration multiline({String? hint, String? error, Color? fill, bool dense = false, EdgeInsetsGeometry? padding}) => InputDecoration(
+        hintText: hint,
+        errorText: error,
+        fillColor: fill,
+        isDense: dense ? true : null,
+        contentPadding: padding,
+        border: _border(AppColors.line),
+        enabledBorder: _border(AppColors.line),
+        focusedBorder: _border(AppColors.primary, 1.6),
+        errorBorder: _border(AppColors.danger),
+        focusedErrorBorder: _border(AppColors.danger, 1.6),
+      );
+}
+
 /// Spacing steps for new UI (older screens still carry their own literals).
 class AppSpace {
   AppSpace._();

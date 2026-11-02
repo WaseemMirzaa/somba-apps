@@ -71,7 +71,8 @@ class AppField extends StatelessWidget {
           keyboardType: keyboard,
           maxLines: obscure ? 1 : maxLines,
           onChanged: onChanged,
-          decoration: InputDecoration(
+          // A multi-line field takes the buttons' corner radius (a pill that tall looks like a stadium).
+          decoration: (!obscure && maxLines > 1 ? AppInput.multiline(hint: hint, error: error) : const InputDecoration()).copyWith(
             hintText: hint,
             errorText: error,
             prefixIcon: icon != null ? Icon(icon, size: 20) : null,

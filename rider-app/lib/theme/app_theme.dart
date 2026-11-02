@@ -121,3 +121,27 @@ class AppTheme {
     );
   }
 }
+
+/// Multi-line text fields take the buttons' corner radius (16), like every button in the app.
+class AppInput {
+  AppInput._();
+
+  static OutlineInputBorder _border(Color color, [double width = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  static InputDecoration multiline({String? label, String? hint, String? error, bool dense = false, bool alignLabel = false}) => InputDecoration(
+        labelText: label,
+        hintText: hint,
+        errorText: error,
+        counterText: '',
+        isDense: dense ? true : null,
+        alignLabelWithHint: alignLabel,
+        border: _border(AppColors.line),
+        enabledBorder: _border(AppColors.line),
+        focusedBorder: _border(AppColors.primary, 1.6),
+        errorBorder: _border(AppColors.danger),
+        focusedErrorBorder: _border(AppColors.danger, 1.6),
+      );
+}

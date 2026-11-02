@@ -275,12 +275,7 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           key: const ValueKey('review-text'),
           controller: _ctrl,
           maxLines: 5,
-          decoration: InputDecoration(
-            hintText: s.reviewHint,
-            filled: true,
-            fillColor: AppColors.surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
-          ),
+          decoration: AppInput.multiline(hint: s.reviewHint),
         ),
         const SizedBox(height: 8),
         Text(s.reviewAfterDelivery, style: const TextStyle(color: AppColors.muted, fontSize: 12)),

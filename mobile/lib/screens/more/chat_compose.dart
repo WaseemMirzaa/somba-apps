@@ -129,7 +129,7 @@ class _ChatComposeScreenState extends State<ChatComposeScreen> {
           onChanged: (_) {
             if (_error != null) setState(() => _error = null);
           },
-          decoration: InputDecoration(hintText: s.chatComposeHint, errorText: _error),
+          decoration: AppInput.multiline(hint: s.chatComposeHint, error: _error),
         ),
         const SizedBox(height: AppSpace.sm),
         PhotoPickerField(attachments: _attachments),

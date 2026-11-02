@@ -249,13 +249,7 @@ class _AskSheetState extends State<_AskSheet> {
           onChanged: (_) {
             if (_error != null) setState(() => _error = null);
           },
-          decoration: InputDecoration(
-            hintText: s.pdAskHint,
-            errorText: _error,
-            filled: true,
-            fillColor: AppColors.background,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
-          ),
+          decoration: AppInput.multiline(hint: s.pdAskHint, error: _error, fill: AppColors.background),
         ),
         const SizedBox(height: 14),
         PrimaryButton(s.pdSubmitQuestion, busy: _busy, onPressed: () => _submit(s)),
