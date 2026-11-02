@@ -20,7 +20,7 @@ import {
   NotificationsService,
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { PaymentsService } from '../payments/payments.service';
+import { CodReceipt, PaymentsService } from '../payments/payments.service';
 import { recordRefund } from '../payments/refund-ledger';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
@@ -945,6 +945,7 @@ export class OrdersService {
   async updateStatus(
     orderId: string,
     status: OrderStatus,
+    actor?: { id: string; name: string; role: string },
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
@@ -979,13 +980,25 @@ export class OrdersService {
       const open = await this.deliveries.find({
         where: { orderId: saved.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) },
       });
+      const now = new Date();
+      let receipt: CodReceipt | undefined;
       for (const task of open) {
         task.status = 'delivered';
-        task.deliveredAt = new Date();
+        task.deliveredAt = now;
+        // C-cod: the operator who closes a COD delivery by hand takes responsibility for its cash. It is recorded as collected
+        // by them and settled at once (it never shows up as cash a rider holds), and it goes in the payment's audit line.
+        const due = task.kind === 'delivery' ? Math.round(task.codAmountUsd * 100) / 100 : 0;
+        if (due > 0 && actor && !task.codCollectedAt) {
+          task.codCollectedUsd = due;
+          task.codCollectedAt = now;
+          task.codCollectedById = actor.id;
+          task.codHandedOverUsd = due;
+          receipt = { amountUsd: due, byId: actor.id, byName: actor.name, byRole: actor.role, at: now, taskId: task.id, source: 'admin_close' };
+        }
         await this.deliveries.save(task);
         await this.logistics.emitTask(task);
       }
-      await this.payments.markCollected(saved.id);
+      await this.payments.markCollected(saved.id, receipt);
     }
 
     // Everyone who cares about this order hears about it instantly.

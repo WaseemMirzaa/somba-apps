@@ -26,6 +26,17 @@ const EXACT: Record<string, string> = {
   "Too many requests — slow down.": "Trop de requêtes. Ralentissez un instant.",
   "Too many requests - slow down.": "Trop de requêtes. Ralentissez un instant.",
 
+  // ── cash on delivery (C-cod) ──
+  "Only supervisors and managers can record a rider's cash hand-over.": "Seuls les superviseurs et les responsables peuvent enregistrer la remise d'espèces d'un livreur.",
+  "This rider belongs to another warehouse.": "Ce livreur appartient à un autre entrepôt.",
+  "Rider not found.": "Livreur introuvable.",
+  "Enter the amount received, more than 0.": "Saisissez le montant reçu, supérieur à 0.",
+  "Enter the amount in dollars and cents, for example 25.50.": "Saisissez le montant en dollars et centimes, par exemple 25,50.",
+  "This rider's cash was just updated. Refresh and try again.": "Les espèces de ce livreur viennent d'être mises à jour. Actualisez et réessayez.",
+  "This receipt reference was already used for a different hand-over.": "Cette référence de reçu a déjà servi pour une autre remise.",
+  "No cash is due on this delivery: it is already paid.": "Aucun paiement en espèces n'est dû pour cette livraison : elle est déjà payée.",
+  "Enter the cash you collected as an amount in dollars.": "Saisissez les espèces encaissées sous forme de montant en dollars.",
+
   // ── logistics ──
   "Your warehouse assigns your tasks. You cannot accept a task yourself.": "Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.",
   "Your account is not linked to a warehouse. Ask an administrator.": "Votre compte n'est lié à aucun entrepôt. Contactez un administrateur.",
@@ -343,6 +354,11 @@ const AREA_LEVEL_ADD_FR: Record<string, string> = { country: "un pays", province
 const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 
 const PATTERNS: Rule[] = [
+  [/^(.+) holds no cash to hand in\.$/, (m) => `${m[1]} ne détient aucune espèce à remettre.`],
+  [/^(.+) holds \$([\d.,]+): you cannot record \$([\d.,]+)\.$/, (m) => `${m[1]} détient ${m[2]} $ : vous ne pouvez pas enregistrer ${m[3]} $.`],
+  [/^Confirm the cash you collected: \$([\d.,]+) is due on this delivery\.$/, (m) => `Confirmez les espèces encaissées : ${m[1]} $ sont dus pour cette livraison.`],
+  [/^The cash you entered \(\$([\d.,]+)\) is not the amount to collect \(\$([\d.,]+)\)\. Collect exactly \$([\d.,]+), or ask the warehouse if the amount changed\.$/, (m) => `Les espèces saisies (${m[1]} $) ne correspondent pas au montant à encaisser (${m[2]} $). Encaissez exactement ${m[3]} $, ou demandez à l'entrepôt si le montant a changé.`],
+  [/^This delivery is already complete with \$([\d.,]+) collected\.$/, (m) => `Cette livraison est déjà terminée avec ${m[1]} $ encaissés.`],
   [/^(.+) must be (\d+)-(\d+) characters\.$/, (m) => `${areaField(m[1])} : ${m[2]} à ${m[3]} caractères.`],
   [/^(.+) must be (?:a number|a whole number) between (\d+) and (\d+)\.$/, (m) => `${areaField(m[1])} : un nombre entre ${m[2]} et ${m[3]}.`],
   [/^Level must be one of: .+\.$/, () => "Le niveau doit être : pays, province, ville, district, commune ou quartier."],

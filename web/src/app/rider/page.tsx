@@ -7,7 +7,7 @@ import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useLocale } from "@/context/locale-context";
-import { useRiderAssignment, useRiderData } from "@/lib/rider";
+import { useRiderAssignment, useRiderCash, useRiderData } from "@/lib/rider";
 import { looseTasks } from "@/lib/rider-runs";
 import { useRiderRuns } from "@/lib/rider-runs-live";
 import { formatCurrency } from "@/lib/utils";
@@ -34,6 +34,7 @@ export default function RiderDashboardPage() {
   const { riderProfile, getActiveRiderTasks, mine, earnings, error, loading } = useRiderData();
   const rr = useRiderRuns(mine);
   const assignment = useRiderAssignment();
+  const { cash } = useRiderCash();
   // A transfer run is one card; its parcels are not listed again as tasks of their own.
   const activeTasks = looseTasks(getActiveRiderTasks(), rr.runs);
   const activeCount = activeTasks.length + rr.activeRuns.length;
@@ -51,7 +52,7 @@ export default function RiderDashboardPage() {
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
         <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(earnings?.delivered ?? 0)} icon={CheckCircle} />
         <Kpi title={t("earnings")} value={formatCurrency(earnings?.earningsUsd ?? 0, locale)} icon={DollarSign} />
-        <Kpi title={fr ? "COD encaissé" : "COD collected"} value={formatCurrency(earnings?.codCollectedUsd ?? 0, locale)} icon={Banknote} />
+        <Kpi title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />
       </div>
 
       <p className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">

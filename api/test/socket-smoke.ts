@@ -216,7 +216,8 @@ async function main() {
   // ---- Payouts (seller ⇄ finance) ----
   // A payout can only draw on DELIVERED sales, so complete the first delivery.
   const sold = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'delivered');
-  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
+  // A cash-on-delivery parcel: the rider confirms the exact cash due (the server records it and refuses any other amount).
+  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered', ...(task.codAmountUsd > 0 ? { cashUsd: task.codAmountUsd } : {}) });
   check('rider completes the delivery → order delivered', (await sold).status === 'delivered');
   const avail = await emit<{ available: number }>(sSock, 'payouts:available');
   check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);

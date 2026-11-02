@@ -5,6 +5,7 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
 import { isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
+import type { CashHandover } from "@/lib/warehouse-live";
 
 /**
  * Live rider data layer. `rider:tasks` returns ONLY the legs assigned to this rider (their warehouse assigns them;
@@ -250,4 +251,46 @@ export function useRiderAssignment() {
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { data, error, reload };
+}
+
+/** The rider's cash in hand (`cash:mine`): collected on cash-on-delivery orders, not yet handed in at the warehouse. */
+export interface RiderCash {
+  collectedUsd: number;
+  handedOverUsd: number;
+  heldUsd: number;
+  openTasks: number;
+  handovers: CashHandover[];
+}
+
+/** Live: re-read after every task change and every hand-over the warehouse records (`cash:updated`). */
+export function useRiderCash() {
+  const rt = useRealtime();
+  const [cash, setCash] = useState<RiderCash | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const ready = rt.status === "connected" && rt.user?.role === "rider";
+
+  const refresh = useCallback(async () => {
+    try {
+      setCash(await socketClient.request<RiderCash>("cash:mine"));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load your cash.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+    const s = socketClient.current;
+    const onPush = () => void refresh();
+    s?.on("cash:updated", onPush);
+    s?.on("task:updated", onPush);
+    return () => {
+      s?.off("cash:updated", onPush);
+      s?.off("task:updated", onPush);
+    };
+  }, [ready, refresh]);
+
+  return { cash, error, refresh };
 }

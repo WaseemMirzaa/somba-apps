@@ -83,7 +83,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
     { path: "/aged", label: fr ? "Colis vieillis" : "Aged Parcels", count: aged24, icon: PackageX },
     { path: "/batch-builder", label: fr ? "Préparation des lots" : "Batch builder", count: activeBatches, icon: Send },
     { path: "/riders", label: fr ? "Livreurs" : "Riders", count: riders.length, icon: Bike },
-    { path: "/reconcile", label: fr ? "Rapprochement COD" : "COD reconcile", count: null as number | null, icon: Banknote },
+    { path: "/reconcile", label: fr ? "Espèces COD" : "COD cash", count: null as number | null, icon: Banknote },
   ];
   const visibleQuickLinks = quickLinks.filter((link) => isAdmin || canWarehouseAccess(gatedTier, `/warehouse${link.path}`));
 
