@@ -10,6 +10,12 @@ import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { useRiderAssignment, useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
+import { useRealtime } from "@/context/realtime-context";
+import { useSocketEvent } from "@/lib/seller-api";
+import { RiderAccountPanels } from "@/components/rider/rider-account";
+import { isSameAccount } from "@/lib/rider-profile";
+import type { BackendUser } from "@/lib/realtime/types";
+import { useState } from "react";
 
 export default function RiderProfilePage() {
   const { t, locale } = useLocale();
@@ -19,7 +25,15 @@ export default function RiderProfilePage() {
   const { riderProfile, getActiveRiderTasks } = useRiderData();
   const assignment = useRiderAssignment();
   const activeTasks = getActiveRiderTasks();
-  const initials = riderProfile.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const rt = useRealtime();
+  // The realtime context keeps the sign-in snapshot; what the rider edits (here or on another device: `me:updated`) is kept locally.
+  const [edited, setEdited] = useState<{ name: string; phone: string | null } | null>(null);
+  useSocketEvent<BackendUser>("me:updated", (u) => {
+    if (isSameAccount(rt.user, u)) setEdited({ name: u.name, phone: u.phone ?? null });
+  });
+  const shownName = edited?.name ?? riderProfile.name;
+  const shownPhone = edited ? edited.phone : riderProfile.phone;
+  const initials = shownName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="space-y-6">
@@ -29,7 +43,7 @@ export default function RiderProfilePage() {
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-2xl font-bold text-white">
           {initials}
         </div>
-        <h2 className="font-[family-name:var(--font-display)] text-xl font-bold">{riderProfile.name}</h2>
+        <h2 className="font-[family-name:var(--font-display)] text-xl font-bold">{shownName}</h2>
         <p className="text-sm text-slate-500">{riderProfile.email}</p>
         <div className="mt-3 flex justify-center gap-2">
           <Badge variant="primary">{riderProfile.id}</Badge>
@@ -38,20 +52,22 @@ export default function RiderProfilePage() {
 
       <DetailSection title={fr ? "Profil" : "Profile"}>
         <InfoGrid items={[
-          { label: fr ? "Nom" : "Name", value: riderProfile.name },
+          { label: fr ? "Nom" : "Name", value: shownName },
           { label: "Email", value: riderProfile.email || "—" },
           {
             label: fr ? "Téléphone" : "Phone",
-            value: riderProfile.phone ? (
-              <a href={`tel:${riderProfile.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1 text-emerald-600 hover:underline">
+            value: shownPhone ? (
+              <a href={`tel:${shownPhone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1 text-emerald-600 hover:underline">
                 <Phone className="h-3.5 w-3.5" />
-                {riderProfile.phone}
+                {shownPhone}
               </a>
             ) : "—",
           },
           { label: fr ? "Livraisons en cours" : "Active deliveries", value: riderProfile.activeTasks },
         ]} />
       </DetailSection>
+
+      <RiderAccountPanels name={shownName} phone={shownPhone} email={riderProfile.email} onSaved={setEdited} />
 
       <DetailSection title={fr ? "Où je travaille" : "Where I work"}>
         {assignment.error ? (

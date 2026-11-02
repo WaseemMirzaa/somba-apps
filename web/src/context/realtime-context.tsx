@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { authApi, AuthApiError } from "@/lib/realtime/auth-api";
+import { isTransientAuthStatus, refreshFailureAction } from "@/lib/session-errors";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
 import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
@@ -402,9 +403,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         await connectWith(result.accessToken, result.user);
         return;
       } catch (e) {
-        const transient = e instanceof AuthApiError && (e.status === 0 || e.status === 429 || e.status >= 500);
-        if (transient && attempt < 3) {
-          await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
+        const next = refreshFailureAction(e instanceof AuthApiError ? e.status : -1, attempt);
+        if (next.action === "retry") {
+          await new Promise((r) => setTimeout(r, next.delayMs));
           continue;
         }
         authApi.clear();
@@ -472,7 +473,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }
       // A refresh the server refused (revoked / expired token) ends the session. One it could not answer (rate limit,
       // network blip) must not: retry a few times, and keep the stored tokens so the next load can restore the session.
-      const transient = (e: unknown) => e instanceof AuthApiError && (e.status === 0 || e.status === 429 || e.status >= 500);
       for (let attempt = 0; ; attempt++) {
         try {
           const result = await authApi.refresh(refresh);
@@ -480,11 +480,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           await connectWith(result.accessToken, result.user);
           return;
         } catch (e) {
-          if (transient(e) && attempt < 3) {
-            await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt));
+          const status = e instanceof AuthApiError ? e.status : -1;
+          const next = refreshFailureAction(status, attempt);
+          if (next.action === "retry") {
+            await new Promise((r) => setTimeout(r, next.delayMs));
             continue;
           }
-          if (!transient(e)) authApi.clear();
+          if (!isTransientAuthStatus(status)) authApi.clear();
           await connectGuest();
           return;
         }

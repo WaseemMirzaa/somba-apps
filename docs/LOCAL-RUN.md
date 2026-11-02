@@ -45,7 +45,7 @@ npm ci && npx next build && npx next start -p 3000
 
 Sign in at `/login` with the seed accounts. The one-click demo role picker (and the quick sign-in on `/live`) is **off by default**; it shows only in a build made with `NEXT_PUBLIC_DEMO_MODE=true`. For a local demo add `NEXT_PUBLIC_DEMO_MODE=true` to `web/.env.local` before `next build` / `next dev` (or run `DEMO_MODE=true bash scripts/run-local.sh`). It is read when the web app is built, so rebuild after changing it. Never set it on a public deployment.
 
-Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; rider accepts → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
+Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; the warehouse assigns the rider → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
 
 ## 4. Flutter apps
 

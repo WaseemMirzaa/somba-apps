@@ -887,6 +887,17 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
     ok(excs.length === excBefore + 1 && excs.some((e) => e.notes === `Parcel missing from run ${run2.reference}.` && e.type === 'missing_item' && e.hubId === L.id && e.severity === 'high'), 'and it becomes an exception at the receiving warehouse (visible to its staff)', JSON.stringify(excs.map((e) => e.notes)));
     ok(!!(await until(async () => (await noteTitles(admin)).filter((t) => t === 'Parcel missing from run').length > adminNotes2)) && (await noteTitles(mgrK)).includes('Parcel missing from run') && (await noteTitles(supL)).includes('Parcel missing from run'), 'admins and both warehouses are told');
     ok((await req(supL.sock, 'logistics:receiveRun', { runId: run2.id })).error === 'This run is already closed.', 'a closed run takes no more scans');
+    // What the driver and the order see afterwards. The missing parcel is NOT given a new leg (it never arrived: there is nothing for a rider to
+    // collect); the desk follows the exception. The driver finds it in Done with the reason, and the closed run on their list with the count.
+    const driverTasks = (await req(riderL.sock, 'rider:tasks')).data ?? [];
+    const lostForDriver = driverTasks.find((t) => t.id === ids[3]);
+    ok(lostForDriver?.status === 'failed' && lostForDriver.failureReason === `Parcel missing from run ${run2.reference}.` && lostForDriver.runReference === run2.reference, 'the driver sees the missing parcel as failed, with the reason and the run reference', JSON.stringify([lostForDriver?.status, lostForDriver?.failureReason]));
+    ok(!driverTasks.some((t) => t.runId === run2.id && ['assigned', 'picked_up', 'in_transit'].includes(t.status)), 'nothing of the closed run is left on the driver\'s list of work');
+    const driverRun = ((await req(riderL.sock, 'rider:runs')).data ?? []).find((r) => r.id === run2.id);
+    ok(driverRun?.status === 'closed' && driverRun.missingCount === 1 && driverRun.receivedCount === 1, 'the closed run stays on the driver\'s list with 1 received and 1 missing', JSON.stringify(driverRun));
+    const orderLegs = (await queueOf(admin)).tasks.filter((t) => t.orderId === missing.orderId);
+    ok(orderLegs.length > 0 && orderLegs.every((t) => ['delivered', 'failed'].includes(t.status)) && !orderLegs.some((t) => t.kind === 'delivery') && orderLegs.filter((t) => t.kind === 'transfer').length === 1, 'no new leg is opened for it: the order keeps its finished pickup and its failed transfer, no delivery', JSON.stringify(orderLegs.map((t) => `${t.kind}:${t.status}`)));
+    ok((await req(riderK.sock, 'rider:tasks')).data?.every((t) => t.id !== ids[3]) && !(await req(riderK.sock, 'rider:runs')).data?.some((r) => r.id === run2.id), 'another driver never sees that parcel or that run');
     ok((await req(supL.sock, 'logistics:runs', { status: 'closed' })).data.filter((r) => [run.id, run2.id].includes(r.id)).length === 2, 'logistics:runs filters by status');
     const an = (await req(admin.sock, 'analytics:warehouse')).data;
     const lane = an?.runs?.byLane?.find((l) => l.fromHubId === K.id && l.toHubId === L.id);

@@ -41,3 +41,10 @@ test("an unknown message is passed through, an empty one gets a generic text", (
   assert.equal(authErrorText(undefined, true), "Une erreur est survenue. Réessayez.");
   assert.equal(authErrorText(null, false), "Something went wrong. Please try again.");
 });
+
+test("a revoked or switched-off rider session reads as a plain 'sign in again' in both languages", () => {
+  assert.equal(authErrorText(new Error("Session has been revoked."), true), "Session expirée. Reconnectez-vous.");
+  assert.equal(authErrorText(new Error("Session has been revoked."), false), "Session has been revoked.");
+  assert.equal(authErrorText(new Error("This account has been suspended. Contact support."), true), "Ce compte a été suspendu. Contactez le support.");
+  assert.equal(authErrorText(new Error("Current password is incorrect."), true), "Le mot de passe actuel est incorrect.");
+});

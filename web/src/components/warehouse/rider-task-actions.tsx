@@ -8,17 +8,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { errorMessage } from "@/lib/warehouse-live";
 import { formatCurrency } from "@/lib/utils";
 import type { RiderTask } from "@/lib/rider";
-
-export const FAIL_REASONS = [
-  { value: "Customer unavailable", fr: "Client indisponible" },
-  { value: "Customer not reachable", fr: "Client injoignable" },
-  { value: "Wrong address", fr: "Mauvaise adresse" },
-  { value: "Refused delivery", fr: "Livraison refusée" },
-  { value: "Payment issue", fr: "Problème de paiement" },
-  { value: "Seller not ready", fr: "Vendeur pas prêt" },
-  { value: "Parcel damaged or missing", fr: "Colis endommagé ou manquant" },
-  { value: "Other", fr: "Autre" },
-];
+import { FAIL_REASONS, canReportFailure, failedPayload, nextStep, stepPayload } from "@/lib/rider-actions";
 
 /** Run one rider action and report the real outcome. Resolves true only after the server acknowledged. */
 function useRun() {
@@ -167,12 +157,7 @@ export function FailedForm({ task, onDone }: { task: RiderTask; onDone: () => vo
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const text = `${reason}${notes.trim() ? `: ${notes.trim()}` : ""}`.slice(0, 200);
-    const ok = await run(
-      "failed",
-      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "failed", reason: text }),
-      fr ? "Échec enregistré" : "Failed attempt recorded",
-    );
+    const ok = await run("failed", () => socketClient.request("delivery:updateStatus", failedPayload(task.id, reason, notes)), fr ? "Échec enregistré" : "Failed attempt recorded");
     if (ok) onDone();
   }
 
@@ -220,10 +205,11 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
   const [panel, setPanel] = useState<"delivered" | "failed" | null>(null);
   const l = labels(task, fr);
 
-  if (task.status === "delivered" || task.status === "failed") return null;
+  const next = nextStep(task);
+  if (next === "none") return null;
 
   async function step(key: string, status: "picked_up" | "in_transit", success: string) {
-    const ok = await run(key, () => socketClient.request("delivery:updateStatus", { taskId: task.id, status }), success);
+    const ok = await run(key, () => socketClient.request("delivery:updateStatus", stepPayload(task.id, status)), success);
     if (ok) onChanged();
   }
 
@@ -231,19 +217,19 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
 
   return (
     <div className="space-y-3">
-      {task.status === "assigned" && (
+      {next === "picked_up" && (
         <button onClick={() => void step("picked_up", "picked_up", l.pickedToast)} disabled={busy !== null} className={primary}>
           <PackageCheck className="h-4 w-4" />
           {busy === "picked_up" ? "…" : l.picked}
         </button>
       )}
-      {task.status === "picked_up" && (
+      {next === "in_transit" && (
         <button onClick={() => void step("in_transit", "in_transit", l.goToast)} disabled={busy !== null} className={primary}>
           <Truck className="h-4 w-4" />
           {busy === "in_transit" ? "…" : l.go}
         </button>
       )}
-      {task.status === "in_transit" && task.hubBound && (
+      {next === "handover" && (
         <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
           <Warehouse className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
@@ -253,19 +239,19 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
           </p>
         </div>
       )}
-      {task.status === "in_transit" && !task.hubBound && panel !== "delivered" && (
+      {next === "deliver" && panel !== "delivered" && (
         <button onClick={() => setPanel("delivered")} className={primary}>
           <CheckCircle className="h-4 w-4" />
           {task.kind === "return_to_seller" ? (fr ? "Remis au vendeur" : "Handed to the seller") : fr ? "Livré" : "Delivered"}
         </button>
       )}
-      {panel === "delivered" && task.status === "in_transit" && !task.hubBound && (
+      {panel === "delivered" && next === "deliver" && (
         <div className="rounded-xl border border-emerald-200 p-4">
           <DeliveredForm task={task} onDone={onChanged} />
         </div>
       )}
 
-      {panel !== "failed" && (
+      {canReportFailure(task) && panel !== "failed" && (
         <button onClick={() => setPanel("failed")} className="w-full rounded-xl border border-red-200 py-2 text-center text-sm text-red-600 hover:bg-red-50">
           {fr ? "Impossible de terminer" : "Could not complete"}
         </button>

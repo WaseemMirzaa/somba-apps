@@ -21,7 +21,7 @@ import 'package:somba_rider/services/support_models.dart';
 import 'package:somba_rider/services/rider_store.dart';
 
 /// Texts that are the same word in both languages.
-const _sameInBothLanguages = {'notifications'};
+const _sameInBothLanguages = {'notifications', 'nav_google_maps'};
 
 Set<String> _placeholders(String text) => RegExp(r'\{(\w+)\}').allMatches(text).map((m) => m.group(1)!).toSet();
 

@@ -28,6 +28,11 @@ export interface RiderRun {
   inTransit: boolean;
   hop: number | null;
   hops: number | null;
+  /** When the run ended (closed, else all scanned in, else left, else made): the history's date filter. ISO strings; null when the payload has none. */
+  closedAt: string | null;
+  arrivedAt: string | null;
+  dispatchedAt: string | null;
+  createdAt: string | null;
 }
 
 /** What a run needs to know about a parcel (a rider task). */
@@ -68,6 +73,10 @@ export function parseRun(raw: unknown): RiderRun | null {
     inTransit: typeof j.inTransit === "boolean" ? j.inTransit : rawStatus === "in_transit" || text(j.inTransitAt) !== null,
     hop: typeof j.hop === "number" ? Math.trunc(j.hop) : null,
     hops: typeof j.hops === "number" ? Math.trunc(j.hops) : null,
+    closedAt: text(j.closedAt),
+    arrivedAt: text(j.arrivedAt),
+    dispatchedAt: text(j.dispatchedAt),
+    createdAt: text(j.createdAt),
   };
 }
 
