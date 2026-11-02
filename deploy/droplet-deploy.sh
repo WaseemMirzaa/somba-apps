@@ -33,6 +33,8 @@ REPO="${REPO:-https://github.com/waseemmirzaa/somba-apps.git}"
 ADMIN_NAME="${ADMIN_NAME:-Administrator}"
 APP_USER=somba
 APP_DIR=/opt/somba
+# Persistent data (uploads, KYC files): outside the project folder, never deleted by a deploy.
+DATA_DIR=/var/lib/somba
 CONF_DIR=/etc/somba
 SECRETS="$CONF_DIR/secrets.env"
 EXTRA="$CONF_DIR/api.extra.env"
@@ -118,8 +120,8 @@ PORT=3001
 CORS_ORIGINS=$BASE_URL
 WEB_URL=$BASE_URL
 PUBLIC_API_URL=$BASE_URL
-UPLOAD_DIR=$APP_DIR/uploads
-PRIVATE_UPLOAD_DIR=$APP_DIR/uploads-private
+UPLOAD_DIR=$DATA_DIR/uploads
+PRIVATE_UPLOAD_DIR=$DATA_DIR/uploads-private
 JWT_SECRET=$JWT_SECRET
 JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
 DATA_ENCRYPTION_KEY=$DATA_ENCRYPTION_KEY
@@ -133,9 +135,20 @@ DB_SYNCHRONIZE=false
 EOF
   cat "$EXTRA"
 } > "$APP_DIR/api/.env"
-mkdir -p "$APP_DIR/uploads"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads"
-# Store KYC documents live here, NOT in the public uploads folder (served only through the authenticated API).
-mkdir -p "$APP_DIR/uploads-private"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads-private"; chmod 700 "$APP_DIR/uploads-private"
+# Uploads live OUTSIDE the project folder ($DATA_DIR), so a redeploy, a git reset or a manual
+# removal of $APP_DIR can never delete customer photos or KYC documents.
+mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/uploads-private"
+# Files written by an older deploy inside the project folder are copied across, never moved or deleted.
+# Once you have checked them, remove the old folders yourself.
+for old in uploads uploads-private; do
+  if [[ -d "$APP_DIR/$old" && -n "$(ls -A "$APP_DIR/$old" 2>/dev/null)" ]]; then
+    cp -an "$APP_DIR/$old/." "$DATA_DIR/$old/"
+    echo "Copied old $APP_DIR/$old into $DATA_DIR/$old (originals kept)."
+  fi
+done
+chown -R "$APP_USER:$APP_USER" "$DATA_DIR"
+# Store KYC documents are served only through the authenticated API, never from a public folder.
+chmod 700 "$DATA_DIR/uploads-private"
 
 # NEXT_PUBLIC_* are baked into the web bundle at BUILD time.
 # Firebase web settings (incl. NEXT_PUBLIC_FIREBASE_VAPID_KEY, needed for web push) live in
@@ -185,7 +198,7 @@ nginx -t && systemctl reload nginx
 # ── 9b. Nightly backups + automatic security updates ────────────────────────
 log "Backups (daily 03:15, 14 days kept) and unattended security updates"
 install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/bin/somba-backup
-printf 'UPLOAD_DIR=%s/uploads\nPRIVATE_UPLOAD_DIR=%s/uploads-private\n15 3 * * * root /usr/local/bin/somba-backup >> /var/log/somba-backup.log 2>&1\n' "$APP_DIR" "$APP_DIR" > /etc/cron.d/somba-backup
+printf 'UPLOAD_DIR=%s/uploads\nPRIVATE_UPLOAD_DIR=%s/uploads-private\n15 3 * * * root /usr/local/bin/somba-backup >> /var/log/somba-backup.log 2>&1\n' "$DATA_DIR" "$DATA_DIR" > /etc/cron.d/somba-backup
 chmod 644 /etc/cron.d/somba-backup
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 /usr/local/bin/somba-backup >/dev/null 2>&1 || printf '\033[1;33m⚠ first backup failed — run somba-backup by hand to see why\033[0m\n'
