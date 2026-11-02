@@ -44,6 +44,8 @@ abstract class CardPayments {
 class StripeCardPayments implements CardPayments {
   @override
   Future<CardSheetResult> present({required String publishableKey, required String clientSecret, required String merchantName}) async {
+    // Only a publishable key may reach the phone: refuse anything else (a secret key sent by a misconfigured server).
+    if (!RegExp(r'^pk_(test|live)_[A-Za-z0-9]{10,}$').hasMatch(publishableKey)) return const CardSheetResult.failed();
     try {
       // Set at RUNTIME from the server's answer; rotating the key needs no app release.
       Stripe.publishableKey = publishableKey;
