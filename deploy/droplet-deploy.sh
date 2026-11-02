@@ -138,12 +138,19 @@ mkdir -p "$APP_DIR/uploads"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads"
 mkdir -p "$APP_DIR/uploads-private"; chown "$APP_USER:$APP_USER" "$APP_DIR/uploads-private"; chmod 700 "$APP_DIR/uploads-private"
 
 # NEXT_PUBLIC_* are baked into the web bundle at BUILD time.
-cat > "$APP_DIR/web/.env.local" <<EOF
+# Firebase web settings (incl. NEXT_PUBLIC_FIREBASE_VAPID_KEY, needed for web push) live in
+# $WEB_EXTRA, root-only, so they survive redeploys. Only NEXT_PUBLIC_FIREBASE_* lines are copied.
+WEB_EXTRA="$CONF_DIR/web.env"
+{
+  cat <<EOF
 NEXT_PUBLIC_API_URL=$BASE_URL
 NEXT_PUBLIC_SOCKET_URL=$BASE_URL
 NEXT_PUBLIC_DEMO_MODE=false
 EOF
+  if [[ -f "$WEB_EXTRA" ]]; then grep -E '^NEXT_PUBLIC_FIREBASE_[A-Z_]+=[^"[:space:]]*$' "$WEB_EXTRA" || true; fi
+} > "$APP_DIR/web/.env.local"
 chown "$APP_USER:$APP_USER" "$APP_DIR/web/.env.local"
+chmod 600 "$APP_DIR/web/.env.local"
 
 # ── 6. Build ─────────────────────────────────────────────────────────────────
 log "Building API"
