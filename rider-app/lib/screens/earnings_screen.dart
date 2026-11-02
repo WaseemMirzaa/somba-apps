@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../l10n/strings.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
@@ -74,13 +75,36 @@ class EarningsScreen extends StatelessWidget {
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(s.usd(e.codCollectedUsd), key: const ValueKey('cod-total'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
-                        Text(s.cashCollected, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        Text(s.usd(store.cash.heldUsd), key: const ValueKey('cod-total'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
+                        Text(s.cashInHand, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                        Text(s.cashInHandSub(s.usd(store.cash.collectedUsd), s.usd(store.cash.handedOverUsd)), key: const ValueKey('cash-sub'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       ]),
                     ),
                   ]),
                 ),
                 const SizedBox(height: 12),
+                if (store.cash.handovers.isNotEmpty) ...[
+                  SurfaceCard(
+                    key: const ValueKey('cash-handovers'),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(s.cashHandovers, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                      const SizedBox(height: 8),
+                      for (final h in store.cash.handovers)
+                        Padding(
+                          key: ValueKey('cash-handover-${h.id}'),
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(s.cashHandoverLine(s.usd(h.amountUsd), h.receivedByName), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                            Text(
+                              [if (h.at != null) DateFormat.yMMMd(s.lang).add_Hm().format(h.at!), s.cashHandoverLeft(s.usd(h.heldAfterUsd))].join(' · '),
+                              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+                            ),
+                          ]),
+                        ),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 SurfaceCard(
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Icon(Icons.info_outline_rounded, color: AppColors.muted, size: 20),

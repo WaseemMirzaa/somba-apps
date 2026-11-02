@@ -134,6 +134,24 @@ export class DeliveryTask {
   @Column({ type: 'float', default: 0 })
   codAmountUsd: number;
 
+  /**
+   * The cash record of a COD delivery (C-cod): what the rider confirmed they collected (always equal to the amount due,
+   * a different figure is refused), when, and by whom. All null when no cash was due or the task predates the record.
+   */
+  @Column({ type: 'double', nullable: true })
+  codCollectedUsd: number | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  codCollectedAt: Date | null;
+
+  /** The user who took the cash: the rider, or the admin who closed the delivery by hand. */
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  codCollectedById: string | null;
+
+  /** How much of `codCollectedUsd` has been handed over at the warehouse so far (0 .. codCollectedUsd). */
+  @Column({ type: 'double', default: 0 })
+  codHandedOverUsd: number;
+
   /** Live rider position, updated over the socket. */
   @Column({ type: 'float', nullable: true })
   lat: number | null;

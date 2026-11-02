@@ -6,6 +6,7 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errorMessage } from "@/lib/warehouse-live";
+import { parseCashAmount } from "@/lib/cash-amount";
 import { formatCurrency } from "@/lib/utils";
 import type { RiderTask } from "@/lib/rider";
 
@@ -85,7 +86,8 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
   const fr = locale === "fr";
   const { busy, error, setError, run } = useRun();
   const [code, setCode] = useState("");
-  const [cash, setCash] = useState(false);
+  // Cash on delivery: the amount taken at the door, which starts at the amount due. The server refuses any other amount.
+  const [cash, setCash] = useState(() => (task.codAmount > 0 ? task.codAmount.toFixed(2) : ""));
   const cod = task.codAmount > 0;
   // The API flags every customer delivery `needsCode`; the code is only enforced when the platform setting is on.
   const [requireCode, setRequireCode] = useState(false);
@@ -107,13 +109,14 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
       setError(fr ? "Demandez le code à 4 chiffres au client." : "Ask the customer for their 4-digit code.");
       return;
     }
-    if (cod && !cash) {
-      setError(fr ? "Confirmez d'abord l'encaissement des espèces." : "Confirm the cash was collected first.");
+    const cashUsd = parseCashAmount(cash);
+    if (cod && cashUsd === null) {
+      setError(fr ? "Saisissez le montant encaissé, par exemple 25,50." : "Enter the amount you collected, for example 25.50.");
       return;
     }
     const ok = await run(
       "delivered",
-      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "delivered", ...(needsCode ? { code: code.trim() } : {}) }),
+      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "delivered", ...(needsCode ? { code: code.trim() } : {}), ...(cod ? { cashUsd } : {}) }),
       fr ? "Livraison confirmée" : "Delivery confirmed",
     );
     if (ok) onDone();
@@ -137,11 +140,21 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
         </label>
       )}
       {cod && (
-        <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          <input type="checkbox" className="mt-1" checked={cash} onChange={(e) => setCash(e.target.checked)} />
+        <label className="block rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <span>
             {fr ? "Espèces encaissées ?" : "Cash collected?"} <strong>{formatCurrency(task.codAmount, locale)}</strong>{" "}
-            {fr ? "ont été reçus du client." : "was received from the customer."}
+            {fr ? "sont à recevoir du client." : "is due from the customer."}
+          </span>
+          <span className="mt-2 block text-xs font-medium">{fr ? "Montant encaissé (USD)" : "Cash you collected (USD)"}</span>
+          <input
+            inputMode="decimal"
+            aria-label={fr ? "Montant encaissé (USD)" : "Cash you collected (USD)"}
+            className="input-premium mt-1 w-full px-4 py-3 text-lg font-semibold"
+            value={cash}
+            onChange={(e) => setCash(e.target.value.replace(/[^0-9.,]/g, ""))}
+          />
+          <span className="mt-1 block text-[11px] text-amber-800">
+            {fr ? "Le serveur enregistre ce montant et refuse tout autre montant que celui dû." : "The server records this amount and refuses any amount other than the one due."}
           </span>
         </label>
       )}

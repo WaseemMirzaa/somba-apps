@@ -117,6 +117,13 @@ extension StringsKeys on Strings {
   String get inProgress => t('in_progress');
   String get cashCollected => t('cash_collected');
   String get cashNote => t('cash_note');
+  String get cashAmountLabel => t('cash_amount_label');
+  String get cashAmountErr => t('cash_amount_err');
+  String get cashInHand => t('cash_in_hand');
+  String cashInHandSub(Object? collected, Object? handed) => t('cash_in_hand_sub', {'collected': collected, 'handed': handed});
+  String get cashHandovers => t('cash_handovers');
+  String cashHandoverLine(Object? amount, Object? name) => t('cash_handover_line', {'amount': amount, 'name': name});
+  String cashHandoverLeft(Object? amount) => t('cash_handover_left', {'amount': amount});
   String get notifications => t('notifications');
   String notificationsNew(Object? n) => t('notifications_new', {'n': n});
   String get notificationsNone => t('notifications_none');

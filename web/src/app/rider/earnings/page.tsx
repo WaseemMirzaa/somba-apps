@@ -7,13 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { useLocale } from "@/context/locale-context";
 import { LEG_KIND, pickL } from "@/lib/logistics";
-import { useRiderData } from "@/lib/rider";
+import { useRiderCash, useRiderData } from "@/lib/rider";
 import { formatCurrency } from "@/lib/utils";
 
 export default function RiderEarningsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { earnings, mine, loading, error } = useRiderData();
+  const { cash } = useRiderCash();
   const delivered = mine.filter((x) => x.status === "delivered");
   // The server pays a flat amount per completed task of any kind (delivery, pickup, transfer...); show the rate it computed.
   const rate = earnings && earnings.delivered > 0 ? earnings.earningsUsd / earnings.delivered : null;
@@ -30,7 +31,7 @@ export default function RiderEarningsPage() {
           <div className="grid grid-cols-2 gap-3">
             <StatCard title={fr ? "Gains" : "Earnings"} value={formatCurrency(earnings.earningsUsd, locale)} icon={DollarSign} />
             <StatCard title={fr ? "Tâches terminées" : "Tasks done"} value={earnings.delivered} icon={CheckCircle} />
-            <StatCard title={fr ? "COD encaissé" : "COD collected"} value={formatCurrency(earnings.codCollectedUsd, locale)} icon={Banknote} />
+            <StatCard title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />
             <StatCard title={fr ? "En cours" : "Active"} value={earnings.active} icon={Package} />
           </div>
           <p className="text-xs text-slate-500">
@@ -38,9 +39,36 @@ export default function RiderEarningsPage() {
               ? (fr ? `Tarif actuel : ${formatCurrency(rate, locale)} par tâche terminée (livraisons, collectes et transferts). ` : `Current rate: ${formatCurrency(rate, locale)} per completed task (deliveries, pickups and transfers). `)
               : ""}
             {fr
-              ? "Les espèces COD encaissées doivent être remises à l'entrepôt."
-              : "Cash collected on COD orders must be handed over at the warehouse."}
+              ? "Remettez les espèces COD encaissées à votre entrepôt : un superviseur enregistre la remise et votre solde diminue d'autant."
+              : "Hand the COD cash you collected to your warehouse: a supervisor records the hand-over and your balance goes down by that amount."}
           </p>
+          {cash && (
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="mb-1 font-semibold text-slate-900">{fr ? "Espèces COD" : "COD cash"}</h2>
+                <p data-testid="cash-summary" className="mb-3 text-xs text-slate-500">
+                  {fr
+                    ? `Encaissé ${formatCurrency(cash.collectedUsd, locale)} · remis ${formatCurrency(cash.handedOverUsd, locale)} · reste ${formatCurrency(cash.heldUsd, locale)}`
+                    : `Collected ${formatCurrency(cash.collectedUsd, locale)} · handed in ${formatCurrency(cash.handedOverUsd, locale)} · still held ${formatCurrency(cash.heldUsd, locale)}`}
+                </p>
+                {cash.handovers.length === 0 ? (
+                  <p className="text-sm text-slate-500">{fr ? "Aucune remise enregistrée pour l'instant." : "No hand-over recorded yet."}</p>
+                ) : (
+                  <ul className="divide-y divide-[var(--border)] text-sm">
+                    {cash.handovers.map((h) => (
+                      <li key={h.id} className="py-2">
+                        <span className="font-semibold text-emerald-700">{formatCurrency(h.amountUsd, locale)}</span>{" "}
+                        {fr ? `reçus par ${h.receivedByName}` : `received by ${h.receivedByName}`}
+                        <span className="block text-xs text-slate-500">
+                          {new Date(h.createdAt).toLocaleString(locale)} · {fr ? `reste ${formatCurrency(h.heldAfterUsd, locale)}` : `${formatCurrency(h.heldAfterUsd, locale)} left to hand over`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {earnings.byKind && earnings.byKind.length > 0 && (
             <Card>
               <CardContent className="p-4">

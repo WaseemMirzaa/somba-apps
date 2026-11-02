@@ -29,6 +29,7 @@
     "smoke:account": "node test/account-smoke.cjs",
     "smoke:authz": "node test/authz-smoke.cjs",
     "smoke:flows": "node test/flows-smoke.cjs",
+    "smoke:cod": "node test/cod-cash-smoke.cjs",
     "smoke:race": "node test/race-smoke.cjs",
     "smoke:coverage": "node test/coverage-smoke.cjs",
     "smoke:routing": "node test/warehouse-routing-smoke.cjs",

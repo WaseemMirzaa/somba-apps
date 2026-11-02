@@ -507,9 +507,13 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(await orderStatus(order.id)).toBe('out_for_delivery');
       await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, '0000')).rejects.toThrow(/Wrong delivery code/);
       const code = (await logistics.proofCodeOf(d.id)) as string;
-      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code);
+      // cash on delivery: the rider must confirm the exact amount due, and the server records it
+      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code)).rejects.toThrow(/Confirm the cash you collected/);
+      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, 1)).rejects.toThrow(/not the amount to collect/);
+      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, d.codAmountUsd);
       expect(await orderStatus(order.id)).toBe('delivered');
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id);
+      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: d.codAmountUsd, byId: riderG.id, source: 'rider' }));
+      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: d.id })).toMatchObject({ codCollectedUsd: d.codAmountUsd, codCollectedById: riderG.id });
     });
 
     it('needsCode on the delivery leg follows the requireDeliveryCode setting; other legs never need it', async () => {

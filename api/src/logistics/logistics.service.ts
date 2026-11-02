@@ -99,6 +99,10 @@ export interface TaskView {
   exchangeId: string | null;
   attempts: number;
   codAmountUsd: number;
+  /** The cash record (C-cod): what the rider confirmed taking, when, and how much of it the warehouse has received. Null before any. */
+  codCollectedUsd: number | null;
+  codCollectedAt: Date | null;
+  codHandedOverUsd: number;
   address: string | null;
   pickupAddress: string | null;
   lat: number | null;
@@ -357,6 +361,9 @@ export class LogisticsService {
         exchangeId: t.exchangeId ?? null,
         attempts: t.attempts,
         codAmountUsd: t.codAmountUsd,
+        codCollectedUsd: t.codCollectedUsd ?? null,
+        codCollectedAt: t.codCollectedAt ?? null,
+        codHandedOverUsd: t.codHandedOverUsd ?? 0,
         address: t.address,
         pickupAddress: t.pickupAddress,
         lat: t.lat,
@@ -383,7 +390,7 @@ export class LogisticsService {
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
-        return { ...base, address: null, codAmountUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
+        return { ...base, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
       }
       return base;
     });

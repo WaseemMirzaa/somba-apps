@@ -642,7 +642,7 @@ export class RealtimeGateway
       if (!this.can(user.role, 'orderOps')) return fail('Not allowed.');
       // Cancelling must restock and refund — route it through the real flow.
       if (body?.status === 'cancelled') return ok(await this.orders.cancel(user, body.orderId));
-      const order = await this.orders.updateStatus(String(body?.orderId ?? ''), body?.status);
+      const order = await this.orders.updateStatus(String(body?.orderId ?? ''), body?.status, { id: user.id, name: user.name, role: user.role });
       await this.audit.record({ actor: user.name, role: user.role, action: 'order.status', entity: 'order', entityId: order.id, detail: `${order.reference} -> ${order.status}` });
       return ok(order);
     } catch (e) {
@@ -722,7 +722,7 @@ export class RealtimeGateway
   @SubscribeMessage('delivery:updateStatus')
   async deliveryUpdateStatus(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string; code?: string },
+    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string; code?: string; cashUsd?: number },
   ) {
     try {
       const user = this.requireUser(client);
@@ -730,7 +730,7 @@ export class RealtimeGateway
       if (!(['picked_up', 'in_transit', 'delivered', 'failed'] as string[]).includes(body?.status)) {
         return fail('Invalid delivery status.');
       }
-      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code));
+      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code, body.cashUsd));
     } catch (e) {
       return fail((e as Error).message);
     }

@@ -306,6 +306,12 @@ export default function AdminOrderDetailPage() {
             { label: fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
             { label: fr ? "Livreur assigné" : "Rider assigned", value: live.riderId ? (fr ? "Oui" : "Yes") : "—" },
             { label: fr ? "COD à encaisser" : "COD to collect", value: task && task.codAmountUsd > 0 ? formatCurrency(task.codAmountUsd, locale) : "—" },
+            ...(task?.codCollectedAt
+              ? [{
+                  label: fr ? "Espèces encaissées" : "Cash collected",
+                  value: `${formatCurrency(task.codCollectedUsd ?? 0, locale)} · ${new Date(task.codCollectedAt).toLocaleString(locale)} · ${fr ? "remis à l'entrepôt" : "handed in"} ${formatCurrency(task.codHandedOverUsd ?? 0, locale)}`,
+                }]
+              : []),
           ]} />
         </DetailGridSection>
 

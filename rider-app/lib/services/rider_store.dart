@@ -34,6 +34,9 @@ class RiderStore extends ChangeNotifier {
   final List<NotificationDto> notifications = [];
   EarningsDto earnings = const EarningsDto();
 
+  /// Cash in hand: collected on cash-on-delivery orders and not yet handed in at the warehouse.
+  CashDto cash = const CashDto();
+
   /// Public setting: when true the customer's 4-digit code is needed to deliver.
   bool requireDeliveryCode = false;
 
@@ -155,6 +158,7 @@ class RiderStore extends ChangeNotifier {
     notifications.clear();
     SupportStore.instance.clear();
     earnings = const EarningsDto();
+    cash = const CashDto();
     requireDeliveryCode = false;
     assignment = null;
     focus.value = null;
@@ -280,6 +284,8 @@ class RiderStore extends ChangeNotifier {
       applyRunPush(d);
       _pushRefresh();
     });
+    // The warehouse recorded a hand-over of this rider's cash: read the new balance and receipts.
+    _socket.on('cash:updated', (_) => unawaited(_readCash().then((_) => notifyListeners())));
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
     _socket.on('notification:new', (d) {
       notifications.insert(0, NotificationDto.fromJson(_map(d)));
@@ -425,6 +431,7 @@ class RiderStore extends ChangeNotifier {
         ..clear()
         ..addAll(rows.where((t) => t.status != 'unassigned')); // an older server may still list its open pool: not ours
       earnings = EarningsDto.fromJson(_map(await request('rider:earnings')));
+      await _readCash();
       unawaited(_readRuns());
       if (full) {
         notifications
@@ -486,13 +493,22 @@ class RiderStore extends ChangeNotifier {
     } catch (_) {/* keep the last known value */}
   }
 
-  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.
-  Future<void> advance(String taskId, String status, {String? reason, String? code}) async {
+  /// The rider's cash in hand. An older server without it leaves the last known value.
+  Future<void> _readCash() async {
+    try {
+      cash = CashDto.fromJson(_map(await request('cash:mine')));
+    } catch (_) {/* keep the last known value */}
+  }
+
+  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`; [cashUsd] is the cash the
+  /// rider took on a cash-on-delivery `delivered` (the server records it and refuses any amount but the one due).
+  Future<void> advance(String taskId, String status, {String? reason, String? code, double? cashUsd}) async {
     await request('delivery:updateStatus', {
       'taskId': taskId,
       'status': status,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+      if (cashUsd != null) 'cashUsd': cashUsd,
     });
     await refresh(light: true);
   }

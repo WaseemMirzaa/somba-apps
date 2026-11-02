@@ -11,7 +11,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { EntityManager, In, LessThan, Repository } from 'typeorm';
-import { DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
+import { AuditLog, DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
 import type { RefundKind } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
 import {
@@ -80,6 +80,18 @@ export const CARD_MERCHANT_NAME = 'Somba & Teka';
 const STRIPE_REFUND_ID = /^re_/;
 /** Stripe forgets an idempotency key after 24 hours: an unanswered refund is only retried with its key well inside that. */
 const REFUND_REPLAY_WINDOW_MS = 20 * 3_600_000;
+
+/** The cash record of a COD delivery, as the payment's audit line reports it. */
+export interface CodReceipt {
+  amountUsd: number;
+  byId: string;
+  byName: string;
+  byRole: string;
+  at: Date;
+  taskId: string;
+  /** `rider`: the rider confirmed the cash at the door; `admin_close`: an admin closed the delivery by hand. */
+  source: 'rider' | 'admin_close';
+}
 
 /** Called when pawaPay reports on a seller payout (set by PayoutsService, which owns payouts). */
 export type PayoutCallbackHandler = (payoutId: string) => Promise<void>;
@@ -938,12 +950,30 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.payments.findOne({ where: { orderId }, order: { createdAt: 'DESC' } });
   }
 
-  /** COD collected when the parcel is delivered. */
-  async markCollected(orderId: string): Promise<void> {
+  /**
+   * COD collected when the parcel is delivered. `receipt` is the cash record the delivery wrote (how much, who took it,
+   * when): it goes into the audit trail on the payment, so finance sees the amount and the person where the payment turns
+   * "succeeded". Only the call that actually flips the payment writes it, so a repeated call records nothing twice.
+   */
+  async markCollected(orderId: string, receipt?: CodReceipt): Promise<void> {
     const payment = await this.payments.findOne({ where: { orderId } });
     if (!payment || payment.status !== 'pending' || payment.method !== 'cod') return;
+    const claim = await this.payments
+      .createQueryBuilder()
+      .update(Payment)
+      .set({ status: 'succeeded' })
+      .where("id = :id AND status = 'pending'", { id: payment.id })
+      .execute();
+    if (!claim.affected) return; // another request collected it a moment ago
     payment.status = 'succeeded';
-    this.publish(await this.payments.save(payment));
+    if (receipt) {
+      const detail = `${payment.orderReference ?? payment.reference}: ${receipt.amountUsd.toFixed(2)} USD cash collected by ${receipt.byName} (${receipt.byRole}) on ${receipt.at.toISOString()}${receipt.source === 'admin_close' ? ' - delivery closed by hand' : ''}; due ${payment.amountUsd.toFixed(2)} USD; task ${receipt.taskId}`;
+      const log = await this.payments.manager.getRepository(AuditLog).save(
+        this.payments.manager.getRepository(AuditLog).create({ actor: receipt.byName, role: receipt.byRole, action: 'payment.cod_collected', entity: 'payment', entityId: payment.id, detail }),
+      );
+      this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log);
+    }
+    this.publish((await this.payments.findOne({ where: { id: payment.id } })) ?? payment);
   }
 
   /**

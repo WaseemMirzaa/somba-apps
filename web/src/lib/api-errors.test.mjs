@@ -106,3 +106,15 @@ test("staff:setActive errors map to French", () => {
   assert.equal(fr("Active must be true or false."), "« Active » doit être vrai ou faux.");
   assert.equal(localizeApiError("Super admin only.", "en"), "Super admin only.");
 });
+
+test("the cash-on-delivery sentences are French (C-cod)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.match(fr("Only supervisors and managers can record a rider's cash hand-over."), /superviseurs et les responsables/);
+  assert.equal(fr("Rider One holds $40.00: you cannot record $40.01."), "Rider One détient 40.00 $ : vous ne pouvez pas enregistrer 40.01 $.");
+  assert.equal(fr("Rider One holds no cash to hand in."), "Rider One ne détient aucune espèce à remettre.");
+  assert.match(fr("The cash you entered ($35.00) is not the amount to collect ($40.00). Collect exactly $40.00, or ask the warehouse if the amount changed."), /ne correspondent pas au montant à encaisser \(40\.00 \$\)/);
+  assert.match(fr("Confirm the cash you collected: $40.00 is due on this delivery."), /Confirmez les espèces/);
+  assert.match(fr("This delivery is already complete with $40.00 collected."), /déjà terminée/);
+  const m = "The cash you entered ($35.00) is not the amount to collect ($40.00). Collect exactly $40.00, or ask the warehouse if the amount changed.";
+  assert.equal(localizeApiError(m, "en"), m);
+});
