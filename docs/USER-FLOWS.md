@@ -628,7 +628,7 @@ flowchart TD
   Already -- no --> T{Tab / choice}
   T -- "Email + password" --> P["POST /auth/login"] --> R{Role}
   T -- "Continue as guest" --> G(["/ (shop as visitor)"])
-  T -- "Demo role picker<br/>(only when NEXT_PUBLIC_DEMO_MODE ≠ false)" --> D[Pick Seller / Admin / Warehouse persona] --> B["Bridge signs into the matching seeded account"] --> R
+  T -- "Demo role picker<br/>(only when NEXT_PUBLIC_DEMO_MODE=true)" --> D[Pick Seller / Admin / Warehouse persona] --> B["Bridge signs into the matching seeded account"] --> R
   R -- customer --> C(["/shop/account"])
   R -- seller --> S(["/seller"])
   R -- admin --> A(["/admin"])
@@ -757,7 +757,7 @@ flowchart TD
 | 4 | Home page, header search suggestions, store pages and product reviews use demo ids, so their links show "not found" for real products |
 | 5 | Header bell count is demo data; there is no sign-out in the shop header |
 | 6 | Legal pages for returns, seller and shipping are linked but missing |
-| 7 | The demo role picker is on unless `NEXT_PUBLIC_DEMO_MODE=false` |
+| 7 | The demo role picker is off unless `NEXT_PUBLIC_DEMO_MODE=true` |
 
 
 ---

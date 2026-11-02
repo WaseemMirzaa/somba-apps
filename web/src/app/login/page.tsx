@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { FullPageLoader } from "@/components/ui/loader";
 import { getHomeForRole } from "@/lib/portal-access";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import type { UserRole } from "@/lib/portal-access";
 
 const ROLE_GROUPS = [
@@ -26,8 +27,7 @@ const ROLE_GROUPS = [
   { label: "Rider", labelFr: "Livreur", roles: ["rider"] as UserRole[] },
 ];
 
-// The one-click role picker is a development convenience; production builds set this to "false".
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+// The one-click role picker is a development convenience: DEMO_MODE is off unless the build opts in (see lib/demo-mode).
 
 export default function LoginPage() {
   const { login, signInReal, isAuthenticated, authReady, persona, personas } = useAuth();

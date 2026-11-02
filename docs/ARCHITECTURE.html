@@ -5966,7 +5966,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 </tbody></table></div>
 <p>&quot;Live&quot; means at least one live hook is used in the page&#39;s tree; several live pages still mix in demo widgets (charts, KPI tiles). For most demo pages the backend handler already exists — the work is wiring (section 11).</p>
-<p>The <strong>demo persona picker</strong> on <code>/login</code> is shown unless <code>NEXT_PUBLIC_DEMO_MODE=false</code> — it must be off in production.</p>
+<p>The <strong>demo persona picker</strong> on <code>/login</code> is shown only when the web build sets <code>NEXT_PUBLIC_DEMO_MODE=true</code> (off by default, so a forgotten variable cannot expose it).</p>
 <h3 id="84-shared-package-shared"><a class="anchor" href="#84-shared-package-shared" aria-hidden="true">#</a>8.4 Shared package (<code>shared/</code>)</h3>
 <p><code>types/index.ts</code> (shared TypeScript types), <code>mock/entities.ts</code>, <code>screens/registry.ts</code> (screen catalogue used by the screenshot site), <code>market-profiles.ts</code> (currency / market presets). It is <strong>not</strong> consumed by the API; API and clients define their own DTOs ⚠ (recommend generating client types from the API).</p>
 <h2 id="9-configuration-environments-cicd-and-testing"><a class="anchor" href="#9-configuration-environments-cicd-and-testing" aria-hidden="true">#</a>9. Configuration, environments, CI/CD and testing</h2>
@@ -6656,7 +6656,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>U2</td>
 <td>Demo login on the web</td>
-<td>Ensure <code>NEXT_PUBLIC_DEMO_MODE=false</code> in production</td>
+<td>Fixed: off unless <code>NEXT_PUBLIC_DEMO_MODE=true</code> is baked into the build</td>
 <td>P0</td>
 </tr>
 <tr>
@@ -6890,7 +6890,7 @@ main li { margin-block: 0.2rem; }
 <li><strong>Proof of delivery</strong> (customer OTP) in the rider app and API.</li>
 <li><strong>Money as DECIMAL</strong> migration; <strong>login lockout</strong>; <strong>backups</strong>, <strong>monitoring/Sentry</strong>, <strong>staging</strong>.</li>
 <li><strong>Email + SMS providers</strong> configured (verification, reset, order confirmations).</li>
-<li><strong>First real droplet deployment</strong> with the script, smoke tests from the test plan, device testing of both apps, <code>NEXT_PUBLIC_DEMO_MODE=false</code>.</li>
+<li><strong>First real droplet deployment</strong> with the script, smoke tests from the test plan, device testing of both apps, <code>NEXT_PUBLIC_DEMO_MODE=false</code> (now the default).</li>
 </ol>
 <h3 id="112-phase-1--professional-parity--610-weeks"><a class="anchor" href="#112-phase-1--professional-parity--610-weeks" aria-hidden="true">#</a>11.2 Phase 1 — professional parity (≈ 6–10 weeks)</h3>
 <ol>

@@ -2149,7 +2149,7 @@ Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, ba
 
 "Live" means at least one live hook is used in the page's tree; several live pages still mix in demo widgets (charts, KPI tiles). For most demo pages the backend handler already exists — the work is wiring (section 11).
 
-The **demo persona picker** on `/login` is shown unless `NEXT_PUBLIC_DEMO_MODE=false` — it must be off in production.
+The **demo persona picker** on `/login` is shown only when the web build sets `NEXT_PUBLIC_DEMO_MODE=true` (off by default, so a forgotten variable cannot expose it).
 
 ### 8.4 Shared package (`shared/`)
 
@@ -2328,7 +2328,7 @@ Priority: **P0** = blocks a real launch with real money · **P1** = expected by 
 | # | Gap | Recommendation | Pri |
 |---|---|---|---|
 | U1 | ~74 web pages on demo data | Wire them to the existing handlers (section 8.3) — mostly wiring, few new endpoints | P1 |
-| U2 | Demo login on the web | Ensure `NEXT_PUBLIC_DEMO_MODE=false` in production | P0 |
+| U2 | Demo login on the web | Fixed: off unless `NEXT_PUBLIC_DEMO_MODE=true` is baked into the build | done |
 | U3 | Apps not tested on devices | Android device/emulator pass, iOS project setup and TestFlight, store listings, permissions copy | P0 |
 | U4 | Rider background GPS | Foreground service with persistent notification; handle Android 14 restrictions and battery optimisation | P1 |
 | U5 | Offline tolerance | Cache last catalogue/orders, queue rider status updates when offline and replay | P2 |
