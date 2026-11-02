@@ -5,7 +5,7 @@ import { Order, OrderItem, Payment } from '../database/entities';
 import type { PaymentRefund } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayUnavailableError } from '../payments/pawapay.provider';
-import { PaymentsService } from '../payments/payments.service';
+import { CardRefundRefusedError, PaymentsService } from '../payments/payments.service';
 import { NOTHING_LEFT_TO_REFUND, recordRefund, refundTooMuch, refundableUsd, revertRefund } from '../payments/refund-ledger';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
@@ -16,7 +16,7 @@ const cents = (n: number) => Number(n.toFixed(2));
 export interface PartialRefundInput {
   orderId: string;
   amountUsd: number;
-  /** false: back to the paying phone (pawaPay); falls back to the wallet when the payment cannot go back to a phone. */
+  /** false: back to the method that paid (the phone through pawaPay, the card through Stripe); falls back to the wallet when the payment cannot go back. */
   toWallet: boolean;
   /** Wallet history line, English (localize.ts has the French). */
   memo: string;
@@ -29,7 +29,7 @@ export interface PartialRefundInput {
 export interface PartialRefundResult {
   refundedUsd: number;
   /** Where the money really went. */
-  to: 'wallet' | 'phone';
+  to: 'wallet' | 'phone' | 'card';
   payment: Payment;
   /** The ledger row this refund wrote. */
   refund: PaymentRefund;
@@ -85,8 +85,10 @@ export class PartialRefundService {
     const left = refundableUsd(payment, order.items);
     if (left < 0.01) throw new BadRequestException(NOTHING_LEFT_TO_REFUND);
     if (amount > left + 0.009) throw new BadRequestException(refundTooMuch(left));
-    const toPhone = input.toWallet === false && this.paymentsSvc.canRefundToPhone(payment) && !payment.refundRef;
-    const refundRef = toPhone ? this.pawapay!.newId() : null;
+    // Back to the original method only while no other phone/card refund of this payment has been sent; otherwise (or when the
+    // payment cannot go back where it came from) the money goes to the wallet, explicitly.
+    const original = input.toWallet === false && !payment.refundRef ? this.paymentsSvc.refundToOriginal(payment) : null;
+    const refundRef = original === 'phone' ? this.pawapay!.newId() : original === 'card' ? PaymentsService.newCardRefundRef() : null;
     const spread = this.attribute(order, amount, input.lines);
 
     // Of two refunds racing for the same money, the payment row serialises them: the second is refused with what is left.
@@ -94,7 +96,7 @@ export class PartialRefundService {
       const { entry: recorded } = await recordRefund(m, {
         payment,
         amountUsd: amount,
-        to: toPhone ? 'phone' : 'wallet',
+        to: original ?? 'wallet',
         kind: input.source?.kind ?? 'dispute',
         memo: input.memo,
         refundRef,
@@ -104,22 +106,29 @@ export class PartialRefundService {
       for (const [id, usd] of spread) {
         await m.createQueryBuilder().update(OrderItem).set({ refundedUsd: () => `ROUND(refundedUsd + ${usd}, 2)` }).where('id = :id', { id }).execute();
       }
-      if (!toPhone) await this.wallet.apply(payment.userId, 'refund', amount, input.memo, m);
+      if (!original) await this.wallet.apply(payment.userId, 'refund', amount, input.memo, m);
       return recorded;
     });
 
-    if (toPhone) {
+    if (original === 'card') {
+      try {
+        const stripeId = await this.paymentsSvc.sendCardRefund(payment, amount, refundRef!);
+        if (stripeId) entry.refundRef = stripeId;
+      } catch (e) {
+        if (!(e instanceof CardRefundRefusedError)) throw e;
+        // Stripe said no: undo, so the money can go to the wallet instead.
+        await this.undoOriginalRefund(entry, spread);
+        this.logger.warn(`Stripe refused ${refundRef}: ${e.message}; refunding to the wallet`);
+        return this.refund({ ...input, toWallet: true });
+      }
+    }
+    if (original === 'phone') {
       try {
         await this.pawapay!.refund({ refundId: refundRef!, depositId: payment.providerRef!, amountUsd: amount, reference: payment.reference });
       } catch (e) {
         if (!(e instanceof PawapayUnavailableError)) {
           // pawaPay said no: undo, so the money can go to the wallet instead.
-          await this.payments.manager.transaction(async (m) => {
-            await revertRefund(m, entry);
-            for (const [id, usd] of spread) {
-              await m.createQueryBuilder().update(OrderItem).set({ refundedUsd: () => `ROUND(refundedUsd - ${usd}, 2)` }).where('id = :id', { id }).execute();
-            }
-          });
+          await this.undoOriginalRefund(entry, spread);
           this.logger.warn(`pawaPay refused ${refundRef}: ${(e as Error).message}; refunding to the wallet`);
           return this.refund({ ...input, toWallet: true });
         }
@@ -129,7 +138,12 @@ export class PartialRefundService {
     }
 
     const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
-    const view = { ...saved, phone: saved.phone ? `${saved.phone.slice(0, 4)}…${saved.phone.slice(-2)}` : null, refundableUsd: refundableUsd(saved) };
+    const view = {
+      ...saved,
+      phone: saved.phone ? `${saved.phone.slice(0, 4)}…${saved.phone.slice(-2)}` : null,
+      refundableUsd: refundableUsd(saved),
+      refundToOriginal: this.paymentsSvc.refundToOriginal(saved),
+    };
     this.emitter.toUser(saved.userId, 'payment:updated', view);
     this.emitter.toRoles(FINANCE_ROLES, 'payment:updated', view);
     const fresh = await this.orders.findOne({ where: { id: order.id } });
@@ -139,13 +153,26 @@ export class PartialRefundService {
     }
     await this.notifications.toUser(saved.userId, {
       title: 'Refund issued',
-      body: toPhone
-        ? `$${amount.toFixed(2)} for ${saved.orderReference} is on its way back to your mobile-money number.`
-        : `$${amount.toFixed(2)} for ${saved.orderReference} → wallet.`,
+      body:
+        original === 'phone'
+          ? `$${amount.toFixed(2)} for ${saved.orderReference} is on its way back to your mobile-money number.`
+          : original === 'card'
+            ? `$${amount.toFixed(2)} for ${saved.orderReference} is on its way back to your card.`
+            : `$${amount.toFixed(2)} for ${saved.orderReference} → wallet.`,
       type: 'payment',
       entityId: input.orderId,
     });
-    return { refundedUsd: amount, to: toPhone ? 'phone' : 'wallet', payment: saved, refund: entry };
+    return { refundedUsd: amount, to: original ?? 'wallet', payment: saved, refund: entry };
+  }
+
+  /** The processor refused a phone or card refund that was already recorded: take it off the payment, the ledger and the order lines. */
+  private undoOriginalRefund(entry: PaymentRefund, spread: Map<string, number>): Promise<void> {
+    return this.payments.manager.transaction(async (m) => {
+      await revertRefund(m, entry);
+      for (const [id, usd] of spread) {
+        await m.createQueryBuilder().update(OrderItem).set({ refundedUsd: () => `ROUND(refundedUsd - ${usd}, 2)` }).where('id = :id', { id }).execute();
+      }
+    });
   }
 
   /** The line each part of the money belongs to: as given, else spread over what is still refundable on each line. */

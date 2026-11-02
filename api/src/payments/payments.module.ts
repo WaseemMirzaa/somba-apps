@@ -7,6 +7,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { MOBILE_MONEY_PROVIDER, createMobileMoneyProvider } from './mobile-money.provider';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayMobileMoneyProvider, createPawapayClient } from './pawapay.provider';
+import { STRIPE_CLIENT, createStripeClient } from './stripe.provider';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 
@@ -22,6 +23,7 @@ import { PaymentsService } from './payments.service';
   providers: [
     PaymentsService,
     { provide: PAWAPAY_CLIENT, useFactory: createPawapayClient },
+    { provide: STRIPE_CLIENT, useFactory: () => createStripeClient() },
     {
       provide: MOBILE_MONEY_PROVIDER,
       inject: [PAWAPAY_CLIENT],
@@ -36,6 +38,6 @@ import { PaymentsService } from './payments.service';
       },
     },
   ],
-  exports: [PaymentsService, PAWAPAY_CLIENT],
+  exports: [PaymentsService, PAWAPAY_CLIENT, STRIPE_CLIENT],
 })
 export class PaymentsModule {}

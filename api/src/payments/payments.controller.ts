@@ -10,6 +10,7 @@ import {
 import type { Request } from 'express';
 import type { MobileMoneyEvent, WebhookRequest } from './mobile-money.provider';
 import { PaymentsService } from './payments.service';
+import type { StripeWebhookEvent } from './stripe.provider';
 
 /** Method, host and path of the webhook request, for HTTP message signatures. */
 function requestOf(req: Request): WebhookRequest {
@@ -19,7 +20,7 @@ function requestOf(req: Request): WebhookRequest {
 }
 
 /**
- * Inbound mobile-money confirmations. Authenticity is the provider's signature
+ * Inbound mobile-money and card confirmations. Authenticity is the provider's signature
  * over the RAW body — never a session. Always answers 200 for a verified call
  * (even for an unknown reference) so the aggregator doesn't retry forever.
  */
@@ -59,5 +60,26 @@ export class PaymentsController {
       this.logger.warn(`Rejected pawaPay callback: ${(e as Error).message}`);
       throw new UnauthorizedException('Invalid callback.');
     }
+  }
+
+  /**
+   * Stripe events (PaymentIntent, refund and charge). The signature over the RAW body (`Stripe-Signature`, 5-minute
+   * tolerance) is checked first; the PaymentIntent or Refund is then read from Stripe itself, so a forged or replayed event
+   * can do nothing. Events we do not act on are acknowledged. A failure after the signature passed answers with an error
+   * so Stripe retries.
+   */
+  @Post('stripe')
+  @HttpCode(200)
+  async stripe(@Req() req: RawBodyRequest<Request>) {
+    let event: StripeWebhookEvent;
+    try {
+      if (!req.rawBody) throw new Error('missing body');
+      event = this.payments.verifyStripeWebhook(req.rawBody, req.headers['stripe-signature']);
+    } catch (e) {
+      this.logger.warn(`Rejected Stripe webhook: ${(e as Error).message}`);
+      throw new UnauthorizedException('Invalid webhook.');
+    }
+    await this.payments.handleStripeEvent(event);
+    return { received: true };
   }
 }

@@ -156,6 +156,31 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   '${} for {} is on its way back to your mobile-money number.': [
     ['$12.50 for SOM-1001 is on its way back to your mobile-money number.', '12,50\u00A0$ pour SOM-1001 reviennent sur votre numéro mobile money.'],
   ],
+  '${} for {} is on its way back to your card.': [
+    ['$12.50 for SOM-1001 is on its way back to your card.', '12,50\u00A0$ pour SOM-1001 reviennent sur votre carte.'],
+  ],
+  '${} for {} was sent back to your card.': [
+    ['$12.50 for SOM-1001 was sent back to your card.', '12,50\u00A0$ pour SOM-1001 ont été renvoyés sur votre carte.'],
+  ],
+  '${} for {} → wallet (the card refund could not be completed).': [
+    ['$12.50 for SOM-1001 → wallet (the card refund could not be completed).', '12,50\u00A0$ pour SOM-1001 → portefeuille (le remboursement sur la carte n’a pas pu aboutir).'],
+  ],
+  'Complete the card payment to confirm {}.': [
+    ['Complete the card payment to confirm SOM-1001.', 'Finalisez le paiement par carte pour confirmer SOM-1001.'],
+  ],
+  '{}: card payment was made in {}, expected USD. Review manually.': [
+    ['PAY-1: card payment was made in EUR, expected USD. Review manually.', 'PAY-1 : le paiement par carte a été fait en EUR, USD attendus. À vérifier manuellement.'],
+  ],
+  "{}: Stripe could not refund ${}{}. It was credited to the customer's wallet.": [
+    [
+      "PAY-1: Stripe could not refund $12.50 (expired_or_canceled_card). It was credited to the customer's wallet.",
+      'PAY-1 : Stripe n’a pas pu rembourser 12,50\u00A0$ (expired_or_canceled_card). Le montant a été crédité sur le portefeuille du client.',
+    ],
+    [
+      "PAY-1: Stripe could not refund $12.50. It was credited to the customer's wallet.",
+      'PAY-1 : Stripe n’a pas pu rembourser 12,50\u00A0$. Le montant a été crédité sur le portefeuille du client.',
+    ],
+  ],
   '${} for {} was sent to your mobile-money number.': [
     ['$12.50 for SOM-1001 was sent to your mobile-money number.', '12,50\u00A0$ pour SOM-1001 ont été envoyés sur votre numéro mobile money.'],
   ],

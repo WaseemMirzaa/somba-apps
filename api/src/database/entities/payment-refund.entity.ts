@@ -12,7 +12,7 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Update
  */
 export type RefundKind = 'admin' | 'cancellation' | 'return' | 'dispute' | 'seller_cancel' | 'late_payment' | 'legacy';
 
-/** completed | sending (a phone refund pawaPay has not confirmed yet) | failed (pawaPay could not; the wallet got it instead). */
+/** completed | sending (a phone or card refund the processor has not confirmed yet) | failed (it could not; the wallet got it instead). */
 export type RefundStatus = 'completed' | 'sending' | 'failed';
 
 /**
@@ -43,14 +43,14 @@ export class PaymentRefund {
   @Column({ type: 'float' })
   amountUsd: number;
 
-  /** Where the money went: the customer's wallet, or back to the paying phone (pawaPay). */
+  /** Where the money went: the customer's wallet, back to the paying phone (pawaPay), or back to the card (Stripe). */
   @Column({ type: 'varchar', length: 10 })
-  refundTo: 'wallet' | 'phone';
+  refundTo: 'wallet' | 'phone' | 'card';
 
   @Column({ type: 'varchar', length: 12, default: 'completed' })
   status: RefundStatus;
 
-  /** pawaPay refundId of a phone refund. */
+  /** pawaPay refundId of a phone refund, or the Stripe refund id (re_…) of a card refund. */
   @Index()
   @Column({ type: 'varchar', length: 100, nullable: true })
   refundRef: string | null;

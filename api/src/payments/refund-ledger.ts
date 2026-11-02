@@ -40,12 +40,12 @@ export function refundableUsd(
 export interface RefundInput {
   payment: Pick<Payment, 'id' | 'userId' | 'orderId' | 'orderReference'>;
   amountUsd: number;
-  /** Where the money goes. A phone refund starts as `sending` until pawaPay confirms it. */
-  to: 'wallet' | 'phone';
+  /** Where the money goes. A phone (pawaPay) or card (Stripe) refund starts as `sending` until the processor confirms it. */
+  to: 'wallet' | 'phone' | 'card';
   kind: RefundKind;
   /** The wallet history line, in English. */
   memo?: string | null;
-  /** pawaPay refundId of a phone refund. */
+  /** pawaPay refundId of a phone refund, or our idempotency key of a card refund (replaced by Stripe's re_… id once created). */
   refundRef?: string | null;
   disputeId?: string | null;
   disputeReference?: string | null;
@@ -75,7 +75,7 @@ async function refusal(m: EntityManager, paymentId: string): Promise<BadRequestE
 export async function recordRefund(m: EntityManager, input: RefundInput): Promise<RecordedRefund> {
   const amount = cents(Number(input.amountUsd));
   if (!(amount > 0)) throw new BadRequestException('The refund amount must be more than zero.');
-  const toPhone = input.to === 'phone';
+  const original = input.to !== 'wallet'; // phone or card: in flight until the processor confirms
 
   // C-refund (data layer): the refund lands only while amount paid - already refunded still covers it.
   const grew = await m
@@ -89,10 +89,10 @@ export async function recordRefund(m: EntityManager, input: RefundInput): Promis
   const now = await m.findOneOrFail(Payment, { where: { id: input.payment.id } });
   const closed = cents(now.amountUsd - (now.refundedUsd ?? 0)) < 0.01;
   if (closed) await m.update(Payment, { id: input.payment.id, status: 'succeeded' }, { status: 'refunded' });
-  if (toPhone) {
-    await m.update(Payment, { id: input.payment.id }, { refundTo: 'phone', refundRef: input.refundRef ?? null, refundStatus: 'sending' });
+  if (original) {
+    await m.update(Payment, { id: input.payment.id }, { refundTo: input.to, refundRef: input.refundRef ?? null, refundStatus: 'sending' });
   } else {
-    // A wallet refund notes where the latest money went, but never overwrites a phone refund still in flight.
+    // A wallet refund notes where the latest money went, but never overwrites a phone or card refund still in flight.
     await m
       .createQueryBuilder()
       .update(Payment)
@@ -109,8 +109,8 @@ export async function recordRefund(m: EntityManager, input: RefundInput): Promis
       userId: input.payment.userId,
       amountUsd: amount,
       refundTo: input.to,
-      status: (toPhone ? 'sending' : 'completed') satisfies RefundStatus,
-      refundRef: toPhone ? (input.refundRef ?? null) : null,
+      status: (original ? 'sending' : 'completed') satisfies RefundStatus,
+      refundRef: original ? (input.refundRef ?? null) : null,
       kind: input.kind,
       disputeId: input.disputeId ?? null,
       disputeReference: input.disputeReference ?? null,
@@ -150,7 +150,7 @@ export async function recordParkedPayment(
   );
 }
 
-/** Undo a refund that was recorded but never happened (pawaPay refused a phone refund): the money goes back on the payment. */
+/** Undo a refund that was recorded but never happened (pawaPay or Stripe refused it): the money goes back on the payment. */
 export async function revertRefund(m: EntityManager, entry: Pick<PaymentRefund, 'id' | 'paymentId' | 'amountUsd'>): Promise<void> {
   await m.delete(PaymentRefund, { id: entry.id });
   await m

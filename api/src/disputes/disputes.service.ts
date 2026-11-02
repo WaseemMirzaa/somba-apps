@@ -969,7 +969,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Pay back the returned items only (never more than is left on the payment). */
-  private async refundReturnedItems(d: Dispute): Promise<{ refundedUsd: number; to: 'wallet' | 'phone' }> {
+  private async refundReturnedItems(d: Dispute): Promise<{ refundedUsd: number; to: 'wallet' | 'phone' | 'card' }> {
     const value = await this.returnedValue(d);
     const left = await this.refunds.outstanding(d.orderId);
     const amount = cents(Math.min(value.total, left));

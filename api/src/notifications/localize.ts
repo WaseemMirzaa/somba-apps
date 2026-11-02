@@ -156,6 +156,10 @@ const REASONS: Record<string, string> = {
   'Declined by subscriber.': 'Refusé par l’abonné.',
   'Declined by finance.': 'Refusé par la comptabilité.',
   'Timed out waiting for approval.': 'Délai de validation dépassé.',
+  'Timed out waiting for the card payment.': 'Délai de paiement par carte dépassé.',
+  'The card payment was cancelled.': 'Le paiement par carte a été annulé.',
+  'Could not reach the card processor. Please try again.': 'Impossible de joindre le prestataire de paiement par carte. Veuillez réessayer.',
+  'Could not start the card payment. Please try again.': 'Impossible de démarrer le paiement par carte. Veuillez réessayer.',
   'Cancelled by customer.': 'Annulé par le client.',
   'Insufficient wallet balance.': 'Solde du portefeuille insuffisant.',
   'Could not reach the mobile-money network. Please try again.': 'Impossible de joindre le réseau mobile money. Veuillez réessayer.',
@@ -207,6 +211,7 @@ const TITLES: Record<string, string> = {
   ...COMMERCE_TITLES,
   // The customer app's own list
   'Approve your payment': 'Validez votre paiement',
+  'Complete your payment': 'Finalisez votre paiement',
   'Order placed': 'Commande enregistrée',
   'Order cancelled': 'Commande annulée',
   'Order update': 'Mise à jour de la commande',
@@ -267,6 +272,7 @@ const TITLES: Record<string, string> = {
   // Payments and payouts
   'Payment amount mismatch': 'Écart de montant du paiement',
   'Phone refund failed': 'Échec du remboursement mobile',
+  'Card refund failed': 'Échec du remboursement par carte',
   'Payout requested': 'Versement demandé',
   'Payout paid': 'Versement effectué',
   'Payout on its way': 'Versement en cours',
@@ -386,6 +392,7 @@ const BODIES: Rule[] = [
 
   // Orders and deliveries
   [/^(\S+) reached the Somba&Teka warehouse and will be on its way soon\.$/, (m) => `${m[1]} est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.`],
+  [/^Complete the card payment to confirm (\S+)\.$/, (m) => `Finalisez le paiement par carte pour confirmer ${m[1]}.`],
   [/^Approve the (.+) request on your phone to confirm (\S+)\.$/, (m) => `Validez la demande ${methodFr(m[1])} sur votre téléphone pour confirmer ${m[2]}.`],
   [/^We received (\S+)\. You'll get updates here in real time\.$/, (m) => `Nous avons reçu ${m[1]}. Vous recevrez les mises à jour ici en temps réel.`],
   [/^(\S+) is now in your deliveries\.$/, (m) => `${m[1]} est maintenant dans vos livraisons.`],
@@ -465,6 +472,12 @@ const BODIES: Rule[] = [
   [/^Payment for your (.*) seller plan confirmed\.$/, (m) => `Le paiement de votre abonnement vendeur ${m[1]} est confirmé.`],
   [/^\$([\d.]+) for (\S+)( → wallet)?\.$/, (m) => `${moneyFr(m[1])} pour ${m[2]}${m[3] !== undefined ? ' → portefeuille' : ''}.`],
   [/^\$([\d.]+) for (\S+) is on its way back to your mobile-money number\.$/, (m) => `${moneyFr(m[1])} pour ${m[2]} reviennent sur votre numéro mobile money.`],
+  [/^\$([\d.]+) for (\S+) is on its way back to your card\.$/, (m) => `${moneyFr(m[1])} pour ${m[2]} reviennent sur votre carte.`],
+  [/^\$([\d.]+) for (\S+) was sent back to your card\.$/, (m) => `${moneyFr(m[1])} pour ${m[2]} ont été renvoyés sur votre carte.`],
+  [
+    /^\$([\d.]+) for (\S+) → wallet \(the card refund could not be completed\)\.$/,
+    (m) => `${moneyFr(m[1])} pour ${m[2]} → portefeuille (le remboursement sur la carte n’a pas pu aboutir).`,
+  ],
   [/^\$([\d.]+) for (\S+) was sent to your mobile-money number\.$/, (m) => `${moneyFr(m[1])} pour ${m[2]} ont été envoyés sur votre numéro mobile money.`],
   [
     /^\$([\d.]+) for (\S+) → wallet \(the network could not take it back to your phone\)\.$/,
@@ -474,6 +487,11 @@ const BODIES: Rule[] = [
   [
     /^(\S+): provider reported \$([\d.]+), expected \$([\d.]+)\. Review manually\.$/,
     (m) => `${m[1]} : le prestataire a indiqué ${moneyFr(m[2])}, ${moneyFr(m[3])} attendus. À vérifier manuellement.`,
+  ],
+  [/^(\S+): card payment was made in ([A-Z]{3}), expected USD\. Review manually\.$/, (m) => `${m[1]} : le paiement par carte a été fait en ${m[2]}, USD attendus. À vérifier manuellement.`],
+  [
+    /^(\S+): Stripe could not refund \$([\d.]+)(?: \((.+)\))?\. It was credited to the customer's wallet\.$/,
+    (m) => `${m[1]} : Stripe n’a pas pu rembourser ${moneyFr(m[2])}${m[3] !== undefined ? ` (${m[3]})` : ''}. Le montant a été crédité sur le portefeuille du client.`,
   ],
   [
     /^(\S+): pawaPay could not refund \$([\d.]+)(?: \((.+)\))?\. It was credited to the customer's wallet\.$/,
@@ -553,6 +571,7 @@ const WALLET_LINES: Rule[] = [
   [/^Wallet top-up via (.+)$/, (m) => `Recharge du portefeuille via ${methodFr(m[1])}`],
   [/^Refund for cancelled order (\S+)$/, (m) => `Remboursement de la commande annulée ${m[1]}`],
   [/^Refund for (\S+) \(phone refund failed\)$/, (m) => `Remboursement de ${m[1]} (échec du remboursement mobile)`],
+  [/^Refund for (\S+) \(card refund failed\)$/, (m) => `Remboursement de ${m[1]} (échec du remboursement par carte)`],
   [/^Refund for (\S+) \(returned items\)$/, (m) => `Remboursement de ${m[1]} (articles retournés)`],
   [/^Refund for (\S+) \(dispute\)$/, (m) => `Remboursement de ${m[1]} (litige)`],
   [/^Refund for (\S+)$/, (m) => `Remboursement de ${m[1]}`],

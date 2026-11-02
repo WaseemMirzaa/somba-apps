@@ -57,7 +57,7 @@ beforeEach(async () => {
   const wallet = new WalletService(ds.getRepository(User), ds.getRepository(WalletTransaction), emitter as never);
   const payments = {
     forOrder: (orderId: string) => ds.getRepository(Payment).findOne({ where: { orderId }, order: { createdAt: 'DESC' } }),
-    canRefundToPhone: () => phoneOk,
+    refundToOriginal: () => (phoneOk ? 'phone' : null),
   };
   const notifications = { toUser: async (to: string, n: { title: string; body: string }) => void notices.push({ to, ...n }) };
   const build = () =>

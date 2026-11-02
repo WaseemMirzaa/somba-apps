@@ -110,7 +110,7 @@ export class Dispute {
   @Column({ type: 'float', default: 0 })
   refundUsd: number;
 
-  /** Where the customer wants the money (`wallet` by default; `phone` needs a pawaPay payment). */
+  /** Where the customer wants the money (`wallet` by default). `phone` means "back to the method that paid": the paying phone (pawaPay) or the card (Stripe). */
   @Column({ type: 'varchar', length: 10, default: 'wallet' })
   refundTo: 'wallet' | 'phone';
 

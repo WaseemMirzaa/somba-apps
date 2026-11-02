@@ -886,6 +886,24 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * The data the app needs to open Stripe's PaymentSheet for the caller's own pending card payment:
+   * `{ orderId?, reference? }` → `{ reference, clientSecret, publishableKey, amountUsd, currency, merchantName }`.
+   * The client secret is returned to the owner only, over this authenticated socket, and is never stored or logged.
+   */
+  @SubscribeMessage('payments:card-sheet')
+  async paymentsCardSheet(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { orderId?: string; reference?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      return ok(await this.payments.cardSheet(user.id, body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   /** Finance confirms a pending mobile-money payment by hand (manual provider / fallback). */
   @SubscribeMessage('payments:confirm')
   async paymentsConfirm(
@@ -946,7 +964,7 @@ export class RealtimeGateway
       const toWallet = body?.toWallet !== false;
       const payment = await this.orders.refund(String(body?.orderId ?? ''), toWallet);
       const { amountUsd: amount, refundTo } = payment.refund; // what THIS refund paid back (payment.refundedUsd is the running total)
-      await this.audit.record({ actor: user.name, role: user.role, action: 'orders:refund', entity: 'order', entityId: String(body.orderId), detail: `${payment.orderReference ?? ''} $${amount.toFixed(2)} to ${refundTo === 'phone' ? 'phone (pawaPay)' : 'wallet'}` });
+      await this.audit.record({ actor: user.name, role: user.role, action: 'orders:refund', entity: 'order', entityId: String(body.orderId), detail: `${payment.orderReference ?? ''} $${amount.toFixed(2)} to ${refundTo === 'phone' ? 'phone (pawaPay)' : refundTo === 'card' ? 'card (Stripe)' : 'wallet'}` });
       return ok(payment);
     } catch (e) {
       return fail((e as Error).message);
@@ -1285,7 +1303,8 @@ export class RealtimeGateway
   async settingsGet(@ConnectedSocket() client: AuthedSocket) {
     // Everyone may read the public pricing/checkout settings; the rest is admin-only.
     const role = client.data.user?.role ?? 'guest';
-    return ok(this.can(role, 'config') ? await this.settings.all() : await this.settings.publicView());
+    // Apps also get the computed `cardPayments` flag ('stripe' | 'off').
+    return ok(this.can(role, 'config') ? await this.settings.all() : await this.settings.clientView());
   }
 
   @SubscribeMessage('settings:set')

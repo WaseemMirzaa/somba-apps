@@ -6,6 +6,7 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { num, oneOf, str } from '../common/validate';
 import { validatePlans } from './plans';
+import { cardPaymentsMode } from '../payments/stripe.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
 export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
@@ -35,10 +36,18 @@ export class SettingsService {
     return row?.value ?? null;
   }
 
-  /** Public view of the settings (what shoppers and guests may see). */
+  /** Public view of the STORED settings (what shoppers and guests may see). */
   async publicView(): Promise<Record<string, string>> {
     const all = await this.all();
     return Object.fromEntries(Object.entries(all).filter(([k]) => (PUBLIC_SETTINGS as readonly string[]).includes(k)));
+  }
+
+  /**
+   * What the apps are sent (`settings:get`, `settings:updated`): the public settings plus `cardPayments`
+   * ('stripe' | 'off'), computed from the Stripe configuration and never stored, so no setting can switch the card option on.
+   */
+  async clientView(): Promise<Record<string, string>> {
+    return { ...(await this.publicView()), cardPayments: cardPaymentsMode() };
   }
 
   /** Validate a settings change; returns the normalised string to store. */
@@ -94,7 +103,7 @@ export class SettingsService {
     await this.repo.save(this.repo.create({ key, value: clean }));
     const all = await this.all();
     // Shoppers/guests only ever receive the public subset; admins get everything.
-    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff'], 'settings:updated', await this.publicView());
+    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff'], 'settings:updated', await this.clientView());
     this.emitter.toRoles(ADMIN_ROLES, 'settings:updated', all);
     return all;
   }

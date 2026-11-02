@@ -66,11 +66,11 @@ export class Payment {
   @Column({ type: 'varchar', nullable: true })
   failureReason: string | null;
 
-  /** Where a refund went: the customer's wallet, or back to the paying phone (pawaPay). */
+  /** Where a refund went: the customer's wallet, back to the paying phone (pawaPay), or back to the card (Stripe). */
   @Column({ type: 'varchar', length: 10, nullable: true })
-  refundTo: 'wallet' | 'phone' | null;
+  refundTo: 'wallet' | 'phone' | 'card' | null;
 
-  /** pawaPay refundId of a phone refund. */
+  /** pawaPay refundId of a phone refund, or the Stripe refund id (re_…) of a card refund. */
   @Index()
   @Column({ type: 'varchar', length: 100, nullable: true })
   refundRef: string | null;
