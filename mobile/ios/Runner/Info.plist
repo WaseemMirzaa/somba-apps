@@ -78,5 +78,19 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Test droplet on plain HTTP (no domain yet). Only this address is exempt; everything else stays HTTPS. -->
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>107.170.116.169</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>
