@@ -103,12 +103,13 @@ export interface WarehouseAnalytics {
   byHub: { hubId: string; hub: string; parcels: number; delivered: number; failed: number; batches30: number }[];
 }
 
-/** Real warehouse figures from the server (`analytics:warehouse`), scoped to the hub (admins: all, or one with `hubId`). */
-export function useWarehouseAnalytics(hubId?: string) {
+/** Real warehouse figures from the server (`analytics:warehouse`, managers and admins), scoped to the hub (admins: all, or one with `hubId`). */
+export function useWarehouseAnalytics(hubId?: string, enabled = true) {
   return useOpsQuery<WarehouseAnalytics | null>("analytics:warehouse", {
     initial: null,
     body: hubId ? { hubId } : {},
     push: ["task:updated", "batch:updated"],
+    enabled,
   });
 }
 
@@ -246,7 +247,30 @@ export interface HubRow {
 export interface ReconcileRow {
   riderId: string;
   parcels: number;
+  /** What the delivered parcels were due to bring in. */
   codUsd: number;
+  /** What the riders recorded taking at the door (deliveries before the cash record are not in it). */
+  collectedUsd: number;
+  /** What the warehouse has received since. */
+  handedOverUsd: number;
+  /** collected - handed over: the cash the rider still holds. */
+  heldUsd: number;
+  lastHandoverAt: string | null;
+}
+
+/** One recorded hand-over of a rider's cash at the warehouse (`cash:history`, `cash:handover`). */
+export interface CashHandover {
+  id: string;
+  riderId: string;
+  riderName: string;
+  hubId: string | null;
+  amountUsd: number;
+  heldBeforeUsd: number;
+  heldAfterUsd: number;
+  receivedById: string;
+  receivedByName: string;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface InventoryRow {

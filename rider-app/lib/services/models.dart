@@ -356,6 +356,10 @@ class DeliveryTaskDto {
   final double totalUsd;
   final List<OrderLine> items;
   final DateTime? createdAt;
+
+  /// When the leg was last touched, and when it was delivered (null on an older server): a finished leg's date.
+  final DateTime? updatedAt;
+  final DateTime? deliveredAt;
   final String? pickupAddress;
   final int attempts;
   final String? failureReason;
@@ -413,6 +417,8 @@ class DeliveryTaskDto {
     this.totalUsd = 0,
     this.items = const [],
     this.createdAt,
+    this.updatedAt,
+    this.deliveredAt,
     this.pickupAddress,
     this.attempts = 1,
     this.failureReason,
@@ -452,6 +458,9 @@ class DeliveryTaskDto {
     if (v == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(v)) return null;
     return '${v.substring(8, 10)}/${v.substring(5, 7)}';
   }
+
+  /// The day a finished leg ended (delivered or failed), for the history's date filter.
+  DateTime? get finishedAt => deliveredAt ?? updatedAt ?? createdAt;
 
   bool get isActive => const {'assigned', 'picked_up', 'in_transit'}.contains(status);
   bool get isFinished => status == 'delivered' || status == 'failed';
@@ -563,6 +572,8 @@ class DeliveryTaskDto {
       totalUsd: (o['totalUsd'] as num?)?.toDouble() ?? 0,
       items: orderItems.isNotEmpty ? orderItems : _lines(j['items']),
       createdAt: _date(j['createdAt']),
+      updatedAt: _date(j['updatedAt']),
+      deliveredAt: _date(j['deliveredAt']),
       pickupAddress: _str(j['pickupAddress']),
       attempts: (j['attempts'] as num?)?.toInt() ?? 1,
       failureReason: _str(j['failureReason']),
@@ -609,6 +620,8 @@ class DeliveryTaskDto {
       totalUsd: old.totalUsd,
       items: items.isNotEmpty ? items : old.items,
       createdAt: createdAt ?? old.createdAt,
+      updatedAt: updatedAt ?? old.updatedAt,
+      deliveredAt: deliveredAt ?? old.deliveredAt,
       pickupAddress: pickupAddress,
       attempts: attempts,
       failureReason: failureReason,
@@ -679,6 +692,49 @@ class EarningsDto {
         byKind: [
           for (final k in (j['byKind'] as List?) ?? const [])
             if (k is Map) EarningsKind.fromJson(k.map((a, b) => MapEntry(a.toString(), b))),
+        ],
+      );
+}
+
+/// One receipt of the rider's cash at the warehouse: who took how much, when, and what the rider still held after it.
+class CashHandoverDto {
+  final String id;
+  final double amountUsd;
+  final double heldAfterUsd;
+  final String receivedByName;
+  final String? note;
+  final DateTime? at;
+
+  const CashHandoverDto({required this.id, required this.amountUsd, required this.heldAfterUsd, required this.receivedByName, this.note, this.at});
+
+  factory CashHandoverDto.fromJson(Map<String, dynamic> j) => CashHandoverDto(
+        id: '${j['id'] ?? ''}',
+        amountUsd: (j['amountUsd'] as num?)?.toDouble() ?? 0,
+        heldAfterUsd: (j['heldAfterUsd'] as num?)?.toDouble() ?? 0,
+        receivedByName: j['receivedByName'] as String? ?? '',
+        note: j['note'] as String?,
+        at: DateTime.tryParse('${j['createdAt'] ?? ''}')?.toLocal(),
+      );
+}
+
+/// The rider's cash in hand (`cash:mine`): collected on cash-on-delivery orders, not yet handed in at the warehouse.
+class CashDto {
+  final double collectedUsd;
+  final double handedOverUsd;
+  final double heldUsd;
+  final int openTasks;
+  final List<CashHandoverDto> handovers;
+
+  const CashDto({this.collectedUsd = 0, this.handedOverUsd = 0, this.heldUsd = 0, this.openTasks = 0, this.handovers = const []});
+
+  factory CashDto.fromJson(Map<String, dynamic> j) => CashDto(
+        collectedUsd: (j['collectedUsd'] as num?)?.toDouble() ?? 0,
+        handedOverUsd: (j['handedOverUsd'] as num?)?.toDouble() ?? 0,
+        heldUsd: (j['heldUsd'] as num?)?.toDouble() ?? 0,
+        openTasks: (j['openTasks'] as num?)?.toInt() ?? 0,
+        handovers: [
+          for (final h in (j['handovers'] as List?) ?? const [])
+            if (h is Map) CashHandoverDto.fromJson(h.map((a, b) => MapEntry(a.toString(), b))),
         ],
       );
 }

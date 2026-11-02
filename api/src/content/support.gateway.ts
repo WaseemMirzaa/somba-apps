@@ -1,12 +1,13 @@
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { AuthedSocket } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
+import { inRoleGroup } from '../common/role-groups';
 import { SupportService } from './support.service';
 import type { TicketStatus } from '../database/entities';
 
 /**
  * Support tickets on the shared Socket.IO server: every signed-in role (customer, seller, rider…) can open one,
- * with an order link, a category and photos; agents (admin roles) answer, assign and close. See docs/contracts/after-sale.md.
+ * with an order link, a category and photos; agents (the Super Admin and the Support department, group `support`) answer, assign and close. See docs/contracts/after-sale.md.
  */
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class SupportGateway {
@@ -57,7 +58,7 @@ export class SupportGateway {
   async setStatus(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; status: TicketStatus }) {
     try {
       const user = requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Not allowed.');
+      if (!inRoleGroup(user.role, 'support')) return fail('Not allowed.');
       return ok(await this.support.setStatus(body.id, body.status));
     } catch (e) {
       return fail((e as Error).message);
@@ -79,7 +80,7 @@ export class SupportGateway {
   async assign(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; assigneeId?: string | null }) {
     try {
       const user = requireUser(client);
-      if (!user.role.startsWith('admin')) return fail('Not allowed.');
+      if (!inRoleGroup(user.role, 'support')) return fail('Not allowed.');
       return ok(await this.support.assign(user, String(body?.id ?? ''), body?.assigneeId ? String(body.assigneeId) : null));
     } catch (e) {
       return fail((e as Error).message);

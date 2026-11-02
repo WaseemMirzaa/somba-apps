@@ -19,7 +19,7 @@ class RiderStore extends ChangeNotifier {
   RiderStore._();
   static final RiderStore instance = RiderStore._();
 
-  final _auth = AuthService();
+  AuthService _auth = AuthService();
   final _socket = SocketService();
   /// Reports the GPS position while a delivery is `in_transit` (tests swap in a fake).
   LocationReporter location = LocationReporter();
@@ -34,6 +34,9 @@ class RiderStore extends ChangeNotifier {
   final List<NotificationDto> notifications = [];
   EarningsDto earnings = const EarningsDto();
 
+  /// Cash in hand: collected on cash-on-delivery orders and not yet handed in at the warehouse.
+  CashDto cash = const CashDto();
+
   /// Public setting: when true the customer's 4-digit code is needed to deliver.
   bool requireDeliveryCode = false;
 
@@ -43,6 +46,15 @@ class RiderStore extends ChangeNotifier {
   /// A tapped notification asks the app to show a tab and task; the shell and Deliveries follow it, then clear it.
   final ValueNotifier<RiderFocus?> focus = ValueNotifier(null);
 
+  /// Tests: the sign-in calls (refresh, token storage) answered by a fake.
+  @visibleForTesting
+  set debugAuth(AuthService auth) => _auth = auth;
+
+  /// Tests: the check that follows a refused connection (is the account still allowed?).
+  @visibleForTesting
+  Future<void> debugVerifySession() => _verifySession(force: true);
+
+  /// The session is over (revoked, suspended, role changed): the app is back at the sign-in screen when this returns.
   VoidCallback? onSessionEnded;
   String? _access;
   String? _refresh;
@@ -155,6 +167,7 @@ class RiderStore extends ChangeNotifier {
     notifications.clear();
     SupportStore.instance.clear();
     earnings = const EarningsDto();
+    cash = const CashDto();
     requireDeliveryCode = false;
     assignment = null;
     focus.value = null;
@@ -280,7 +293,11 @@ class RiderStore extends ChangeNotifier {
       applyRunPush(d);
       _pushRefresh();
     });
+    // The warehouse recorded a hand-over of this rider's cash: read the new balance and receipts.
+    _socket.on('cash:updated', (_) => unawaited(_readCash().then((_) => notifyListeners())));
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
+    // The rider's own account changed (here, or on another phone or the web portal).
+    _socket.on('me:updated', _applyAccount);
     _socket.on('notification:new', (d) {
       notifications.insert(0, NotificationDto.fromJson(_map(d)));
       notifyListeners();
@@ -425,6 +442,7 @@ class RiderStore extends ChangeNotifier {
         ..clear()
         ..addAll(rows.where((t) => t.status != 'unassigned')); // an older server may still list its open pool: not ours
       earnings = EarningsDto.fromJson(_map(await request('rider:earnings')));
+      await _readCash();
       unawaited(_readRuns());
       if (full) {
         notifications
@@ -486,13 +504,22 @@ class RiderStore extends ChangeNotifier {
     } catch (_) {/* keep the last known value */}
   }
 
-  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.
-  Future<void> advance(String taskId, String status, {String? reason, String? code}) async {
+  /// The rider's cash in hand. An older server without it leaves the last known value.
+  Future<void> _readCash() async {
+    try {
+      cash = CashDto.fromJson(_map(await request('cash:mine')));
+    } catch (_) {/* keep the last known value */}
+  }
+
+  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`; [cashUsd] is the cash the
+  /// rider took on a cash-on-delivery `delivered` (the server records it and refuses any amount but the one due).
+  Future<void> advance(String taskId, String status, {String? reason, String? code, double? cashUsd}) async {
     await request('delivery:updateStatus', {
       'taskId': taskId,
       'status': status,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+      if (cashUsd != null) 'cashUsd': cashUsd,
     });
     await refresh(light: true);
   }
@@ -556,6 +583,35 @@ class RiderStore extends ChangeNotifier {
       notifications[i] = notifications[i].asRead();
       notifyListeners();
     }
+  }
+
+  /// The rider's own name and phone (`me:update`; the server edits the signed-in account only, and never the e-mail, the
+  /// role or the warehouse). A blank phone clears it. Throws what the server refuses with ("Enter a valid phone number.").
+  Future<void> updateProfile({required String name, required String phone}) async {
+    final res = await request('me:update', {'name': name.trim(), 'phone': phone.trim().isEmpty ? null : phone.trim()});
+    _applyAccount(res);
+  }
+
+  /// Change the password (`me:changePassword`). The answer carries FRESH tokens: this phone keeps them (otherwise its next
+  /// refresh would be refused as revoked and the rider signed out); every other phone is signed out by the server.
+  Future<void> changePassword({required String current, required String next}) async {
+    final res = await request('me:changePassword', {'current': current, 'next': next});
+    final r = AuthResult.fromJson(_map(res));
+    await _auth.saveTokens(r);
+    _access = r.accessToken;
+    _refresh = r.refreshToken;
+    _applyAccount(_map(res)['user']);
+  }
+
+  /// A `me:updated` push or the answer of `me:update`: the signed-in rider's own account (another account's is ignored).
+  void _applyAccount(dynamic d) {
+    if (d is! Map || user == null) return;
+    try {
+      final fresh = BackendUser.fromJson(_map(d));
+      if (fresh.id != user!.id || fresh.role != 'rider') return;
+      user = fresh;
+      notifyListeners();
+    } catch (_) {/* malformed push: keep what is known */}
   }
 
   Future<String?> forgotPassword(String email) => _auth.forgotPassword(email);

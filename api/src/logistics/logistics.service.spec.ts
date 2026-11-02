@@ -507,9 +507,13 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(await orderStatus(order.id)).toBe('out_for_delivery');
       await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, '0000')).rejects.toThrow(/Wrong delivery code/);
       const code = (await logistics.proofCodeOf(d.id)) as string;
-      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code);
+      // cash on delivery: the rider must confirm the exact amount due, and the server records it
+      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code)).rejects.toThrow(/Confirm the cash you collected/);
+      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, 1)).rejects.toThrow(/not the amount to collect/);
+      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, d.codAmountUsd);
       expect(await orderStatus(order.id)).toBe('delivered');
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id);
+      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: d.codAmountUsd, byId: riderG.id, source: 'rider' }));
+      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: d.id })).toMatchObject({ codCollectedUsd: d.codAmountUsd, codCollectedById: riderG.id });
     });
 
     it('needsCode on the delivery leg follows the requireDeliveryCode setting; other legs never need it', async () => {
@@ -973,6 +977,54 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       // closing twice is harmless
       expect((await runs.close(admin, { runId: run.id })).status).toBe('closed');
       expect(await ds.getRepository(WarehouseException).count()).toBe(2);
+    });
+
+    it('a parcel missing when the run closes: failed with the run reference, one exception, NO automatic new leg, the driver sees it as finished', async () => {
+      const legs = await waiting(2);
+      const ids = legs.map((t) => t.id);
+      const lost = legs[1];
+      const run = await runs.create(staff(gombe, 'supervisor'), { toHubId: limete.id, taskIds: ids });
+      await runs.assign(staff(gombe, 'supervisor'), { runId: run.id, riderId: riderG.id });
+      await runs.dispatch(staff(gombe, 'supervisor'), { runId: run.id });
+      await runs.markInTransit(run.id, riderG.id);
+      await runs.receive(staff(limete, 'operator'), { runId: run.id, taskIds: [ids[0]] });
+      const closed = await runs.close(staff(limete, 'supervisor'), { runId: run.id });
+
+      // the run says so: one received, one missing
+      expect(closed).toMatchObject({ status: 'closed', count: 2, receivedCount: 1, missingCount: 1 });
+
+      // the lost leg is failed with the literal reason and stays in its run; the other one arrived
+      expect(await fresh(lost.id)).toMatchObject({ status: 'failed', failureReason: `Parcel missing from run ${run.reference}.`, runId: run.id });
+      expect((await fresh(ids[0])).status).toBe('delivered');
+
+      // No new leg is opened for a parcel that never arrived (it is not where a rider could collect it): the order keeps its
+      // pickup and its failed transfer, no second transfer and no delivery. The desk follows the exception.
+      expect(await kinds(lost.orderId)).toEqual(['pickup:delivered', 'transfer:failed']);
+      const [exc] = await ds.getRepository(WarehouseException).find({ where: { taskId: lost.id } });
+      expect(exc).toMatchObject({ type: 'missing_item', severity: 'high', status: 'open', hubId: limete.id, orderReference: lost.orderReference, notes: `Parcel missing from run ${run.reference}.` });
+      expect(await ds.getRepository(WarehouseException).count()).toBe(1);
+      expect(emitter.toHub).toHaveBeenCalledWith(limete.id, 'exception:updated', expect.objectContaining({ id: exc.id }));
+
+      // the driver finds it in the finished list with the reason, and nothing of this run is left to do
+      const riders = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics);
+      const queue = await riders.queue(riderG.id);
+      expect(queue.find((t) => t.id === lost.id)).toMatchObject({ status: 'failed', failureReason: `Parcel missing from run ${run.reference}.` });
+      expect(queue.filter((t) => ['assigned', 'picked_up', 'in_transit'].includes(t.status) && t.runId === run.id)).toEqual([]);
+      // the driver's run list keeps the closed run for a few days, with the missing count
+      expect((await runs.forRider(riderG.id))[0]).toMatchObject({ id: run.id, status: 'closed', missingCount: 1 });
+    });
+
+    it('a run where every parcel arrived closes with nothing missing and raises no exception', async () => {
+      const ids = (await waiting(2)).map((t) => t.id);
+      const run = await runs.create(staff(gombe, 'supervisor'), { toHubId: limete.id, taskIds: ids });
+      await runs.assign(staff(gombe, 'supervisor'), { runId: run.id, riderId: riderG.id });
+      await runs.dispatch(staff(gombe, 'supervisor'), { runId: run.id });
+      await runs.receive(staff(limete, 'operator'), { runId: run.id });
+      notif.toAdmins.mockClear();
+      const closed = await runs.close(staff(limete, 'supervisor'), { runId: run.id });
+      expect(closed).toMatchObject({ status: 'closed', receivedCount: 2, missingCount: 0 });
+      expect(await ds.getRepository(WarehouseException).count()).toBe(0);
+      expect(notif.toAdmins).not.toHaveBeenCalled();
     });
 
     it('works for return transfers and for a hop of a multi-warehouse route', async () => {

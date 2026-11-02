@@ -3,6 +3,7 @@ import { AuditService } from '../ops/audit.service';
 import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
+import { StaffTierService } from '../logistics/staff-tier.service';
 import { DisputesService } from './disputes.service';
 
 /** Admin roles that may decide a request; refunding also needs finance or the super admin. */
@@ -18,6 +19,7 @@ export class DisputesGateway {
   constructor(
     private readonly disputes: DisputesService,
     private readonly audit: AuditService,
+    private readonly tiers: StaffTierService,
   ) {}
 
   /** The seller's store owner identity for a seller account (a team member acts as the store); other roles as they are. */
@@ -211,6 +213,8 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin') && user.role !== 'warehouse_staff') return fail('Ops only.');
+      // The returns queue is a supervisor page in the web; receiving starts the refund, so the server holds the same line.
+      if (!(await this.tiers.allows(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
       const d = await this.disputes.markReceived(String(body?.disputeId ?? ''), body?.restock !== false);
       await this.audit.record({ actor: user.name, role: user.role, action: 'return.received', entity: 'dispute', entityId: d.id, detail: d.reference });
       return ok(d);
@@ -228,6 +232,7 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin') && user.role !== 'warehouse_staff') return fail('Ops only.');
+      if (!(await this.tiers.allows(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
       const d = await this.disputes.grade(user, idOf(body), body?.grades, body?.note);
       await this.audit.record({ actor: user.name, role: user.role, action: 'return.graded', entity: 'dispute', entityId: d.id, detail: d.reference });
       return ok(d);
@@ -241,7 +246,9 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(await this.disputes.reject(body.disputeId, body.resolution));
+      const d = await this.disputes.reject(body.disputeId, body.resolution);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'dispute.rejected', entity: 'dispute', entityId: d.id, detail: d.reference });
+      return ok(d);
     } catch (e) {
       return fail((e as Error).message);
     }

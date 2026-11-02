@@ -15,6 +15,7 @@ export { WalletTransaction } from './wallet-transaction.entity';
 export { Payment } from './payment.entity';
 export type { PaymentStatus, PaymentPurpose } from './payment.entity';
 export { PaymentRefund } from './payment-refund.entity';
+export { CodHandover } from './cod-handover.entity';
 export type { RefundKind, RefundStatus } from './payment-refund.entity';
 export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
@@ -100,6 +101,7 @@ import { DeliveryTask } from './delivery-task.entity';
 import { WalletTransaction } from './wallet-transaction.entity';
 import { Payment } from './payment.entity';
 import { PaymentRefund } from './payment-refund.entity';
+import { CodHandover } from './cod-handover.entity';
 import { Payout } from './payout.entity';
 import { PayoutStatementLine } from './payout-statement-line.entity';
 import { Dispute } from './dispute.entity';
@@ -158,6 +160,7 @@ export const ENTITIES = [
   WalletTransaction,
   Payment,
   PaymentRefund,
+  CodHandover,
   Payout,
   PayoutStatementLine,
   Dispute,

@@ -198,6 +198,15 @@ a staff member's list holds their own hub only).
 - `delivery:unassigned` for a rider → `[]`.
 - `delivery:list` (rider) = my tasks. `rider:earnings` -> `{ totalTasks, delivered, active, codCollectedUsd, perTaskUsd, byKind: [{ kind, count, earningsUsd }], earningsUsd }`. The pay is flat (`perTaskUsd`, $2.50) per COMPLETED task of any kind, so `delivered` counts every finished leg (customer deliveries, seller pickups, transfers, return legs), not only customer deliveries; `byKind` (kinds with at least one) says how many of each and `earningsUsd` is its sum. Screens must call them tasks, not deliveries.
 
+### Cash on delivery: the cash record and the hand-over (C-cod)
+
+- `delivery:updateStatus { taskId, status: 'delivered', cashUsd }`: on a cash-on-delivery customer delivery (`codAmountUsd > 0`) `cashUsd` is required and must equal the amount due, otherwise the call is refused with both figures ("The cash you entered ($35.00) is not the amount to collect ($40.00). ..."). On a prepaid delivery `cashUsd` must be absent or 0. The server writes `codCollectedUsd`, `codCollectedAt`, `codCollectedById` on the task in the same update that delivers it; a repeated "delivered" changes nothing. The payment turns "succeeded" (`PaymentsService.markCollected`) and the audit trail gets `payment.cod_collected` (entity payment) and `cod.collected` (entity delivery). A delivery closed by hand by an admin (`orders:updateStatus` to delivered) records the cash as taken and settled by that admin.
+- Task views carry `codCollectedUsd`, `codCollectedAt`, `codHandedOverUsd` (null / 0 before any, and for sellers).
+- `cash:mine` (rider) -> `{ collectedUsd, handedOverUsd, heldUsd, openTasks, handovers: [{ id, amountUsd, heldBeforeUsd, heldAfterUsd, receivedByName, note, createdAt }] }` (latest 20). The rider is pushed `cash:updated` when a hand-over is recorded.
+- `cash:handover { riderId, amountUsd, note?, clientRef? }` (supervisor or manager of the rider's warehouse, or an admin; `tierAllows(.., 'assign')`) -> `{ handover, balance }`. Partial amounts are fine, never more than the rider holds; the same `clientRef` is recorded once. Audit action `cod.handover`. `cash:history { hubId?, riderId?, limit? }` (any staff of the warehouse; admins all) -> the receipts, newest first.
+- `warehouse:reconcile` rows are `{ riderId, parcels, codUsd (due), collectedUsd, handedOverUsd, heldUsd, lastHandoverAt }`. Deliveries made before the record existed count in `codUsd` only.
+- Storage: `delivery_tasks.codCollectedUsd/codCollectedAt/codCollectedById/codHandedOverUsd` and the ledger table `cod_handovers` (migration `1793100000001-CodCashRecord`).
+
 ## 8. Calling logistics from other modules (after-sale)
 
 `LogisticsService` (`api/src/logistics/logistics.service.ts`, import `LogisticsModule`). Nobody else writes delivery tasks.

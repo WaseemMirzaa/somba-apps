@@ -207,3 +207,10 @@ test("every word is the same text as in the Flutter rider app", { skip: !existsS
     assert.deepEqual([...r.RUN_WORDS[key]], flutter, key);
   }
 });
+
+test("a run carries the moments the history dates it by (closed, all scanned in, left, made); an older payload has none", () => {
+  const x = run({ closedAt: "2026-10-20T12:00:00Z", arrivedAt: "2026-10-20T10:00:00Z", dispatchedAt: "2026-10-20T08:00:00Z", createdAt: "2026-10-19T08:00:00Z" });
+  assert.deepEqual([x.closedAt, x.arrivedAt, x.dispatchedAt, x.createdAt], ["2026-10-20T12:00:00Z", "2026-10-20T10:00:00Z", "2026-10-20T08:00:00Z", "2026-10-19T08:00:00Z"]);
+  const old = run();
+  assert.deepEqual([old.closedAt, old.arrivedAt, old.dispatchedAt, old.createdAt], [null, null, null, null]);
+});

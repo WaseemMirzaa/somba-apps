@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { DeliveryStatus, DeliveryTask, Order } from '../database/entities';
+import { AuditLog, DeliveryStatus, DeliveryTask, Order, User } from '../database/entities';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { SettingsService } from '../content/settings.service';
+import { cents, HALF_CENT, usd } from '../warehouse/cash.service';
 import { pageOf } from '../common/paging';
 import { tasksOfHub } from '../logistics/hub-scope';
 import { isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
@@ -79,11 +80,14 @@ export class DeliveryService {
     riderId: string,
     reason?: string,
     code?: string,
+    cashUsd?: unknown,
   ): Promise<DeliveryTask> {
     const task = await this.tasks.findOne({ where: { id: taskId } });
     // Same answer for "missing" and "someone else's" so ids can't be probed.
     if (!task || task.riderId !== riderId) throw new NotFoundException('Delivery task not found.');
     const kind = task.kind ?? 'delivery';
+    // A repeated "delivered" (a retry after a lost answer, a double tap) changes nothing: the cash is recorded once.
+    if (status === 'delivered' && task.status === 'delivered' && !isHubBound(kind)) return this.repeatDelivered(task, cashUsd);
     if (status === 'delivered' && isHubBound(kind)) {
       throw new BadRequestException('This leg ends at the warehouse: warehouse staff scan the parcel in.');
     }
@@ -94,6 +98,8 @@ export class DeliveryService {
         throw new BadRequestException('Wrong delivery code. Ask the customer for the 4-digit code shown in their app.');
       }
     }
+    // C-cod: the cash the rider says they took must be exactly what is due, before anything is written.
+    const cashDue = status === 'delivered' && kind === 'delivery' && isOrderFlow(task) ? DeliveryService.checkCash(task, cashUsd) : 0;
     // A parcel in a run that has not left is handed to the driver with the whole run (dispatch), not picked up on its own.
     if (task.runId && status === 'picked_up' && (await this.runs?.isPlanned(task.runId))) {
       throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
@@ -102,6 +108,7 @@ export class DeliveryService {
       // "A pickup that is picked up cannot become assigned.": the leg's own name, the words of the statuses (see the logistics contract §10).
       throw new BadRequestException(`A ${kindLabel(kind)} that is ${task.status.replace('_', ' ')} cannot become ${String(status).replace('_', ' ')}.`);
     }
+    const now = new Date();
     const failure = status === 'failed' ? String(reason ?? '').trim().slice(0, 200) || 'Customer not reachable' : null;
     // Conditional on the status we just read: a double-tap can't apply it twice.
     const claim = await this.tasks
@@ -111,16 +118,29 @@ export class DeliveryService {
         status,
         ...(failure ? { failureReason: failure } : {}),
         ...(status === 'picked_up' ? { pickedUpAt: new Date() } : {}),
-        ...(status === 'delivered' ? { deliveredAt: new Date() } : {}),
+        ...(status === 'delivered' ? { deliveredAt: now } : {}),
+        // The cash record is written with the status change itself: a delivered COD task always has its amount, time and rider.
+        ...(cashDue > 0 ? { codCollectedUsd: cashDue, codCollectedAt: now, codCollectedById: riderId } : {}),
       })
       .where('id = :id AND status = :cur', { id: taskId, cur: task.status })
       .execute();
-    if (!claim.affected) throw new BadRequestException('This delivery was just updated. Refresh and try again.');
+    if (!claim.affected) {
+      // Lost a race with the very same request (two taps at once): the winner recorded it, this one just reports it.
+      const now2 = await this.tasks.findOne({ where: { id: taskId } });
+      if (status === 'delivered' && now2?.status === 'delivered') return this.repeatDelivered(now2, cashUsd);
+      throw new BadRequestException('This delivery was just updated. Refresh and try again.');
+    }
     const saved = (await this.tasks.findOne({ where: { id: taskId } }))!;
 
     // Collect COD when the customer's parcel is delivered.
     if (status === 'delivered' && kind === 'delivery' && isOrderFlow(saved)) {
-      await this.payments.markCollected(task.orderId);
+      const rider = cashDue > 0 ? await this.tasks.manager.getRepository(User).findOne({ where: { id: riderId }, select: ['id', 'name'] }).catch(() => null) : null;
+      const byName = rider?.name ?? 'Rider';
+      await this.payments.markCollected(
+        task.orderId,
+        cashDue > 0 ? { amountUsd: cashDue, byId: riderId, byName, byRole: 'rider', at: now, taskId: saved.id, source: 'rider' } : undefined,
+      );
+      if (cashDue > 0) await this.auditCash('rider', byName, 'cod.collected', saved, `${saved.orderReference}: ${usd(cashDue)} collected at the door`);
     }
 
     // A failed attempt is not a dead end: the leg is re-opened for another attempt (or the order is cancelled and
@@ -135,6 +155,54 @@ export class DeliveryService {
     // A parcel of a dispatched transfer run reported on the road: the whole run is on the road.
     if (status === 'in_transit' && saved.runId) await this.runs?.onTaskInTransit(saved);
     return saved;
+  }
+
+  /**
+   * C-cod: what a delivery must bring in. Returns the amount due to record (0 when the delivery is prepaid). A COD delivery
+   * needs the rider to confirm the cash and the figure must be the amount due; anything else is refused with the amounts.
+   */
+  private static checkCash(task: DeliveryTask, cashUsd: unknown): number {
+    const due = cents(task.codAmountUsd);
+    const given = cashUsd === undefined || cashUsd === null || cashUsd === '' ? null : Number(cashUsd);
+    if (given !== null && !Number.isFinite(given)) throw new BadRequestException('Enter the cash you collected as an amount in dollars.');
+    if (due < HALF_CENT) {
+      if (given !== null && given > HALF_CENT) throw new BadRequestException('No cash is due on this delivery: it is already paid.');
+      return 0;
+    }
+    if (given === null) throw new BadRequestException(`Confirm the cash you collected: ${usd(due)} is due on this delivery.`);
+    if (Math.abs(cents(given) - due) > HALF_CENT) {
+      throw new BadRequestException(`The cash you entered (${usd(given)}) is not the amount to collect (${usd(due)}). Collect exactly ${usd(due)}, or ask the warehouse if the amount changed.`);
+    }
+    return due;
+  }
+
+  /**
+   * The same "delivered" again: no new cash record. A different cash figure than the recorded one is still refused. If
+   * the first request died after the delivery was written but before the payment was marked collected, this retry
+   * finishes that (`markCollected` only acts on a payment that is still pending).
+   */
+  private async repeatDelivered(task: DeliveryTask, cashUsd: unknown): Promise<DeliveryTask> {
+    const given = cashUsd === undefined || cashUsd === null || cashUsd === '' ? null : Number(cashUsd);
+    if (given !== null && task.codCollectedUsd !== null && Math.abs(cents(given) - cents(task.codCollectedUsd)) > HALF_CENT) {
+      throw new BadRequestException(`This delivery is already complete with ${usd(task.codCollectedUsd)} collected.`);
+    }
+    if (task.codCollectedAt && task.codCollectedUsd !== null && (task.kind ?? 'delivery') === 'delivery') {
+      const rider = await this.tasks.manager.getRepository(User).findOne({ where: { id: task.codCollectedById ?? task.riderId ?? '' }, select: ['id', 'name'] }).catch(() => null);
+      await this.payments.markCollected(task.orderId, { amountUsd: task.codCollectedUsd, byId: task.codCollectedById ?? '', byName: rider?.name ?? 'Rider', byRole: 'rider', at: task.codCollectedAt, taskId: task.id, source: 'rider' });
+    }
+    return task;
+  }
+
+  /** One audit line (fire-and-forget like the desk's other audit lines: the delivery must not fail because of it). */
+  private async auditCash(role: string, name: string, action: string, task: DeliveryTask, detail: string): Promise<void> {
+    try {
+      const log = await this.tasks.manager.getRepository(AuditLog).save(
+        this.tasks.manager.getRepository(AuditLog).create({ actor: name, role, action, entity: 'delivery', entityId: task.id, detail }),
+      );
+      this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log);
+    } catch {
+      /* the cash record on the task is the source of truth */
+    }
   }
 
   /** High-frequency live position pushed to the customer + the warehouses and admins following the task. */

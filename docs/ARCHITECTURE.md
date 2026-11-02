@@ -68,7 +68,7 @@ Somba&Teka is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a 
 | Payments — mobile money | 🟡 | Full lifecycle, signed webhook, idempotent settlement, expiry, late-success credit — **but no real aggregator adapter yet** (production refuses mobile money until one is configured) |
 | Payments — COD | ✅ (disabled) | Implemented and tested, **switched off** per client scope (`codEnabled=false`) |
 | Payments — card | ❌ | Mock only, refused in production |
-| Fulfilment & delivery | 🟡 | Delivery task pool, rider claim/assign, forward-only status, live GPS, COD collection. **No proof of delivery, no seller "ready to ship" step, no per-seller sub-orders** |
+| Fulfilment & delivery | 🟡 | Delivery tasks assigned to riders by the warehouse (riders do not claim), forward-only status, live GPS, COD collection. **No proof of delivery, no seller "ready to ship" step, no per-seller sub-orders** |
 | Warehouse | 🟡 | Hubs, parcels by stage, aged parcels, batches, transfers, exceptions, COD reconciliation. **No hub inventory, no receiving/sorting model; about half of the warehouse pages are mock** |
 | After-sales | 🟡 | Disputes/returns (refund to wallet or original method), exchanges, replacements, support tickets. **No return pickup logistics, no attachments** |
 | Seller finance | 🟡 | Available balance (delivered + clearance − commission), payout request/approve. **"Paid" credits the seller's in-app wallet only — no real bank / mobile-money disbursement, no statements/invoices** |
@@ -274,7 +274,7 @@ sequenceDiagram
 |---|---|---|
 | `customer` | Self-registration | Shop, pay, track, review, dispute, support, wallet, addresses |
 | `seller` | Self-registration + store approval | Store profile, products, campaigns, own orders (redacted), payouts, Q&A answers, reviews |
-| `rider` | Super admin | Delivery pool, claim, status updates, GPS, earnings |
+| `rider` | Super admin | Assigned tasks, status updates, GPS, earnings |
 | `warehouse_staff` | Super admin | Parcels, batches, transfers, exceptions, assignment, exchanges/replacements status |
 | `admin` | Bootstrap / super admin | Everything, including staff roles |
 | `admin_operations` | Super admin | config, catalog, people, insight, audit, fraud, seller moderation, ops |
@@ -1439,8 +1439,8 @@ stateDiagram-v2
   pending --> cancelled: mobile money failed or expired 🔒
   pending --> cancelled: customer cancels 🔒
   confirmed --> cancelled: customer cancels 🔒 (restock + wallet refund)
-  pending --> processing: rider accepts (COD orders stay pending until then)
-  confirmed --> processing: rider accepts / assigned
+  pending --> processing: the warehouse assigns a rider (COD orders stay pending until then)
+  confirmed --> processing: rider assigned
   processing --> shipped: rider picked_up
   shipped --> out_for_delivery: rider in_transit
   out_for_delivery --> delivered: rider delivered (COD collected)
@@ -1476,7 +1476,7 @@ Purposes: `order` (linked to an order) and `topup` (wallet top-up; on success th
 ```mermaid
 stateDiagram-v2
   [*] --> unassigned: order paid (or COD) → openFulfilment
-  unassigned --> assigned: rider accepts / ops assigns 🔒
+  unassigned --> assigned: ops assigns 🔒
   assigned --> picked_up 🔒
   picked_up --> in_transit 🔒
   in_transit --> delivered 🔒
@@ -1630,12 +1630,8 @@ sequenceDiagram
   actor R as Rider app
   actor C as Customer app
   API-->>WH: order:created (paid) → task "unassigned"
-  alt rider self-claims
-    R->>API: delivery:unassigned / rider:tasks
-    R->>API: delivery:accept {taskId} (atomic: first rider wins)
-  else dispatcher assigns
-    WH->>API: warehouse:buildBatch / delivery:assign {taskId, riderId}
-  end
+  WH->>API: logistics:assign / delivery:assign {taskId, riderId}
+  API-->>R: task:updated (New task assigned to you)
   API-->>C: order:updated (processing)
   R->>API: delivery:updateStatus picked_up
   API-->>C: order:updated (shipped)
@@ -1765,8 +1761,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
 | `delivery:list` | Ops (any admin_* role, warehouse_staff), rider (own) | `—` |  |
-| `delivery:unassigned` | Ops (any admin_* role, warehouse_staff), rider | `—` | Pool of unclaimed tasks |
-| `delivery:accept` | rider | `{ taskId: string }` | Atomic claim (one rider wins); order → processing |
+| `delivery:unassigned` | Ops (any admin_* role, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
+| `delivery:accept` | rider | `{ taskId: string }` | Always refused: "Your warehouse assigns your tasks. You cannot accept a task yourself." |
 | `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered |
 | `delivery:location` | rider (assigned) | `{ taskId: string; lat: number; lng: number }` | Pushed to the customer and ops as `delivery:location` |
 | `delivery:assign` | Ops (any admin_* role, warehouse_staff) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
@@ -2116,13 +2112,13 @@ Push notifications and push-tap navigation are done (MOBILE-PUSH.md). Gaps: secu
 
 | Layer | Content |
 |---|---|
-| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Available / Done, claim, next step, fail with confirmation, cash confirmation for COD), **Earnings** (delivered count, active, earnings, cash collected), **Profile** (notifications, language EN/FR, sign out) |
-| State | `RiderStore` (ChangeNotifier): `myTasks`, `pool`, `earnings`, `notifications`, connection status |
+| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Done; the warehouse assigns every task, the rider only moves it along: next step, fail with a reason, cash confirmation for COD; Done has a search and a date filter), **Earnings** (completed count, active, cash collected; riders are salaried, no payouts), **Profile** (edit name and phone, change password, notifications, language EN/FR, sign out) |
+| State | `RiderStore` (ChangeNotifier): `myTasks`, `earnings`, `notifications`, connection status |
 | Services | `AuthService`, `SocketService` (same as customer app), `LocationReporter` (geolocator stream, high accuracy, 10 m distance filter, max one fix / 4 s, immediate first fix; starts on `picked_up`, stops when no delivery is on the road) |
 | Permissions | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` (Android) |
-| Tests | 3 widget tests; live-API test (sign in → claim → picked up → in transit → GPS reaches customer → delivered → earnings → forward-only rule) |
+| Tests | 3 widget tests; live-API test (sign in → warehouse assigns → picked up → in transit → GPS reaches customer → delivered → earnings → forward-only rule) |
 
-Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the `users.active` "availability" comment exists but no rider UI), batches view, cash hand-over. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)
+Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, battery handling), in-app map (navigation opens Google Maps, or Apple Maps on an iPhone), proof of delivery photo. No availability toggle, accept/refuse or payouts by design: the warehouse assigns, riders are salaried. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)
 
 ### 8.3 Web — Next.js 16 / React 19 (`web/`)
 
@@ -2149,7 +2145,7 @@ Gaps: background location (foreground service + `ACCESS_BACKGROUND_LOCATION`, ba
 
 "Live" means at least one live hook is used in the page's tree; several live pages still mix in demo widgets (charts, KPI tiles). For most demo pages the backend handler already exists — the work is wiring (section 11).
 
-The **demo persona picker** on `/login` is shown unless `NEXT_PUBLIC_DEMO_MODE=false` — it must be off in production.
+The **demo persona picker** on `/login` is shown only when the web build sets `NEXT_PUBLIC_DEMO_MODE=true` (off by default, so a forgotten variable cannot expose it).
 
 ### 8.4 Shared package (`shared/`)
 
@@ -2328,7 +2324,7 @@ Priority: **P0** = blocks a real launch with real money · **P1** = expected by 
 | # | Gap | Recommendation | Pri |
 |---|---|---|---|
 | U1 | ~74 web pages on demo data | Wire them to the existing handlers (section 8.3) — mostly wiring, few new endpoints | P1 |
-| U2 | Demo login on the web | Ensure `NEXT_PUBLIC_DEMO_MODE=false` in production | P0 |
+| U2 | Demo login on the web | Fixed: off unless `NEXT_PUBLIC_DEMO_MODE=true` is baked into the build | done |
 | U3 | Apps not tested on devices | Android device/emulator pass, iOS project setup and TestFlight, store listings, permissions copy | P0 |
 | U4 | Rider background GPS | Foreground service with persistent notification; handle Android 14 restrictions and battery optimisation | P1 |
 | U5 | Offline tolerance | Cache last catalogue/orders, queue rider status updates when offline and replay | P2 |

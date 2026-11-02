@@ -71,10 +71,54 @@ describe('sending a broadcast', () => {
     expect(notices).toHaveLength(0);
   });
 
-  it('audience "all" goes to customers; list() serves both languages', async () => {
-    await svc.send('Admin', { title: 'Hello', body: 'World wide', audience: 'all' });
-    expect(notices[0].role).toBe('customer');
+  it('list() serves both languages', async () => {
+    await svc.send('Admin', { title: 'Hello', body: 'World wide' });
     expect((await svc.list())[0]).toMatchObject({ titleFr: '[fr] Hello', bodyFr: '[fr] World wide' });
     expect(await ds.getRepository(Translation).count({ where: { entityType: 'broadcast' } })).toBe(2);
+  });
+
+  describe('audience: the recipient count, the saved audience and the notification name the same people', () => {
+    beforeEach(async () => {
+      const users = ds.getRepository(User);
+      const add = (role: string, n: number) =>
+        users.save(Array.from({ length: n }, (_, i) => users.create({ emailHash: `${role}-${i}`, email: `${role}${i}@x.y`, passwordHash: 'x', name: `${role} ${i}`, role: role as never })));
+      await add('customer', 3);
+      await add('seller', 2);
+      await add('rider', 1);
+      await add('warehouse_staff', 4);
+      await add('admin', 1);
+    });
+
+    it('"all" is every CUSTOMER: delivered to the customer room only, counted as customers only (not sellers, riders, staff or admins)', async () => {
+      const b = await svc.send('Admin', { title: 'Hello', body: 'World wide', audience: 'all' });
+      expect(notices.map((n) => n.role)).toEqual(['customer']);
+      expect(b.recipients).toBe(3); // was 11, the count of every user
+      expect(b.audience).toBe('all');
+    });
+
+    it('"customer" (and no audience) is the same people as "all"', async () => {
+      expect((await svc.send('Admin', { title: 'A', body: 'a', audience: 'customer' })).recipients).toBe(3);
+      expect((await svc.send('Admin', { title: 'B', body: 'b' })).recipients).toBe(3);
+      expect(notices.map((n) => n.role)).toEqual(['customer', 'customer']);
+    });
+
+    it.each([
+      ['seller', 2],
+      ['rider', 1],
+      ['warehouse_staff', 4],
+    ])('"%s" is delivered to that role and counted as that role', async (audience, count) => {
+      const b = await svc.send('Admin', { title: 'Hi', body: 'there', audience });
+      expect(notices.map((n) => n.role)).toEqual([audience]);
+      expect(b).toMatchObject({ recipients: count, audience });
+    });
+
+    it('an audience that is not offered (an admin role, a typo) is refused before anything is translated, saved or sent', async () => {
+      for (const audience of ['admin', 'admin_finance', 'everyone', 'Customer', 7 as never]) {
+        await expect(svc.send('Admin', { title: 'Hi', body: 'there', audience })).rejects.toThrow('Choose who receives it');
+      }
+      expect(notices).toEqual([]);
+      expect(fake.calls).toHaveLength(0);
+      expect(await ds.getRepository(Broadcast).count()).toBe(0);
+    });
   });
 });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
+import '../services/history_filter.dart';
 import '../services/location_reporter.dart';
 import '../services/models.dart';
 import '../services/navigation_link.dart';
@@ -39,9 +40,16 @@ const kFailReasonIds = ['unreachable', 'wrong_address', 'refused', 'payment', 'o
 /// The rider's work: the legs the warehouse assigned (pickups, transfers, deliveries, returns, replacements) and
 /// what was finished. Riders cannot accept or pick tasks: the warehouse staff assign them. Everything is live.
 class DeliveriesScreen extends StatefulWidget {
-  /// Opens a navigation link; defaults to the system (Google Maps app / browser). Replaced in tests.
+  /// Opens a navigation link; defaults to the system (Google Maps app / browser, Apple Maps on an iPhone). Replaced in tests.
   final Future<bool> Function(Uri uri)? launcher;
-  const DeliveriesScreen({super.key, this.launcher});
+
+  /// Tests: pretend to be an iPhone (or not), and say whether the Google Maps app is installed.
+  final bool? isIPhone;
+  final Future<bool> Function()? googleInstalled;
+
+  /// Tests: choose the days of the history filter without driving the Material picker.
+  final Future<DateTimeRange?> Function(DateTimeRange? current)? pickDays;
+  const DeliveriesScreen({super.key, this.launcher, this.isIPhone, this.googleInstalled, this.pickDays});
   @override
   State<DeliveriesScreen> createState() => _DeliveriesScreenState();
 }
@@ -50,6 +58,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   final store = RiderStore.instance;
   int _tab = 0; // 0 active · 1 done
   bool _busy = false;
+
+  /// The Done list's search (order reference) and date range.
+  final _search = TextEditingController();
+  DateTimeRange? _range;
 
   /// Transfer runs whose parcel list is open.
   final Set<String> _openRuns = {};
@@ -64,6 +76,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   @override
   void dispose() {
     store.focus.removeListener(_onFocus);
+    _search.dispose();
     super.dispose();
   }
 
@@ -130,12 +143,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     return ok == true && mounted;
   }
 
-  Future<void> _askCode(DeliveryTaskDto t) async {
+  Future<void> _askCode(DeliveryTaskDto t, {double? cashUsd}) async {
     // The dialog keeps itself open and shows the server's error until the code is right.
     final done = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code)),
+      builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code, cashUsd: cashUsd)),
     );
     if (done == true && mounted) showSnack(context, Strings.of(context).doneDelivered);
   }
@@ -156,19 +169,27 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
       return;
     }
     if (to == 'delivered') {
-      if (t.collectsCash && !await _confirm(s.cashTitle, s.cashBody(s.usd(t.codAmountUsd), t.customerName ?? s.theCustomer))) return;
+      // Cash on delivery: the rider confirms the amount they took; the server records it and refuses any other than the one due.
+      double? cashUsd;
+      if (t.collectsCash) {
+        cashUsd = await showDialog<double>(
+          context: context,
+          builder: (ctx) => CashCollectDialog(due: t.codAmountUsd, customer: t.customerName ?? s.theCustomer),
+        );
+        if (cashUsd == null || !mounted) return;
+      }
       if (t.collectOld && !await _confirm(s.collectOldTitle, s.collectOldBody(t.customerName ?? s.theCustomer))) return;
       // The customer's code is asked on the customer delivery only (never on a hub-bound leg, a return or a replacement).
-      if (t.needsCode && store.requireDeliveryCode) return _askCode(t);
+      if (t.needsCode && store.requireDeliveryCode) return _askCode(t, cashUsd: cashUsd);
       try {
         setState(() => _busy = true);
-        await store.advance(t.id, 'delivered');
+        await store.advance(t.id, 'delivered', cashUsd: cashUsd);
         if (mounted) showSnack(context, s.doneDelivered);
       } catch (e) {
         // The setting was not known yet but the server wants the code: ask for it.
         if (e is ApiException && e.message.startsWith('Wrong delivery code') && mounted) {
           setState(() => _busy = false);
-          return _askCode(t);
+          return _askCode(t, cashUsd: cashUsd);
         }
         if (mounted) showSnack(context, Strings.current.errorText(e));
       } finally {
@@ -185,10 +206,20 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
       listenable: store,
       builder: (context, _) {
         final s = Strings.of(context);
-        final lists = [store.active, store.finished];
+        // Done can be searched by order reference and narrowed to some days.
+        final filtering = _tab == 1 && (_search.text.trim().isNotEmpty || _range != null);
+        final allDone = store.finished.length + store.finishedRuns.length;
+        final lists = [
+          store.active,
+          filtering ? filterFinishedTasks(store.finished, query: _search.text, from: _range?.start, to: _range?.end) : store.finished,
+        ];
         final rows = lists[_tab];
         // This driver's transfer runs come first, one card each; their parcels are inside the card.
-        final runs = _tab == 0 ? store.activeRuns : store.finishedRuns;
+        final runs = _tab == 0
+            ? store.activeRuns
+            : filtering
+                ? filterFinishedRuns(store.finishedRuns, store.tasksOfRun, query: _search.text, from: _range?.start, to: _range?.end)
+                : store.finishedRuns;
         final total = runs.length + rows.length;
         final top = MediaQuery.of(context).padding.top;
         return Column(children: [
@@ -208,13 +239,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               ]),
             ]),
           ),
+          if (_tab == 1 && store.loaded && allDone > 0) _historyBar(s),
           Expanded(
             child: RefreshIndicator(
               onRefresh: store.refresh,
               child: !store.loaded
                   ? ListView(children: const [SizedBox(height: 120), Center(child: CircularProgressIndicator())])
                   : total == 0
-                      ? ListView(children: [const SizedBox(height: 90), _empty(s)])
+                      ? ListView(children: [const SizedBox(height: 90), _empty(s, noMatch: filtering)])
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
                           itemCount: total,
@@ -259,8 +291,8 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     );
   }
 
-  Widget _empty(Strings s) {
-    final msg = [s.emptyActive, s.emptyDone][_tab];
+  Widget _empty(Strings s, {bool noMatch = false}) {
+    final msg = noMatch ? s.historyNoMatch : [s.emptyActive, s.emptyDone][_tab];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(children: [
@@ -628,9 +660,92 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   }
 
   Future<void> _navigate(Strings s, NavTarget target) async {
-    final opened = await openNavigation(pin: target.pin, addressText: target.addressText, launcher: widget.launcher);
+    final opened = await openNavigation(
+      pin: target.pin,
+      addressText: target.addressText,
+      launcher: widget.launcher,
+      isIPhone: widget.isIPhone,
+      googleInstalled: widget.googleInstalled,
+      choose: () => _chooseMapsApp(s),
+    );
     if (!opened && mounted) showSnack(context, s.navFailed);
   }
+
+  /// iPhone with both maps apps: which one to use for this trip (a tap outside cancels).
+  Future<MapsApp?> _chooseMapsApp(Strings s) => showModalBottomSheet<MapsApp>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(s.navChooseTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            ),
+            ListTile(key: const ValueKey('nav-choice-google'), title: Text(s.navGoogleMaps), onTap: () => Navigator.pop(ctx, MapsApp.google)),
+            ListTile(key: const ValueKey('nav-choice-apple'), title: Text(s.navAppleMaps), onTap: () => Navigator.pop(ctx, MapsApp.apple)),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      );
+
+  Future<void> _pickRange(Strings s) async {
+    final now = DateTime.now();
+    final picked = widget.pickDays != null
+        ? await widget.pickDays!(_range)
+        : await showDateRangePicker(
+            context: context,
+            firstDate: DateTime(now.year - 2),
+            lastDate: DateTime(now.year, now.month, now.day),
+            initialDateRange: _range,
+          );
+    if (picked != null && mounted) setState(() => _range = picked);
+  }
+
+  String _rangeLabel(BuildContext context, Strings s) {
+    final r = _range;
+    if (r == null) return s.historyAnyDate;
+    final m = MaterialLocalizations.of(context);
+    final a = m.formatShortDate(r.start), b = m.formatShortDate(r.end);
+    return a == b ? a : '$a – $b';
+  }
+
+  /// Search by order reference and a date range, above the Done list.
+  Widget _historyBar(Strings s) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(
+            key: const ValueKey('history-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            autocorrect: false,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              hintText: s.historySearchHint,
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: _search.text.isEmpty
+                  ? null
+                  : IconButton(key: const ValueKey('history-search-clear'), tooltip: s.historyClear, icon: const Icon(Icons.close_rounded, size: 18), onPressed: () => setState(_search.clear)),
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.surface,
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1.6)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.line)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            ActionChip(
+              key: const ValueKey('history-date'),
+              avatar: const Icon(Icons.calendar_today_rounded, size: 16),
+              label: Text(_rangeLabel(context, s)),
+              onPressed: () => _pickRange(s),
+            ),
+            if (_range != null) TextButton(key: const ValueKey('history-date-clear'), onPressed: () => setState(() => _range = null), child: Text(s.historyClear)),
+          ]),
+        ]),
+      );
 
   /// Who follows the driver: the customer on a delivery to them; only the warehouses on pickups and transfers (the server
   /// never sends those positions to a customer).
@@ -758,6 +873,62 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// Cash on delivery: the rider confirms how much cash they took at the door. The field starts at the amount due; the
+/// dialog answers with the amount entered (the server refuses anything but the amount due, and says so).
+class CashCollectDialog extends StatefulWidget {
+  final double due;
+  final String customer;
+  const CashCollectDialog({super.key, required this.due, required this.customer});
+  @override
+  State<CashCollectDialog> createState() => _CashCollectDialogState();
+}
+
+class _CashCollectDialogState extends State<CashCollectDialog> {
+  late final TextEditingController _ctrl = TextEditingController(text: widget.due.toStringAsFixed(2));
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_ctrl.text.trim().replaceAll(',', '.'));
+    if (v == null || !v.isFinite || v <= 0 || (v * 100 - (v * 100).roundToDouble()).abs() > 1e-6) {
+      setState(() => _error = Strings.of(context).cashAmountErr);
+      return;
+    }
+    Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    return AlertDialog(
+      title: Text(s.cashTitle),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(s.cashBody(s.usd(widget.due), widget.customer)),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('cash-amount-field'),
+          controller: _ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          decoration: InputDecoration(labelText: s.cashAmountLabel, border: const OutlineInputBorder(), errorText: _error),
+          onChanged: (_) => _error == null ? null : setState(() => _error = null),
+          onSubmitted: (_) => _submit(),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.notYet)),
+        FilledButton(key: const ValueKey('confirm-dialog'), onPressed: _submit, child: Text(s.yesCollected)),
+      ],
     );
   }
 }

@@ -27,6 +27,11 @@ const TITLE_TEMPLATES: Record<string, string[]> = {
  * instances and their French. Bodies that are only data (references, names, free text) need no entry.
  */
 const BODY_CASES: Record<string, [sample: string, french: string][]> = {
+  // Fraud: an alert suspended or reinstated an account
+  '{} was suspended after a fraud alert.': [['Awa Diallo was suspended after a fraud alert.', 'Awa Diallo a été suspendu après une alerte de fraude.']],
+  '{} was reactivated after a fraud alert.': [['Awa Diallo was reactivated after a fraud alert.', 'Awa Diallo a été réactivé après une alerte de fraude.']],
+  'Your account is suspended. Contact support for help.': [['Your account is suspended. Contact support for help.', 'Votre compte est suspendu. Contactez le support pour obtenir de l’aide.']],
+  'Your account is active again.': [['Your account is active again.', 'Votre compte est de nouveau actif.']],
   // Orders and deliveries
   'We received {}. You\'ll get updates here in real time.': [
     ["We received SOM-1001. You'll get updates here in real time.", 'Nous avons reçu SOM-1001. Vous recevrez les mises à jour ici en temps réel.'],

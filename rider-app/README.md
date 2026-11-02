@@ -1,8 +1,9 @@
 # Somba&Teka — Rider App (Flutter)
 
-The rider/courier app for the Somba&Teka marketplace: manage delivery, pickup and
-return tasks, collect cash on delivery, navigate an optimized route, and track
-earnings.
+The rider/courier app for the Somba&Teka marketplace: work through the tasks your warehouse
+assigns (pickups, transfers, deliveries, returns, replacements), open turn-by-turn navigation in
+your maps app, collect cash on delivery, and see what you completed. Riders are salaried: the app
+has no payout or withdrawal.
 
 ## Realtime backend connection
 
@@ -24,9 +25,10 @@ are created by the fleet team in the admin panel. The sign-in screen never pre-f
 never lets anyone in offline.
 
 Tabs: **Deliveries** (Active / Done; picked up → in transit → delivered, with a cash-collected confirmation
-for COD and the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff),
-**Earnings** (server-computed totals + cash to hand over), **Profile** (home warehouse, **Support** tickets
-with photos, notifications, language, sign out). While a delivery is on the road the app streams the
+for COD and the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff;
+Done can be searched by order reference and narrowed to a range of days),
+**Earnings** (server-computed totals of completed tasks + cash to hand over), **Profile** (edit name and phone,
+change password, home warehouse, **Support** tickets with photos, notifications, language, sign out). While a delivery is on the road the app streams the
 real GPS position (`geolocator`; permission declared in the Android manifest) as `delivery:location`.
 
 ### Tests
@@ -38,19 +40,35 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   --dart-define=API_URL=http://localhost:3001 --dart-define=SOCKET_URL=http://localhost:3001
 ```
 
+## How the rider works (and what the app does not have)
+
+- **The warehouse assigns every task.** There is no pool of open jobs, no accept and no refuse: a task shows up
+  in *Active* (with a "New task assigned to you" notice) as soon as the warehouse desk assigns it, and the rider
+  only moves it along: picked up → on the way → delivered (or failed, with a reason). The server refuses
+  `delivery:accept` for riders ("Your warehouse assigns your tasks...") and `delivery:unassigned` is empty for them.
+- **No on-duty switch.** The green **Online** pill on the Deliveries header only shows that the phone is connected
+  to the server (`ConnStatus`); it does not make the rider available or unavailable. A rider receives work as long
+  as the account is active; to stop work, the desk stops assigning or an admin switches the account off (the app then
+  signs the rider out).
+- **No payouts.** Riders are salaried. *Earnings* is a record of completed tasks and the cash collected; nothing is
+  paid out or withdrawn through the platform.
+
 ## Highlights
 
-- Modern royal-blue identity (logo colour) with a **floating capsule navigation** (animated
-  expanding pill), **Plus Jakarta Sans** display headings paired with Inter body text.
-- **Tasks**: gradient on-duty header with live stats, colour-coded task cards
-  (delivery / pickup / return) with COD and open-box chips, distance · ETA · items,
-  and a rich task-action bottom sheet (navigate, complete, report).
-- **Navigate**: a custom-painted route map with sequenced stop markers and a
-  next-stop action card.
-- **Earnings**: gradient balance hero, a weekly bar chart with the best day
-  highlighted, and payout history.
-- **Profile**: stats header, on-duty switch, vehicle/documents/support, EN/FR toggle.
-- Bundled **Inter + Plus Jakarta Sans** fonts — no runtime font fetching; fully self-contained.
+- Royal-blue identity with a **floating capsule navigation** (animated expanding pill), **Plus Jakarta Sans** display
+  headings paired with Inter body text. Bundled fonts: no runtime font fetching.
+- **Deliveries**: Active / Done tabs, task cards for every leg (pickup, transfer, delivery, return, replacement) with
+  COD chips, the parcel, from → to, and the next action as a label-only button; transfer runs are one card with the parcels
+  inside. *Done* has a search by order reference (or run reference) and a date-range filter.
+- **Navigate**: opens turn-by-turn directions in your maps app. Android: Google Maps (the app when installed, else the
+  browser). iPhone: **Apple Maps** straight away when Google Maps is not installed (no extra tap); when both are installed a
+  small list asks which one to use for this trip. There is no in-app map. No API key is needed.
+- **Earnings**: totals of completed tasks, by kind, and the cash collected to hand over at the warehouse.
+- **Profile**: edit name and phone, change password (the server signs every other phone out and this phone keeps working),
+  home warehouse and the areas it covers, support tickets, notifications, EN/FR toggle, sign out. The e-mail, role and
+  warehouse are changed by the fleet team or an admin only.
+- **Session**: if the server revokes the session (password changed elsewhere, account switched off), the rider is signed out
+  cleanly: every screen opened on top is closed and the sign-in screen shows with a message.
 
 ## Run locally
 

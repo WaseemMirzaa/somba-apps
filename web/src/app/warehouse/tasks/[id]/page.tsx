@@ -30,10 +30,10 @@ export default function WarehouseLegDetailPage() {
   const isAdmin = base.startsWith("/admin");
   const q = useDeskQueue({ status: "all" });
   const [showIncident, setShowIncident] = useState(false);
-  const exceptionsQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
-
   const key = decodeURIComponent(id);
   const task = findLeg(q.tasks, key);
+  // This parcel's incidents only: the whole incident list is a supervisor page (the server refuses an operator it).
+  const exceptionsQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], body: { taskId: task?.id ?? "" }, push: ["exception:updated"], enabled: !!task });
 
   if (!task) {
     return q.loading ? (
@@ -130,6 +130,12 @@ export default function WarehouseLegDetailPage() {
                 : []),
               { label: fr ? "Adresse enregistrée" : "Recorded address", value: addressText(task.address), full: true },
               ...(task.codAmountUsd > 0 ? [{ label: fr ? "COD à encaisser" : "COD to collect", value: formatCurrency(task.codAmountUsd, locale) }] : []),
+              ...(task.codCollectedAt
+                ? [{
+                    label: fr ? "Espèces encaissées" : "Cash collected",
+                    value: `${formatCurrency(task.codCollectedUsd ?? 0, locale)} · ${new Date(task.codCollectedAt).toLocaleString(locale)} · ${fr ? "remis à l'entrepôt" : "handed in"} ${formatCurrency(task.codHandedOverUsd ?? 0, locale)}`,
+                  }]
+                : []),
               { label: fr ? "Tentatives" : "Attempts", value: task.attempts },
               { label: fr ? "Âge" : "Age", value: isOpenLeg(task) ? (age < 48 ? `${Math.round(age)} h` : `${Math.floor(age / 24)} ${fr ? "j" : "d"}`) : "—" },
             ]}

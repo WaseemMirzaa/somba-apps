@@ -60,6 +60,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3001
         NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+        # Demo role picker on /login: off unless you run `NEXT_PUBLIC_DEMO_MODE=true docker compose up --build`.
+        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
     restart: unless-stopped
     depends_on:
       - api

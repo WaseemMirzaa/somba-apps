@@ -18,6 +18,7 @@ import {
   Setting,
   WarehouseBatch,
   Hub,
+  WalletTransaction,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -55,6 +56,7 @@ import { GeoModule } from '../geo/geo.module';
       FraudAlert,
       Broadcast,
       Setting,
+      WalletTransaction,
     ]),
     NotificationsModule,
     PaymentsModule,

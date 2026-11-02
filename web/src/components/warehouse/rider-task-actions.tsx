@@ -6,19 +6,10 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errorMessage } from "@/lib/warehouse-live";
+import { parseCashAmount } from "@/lib/cash-amount";
 import { formatCurrency } from "@/lib/utils";
 import type { RiderTask } from "@/lib/rider";
-
-export const FAIL_REASONS = [
-  { value: "Customer unavailable", fr: "Client indisponible" },
-  { value: "Customer not reachable", fr: "Client injoignable" },
-  { value: "Wrong address", fr: "Mauvaise adresse" },
-  { value: "Refused delivery", fr: "Livraison refusée" },
-  { value: "Payment issue", fr: "Problème de paiement" },
-  { value: "Seller not ready", fr: "Vendeur pas prêt" },
-  { value: "Parcel damaged or missing", fr: "Colis endommagé ou manquant" },
-  { value: "Other", fr: "Autre" },
-];
+import { FAIL_REASONS, canReportFailure, failedPayload, nextStep, stepPayload } from "@/lib/rider-actions";
 
 /** Run one rider action and report the real outcome. Resolves true only after the server acknowledged. */
 function useRun() {
@@ -85,7 +76,8 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
   const fr = locale === "fr";
   const { busy, error, setError, run } = useRun();
   const [code, setCode] = useState("");
-  const [cash, setCash] = useState(false);
+  // Cash on delivery: the amount taken at the door, which starts at the amount due. The server refuses any other amount.
+  const [cash, setCash] = useState(() => (task.codAmount > 0 ? task.codAmount.toFixed(2) : ""));
   const cod = task.codAmount > 0;
   // The API flags every customer delivery `needsCode`; the code is only enforced when the platform setting is on.
   const [requireCode, setRequireCode] = useState(false);
@@ -107,13 +99,14 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
       setError(fr ? "Demandez le code à 4 chiffres au client." : "Ask the customer for their 4-digit code.");
       return;
     }
-    if (cod && !cash) {
-      setError(fr ? "Confirmez d'abord l'encaissement des espèces." : "Confirm the cash was collected first.");
+    const cashUsd = parseCashAmount(cash);
+    if (cod && cashUsd === null) {
+      setError(fr ? "Saisissez le montant encaissé, par exemple 25,50." : "Enter the amount you collected, for example 25.50.");
       return;
     }
     const ok = await run(
       "delivered",
-      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "delivered", ...(needsCode ? { code: code.trim() } : {}) }),
+      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "delivered", ...(needsCode ? { code: code.trim() } : {}), ...(cod ? { cashUsd } : {}) }),
       fr ? "Livraison confirmée" : "Delivery confirmed",
     );
     if (ok) onDone();
@@ -137,11 +130,21 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
         </label>
       )}
       {cod && (
-        <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          <input type="checkbox" className="mt-1" checked={cash} onChange={(e) => setCash(e.target.checked)} />
+        <label className="block rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <span>
             {fr ? "Espèces encaissées ?" : "Cash collected?"} <strong>{formatCurrency(task.codAmount, locale)}</strong>{" "}
-            {fr ? "ont été reçus du client." : "was received from the customer."}
+            {fr ? "sont à recevoir du client." : "is due from the customer."}
+          </span>
+          <span className="mt-2 block text-xs font-medium">{fr ? "Montant encaissé (USD)" : "Cash you collected (USD)"}</span>
+          <input
+            inputMode="decimal"
+            aria-label={fr ? "Montant encaissé (USD)" : "Cash you collected (USD)"}
+            className="input-premium mt-1 w-full px-4 py-3 text-lg font-semibold"
+            value={cash}
+            onChange={(e) => setCash(e.target.value.replace(/[^0-9.,]/g, ""))}
+          />
+          <span className="mt-1 block text-[11px] text-amber-800">
+            {fr ? "Le serveur enregistre ce montant et refuse tout autre montant que celui dû." : "The server records this amount and refuses any amount other than the one due."}
           </span>
         </label>
       )}
@@ -167,12 +170,7 @@ export function FailedForm({ task, onDone }: { task: RiderTask; onDone: () => vo
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const text = `${reason}${notes.trim() ? `: ${notes.trim()}` : ""}`.slice(0, 200);
-    const ok = await run(
-      "failed",
-      () => socketClient.request("delivery:updateStatus", { taskId: task.id, status: "failed", reason: text }),
-      fr ? "Échec enregistré" : "Failed attempt recorded",
-    );
+    const ok = await run("failed", () => socketClient.request("delivery:updateStatus", failedPayload(task.id, reason, notes)), fr ? "Échec enregistré" : "Failed attempt recorded");
     if (ok) onDone();
   }
 
@@ -220,10 +218,11 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
   const [panel, setPanel] = useState<"delivered" | "failed" | null>(null);
   const l = labels(task, fr);
 
-  if (task.status === "delivered" || task.status === "failed") return null;
+  const next = nextStep(task);
+  if (next === "none") return null;
 
   async function step(key: string, status: "picked_up" | "in_transit", success: string) {
-    const ok = await run(key, () => socketClient.request("delivery:updateStatus", { taskId: task.id, status }), success);
+    const ok = await run(key, () => socketClient.request("delivery:updateStatus", stepPayload(task.id, status)), success);
     if (ok) onChanged();
   }
 
@@ -231,19 +230,19 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
 
   return (
     <div className="space-y-3">
-      {task.status === "assigned" && (
+      {next === "picked_up" && (
         <button onClick={() => void step("picked_up", "picked_up", l.pickedToast)} disabled={busy !== null} className={primary}>
           <PackageCheck className="h-4 w-4" />
           {busy === "picked_up" ? "…" : l.picked}
         </button>
       )}
-      {task.status === "picked_up" && (
+      {next === "in_transit" && (
         <button onClick={() => void step("in_transit", "in_transit", l.goToast)} disabled={busy !== null} className={primary}>
           <Truck className="h-4 w-4" />
           {busy === "in_transit" ? "…" : l.go}
         </button>
       )}
-      {task.status === "in_transit" && task.hubBound && (
+      {next === "handover" && (
         <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
           <Warehouse className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
@@ -253,19 +252,19 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
           </p>
         </div>
       )}
-      {task.status === "in_transit" && !task.hubBound && panel !== "delivered" && (
+      {next === "deliver" && panel !== "delivered" && (
         <button onClick={() => setPanel("delivered")} className={primary}>
           <CheckCircle className="h-4 w-4" />
           {task.kind === "return_to_seller" ? (fr ? "Remis au vendeur" : "Handed to the seller") : fr ? "Livré" : "Delivered"}
         </button>
       )}
-      {panel === "delivered" && task.status === "in_transit" && !task.hubBound && (
+      {panel === "delivered" && next === "deliver" && (
         <div className="rounded-xl border border-emerald-200 p-4">
           <DeliveredForm task={task} onDone={onChanged} />
         </div>
       )}
 
-      {panel !== "failed" && (
+      {canReportFailure(task) && panel !== "failed" && (
         <button onClick={() => setPanel("failed")} className="w-full rounded-xl border border-red-200 py-2 text-center text-sm text-red-600 hover:bg-red-50">
           {fr ? "Impossible de terminer" : "Could not complete"}
         </button>

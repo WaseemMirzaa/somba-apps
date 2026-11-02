@@ -308,6 +308,10 @@ export interface DeliveryTask {
   replacementId?: string | null;
   exchangeId?: string | null;
   codAmountUsd: number;
+  /** The cash record: what the rider confirmed taking, when, and how much of it the warehouse has received. */
+  codCollectedUsd?: number | null;
+  codCollectedAt?: string | null;
+  codHandedOverUsd?: number;
   lat: number | null;
   lng: number | null;
   createdAt: string;

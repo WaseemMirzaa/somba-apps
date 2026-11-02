@@ -9,13 +9,13 @@ _Companion to `BACKEND-AUDIT.md` and `PRODUCTION-READINESS-AUDIT.md`. Database t
 | Backend (NestJS + TypeORM + Socket.IO) | 113 WebSocket handlers, 14 REST endpoints, 33 domains, 31 server-pushed events. MySQL migration `InitialSchema` (33 tables), production bootstrap (admin, categories, settings, hubs). |
 | Security | Production boot guard, AES-256-GCM field encryption, bcrypt(12), JWT access/refresh with revocation, helmet, WS + REST throttling, server-authoritative order pricing, suspended-account enforcement at handshake. |
 | Account lifecycle | Register, email verification, phone OTP (lockout), forgot/reset, change password, profile + prefs, avatar upload, account deletion, device-token registry. |
-| Web (customer + seller + warehouse + rider + admin) | Live hooks on the core flows. Real email/password sign-in on `/login` (demo persona picker only when `NEXT_PUBLIC_DEMO_MODE` is not `false`). |
+| Web (customer + seller + warehouse + rider + admin) | Live hooks on the core flows. Real email/password sign-in on `/login` (demo persona picker only when `NEXT_PUBLIC_DEMO_MODE=true`). |
 | Deployment | `docker-compose.yml`, `deploy/nginx/somba.conf`, `deploy/droplet-deploy.sh` (one-command idempotent droplet deploy), GitHub Actions CI incl. MySQL job. |
 | Payments | Mobile-money lifecycle (Airtel / Orange / M-Pesa): order + payment stay `pending` until a signed webhook (HMAC over the raw body, `POST /api/v1/payments/webhook/mobile-money`) or the sandbox confirms; atomic idempotent settlement; late success credited to the wallet; stale intents expire (`MM_PENDING_TTL_MIN`). Wallet orders are atomic. **COD is disabled** (`codEnabled=false`, admin can enable). **Account is mandatory** (no guest checkout). |
 | Money/stock integrity | Atomic stock reservation, conditional `UPDATE` transitions for cancel / settle / refund / payout approve / delivery accept, server-authoritative prices, promo limits, zone-based delivery fee (`deliveryZones` setting), payouts only from delivered sales after `PAYOUT_CLEARANCE_HOURS`. |
 | Authorization | Every WebSocket handler is role-checked; least-privilege admin sub-roles (operations / finance / warehouse); suspension and role change kick live sockets and revoke tokens; self-registration limited to customer/seller; audit log. 114-assertion authz smoke test in CI. |
 | Flutter customer app (`mobile/`) | Rewritten onto the live backend (no mock catalogue/state, real auth incl. verify/forgot/reset, mobile-money checkout with pending screen, orders, wallet, addresses, wishlist, promos, notifications). `flutter analyze` clean; 3 widget tests + 15 live-API tests; web build loaded and signed in a real browser. |
-| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, available / active / done deliveries, claim -> picked up -> in transit -> delivered, real GPS stream (`delivery:location`), earnings + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
+| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, active / done deliveries assigned by the warehouse (no accept), picked up -> in transit -> delivered, real GPS stream (`delivery:location`), earnings + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
 | Not verified here | Android/iOS device or emulator builds (no Android SDK in the sandbox), the droplet itself, and any real aggregator / SMTP / SMS / FCM account. |
 
 ## 2. Remaining work (scope vs backend)
@@ -153,7 +153,7 @@ Set the apps to the droplet: API `https://api.example.com/api/v1`, socket `https
 
 **C. Seller / warehouse / rider / admin (web)**
 1. Seller registers a store; admin approves (`sellers:setStatus`); seller lists a product.
-2. Order placed -> warehouse sees the parcel -> admin assigns a rider -> rider accepts, updates status and location (live map updates) -> delivered.
+2. Order placed -> warehouse sees the parcel -> admin assigns a rider -> rider updates status and location (live map updates) -> delivered.
 3. Payout request -> admin approves/rejects. Dispute open/resolve. Support ticket reply. Broadcast reaches customers.
 4. Suspend a customer in the admin panel -> their live session is disconnected and login is refused.
 

@@ -2,6 +2,7 @@
 # Run the whole Somba&Teka stack on your own machine (API + web) with demo data.
 #   bash scripts/run-local.sh          # first run installs, seeds and starts
 #   RESET=1 bash scripts/run-local.sh  # wipe the local database and re-seed
+#   DEMO_MODE=true bash scripts/run-local.sh  # also show the one-click demo role picker on /login (off by default)
 # Needs only Node 22+ and npm. Uses SQLite, so no database server is required.
 # Web http://localhost:3000   API http://localhost:3001   Stop with Ctrl-C.
 set -euo pipefail
@@ -20,7 +21,8 @@ export NODE_ENV=development DB_TYPE=sqlite DB_SQLITE_FILE="$DB" DB_SYNCHRONIZE=t
 (cd api && npm run build >/dev/null)
 if [ ! -f "$DB" ]; then echo "Seeding demo data…"; (cd api && npm run seed >/dev/null); fi
 
-printf 'NEXT_PUBLIC_API_URL=http://localhost:%s\nNEXT_PUBLIC_SOCKET_URL=http://localhost:%s\nNEXT_PUBLIC_DEMO_MODE=false\n' "$API_PORT" "$API_PORT" > web/.env.local
+# The demo role picker is off unless asked for; NEXT_PUBLIC_* is read when the web app compiles.
+printf 'NEXT_PUBLIC_API_URL=http://localhost:%s\nNEXT_PUBLIC_SOCKET_URL=http://localhost:%s\nNEXT_PUBLIC_DEMO_MODE=%s\n' "$API_PORT" "$API_PORT" "$([ "${DEMO_MODE:-false}" = true ] && echo true || echo false)" > web/.env.local
 
 cleanup() { kill "$API_PID" "$WEB_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM

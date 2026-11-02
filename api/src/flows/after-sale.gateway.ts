@@ -3,9 +3,11 @@ import { oneOf } from '../common/validate';
 import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
+import { StaffTierService } from '../logistics/staff-tier.service';
 import { ExchangesService } from './exchanges.service';
 import { ReplacementsService } from './replacements.service';
 
+const SUPERVISORS_ONLY = 'Only supervisors and managers can see this.';
 const isOps = (role: string) => role.startsWith('admin') || role === 'warehouse_staff';
 const REPLACEMENT_STATUSES = ['requested', 'approved', 'received', 'allocated', 'dispatched', 'delivered', 'rejected'] as const;
 const EXCHANGE_STATUSES = ['requested', 'approved', 'received', 'ready', 'dispatched', 'delivered', 'rejected'] as const;
@@ -20,7 +22,16 @@ export class AfterSaleGateway {
   constructor(
     private readonly replacements: ReplacementsService,
     private readonly exchanges: ExchangesService,
+    private readonly tiers: StaffTierService,
   ) {}
+
+  /**
+   * Warehouse staff reach replacements and exchanges through the supervisor pages only, so an operator is refused here
+   * (same tier as `WAREHOUSE_ROUTES` in the web). Sellers, customers and admins are not affected.
+   */
+  private async staffBelowSupervisor(user: SocketUser): Promise<boolean> {
+    return user.role === 'warehouse_staff' && !(await this.tiers.allows(user, 'oversee'));
+  }
 
   /** A seller account acts as its store (a team member with the orders permission too); everyone else as themselves. */
   private async viewer(user: SocketUser, write: boolean) {
@@ -38,6 +49,7 @@ export class AfterSaleGateway {
   async replacementsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
     try {
       const user = requireUser(client);
+      if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.replacements.list(await this.viewer(user, false), body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
@@ -58,6 +70,7 @@ export class AfterSaleGateway {
   async replacementsGet(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string }) {
     try {
       const user = requireUser(client);
+      if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.replacements.get(await this.viewer(user, false), String(body?.id ?? '')));
     } catch (e) {
       return fail((e as Error).message);
@@ -94,6 +107,7 @@ export class AfterSaleGateway {
     try {
       const user = requireUser(client);
       if (!isOps(user.role)) return fail('Ops only.');
+      if (await this.staffBelowSupervisor(user)) return fail('Only supervisors and managers can do this.');
       oneOf(body?.status, REPLACEMENT_STATUSES, 'Status');
       return ok(await this.replacements.setStatus(body.id, body.status));
     } catch (e) {
@@ -106,6 +120,7 @@ export class AfterSaleGateway {
   async exchangesList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
     try {
       const user = requireUser(client);
+      if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.exchanges.list(await this.viewer(user, false), body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
@@ -125,6 +140,7 @@ export class AfterSaleGateway {
   async exchangesGet(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string }) {
     try {
       const user = requireUser(client);
+      if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.exchanges.get(await this.viewer(user, false), String(body?.id ?? '')));
     } catch (e) {
       return fail((e as Error).message);
@@ -161,6 +177,7 @@ export class AfterSaleGateway {
     try {
       const user = requireUser(client);
       if (!isOps(user.role)) return fail('Ops only.');
+      if (await this.staffBelowSupervisor(user)) return fail('Only supervisors and managers can do this.');
       oneOf(body?.status, EXCHANGE_STATUSES, 'Status');
       return ok(await this.exchanges.setStatus(body.id, body.status));
     } catch (e) {

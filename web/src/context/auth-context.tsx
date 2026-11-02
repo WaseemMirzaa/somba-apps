@@ -5,6 +5,7 @@ import { useRealtime } from "@/context/realtime-context";
 import type { AdminDepartment } from "@/lib/admin-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import { TIER_LABEL } from "@/lib/logistics";
+import { DEMO_MODE } from "@/lib/demo-mode";
 
 export type Persona = {
   id: string;
@@ -362,6 +363,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const bridgingRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authReady) return;
+    if (!DEMO_MODE) return; // the shared seed password is never used from a build that did not opt in
     if (localStorage.getItem(REAL_SESSION_KEY)) return; // real session — hands off
     const email = backendEmailFor(persona);
     if (!email) {

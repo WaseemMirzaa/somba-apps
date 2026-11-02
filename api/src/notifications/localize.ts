@@ -306,6 +306,11 @@ const TITLES: Record<string, string> = {
   'Product approved': 'Produit approuvé',
   'Product rejected': 'Produit refusé',
   'Product updated': 'Produit mis à jour',
+  // Fraud: the account a fraud alert suspended or reinstated
+  'Account blocked': 'Compte bloqué',
+  'Account unblocked': 'Compte débloqué',
+  'Account suspended': 'Compte suspendu',
+  'Account reinstated': 'Compte réactivé',
   'Campaign withdrawn': 'Campagne retirée',
   'New campaign request': 'Nouvelle demande de campagne',
   'Campaign ended': 'Campagne terminée',
@@ -425,6 +430,10 @@ const BODIES: Rule[] = [
   ],
   [/^Your (.+) plan is active until (\S+)\.$/, (m) => `Votre abonnement ${m[1]} est actif jusqu’au ${dateFr(m[2])}.`],
   [/^Your changes to (.+) are being reviewed$/, (m) => `Vos modifications de ${m[1]} sont en cours d’examen.`],
+  [/^(.+) was suspended after a fraud alert\.$/, (m) => `${m[1]} a été suspendu après une alerte de fraude.`],
+  [/^(.+) was reactivated after a fraud alert\.$/, (m) => `${m[1]} a été réactivé après une alerte de fraude.`],
+  [/^Your account is suspended\. Contact support for help\.$/, () => 'Votre compte est suspendu. Contactez le support pour obtenir de l’aide.'],
+  [/^Your account is active again\.$/, () => 'Votre compte est de nouveau actif.'],
   [/^(.+) from (.+) needs moderation\.$/, (m) => `${m[1]} de ${m[2] === 'a seller' ? 'un vendeur' : m[2]} doit être modéré.`],
   [
     /^(.+) was edited by (.+) and needs moderation again\.$/,

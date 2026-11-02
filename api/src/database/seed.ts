@@ -396,7 +396,8 @@ async function run() {
         await delivery.updateStatus(fresh.id, 'picked_up', rider.id);
         await delivery.updateStatus(fresh.id, 'in_transit', rider.id);
         if (upTo === 'on_the_road') return;
-        await delivery.updateStatus(fresh.id, 'delivered', rider.id);
+        // The seeded rider confirms the cash on a cash-on-delivery parcel, exactly as the app does.
+        await delivery.updateStatus(fresh.id, 'delivered', rider.id, undefined, undefined, fresh.codAmountUsd > 0 ? fresh.codAmountUsd : undefined);
       }
     };
 

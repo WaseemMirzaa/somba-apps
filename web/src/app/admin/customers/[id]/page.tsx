@@ -14,12 +14,16 @@ import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useToast } from "@/context/toast-context";
 import { errMsg, orderStatusLabel } from "@/lib/admin-live";
+import { CustomerWalletPanel } from "@/components/admin/customer-wallet";
+import { canSuspendAccounts } from "@/lib/fraud-block";
+import { useRealtime } from "@/context/realtime-context";
 
 export default function AdminCustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const canSuspend = canSuspendAccounts(useRealtime().user?.role);
   const { getCustomer, orderEntities, setCustomerActive, loading, error, reload } = useAdminData({ customers: true });
   const customer = getCustomer(id);
   const [status, setStatus] = useState(customer?.status ?? "active");
@@ -48,6 +52,7 @@ export default function AdminCustomerDetailPage() {
           { label: customer.name },
         ]}
         actions={
+          canSuspend ? (
           <>
             <button
               onClick={async () => {
@@ -71,6 +76,7 @@ export default function AdminCustomerDetailPage() {
               {status === "active" ? (fr ? "Suspendre" : "Suspend") : fr ? "Réactiver" : "Reactivate"}
             </button>
           </>
+          ) : undefined
         }
       />
 
@@ -92,6 +98,8 @@ export default function AdminCustomerDetailPage() {
           ]} />
         </DetailSection>
       </div>
+
+      <CustomerWalletPanel customerId={customer.id} fr={fr} locale={locale} />
 
       <DetailSection title={fr ? "Commandes" : "Orders"}>
         <DataTable

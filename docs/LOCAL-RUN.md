@@ -27,9 +27,9 @@ Payment providers: `MM_PROVIDER=sandbox` (development: payments stay pending unt
 | `npm test` | Unit tests (incl. pricing rules, analytics helpers, paging, seller plans) | 78 |
 | `npm run smoke` | Main commerce flow over the socket | 33 |
 | `npm run smoke:account` | Sign-up, verification, reset, uploads, suspension, deletion, promos, reviews | 123 |
-| `npm run smoke:authz` | Role boundaries, ownership, mass assignment (incl. analytics, plans, reviews, hubs, campaigns, verification policy) | 198 |
+| `npm run smoke:authz` | Role boundaries, ownership, mass assignment (incl. analytics, plans, reviews, hubs, campaigns, verification policy, campaign decisions audited) | 205 |
 | `npm run smoke:flows` | The fixed flows: failed delivery, pickup / ready / receive, moderation, flash price, handover code, returns before refunds, manual payment, staff accounts, campaign discounts, review replies + moderation, verification policy, seller subscription | 185 |
-| `npm run smoke:coverage` | Every other event: catalogue admin, CMS, fraud, questions, warehouse reads and writes, exchanges, real analytics (admin / finance / warehouse / seller), hub directory, list paging | 223 |
+| `npm run smoke:coverage` | Every other event: catalogue admin, CMS, fraud, questions, warehouse reads and writes, exchanges, real analytics (admin / finance / warehouse / seller), hub directory, list paging, fraud block / unblock, broadcast audience, audit filters, customer wallet panel | 274 |
 | `npm run smoke:race` | Concurrency: last unit of stock, double cancel / refund / payout / confirmation, two riders on one task, wallet double-spend | 24 |
 | `npm run check:prod` | Production-mode defaults (incl. verification policy) and manual payment (run against `NODE_ENV=production`) | 17 |
 
@@ -39,13 +39,13 @@ All of them pass on MySQL (migrations only; run them one after another with a pa
 
 ```bash
 cd web
-printf 'NEXT_PUBLIC_API_URL=http://localhost:3001\nNEXT_PUBLIC_SOCKET_URL=http://localhost:3001\nNEXT_PUBLIC_DEMO_MODE=false\n' > .env.local
+printf 'NEXT_PUBLIC_API_URL=http://localhost:3001\nNEXT_PUBLIC_SOCKET_URL=http://localhost:3001\n' > .env.local
 npm ci && npx next build && npx next start -p 3000
 ```
 
-Sign in at `/login` with the seed accounts. With `NEXT_PUBLIC_DEMO_MODE=false` the one-click demo role picker is hidden.
+Sign in at `/login` with the seed accounts. The one-click demo role picker (and the quick sign-in on `/live`) is **off by default**; it shows only in a build made with `NEXT_PUBLIC_DEMO_MODE=true`. For a local demo add `NEXT_PUBLIC_DEMO_MODE=true` to `web/.env.local` before `next build` / `next dev` (or run `DEMO_MODE=true bash scripts/run-local.sh`). It is read when the web app is built, so rebuild after changing it. Never set it on a public deployment.
 
-Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; rider accepts → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
+Browser checks that were run with Chromium (all passing): customer cart → saved address → mobile-money checkout → pending screen → finance confirms → live confirmation → cancel; seller order page → "package ready"; warehouse inbound → receive; the warehouse assigns the rider → picked up → on the way → wrong code refused → right code delivers; rider reports a failed attempt (re-queued); admin approves a payout with a transfer reference, approves a product, saves a setting; customer return wizard → warehouse marks received → admin resolves; seller 4-step product wizard with a real photo upload.
 
 ## 4. Flutter apps
 

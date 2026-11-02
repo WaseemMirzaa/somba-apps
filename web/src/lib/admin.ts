@@ -192,7 +192,8 @@ export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}
     };
     return {
       setCustomerActive: (id: string, active: boolean) => run("customers:setActive", { id, active }),
-      setFraudStatus: (id: string, status: string) => run("fraud:setStatus", { id, status }),
+      // `confirm` is the admin's yes to blocking (suspending) or unblocking (reactivating) the account.
+      setFraudStatus: (id: string, status: string, confirm = false) => run("fraud:setStatus", { id, status, confirm }),
     };
   }, [refresh]);
 

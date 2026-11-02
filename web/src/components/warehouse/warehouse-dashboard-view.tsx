@@ -50,13 +50,14 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const ops = useOpsPath();
-  const { hubId, isAdmin, tier, canAssign } = useHubScope();
+  const { hubId, isAdmin, tier, canAssign, canManage } = useHubScope();
   const queue = useDeskQueue({ status: "all" });
   const { riders } = useWarehouseData();
-  const excQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
+  // The incident list and the warehouse analytics are supervisor / manager data on the server too: an operator does not ask.
+  const excQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"], enabled: canAssign });
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const { returns } = useReturns();
-  const analyticsQ = useWarehouseAnalytics(hubId);
+  const analyticsQ = useWarehouseAnalytics(hubId, canManage);
   const an = analyticsQ.data;
 
   const title = hubName ?? (fr ? "Opérations de l'entrepôt" : "Warehouse operations");
@@ -82,7 +83,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
     { path: "/aged", label: fr ? "Colis vieillis" : "Aged Parcels", count: aged24, icon: PackageX },
     { path: "/batch-builder", label: fr ? "Préparation des lots" : "Batch builder", count: activeBatches, icon: Send },
     { path: "/riders", label: fr ? "Livreurs" : "Riders", count: riders.length, icon: Bike },
-    { path: "/reconcile", label: fr ? "Rapprochement COD" : "COD reconcile", count: null as number | null, icon: Banknote },
+    { path: "/reconcile", label: fr ? "Espèces COD" : "COD cash", count: null as number | null, icon: Banknote },
   ];
   const visibleQuickLinks = quickLinks.filter((link) => isAdmin || canWarehouseAccess(gatedTier, `/warehouse${link.path}`));
 
@@ -145,21 +146,25 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <StatCard title={fr ? "Trajets échoués" : "Failed legs"} value={failed.length} icon={AlertTriangle} />
         <StatCard title={fr ? "Livreurs actifs" : "Active riders"} value={`${riders.filter((r) => r.activeTasks > 0).length} / ${riders.length}`} icon={Bike} />
         <StatCard title={fr ? "Lots actifs" : "Active batches"} value={activeBatches} icon={Layers} />
-        <StatCard
-          title={fr ? "Délai ramassage → livraison (30 j)" : "Pickup → delivery time (30 d)"}
-          value={an ? formatMinutes(an.avgPickupToDeliveryMinutes, fr) : "…"}
-          icon={Clock}
-        />
-        <StatCard
-          title={fr ? "Taux d'échec (30 j)" : "Failure rate (30 d)"}
-          value={an ? (an.failureRatePct == null ? "—" : `${an.failureRatePct}%`) : "…"}
-          icon={Percent}
-        />
-        <StatCard
-          title={fr ? "COD à encaisser" : "COD to collect"}
-          value={an ? formatCurrency(an.codToCollect, locale) : "…"}
-          icon={Banknote}
-        />
+        {canManage && (
+          <>
+            <StatCard
+              title={fr ? "Délai ramassage → livraison (30 j)" : "Pickup → delivery time (30 d)"}
+              value={an ? formatMinutes(an.avgPickupToDeliveryMinutes, fr) : "…"}
+              icon={Clock}
+            />
+            <StatCard
+              title={fr ? "Taux d'échec (30 j)" : "Failure rate (30 d)"}
+              value={an ? (an.failureRatePct == null ? "—" : `${an.failureRatePct}%`) : "…"}
+              icon={Percent}
+            />
+            <StatCard
+              title={fr ? "COD à encaisser" : "COD to collect"}
+              value={an ? formatCurrency(an.codToCollect, locale) : "…"}
+              icon={Banknote}
+            />
+          </>
+        )}
       </div>
       {analyticsQ.error && <OpsError message={analyticsQ.error} onRetry={() => void analyticsQ.reload()} />}
 
@@ -291,6 +296,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         </Card>
       )}
 
+      {canManage && (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -318,6 +324,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

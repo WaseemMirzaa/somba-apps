@@ -22,7 +22,9 @@ Future<void> main() async {
 }
 
 class SombaRiderApp extends StatefulWidget {
-  const SombaRiderApp({super.key});
+  /// Tests: how the saved session is resumed at launch (default: the store's `tryRestore`).
+  final Future<bool> Function()? restore;
+  const SombaRiderApp({super.key, this.restore});
 
   @override
   State<SombaRiderApp> createState() => _SombaRiderAppState();
@@ -34,6 +36,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   bool _restored = false;
   bool _authed = false;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
+  final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<PushMessage>? _foregroundSub;
 
   @override
@@ -46,11 +49,14 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
     RiderStore.instance.onSessionEnded = () {
       if (!mounted) return;
+      // Screens opened on top of the shell (support, edit profile, a dialog or a sheet) go first: otherwise the sign-in
+      // screen would sit UNDER them and the signed-out rider would keep looking at their old data.
+      _navigator.currentState?.popUntil((r) => r.isFirst);
       setState(() => _authed = false);
       _messenger.currentState?.showSnackBar(SnackBar(content: Text(Strings.current.errSignedOut)));
     };
     // Silently resume the previous shift (stored refresh token).
-    RiderStore.instance.tryRestore().timeout(const Duration(seconds: 8), onTimeout: () => false).then((ok) {
+    (widget.restore ?? RiderStore.instance.tryRestore)().timeout(const Duration(seconds: 8), onTimeout: () => false).then((ok) {
       if (!mounted) return;
       setState(() {
         _restored = true;
@@ -114,6 +120,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     return MaterialApp(
       title: 'Somba&Teka Rider',
       scaffoldMessengerKey: _messenger,
+      navigatorKey: _navigator,
       debugShowCheckedModeBanner: false,
       locale: _locale,
       supportedLocales: const [Locale('en'), Locale('fr')],
