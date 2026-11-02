@@ -35,7 +35,7 @@ describe('admin actions are audited (gateway)', () => {
 
   it('a campaign decision is audited with the status and the reason', async () => {
     Object.assign(gw, { campaigns: { setStatus: jest.fn(async () => ({ id: 'c1', name: 'Eid sale' })) } });
-    expect(await gw.campaignsSetStatus(as('seller'), { id: 'c1', status: 'active' })).toEqual({ ok: false, error: 'Admins only.' });
+    expect(await gw.campaignsSetStatus(as('seller'), { id: 'c1', status: 'active' })).toEqual({ ok: false, error: 'Only marketing can decide on campaigns.' });
     expect(audit.record).not.toHaveBeenCalled();
     expect(await gw.campaignsSetStatus(as('admin_marketing'), { id: 'c1', status: 'rejected', reason: 'Misleading' })).toMatchObject({ ok: true });
     expect(entries()).toEqual(['campaign.rejected|campaign|c1']);

@@ -41,7 +41,9 @@ function gateway() {
   const notifications = { toUser: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined) };
   const kit = { ctx: { resolve: jest.fn(async () => ({ seller: { id: 'store1', status: 'approved' }, actor: { id: 'owner', name: 'Shop', role: 'seller' } })) } };
   const settings = { get: jest.fn(async () => 'true') };
-  const gw = Object.assign(Object.create(RealtimeGateway.prototype), { products, campaigns, warehouse, analytics, users, sellersSvc, notifications, kit, settings }) as RealtimeGateway;
+  // Moderation and campaign decisions are audited (admin-audit.spec.ts covers the entries themselves).
+  const audit = { record: jest.fn(async () => undefined) };
+  const gw = Object.assign(Object.create(RealtimeGateway.prototype), { products, campaigns, warehouse, analytics, users, sellersSvc, notifications, kit, settings, audit }) as RealtimeGateway;
   return { gw, products, campaigns, warehouse, analytics };
 }
 
