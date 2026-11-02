@@ -32,6 +32,14 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+// flutter_stripe's Android module lists com.stripe:stripe-android-issuing-push-provisioning, whose
+// play-services-tapandpay dependency is not on public Maven. Only the release "lintVital" check of plugin
+// modules resolves it (and fails); the app itself never uses push provisioning, so skip that check there.
+subprojects {
+    if (name != "app") {
+        tasks.matching { it.name.startsWith("lintVital") }.configureEach { enabled = false }
+    }
+}
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
