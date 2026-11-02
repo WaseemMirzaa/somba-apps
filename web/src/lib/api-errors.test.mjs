@@ -106,3 +106,14 @@ test("staff:setActive errors map to French", () => {
   assert.equal(fr("Active must be true or false."), "« Active » doit être vrai ou faux.");
   assert.equal(localizeApiError("Super admin only.", "en"), "Super admin only.");
 });
+
+test("the permission refusals of the tiers and departments are French (least privilege)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Only supervisors and managers can see this."), "Seuls les superviseurs et les responsables peuvent voir ceci.");
+  assert.equal(fr("Only supervisors and managers can do this."), "Seuls les superviseurs et les responsables peuvent effectuer cette action.");
+  assert.equal(fr("Only managers can see this."), "Seuls les responsables peuvent voir ceci.");
+  assert.equal(fr("Only a moderator can change this listing's status."), "Seul un modérateur peut modifier le statut de cette annonce.");
+  assert.equal(fr("Only marketing can decide on campaigns."), "Seule l'équipe marketing peut décider des campagnes.");
+  assert.equal(fr("Only sellers or marketing can create campaigns."), "Seuls les vendeurs ou l'équipe marketing peuvent créer des campagnes.");
+  assert.equal(localizeApiError("Only managers can see this.", "en"), "Only managers can see this.");
+});

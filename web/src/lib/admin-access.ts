@@ -126,7 +126,6 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/products", label: "products", icon: Package, i18n: true },
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
       { href: "/admin/reviews", label: "reviews", icon: Star, i18n: true },
-      { href: "/admin/categories", label: "categories", icon: Package, i18n: true },
     ],
   },
   {
@@ -139,6 +138,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/cms", label: "cms", icon: FileText, i18n: true },
       { href: "/admin/broadcasts", label: "broadcasts", icon: Megaphone, i18n: true },
       { href: "/admin/marketing", label: "marketing", icon: Megaphone, i18n: true },
+      // The server lets only the Super Admin, Operations and Marketing change categories (`catalog` group), so the page lives here, not under Moderation.
+      { href: "/admin/categories", label: "categories", icon: Package, i18n: true },
     ],
   },
   {

@@ -142,6 +142,15 @@ describe('warehouse tiers', () => {
     expect(tierAllows('admin_operations', undefined, 'assign')).toBe(true);
   });
 
+  it('oversight (aged parcels, COD cash, incidents, after-sale statuses, return grading) starts at supervisor, like the web pages', () => {
+    expect(tierAllows('warehouse_staff', 'operator', 'oversee')).toBe(false);
+    expect(tierAllows('warehouse_staff', null, 'oversee')).toBe(false);
+    expect(tierAllows('warehouse_staff', 'supervisor', 'oversee')).toBe(true);
+    expect(tierAllows('warehouse_staff', 'manager', 'oversee')).toBe(true);
+    expect(tierAllows('admin_operations', null, 'oversee')).toBe(true);
+    expect(tierAllows('rider', 'manager', 'oversee')).toBe(false);
+  });
+
   it('a staff account with no tier is an operator; riders and customers get nothing', () => {
     expect(tierOf(null)).toBe('operator');
     expect(tierOf('bogus')).toBe('operator');

@@ -12,6 +12,7 @@ import { LogisticsGateway } from './logistics.gateway';
 import { LogisticsService } from './logistics.service';
 import { RoutingService } from './routing.service';
 import { RunsService } from './runs.service';
+import { StaffTierService } from './staff-tier.service';
 import { TransfersGateway } from './transfers.gateway';
 
 /**
@@ -27,7 +28,7 @@ import { TransfersGateway } from './transfers.gateway';
     AddressesModule,
     GeoModule,
   ],
-  providers: [RoutingService, LanesService, HubsService, LogisticsService, RunsService, LogisticsGateway, TransfersGateway],
-  exports: [RoutingService, LanesService, HubsService, LogisticsService, RunsService],
+  providers: [RoutingService, LanesService, HubsService, LogisticsService, RunsService, StaffTierService, LogisticsGateway, TransfersGateway],
+  exports: [RoutingService, LanesService, HubsService, LogisticsService, RunsService, StaffTierService],
 })
 export class LogisticsModule {}

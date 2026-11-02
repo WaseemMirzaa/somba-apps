@@ -54,7 +54,9 @@ import { RolesService } from '../ops/roles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { LogisticsService } from '../logistics/logistics.service';
 import type { Actor } from '../logistics/logistics.service';
-import { tierOf } from '../logistics/tiers';
+import { tierAllows, tierOf } from '../logistics/tiers';
+import type { DeskAction } from '../logistics/tiers';
+import { ROLE_GROUPS } from '../common/role-groups';
 import { RiderService } from '../warehouse/rider.service';
 import { CampaignsService } from '../flows/campaigns.service';
 import { ReplacementsService } from '../flows/replacements.service';
@@ -100,6 +102,8 @@ const GROUPS = {
   hubs: ['admin', 'admin_operations'],
   /** Operators who move orders by hand and cancel them on a customer's behalf. */
   orderOps: ['admin', 'admin_operations'],
+  /** Product moderation, campaign decisions and support tickets: shared with the other gateways. */
+  ...ROLE_GROUPS,
 } as const;
 const ALL_ROLES = ['customer', 'seller', 'admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'] as const;
 
@@ -194,6 +198,16 @@ export class RealtimeGateway
 
   private isAdmin(role: string) {
     return role.startsWith('admin');
+  }
+
+  /**
+   * May this caller do a warehouse action at this tier? Admins always; warehouse staff by the tier in the database
+   * (it can change while they are connected); everyone else never. The same table the web hides pages by.
+   */
+  private async tierOk(user: SocketUser, action: DeskAction): Promise<boolean> {
+    if (this.isAdmin(user.role)) return true;
+    if (user.role !== 'warehouse_staff') return false;
+    return tierAllows(user.role, (await this.users.findById(user.id))?.warehouseTier, action);
   }
 
   /** Is the user's role in the given least-privilege group? */
@@ -446,22 +460,24 @@ export class RealtimeGateway
       const isOwner =
         existing.sellerId === user.id ||
         (seller != null && existing.sellerId === seller.id);
-      if (!isOwner && !user.role.startsWith('admin')) {
+      // Only the roles whose menu owns product moderation may touch another seller's listing (group `productModeration`).
+      const moderator = this.can(user.role, 'productModeration');
+      if (!isOwner && !moderator) {
         return fail('You can only edit your own products.');
       }
       if (!user.role.startsWith('admin') && seller?.status !== 'approved' && existing.sellerId !== user.id) {
         return fail('Your store is not active.');
       }
-      // Whitelisted + range-checked; only admins may change moderation status. `basePrice` is the stored price.
+      // Whitelisted + range-checked; only moderators may change moderation status. `basePrice` is the stored price.
       const clean = cleanListing(body.patch as ListingInput, {
         partial: true,
-        allowStatus: this.isAdmin(user.role),
+        allowStatus: moderator,
         currentPrice: existing.basePrice,
       });
       // A seller may pause a live listing or resume a paused one; everything else
       // (approving, rejecting, un-removing) is a moderator's decision.
       const wanted = (body.patch as Record<string, unknown> | undefined)?.status;
-      if (!this.isAdmin(user.role) && wanted !== undefined) {
+      if (!moderator && wanted !== undefined) {
         const pause = wanted === 'draft' && existing.status === 'live';
         const resume = wanted === 'live' && existing.status === 'draft';
         if (!pause && !resume) return fail('Only a moderator can change this listing\'s status.');
@@ -497,7 +513,7 @@ export class RealtimeGateway
           entityId: existing.id,
         });
       }
-      if (this.isAdmin(user.role) && clean.columns.status && clean.columns.status !== existing.status && existing.sellerId) {
+      if (moderator && clean.columns.status && clean.columns.status !== existing.status && existing.sellerId) {
         const owner = await this.sellersSvc.get(existing.sellerId);
         if (owner?.userId) {
           await this.notifications.toUser(owner.userId, {
@@ -1527,6 +1543,7 @@ export class RealtimeGateway
       if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
         return fail('Staff only.');
       }
+      if (!(await this.tierOk(user, 'manage'))) return fail('Only managers can see this.');
       // Staff see their own warehouse's figures; admins see all, or one warehouse when they ask.
       return ok(await this.analytics.warehouseStats(await this.hubScope(user, body?.hubId)));
     } catch (e) {
@@ -1880,6 +1897,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
       return ok(await this.warehouse.aged(body, await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -1935,6 +1953,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
       return ok(await this.warehouse.reconcile(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -2015,8 +2034,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller' && !this.isAdmin(user.role)) {
-        return fail('Only sellers or admins can create campaigns.');
+      if (user.role !== 'seller' && !this.can(user.role, 'campaignDecisions')) {
+        return fail('Only sellers or marketing can create campaigns.');
       }
       if (user.role === 'seller') {
         const ctx = await this.kit.ctx.resolve(user, 'catalog');
@@ -2037,7 +2056,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller' && !this.isAdmin(user.role)) {
+      if (user.role !== 'seller' && !this.can(user.role, 'campaignDecisions')) {
         return fail('Not allowed.');
       }
       const who = user.role === 'seller' ? (await this.kit.ctx.resolve(user, 'catalog')).actor : user;
@@ -2075,7 +2094,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'campaignDecisions')) return fail('Only marketing can decide on campaigns.');
       oneOf(body?.status, ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'] as const, 'Status');
       return ok(await this.campaigns.setStatus(body.id, body.status, body.reason));
     } catch (e) {
@@ -2087,12 +2106,15 @@ export class RealtimeGateway
   @SubscribeMessage('exceptions:list')
   async exceptionsList(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { status?: string },
+    @MessageBody() body: { status?: string; taskId?: string },
   ) {
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
-      return ok(await this.warehouse.listExceptions(body?.status, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
+      // The incident list is a supervisor page; an operator may read the incidents of ONE parcel (its detail screen).
+      const taskId = typeof body?.taskId === 'string' && body.taskId ? body.taskId : null;
+      if (!taskId && !(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
+      return ok(await this.warehouse.listExceptions(body?.status, user.role === 'warehouse_staff' ? await this.hubScope(user) : null, taskId));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2134,6 +2156,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
       return ok(
         await this.warehouse.setExceptionStatus(body.id, body.status, body.resolution, user.role === 'warehouse_staff' ? await this.hubScope(user) : null),
       );
@@ -2171,7 +2194,7 @@ export class RealtimeGateway
       const isOwner =
         existing.sellerId === user.id ||
         (seller != null && existing.sellerId === seller.id);
-      if (!isOwner && !this.isAdmin(user.role)) {
+      if (!isOwner && !this.can(user.role, 'productModeration')) {
         return fail('You can only remove your own products.');
       }
       return ok(await this.products.remove(body.id));

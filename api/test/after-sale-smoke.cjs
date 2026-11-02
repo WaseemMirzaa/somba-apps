@@ -643,13 +643,14 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(!(await noticesOf(finance)).some((n) => n.entityId === tk.id && n.title === 'New reply on a ticket'), 'and the others do not');
   ok(!(await req(cust.sock, 'support:setStatus', { id: tk.id, status: 'closed' })).ok, 'customers cannot change the status');
   ok(!(await req(agent.sock, 'support:setStatus', { id: tk.id, status: 'banana' })).ok, 'an invalid status is refused');
-  a = await req(agent.sock, 'support:assign', { id: tk.id, assigneeId: finance.user.id });
-  ok(a.ok && a.data.assigneeId === finance.user.id && a.data.assigneeName, 'an agent hands the ticket to a colleague', a.error ?? '');
-  ok(await hasNotice(finance, (n) => n.entityId === tk.id && n.title === 'Ticket assigned to you'), 'who is notified');
+  a = await req(agent.sock, 'support:assign', { id: tk.id, assigneeId: admin.user.id });
+  ok(a.ok && a.data.assigneeId === admin.user.id && a.data.assigneeName, 'an agent hands the ticket to a colleague (the super admin)', a.error ?? '');
+  ok(await hasNotice(admin, (n) => n.entityId === tk.id && n.title === 'Ticket assigned to you'), 'who is notified');
   ok(!(await req(agent.sock, 'support:assign', { id: tk.id, assigneeId: cust.user.id })).ok, 'only an admin account can be assigned');
-  ok(!(await req(cust.sock, 'support:assign', { id: tk.id, assigneeId: finance.user.id })).ok, 'customers cannot assign');
+  ok(!(await req(agent.sock, 'support:assign', { id: tk.id, assigneeId: finance.user.id })).ok, 'and only a support agent: a finance admin cannot be assigned a ticket');
+  ok(!(await req(cust.sock, 'support:assign', { id: tk.id, assigneeId: admin.user.id })).ok, 'customers cannot assign');
   await req(cust.sock, 'support:reply', { id: tk.id, text: 'Any news?' });
-  ok(await hasNotice(finance, (n) => n.entityId === tk.id && n.title === 'New reply on a ticket'), 'the new assignee now gets the reply notices');
+  ok(await hasNotice(admin, (n) => n.entityId === tk.id && n.title === 'New reply on a ticket'), 'the new assignee now gets the reply notices');
   // concurrent replies from both sides lose nothing
   const before = JSON.parse((await req(agent.sock, 'support:get', { id: tk.id })).data.messages).length;
   await Promise.all([

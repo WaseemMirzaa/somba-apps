@@ -103,12 +103,13 @@ export interface WarehouseAnalytics {
   byHub: { hubId: string; hub: string; parcels: number; delivered: number; failed: number; batches30: number }[];
 }
 
-/** Real warehouse figures from the server (`analytics:warehouse`), scoped to the hub (admins: all, or one with `hubId`). */
-export function useWarehouseAnalytics(hubId?: string) {
+/** Real warehouse figures from the server (`analytics:warehouse`, managers and admins), scoped to the hub (admins: all, or one with `hubId`). */
+export function useWarehouseAnalytics(hubId?: string, enabled = true) {
   return useOpsQuery<WarehouseAnalytics | null>("analytics:warehouse", {
     initial: null,
     body: hubId ? { hubId } : {},
     push: ["task:updated", "batch:updated"],
+    enabled,
   });
 }
 

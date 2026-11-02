@@ -6,9 +6,14 @@ import type { TicketStatus } from '../database/entities';
 import { cleanAttachments, parseAttachments, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { inRoleGroup, ROLE_GROUPS } from '../common/role-groups';
 
 export const TICKET_STATUSES: readonly TicketStatus[] = ['open', 'pending', 'resolved', 'closed'];
+/** Agents: the Super Admin and the Support department (group `support`); other admin roles are customers of this desk, not agents. */
+const isAgent = (role: string) => inRoleGroup(role, 'support');
+/** Who hears about ticket changes live (the agents; the ticket's owner has their own room). */
+const AGENT_ROLES = [...ROLE_GROUPS.support];
 const preview = (text: string, photos: string[]) => (text || (photos.length ? '📷' : '')).slice(0, 60);
 
 /** One message as clients receive it (inside `ticket.messages`, a JSON array, as before). */
@@ -56,8 +61,8 @@ export class SupportService {
   }
 
   async list(user: { id: string; role: string }, filter: { status?: string; assignee?: string; limit?: number; offset?: number } = {}): Promise<SupportTicket[]> {
-    // Only admins see everyone's tickets; every other role sees its own.
-    if (!user.role.startsWith('admin')) {
+    // Only agents see everyone's tickets; every other role sees its own.
+    if (!isAgent(user.role)) {
       return this.present(await this.tickets.find({ where: { userId: user.id }, order: { updatedAt: 'DESC' }, take: 200 }));
     }
     const { take, skip } = pageOf(filter, { def: 200 });
@@ -70,7 +75,7 @@ export class SupportService {
   async get(user: { id: string; role: string }, id: string): Promise<SupportTicket> {
     const ticket = await this.one(String(id ?? ''));
     // Same answer for "missing" and "not yours" so ids can't be probed.
-    if (!ticket || (!user.role.startsWith('admin') && ticket.userId !== user.id)) throw new NotFoundException('Ticket not found.');
+    if (!ticket || (!isAgent(user.role) && ticket.userId !== user.id)) throw new NotFoundException('Ticket not found.');
     return ticket;
   }
 
@@ -142,7 +147,7 @@ export class SupportService {
     });
     const view = (await this.one(ticket.id))!;
     this.emitter.toUser(user.id, 'support:updated', view);
-    this.emitter.toRoles(ADMIN_ROLES, 'support:updated', view);
+    this.emitter.toRoles(AGENT_ROLES, 'support:updated', view);
     // Every admin role hears about a new ticket (support works it; the others may step in).
     await this.notifications.toAdmins({
       title: 'New support ticket',
@@ -161,13 +166,13 @@ export class SupportService {
   ): Promise<SupportTicket> {
     const ticket = await this.tickets.findOne({ where: { id } });
     // Same answer for "missing" and "not yours" so ids can't be probed.
-    if (!ticket || (!from.role.startsWith('admin') && ticket.userId !== from.id)) {
+    if (!ticket || (!isAgent(from.role) && ticket.userId !== from.id)) {
       throw new NotFoundException('Ticket not found.');
     }
     const body = String(text ?? '').trim().slice(0, 4000);
     const photos = cleanAttachments(attachments);
     if (!body && !photos.length) throw new BadRequestException('Write a message first.');
-    const agent = from.role.startsWith('admin');
+    const agent = isAgent(from.role);
     // A closed ticket stays closed: the customer opens a new one (an agent reopens it first with `support:setStatus`).
     const closed = () => new BadRequestException(agent ? 'This ticket is closed. Reopen it first.' : 'This ticket is closed. Open a new ticket if you still need help.');
     if (ticket.status === 'closed') throw closed();
@@ -193,7 +198,7 @@ export class SupportService {
     );
     const saved = (await this.one(ticket.id))!;
     this.emitter.toUser(saved.userId, 'support:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'support:updated', saved);
+    this.emitter.toRoles(AGENT_ROLES, 'support:updated', saved);
     if (agent) {
       await this.notifications.toUser(saved.userId, {
         title: 'Support reply',
@@ -228,7 +233,7 @@ export class SupportService {
     await this.tickets.update({ id }, { status });
     const saved = (await this.one(id))!;
     this.emitter.toUser(saved.userId, 'support:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'support:updated', saved);
+    this.emitter.toRoles(AGENT_ROLES, 'support:updated', saved);
     if (changed && status !== 'pending') {
       await this.notifications.toUser(saved.userId, {
         title: status === 'resolved' ? 'Ticket resolved' : status === 'closed' ? 'Ticket closed' : 'Ticket reopened',
@@ -243,30 +248,30 @@ export class SupportService {
   /** The owner (or the agents) opened the conversation: its unread counter goes to zero. */
   async markRead(user: { id: string; role: string }, id: string): Promise<SupportTicket> {
     const ticket = await this.tickets.findOne({ where: { id } });
-    if (!ticket || (!user.role.startsWith('admin') && ticket.userId !== user.id)) throw new NotFoundException('Ticket not found.');
-    const agent = user.role.startsWith('admin');
+    if (!ticket || (!isAgent(user.role) && ticket.userId !== user.id)) throw new NotFoundException('Ticket not found.');
+    const agent = isAgent(user.role);
     await this.tickets.update({ id }, agent ? { staffUnread: 0 } : { userUnread: 0 });
     const saved = (await this.one(id))!;
     // The reader's other screens clear their badge; agents share one counter, so the team sees it too.
-    if (agent) this.emitter.toRoles(ADMIN_ROLES, 'support:updated', saved);
+    if (agent) this.emitter.toRoles(AGENT_ROLES, 'support:updated', saved);
     else this.emitter.toUser(saved.userId, 'support:updated', saved);
     return saved;
   }
 
   /** Hand a ticket to an agent (an admin account), or take it back to the queue with `assigneeId = null`. */
   async assign(actor: { id: string; name: string; role: string }, id: string, assigneeId: string | null): Promise<SupportTicket> {
-    if (!actor.role.startsWith('admin')) throw new BadRequestException('Admins only.');
+    if (!isAgent(actor.role)) throw new BadRequestException('Admins only.');
     const ticket = await this.tickets.findOne({ where: { id } });
     if (!ticket) throw new NotFoundException('Ticket not found.');
     let name: string | null = null;
     if (assigneeId) {
       const agent = await this.users.findOne({ where: { id: assigneeId }, select: ['id', 'name', 'role', 'active'] });
-      if (!agent || !agent.role.startsWith('admin') || agent.active === false) throw new BadRequestException('Choose an active admin account.');
+      if (!agent || !isAgent(agent.role) || agent.active === false) throw new BadRequestException('Choose an active admin account.');
       name = agent.name;
     }
     await this.tickets.update({ id }, { assigneeId: assigneeId ?? null, assigneeName: name });
     const saved = (await this.one(id))!;
-    this.emitter.toRoles(ADMIN_ROLES, 'support:updated', saved);
+    this.emitter.toRoles(AGENT_ROLES, 'support:updated', saved);
     if (assigneeId && assigneeId !== actor.id) {
       await this.notifications.toUser(assigneeId, {
         title: 'Ticket assigned to you',
