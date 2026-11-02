@@ -6,8 +6,8 @@
 set -euo pipefail
 DEST="${BACKUP_DIR:-/var/backups/somba}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
-UPLOAD_DIR="${UPLOAD_DIR:-/opt/somba/uploads}"
-PRIVATE_UPLOAD_DIR="${PRIVATE_UPLOAD_DIR:-/opt/somba/uploads-private}"
+UPLOAD_DIR="${UPLOAD_DIR:-/var/lib/somba/uploads}"
+PRIVATE_UPLOAD_DIR="${PRIVATE_UPLOAD_DIR:-/var/lib/somba/uploads-private}"
 STAMP="$(date +%Y%m%d)"
 umask 077
 mkdir -p "$DEST"
