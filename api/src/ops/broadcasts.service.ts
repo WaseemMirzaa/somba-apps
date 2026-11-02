@@ -16,6 +16,12 @@ import { otherLocale } from '../translation/translator.provider';
 /** A broadcast as admins receive it: title and body in both languages. */
 export type ServedBroadcast = Broadcast & { titleFr: string; bodyFr: string; machineTranslated: string[]; translationStatus: TranslationStatus };
 
+/** Who a broadcast can go to. `all` is kept for older clients and means every customer, never staff or sellers. */
+export const BROADCAST_AUDIENCES = ['customer', 'all', 'seller', 'rider', 'warehouse_staff'];
+
+/** The user role (and notification room) an audience reaches. */
+export const audienceRole = (audience: string): string => (audience === 'all' ? 'customer' : audience);
+
 /** Translate a broadcast for the recipients' phones within this long; slower means the source text goes out. */
 const SEND_TRANSLATION_TIMEOUT_MS = 5000;
 
@@ -49,7 +55,7 @@ export class BroadcastsService {
   }
 
   /**
-   * Send a marketing broadcast to an audience role (or all customers). Written in English, French or both: the
+   * Send a marketing broadcast to an audience role (`all` means all customers). Written in English, French or both: the
    * missing language is translated right now (5 s at most; the source text goes out when that fails), and the
    * French version is handed to notifications so French phones get French pushes.
    */
@@ -57,6 +63,13 @@ export class BroadcastsService {
     sentBy: string,
     data: { title?: string; body?: string; titleFr?: string; bodyFr?: string; audience?: string; sourceLang?: string },
   ): Promise<ServedBroadcast> {
+    // Checked before anything is translated or saved. "all" means every customer: delivery has always gone to the
+    // customer room only, so the count, the saved audience and the notification all name the same people.
+    const audience = data.audience === undefined || data.audience === null || data.audience === '' ? 'customer' : data.audience;
+    if (typeof audience !== 'string' || !BROADCAST_AUDIENCES.includes(audience)) {
+      throw new Error('Choose who receives it: customers, sellers, riders or warehouse staff.');
+    }
+    const role = audienceRole(audience);
     const word = (k: 'title' | 'body' | 'titleFr' | 'bodyFr', label: string, max: number) =>
       data[k] === undefined || data[k] === null || data[k] === '' ? null : str(data[k], label, { max });
     const input = {
@@ -88,13 +101,7 @@ export class BroadcastsService {
     const fr = source === 'fr' ? { title, body } : otherTitle || otherBody ? { title: otherTitle ?? title, body: otherBody ?? body } : undefined;
     const en = { title: source === 'en' ? title : (otherTitle ?? title), body: source === 'en' ? body : (otherBody ?? body) };
 
-    const audience = data.audience ?? 'customer';
-    const recipients =
-      audience === 'all'
-        ? await this.users.count()
-        : await this.users.count({
-            where: { role: audience as never },
-          });
+    const recipients = await this.users.count({ where: { role: role as never } });
     const broadcast = await this.repo.manager.transaction(async (m) => {
       const row = await m.save(m.create(Broadcast, { title, body, sourceLang: source, audience, sentBy, recipients }));
       await this.translations.applyPlan(m, 'broadcast', row.id, plan, { title, body });
@@ -111,7 +118,7 @@ export class BroadcastsService {
     if (!translated) await this.translations.enqueue('broadcast', broadcast.id);
 
     // Push a notification into the audience room. Phones show the title/body in the recipient's language.
-    await this.notifications.toRole(audience === 'all' ? 'customer' : audience, {
+    await this.notifications.toRole(role, {
       title: en.title,
       body: en.body,
       type: 'marketing',

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Order, User } from '../database/entities';
+import { Order, User, WalletTransaction } from '../database/entities';
+import { localizeWalletDescription } from '../notifications/localize';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { pageOf } from '../common/paging';
@@ -18,11 +19,18 @@ export interface CustomerRow {
   createdAt: Date;
 }
 
+/** A customer's wallet as an admin reads it: the balance and the newest ledger lines, with the text in both languages. */
+export interface CustomerWallet {
+  balance: number;
+  transactions: (WalletTransaction & { descriptionFr: string })[];
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(WalletTransaction) private readonly walletTxs: Repository<WalletTransaction>,
     private readonly emitter: RealtimeEmitter,
   ) {}
 
@@ -51,6 +59,15 @@ export class CustomersService {
       spendUsd: Number(Number(byId.get(c.id)?.spend ?? 0).toFixed(2)),
       createdAt: c.createdAt,
     }));
+  }
+
+  /** Read-only: a customer's balance and their latest wallet transactions (`limit` / `offset`, 20 by default). */
+  async wallet(id: string, paging?: unknown): Promise<CustomerWallet> {
+    const customer = await this.users.findOne({ where: { id, role: 'customer' } });
+    if (!customer) throw new Error('Customer not found.');
+    const { take, skip } = pageOf(paging, { def: 20, max: 100 });
+    const rows = await this.walletTxs.find({ where: { userId: id }, order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
+    return { balance: customer.walletBalance, transactions: rows.map((t) => ({ ...t, descriptionFr: localizeWalletDescription(t.description, 'fr') })) };
   }
 
   /**

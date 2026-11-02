@@ -246,7 +246,9 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
-      return ok(await this.disputes.reject(body.disputeId, body.resolution));
+      const d = await this.disputes.reject(body.disputeId, body.resolution);
+      await this.audit.record({ actor: user.name, role: user.role, action: 'dispute.rejected', entity: 'dispute', entityId: d.id, detail: d.reference });
+      return ok(d);
     } catch (e) {
       return fail((e as Error).message);
     }

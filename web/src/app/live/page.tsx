@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import type {
   DeliveryStatus,
   DeliveryTask,
@@ -29,7 +30,8 @@ const DEMO_ACCOUNTS = [
   { label: "Warehouse", email: "warehouse@somba.app" },
   { label: "Rider", email: "rider@somba.app" },
 ];
-const DEMO_PASSWORD = "Somba@2026";
+// Prefilled credentials and the quick sign-in row exist only in a demo build (lib/demo-mode).
+const DEMO_PASSWORD = DEMO_MODE ? "Somba@2026" : "";
 
 const NEXT_ORDER_STATUS: Record<string, OrderStatus[]> = {
   pending: ["confirmed", "cancelled"],
@@ -63,7 +65,7 @@ function StatusPill({ status }: { status: string }) {
 
 export default function LiveConsolePage() {
   const rt = useRealtime();
-  const [email, setEmail] = useState("customer@somba.app");
+  const [email, setEmail] = useState(DEMO_MODE ? "customer@somba.app" : "");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [busy, setBusy] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -241,6 +243,8 @@ export default function LiveConsolePage() {
           {loginError && (
             <p className="mt-2 text-center text-xs text-rose-600">{loginError}</p>
           )}
+          {DEMO_MODE && (
+          <>
           <p className="mt-4 text-center text-xs text-slate-400">
             Quick sign-in (password {DEMO_PASSWORD})
           </p>
@@ -259,6 +263,8 @@ export default function LiveConsolePage() {
               </button>
             ))}
           </div>
+          </>
+          )}
         </div>
       </main>
     );

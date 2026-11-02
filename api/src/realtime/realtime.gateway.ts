@@ -46,10 +46,11 @@ import { SettingsService } from '../content/settings.service';
 import { SellersService } from '../ops/sellers.service';
 import type { KycInput as SellerKycBody } from '../ops/sellers.service';
 import { AnalyticsService } from '../ops/analytics.service';
-import { AuditService } from '../ops/audit.service';
+import { AuditService, type AuditFilter } from '../ops/audit.service';
 import { FraudService } from '../ops/fraud.service';
 import { CustomersService } from '../ops/customers.service';
 import { BroadcastsService } from '../ops/broadcasts.service';
+
 import { RolesService } from '../ops/roles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { LogisticsService } from '../logistics/logistics.service';
@@ -213,6 +214,16 @@ export class RealtimeGateway
   /** Is the user's role in the given least-privilege group? */
   private can(role: string, group: keyof typeof GROUPS) {
     return (GROUPS[group] as readonly string[]).includes(role);
+  }
+
+  /** Who may suspend and reactivate accounts (`customers:setActive`, and so a fraud "Block"). */
+  private canSuspendAccounts(role: string) {
+    return role === 'admin' || role === 'admin_support';
+  }
+
+  /** One audit entry for an admin action. */
+  private auditAction(user: { name: string; role: string }, action: string, entity: string, entityId?: string, detail?: string) {
+    return this.audit.record({ actor: user.name, role: user.role, action, entity, entityId, detail: detail?.slice(0, 500) });
   }
 
   /** Drop every open socket of a user (after suspension / role change / password reset). */
@@ -512,6 +523,10 @@ export class RealtimeGateway
           type: 'moderation',
           entityId: existing.id,
         });
+      }
+      // A moderator's takedown, approval or rejection is a moderation action: it is on the record.
+      if (moderator && clean.columns.status && clean.columns.status !== existing.status) {
+        await this.auditAction(user, `product.${clean.columns.status}`, 'product', existing.id, `${existing.name} (was ${existing.status})`);
       }
       if (moderator && clean.columns.status && clean.columns.status !== existing.status && existing.sellerId) {
         const owner = await this.sellersSvc.get(existing.sellerId);
@@ -1098,7 +1113,9 @@ export class RealtimeGateway
       if (user.role !== 'admin' && user.role !== 'admin_finance') {
         return fail('Only admin/finance can reject payouts.');
       }
-      return ok(await this.payouts.reject(body.payoutId, body.note));
+      const rejected = await this.payouts.reject(body.payoutId, body.note);
+      await this.auditAction(user, 'payout.rejected', 'payout', rejected.id, [rejected.reference, body.note].filter(Boolean).join(' · '));
+      return ok(rejected);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1289,7 +1306,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'content')) return fail('Not allowed.');
-      return ok(await this.promos.createFlashSale(body));
+      const sale = await this.promos.createFlashSale(body);
+      await this.auditAction(user, 'flashsale.create', 'flashsale', sale.id, sale.title);
+      return ok(sale);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1309,7 +1328,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'content')) return fail('Not allowed.');
-      return ok(await this.cms.upsert(body));
+      const block = await this.cms.upsert(body);
+      await this.auditAction(user, 'cms.upsert', 'cms', String(body?.key ?? ''));
+      return ok(block);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1347,7 +1368,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
-      return ok(await this.categories.create(body));
+      const created = await this.categories.create(body);
+      await this.auditAction(user, 'category.create', 'category', created.id, created.name);
+      return ok(created);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1361,7 +1384,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
-      return ok(await this.categories.update(body.id, body.patch));
+      const updated = await this.categories.update(body.id, body.patch);
+      await this.auditAction(user, 'category.update', 'category', body.id, updated?.name);
+      return ok(updated);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1376,6 +1401,7 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!this.can(user.role, 'catalog')) return fail('Not allowed.');
       await this.categories.remove(body.id);
+      await this.auditAction(user, 'category.remove', 'category', body.id);
       return ok({ id: body.id });
     } catch (e) {
       return fail((e as Error).message);
@@ -1605,12 +1631,25 @@ export class RealtimeGateway
   }
 
   // ---- Audit / fraud / customers / broadcasts / roles (admin) ------------
+  /** `{ action?, actor?, role?, entity?, q?, from?, to?, limit?, offset? }`, filtered and paged on the server. */
   @SubscribeMessage('audit:list')
-  async auditList(@ConnectedSocket() client: AuthedSocket) {
+  async auditList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: AuditFilter) {
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'audit')) return fail('Not allowed.');
-      return ok(await this.audit.list());
+      return ok(await this.audit.list(body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The actions and roles in the log, for the filter pickers. */
+  @SubscribeMessage('audit:facets')
+  async auditFacets(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'audit')) return fail('Not allowed.');
+      return ok(await this.audit.facets());
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1627,16 +1666,28 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * Blocking an alert suspends the customer's account (needs the right to suspend, and `confirm: true`); moving a
+   * blocked alert back reactivates it. Marking reviewed or reopening an unblocked alert is open to the whole fraud group.
+   */
   @SubscribeMessage('fraud:setStatus')
   async fraudSetStatus(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { id: string; status: 'open' | 'reviewed' | 'blocked' },
+    @MessageBody() body: { id: string; status: 'open' | 'reviewed' | 'blocked'; confirm?: boolean },
   ) {
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'fraud')) return fail('Not allowed.');
       oneOf(body?.status, ['open', 'reviewed', 'blocked'] as const, 'Status');
-      return ok(await this.fraud.setStatus(body.id, body.status));
+      const { alert, kickUserId } = await this.fraud.setStatus(String(body.id ?? ''), body.status, {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        canSuspend: this.canSuspendAccounts(user.role),
+        confirmed: body.confirm === true,
+      });
+      if (kickUserId) this.kick(kickUserId); // a blocked customer loses their live sockets immediately
+      return ok(alert);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1656,6 +1707,21 @@ export class RealtimeGateway
     }
   }
 
+  /** Read-only wallet panel of the customer page: the balance and the newest transactions (nothing here edits money). */
+  @SubscribeMessage('customers:wallet')
+  async customersWallet(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { id: string; limit?: number; offset?: number },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'people')) return fail('Not allowed.');
+      return ok(await this.customers.wallet(String(body?.id ?? ''), body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('customers:setActive')
   async customersSetActive(
     @ConnectedSocket() client: AuthedSocket,
@@ -1663,7 +1729,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'admin' && user.role !== 'admin_support') return fail('Not allowed.');
+      if (!this.canSuspendAccounts(user.role)) return fail('Not allowed.');
       const active = body?.active === true;
       await this.customers.setActive(String(body?.id ?? ''), active, user.id);
       await this.audit.record({ actor: user.name, role: user.role, action: active ? 'user.reactivate' : 'user.suspend', entity: 'user', entityId: body.id });
@@ -1693,7 +1759,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'content')) return fail('Not allowed.');
-      return ok(await this.broadcasts.send(user.name, body));
+      const sent = await this.broadcasts.send(user.name, body);
+      await this.auditAction(user, 'broadcast.sent', 'broadcast', sent.id, `${sent.audience} · ${sent.recipients} recipients · ${sent.title}`);
+      return ok(sent);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2096,7 +2164,9 @@ export class RealtimeGateway
       const user = this.requireUser(client);
       if (!this.can(user.role, 'campaignDecisions')) return fail('Only marketing can decide on campaigns.');
       oneOf(body?.status, ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'] as const, 'Status');
-      return ok(await this.campaigns.setStatus(body.id, body.status, body.reason));
+      const campaign = await this.campaigns.setStatus(body.id, body.status, body.reason);
+      await this.auditAction(user, `campaign.${body.status}`, 'campaign', body.id, [campaign?.name, body.reason].filter(Boolean).join(' · '));
+      return ok(campaign);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2197,7 +2267,10 @@ export class RealtimeGateway
       if (!isOwner && !this.can(user.role, 'productModeration')) {
         return fail('You can only remove your own products.');
       }
-      return ok(await this.products.remove(body.id));
+      const removed = await this.products.remove(body.id);
+      // An admin removing someone else's listing is a takedown.
+      if (!isOwner) await this.auditAction(user, 'product.removed', 'product', existing.id, existing.name);
+      return ok(removed);
     } catch (e) {
       return fail((e as Error).message);
     }

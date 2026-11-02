@@ -981,7 +981,7 @@ main li { margin-block: 0.2rem; }
   Already -- no --&gt; T{Tab / choice}
   T -- "Email + password" --&gt; P["POST /auth/login"] --&gt; R{Role}
   T -- "Continue as guest" --&gt; G(["/ (shop as visitor)"])
-  T -- "Demo role picker&lt;br/&gt;(only when NEXT_PUBLIC_DEMO_MODE ≠ false)" --&gt; D[Pick Seller / Admin / Warehouse persona] --&gt; B["Bridge signs into the matching seeded account"] --&gt; R
+  T -- "Demo role picker&lt;br/&gt;(only when NEXT_PUBLIC_DEMO_MODE=true)" --&gt; D[Pick Seller / Admin / Warehouse persona] --&gt; B["Bridge signs into the matching seeded account"] --&gt; R
   R -- customer --&gt; C(["/shop/account"])
   R -- seller --&gt; S(["/seller"])
   R -- admin --&gt; A(["/admin"])
@@ -1254,7 +1254,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>7</td>
-<td>The demo role picker is on unless <code>NEXT_PUBLIC_DEMO_MODE=false</code></td>
+<td>The demo role picker is off unless <code>NEXT_PUBLIC_DEMO_MODE=true</code></td>
 </tr>
 </tbody></table></div>
 <h2 id="6-seller--web-portal-seller"><a class="anchor" href="#6-seller--web-portal-seller" aria-hidden="true">#</a>6. Seller — web portal (<code>/seller</code>)</h2>

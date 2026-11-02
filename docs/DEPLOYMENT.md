@@ -35,9 +35,9 @@ secrets to `/etc/somba/secrets.env` (**back it up** — losing `DATA_ENCRYPTION_
 makes encrypted data unreadable), builds the stack, applies migrations, runs
 `bootstrap:prod`, configures nginx (WebSocket upgrade, `/uploads/`, 6 MB body limit,
 `trust proxy`) and requests the TLS certificate. Optional integrations (SMTP, Twilio,
-Firebase, `WEB_URL`, `PUBLIC_API_URL`) go in `/etc/somba/api.extra.env`. Set
-`NEXT_PUBLIC_DEMO_MODE=false` for the web build so `/login` shows the real
-email/password form instead of the demo persona picker. See `docs/BACKEND-REMAINING.md`
+Firebase, `WEB_URL`, `PUBLIC_API_URL`) go in `/etc/somba/api.extra.env`. The script builds the web app with
+`NEXT_PUBLIC_DEMO_MODE=false`, so `/login` shows the real
+email/password form; the demo persona picker appears only when a build sets it to `true`. See `docs/BACKEND-REMAINING.md`
 for the mobile/web test plan. The manual walkthrough below is the same thing step by step.
 
 ---
@@ -59,7 +59,7 @@ After you run the seed (Step 7), these accounts exist. **All share the password
 | `/live` · Realtime console | any of the above | — | `Somba@2026` |
 
 Portals sign in against the real backend on `/login` (email + password, JWT).
-With `NEXT_PUBLIC_DEMO_MODE=false` (production) the demo persona picker is hidden.
+The demo persona picker is **hidden unless** the web build sets `NEXT_PUBLIC_DEMO_MODE=true` (local demos only: add it to `web/.env.local` and rebuild; docker compose: `NEXT_PUBLIC_DEMO_MODE=true docker compose up --build`).
 These seeded accounts exist only on demo boxes where `npm run seed` was run; on
 production the only account is the admin created by `bootstrap:prod`.
 
@@ -272,6 +272,7 @@ cat > .env.local <<'EOF'
 NEXT_PUBLIC_API_URL=https://yourdomain.com
 NEXT_PUBLIC_SOCKET_URL=https://yourdomain.com
 NEXT_PUBLIC_MARKET_PROFILE=france
+NEXT_PUBLIC_DEMO_MODE=false
 EOF
 
 npm ci
