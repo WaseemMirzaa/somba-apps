@@ -24,7 +24,7 @@ async function main(){
  await shot('02-task-detail');
  // Flow 2: Navigate / My work / Profile
  await reload(); await tap(171, navY); await shot('03-navigate');
- await reload(); await tap(257, navY); await shot('04-earnings');
+ await reload(); await tap(257, navY); await shot('04-my-work');
  await reload(); await tap(343, navY); await shot('05-profile');
  await b.close(); server.close(); console.log('done');
 }

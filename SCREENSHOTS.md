@@ -156,7 +156,7 @@ A visual walkthrough of every screen across the Somba&Teka apps. Two mobile apps
 <td align="center"><img src="rider-app/docs/screenshots/01-tasks.png" width="180"><br><sub><b>Task queue</b></sub></td>
 <td align="center"><img src="rider-app/docs/screenshots/02-task-detail.png" width="180"><br><sub><b>Task detail</b></sub></td>
 <td align="center"><img src="rider-app/docs/screenshots/03-navigate.png" width="180"><br><sub><b>Navigation</b></sub></td>
-<td align="center"><img src="rider-app/docs/screenshots/04-earnings.png" width="180"><br><sub><b>Earnings</b></sub></td>
+<td align="center"><img src="rider-app/docs/screenshots/04-my-work.png" width="180"><br><sub><b>My work</b></sub></td>
 <td align="center"><img src="rider-app/docs/screenshots/05-profile.png" width="180"><br><sub><b>Profile</b></sub></td>
 </tr>
 </table>
