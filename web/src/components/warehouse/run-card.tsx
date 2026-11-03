@@ -181,6 +181,27 @@ export function RunCard({
         </p>
       )}
 
+      {!incoming && planned && canAssign && (
+        <div className="mt-3 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3" data-testid="run-load-scan">
+          <p className="text-xs font-medium text-slate-600">{fr ? "Charger la tournée : scanner colis par colis" : "Load the run: scan parcel by parcel"}</p>
+          <ScanInput
+            legs={[...ids, ...addable].map((id) => taskOf(id)).filter((t): t is DeskTask => !!t)}
+            buttonLabel={fr ? "Charger" : "Load"}
+            onFound={async (leg) => {
+              if (ids.includes(leg.id)) {
+                toast(fr ? `${parcelCode(leg)} est déjà dans cette tournée.` : `${parcelCode(leg)} is already in this run.`, "info");
+                return;
+              }
+              if (!addable.includes(leg.id)) {
+                toast(fr ? `${parcelCode(leg)} n'attend pas cet entrepôt : il ne peut pas rejoindre cette tournée.` : `${parcelCode(leg)} is not waiting for this warehouse, so it cannot join this run.`, "error");
+                return;
+              }
+              await act("load", () => runActions.update(run.id, { addTaskIds: [leg.id] }), fr ? `${parcelCode(leg)} chargé dans ${run.reference}` : `${parcelCode(leg)} loaded into ${run.reference}`);
+            }}
+          />
+        </div>
+      )}
+
       {canReceive && (
         <div className="mt-3 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
           <p className="text-xs font-medium text-slate-600">{fr ? "Scanner colis par colis" : "Scan parcel by parcel"}</p>

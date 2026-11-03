@@ -552,8 +552,17 @@ export class WarehouseStockService implements OnModuleInit {
       const from = await this.binOf(m, c.hubId, { binId: input.fromBinId, binCode: input.fromBinCode });
       const to = await this.binOf(m, c.hubId, { binId: input.toBinId, binCode: input.toBinCode }, { active: true });
       if (from.id === to.id) throw new BadRequestException('Choose a different bin to move the stock to.');
-      await this.takeFrom(m, c.hubId, from, p.productId, p.variant, n, p.name);
-      await this.addTo(m, c.hubId, to.id, p.productId, p.variant, n);
+      // Always touch the two rows in the same order (lower bin id first), whichever way the move goes, so two moves in
+      // opposite directions between the same bins queue up instead of locking each other out.
+      const take = () => this.takeFrom(m, c.hubId, from, p.productId, p.variant, n, p.name);
+      const add = () => this.addTo(m, c.hubId, to.id, p.productId, p.variant, n);
+      if (from.id < to.id) {
+        await take();
+        await add();
+      } else {
+        await add();
+        await take();
+      }
       return this.write(m, c, { productId: p.productId, variant: p.variant, kind: 'move', reason: 'relocation', qty: n, delta: 0, fromBinId: from.id, fromBinCode: from.code, toBinId: to.id, toBinCode: to.code, note, clientRef: ref });
     }).catch((e) => this.retried(e, c.hubId, ref));
     this.done(c.hubId, p.productId);

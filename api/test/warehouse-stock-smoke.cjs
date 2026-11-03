@@ -110,12 +110,13 @@ const login = async (email) => {
   ok((await binQty(mgr.sock, prod.id, B)) === 5, 'B holds the counted 5');
   a = await req(op.sock, 'stock:out', { productId: prod.id, qty: 2, binId: binA.id, reason: 'damaged', note: 'dropped' });
   ok(a.ok && a.data.kind === 'stock_out' && a.data.delta === -2 && a.data.onHandAfter === t0 + 9, 'stock out 2 as damaged', a.error ?? '');
-  const hist = (await req(op.sock, 'stock:history', { productId: prod.id })).data ?? [];
+  const hist = (await req(op.sock, 'stock:history', { productId: prod.id, limit: 500 })).data ?? [];
   const kinds = hist.map((h) => h.kind);
   ok(['receive', 'move', 'count', 'stock_out'].every((k) => kinds.includes(k)) && hist[0].kind === 'stock_out', 'the history lists receive, move, count and stock out, newest first');
   ok(hist.every((h) => h.actorName && h.createdAt && h.sku), 'every line says who, when and which SKU');
   const sum = hist.reduce((s, h) => s + h.delta, 0);
-  ok(sum === 10 + 1 - 2, 'the deltas of the ledger add up to what is on hand (+10 +1 -2)', String(sum));
+  ok(sum === (await total(mgr.sock, prod.id)), 'the deltas of the whole ledger add up to what is on hand (the stock is the sum of its history)', `${sum} vs ${await total(mgr.sock, prod.id)}`);
+  ok(hist.slice(0, 4).map((h) => h.delta).join() === '-2,1,0,10', 'and this session adds up too: +10, move 0, count +1, out -2');
 
   section('Negative stock is refused');
   a = await req(op.sock, 'stock:out', { productId: prod.id, qty: 99, binId: binA.id, reason: 'lost' });

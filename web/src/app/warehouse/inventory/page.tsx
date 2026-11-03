@@ -1,68 +1,71 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { WarehouseListPage } from "@/components/warehouse/list-page";
-import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
-import { applyListFilters } from "@/lib/list-filter-utils";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
+import { OpsLoading } from "@/components/warehouse/ops-state";
+import { BinsTab } from "@/components/warehouse/stock/bins";
+import { CountTab } from "@/components/warehouse/stock/count";
+import { CustodyTab } from "@/components/warehouse/stock/custody";
+import { HistoryTab } from "@/components/warehouse/stock/history";
+import { MoveOutTab } from "@/components/warehouse/stock/move-out";
+import { OnHandTab } from "@/components/warehouse/stock/on-hand";
+import { ReceiveTab } from "@/components/warehouse/stock/receive";
 import { useLocale } from "@/context/locale-context";
-import { useWarehouseData } from "@/lib/warehouse";
-import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { pickText } from "@/lib/i18n-fields";
+import { useOpsBase } from "@/lib/ops-path";
 
-const STATUS_OPTIONS = [
-  { value: "ok", label: "In stock", labelFr: "En stock" },
-  { value: "low", label: "Low", labelFr: "Faible" },
-  { value: "out", label: "Out of stock", labelFr: "Rupture" },
-];
+const TAB_IDS = ["onhand", "receive", "move", "count", "history", "bins", "custody"] as const;
+type TabId = (typeof TAB_IDS)[number];
 
-export default function WarehouseInventoryPage() {
-  const { t, locale } = useLocale();
+/**
+ * The warehouse stock ledger: what the warehouse holds by SKU and bin, receiving (from a scanned parcel or by hand), moves,
+ * cycle counts, stock-outs and the history, plus the older read-only view of the parcels in custody. Everything is live and
+ * every change is a ledger line (who, when, how many, from / to which bin, why).
+ */
+function InventoryContent() {
+  const { locale } = useLocale();
   const fr = locale === "fr";
-  const ops = useOpsPath();
   const base = useOpsBase();
-  const { inventory, inventoryError } = useWarehouseData();
-  const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
+  const params = useSearchParams();
+  const asked = params.get("tab") as TabId | null;
+  const [tab, setTab] = useState<TabId>(asked && TAB_IDS.includes(asked) ? asked : "onhand");
 
-  const filtered = useMemo(
-    () => applyListFilters(inventory, filters, { searchFields: ["sku", "name", "nameFr", "category", "categoryFr"], statusField: "status" }),
-    [inventory, filters],
-  );
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "onhand", label: fr ? "En stock" : "On hand" },
+    { id: "receive", label: fr ? "Réception" : "Receive" },
+    { id: "move", label: fr ? "Déplacer / sortir" : "Move / out" },
+    { id: "count", label: fr ? "Comptage" : "Count" },
+    { id: "history", label: fr ? "Historique" : "History" },
+    { id: "bins", label: fr ? "Emplacements" : "Bins" },
+    { id: "custody", label: fr ? "Colis en garde" : "In custody" },
+  ];
 
   return (
-    <WarehouseListPage
-      title={t("inventory")}
-      subtitle={fr ? "Niveaux de stock en direct par produit. Les vendeurs gèrent leur stock ; cette vue est en lecture seule." : "Live stock levels per product. Sellers manage their stock; this view is read-only."}
-      breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("inventory") }]}
-      filters={
-        <div className="space-y-3">
-          {inventoryError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{inventoryError}</p>}
-          <ListFilters
-            values={filters}
-            onChange={setFilters}
-            statusOptions={STATUS_OPTIONS}
-            searchPlaceholder={fr ? "SKU, produit, catégorie…" : "SKU, product, category…"}
-            showDateFilters={false}
-          />
-        </div>
-      }
-      columns={[
-        { key: "sku", label: "SKU", render: (row) => (
-          <Link href={ops(`/inventory/${encodeURIComponent(String(row.sku))}`)} className="font-medium text-[var(--primary)] hover:underline">{String(row.sku)}</Link>
-        )},
-        { key: "name", label: fr ? "Produit" : "Product", render: (row) => pickText(fr, row.name as string, row.nameFr as string | null) },
-        { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => pickText(fr, row.category as string, row.categoryFr as string | null) },
-        { key: "stock", label: fr ? "Stock" : "Stock" },
-        { key: "status", label: t("status"), render: (row) => {
-          const s = String(row.status);
-          return <Badge variant={s === "ok" ? "success" : s === "low" ? "warning" : "danger"}>{(STATUS_OPTIONS.find((o) => o.value === s) ? (fr ? STATUS_OPTIONS.find((o) => o.value === s)!.labelFr : STATUS_OPTIONS.find((o) => o.value === s)!.label) : s)}</Badge>;
-        }},
-        { key: "actions", label: t("action"), render: (row) => (
-          <Link href={ops(`/inventory/${encodeURIComponent(String(row.sku))}`)} className="text-sm text-[var(--primary)] hover:underline">{t("view")}</Link>
-        )},
-      ]}
-      data={filtered as unknown as Record<string, unknown>[]}
-    />
+    <div className="space-y-5">
+      <PageHeader
+        title={fr ? "Inventaire" : "Inventory"}
+        subtitle={fr ? "Le stock de l'entrepôt par SKU et par emplacement, avec chaque mouvement enregistré." : "What the warehouse holds by SKU and bin, with every movement on record."}
+        breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Inventaire" : "Inventory" }]}
+      />
+      <HubScopeBar />
+      <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      {tab === "onhand" && <OnHandTab />}
+      {tab === "receive" && <ReceiveTab />}
+      {tab === "move" && <MoveOutTab />}
+      {tab === "count" && <CountTab />}
+      {tab === "history" && <HistoryTab />}
+      {tab === "bins" && <BinsTab />}
+      {tab === "custody" && <CustodyTab />}
+    </div>
+  );
+}
+
+export default function WarehouseInventoryPage() {
+  return (
+    <Suspense fallback={<OpsLoading />}>
+      <InventoryContent />
+    </Suspense>
   );
 }
