@@ -43,5 +43,12 @@ iOS needs "Always".
   foreground service is what keeps it alive on a ride. A rider who chose it will be asked again at the next set-off.
 * Battery savers of some Android makers (Xiaomi, Huawei, Samsung "sleeping apps") can still kill the service. The rider
   has to exclude the app from battery optimisation; this cannot be done from the app.
-* Verified on an emulator and a simulator with scripted positions only. A real Android phone and a real iPhone are still to
-  be tried before launch.
+* Verified on an Android 14 emulator (API 34, arm64) and an iOS 27 simulator with scripted positions, nothing on a real
+  phone yet. Android, `integration_test/ride_device_test.dart` plus `adb emu geo fix`, with only `ACCESS_FINE_LOCATION`
+  granted: the geolocator foreground service was running (`isForeground=true`, type `location`), and the API received every
+  position with the app in front, with the app in the background (Home), and with the screen off (`mWakefulness=Asleep`).
+  iOS, same test plus `simctl privacy` and `simctl location`, "While Using": positions arrived with the app in the
+  background (Settings in front). The iOS screen was not locked, only backgrounded. A real Android phone and a real iPhone
+  are still to be tried before launch.
+* Android 13+ asks for notification permission with a system dialog the first time the foreground service wants to notify;
+  while that dialog is up the app is paused. Answer it (the service runs either way).
