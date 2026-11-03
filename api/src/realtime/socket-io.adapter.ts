@@ -6,6 +6,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 import { Server, ServerOptions, Socket } from 'socket.io';
+import { StaffTwoFaPolicy, guardStaffTwoFa } from '../auth/staff-twofa';
 
 /**
  * Socket.IO adapter that locks CORS to the configured origins (from
@@ -46,6 +47,8 @@ export class SocketIoAdapter extends IoAdapter {
     };
     const server = super.createIOServer(port, { ...options, cors }) as Server;
     if (this.redisAdapter) server.adapter(this.redisAdapter);
+    // Staff two-factor rule (requireStaffTwoFactor) for every event of every gateway; see auth/staff-twofa.ts.
+    server.on('connection', (socket) => guardStaffTwoFa(socket, () => this.app.get(StaffTwoFaPolicy, { strict: false })));
     return server;
   }
 
@@ -76,7 +79,8 @@ export class SocketIoAdapter extends IoAdapter {
   }
 
   bindClientConnect(server: Server, callback: Function): void {
-    server.sockets.setMaxListeners(this.maxListeners(1));
+    // One `connection` listener per gateway, plus the staff two-factor guard that createIOServer adds.
+    server.sockets.setMaxListeners(this.maxListeners(1) + 1);
     super.bindClientConnect(server, callback);
   }
 

@@ -69,6 +69,8 @@ export interface TwoFaStatus {
   pending: boolean;
   recoveryRemaining: number;
   required: boolean;
+  /** Who the platform requires it from: store owners or staff (admin roles). */
+  requiredFor?: "seller" | "staff" | null;
 }
 
 export interface TwoFaSetup {

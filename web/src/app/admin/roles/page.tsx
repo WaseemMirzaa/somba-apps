@@ -9,7 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { SecretBox } from "@/components/admin/copy-box";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
-import { ErrorNote } from "@/components/admin/modal";
+import { ErrorNote, Modal } from "@/components/admin/modal";
 import { HomeWarehouseDialog, HubTierFields, needsHubText } from "@/components/admin/home-warehouse-dialog";
 import type { HubRow } from "@/lib/admin-stats";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -18,6 +18,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { errMsg, useRole, useServerList, type StaffRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { errMessage } from "@/lib/seller-labels";
 import { TIER_LABEL, type WarehouseTier } from "@/lib/logistics";
 
 interface RoleDef {
@@ -70,6 +71,10 @@ export default function AdminRolesPage() {
   const hubs = useServerList<HubRow>("hubs:list", { enabled: isSuper });
   const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
   const [placing, setPlacing] = useState<StaffRow | null>(null);
+  // Super admin switches off another staff member's two-factor authentication (confirmed first, audited by the server).
+  const [resetting, setResetting] = useState<StaffRow | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const roleName = (key: string) => {
     const d = defs.find((x) => x.key === key);
@@ -123,6 +128,24 @@ export default function AdminRolesPage() {
       setFormError(errMsg(e));
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function resetTwoFactor() {
+    if (!resetting) return;
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      await socketClient.request("auth:2fa:reset", { userId: resetting.id });
+      toast(fr ? `Authentification à deux facteurs de ${resetting.name} réinitialisée` : `Two-factor authentication reset for ${resetting.name}`, "success");
+      setResetting(null);
+      await reload();
+    } catch (e) {
+      const msg = errMessage(e);
+      setResetError(msg);
+      toast(msg, "error");
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -245,6 +268,24 @@ export default function AdminRolesPage() {
                 ),
             },
             {
+              key: "twofaEnabled",
+              label: fr ? "2FA" : "2FA",
+              render: (row) => {
+                const u = row as unknown as StaffRow;
+                const self = u.id === rt.user?.id;
+                return (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={u.twofaEnabled ? "success" : "default"}>{u.twofaEnabled ? (fr ? "Activée" : "On") : fr ? "Désactivée" : "Off"}</Badge>
+                    {u.twofaEnabled && !self && (
+                      <Button size="sm" variant="secondary" onClick={() => { setResetError(null); setResetting(u); }}>
+                        {fr ? "Réinitialiser" : "Reset"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              },
+            },
+            {
               key: "hubId",
               label: fr ? "Entrepôt" : "Warehouse",
               render: (row) => {
@@ -262,6 +303,26 @@ export default function AdminRolesPage() {
           ]}
         />
       </div>
+      <Modal
+        open={!!resetting}
+        onClose={() => { if (!resetBusy) setResetting(null); }}
+        title={fr ? "Réinitialiser l'authentification à deux facteurs ?" : "Reset two-factor authentication?"}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setResetting(null)} disabled={resetBusy}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="danger" size="sm" onClick={() => void resetTwoFactor()} disabled={resetBusy}>{resetBusy ? "…" : fr ? "Réinitialiser" : "Reset"}</Button>
+          </>
+        }
+      >
+        <p>
+          {resetting
+            ? fr
+              ? `Cela désactive l'authentification à deux facteurs de ${resetting.name} et la déconnecte partout. La personne devra la configurer de nouveau (tout de suite si la plateforme l'exige). L'action est inscrite au journal d'audit.`
+              : `This turns off two-factor authentication for ${resetting.name} and signs them out everywhere. They must set it up again (at once if the platform requires it). The action is recorded in the audit log.`
+            : ""}
+        </p>
+        <ErrorNote message={resetError} />
+      </Modal>
       <HomeWarehouseDialog user={placing} hubs={hubs.items} fr={fr} onClose={() => setPlacing(null)} onSaved={() => void reload()} />
       <HomeWarehouseDialog user={promoting?.user ?? null} nextRole={promoting?.role} hubs={hubs.items} fr={fr} onClose={() => setPromoting(null)} onSaved={() => void reload()} />
     </div>

@@ -14,6 +14,7 @@ import { TranslationsStatusPanel } from "@/components/admin/translations-status-
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { codOffered } from "@/lib/cod-visibility";
+import { errMessage } from "@/lib/seller-labels";
 
 type Values = Record<string, string>;
 
@@ -92,6 +93,26 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Catalogue",
     fields: [
       { key: "productModeration", kind: "toggle", label: "Moderate new seller products", labelFr: "Modérer les nouveaux produits vendeurs", hint: "On: new listings wait for approval. Off: they go live at once.", hintFr: "Activé : les nouvelles annonces attendent une approbation. Désactivé : publication immédiate." },
+    ],
+  },
+  {
+    title: "Staff security",
+    titleFr: "Sécurité du personnel",
+    fields: [
+      { key: "requireStaffTwoFactor", kind: "toggle", label: "Require two-factor authentication for staff", labelFr: "Exiger l'authentification à deux facteurs pour le personnel", hint: "On: an admin without 2FA can sign in but can only open My account until they set it up. Only the super admin can change this, and only once their own 2FA is on.", hintFr: "Activé : un admin sans 2FA peut se connecter mais ne peut ouvrir que Mon compte tant qu'il ne l'a pas configurée. Seul le super admin peut le modifier, et seulement une fois sa propre 2FA activée." },
+    ],
+  },
+  {
+    title: "Fraud rules",
+    titleFr: "Règles de fraude",
+    fields: [
+      { key: "fraudFailedPayments24h", kind: "text", label: "Failed payments in 24 hours", labelFr: "Paiements échoués en 24 heures", hint: "2 to 100. At or above this, one alert per customer per day.", hintFr: "2 à 100. À partir de ce nombre, une alerte par client et par jour.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+      { key: "fraudNewAccountOrders24h", kind: "text", label: "Orders in 24 hours from a new account", labelFr: "Commandes en 24 heures d'un compte récent", hint: "2 to 100. Applies to accounts younger than the number of days below.", hintFr: "2 à 100. Concerne les comptes plus récents que le nombre de jours ci-dessous.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+      { key: "fraudNewAccountDays", kind: "text", label: "A new account is younger than (days)", labelFr: "Un compte est récent s'il a moins de (jours)", hint: "1 to 90.", hintFr: "1 à 90.", inputMode: "numeric", range: { min: 1, max: 90, integer: true } },
+      { key: "fraudSharedAccounts", kind: "text", label: "Accounts sharing a phone or device", labelFr: "Comptes partageant un téléphone ou un appareil", hint: "2 to 50. The same phone number or the same device on this many customer accounts.", hintFr: "2 à 50. Le même numéro ou le même appareil sur ce nombre de comptes clients.", inputMode: "numeric", range: { min: 2, max: 50, integer: true } },
+      { key: "fraudReturnRatePct", kind: "text", label: "Return / refund rate over 30 days (%)", labelFr: "Taux de retours / remboursements sur 30 jours (%)", hint: "1 to 100. Share of the last 30 days' orders that were returned, disputed or refunded.", hintFr: "1 à 100. Part des commandes des 30 derniers jours retournées, contestées ou remboursées.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
+      { key: "fraudReturnMinOrders", kind: "text", label: "Fewest orders before the return rate counts", labelFr: "Minimum de commandes avant de juger le taux de retours", hint: "1 to 100. Below this many orders in 30 days the rate is not judged.", hintFr: "1 à 100. En dessous de ce nombre de commandes sur 30 jours, le taux n'est pas jugé.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
+      { key: "fraudAddressChanges24h", kind: "text", label: "Address changes in 24 hours before delivery", labelFr: "Changements d'adresse en 24 heures avant livraison", hint: "2 to 100. Counted only while one of the customer's orders is still on its way.", hintFr: "2 à 100. Comptés seulement tant qu'une commande du client est encore en route.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
     ],
   },
 ];
@@ -178,7 +199,7 @@ export default function AdminSettingsPage() {
       setDraft((d) => ({ ...d, [key]: all[key] ?? d[key] }));
       return true;
     } catch (e) {
-      setErrors((er) => ({ ...er, [key]: errMsg(e) }));
+      setErrors((er) => ({ ...er, [key]: errMessage(e) }));
       return false;
     } finally {
       setSavingKey(null);

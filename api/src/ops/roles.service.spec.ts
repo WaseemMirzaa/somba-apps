@@ -36,3 +36,15 @@ describe('roles:defs', () => {
     expect(ROLE_DEFS.find((d) => d.key === key)).toMatchObject({ scope, scopeFr });
   });
 });
+
+describe('roles:staff shows who has two-factor authentication on', () => {
+  it('lists twofaEnabled for every staff account', async () => {
+    const rows = [
+      { id: 'a', name: 'Boss', email: 'b@x', phone: null, role: 'admin', active: true, hubId: null, warehouseTier: null, twofaEnabled: true },
+      { id: 'b', name: 'Fin', email: 'f@x', phone: null, role: 'admin_finance', active: true, hubId: null, warehouseTier: null, twofaEnabled: false },
+      { id: 'c', name: 'Old', email: 'o@x', phone: null, role: 'rider', active: true, hubId: 'h', warehouseTier: null, twofaEnabled: undefined },
+    ];
+    const svc = new RolesService({ find: async () => rows } as never, NONE, NONE, NONE);
+    expect((await svc.staff()).map((s) => [s.id, s.twofaEnabled])).toEqual([['a', true], ['b', false], ['c', false]]);
+  });
+});

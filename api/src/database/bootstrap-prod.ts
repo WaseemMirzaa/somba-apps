@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -154,6 +155,8 @@ async function run() {
     // order or top up its wallet (needs SMTP and/or Twilio to be configured, see docs/DEPLOYMENT.md).
     requireVerifiedForCheckout: 'true',
     sellerPlans: JSON.stringify(DEFAULT_SELLER_PLANS),
+    requireStaffTwoFactor: 'false', // super admin turns it on (Admin -> Settings) once the staff have set 2FA up
+    ...Object.fromEntries(Object.values(FRAUD_THRESHOLDS).map((t) => [t.key, String(t.default)])), // fraud-rule thresholds
   };
   for (const [key, value] of Object.entries(defaults)) {
     if (!(await settings.findOne({ where: { key } }))) {

@@ -32,7 +32,11 @@ interface FraudRow {
   type: string;
   severity: string;
   customer?: string;
-  orderId?: string;
+  customerId?: string | null;
+  orderId?: string | null;
+  /** Why the server raised it, English and French (rule alerts; older alerts have none). */
+  reason?: string | null;
+  reasonFr?: string | null;
   score: number;
   status: string;
   createdAt?: string;
@@ -176,7 +180,9 @@ export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}
         type: f.type,
         severity: f.severity,
         customer: f.customer ?? "—",
-        orderId: f.orderId,
+        orderId: f.orderId ?? undefined,
+        reason: f.reason ?? null,
+        reasonFr: f.reasonFr ?? null,
         score: f.score,
         status: f.status,
         date: f.date ?? (f.createdAt ? dateOf(f.createdAt) : "—"),

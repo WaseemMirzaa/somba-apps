@@ -46,6 +46,8 @@ export { CmsBlock } from './cms-block.entity';
 export { Setting } from './setting.entity';
 export { AuditLog } from './audit-log.entity';
 export { FraudAlert } from './fraud-alert.entity';
+export { FraudSignal } from './fraud-signal.entity';
+export type { FraudSignalKind } from './fraud-signal.entity';
 export { Broadcast } from './broadcast.entity';
 export { Hub } from './hub.entity';
 export { GeoArea } from './geo-area.entity';
@@ -124,6 +126,7 @@ import { CmsBlock } from './cms-block.entity';
 import { Setting } from './setting.entity';
 import { AuditLog } from './audit-log.entity';
 import { FraudAlert } from './fraud-alert.entity';
+import { FraudSignal } from './fraud-signal.entity';
 import { Broadcast } from './broadcast.entity';
 import { Hub } from './hub.entity';
 import { GeoArea } from './geo-area.entity';
@@ -182,6 +185,7 @@ export const ENTITIES = [
   Setting,
   AuditLog,
   FraudAlert,
+  FraudSignal,
   Broadcast,
   Hub,
   GeoArea,

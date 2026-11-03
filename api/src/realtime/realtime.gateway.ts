@@ -95,7 +95,8 @@ const GROUPS = {
   people: ['admin', 'admin_support', 'admin_operations', 'admin_finance'],
   insight: ['admin', 'admin_operations', 'admin_finance'],
   audit: ['admin', 'admin_operations'],
-  fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation'],
+  // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.
+  fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support'],
   /** Money screens: confirm/decline payments, finance dashboard. */
   finance: ['admin', 'admin_finance'],
   /** Hide / restore customer reviews. */
@@ -652,11 +653,8 @@ export class RealtimeGateway
         { id: user.id, name: user.name },
         body,
       );
-      // Raise a COD-risk fraud alert for large cash orders.
-      if (order.paymentMethod === 'cod') {
-        const cap = Number((await this.settings.get('codCapUsd')) ?? '500');
-        await this.fraud.flagCodRisk(user.name, order.id, order.totalUsd, cap);
-      }
+      // Fraud rules: the COD cap (only while COD is offered), failed payments, new-account bursts, shared phone/device, returns, address changes.
+      await this.fraud.afterOrder({ id: user.id, name: user.name }, order);
       // The same view the customer's list and pushes carry (journey and warehouse names).
       return ok((await this.orders.customerViews([order]))[0] ?? order);
     } catch (e) {

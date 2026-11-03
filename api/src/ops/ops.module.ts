@@ -6,9 +6,11 @@ import {
   DeliveryTask,
   Dispute,
   FraudAlert,
+  FraudSignal,
   Order,
   OrderItem,
   Payment,
+  PaymentRefund,
   Payout,
   Product,
   ProductView,
@@ -29,6 +31,8 @@ import { SellersService } from './sellers.service';
 import { AnalyticsService } from './analytics.service';
 import { AuditService } from './audit.service';
 import { FraudService } from './fraud.service';
+import { FraudRulesService } from './fraud-rules.service';
+import { FraudSignalsModule } from './fraud-signals.module';
 import { CustomersService } from './customers.service';
 import { BroadcastsService } from './broadcasts.service';
 import { UsersModule } from '../users/users.module';
@@ -54,6 +58,8 @@ import { GeoModule } from '../geo/geo.module';
       DeliveryTask,
       AuditLog,
       FraudAlert,
+      FraudSignal,
+      PaymentRefund,
       Broadcast,
       Setting,
       WalletTransaction,
@@ -66,12 +72,14 @@ import { GeoModule } from '../geo/geo.module';
     UsersModule,
     LogisticsModule,
     GeoModule,
+    FraudSignalsModule,
   ],
   providers: [
     SellersService,
     AnalyticsService,
     AuditService,
     FraudService,
+    FraudRulesService,
     CustomersService,
     BroadcastsService,
     RolesService,
@@ -81,6 +89,7 @@ import { GeoModule } from '../geo/geo.module';
     AnalyticsService,
     AuditService,
     FraudService,
+    FraudRulesService,
     CustomersService,
     BroadcastsService,
     RolesService,

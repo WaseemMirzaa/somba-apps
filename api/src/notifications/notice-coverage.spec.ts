@@ -279,6 +279,9 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   'Two-factor authentication was turned off on your account.': [
     ['Two-factor authentication was turned off on your account.', 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
   ],
+  'A super admin reset two-factor authentication on your account. Sign in again and set it up again.': [
+    ['A super admin reset two-factor authentication on your account. Sign in again and set it up again.', 'Un super admin a réinitialisé l’authentification à deux facteurs de votre compte. Reconnectez-vous et configurez-la de nouveau.'],
+  ],
   'Your store is open again and takes new orders.': [['Your store is open again and takes new orders.', 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.']],
   'Your store badge is now {} (was {}).': [
     ['Your store badge is now gold (was silver).', 'Le badge de votre boutique est maintenant or (avant : argent).'],
