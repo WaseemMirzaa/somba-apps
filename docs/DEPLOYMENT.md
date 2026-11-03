@@ -279,6 +279,12 @@ npm ci
 npm run build
 ```
 
+> **Scripted deploy (`deploy/droplet-deploy.sh`):** it writes `web/.env.local` itself on every run. Values that must
+> survive a redeploy go in `/etc/somba/web.env` (root-only), one `NAME=value` per line without quotes or spaces.
+> Only `NEXT_PUBLIC_FIREBASE_*` (web push, including `NEXT_PUBLIC_FIREBASE_VAPID_KEY`) and
+> `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` / `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` (web address map, optional) are copied from it;
+> any other line is ignored. Without the Maps key the address map is off and manual entry still works.
+
 > Using the raw droplet IP or plain HTTP for now? Use
 > `http://YOUR_DROPLET_IP` for both `NEXT_PUBLIC_*` values instead, and
 > **rebuild** whenever they change.
