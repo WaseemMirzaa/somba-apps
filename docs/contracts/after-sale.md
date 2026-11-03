@@ -80,7 +80,7 @@ Return flow in one line: `awaiting_seller` → seller yes → `pickup` → wareh
 |---|---|---|---|
 | `disputes:eligibility` | customer | `{orderId}` | `{ eligible, reason: string\|null, windowDays, deliveredAt, endsAt, items: [{itemId, productId, productName, variant, qty, remaining, unitPriceUsd}] }` — what can still be returned and whether the window is open. `reason` is one of the return errors in §11 |
 | `disputes:open` | customer | `{ orderId, type: 'return'\|'dispute', reason (≥5 chars), category?, items?: [{itemId? \| productId?, qty?}], attachments?: string[] (≤6 upload URLs), refundTo?: 'wallet'\|'phone' }` | `DisputeView` (+ `siblings`) |
-| `disputes:list` | any signed-in | `{status?, type?, stage?, limit?, offset?}` | `DisputeView[]` (customer: own; seller: their store's + own purchases; warehouse: returns; admin: all) |
+| `disputes:list` | any signed-in | `{status?, type?, stage?, limit?, offset?}` | `DisputeView[]` (customer: own; seller: their store's + own purchases; warehouse staff: only the returns that arrive at their own warehouse; admin: all) |
 | `returns:list` | same | same without `type` | returns only |
 | `disputes:get` | a party or staff | `{id}` | `DisputeView` with `messages` |
 | `disputes:reply` | customer / seller of the request / admin | `{ id, message, attachments? }` | `DisputeMessage` `{id, disputeId, authorId, authorName, role, text, attachments[], createdAt}` |
@@ -89,8 +89,8 @@ Return flow in one line: `awaiting_seller` → seller yes → `pickup` → wareh
 | `disputes:cancel` | customer | `{ id }` (only before the seller said yes) | `DisputeView` |
 | `returns:decide` | `admin`, `admin_support`, `admin_operations`, `admin_finance` | `{ id, approve: boolean, reason? }` (reason ≥5 chars when refusing) | `DisputeView` |
 | `disputes:decide` | same roles; refunds need `admin` or `admin_finance` | `{ id, outcome: 'refund_full'\|'refund_partial'\|'replacement'\|'reject', amountUsd? (partial), reason? (needed for reject), items?: [{itemId, qty}] (replacement), refundTo? }` | `DisputeView` |
-| `returns:grade` | `warehouse_staff`, admins | `{ id, grades: [{ itemId (the dispute item id), condition: 'resellable'\|'damaged'\|'unsellable', restockQty? }], note? }` | `DisputeView` |
-| `disputes:markReceived` | warehouse, admins | `{ disputeId, restock? = true }` | `DisputeView` — the old desk button; `restock` grades everything resellable and shelves it. Prefer the logistics scan-in |
+| `returns:grade` | warehouse supervisors and managers (their own warehouse's returns only), `admin`, `admin_operations` (support, finance, marketing and moderation are refused) | `{ id, grades: [{ itemId (the dispute item id), condition: 'resellable'\|'damaged'\|'unsellable', restockQty? }], note? }` | `DisputeView` |
+| `disputes:markReceived` | same as `returns:grade` | `{ disputeId, restock? = true }` | `DisputeView` — the old desk button; `restock` grades everything resellable and shelves it. Prefer the logistics scan-in |
 | `disputes:resolve` | admins (refund: `admin`, `admin_finance`) | `{ disputeId, resolution?, refund?, force? }` | `DisputeView` — a refund on a return pays the **returned items only**; on a dispute everything outstanding |
 | `disputes:reject` | admins | `{ disputeId, resolution? }` | `DisputeView` |
 

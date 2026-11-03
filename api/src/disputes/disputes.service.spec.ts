@@ -23,7 +23,9 @@ const sellerOne = { id: 'su1', role: 'seller', name: 'Seller One' };
 const sellerTwo = { id: 'su2', role: 'seller', name: 'Seller Two' };
 const agent = { id: 'a1', role: 'admin_support', name: 'Agent' };
 const admin = { id: 'a0', role: 'admin', name: 'Admin' };
-const warehouse = { id: 'w1', role: 'warehouse_staff', name: 'Desk' };
+const warehouse = { id: 'w1', role: 'warehouse_staff', name: 'Desk', hubId: 'hub-k' };
+const otherWarehouse = { id: 'w2', role: 'warehouse_staff', name: 'Other desk', hubId: 'hub-l' };
+const unlinkedStaff = { id: 'w3', role: 'warehouse_staff', name: 'Nowhere', hubId: null };
 
 let s1: Seller;
 let s2: Seller;
@@ -37,6 +39,7 @@ async function makeOrder(lines: { sellerId: string; productId: string; qty: numb
       customerId: customer.id,
       customerName: customer.name,
       status: 'delivered',
+      destinationHubId: 'hub-k',
       totalUsd: subtotal + 3,
       subtotalUsd: subtotal,
       deliveryFeeUsd: 3,
@@ -192,7 +195,10 @@ describe('opening a return', () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Not what I expected' });
     expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'user:su1')).toBe(true);
-    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(true);
+    // The return goes to the staff of the warehouse it belongs to, and to no other warehouse's.
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'hub:hub-k')).toBe(true);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(false);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'hub:hub-l')).toBe(false);
     expect(notices.some((n) => n.to === 'role:warehouse_staff')).toBe(false);
   });
 });
@@ -408,6 +414,23 @@ describe('goods back, grading and the refund', () => {
     expect(restocks).toHaveLength(1);
   });
 
+  it('the returns desk: receiving and grading work on the return of the staff’s own warehouse only; support has no part in handling goods', async () => {
+    const { d } = await approved();
+    await expect(svc.markReceived(d.id, true, otherWarehouse)).rejects.toThrow('Dispute not found.');
+    await expect(svc.markReceived(d.id, true, unlinkedStaff)).rejects.toThrow('Dispute not found.');
+    expect((await ds.getRepository(Dispute).findOneByOrFail({ id: d.id })).receivedAt).toBeNull();
+    expect(refundCalls).toHaveLength(0);
+    const done = await svc.markReceived(d.id, false, warehouse);
+    expect(done.receivedAt).toBeTruthy();
+    const item = (await ds.getRepository(DisputeItem).find({ where: { disputeId: d.id } }))[0];
+    await expect(svc.grade(otherWarehouse, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Dispute not found.');
+    await expect(svc.grade({ ...agent }, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Warehouse staff only');
+    await expect(svc.grade({ id: 'm', role: 'admin_marketing', name: 'M' }, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Warehouse staff only');
+    expect(restocks).toHaveLength(0);
+    const graded = await svc.grade({ id: 'o1', role: 'admin_operations', name: 'Ops' }, d.id, [{ itemId: item.id, condition: 'resellable', restockQty: 1 }]);
+    expect(graded.gradedAt).toBeTruthy();
+  });
+
   it('cannot be graded before the goods arrive', async () => {
     const { d } = await approved();
     await expect(svc.grade(warehouse, d.id, [{ itemId: 'x', condition: 'resellable' }])).rejects.toThrow('Receive the returned goods first');
@@ -515,6 +538,33 @@ describe('who sees what', () => {
     expect(await svc.list(agent)).toHaveLength(2);
     expect(await svc.list(agent, { type: 'dispute' })).toHaveLength(1);
     expect(await svc.list(agent, { status: 'resolved' })).toHaveLength(0);
+  });
+
+  it('warehouse staff see the returns of their own warehouse only: list, detail and the live push; staff linked to none see nothing', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+    const l = await makeOrder([{ sellerId: s1.id, productId: 'p2', qty: 1, price: 20 }], { destinationHubId: 'hub-l' });
+    const dl = await svc.open(customer, { orderId: l.id, type: 'return', reason: 'Strap is torn' });
+    expect((await svc.list(warehouse)).map((x) => x.id)).toEqual([d.id]);
+    expect((await svc.list(otherWarehouse)).map((x) => x.id)).toEqual([dl.id]);
+    expect(await svc.list(unlinkedStaff)).toEqual([]);
+    expect(await svc.list({ id: 'w9', role: 'warehouse_staff' })).toEqual([]); // no hub on the viewer at all
+    expect((await svc.get(warehouse, d.id)).id).toBe(d.id);
+    await expect(svc.get(warehouse, dl.id)).rejects.toThrow('Dispute not found.');
+    await expect(svc.get(otherWarehouse, d.id)).rejects.toThrow('Dispute not found.');
+    await expect(svc.get(unlinkedStaff, d.id)).rejects.toThrow('Dispute not found.');
+    expect(emitter.sent.filter((e) => e.event === 'dispute:created' && e.to === 'hub:hub-l').map((e) => e.payload.id)).toEqual([dl.id]);
+    expect(emitter.sent.filter((e) => e.event === 'dispute:created' && e.to === 'hub:hub-k').map((e) => e.payload.id)).toEqual([d.id]);
+  });
+
+  it('a return belongs to the warehouse its pickup task brings the goods to, not only to the order’s destination', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const task = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: o.id, orderReference: o.reference, kind: 'return_pickup', toHubId: 'hub-l', hubId: 'hub-l' }));
+    pickupAnswer = { id: task.id };
+    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+    await svc.sellerRespond(sellerOne, d.id, true, '');
+    expect((await svc.list(otherWarehouse)).map((x) => x.id)).toEqual([d.id]);
+    expect(await svc.list(warehouse)).toEqual([]);
   });
 
   it('a dispute that names no lines on a two-store order is visible to both stores', async () => {

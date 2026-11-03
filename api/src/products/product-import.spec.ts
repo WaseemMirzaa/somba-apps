@@ -162,6 +162,17 @@ describe('products:import', () => {
     await expect(importer.import({ id: 'a1', role: 'admin' }, { rows: [{ name: 'x', price: 1 }] })).rejects.toThrow('sellerId');
   });
 
+  it('importing for a store is listing as the platform: the Super Admin and Moderation only; other admin roles are refused and nothing is created', async () => {
+    const before = (await w.products.list({ sellerId: shop.id, limit: 100 })).length;
+    for (const role of ['admin_finance', 'admin_support', 'admin_marketing', 'admin_operations']) {
+      await expect(importer.import({ id: `x-${role}`, role }, { sellerId: shop.id, rows: [{ name: 'Not allowed', price: 3, category: 'Electronics' }] })).rejects.toThrow('Only moderators can import products for a store.');
+    }
+    expect((await w.products.list({ sellerId: shop.id, limit: 100 })).length).toBe(before);
+    for (const role of ['admin', 'admin_moderation']) {
+      expect((await importer.import({ id: `x-${role}`, role }, { sellerId: shop.id, rows: [{ name: `By ${role}`, price: 3, category: 'Electronics' }] })).created).toBe(1);
+    }
+  });
+
   it('refuses a csvUrl that is not a public https address', async () => {
     for (const url of ['http://example.com/p.csv', 'https://localhost/p.csv', 'https://127.0.0.1/p.csv', 'https://169.254.169.254/x', 'https://user:pw@example.com/p.csv', 'ftp://example.com/p.csv', 'nonsense']) {
       await expect(importer.import(seller, { csvUrl: url })).rejects.toThrow(/secure \(https\)|not valid/);

@@ -225,7 +225,7 @@ Defaults: `'false'` in the dev seed (demo accounts are unverified), **`'true'` i
 
 * `warehouse:hubs {activeOnly?}` (staff) now returns every hub with `active` and `address`; `activeOnly:true` hides inactive hubs.
 * **`warehouse:saveHub {id?, name, city, country?, address?, capacity?}`**. Roles: `hubs` (`admin`, `admin_operations`). No `id` = create, `id` = edit (omitted fields keep their value). Validation: name 2..100 chars and unique (case-insensitive), city 2..100, capacity integer 1..1,000,000 (default 500), address 3..200 or null. An `active` flag in this form is ignored. Ack: the hub.
-* **`warehouse:setHubActive {id, active: boolean}`**. Roles: `hubs`. The last active hub cannot be deactivated. `warehouse:createTransfer` refuses an inactive hub.
+* **`warehouse:setHubActive {id, active: boolean}`**. Roles: `hubs`. The last active hub cannot be deactivated.
 * Push `hub:updated` (hub) to admins and warehouse staff after either write. Both writes are audit-logged.
 
 ## 11. Seller subscription plans

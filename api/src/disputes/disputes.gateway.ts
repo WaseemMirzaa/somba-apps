@@ -4,6 +4,7 @@ import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import { StaffTierService } from '../logistics/staff-tier.service';
+import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { DisputesService } from './disputes.service';
 
 /** Admin roles that may decide a request; refunding also needs finance or the super admin. */
@@ -28,13 +29,25 @@ export class DisputesGateway {
     return (await sellerContext(user, 'orders', { write })).actor;
   }
 
-  /** A seller who is not (yet) in a store still sees what they bought. */
+  /** A seller who is not (yet) in a store still sees what they bought. Warehouse staff carry their warehouse (they see its returns only). */
   private async viewer(user: SocketUser) {
+    if (user.role === 'warehouse_staff') return { ...user, hubId: await this.tiers.hubOf(user) };
     try {
       return await this.actor(user, false);
     } catch {
       return user;
     }
+  }
+
+  /**
+   * The returns desk (receive and grade returned goods): the Super Admin and Operations, or a supervisor or manager of the
+   * warehouse the return belongs to. Support decides returns but never handles the goods; the other admin roles have no part.
+   * Null when allowed, else the refusal.
+   */
+  private async deskRefusal(user: SocketUser): Promise<string | null> {
+    if (user.role === 'warehouse_staff') return (await this.tiers.allows(user, 'oversee')) ? null : 'Only supervisors and managers can do this.';
+    if (user.role.startsWith('admin')) return RETURNS_DESK_ADMINS.includes(user.role) ? null : 'Not allowed.';
+    return 'Ops only.';
   }
 
   @SubscribeMessage('disputes:list')
@@ -212,10 +225,10 @@ export class DisputesGateway {
   async markReceived(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { disputeId: string; restock?: boolean }) {
     try {
       const user = requireUser(client);
-      if (!user.role.startsWith('admin') && user.role !== 'warehouse_staff') return fail('Ops only.');
       // The returns queue is a supervisor page in the web; receiving starts the refund, so the server holds the same line.
-      if (!(await this.tiers.allows(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
-      const d = await this.disputes.markReceived(String(body?.disputeId ?? ''), body?.restock !== false);
+      const refusal = await this.deskRefusal(user);
+      if (refusal) return fail(refusal);
+      const d = await this.disputes.markReceived(String(body?.disputeId ?? ''), body?.restock !== false, await this.viewer(user));
       await this.audit.record({ actor: user.name, role: user.role, action: 'return.received', entity: 'dispute', entityId: d.id, detail: d.reference });
       return ok(d);
     } catch (e) {
@@ -231,9 +244,9 @@ export class DisputesGateway {
   ) {
     try {
       const user = requireUser(client);
-      if (!user.role.startsWith('admin') && user.role !== 'warehouse_staff') return fail('Ops only.');
-      if (!(await this.tiers.allows(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
-      const d = await this.disputes.grade(user, idOf(body), body?.grades, body?.note);
+      const refusal = await this.deskRefusal(user);
+      if (refusal) return fail(refusal);
+      const d = await this.disputes.grade(await this.viewer(user), idOf(body), body?.grades, body?.note);
       await this.audit.record({ actor: user.name, role: user.role, action: 'return.graded', entity: 'dispute', entityId: d.id, detail: d.reference });
       return ok(d);
     } catch (e) {

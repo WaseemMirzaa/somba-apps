@@ -5,7 +5,7 @@ import { AuditLog, CodHandover, DeliveryTask, User } from '../database/entities'
 import { Actor } from '../logistics/logistics.service';
 import { tierAllows } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { CASH_DESK_ADMINS } from '../common/staff-access';
 
 /** Half a cent: amounts closer than this are the same amount (the cash record is in whole cents, stored as doubles). */
 export const HALF_CENT = 0.005;
@@ -89,9 +89,10 @@ export class CashService {
     return { ...(await this.balance(riderId)), handovers: rows.map(view) };
   }
 
-  /** Latest receipts of a warehouse (every warehouse for an admin), optionally of one rider. Any staff tier may read. */
+  /** Latest receipts of a warehouse (every warehouse for an admin), optionally of one rider. Supervisors and managers (and the cash admins) read. */
   async history(actor: Actor, opts: { hubId?: string | null; riderId?: string | null; limit?: number } = {}): Promise<HandoverView[]> {
     this.requireStaff(actor);
+    if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can see cash hand-overs.');
     const hubId = actor.hubId ?? opts.hubId ?? null;
     const where: Record<string, string> = {};
     if (hubId) where.hubId = String(hubId);
@@ -187,12 +188,20 @@ export class CashService {
     const payload = { ...balance, handover: view(saved) };
     this.emitter.toUser(rider.id, 'cash:updated', payload);
     if (saved.hubId) this.emitter.toHub(saved.hubId, 'cash:updated', { riderId: rider.id, ...payload });
-    this.emitter.toRoles(ADMIN_ROLES, 'cash:updated', { riderId: rider.id, ...payload });
+    this.emitter.toRoles([...CASH_DESK_ADMINS], 'cash:updated', { riderId: rider.id, ...payload });
     return { handover: view(saved), balance };
   }
 
+  /**
+   * Who may touch rider cash: the Super Admin, Finance and Operations, and warehouse staff (their tier is checked by the
+   * caller). The other admin roles (support, marketing, moderation) have no business with it.
+   */
   private requireStaff(actor: Actor): void {
-    if (!actor.role.startsWith('admin') && actor.role !== 'warehouse_staff') throw new BadRequestException('Staff only.');
+    if (actor.role.startsWith('admin')) {
+      if (!CASH_DESK_ADMINS.includes(actor.role)) throw new BadRequestException('Not allowed.');
+      return;
+    }
+    if (actor.role !== 'warehouse_staff') throw new BadRequestException('Staff only.');
   }
 
   /** A positive USD amount in whole cents. */
