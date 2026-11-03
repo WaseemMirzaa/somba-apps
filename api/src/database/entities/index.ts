@@ -29,6 +29,7 @@ export { DisputeMessage } from './dispute-message.entity';
 export { ReviewReport } from './review-report.entity';
 export type { ReviewReportStatus } from './review-report.entity';
 export { ReviewHelpful } from './review-helpful.entity';
+export { StoreFollow } from './store-follow.entity';
 export { SupportMessage } from './support-message.entity';
 export { NotificationRead } from './notification-read.entity';
 export { Category } from './category.entity';
@@ -109,6 +110,7 @@ import { DisputeItem } from './dispute-item.entity';
 import { DisputeMessage } from './dispute-message.entity';
 import { ReviewReport } from './review-report.entity';
 import { ReviewHelpful } from './review-helpful.entity';
+import { StoreFollow } from './store-follow.entity';
 import { SupportMessage } from './support-message.entity';
 import { NotificationRead } from './notification-read.entity';
 import { Category } from './category.entity';
@@ -168,6 +170,7 @@ export const ENTITIES = [
   DisputeMessage,
   ReviewReport,
   ReviewHelpful,
+  StoreFollow,
   SupportMessage,
   NotificationRead,
   Category,

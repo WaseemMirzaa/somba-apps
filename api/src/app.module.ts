@@ -30,6 +30,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { CartModule } from './cart/cart.module';
 import { SearchModule } from './search/search.module';
 import { AfterSaleModule } from './after-sale/after-sale.module';
+import { FollowsModule } from './follows/follows.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { CommerceModule } from './products/commerce.module';
 import { FinanceModule } from './finance/finance.module';
@@ -76,6 +77,7 @@ import { SellerPlatformModule } from './sellers/seller-platform.module';
     CommerceModule,
     SellerPlatformModule,
     AfterSaleModule,
+    FollowsModule,
     RealtimeModule,
   ],
   controllers: [AppController],

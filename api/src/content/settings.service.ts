@@ -10,6 +10,12 @@ import { cardPaymentsMode } from '../payments/stripe.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
 export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
+/**
+ * How shoppers reach Somba from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
+ * the rest of the shopper settings; written by admins only (see `WRITABLE`).
+ */
+export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsapp'] as const;
+const isContactKey = (k: string) => (CONTACT_SETTINGS as readonly string[]).includes(k);
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
 const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
@@ -39,7 +45,7 @@ export class SettingsService {
   /** Public view of the STORED settings (what shoppers and guests may see). */
   async publicView(): Promise<Record<string, string>> {
     const all = await this.all();
-    return Object.fromEntries(Object.entries(all).filter(([k]) => (PUBLIC_SETTINGS as readonly string[]).includes(k)));
+    return Object.fromEntries(Object.entries(all).filter(([k]) => (PUBLIC_SETTINGS as readonly string[]).includes(k) || isContactKey(k)));
   }
 
   /**
@@ -61,6 +67,17 @@ export class SettingsService {
         return String(num(value, 'Commission', { min: 0, max: 60 }));
       case 'codEnabled':
         return oneOf(String(value), ['true', 'false'] as const, 'COD flag');
+      case 'supportPhone':
+      case 'supportWhatsapp': {
+        const v = String(value ?? '').trim();
+        if (v && !/^\+?[0-9][0-9 ()\-.]{5,19}$/.test(v)) throw new Error(`${key === 'supportPhone' ? 'Support phone' : 'WhatsApp number'} must be a phone number such as +243 970 000 000.`);
+        return v;
+      }
+      case 'supportEmail': {
+        const v = String(value ?? '').trim();
+        if (v && (v.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v))) throw new Error('Support e-mail must be an e-mail address.');
+        return v;
+      }
       case 'seller2faRequired':
       case 'allowInterCityDelivery':
       case 'requireDeliveryCode':
@@ -98,7 +115,7 @@ export class SettingsService {
   }
 
   async set(key: string, value: unknown): Promise<Record<string, string>> {
-    if (!(WRITABLE as readonly string[]).includes(key)) throw new Error('Unknown setting.');
+    if (!(WRITABLE as readonly string[]).includes(key) && !isContactKey(key)) throw new Error('Unknown setting.');
     const clean = SettingsService.validate(key, value);
     await this.repo.save(this.repo.create({ key, value: clean }));
     const all = await this.all();

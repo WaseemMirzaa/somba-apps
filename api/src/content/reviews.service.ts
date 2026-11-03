@@ -9,6 +9,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { ProductsService } from '../products/products.service';
+import { cleanAttachments } from '../common/attachments';
+
+/** Photos a customer may attach to one review. */
+export const MAX_REVIEW_PHOTOS = 4;
 
 /** Staff who may answer a review on a seller's behalf (the same people who moderate reviews). */
 const REPLY_STAFF = ['admin', 'admin_operations', 'admin_moderation'];
@@ -138,13 +142,15 @@ export class ReviewsService {
 
   async create(
     user: { id: string; name: string },
-    input: { productId: string; rating: number; text: string },
+    input: { productId: string; rating: number; text: string; photos?: unknown },
   ): Promise<Review> {
     const text = String(input?.text ?? '').trim();
     const rating = Number(input?.rating);
     if (!input?.productId || !Number.isFinite(rating) || text.length < 3) {
       throw new BadRequestException('Give a rating and write a short review.');
     }
+    // Up to 4 photos, each one this platform stored (POST /api/v1/uploads); anything else is refused.
+    const photos = cleanAttachments(input.photos, MAX_REVIEW_PHOTOS);
     // Only people who actually received the product can review it — once.
     const bought = await this.orders
       .createQueryBuilder('o')
@@ -168,6 +174,7 @@ export class ReviewsService {
         author: user.name,
         rating: Math.min(5, Math.max(1, Math.round(rating))),
         text: text.slice(0, 2000),
+        photos,
       }),
     );
     await this.recomputeRating(input.productId);

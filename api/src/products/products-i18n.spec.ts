@@ -317,3 +317,47 @@ describe('the tables behind it', () => {
     expect(await ds.getRepository(Translation).findOneByOrFail({ entityType: 'product', entityId: p.id, field: 'name', locale: 'fr' })).toMatchObject({ origin: 'author', value: 'Téléphone' });
   });
 });
+
+describe('a listing becoming visible to shoppers (new-product notices to followers hang on this)', () => {
+  const approve = (id: string, status: 'live' | 'pending' | 'removed') => products.update(id, cleanListing({ status }, { partial: true, allowStatus: true }));
+
+  it('fires for a listing created live, not for one created pending', async () => {
+    const seen: string[] = [];
+    products.onWentLive((p) => void seen.push(p.id));
+    const live = await create({ name: 'Wireless Earbuds' }, 'live');
+    await create({ name: 'Desk Lamp' }, 'pending');
+    expect(seen).toEqual([live.id]);
+  });
+
+  it('fires when moderation approves a pending listing, once, not for plain edits of a live one', async () => {
+    const seen: string[] = [];
+    products.onWentLive((p) => void seen.push(p.id));
+    const pending = await create({ name: 'Desk Lamp' }, 'pending');
+    await edit(pending.id, { price: 12 });
+    expect(seen).toEqual([]);
+    await approve(pending.id, 'live');
+    expect(seen).toEqual([pending.id]);
+    await edit(pending.id, { price: 14 });
+    await approve(pending.id, 'live');
+    expect(seen).toEqual([pending.id]);
+  });
+
+  it('fires again when a listing returns to live from another status (the followers guard dedupes per product)', async () => {
+    const seen: string[] = [];
+    const p = await create({ name: 'Wireless Earbuds' });
+    products.onWentLive((x) => void seen.push(x.id));
+    await approve(p.id, 'pending');
+    await approve(p.id, 'live');
+    expect(seen).toEqual([p.id]);
+  });
+
+  it('a failing listener never breaks the listing change', async () => {
+    products.onWentLive(() => {
+      throw new Error('listener bug');
+    });
+    products.onWentLive(async () => {
+      throw new Error('async listener bug');
+    });
+    await expect(create({ name: 'Wireless Earbuds' })).resolves.toMatchObject({ status: 'live' });
+  });
+});

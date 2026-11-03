@@ -27,7 +27,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'support') return pick(`/shop/support/${id}`, '/shop/support');
       if (t === 'exchange') return pick(`/shop/exchanges/${id}`, '/shop/returns');
       if (t === 'replacement') return pick(`/shop/replacements/${id}`, '/shop/returns');
-      if (t === 'question') return pick(`/shop/products/${id}`, '/shop/notifications'); // entityId is the product
+      if (t === 'question' || t === 'store') return pick(`/shop/products/${id}`, '/shop/notifications'); // entityId is the product
       if (t === 'chat') return pick(`/shop/messages/${id}`, '/shop/messages'); // entityId is the conversation
       return '/shop/notifications';
     case 'seller':

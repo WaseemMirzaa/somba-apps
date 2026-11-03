@@ -41,7 +41,8 @@ import { PartialRefundService } from './partial-refund.service';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
-const SWEEP_MS = Number(process.env.AFTER_SALE_SWEEP_MS ?? 60_000);
+/** Read when the module starts (not when the file loads), so a value from `.env` counts too. */
+const sweepMs = () => Number(process.env.AFTER_SALE_SWEEP_MS ?? 60_000);
 
 export const DISPUTE_CATEGORIES = ['missing', 'damaged', 'wrong_item', 'not_received', 'other'] as const;
 export const RETURN_CATEGORIES = ['damaged', 'wrong_item', 'not_as_described', 'changed_mind', 'defective', 'other'] as const;
@@ -119,8 +120,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    if (SWEEP_MS > 0) {
-      this.sweeper = setInterval(() => void this.sweep().catch((e) => this.logger.warn(`sweep failed: ${(e as Error).message}`)), SWEEP_MS);
+    const every = sweepMs();
+    if (every > 0) {
+      this.sweeper = setInterval(() => void this.sweep().catch((e) => this.logger.warn(`sweep failed: ${(e as Error).message}`)), every);
       this.sweeper.unref?.();
     }
   }
@@ -146,7 +148,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   /** When the goods reached the customer: the delivered task's time, else when the order last changed. */
   private async deliveredAt(order: Order): Promise<Date> {
-    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered' }, select: ['id', 'deliveredAt', 'updatedAt'] });
+    // Only the leg that brought the goods to the customer counts: a pickup, a return leg or a replacement that was
+    // delivered later must not push the end of the return window further out.
+    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered', kind: 'delivery' }, select: ['id', 'deliveredAt', 'updatedAt'] });
     const times = rows.map((t) => (t.deliveredAt ?? t.updatedAt)?.getTime?.() ?? 0).filter(Boolean);
     return times.length ? new Date(Math.max(...times)) : order.updatedAt;
   }
@@ -1048,6 +1052,36 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
       await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
       await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
+    }
+    return moved + (await this.sweepDisputes(now));
+  }
+
+  /**
+   * A dispute has no accept or reject, so a seller who never replies does not move it anywhere: it was already with
+   * support. When the time runs out, the customer, the seller and support are told once (`sellerLapsedAt` is the mark).
+   */
+  private async sweepDisputes(now: Date): Promise<number> {
+    const due = await this.disputes
+      .createQueryBuilder('d')
+      .where("d.type = 'dispute' AND d.status = 'open' AND d.stage = 'awaiting_seller' AND d.sellerLapsedAt IS NULL AND d.sellerDueAt IS NOT NULL AND d.sellerDueAt < :now", { now })
+      .take(100)
+      .getMany();
+    let moved = 0;
+    for (const d of due) {
+      const res = await this.disputes
+        .createQueryBuilder()
+        .update(Dispute)
+        .set({ sellerLapsedAt: now })
+        .where("id = :id AND stage = 'awaiting_seller' AND status = 'open' AND sellerLapsedAt IS NULL", { id: d.id })
+        .execute();
+      if (!res.affected) continue;
+      moved++;
+      const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
+      await this.publish(saved, 'dispute:updated');
+      const body = `${saved.reference} · ${saved.orderReference}`;
+      await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
+      await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
+      await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
     }
     return moved;
   }
