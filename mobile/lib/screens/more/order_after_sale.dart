@@ -13,6 +13,7 @@ import '../../services/models.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
+import '../../util/payment_label.dart';
 import '../cart_screen.dart';
 import 'catalog_extra.dart';
 
@@ -67,7 +68,7 @@ String receiptText(Strings s, OrderDto o) {
   if (o.refundedUsd > 0) b.writeln('${s.receiptRefunded}: -${money(o.refundedUsd)}');
   b
     ..writeln('${s.total}: ${money(o.totalUsd)}')
-    ..writeln('${s.receiptPaidWith}: ${s.paymentLabel(o.paymentMethod)}');
+    ..writeln('${s.receiptPaidWith}: ${shownPaymentLabel(s, o.paymentMethod)}');
   return b.toString();
 }
 

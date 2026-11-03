@@ -19,6 +19,7 @@ import { CampaignsService } from './campaigns.service';
 import { ReplacementsService } from './replacements.service';
 import { ExchangesService } from './exchanges.service';
 import { AfterSaleNames } from './after-sale-names';
+import { SellerLapseService } from './seller-lapse.service';
 
 /**
  * Cross-cutting commerce flows that don't belong to a single existing domain:
@@ -33,7 +34,7 @@ import { AfterSaleNames } from './after-sale-names';
     WalletModule,
     LogisticsModule,
   ],
-  providers: [CampaignsService, ReplacementsService, ExchangesService, AfterSaleNames, LogisticsBridge],
-  exports: [CampaignsService, ReplacementsService, ExchangesService, LogisticsBridge],
+  providers: [CampaignsService, ReplacementsService, ExchangesService, AfterSaleNames, LogisticsBridge, SellerLapseService],
+  exports: [CampaignsService, ReplacementsService, ExchangesService, LogisticsBridge, SellerLapseService],
 })
 export class FlowsModule {}

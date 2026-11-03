@@ -292,7 +292,10 @@ class ReviewDto {
   /// The seller's public answer to this review (null when none).
   final String? sellerReply;
 
-  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt, this.sellerReply});
+  /// Up to 4 photos the customer attached (upload paths or URLs); empty when none.
+  final List<String> photos;
+
+  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt, this.sellerReply, this.photos = const []});
 
   factory ReviewDto.fromJson(Map<String, dynamic> j) => ReviewDto(
         id: j['id'] as String,
@@ -302,6 +305,7 @@ class ReviewDto {
         helpful: (j['helpful'] as num?)?.toInt() ?? 0,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         sellerReply: (j['sellerReply'] as String?)?.trim().isNotEmpty == true ? (j['sellerReply'] as String).trim() : null,
+        photos: j['photos'] is List ? [for (final u in j['photos'] as List) if (u is String && u.isNotEmpty) u] : const [],
       );
 }
 

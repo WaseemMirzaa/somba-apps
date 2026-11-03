@@ -73,7 +73,7 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Retours et vendeurs",
     fields: [
       { key: "returnWindowDays", kind: "text", label: "Return window (days)", labelFr: "Délai de retour (jours)", hint: "Whole days 0 to 90 after delivery. 0 closes returns.", hintFr: "Jours entiers de 0 à 90 après la livraison. 0 ferme les retours.", inputMode: "numeric", range: { min: 0, max: 90, integer: true } },
-      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, the customer may escalate to Somba support.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader au support Somba.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
+      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, a return can be escalated by the customer to Somba support; for a dispute, replacement or exchange the customer, the seller and support are told.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader un retour au support Somba ; pour un litige, un remplacement ou un échange, le client, le vendeur et le support sont prévenus.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
       { key: "seller2faRequired", kind: "toggle", label: "Require two-factor authentication for store owners", labelFr: "Exiger l'authentification à deux facteurs pour les propriétaires", hint: "On: store owners without 2FA can only open Settings > Security until they turn it on.", hintFr: "Activé : un propriétaire sans 2FA ne peut ouvrir que Paramètres > Sécurité tant qu'il ne l'a pas activée." },
     ],
   },
@@ -113,6 +113,15 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
       { key: "fraudReturnRatePct", kind: "text", label: "Return / refund rate over 30 days (%)", labelFr: "Taux de retours / remboursements sur 30 jours (%)", hint: "1 to 100. Share of the last 30 days' orders that were returned, disputed or refunded.", hintFr: "1 à 100. Part des commandes des 30 derniers jours retournées, contestées ou remboursées.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
       { key: "fraudReturnMinOrders", kind: "text", label: "Fewest orders before the return rate counts", labelFr: "Minimum de commandes avant de juger le taux de retours", hint: "1 to 100. Below this many orders in 30 days the rate is not judged.", hintFr: "1 à 100. En dessous de ce nombre de commandes sur 30 jours, le taux n'est pas jugé.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
       { key: "fraudAddressChanges24h", kind: "text", label: "Address changes in 24 hours before delivery", labelFr: "Changements d'adresse en 24 heures avant livraison", hint: "2 to 100. Counted only while one of the customer's orders is still on its way.", hintFr: "2 à 100. Comptés seulement tant qu'une commande du client est encore en route.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+    ],
+  },
+  {
+    title: "Help and contact (customer app)",
+    titleFr: "Aide et contact (application client)",
+    fields: [
+      { key: "supportPhone", kind: "text", label: "Support phone", labelFr: "Téléphone du support", hint: "Shown in the app's Help screen as a Call us row. Leave empty to hide it.", hintFr: "Affiché dans l'écran Aide de l'application (ligne « Nous appeler »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportEmail", kind: "text", label: "Support e-mail", labelFr: "E-mail du support", hint: "Shown in Help as a Send an e-mail row. Leave empty to hide it.", hintFr: "Affiché dans Aide (ligne « Envoyer un e-mail »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportWhatsapp", kind: "text", label: "WhatsApp number", labelFr: "Numéro WhatsApp", hint: "With the country code, e.g. +243 970 000 000. Help opens a WhatsApp chat with it. Leave empty to hide it.", hintFr: "Avec l'indicatif du pays, ex. +243 970 000 000. Aide ouvre une discussion WhatsApp. Laissez vide pour le masquer.", inputMode: "text" },
     ],
   },
 ];

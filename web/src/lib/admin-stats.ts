@@ -151,6 +151,8 @@ export interface ReviewRow {
   author: string;
   rating: number;
   text: string;
+  /** Photos the customer attached (upload URLs). */
+  photos?: string[];
   helpful?: number;
   status: "visible" | "hidden";
   sellerReply: string | null;

@@ -15,6 +15,7 @@ import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
 import 'more/auth_screens.dart' show VerifyEmailScreen;
 import 'more/catalog_extra.dart';
+import 'more/following_screen.dart';
 import 'more/returns_extra.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -39,6 +40,8 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(locale: locale)))),
             _MenuItem(Icons.favorite_border_rounded, s.wishlist, AppColors.accent,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => WishlistScreen(locale: locale)))),
+            _MenuItem(Icons.storefront_outlined, s.followingTitle, AppColors.primary,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => FollowingScreen(locale: locale))), key: 'menu-following'),
             _MenuItem(Icons.location_on_outlined, s.addresses, AppColors.mint,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: locale)))),
             _MenuItem(Icons.account_balance_wallet_outlined, s.wallet, AppColors.royalBlue,

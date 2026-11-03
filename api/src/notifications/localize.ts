@@ -333,6 +333,8 @@ const TITLES: Record<string, string> = {
   'Two-factor authentication reset': 'Authentification à deux facteurs réinitialisée',
   'Vacation mode ended': 'Fin du mode vacances',
   'Seller badge updated': 'Badge vendeur mis à jour',
+  // Customers: a store they follow has a new product
+  'New from a store you follow': 'Nouveau chez une boutique que vous suivez',
 };
 
 function titlePattern(title: string): string | null {

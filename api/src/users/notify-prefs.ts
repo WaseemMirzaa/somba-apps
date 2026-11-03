@@ -42,6 +42,7 @@ export function noticeCategory(type: string | null | undefined): NotifyCategory 
     case 'moderation':
     case 'product':
       return 'product';
+    case 'store':
     case 'campaign':
     case 'flash':
     case 'promo':

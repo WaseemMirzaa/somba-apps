@@ -88,6 +88,10 @@ export class Exchange {
   @Column({ type: 'datetime', nullable: true })
   sellerDueAt: Date | null;
 
+  /** When the response time ran out with no answer (support was told once; null = not lapsed). */
+  @Column({ type: 'datetime', nullable: true })
+  sellerLapsedAt: Date | null;
+
   @Column({ type: 'datetime', nullable: true })
   sellerRespondedAt: Date | null;
 

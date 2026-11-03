@@ -73,6 +73,11 @@ class RealtimeStore extends ChangeNotifier {
   /// (`codCapUsd` is not read: the server only raises a fraud alert above the cap, it never refuses the order.)
   bool codEnabled = false;
 
+  /// Public settings `supportPhone`, `supportEmail`, `supportWhatsapp`: how Help offers to reach Somba. Blank = not offered.
+  String supportPhone = '';
+  String supportEmail = '';
+  String supportWhatsapp = '';
+
   /// Public setting `cardPayments`: `"stripe"` when the server has bank-card payments configured, else `"off"`
   /// (computed server-side from its keys, not a stored setting). The checkout offers the card tile only on `"stripe"`.
   String cardPayments = 'off';
@@ -398,6 +403,9 @@ class RealtimeStore extends ChangeNotifier {
     if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
     if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
     if (m.containsKey('codEnabled')) codEnabled = '${m['codEnabled']}' == 'true';
+    if (m.containsKey('supportPhone')) supportPhone = '${m['supportPhone'] ?? ''}'.trim();
+    if (m.containsKey('supportEmail')) supportEmail = '${m['supportEmail'] ?? ''}'.trim();
+    if (m.containsKey('supportWhatsapp')) supportWhatsapp = '${m['supportWhatsapp'] ?? ''}'.trim();
     if (m.containsKey('cardPayments')) cardPayments = '${m['cardPayments']}' == 'stripe' ? 'stripe' : 'off';
   }
 
@@ -706,8 +714,9 @@ class RealtimeStore extends ChangeNotifier {
           .map((e) => ReviewDto.fromJson(_map(e)))
           .toList();
 
-  Future<ReviewDto> addReview(String productId, int rating, String text) async =>
-      ReviewDto.fromJson(_map(await _socket.request('reviews:create', {'productId': productId, 'rating': rating, 'text': text})));
+  /// Sends a review (`reviews:create`) with up to 4 photos already uploaded through `POST /api/v1/uploads`.
+  Future<ReviewDto> addReview(String productId, int rating, String text, {List<String> photos = const []}) async =>
+      ReviewDto.fromJson(_map(await call('reviews:create', {'productId': productId, 'rating': rating, 'text': text, if (photos.isNotEmpty) 'photos': photos})));
 
   Future<List<QuestionDto>> questionsFor(String productId) async =>
       ((await call('questions:list', {'productId': productId})) as List)

@@ -51,6 +51,8 @@ NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(S
       return id != null ? NoticeRoute(NoticeDest.exchangeStatus, id) : const NoticeRoute(NoticeDest.returns);
     case 'support':
       return id != null ? NoticeRoute(NoticeDest.ticket, id) : const NoticeRoute(NoticeDest.support);
+    case 'store':
+    // "New from a store you follow": the entityId is the PRODUCT id too.
     case 'question':
       // "Your question was answered": the entityId is the PRODUCT id.
       return id != null ? NoticeRoute(NoticeDest.product, id) : const NoticeRoute(NoticeDest.notifications);

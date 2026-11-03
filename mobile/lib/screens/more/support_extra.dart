@@ -16,6 +16,7 @@ import '../location_picker_screen.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import 'area_picker.dart';
+import 'help_contact.dart';
 
 // The ticket screens (list, detail, new ticket) live in support_screens.dart; imports of this file still see them.
 import 'support_screens.dart';
@@ -521,6 +522,7 @@ class HelpScreen extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         PrimaryButton(s.contactSupport,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale)))),
+        const HelpContactCard(),
         SectionHeader(s.faqs, padding: EdgeInsets.fromLTRB(4, 22, 4, 10)),
         Panel(
             padding: EdgeInsets.zero,
