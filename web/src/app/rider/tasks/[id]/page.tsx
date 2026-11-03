@@ -12,7 +12,8 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/rider-task-card";
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
-import { useRiderData } from "@/lib/rider";
+import { useCodEnabled, useRiderData } from "@/lib/rider";
+import { riderPaymentLabel, showTaskCash } from "@/lib/rider-cod";
 import { formatCurrency } from "@/lib/utils";
 import { paymentMethodLabel } from "@/lib/seller-labels";
 import { variantDisplay } from "@/lib/i18n-fields";
@@ -24,6 +25,7 @@ export default function RiderTaskDetailPage() {
   const fr = locale === "fr";
   const { getRiderTask, refresh, loading } = useRiderData();
   const task = getRiderTask(id);
+  const codEnabled = useCodEnabled();
 
   if (!task) {
     return (
@@ -45,7 +47,7 @@ export default function RiderTaskDetailPage() {
       <div className="flex flex-wrap gap-2">
         <Badge variant={riderStatusVariant(task.status)}>{statusLabel}</Badge>
         {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts} sur 3` : `Attempt ${task.attempts} of 3`}</Badge>}
-        {task.codAmount > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
+        {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
         <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
       </div>
 
@@ -104,7 +106,7 @@ export default function RiderTaskDetailPage() {
         <InfoGrid
           items={[
             { label: fr ? "N° commande" : "Order ID", value: task.orderId },
-            { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? paymentMethodLabel(task.paymentMethod, fr) : task.paymentType },
+            { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? riderPaymentLabel(codEnabled, task.paymentMethod, paymentMethodLabel(task.paymentMethod, fr), task) : task.paymentType },
             { label: fr ? "Montant" : "Amount", value: task.amount ? formatCurrency(task.amount, locale) : "—" },
             { label: fr ? "Articles" : "Items", value: task.items },
             { label: fr ? "Tentatives" : "Attempts", value: task.attempts },

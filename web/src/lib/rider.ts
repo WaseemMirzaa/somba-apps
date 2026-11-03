@@ -6,6 +6,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
 import { isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 import type { CashHandover } from "@/lib/warehouse-live";
+import { parseCodEnabled } from "@/lib/rider-cod";
 
 /**
  * Live rider data layer. `rider:tasks` returns ONLY the legs assigned to this rider (their warehouse assigns them;
@@ -299,4 +300,34 @@ export function useRiderCash() {
   }, [ready, refresh]);
 
   return { cash, error, refresh };
+}
+
+/**
+ * The public setting `codEnabled`, live (`settings:get`, then `settings:updated`). False until it is known and whenever it
+ * is off, so a COD surface never flashes up first. See `lib/rider-cod.ts` for what hides.
+ */
+export function useCodEnabled(): boolean {
+  const rt = useRealtime();
+  const [on, setOn] = useState(false);
+  const ready = rt.status === "connected";
+
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    socketClient
+      .request<Record<string, unknown>>("settings:get")
+      .then((all) => live && setOn(parseCodEnabled(all?.codEnabled)))
+      .catch(() => undefined);
+    const s = socketClient.current;
+    const onPush = (all: Record<string, unknown>) => {
+      if (all && "codEnabled" in all) setOn(parseCodEnabled(all.codEnabled));
+    };
+    s?.on("settings:updated", onPush);
+    return () => {
+      live = false;
+      s?.off("settings:updated", onPush);
+    };
+  }, [ready]);
+
+  return on;
 }

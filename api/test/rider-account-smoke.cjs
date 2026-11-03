@@ -126,6 +126,38 @@ const handshake = (token) => new Promise((resolve) => {
     ok(r.status === 201 || r.status === 200, 'this phone\'s fresh refresh token keeps working', String(r.status));
     ok((await handshake(fresh.accessToken)) === 'ready', 'and its fresh access token is let in');
 
+    section('COD is not offered: what the rider is told (codEnabled) and web push for the rider portal');
+    const admin = await login('admin@somba.app');
+    const adminSettings = await req(admin.sock, 'settings:get');
+    const codWas = adminSettings.data?.codEnabled;
+    let st = await req(me.sock, 'settings:get');
+    ok(st.ok && 'codEnabled' in st.data, 'a rider can read the public setting codEnabled (settings:get)', JSON.stringify(st));
+    ok(st.ok && st.data.codEnabled === 'false', 'it is "false" on a launch-configured platform: the rider app and portal hide every COD surface', String(st.data?.codEnabled));
+    ok(st.ok && !('commissionPct' in st.data) && !('minPayoutUsd' in st.data), 'the rider is not sent the admin-only settings');
+    const pushes = [];
+    me.sock.on('settings:updated', (d) => pushes.push(d));
+    a = await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
+    ok(a.ok, 'an admin switches COD on', a.error ?? '');
+    ok(await until(() => pushes.some((d) => d.codEnabled === 'true')), 'the rider is pushed settings:updated {codEnabled: "true"}: the apps show COD at once');
+    a = await req(admin.sock, 'settings:set', { key: 'codEnabled', value: codWas ?? 'false' });
+    ok(a.ok, 'and back off', a.error ?? '');
+    ok(await until(() => pushes.some((d) => d.codEnabled === (codWas ?? 'false'))), 'the rider is pushed the change back: the apps hide COD again');
+    st = await req(me.sock, 'settings:get');
+    ok(st.ok && st.data.codEnabled === (codWas ?? 'false'), 'settings:get agrees', String(st.data?.codEnabled));
+    const webToken = `r2e-web-token-${Date.now()}`;
+    a = await req(me.sock, 'devices:register', { token: webToken, platform: 'web', app: 'web' });
+    ok(a.ok && a.data.registered === true, 'the rider portal registers its browser for web push (devices:register, platform web)', JSON.stringify(a));
+    a = await req(me.sock, 'devices:test');
+    ok(a.ok && a.data.devices >= 1, 'a test notice counts that browser among the rider\'s devices', JSON.stringify(a));
+    a = await req(other.sock, 'devices:unregister', { token: webToken });
+    ok(a.ok, 'another rider cannot unregister it (scoped to the owner, no error)', JSON.stringify(a));
+    a = await req(me.sock, 'devices:test');
+    ok(a.ok && a.data.devices >= 1, '... and it is still registered', JSON.stringify(a));
+    a = await req(me.sock, 'devices:unregister', { token: webToken });
+    ok(a.ok, 'sign-out removes the browser token (devices:unregister)', JSON.stringify(a));
+    me.sock.removeAllListeners('settings:updated');
+    admin.sock.close();
+
     section('Put everything back');
     const back = await login(RIDER, NEW_PW);
     a = await req(back.sock, 'me:changePassword', { current: NEW_PW, next: PW });
