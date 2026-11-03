@@ -13,6 +13,7 @@ import { PlansEditor } from "@/components/admin/plans-editor";
 import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { codOffered } from "@/lib/cod-visibility";
 
 type Values = Record<string, string>;
 
@@ -204,6 +205,8 @@ export default function AdminSettingsPage() {
   }
 
   const anyDirty = GROUPS.some((g) => g.fields.some((f) => dirty(f.key)));
+  // Cash on delivery is not offered unless the server value is "true": then the toggle gives way to a read-only line and the cap is hidden.
+  const codOff = !codOffered(saved.codEnabled);
 
   return (
     <div className="space-y-6">
@@ -222,9 +225,18 @@ export default function AdminSettingsPage() {
             <div key={g.title} className="card-premium space-y-4 p-6">
               <h3 className="font-semibold">{fr ? g.titleFr : g.title}</h3>
               <div className="grid gap-5 lg:grid-cols-2">
-                {g.fields.map((f) => {
+                {g.fields.filter((f) => !(codOff && f.key === "codCapUsd")).map((f) => {
                   const err = errors[f.key];
                   const busy = savingKey === f.key;
+                  if (codOff && f.key === "codEnabled") {
+                    return (
+                      <div key={f.key} className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>
+                        <p className="text-sm text-slate-600" data-testid="cod-not-offered">{fr ? "Non proposé" : "Not offered"}</p>
+                        <p className="text-xs text-slate-400">{fr ? "Le paiement à la livraison n'est pas proposé sur cette plateforme." : "Cash on delivery is not offered on this platform."}</p>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={f.key} className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>

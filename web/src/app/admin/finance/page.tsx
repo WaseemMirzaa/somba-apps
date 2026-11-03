@@ -24,6 +24,7 @@ import { formatCurrency } from "@/lib/utils";
 import { paymentMethodLabel } from "@/lib/payment-methods";
 import { refundFigures } from "@/lib/refunds";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { useCodOffered } from "@/lib/use-cod-offered";
 
 const PAY_STATUS_FR: Record<string, string> = { succeeded: "Réussi", pending: "En attente", failed: "Échoué", refunded: "Remboursé" };
 const PAY_STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "default"> = { succeeded: "success", pending: "warning", failed: "danger", refunded: "default" };
@@ -45,6 +46,7 @@ const methodLabel = paymentMethodLabel;
 export default function AdminFinancePage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const codOffered = useCodOffered();
   const rt = useRealtime();
   const role = useRole();
   const { toast } = useToast();
@@ -151,13 +153,13 @@ export default function AdminFinancePage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             <StatCard title={fr ? "GMV brut (hors annulées)" : "Gross GMV (excl. cancelled)"} value={formatCurrency(f.grossGmvUsd, locale)} icon={DollarSign} trend={`${fr ? "dont livraison" : "incl. delivery"} ${formatCurrency(f.deliveryFeesUsd, locale)}`} />
-            <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)"} />
+            <StatCard title={fr ? "Encaissé" : "Collected"} value={formatCurrency(f.collectedUsd, locale)} icon={Banknote} trend={codOffered ? (fr ? "Paiements réussis (COD une fois encaissé)" : "Succeeded payments (COD once collected)") : (fr ? "Paiements réussis" : "Succeeded payments")} />
             <StatCard title={fr ? "Commission gagnée" : "Commission earned"} value={formatCurrency(f.commissionEarnedUsd, locale)} icon={Percent} trend={`${fr ? "À venir" : "Expected"} ${formatCurrency(f.commissionExpectedUsd, locale)} · ${fr ? "taux actuel" : "current rate"} ${f.commissionPct}%`} />
             <StatCard title={fr ? "Remboursements" : "Refunds"} value={formatCurrency(f.refundsUsd, locale)} icon={Receipt} trend={`${f.refundsCount} ${fr ? "paiement(s) · retours inclus" : "payment(s) · returns included"}`} />
             <StatCard title={fr ? "Versements payés" : "Payouts paid"} value={formatCurrency(f.payouts.paidUsd, locale)} icon={Wallet} trend={`${f.payouts.paidCount} ${fr ? "versement(s)" : "payout(s)"}`} />
             <StatCard title={fr ? "Versements à payer" : "Payouts owed"} value={formatCurrency(f.payouts.pendingUsd, locale)} icon={PiggyBank} trend={`${f.payouts.requestedCount} ${fr ? "à examiner" : "to review"} · ${f.payouts.pendingCount} ${fr ? "en cours" : "open"}`} />
             <StatCard title={fr ? "Mobile money en attente" : "Mobile money receivable"} value={formatCurrency(f.receivables.amountUsd, locale)} icon={Smartphone} trend={`${f.receivables.count} ${fr ? "paiement(s)" : "payment(s)"}${f.receivables.count ? ` · ${fr ? "plus ancien" : "oldest"} ${ageLabel(f.receivables.oldestMinutes, fr)}` : ""}`} />
-            <StatCard title={fr ? "COD à encaisser" : "COD outstanding"} value={formatCurrency(f.codOutstandingUsd, locale)} icon={Truck} trend={`${f.codOutstandingCount} ${fr ? "commande(s)" : "order(s)"}`} />
+            {codOffered && <StatCard title={fr ? "COD à encaisser" : "COD outstanding"} value={formatCurrency(f.codOutstandingUsd, locale)} icon={Truck} trend={`${f.codOutstandingCount} ${fr ? "commande(s)" : "order(s)"}`} />}
             <StatCard title={fr ? "Portefeuilles clients (dette)" : "Customer wallet liability"} value={formatCurrency(f.walletLiabilityUsd, locale)} icon={CreditCard} />
             <StatCard title={fr ? "Abonnements vendeurs" : "Seller subscriptions"} value={formatCurrency(f.subscriptionRevenueUsd, locale)} icon={Wallet} />
             <StatCard title={fr ? "Remises promo déduites" : "Promo discounts given"} value={formatCurrency(f.promoDiscountsUsd, locale)} icon={Tag} />

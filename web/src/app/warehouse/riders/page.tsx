@@ -11,12 +11,14 @@ import { useDeskQueue, useWarehouseData } from "@/lib/warehouse";
 import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
+import { useCodOffered } from "@/lib/use-cod-offered";
 
 export default function WarehouseRidersPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
+  const codOffered = useCodOffered();
   const { riders, ridersError } = useWarehouseData();
   const queue = useDeskQueue({ status: "all" });
   const parcels = queue.tasks;
@@ -75,7 +77,8 @@ export default function WarehouseRidersPage() {
         )},
         { key: "delivered", label: fr ? "Livrées" : "Delivered" },
         { key: "failed", label: fr ? "Échouées" : "Failed" },
-        { key: "cod", label: fr ? "COD encaissé" : "COD collected", render: (row) => formatCurrency(Number(row.cod), locale) },
+        // The cash column exists only while cash on delivery is offered.
+        ...(codOffered ? [{ key: "cod", label: fr ? "COD encaissé" : "COD collected", render: (row: Record<string, unknown>) => formatCurrency(Number(row.cod), locale) }] : []),
         { key: "actions", label: t("action"), render: (row) => (
           <Link href={ops(`/riders/${row.id}`)} className="text-xs text-[var(--primary)] hover:underline">{t("view")}</Link>
         )},
