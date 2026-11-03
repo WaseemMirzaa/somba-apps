@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { PageHeader } from "@/components/ui/page-header";
+import { HubScopeBar } from "@/components/warehouse/hub-scope";
+import { HubOpsSettingsCard } from "@/components/warehouse/hub-ops-settings";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -12,7 +14,10 @@ import { errorMessage, isOpsRole } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 
-/** Read-only view of the platform settings that matter on the hub floor. Changing them is an admin job. */
+/**
+ * The warehouse's own settings (its manager edits them: working hours, batch size, auto-assignment, aged-parcel ages) above the
+ * read-only platform settings that matter on the hub floor (changing those is an admin job).
+ */
 export default function WarehouseSettingsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
@@ -49,10 +54,12 @@ export default function WarehouseSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("settings")}
-        subtitle={fr ? "Paramètres de la plateforme utiles à l'entrepôt (lecture seule)" : "Platform settings that matter on the hub floor (read-only)"}
+        subtitle={fr ? "Les réglages de votre entrepôt, et ceux de la plateforme utiles sur le terrain (lecture seule)" : "Your warehouse's settings, and the platform settings that matter on the hub floor (read-only)"}
         breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : (fr ? "Entrepôt" : "Warehouse"), href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: t("settings") }]}
         actions={<Link href={ops("/hubs")} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50">{fr ? "Mon entrepôt" : "My warehouse"}</Link>}
       />
+      <HubScopeBar />
+      <HubOpsSettingsCard />
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <DetailSection title={fr ? "Livraison et paiement" : "Delivery and payment"}>
@@ -76,8 +83,8 @@ export default function WarehouseSettingsPage() {
 
       <p className="text-xs text-slate-500">
         {fr
-          ? "Ces valeurs se modifient dans le portail admin (Paramètres). Les heures d'ouverture, la taille des lots et l'attribution automatique ne sont pas encore configurables."
-          : "Change these in the admin portal (Settings). Working hours, batch size and auto-assignment are not configurable yet."}
+          ? "Ces valeurs de la plateforme se modifient dans le portail admin (Paramètres)."
+          : "Change these platform values in the admin portal (Settings)."}
       </p>
     </div>
   );

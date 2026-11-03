@@ -249,6 +249,9 @@ const TITLES: Record<string, string> = {
   'Transfer run on its way': 'Tournée de transfert en route',
   'Parcel missing from run': 'Colis manquant dans une tournée',
   'Task needs attention': 'Tâche à vérifier',
+  'Aged parcel': 'Colis en attente depuis longtemps',
+  'Parcel escalated': 'Colis remonté à la direction',
+  'Parcel returned to seller': 'Colis retourné au vendeur',
   'Seller package ready': 'Colis vendeur prêt',
   'Item cancelled by the seller': 'Article annulé par le vendeur',
   'Seller cancelled items': 'Articles annulés par le vendeur',
@@ -361,6 +364,10 @@ const BODIES: Rule[] = [
   // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins
   [/^(\S+): ([a-z ]+) needs a rider\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » à confier à un livreur.`],
   [/^(\S+): ([a-z ]+) is now in your tasks\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ajoutée à vos tâches.`],
+  [/^(\S+): ([a-z ]+) has been open for (\d+) hours and needs a decision\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures, une décision est nécessaire.`],
+  [/^(\S+): ([a-z ]+) has been open for (\d+) hours\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures.`],
+  [/^(\S+): the customer parcel is going back to the seller\. Review the order\.$/, (m) => `${m[1]} : le colis du client retourne chez le vendeur. Vérifiez la commande.`],
+  [/^(\S+) could not be delivered and is going back to the seller\. Our team will contact you about your order\.$/, (m) => `${m[1]} n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.`],
   [/^(\S+): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
   [/^(\S+): your package reached the warehouse\.$/, (m) => `${m[1]} : votre colis est arrivé à l’entrepôt.`],
   [

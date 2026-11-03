@@ -14,8 +14,9 @@ import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { HubScopeBar } from "@/components/warehouse/hub-scope";
+import { OpsPerformance } from "@/components/warehouse/ops-performance";
 import { LEG_KIND, LEG_KINDS, LEG_STATUS, pickL } from "@/lib/logistics";
-import { isOpenLeg, riderLabel, useDeskQueue, useHubScope } from "@/lib/warehouse";
+import { isOpenLeg, useDeskQueue, useHubScope } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import {
@@ -43,20 +44,6 @@ export default function WarehouseAnalyticsPage() {
   const excQ = useOpsQuery<ExceptionRow[]>("exceptions:list", { initial: [] as ExceptionRow[], push: ["exception:updated"] });
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
   const { returns, error: returnsError, reload: reloadReturns } = useReturns();
-
-  // Rider table: computed from the parcels the server returned (delivered / failed per rider).
-  const riderRows = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; delivered: number; failed: number; open: number }>();
-    for (const p of parcels) {
-      if (!p.riderId) continue;
-      const r = m.get(p.riderId) ?? { id: p.riderId, name: riderLabel(p, fr), delivered: 0, failed: 0, open: 0 };
-      if (p.status === "delivered") r.delivered += 1;
-      else if (p.status === "failed") r.failed += 1;
-      else r.open += 1;
-      m.set(p.riderId, r);
-    }
-    return [...m.values()].sort((a, b) => b.delivered - a.delivered);
-  }, [parcels, fr]);
 
   // Exceptions: real counts, real resolution time (created -> last update of resolved ones).
   const exc = useMemo(() => {
@@ -197,29 +184,7 @@ export default function WarehouseAnalyticsPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-900">{fr ? "Livreurs" : "Riders"}</h2>
-            <p className="text-xs text-slate-500">
-              {fr ? "Livraisons et échecs sur les colis chargés" : "Deliveries and failures across the loaded parcels"}
-            </p>
-          </div>
-          <NavLinkButton href={ops("/riders")}>{t("viewAll")}</NavLinkButton>
-        </CardHeader>
-        <CardContent className="p-0">
-          <DataTable
-            emptyMessage={fr ? "Aucun colis attribué à un livreur." : "No parcel is assigned to a rider yet."}
-            columns={[
-              { key: "name", label: fr ? "Livreur" : "Rider", render: (row) => <span className="font-medium text-slate-900">{String(row.name)}</span> },
-              { key: "delivered", label: fr ? "Livrés" : "Delivered" },
-              { key: "open", label: fr ? "En cours" : "In progress" },
-              { key: "failed", label: fr ? "Échecs" : "Failed", render: (row) => <Badge variant={Number(row.failed) > 0 ? "warning" : "default"}>{String(row.failed)}</Badge> },
-            ]}
-            data={riderRows as unknown as Record<string, unknown>[]}
-          />
-        </CardContent>
-      </Card>
+      <OpsPerformance />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
