@@ -7,7 +7,9 @@ import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useLocale } from "@/context/locale-context";
-import { useRiderAssignment, useRiderCash, useRiderData } from "@/lib/rider";
+import { useCodEnabled, useRiderAssignment, useRiderCash, useRiderData } from "@/lib/rider";
+import { showCashSummary } from "@/lib/rider-cod";
+import { RiderAlertsCard } from "@/components/rider/rider-alerts-card";
 import { looseTasks } from "@/lib/rider-runs";
 import { useRiderRuns } from "@/lib/rider-runs-live";
 import { formatCurrency } from "@/lib/utils";
@@ -35,6 +37,7 @@ export default function RiderDashboardPage() {
   const rr = useRiderRuns(mine);
   const assignment = useRiderAssignment();
   const { cash } = useRiderCash();
+  const codEnabled = useCodEnabled();
   // A transfer run is one card; its parcels are not listed again as tasks of their own.
   const activeTasks = looseTasks(getActiveRiderTasks(), rr.runs);
   const activeCount = activeTasks.length + rr.activeRuns.length;
@@ -47,12 +50,14 @@ export default function RiderDashboardPage() {
 
       <RiderGpsPanel />
 
+      <RiderAlertsCard />
+
       <div className="grid grid-cols-2 gap-3">
         <Kpi title={t("activeTasks")} value={String(activeCount)} icon={Bike} />
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
         <Kpi title={t("completedToday")} value={String(stats?.completedToday ?? 0)} icon={CheckCircle} />
         <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(stats?.completed ?? 0)} icon={ListChecks} />
-        <Kpi title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />
+        {showCashSummary(codEnabled) && <Kpi title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />}
       </div>
 
       <p className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">

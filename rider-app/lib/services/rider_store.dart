@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../l10n/strings.dart';
 import 'auth_service.dart';
+import 'cod_visibility.dart' show parseCodEnabled;
 import 'location_reporter.dart';
 import 'models.dart';
 import 'push_service.dart';
@@ -39,6 +40,10 @@ class RiderStore extends ChangeNotifier {
 
   /// Public setting: when true the customer's 4-digit code is needed to deliver.
   bool requireDeliveryCode = false;
+
+  /// Public setting `codEnabled`. Cash on delivery is not offered, so every COD surface (cash card, receipts, note, cash
+  /// prompt) stays hidden unless this is true. False until the setting has been read. See `cod_visibility.dart`.
+  bool codEnabled = false;
 
   /// Home warehouse (null until loaded, or for an older server).
   RiderAssignment? assignment;
@@ -169,6 +174,9 @@ class RiderStore extends ChangeNotifier {
     stats = const WorkStatsDto();
     cash = const CashDto();
     requireDeliveryCode = false;
+    codEnabled = false;
+    location.promptsAllowed = true;
+    lastLocationAccess = null;
     assignment = null;
     focus.value = null;
     notifyListeners();
@@ -295,6 +303,8 @@ class RiderStore extends ChangeNotifier {
     });
     // The warehouse recorded a hand-over of this rider's cash: read the new balance and receipts.
     _socket.on('cash:updated', (_) => unawaited(_readCash().then((_) => notifyListeners())));
+    // An administrator changed a public setting (COD on or off, the delivery code): the screens follow at once.
+    _socket.on('settings:updated', applySettingsPush);
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
     // The rider's own account changed (here, or on another phone or the web portal).
     _socket.on('me:updated', _applyAccount);
@@ -302,6 +312,14 @@ class RiderStore extends ChangeNotifier {
       notifications.insert(0, NotificationDto.fromJson(_map(d)));
       notifyListeners();
     });
+  }
+
+  /// A `settings:updated` push: the public settings the rider screens follow (COD on or off, the delivery code).
+  void applySettingsPush(dynamic d) {
+    if (d is! Map) return;
+    if (d.containsKey('codEnabled')) codEnabled = parseCodEnabled(d['codEnabled']);
+    if (d.containsKey('requireDeliveryCode')) requireDeliveryCode = '${d['requireDeliveryCode']}' == 'true';
+    notifyListeners();
   }
 
   Timer? _pushTimer;
@@ -501,6 +519,7 @@ class RiderStore extends ChangeNotifier {
     try {
       final m = _map(await request('settings:get'));
       requireDeliveryCode = '${m['requireDeliveryCode']}' == 'true';
+      codEnabled = parseCodEnabled(m['codEnabled']);
     } catch (_) {/* keep the last known value */}
   }
 
@@ -536,6 +555,13 @@ class RiderStore extends ChangeNotifier {
 
   @visibleForTesting
   void syncLocationNow() => _syncLocation();
+
+  /// The app is back in front (for example from the phone's location settings): if a ride is on and the position is not
+  /// being shared, try to start it again.
+  void retryLocation() {
+    if (user == null || location.running) return;
+    _syncLocation();
+  }
 
   void _syncLocation() {
     final onRoad = myTasks.where((t) => t.status == 'in_transit').toList();

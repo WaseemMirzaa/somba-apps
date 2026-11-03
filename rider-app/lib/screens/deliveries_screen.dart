@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
+import '../services/cod_visibility.dart';
 import '../services/history_filter.dart';
 import '../services/location_reporter.dart';
+import '../services/maps_config.dart';
 import '../services/models.dart';
 import '../services/navigation_link.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
+import 'location_access_screen.dart';
+import 'task_route_screen.dart';
 
 /// Ids of the failure reasons a rider can pick (texts: `fail_<id>`).
 const kFailReasonIds = ['unreachable', 'wrong_address', 'refused', 'payment', 'other'];
@@ -49,12 +53,15 @@ class DeliveriesScreen extends StatefulWidget {
 
   /// Tests: choose the days of the history filter without driving the Material picker.
   final Future<DateTimeRange?> Function(DateTimeRange? current)? pickDays;
-  const DeliveriesScreen({super.key, this.launcher, this.isIPhone, this.googleInstalled, this.pickDays});
+
+  /// Tests: draw something else than the Google map on the route map screen.
+  final RouteMapBuilder? routeMapBuilder;
+  const DeliveriesScreen({super.key, this.launcher, this.isIPhone, this.googleInstalled, this.pickDays, this.routeMapBuilder});
   @override
   State<DeliveriesScreen> createState() => _DeliveriesScreenState();
 }
 
-class _DeliveriesScreenState extends State<DeliveriesScreen> {
+class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBindingObserver {
   final store = RiderStore.instance;
   int _tab = 0; // 0 active · 1 done
   bool _busy = false;
@@ -69,12 +76,21 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     store.focus.addListener(_onFocus);
     _onFocus();
   }
 
+  /// Back from the phone's location settings (or from another app): if a ride is on and the position is not being
+  /// shared, try to start sharing again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) store.retryLocation();
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     store.focus.removeListener(_onFocus);
     _search.dispose();
     super.dispose();
@@ -105,24 +121,19 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
 
   static const _rationaleSeenKey = 'somba.rider.bgLocationExplained';
 
-  /// Before the first ride: say why the position is shared even with the screen off.
-  /// (The system permission prompt follows; this runs once per install.)
+  /// Before the first ride: a full screen that says why the position is shared (also with the screen off), then the phone's
+  /// own prompt. When the rider already allowed location, nothing is shown. A rider who answers "Not now" is not asked by the
+  /// phone again on this ride: the card says location is off and offers "Open settings". Shown once per install.
   Future<void> _explainBackgroundLocation() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool(_rationaleSeenKey) == true || !mounted) return;
-      final s = Strings.of(context);
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          key: const ValueKey('bg-location-rationale'),
-          icon: const Icon(Icons.my_location_rounded, color: AppColors.primary),
-          title: Text(s.bgRationaleTitle),
-          content: Text(s.bgRationaleBody),
-          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: Text(s.bgRationaleContinue))],
-        ),
+      final access = await store.location.checkAccess();
+      if (access == LocationAccess.granted || !mounted) return;
+      final allowed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(fullscreenDialog: true, builder: (_) => LocationAccessScreen(reporter: store.location, initial: access)),
       );
+      store.location.promptsAllowed = allowed != false;
       await prefs.setBool(_rationaleSeenKey, true);
     } catch (_) {/* storage unavailable: skip the explanation */}
   }
@@ -171,7 +182,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     if (to == 'delivered') {
       // Cash on delivery: the rider confirms the amount they took; the server records it and refuses any other than the one due.
       double? cashUsd;
-      if (t.collectsCash) {
+      if (showTaskCash(store.codEnabled, t)) {
         cashUsd = await showDialog<double>(
           context: context,
           builder: (ctx) => CashCollectDialog(due: t.codAmountUsd, customer: t.customerName ?? s.theCustomer),
@@ -374,6 +385,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               ),
             ),
           ),
+        if (t.isActive && nav != null && MapsConfig.enabled)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(key: ValueKey('route-map-${t.id}'), onPressed: () => _openRouteMap(t), child: ButtonLabel(s.routeMap)),
+            ),
+          ),
         if (t.collectOld && t.isActive)
           Container(
             key: ValueKey('collect-old-${t.id}'),
@@ -407,7 +426,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               ),
             ]),
           ),
-        if (t.collectsCash && t.isActive)
+        if (showTaskCash(store.codEnabled, t) && t.isActive)
           Container(
             margin: const EdgeInsets.only(top: 10),
             padding: const EdgeInsets.all(12),
@@ -418,7 +437,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               Expanded(child: Text(s.collectCash(s.usd(t.codAmountUsd)), style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF92610A)))),
             ]),
           )
-        else if (t.isActive && t.kind == LegKind.delivery)
+        else if (showPrepaidNote(store.codEnabled, t))
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.alreadyPaid, style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.isActive && t.needsCode && store.requireDeliveryCode && t.status != 'assigned')
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
@@ -580,6 +599,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               child: OutlinedButton(key: ValueKey('run-navigate-${r.id}'), onPressed: () => _navigate(s, nav), child: ButtonLabel(s.navigateHub)),
             ),
           ),
+        if (nav != null && MapsConfig.enabled)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(key: ValueKey('run-route-map-${r.id}'), onPressed: () => _openRouteMap(parcels.first), child: ButtonLabel(s.routeMap)),
+            ),
+          ),
         if (r.isDispatched && !onRoad) ...[
           const SizedBox(height: 12),
           _cardAction(key: ValueKey('run-next-${r.id}'), alone: alone, onPressed: _busy ? null : () => _runOnRoad(r), label: s.actRunOnRoad),
@@ -657,6 +684,13 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
           if (phone != null) phone,
         ];
     }
+  }
+
+  /// The in-app route map of a task: the rider, the next stop and the line between them. Navigate stays the way to drive.
+  void _openRouteMap(DeliveryTaskDto t) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TaskRouteScreen(task: t, launcher: widget.launcher, isIPhone: widget.isIPhone, googleInstalled: widget.googleInstalled, mapBuilder: widget.routeMapBuilder),
+    ));
   }
 
   Future<void> _navigate(Strings s, NavTarget target) async {

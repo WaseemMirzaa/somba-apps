@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { List, User, BarChart3, Home, LogOut, Bell, Headphones } from "lucide-react";
-import { useRealtime } from "@/context/realtime-context";
+import { List, User, BarChart3, Home, LogOut, Headphones } from "lucide-react";
 import { RiderGpsProvider } from "@/lib/rider-gps";
 import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
@@ -11,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { PortalGuard } from "@/components/layout/portal-guard";
 import { useOpsTickets } from "@/lib/ops-support";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
@@ -19,25 +19,6 @@ const nav = [
   { href: "/rider/support", icon: Headphones, label: "support" },
   { href: "/rider/profile", icon: User, label: "myAccount" },
 ];
-
-/** Notification bell with the live unread count from the server. */
-function RiderBell() {
-  const { unreadCount } = useRealtime();
-  return (
-    <Link
-      href="/rider/notifications"
-      className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
-      aria-label="Notifications"
-    >
-      <Bell className="h-5 w-5" />
-      {unreadCount > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-          {unreadCount}
-        </span>
-      )}
-    </Link>
-  );
-}
 
 /** Unread staff replies on my tickets, shown on the Support tab. */
 function SupportBadge() {
@@ -68,7 +49,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
               <button onClick={() => setLocale("en")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "en" ? "bg-emerald-600 text-white" : "text-slate-500")}>EN</button>
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>
-            <RiderBell />
+            <NotificationBell portal="rider" fr={locale === "fr"} />
             <button onClick={() => { logout(); router.push("/login"); }} className="rounded-lg p-1.5 text-slate-500 hover:text-red-600" aria-label={t("logout")}>
               <LogOut className="h-4 w-4" />
             </button>

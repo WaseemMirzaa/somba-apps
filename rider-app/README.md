@@ -63,7 +63,14 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   inside. *Done* has a search by order reference (or run reference) and a date-range filter.
 - **Navigate**: opens turn-by-turn directions in your maps app. Android: Google Maps (the app when installed, else the
   browser). iPhone: **Apple Maps** straight away when Google Maps is not installed (no extra tap); when both are installed a
-  small list asks which one to use for this trip. There is no in-app map. No API key is needed.
+  small list asks which one to use for this trip. No API key is needed for Navigate.
+- **Route map**: a "Route map" button on every active card (and transfer run) opens the rider, the next stop (the one
+  Navigate leads to) and the route line on a Google map. Needs the Maps key (see *Maps key* below); without it the button is
+  not offered and Navigate is all there is. With *Routes API* enabled on the key the line follows the roads, with the
+  distance and time; otherwise it is a dashed straight line, and says so.
+- **Cash on delivery is hidden** unless the public setting `codEnabled` is `true` (it is `false` in production): no cash
+  card, receipts or note on *My work*, no "Collect $X" line, no cash prompt. It follows the setting live. The only exception
+  is an open task that still has cash due (placed while COD was on): the server will not complete it without the amount.
 - **My work**: tasks completed today, this week and all time; completed, in progress, failed and success rate; completed by
   type (counts only); and the cash collected to hand over at the warehouse.
 - **Profile**: edit name and phone, change password (the server signs every other phone out and this phone keeps working),
@@ -110,8 +117,20 @@ The first launch follows the phone (`fr` → French, anything else → English);
 The GPS runs **only while a delivery is `in_transit`**; it stops when the delivery is delivered or failed, and on sign-out (`RiderStore._syncLocation`).
 
 * Android: geolocator's foreground service (`ForegroundNotificationConfig`, ongoing notification "Livraison en cours / Delivery in progress" in the rider's language). Manifest: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `WAKE_LOCK`, `POST_NOTIFICATIONS` (the service type `location` is declared by geolocator). Only the *while in use* location permission is needed because the service is started from the foreground; the app label is localised in `res/values{,-fr}/strings.xml`.
-* iOS (`ios/` project, generated with `flutter create --platforms=ios`): `UIBackgroundModes` = `location` + `remote-notification`, `AppleSettings(allowBackgroundLocationUpdates: true, showBackgroundLocationIndicator: true, pauseLocationUpdatesAutomatically: false)`, and the usage descriptions in `Info.plist` with French/English `InfoPlist.strings` (`en.lproj`, `fr.lproj`, registered in the Xcode project). The usage text is also explained in-app (localised dialog) before the first ride.
-* **Not verified on a device**: it was written against the geolocator API and unit-tested (settings per platform, start/stop rules with a fake reporter), but never run on an Android phone or an iPhone. Check battery behaviour, Android 12+ "foreground service from background" restrictions and the iOS blue indicator on real hardware before release.
+* iOS (`ios/` project, generated with `flutter create --platforms=ios`): `UIBackgroundModes` = `location` + `remote-notification`, `AppleSettings(allowBackgroundLocationUpdates: true, showBackgroundLocationIndicator: true, pauseLocationUpdatesAutomatically: false)`, and the usage descriptions in `Info.plist` with French/English `InfoPlist.strings` (`en.lproj`, `fr.lproj`, registered in the Xcode project). Before the first ride a full screen explains why the position is shared (`lib/screens/location_access_screen.dart`); when location is refused or off it offers **Open settings** and carries on by itself when the rider comes back.
+* **`ACCESS_BACKGROUND_LOCATION` and iOS "Always" are not requested**: see `docs/BACKGROUND-LOCATION.md` for the decision and how it was checked.
+* **Checked on an Android 14 emulator and an iOS simulator with scripted positions** (`integration_test/ride_device_test.dart`, `simctl location`, `adb emu geo fix`): positions kept arriving with the app in the background and, on Android, with the screen off. **Not yet tried on a real Android phone or a real iPhone**: check battery behaviour and vendor battery savers before release.
+
+## Maps key (route map)
+
+Same wiring as the customer app, three places (all git-ignored, never committed):
+
+* Android: `GOOGLE_MAPS_API_KEY=...` in `android/local.properties` (read in `android/app/build.gradle.kts`) or `-PGOOGLE_MAPS_API_KEY=...`;
+* iOS: `GOOGLE_MAPS_API_KEY=...` in `ios/Flutter/Secrets.xcconfig` (`Info.plist` `GMSApiKey`, started in `AppDelegate.swift`);
+* Dart: `--dart-define=GOOGLE_MAPS_API_KEY=...` (turns the map on and is the key for the Routes API call).
+
+Enable *Maps SDK for Android* and *Maps SDK for iOS* for the key; add *Routes API* for road-following lines. The Firebase files
+(`android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`) are git-ignored too.
 
 ## Push notifications
 

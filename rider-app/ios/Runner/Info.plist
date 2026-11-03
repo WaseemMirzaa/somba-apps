@@ -71,6 +71,8 @@
 		<string>en</string>
 		<string>fr</string>
 	</array>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Somba&amp;Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
