@@ -1,6 +1,7 @@
 import 'aftersale_store.dart';
 import 'chat_store.dart';
 import 'engage_store.dart';
+import 'follow_store.dart';
 import 'geo_directory.dart';
 import 'hub_directory.dart';
 import 'realtime_store.dart';
@@ -30,6 +31,7 @@ List<FeatureHook> buildFeatureHooks() => [
       SupportStore.instance.hook,
       AfterSaleStore.instance.hook,
       EngageStore.instance.hook,
+      FollowStore.instance.hook,
       HubDirectory.instance.hook,
       GeoDirectory.instance.hook,
     ];

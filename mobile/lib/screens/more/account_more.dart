@@ -52,6 +52,7 @@ class NotificationsScreen extends StatelessWidget {
         'broadcast' || 'promo' => (Icons.campaign_rounded, AppColors.royalBlue),
         'support' => (Icons.headset_mic_rounded, AppColors.royalBlue),
         'chat' => (Icons.chat_bubble_outline_rounded, AppColors.mint),
+        'store' => (Icons.storefront_outlined, AppColors.primary),
         _ => (Icons.notifications_rounded, AppColors.primary),
       };
 

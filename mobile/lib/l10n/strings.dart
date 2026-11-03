@@ -11,6 +11,7 @@ export 'strings_aftersale.dart';
 export 'strings_social.dart';
 export 'strings_engage.dart';
 export 'strings_areas.dart';
+export 'strings_r2f.dart';
 
 /// UI texts in English and French. Every text lives in `messages.dart`
 /// (key -> (English, French)); the typed accessors in `strings_keys.dart`

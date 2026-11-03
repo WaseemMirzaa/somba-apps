@@ -172,9 +172,12 @@ class LimitedStepper extends StatelessWidget {
 
 /// A row of photo thumbnails (the customer's own uploads); a tap opens the photo full screen.
 class RemotePhotos extends StatelessWidget {
-  const RemotePhotos({super.key, required this.urls, this.size = 72});
+  const RemotePhotos({super.key, required this.urls, this.size = 72, this.semantic});
   final List<String> urls;
   final double size;
+
+  /// The alt text of photo `n` of `total` (screen readers); photos have none when this is null.
+  final String Function(int n, int total)? semantic;
 
   Widget _image(String url, {BoxFit fit = BoxFit.cover}) => Image.network(
         uploadUrl(url),
@@ -187,7 +190,10 @@ class RemotePhotos extends StatelessWidget {
     if (urls.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 10, runSpacing: 10, children: [
       for (var i = 0; i < urls.length; i++)
-        InkWell(
+        Semantics(
+          label: semantic?.call(i + 1, urls.length),
+          button: true,
+          child: InkWell(
           key: ValueKey('photo-$i'),
           borderRadius: BorderRadius.circular(AppRadius.sm),
           onTap: () => showDialog<void>(
@@ -210,7 +216,7 @@ class RemotePhotos extends StatelessWidget {
             ),
           ),
           child: ClipRRect(borderRadius: BorderRadius.circular(AppRadius.sm), child: SizedBox(width: size, height: size, child: _image(urls[i]))),
-        ),
+        )),
     ]);
   }
 }
