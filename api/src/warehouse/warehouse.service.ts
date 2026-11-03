@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { FindOptionsWhere, In, Not } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { pageOf } from '../common/paging';
@@ -21,6 +21,7 @@ import type {
 import { oneOf, str } from '../common/validate';
 import { tasksOfHub } from '../logistics/hub-scope';
 import { HubsService } from '../logistics/hubs.service';
+import { HubOpsSettingsService } from '../logistics/hub-ops-settings.service';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { riderFits } from '../logistics/leg-rules';
 import { tierAllows } from '../logistics/tiers';
@@ -45,6 +46,7 @@ export class WarehouseService {
     private readonly productsSvc: ProductsService,
     private readonly hubsSvc: HubsService,
     private readonly logistics: LogisticsService,
+    @Optional() private readonly hubOps?: HubOpsSettingsService,
   ) {}
 
   // ── Warehouse exceptions (parcel incidents) ──────────────────────────────
@@ -224,8 +226,13 @@ export class WarehouseService {
       if (!['unassigned', 'assigned'].includes(task.status)) continue;
       tasks.push(task);
     }
-    for (const task of tasks) await this.logistics.assign(task.id, rider.id, actor);
     const hubId = actor.hubId ?? tasks[0]?.hubId ?? null;
+    // The warehouse's own limit (Settings > batch size) is enforced here, not only in the page.
+    if (this.hubOps && hubId) {
+      const { batchSize } = await this.hubOps.ops(hubId);
+      if (tasks.length > batchSize) throw new BadRequestException(`A batch at this warehouse holds at most ${batchSize} parcels.`);
+    }
+    for (const task of tasks) await this.logistics.assign(task.id, rider.id, actor);
     const batch = await this.batches.save(
       this.batches.create({
         reference: `BATCH-${Date.now().toString().slice(-6)}`,

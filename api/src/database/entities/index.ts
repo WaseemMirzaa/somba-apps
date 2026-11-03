@@ -54,6 +54,8 @@ export { FraudSignal } from './fraud-signal.entity';
 export type { FraudSignalKind } from './fraud-signal.entity';
 export { Broadcast } from './broadcast.entity';
 export { Hub } from './hub.entity';
+export { HubOpsSettings } from './hub-ops-settings.entity';
+export { AgedAlert } from './aged-alert.entity';
 export { GeoArea } from './geo-area.entity';
 export type { AreaLevel } from './geo-area.entity';
 export { HubCoverage } from './hub-coverage.entity';
@@ -158,6 +160,8 @@ import { SellerTeamMember } from './seller-team.entity';
 import { Conversation } from './conversation.entity';
 import { ConversationMessage } from './conversation-message.entity';
 import { PrivateFile } from './private-file.entity';
+import { HubOpsSettings } from './hub-ops-settings.entity';
+import { AgedAlert } from './aged-alert.entity';
 
 export const ENTITIES = [
   User,
@@ -198,6 +202,8 @@ export const ENTITIES = [
   FraudSignal,
   Broadcast,
   Hub,
+  HubOpsSettings,
+  AgedAlert,
   GeoArea,
   HubCoverage,
   HubLane,
