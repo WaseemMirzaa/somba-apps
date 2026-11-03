@@ -138,7 +138,7 @@ describe('warehouse operations', () => {
 
     it('limits a batch to the warehouse batch size, in the service (not only in the page)', async () => {
       const mkWarehouse = () =>
-        new WarehouseService(ds.getRepository(Hub), ds.getRepository('WarehouseBatch') as never, {} as never, ds.getRepository(DeliveryTask), ds.getRepository(Product), ds.getRepository(Order), {} as never, emitter as never, {} as never, {} as never, {} as never, { assign: async () => undefined } as never, settings);
+        new WarehouseService(ds.getRepository(Hub), ds.getRepository('WarehouseBatch') as never, ds.getRepository(DeliveryTask), ds.getRepository(Product), ds.getRepository(Order), {} as never, emitter as never, {} as never, {} as never, {} as never, { assign: async () => undefined } as never, settings);
       const rider = await mkUser('rider', hub.id);
       const tasks = [await mkTask(), await mkTask(), await mkTask()];
       await settings.update(admin(), hub.id, { batchSize: 2 });
