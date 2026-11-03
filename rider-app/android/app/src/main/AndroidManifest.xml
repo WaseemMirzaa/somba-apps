@@ -36,6 +36,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Route map on a task (google_maps_flutter). Empty key: the map is off and the Navigate button still works. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${GOOGLE_MAPS_API_KEY}" />
         <!-- Push: icon, tint and channel for notifications shown while the app is in the background. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
