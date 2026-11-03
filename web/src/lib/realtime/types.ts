@@ -525,6 +525,8 @@ export interface Review {
   author: string;
   rating: number;
   text: string;
+  /** Up to 4 photos the customer attached (upload URLs); hidden together with the review. */
+  photos?: string[];
   createdAt: string;
   status?: "visible" | "hidden";
   /** The seller's public answer to this review. */

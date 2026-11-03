@@ -19,13 +19,14 @@ import { useShop } from "@/context/shop-context";
 import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { useSocketEvent, usePublicSettings, useProductReviews } from "@/lib/shop-live";
+import { useSocketEvent, usePublicSettings, useProductReviews, useStoreFollow } from "@/lib/shop-live";
 import { useCampaignView } from "@/lib/shop-engage";
 import { ProductFeeCheck } from "@/components/shop/product-fee-check";
 import { ContactSeller } from "@/components/shop/contact-seller";
 import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
 import { TranslatableText } from "@/components/shop/translatable-text";
+import { AttachmentGallery } from "@/components/seller/attachments";
 
 type ProductQuestion = {
   id: string;
@@ -44,7 +45,7 @@ export default function ShopProductDetailPage() {
   const fr = locale === "fr";
   const router = useRouter();
   const rt = useRealtime();
-  const { addToCart, toggleFollowStore, isFollowingStore, addRecentlyViewed, cart } = useShop();
+  const { addToCart, addRecentlyViewed, cart } = useShop();
   const { toast } = useToast();
   const settings = usePublicSettings();
   const [qty, setQty] = useState(1);
@@ -57,6 +58,7 @@ export default function ShopProductDetailPage() {
   const { reviews, loaded: reviewsLoaded, error: reviewsError, reload: reloadReviews } = useProductReviews(productId);
   const product = useProductDetail(productId);
   const catalog = useCatalog();
+  const follow = useStoreFollow(product?.sellerId);
 
   useEffect(() => {
     if (product) addRecentlyViewed(product.id);
@@ -109,6 +111,20 @@ export default function ShopProductDetailPage() {
       toast((e as Error).message, "error");
     } finally {
       setAsking(false);
+    }
+  }
+
+  async function toggleFollow() {
+    if (!rt.user) {
+      toast(fr ? "Connectez-vous pour suivre une boutique" : "Sign in to follow a store", "info");
+      router.push(`/shop/login?next=${encodeURIComponent(`/shop/products/${productId}`)}`);
+      return;
+    }
+    try {
+      const s = await follow.toggle();
+      toast(s.following ? (fr ? "Boutique suivie" : "Following store") : (fr ? "Vous ne suivez plus cette boutique" : "Unfollowed"));
+    } catch (e) {
+      toast((e as Error).message, "error");
     }
   }
 
@@ -354,8 +370,13 @@ export default function ShopProductDetailPage() {
             ) : (
               <div className="flex-1 font-medium text-slate-900">{product.seller}</div>
             )}
-            <button onClick={() => { toggleFollowStore(product.seller); toast(isFollowingStore(product.seller) ? (fr ? "Ne plus suivre" : "Unfollowed") : (fr ? "Boutique suivie" : "Following store")); }} className="text-sm text-[var(--primary)]">
-              {isFollowingStore(product.seller) ? (fr ? "Suivi" : "Following") : (fr ? "Suivre" : "Follow")}
+            <button
+              type="button"
+              disabled={follow.busy || !follow.state}
+              onClick={() => void toggleFollow()}
+              className="text-sm text-[var(--primary)] disabled:opacity-50"
+            >
+              {follow.state?.following ? (fr ? "Suivi" : "Following") : (fr ? "Suivre" : "Follow")}
             </button>
           </div>
 
@@ -416,6 +437,7 @@ export default function ShopProductDetailPage() {
                     <span className="text-amber-500">{"★".repeat(r.rating)}</span>
                   </div>
                   <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="mt-1 text-sm text-slate-600" />
+                  <AttachmentGallery urls={r.photos} className="my-2" />
                   <p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</p>
                   {r.sellerReply && (
                     <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">

@@ -126,7 +126,7 @@ export default function SellerDashboard() {
 
       {load.error && <LoadError message={load.error} onRetry={load.retry} />}
 
-      {needsPickup && (
+      {needsPickup && access.can("storefront") && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>
             <strong>{fr ? "Les livreurs ont besoin de votre lieu de collecte (adresse et position sur la carte)." : "Riders need your pickup location (address and map pin)."}</strong>{" "}
@@ -138,11 +138,12 @@ export default function SellerDashboard() {
         </div>
       )}
 
-      <PickupAreaBanner withLink />
+      <PickupAreaBanner withLink={access.can("storefront")} />
 
       <PlanSummary />
 
-      {/* Period + analytics state */}
+      {/* Period + analytics state (dashboards belong to the `insight` permission: a support or orders member never sees this block) */}
+      {access.can("insight") && (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900">
           {fr ? "Performance" : "Performance"} <span className="text-sm font-medium text-slate-500">· {periodLabel}</span>
@@ -164,6 +165,7 @@ export default function SellerDashboard() {
           ))}
         </div>
       </div>
+      )}
 
       {an.error && <LoadError message={an.error} onRetry={an.retry} />}
       {an.loading && !a && <SectionLoader />}
@@ -402,6 +404,7 @@ export default function SellerDashboard() {
 
       {/* Products chart + activity + orders */}
       <div className="grid gap-6 lg:grid-cols-3">
+        {access.can("insight") && (
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -423,6 +426,7 @@ export default function SellerDashboard() {
             )}
           </CardContent>
         </Card>
+        )}
 
         <Card className="lg:col-span-1">
           <CardHeader className="flex flex-row items-center gap-2">

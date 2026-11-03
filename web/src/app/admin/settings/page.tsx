@@ -71,7 +71,7 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Retours et vendeurs",
     fields: [
       { key: "returnWindowDays", kind: "text", label: "Return window (days)", labelFr: "Délai de retour (jours)", hint: "Whole days 0 to 90 after delivery. 0 closes returns.", hintFr: "Jours entiers de 0 à 90 après la livraison. 0 ferme les retours.", inputMode: "numeric", range: { min: 0, max: 90, integer: true } },
-      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, the customer may escalate to Somba support.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader au support Somba.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
+      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, a return can be escalated by the customer to Somba support; for a dispute, replacement or exchange the customer, the seller and support are told.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader un retour au support Somba ; pour un litige, un remplacement ou un échange, le client, le vendeur et le support sont prévenus.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
       { key: "seller2faRequired", kind: "toggle", label: "Require two-factor authentication for store owners", labelFr: "Exiger l'authentification à deux facteurs pour les propriétaires", hint: "On: store owners without 2FA can only open Settings > Security until they turn it on.", hintFr: "Activé : un propriétaire sans 2FA ne peut ouvrir que Paramètres > Sécurité tant qu'il ne l'a pas activée." },
     ],
   },
@@ -91,6 +91,15 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Catalogue",
     fields: [
       { key: "productModeration", kind: "toggle", label: "Moderate new seller products", labelFr: "Modérer les nouveaux produits vendeurs", hint: "On: new listings wait for approval. Off: they go live at once.", hintFr: "Activé : les nouvelles annonces attendent une approbation. Désactivé : publication immédiate." },
+    ],
+  },
+  {
+    title: "Help and contact (customer app)",
+    titleFr: "Aide et contact (application client)",
+    fields: [
+      { key: "supportPhone", kind: "text", label: "Support phone", labelFr: "Téléphone du support", hint: "Shown in the app's Help screen as a Call us row. Leave empty to hide it.", hintFr: "Affiché dans l'écran Aide de l'application (ligne « Nous appeler »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportEmail", kind: "text", label: "Support e-mail", labelFr: "E-mail du support", hint: "Shown in Help as a Send an e-mail row. Leave empty to hide it.", hintFr: "Affiché dans Aide (ligne « Envoyer un e-mail »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportWhatsapp", kind: "text", label: "WhatsApp number", labelFr: "Numéro WhatsApp", hint: "With the country code, e.g. +243 970 000 000. Help opens a WhatsApp chat with it. Leave empty to hide it.", hintFr: "Avec l'indicatif du pays, ex. +243 970 000 000. Aide ouvre une discussion WhatsApp. Laissez vide pour le masquer.", inputMode: "text" },
     ],
   },
 ];

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Flag, MessageSquareReply, Pencil, ShieldAlert, ShieldCheck, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AttachmentGallery } from "@/components/seller/attachments";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { TranslatableText } from "@/components/shop/translatable-text";
 import { useLocale } from "@/context/locale-context";
@@ -251,6 +252,7 @@ function ReviewRow({ review, fr, fresh, focused, onChanged }: { review: EngageRe
       </div>
       <div className="mt-3">
         <TranslatableText kind="review" id={review.id} text={review.text} sourceLang={review.sourceLang} className="whitespace-pre-line break-words text-sm text-slate-700" />
+        <AttachmentGallery urls={review.photos} className="mt-3" />
       </div>
       <div className="mt-3 flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">

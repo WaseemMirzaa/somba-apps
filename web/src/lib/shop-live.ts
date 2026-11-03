@@ -425,3 +425,51 @@ export function useSellerPlans() {
   }, [rt.status, load]);
   return { plans, error, reload: load };
 }
+
+/** Whether the signed-in shopper follows a store, and how many do (`follows:state`, `follows:toggle`). */
+export interface StoreFollowState {
+  sellerId: string;
+  following: boolean;
+  followers: number;
+}
+
+/**
+ * Follow / unfollow a store from the shop. The state comes from the server (the same follow the customer app shows),
+ * follows the shopper's other devices (`follows:updated`) and `toggle` resolves with the new state or throws the
+ * server's message (so the caller can toast it). A guest sees the follower count; following asks them to sign in.
+ */
+export function useStoreFollow(sellerId: string | null | undefined) {
+  const rt = useRealtime();
+  const [state, setState] = useState<StoreFollowState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!sellerId || rt.status !== "connected") return;
+    let alive = true;
+    socketClient
+      .request<StoreFollowState>("follows:state", { sellerId })
+      .then((s) => alive && setState(s))
+      .catch(() => alive && setState(null));
+    return () => {
+      alive = false;
+    };
+  }, [sellerId, rt.status, rt.user?.id]);
+
+  useSocketEvent<StoreFollowState>("follows:updated", (s) => {
+    setState((cur) => (cur && cur.sellerId === s.sellerId ? s : cur));
+  });
+
+  const toggle = useCallback(async (): Promise<StoreFollowState> => {
+    if (!sellerId) throw new Error("Store not found.");
+    setBusy(true);
+    try {
+      const s = await socketClient.request<StoreFollowState>("follows:toggle", { sellerId });
+      setState(s);
+      return s;
+    } finally {
+      setBusy(false);
+    }
+  }, [sellerId]);
+
+  return { state, busy, toggle };
+}
