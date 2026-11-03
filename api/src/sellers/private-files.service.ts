@@ -10,14 +10,15 @@ import { PrivateFile, Seller } from '../database/entities';
 import { parseJsonList } from '../database/entities/seller.entity';
 import { UPLOAD_DIR } from '../uploads/uploads.controller';
 import { privateIdOf } from './private-url';
+import { KYC_REVIEWERS } from '../common/staff-access';
 
 export { privateIdOf };
 
 export const PRIVATE_UPLOAD_DIR = process.env.PRIVATE_UPLOAD_DIR ?? join(process.cwd(), 'uploads-private');
 /** Same cap as the public uploads, and under the proxy's 6 MB body limit. */
 export const MAX_PRIVATE_BYTES = 5 * 1024 * 1024;
-/** Roles that review applications and may open any store's documents. */
-export const KYC_REVIEWERS: readonly string[] = ['admin', 'admin_moderation', 'admin_operations'];
+/** Roles that review applications and may open any store's documents (defined in `common/staff-access.ts`). */
+export { KYC_REVIEWERS };
 const LINK_TTL_MS = 5 * 60_000;
 const PUBLIC_PATH = /^\/uploads\/([0-9a-f-]{36})\.(png|jpg|webp)$/;
 const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf' };

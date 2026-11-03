@@ -20,6 +20,7 @@ import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { errMsg } from "@/lib/admin-live";
 import { canSuspendAccounts, fraudDialogText, type FraudDialogMode } from "@/lib/fraud-block";
+import { useCodOffered } from "@/lib/use-cod-offered";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
@@ -45,6 +46,7 @@ const STATUS_OPTIONS = [
 export default function AdminFraudPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const codOffered = useCodOffered();
   const { fraudAlerts, setFraudStatus, loading, error, reload } = useAdminData({ fraud: true });
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -98,7 +100,7 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server (e.g. COD orders above the cap) — review them; blocking suspends the customer's account"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={codOffered ? (fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server (e.g. COD orders above the cap) — review them; blocking suspends the customer's account") : (fr ? "Alertes levées par le serveur — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server — review them; blocking suspends the customer's account")} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />

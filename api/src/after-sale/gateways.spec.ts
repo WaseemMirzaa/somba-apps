@@ -18,7 +18,7 @@ const guest = { data: { user: { id: 'guest', role: 'guest', name: 'Guest' } } } 
 
 /** Warehouse staff by user id: the tier a person holds in the database (no entry = no tier set = operator). */
 const STAFF_TIER: Record<string, string> = { 'op-1': 'operator', 'sup-1': 'supervisor', 'mgr-1': 'manager' };
-const tiers = () => new StaffTierService({ findOne: jest.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, warehouseTier: STAFF_TIER[where.id] ?? null })) } as never);
+const tiers = () => new StaffTierService({ findOne: jest.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, warehouseTier: STAFF_TIER[where.id] ?? null, hubId: `hub-of-${where.id}` })) } as never);
 const SUP = 'Only supervisors and managers can do this.';
 
 const echo = () => jest.fn(async (...a: unknown[]) => ({ args: a }));
@@ -79,18 +79,47 @@ describe('DisputesGateway', () => {
     expect(audit.record).toHaveBeenCalledTimes(4);
   });
 
-  it('the warehouse desk: receive and grade for warehouse staff and admins only', async () => {
+  it('the warehouse desk: receive and grade for warehouse supervisors and above, the Super Admin and Operations only', async () => {
     const { gw, svc } = disputes();
     for (const role of ['customer', 'seller', 'rider']) {
       expect(await gw.markReceived(client(role), { disputeId: 'd' })).toEqual({ ok: false, error: 'Ops only.' });
       expect(await gw.grade(client(role), { id: 'd', grades: [] })).toEqual({ ok: false, error: 'Ops only.' });
     }
     await gw.markReceived(client('warehouse_staff', 'sup-1'), { disputeId: 'd', restock: false });
-    expect(svc.markReceived).toHaveBeenCalledWith('d', false);
-    await gw.markReceived(client('admin_support'), { disputeId: 'd' });
-    expect(svc.markReceived).toHaveBeenLastCalledWith('d', true);
+    // The service gets the caller with their warehouse, so it can refuse another warehouse's return.
+    expect(svc.markReceived).toHaveBeenCalledWith('d', false, expect.objectContaining({ id: 'sup-1', role: 'warehouse_staff', hubId: 'hub-of-sup-1' }));
+    await gw.markReceived(client('admin_operations'), { disputeId: 'd' });
+    expect(svc.markReceived).toHaveBeenLastCalledWith('d', true, expect.objectContaining({ role: 'admin_operations' }));
     await gw.grade(client('warehouse_staff', 'mgr-1'), { id: 'd', grades: [{ itemId: 'i', condition: 'resellable' }], note: 'fine' });
-    expect(svc.grade).toHaveBeenCalledWith(expect.objectContaining({ role: 'warehouse_staff' }), 'd', [{ itemId: 'i', condition: 'resellable' }], 'fine');
+    expect(svc.grade).toHaveBeenCalledWith(expect.objectContaining({ role: 'warehouse_staff', hubId: 'hub-of-mgr-1' }), 'd', [{ itemId: 'i', condition: 'resellable' }], 'fine');
+  });
+
+  it('every other admin role is refused at the returns desk, and nothing is written or audited', async () => {
+    const { gw, svc, audit } = disputes();
+    for (const role of ['admin_support', 'admin_finance', 'admin_marketing', 'admin_moderation']) {
+      expect(await gw.markReceived(client(role), { disputeId: 'd' })).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.grade(client(role), { id: 'd', grades: [{ itemId: 'i', condition: 'resellable' }] })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(svc.markReceived).not.toHaveBeenCalled();
+    expect(svc.grade).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations']) {
+      expect((await gw.markReceived(client(role), { disputeId: 'd' })).ok).toBe(true);
+      expect((await gw.grade(client(role), { id: 'd', grades: [] })).ok).toBe(true);
+    }
+    expect(audit.record).toHaveBeenCalledTimes(4);
+  });
+
+  it('warehouse staff read returns through their own warehouse: the list and the detail carry their hub; other roles are unchanged', async () => {
+    const { gw, svc } = disputes();
+    await gw.list(client('warehouse_staff', 'op-1'), { status: 'open' });
+    expect(svc.list).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'op-1', role: 'warehouse_staff', hubId: 'hub-of-op-1' }), { status: 'open' });
+    await gw.returnsList(client('warehouse_staff', 'sup-1'), {});
+    expect(svc.list).toHaveBeenLastCalledWith(expect.objectContaining({ hubId: 'hub-of-sup-1' }), { type: 'return' });
+    await gw.get(client('warehouse_staff', 'mgr-1'), { id: 'd' });
+    expect(svc.get).toHaveBeenLastCalledWith(expect.objectContaining({ hubId: 'hub-of-mgr-1' }), 'd');
+    await gw.list(client('admin_support'), {});
+    expect(svc.list).toHaveBeenLastCalledWith(expect.not.objectContaining({ hubId: expect.anything() }), {});
   });
 
   it('the returns queue is a supervisor page: an operator (or staff with no tier set) can neither receive nor grade; supervisors, managers and admins can', async () => {

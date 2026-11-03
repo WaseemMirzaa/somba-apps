@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { LegActions } from "@/components/warehouse/leg-actions";
 import { useLocale } from "@/context/locale-context";
 import { useOpsPath } from "@/lib/ops-path";
+import { useCodOffered } from "@/lib/use-cod-offered";
 import {
   LEG_KIND,
   LEG_STATUS,
@@ -45,6 +46,7 @@ export function LegRoute({ task }: { task: Pick<TaskView, "from" | "to"> }) {
 }
 
 export function LegBadges({ task }: { task: TaskView }) {
+  const codOffered = useCodOffered();
   const { locale } = useLocale();
   const fr = locale === "fr";
   return (
@@ -52,7 +54,7 @@ export function LegBadges({ task }: { task: TaskView }) {
       <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
       <Badge variant={legStatusVariant(task.status)}>{pickL(LEG_STATUS[task.status], fr)}</Badge>
       {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
-      {task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}
+      {codOffered && task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}
       {task.collectOld && <Badge variant="info">{fr ? "Reprise de l'ancien article" : "Collect the old unit"}</Badge>}
       {runBadgeText(task, fr) && <Badge variant="purple">{runBadgeText(task, fr)}</Badge>}
     </>

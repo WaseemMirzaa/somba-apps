@@ -57,8 +57,13 @@ export default function WarehouseSettingsPage() {
 
       <DetailSection title={fr ? "Livraison et paiement" : "Delivery and payment"}>
         <InfoGrid items={[
-          { label: fr ? "Paiement à la livraison (COD)" : "Cash on delivery (COD)", value: settings ? <Badge variant={settings.codEnabled === "true" ? "success" : "warning"}>{settings.codEnabled === "true" ? (fr ? "Activé" : "Enabled") : (fr ? "Désactivé" : "Disabled")}</Badge> : "…" },
-          { label: fr ? "Plafond COD" : "COD cap", value: settings?.codCapUsd ? formatCurrency(Number(settings.codCapUsd), locale) : "—" },
+          // Cash on delivery is shown only while it is offered (`codEnabled`); when it is off nothing about it appears.
+          ...(settings?.codEnabled === "true"
+            ? [
+                { label: fr ? "Paiement à la livraison (COD)" : "Cash on delivery (COD)", value: <Badge variant="success">{fr ? "Activé" : "Enabled"}</Badge> },
+                { label: fr ? "Plafond COD" : "COD cap", value: settings?.codCapUsd ? formatCurrency(Number(settings.codCapUsd), locale) : "—" },
+              ]
+            : []),
           { label: fr ? "Code de remise obligatoire" : "Delivery code required", value: settings ? (settings.requireDeliveryCode === "true" ? yes : no) : "…" },
           ...(settings?.hubAddress ? [{ label: fr ? "Adresse du hub" : "Hub address", value: settings.hubAddress, full: true }] : []),
         ]} />

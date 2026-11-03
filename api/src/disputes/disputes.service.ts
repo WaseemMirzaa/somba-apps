@@ -26,6 +26,7 @@ import type {
 } from '../database/entities';
 import { cleanAttachments, firstName, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
+import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { SettingsService } from '../content/settings.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -94,6 +95,8 @@ interface Viewer {
   id: string;
   role: string;
   name?: string;
+  /** Warehouse staff only: the warehouse they belong to. A return is theirs when it is received there. */
+  hubId?: string | null;
 }
 
 @Injectable()
@@ -265,9 +268,22 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return (await this.sellerUsersOf(d)).includes(user.id);
   }
 
+  /**
+   * The warehouse a return belongs to: where the rider brings the goods from the customer (the return pickup's receiving
+   * warehouse), or the order's destination warehouse while no pickup exists. Null when neither is known.
+   */
+  async hubOfReturn(d: Pick<Dispute, 'pickupTaskId' | 'orderId'>): Promise<string | null> {
+    if (d.pickupTaskId) {
+      const t = await this.tasks.findOne({ where: { id: d.pickupTaskId }, select: ['id', 'hubId', 'toHubId'] });
+      if (t) return t.toHubId ?? t.hubId ?? null;
+    }
+    return (await this.orders.findOne({ where: { id: d.orderId }, select: ['id', 'destinationHubId'] }))?.destinationHubId ?? null;
+  }
+
   private async canSee(user: Viewer, d: Dispute): Promise<boolean> {
     if (user.role.startsWith('admin')) return true;
-    if (user.role === 'warehouse_staff') return d.type === 'return';
+    // Warehouse staff see the returns of their own warehouse only (their customers' names and addresses are in them).
+    if (user.role === 'warehouse_staff') return d.type === 'return' && !!user.hubId && (await this.hubOfReturn(d)) === user.hubId;
     if (d.customerId === user.id) return true;
     return this.isSellerOf(user, d);
   }
@@ -285,7 +301,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   private async publish(dispute: Dispute, event: 'dispute:created' | 'dispute:updated'): Promise<DisputeView> {
     const [view] = await this.present([dispute]);
     this.emitter.toUser(dispute.customerId, event, view);
-    this.emitter.toRoles(dispute.type === 'return' ? [...ADMIN_ROLES, 'warehouse_staff'] : ADMIN_ROLES, event, view);
+    this.emitter.toRoles(ADMIN_ROLES, event, view);
+    // A return also goes to the staff of the warehouse it belongs to, and to nobody else's.
+    if (dispute.type === 'return') {
+      const hub = await this.hubOfReturn(dispute);
+      if (hub) this.emitter.toHub(hub, event, view);
+    }
     for (const id of await this.sellerUsersOf(dispute)) this.emitter.toUser(id, event, DisputesService.forSeller(view, id));
     return view;
   }
@@ -502,7 +523,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (user.role.startsWith('admin')) {
       // everything
     } else if (user.role === 'warehouse_staff') {
-      qb.andWhere("d.type = 'return'");
+      // Only the returns that arrive at their own warehouse (no warehouse on the account: none).
+      qb.andWhere(
+        "d.type = 'return' AND :hub <> '' AND (d.pickupTaskId IN (SELECT t.id FROM delivery_tasks t WHERE COALESCE(t.toHubId, t.hubId) = :hub) " +
+          'OR (d.pickupTaskId IS NULL AND d.orderId IN (SELECT o.id FROM orders o WHERE o.destinationHubId = :hub)))',
+        { hub: user.hubId ?? '' },
+      );
     } else if (user.role === 'seller') {
       const keys = await sellerKeys(user.id, this.sellers);
       // Their store's requests, their own purchases, and requests that name no store on an order holding their goods
@@ -844,8 +870,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
    * back while the goods are still with the customer. `restock` (the desk's old button) also puts everything back on
    * the shelf as resellable; the logistics scan-in calls {@link onReturnReceived} and grades afterwards.
    */
-  async markReceived(disputeId: string, restock = true): Promise<DisputeView> {
-    const dispute = await this.disputes.findOne({ where: { id: disputeId } });
+  async markReceived(disputeId: string, restock = true, actor?: Viewer): Promise<DisputeView> {
+    // With an actor (the desk), the return must be one that person may see: staff reach their own warehouse's returns only.
+    const dispute = actor ? await this.loadFor(actor, disputeId) : await this.disputes.findOne({ where: { id: disputeId } });
     if (!dispute) throw new NotFoundException('Dispute not found.');
     if (dispute.type !== 'return') throw new BadRequestException('Only returns have goods to receive.');
     if (dispute.status !== 'open') throw new BadRequestException('This request was already handled.');
@@ -884,9 +911,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     grades: { itemId: string; condition: string; restockQty?: number }[],
     note?: unknown,
   ): Promise<DisputeView> {
-    if (user.role !== 'warehouse_staff' && !user.role.startsWith('admin')) throw new BadRequestException('Warehouse staff only.');
-    const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
-    if (!d) throw new NotFoundException('Dispute not found.');
+    if (user.role !== 'warehouse_staff' && !RETURNS_DESK_ADMINS.includes(user.role)) throw new BadRequestException('Warehouse staff only.');
+    // Staff grade the returns of their own warehouse only; the same answer for "missing" and "not yours".
+    const d = await this.loadFor(user, id);
     if (d.type !== 'return') throw new BadRequestException('Only returns have goods to grade.');
     if (!d.receivedAt) throw new BadRequestException('Receive the returned goods first.');
     if (d.gradedAt) throw new BadRequestException('These goods were already graded.');

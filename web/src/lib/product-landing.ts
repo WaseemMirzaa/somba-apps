@@ -545,8 +545,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept mobile money (Airtel, Orange, M-Pesa) and your Somba wallet, and cash on delivery where enabled. An account is required to place an order.",
-    aFr: "Mobile money (Airtel, Orange, M-Pesa) et portefeuille Somba, et paiement à la livraison lorsqu'il est activé. Un compte est nécessaire pour commander.",
+    a: "We accept mobile money (Airtel, Orange, M-Pesa) and your Somba wallet. An account is required to place an order.",
+    aFr: "Mobile money (Airtel, Orange, M-Pesa) et portefeuille Somba. Un compte est nécessaire pour commander.",
   },
   {
     q: "How long does delivery take?",

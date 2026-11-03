@@ -18,6 +18,7 @@ import { LEG_KIND, LEG_KINDS, LEG_STATUS, pickL } from "@/lib/logistics";
 import { isOpenLeg, riderLabel, useDeskQueue, useHubScope } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
+import { useCodOffered } from "@/lib/use-cod-offered";
 import {
   BATCH_STATUS,
   EXCEPTION_TYPE,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/warehouse-live";
 
 export default function WarehouseAnalyticsPage() {
+  const codOffered = useCodOffered();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const ops = useOpsPath();
@@ -122,7 +124,7 @@ export default function WarehouseAnalyticsPage() {
           icon={Percent}
         />
         <StatCard title={fr ? "Colis ouverts > 24 h" : "Open parcels > 24 h"} value={an ? num(an.agedOver24h) : "…"} icon={AlertTriangle} />
-        <StatCard title={fr ? "COD à encaisser" : "COD to collect"} value={an ? formatCurrency(an.codToCollect, locale) : "…"} icon={Banknote} />
+        {codOffered && <StatCard title={fr ? "COD à encaisser" : "COD to collect"} value={an ? formatCurrency(an.codToCollect, locale) : "…"} icon={Banknote} />}
       </div>
       {an && (
         <p className="-mt-3 text-xs text-slate-500">

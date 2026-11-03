@@ -343,7 +343,30 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   a = await req(admin.sock, 'disputes:resolve', { disputeId: r4.id, refund: true });
   ok(!a.ok && /received/i.test(a.error ?? ''), 'a refund is refused until the goods are received', a.error ?? '');
   ok(!(await req(cust.sock, 'disputes:markReceived', { disputeId: r4.id })).ok, 'a customer cannot mark their own return received');
-  ok((await req(warehouse.sock, 'disputes:markReceived', { disputeId: r4.id })).ok, 'the warehouse marks it received');
+  // Round 2: the returns desk is the Super Admin, Operations and the supervisors/managers of the return's own warehouse.
+  const supLimete = await login('warehouse.limete@somba.app', process.env.WAREHOUSE_PW ?? PW);
+  const opsAdmin = await login('ops@somba.app', process.env.OPS_PW ?? PW);
+  for (const [name, u] of Object.entries({ support: agent, finance, moderation: mod })) {
+    a = await req(u.sock, 'disputes:markReceived', { disputeId: r4.id });
+    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot receive returned goods`, a.error ?? 'was allowed');
+    a = await req(u.sock, 'returns:grade', { id: r4.id, grades: [{ itemId: r4.items[0].id, condition: 'resellable' }] });
+    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot grade returned goods`, a.error ?? 'was allowed');
+  }
+  ok(!((await req(supLimete.sock, 'disputes:list')).data ?? []).some((d) => d.id === r4.id), "a supervisor of another warehouse does not see this warehouse's return in the list");
+  ok(!((await req(supLimete.sock, 'returns:list')).data ?? []).some((d) => d.id === r4.id), 'nor in the returns list');
+  ok(!(await req(supLimete.sock, 'disputes:get', { id: r4.id })).ok, 'nor can they open it');
+  a = await req(supLimete.sock, 'disputes:markReceived', { disputeId: r4.id });
+  ok(!a.ok && /not found/i.test(a.error ?? ''), "nor receive it (it looks like it does not exist)", a.error ?? 'was allowed');
+  a = await req(supLimete.sock, 'returns:grade', { id: r4.id, grades: [{ itemId: r4.items[0].id, condition: 'resellable' }] });
+  ok(!a.ok && /not found/i.test(a.error ?? ''), 'nor grade it', a.error ?? 'was allowed');
+  ok((await sql('SELECT receivedAt FROM disputes WHERE id = ?', [r4.id]))[0].receivedAt === null, 'so the return is still not received');
+  ok(((await req(warehouse.sock, 'disputes:list')).data ?? []).some((d) => d.id === r4.id), 'the warehouse it belongs to sees it');
+  ok(((await req(opsAdmin.sock, 'disputes:list')).data ?? []).some((d) => d.id === r4.id), 'and so does Operations');
+  ok((await req(warehouse.sock, 'disputes:markReceived', { disputeId: r4.id, restock: false })).ok, 'the warehouse marks it received');
+  a = await req(opsAdmin.sock, 'returns:grade', { id: r4.id, grades: [{ itemId: r4.items[0].id, condition: 'resellable' }] });
+  ok(a.ok && !!a.data.gradedAt, 'Operations can grade it', a.error ?? '');
+  supLimete.sock.close();
+  opsAdmin.sock.close();
   a = await req(admin.sock, 'disputes:resolve', { disputeId: r4.id, refund: true });
   ok(a.ok && a.data.status === 'resolved', 'finance resolves it with the refund', a.error ?? '');
 

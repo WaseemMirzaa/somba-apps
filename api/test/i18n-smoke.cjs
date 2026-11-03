@@ -372,7 +372,7 @@ const settled = async (sock, id) => until(async () => {
   section('roles:defs serves a French scope for every role');
   a = await req(guest.sock, 'roles:defs');
   ok(a.ok && a.data.length >= 8 && a.data.every((d) => typeof d.scopeFr === 'string' && d.scopeFr.trim() && d.scopeFr !== d.scope), 'every role definition has scope and scopeFr', JSON.stringify(a.data?.[0]));
-  ok(a.data.find((d) => d.key === 'rider')?.scopeFr === 'Livraisons, GPS, gains', 'with proper French ("Livraisons, GPS, gains")');
+  ok(a.data.find((d) => d.key === 'rider')?.scopeFr === 'Livraisons, GPS, statistiques', 'with proper French ("Livraisons, GPS, statistiques")');
 
   section('Analytics lists carry French names');
   const mine12 = (await req(sellerU.sock, 'analytics:seller', { days: 30 })).data;

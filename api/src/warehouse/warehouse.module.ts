@@ -8,7 +8,6 @@ import {
   Order,
   Product,
   Setting,
-  StockTransfer,
   User,
   WarehouseBatch,
   WarehouseException,
@@ -27,7 +26,6 @@ import { ProductsModule } from '../products/products.module';
     TypeOrmModule.forFeature([
       Hub,
       WarehouseBatch,
-      StockTransfer,
       DeliveryTask,
       Product,
       Order,

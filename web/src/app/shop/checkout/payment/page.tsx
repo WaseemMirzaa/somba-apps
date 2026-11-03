@@ -74,7 +74,8 @@ function PaymentContent() {
   const snapshot = useRef<CartLine[]>([]);
 
   // Default method: wallet when it covers the total, otherwise Airtel Money.
-  const chosen = method || (walletEnough ? "wallet" : "airtel_money");
+  // A cash-on-delivery pick falls back to the default once COD is no longer offered (the setting can change while the page is open).
+  const chosen = (method === "cod" && !settings.codEnabled ? "" : method) || (walletEnough ? "wallet" : "airtel_money");
   const mobile = isMobileMoneyMethod(chosen);
 
   const methods = useMemo(() => {

@@ -10,7 +10,6 @@ import {
   Hub,
   Order,
   Product,
-  StockTransfer,
   WarehouseBatch,
   WarehouseException,
 } from '../database/entities';
@@ -19,7 +18,7 @@ import type {
   ExceptionStatus,
   ExceptionType,
 } from '../database/entities';
-import { num, oneOf, str } from '../common/validate';
+import { oneOf, str } from '../common/validate';
 import { tasksOfHub } from '../logistics/hub-scope';
 import { HubsService } from '../logistics/hubs.service';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
@@ -29,16 +28,12 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 
-const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
-
 @Injectable()
 export class WarehouseService {
   constructor(
     @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
     @InjectRepository(WarehouseBatch)
     private readonly batches: Repository<WarehouseBatch>,
-    @InjectRepository(StockTransfer)
-    private readonly transfers: Repository<StockTransfer>,
     @InjectRepository(DeliveryTask)
     private readonly tasks: Repository<DeliveryTask>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
@@ -286,34 +281,5 @@ export class WarehouseService {
         lastHandoverAt: r.riderId ? (last.get(r.riderId) ?? null) : null,
       };
     });
-  }
-
-  listTransfers(): Promise<StockTransfer[]> {
-    return this.transfers.find({ order: { createdAt: 'DESC' }, take: 100 });
-  }
-
-  async createTransfer(data: Record<string, unknown>): Promise<StockTransfer> {
-    const fromHub = str(data?.fromHub, 'From hub', { max: 100 });
-    const toHub = str(data?.toHub, 'To hub', { max: 100 });
-    if (fromHub.toLowerCase() === toHub.toLowerCase()) throw new Error('Choose two different hubs.');
-    for (const h of await this.hubs.find({ where: { active: false } })) {
-      if ([fromHub, toHub].some((n) => n.toLowerCase() === h.name.trim().toLowerCase())) {
-        throw new Error(`${h.name} is deactivated and cannot take stock transfers.`);
-      }
-    }
-    // Only these fields are accepted; reference, status and ids are ours.
-    const transfer = await this.transfers.save(
-      this.transfers.create({
-        fromHub,
-        toHub,
-        sku: str(data?.sku, 'SKU', { max: 100 }),
-        productName: data?.productName ? str(data.productName, 'Product', { max: 200 }) : null,
-        qty: num(data?.qty, 'Quantity', { min: 1, max: 100000, int: true }),
-        reference: `TRF-${Date.now().toString().slice(-8)}`,
-        status: 'requested',
-      }),
-    );
-    this.emitter.toRoles(OPS_ROOMS, 'transfer:updated', transfer);
-    return transfer;
   }
 }

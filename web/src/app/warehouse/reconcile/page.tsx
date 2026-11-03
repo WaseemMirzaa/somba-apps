@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Banknote, Bike, HandCoins, Package } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +25,8 @@ import { formatCurrency } from "@/lib/utils";
  * COD cash per rider (`warehouse:reconcile`): what the delivered parcels were due to bring in, what the riders recorded
  * taking at the door, what the warehouse has received since and what each rider still holds. A supervisor or manager
  * records a hand-over (`cash:handover`): who received how much and when; it can be partial and never more than the rider
- * holds. The receipts are listed below (`cash:history`).
+ * holds. The receipts are listed below (`cash:history`). Shown only while cash on delivery is offered (`codEnabled`): when
+ * it is off the menu has no entry for it, and anyone who opens the address is sent back to the warehouse home.
  */
 type Row = ReconcileRow & { name: string };
 
@@ -32,6 +34,7 @@ export default function WarehouseReconcilePage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const base = useOpsBase();
+  const router = useRouter();
   const rt = useRealtime();
   const { toast } = useToast();
   const { riders } = useWarehouseData();
@@ -62,6 +65,11 @@ export default function WarehouseReconcilePage() {
       alive = false;
     };
   }, [rt.status, rt.user?.role]);
+
+  // COD is not offered: this page has nothing to show. Wait for the setting before deciding (null = still loading).
+  useEffect(() => {
+    if (codEnabled === false) router.replace(base);
+  }, [codEnabled, router, base]);
 
   const nameOf = (id: string) => (id === "unassigned" ? (fr ? "Sans livreur" : "No rider") : riders.find((x) => x.id === id)?.name ?? `Rider ${id.slice(0, 6).toUpperCase()}`);
   const rows: Row[] = useMemo(
@@ -105,6 +113,8 @@ export default function WarehouseReconcilePage() {
       setBusy(false);
     }
   }
+
+  if (codEnabled !== true) return null;
 
   return (
     <div className="space-y-6">

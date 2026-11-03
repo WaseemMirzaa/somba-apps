@@ -306,19 +306,59 @@ describe('cash on delivery: the cash record and the hand-over', () => {
       expect(live).toEqual(expect.arrayContaining([`user:${rider.id}`, `hub:${gombe.id}`]));
     });
 
-    it('lets any staff read the receipts of their own warehouse only; admins read all', async () => {
+    it('lets supervisors and managers read the receipts of their own warehouse only; admins read all', async () => {
       await deliver(await mkCodTask(40), 40);
       await cash.handOver(supervisor(gombe), { riderId: rider.id, amountUsd: 10 });
-      expect(await cash.history(operator(gombe))).toHaveLength(1);
-      expect(await cash.history(operator(limete))).toHaveLength(0);
+      expect(await cash.history(supervisor(gombe))).toHaveLength(1);
+      expect(await cash.history(manager(gombe))).toHaveLength(1);
+      expect(await cash.history(supervisor(limete))).toHaveLength(0);
       expect(await cash.history(admin)).toHaveLength(1);
       expect(await cash.history(admin, { hubId: limete.id })).toHaveLength(0);
       await expect(cash.history({ id: 'c', role: 'customer', name: 'C' })).rejects.toThrow('Staff only.');
     });
 
+    it('an operator cannot read the hand-over receipts (supervisor and above)', async () => {
+      await deliver(await mkCodTask(40), 40);
+      await cash.handOver(supervisor(gombe), { riderId: rider.id, amountUsd: 10 });
+      await expect(cash.history(operator(gombe))).rejects.toThrow('Only supervisors and managers can see cash hand-overs.');
+      await expect(cash.history({ ...operator(gombe), tier: null })).rejects.toThrow('Only supervisors and managers');
+    });
+
+    it('only the Super Admin, Finance and Operations admins touch rider cash; support, marketing and moderation are refused', async () => {
+      await deliver(await mkCodTask(40), 40);
+      const as = (role: string): Actor => ({ id: `x-${role}`, role, name: role, hubId: null, tier: null });
+      for (const role of ['admin_support', 'admin_marketing', 'admin_moderation']) {
+        await expect(cash.history(as(role))).rejects.toThrow('Not allowed.');
+        await expect(cash.handOver(as(role), { riderId: rider.id, amountUsd: 5 })).rejects.toThrow('Not allowed.');
+      }
+      expect((await cash.balance(rider.id)).handedOverUsd).toBe(0);
+      expect(await ds.getRepository(CodHandover).count()).toBe(0);
+      for (const role of ['admin', 'admin_finance', 'admin_operations']) {
+        await expect(cash.history(as(role))).resolves.toEqual(expect.any(Array));
+      }
+      await cash.handOver(as('admin_finance'), { riderId: rider.id, amountUsd: 5 });
+      await cash.handOver(as('admin_operations'), { riderId: rider.id, amountUsd: 5 });
+      expect((await cash.balance(rider.id)).handedOverUsd).toBe(10);
+    });
+
+    it('an operator cannot record a hand-over, and a supervisor of another warehouse cannot take this warehouse’s rider cash', async () => {
+      await deliver(await mkCodTask(40), 40);
+      await expect(cash.handOver(operator(gombe), { riderId: rider.id, amountUsd: 5 })).rejects.toThrow('Only supervisors and managers');
+      await expect(cash.handOver(supervisor(limete), { riderId: rider.id, amountUsd: 5 })).rejects.toThrow('belongs to another warehouse');
+      expect((await cash.balance(rider.id)).handedOverUsd).toBe(0);
+    });
+
+    it('the live cash update goes to the cash admins, the warehouse and the rider, not to every admin role', async () => {
+      await deliver(await mkCodTask(40), 40);
+      await cash.handOver(supervisor(gombe), { riderId: rider.id, amountUsd: 10 });
+      const live = emitter.sent.filter((e) => e.event === 'cash:updated').map((e) => e.to);
+      const roleTargets = live.filter((t) => t.includes('admin')).join(',').split(',');
+      expect(roleTargets.sort()).toEqual(['admin', 'admin_finance', 'admin_operations']);
+    });
+
     it('the warehouse count sheet shows due, collected, handed in and held per rider', async () => {
       const warehouse = new WarehouseService(
-        ds.getRepository(Hub), {} as never, {} as never, ds.getRepository(DeliveryTask), {} as never, ds.getRepository(Order),
+        ds.getRepository(Hub), {} as never, ds.getRepository(DeliveryTask), {} as never, ds.getRepository(Order),
         ds.getRepository(WarehouseException), emitter as never, {} as never, {} as never, {} as never, {} as never,
       );
       await deliver(await mkCodTask(40), 40);

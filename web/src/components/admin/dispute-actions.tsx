@@ -32,6 +32,8 @@ export function DisputeActions({ dispute }: { dispute: DisputeRow }) {
   const rt = useRealtime();
   const role = useRole();
   const mayRefund = canMoveMoney(role);
+  // Receiving returned goods is the returns desk's job (the server refuses everyone else): the Super Admin and Operations.
+  const mayReceive = role === "admin" || role === "admin_operations";
   const [mode, setMode] = useState<Mode>(null);
   const [note, setNote] = useState("");
   const [outcome, setOutcome] = useState<Outcome>(mayRefund ? "refund_full" : "replacement");
@@ -168,7 +170,7 @@ export function DisputeActions({ dispute }: { dispute: DisputeRow }) {
             <Button size="sm" variant="reject" onClick={() => start("refuse")}>{fr ? "Refuser" : "Refuse"}</Button>
           </>
         )}
-        {isReturn && !received && !undecided && (
+        {isReturn && !received && !undecided && mayReceive && (
           <Button size="sm" variant="secondary" onClick={() => start("received")}>
             {fr ? "Marquer reçu à l'entrepôt" : "Mark goods received at warehouse"}
           </Button>

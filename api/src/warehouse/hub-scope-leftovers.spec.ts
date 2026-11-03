@@ -44,7 +44,6 @@ describe('hub scoping of orders, incidents and inventory', () => {
     warehouse = new WarehouseService(
       ds.getRepository(Hub),
       {} as never,
-      {} as never,
       ds.getRepository(DeliveryTask),
       ds.getRepository(Product),
       ds.getRepository(Order),
