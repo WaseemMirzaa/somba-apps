@@ -16,6 +16,10 @@ export { Payment } from './payment.entity';
 export type { PaymentStatus, PaymentPurpose } from './payment.entity';
 export { PaymentRefund } from './payment-refund.entity';
 export { CodHandover } from './cod-handover.entity';
+export { WarehouseBin } from './warehouse-bin.entity';
+export { WarehouseStock } from './warehouse-stock.entity';
+export { WarehouseLedger, LEDGER_KINDS, RECEIVE_REASONS, OUT_REASONS } from './warehouse-ledger.entity';
+export type { LedgerKind, LedgerReason } from './warehouse-ledger.entity';
 export type { RefundKind, RefundStatus } from './payment-refund.entity';
 export { Payout } from './payout.entity';
 export type { PayoutStatus } from './payout.entity';
@@ -102,6 +106,9 @@ import { WalletTransaction } from './wallet-transaction.entity';
 import { Payment } from './payment.entity';
 import { PaymentRefund } from './payment-refund.entity';
 import { CodHandover } from './cod-handover.entity';
+import { WarehouseBin } from './warehouse-bin.entity';
+import { WarehouseStock } from './warehouse-stock.entity';
+import { WarehouseLedger } from './warehouse-ledger.entity';
 import { Payout } from './payout.entity';
 import { PayoutStatementLine } from './payout-statement-line.entity';
 import { Dispute } from './dispute.entity';
@@ -161,6 +168,9 @@ export const ENTITIES = [
   Payment,
   PaymentRefund,
   CodHandover,
+  WarehouseBin,
+  WarehouseStock,
+  WarehouseLedger,
   Payout,
   PayoutStatementLine,
   Dispute,
