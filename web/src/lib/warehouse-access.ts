@@ -66,7 +66,7 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/custody", label: "custody", icon: Boxes, tier: T.operator, nav: true },
   { href: "/warehouse/runs", label: "transferRuns", icon: Truck, tier: T.operator, nav: true },
   { href: "/warehouse/tasks", label: "parcels", icon: Boxes, tier: T.operator, nav: false },
-  { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: false },
+  { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: true },
   { href: "/warehouse/notifications", label: "notifications", icon: Bell, tier: T.operator, nav: true },
   { href: "/warehouse/support", label: "support", icon: Headphones, tier: T.operator, nav: true },
   // Retired pages that only redirect to the desk: reachable by everyone so old links keep working.

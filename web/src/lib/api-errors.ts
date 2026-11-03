@@ -26,6 +26,33 @@ const EXACT: Record<string, string> = {
   "Too many requests — slow down.": "Trop de requêtes. Ralentissez un instant.",
   "Too many requests - slow down.": "Trop de requêtes. Ralentissez un instant.",
 
+  // ── warehouse stock ledger (docs/contracts/warehouse-stock.md) ──
+  "Enter a whole number of units, at least 1.": "Saisissez un nombre entier d'unités, au moins 1.",
+  "A bin code uses letters, digits and . _ / - (up to 40 characters).": "Un code d'emplacement utilise des lettres, des chiffres et . _ / - (40 caractères au maximum).",
+  "Choose a warehouse first.": "Choisissez d'abord un entrepôt.",
+  "Warehouse not found.": "Entrepôt introuvable.",
+  "Only operations administrators and warehouse staff can change warehouse stock.": "Seuls les administrateurs des opérations et le personnel d'entrepôt peuvent modifier le stock de l'entrepôt.",
+  "That bin does not exist in this warehouse. Ask a supervisor to create it.": "Cet emplacement n'existe pas dans cet entrepôt. Demandez à un superviseur de le créer.",
+  "Choose a bin.": "Choisissez un emplacement.",
+  "Bin not found.": "Emplacement introuvable.",
+  "The receiving area cannot be switched off.": "La zone de réception ne peut pas être désactivée.",
+  "Parcel not found.": "Colis introuvable.",
+  "Product not found.": "Produit introuvable.",
+  "This parcel is not at your warehouse.": "Ce colis n'est pas dans votre entrepôt.",
+  "Scan the parcel in before putting it away.": "Enregistrez le colis à l'arrivée avant de le ranger.",
+  "This parcel has no lines that match a product, so it cannot be put away here. Use a manual receipt.": "Ce colis n'a aucune ligne correspondant à un produit : il ne peut pas être rangé ici. Utilisez une réception manuelle.",
+  "One of those lines is not on this parcel.": "Une de ces lignes ne figure pas sur ce colis.",
+  "Everything on this parcel is already in stock.": "Tout le contenu de ce colis est déjà en stock.",
+  "Choose a different bin to move the stock to.": "Choisissez un autre emplacement de destination.",
+  "Say why the stock is leaving in the note.": "Indiquez dans la note pourquoi le stock sort.",
+  "Count between 1 and 200 lines.": "Comptez entre 1 et 200 lignes.",
+  "The expected number is invalid.": "Le nombre attendu est invalide.",
+  "This bin was just updated. Refresh and try again.": "Cet emplacement vient d'être mis à jour. Actualisez et réessayez.",
+  "This request reference was already used.": "Cette référence de requête a déjà été utilisée.",
+  "A request reference is at most 64 characters.": "Une référence de requête fait 64 caractères au maximum.",
+  "Keep the note under 200 characters.": "Gardez la note sous 200 caractères.",
+  "That code is too long.": "Ce code est trop long.",
+
   // ── cash on delivery (C-cod) ──
   "Only supervisors and managers can record a rider's cash hand-over.": "Seuls les superviseurs et les responsables peuvent enregistrer la remise d'espèces d'un livreur.",
   "This rider belongs to another warehouse.": "Ce livreur appartient à un autre entrepôt.",
@@ -354,6 +381,19 @@ const AREA_LEVEL_ADD_FR: Record<string, string> = { country: "un pays", province
 const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 
 const PATTERNS: Rule[] = [
+  // ── warehouse stock ledger ──
+  [/^Bin (.+) holds only (\d+) of (.+): you cannot take (\d+)\.$/, (m) => `L'emplacement ${m[1]} ne contient que ${m[2]} × ${m[3]} : vous ne pouvez pas en prendre ${m[4]}.`],
+  [/^Bin (.+) holds no (.+)\.$/, (m) => `L'emplacement ${m[1]} ne contient aucun ${m[2]}.`],
+  [/^Bin (.+) is switched off\. Choose another bin\.$/, (m) => `L'emplacement ${m[1]} est désactivé. Choisissez-en un autre.`],
+  [/^Bin (.+) already exists in this warehouse\.$/, (m) => `L'emplacement ${m[1]} existe déjà dans cet entrepôt.`],
+  [/^Bin (.+) still holds stock\. Move it or count it out first\.$/, (m) => `L'emplacement ${m[1]} contient encore du stock. Déplacez-le ou sortez-le d'abord.`],
+  [/^(.+) from this parcel is already in stock\.$/, (m) => `${m[1]} de ce colis est déjà en stock.`],
+  [/^This parcel carries (\d+) more of (.+): you cannot put away (\d+)\.$/, (m) => `Ce colis contient encore ${m[1]} × ${m[2]} : vous ne pouvez pas en ranger ${m[3]}.`],
+  [/^Reason must be one of: .+\.$/, () => "Le motif n'est pas valide."],
+  [/^Enter the counted number of (.+) \(0 or more\)\.$/, (m) => `Saisissez la quantité comptée de ${m[1]} (0 ou plus).`],
+  [/^(.+) is on the sheet twice\.$/, (m) => `${m[1]} figure deux fois sur la feuille.`],
+  [/^(.+) in bin (.+) changed while you were counting \(now (\d+)\)\. Refresh and count again\.$/, (m) => `${m[1]} dans l'emplacement ${m[2]} a changé pendant le comptage (maintenant ${m[3]}). Actualisez et recomptez.`],
+  [/^(.+) in bin (.+) was just updated\. Refresh and count again\.$/, (m) => `${m[1]} dans l'emplacement ${m[2]} vient d'être mis à jour. Actualisez et recomptez.`],
   [/^(.+) holds no cash to hand in\.$/, (m) => `${m[1]} ne détient aucune espèce à remettre.`],
   [/^(.+) holds \$([\d.,]+): you cannot record \$([\d.,]+)\.$/, (m) => `${m[1]} détient ${m[2]} $ : vous ne pouvez pas enregistrer ${m[3]} $.`],
   [/^Confirm the cash you collected: \$([\d.,]+) is due on this delivery\.$/, (m) => `Confirmez les espèces encaissées : ${m[1]} $ sont dus pour cette livraison.`],
