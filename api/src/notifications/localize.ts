@@ -327,6 +327,7 @@ const TITLES: Record<string, string> = {
   'New message from the seller': 'Nouveau message du vendeur',
   'Two-factor authentication enabled': 'Authentification à deux facteurs activée',
   'Two-factor authentication disabled': 'Authentification à deux facteurs désactivée',
+  'Two-factor authentication reset': 'Authentification à deux facteurs réinitialisée',
   'Vacation mode ended': 'Fin du mode vacances',
   'Seller badge updated': 'Badge vendeur mis à jour',
 };
@@ -356,6 +357,7 @@ const BODIES: Rule[] = [
   [/^(.+) left your store team\.$/, (m) => `${m[1]} a quitté l’équipe de votre boutique.`],
   [/^Signing in to your account now asks for a code from your authenticator app\.$/, () => 'La connexion à votre compte demande maintenant un code de votre application d’authentification.'],
   [/^Two-factor authentication was turned off on your account\.$/, () => 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
+  [/^A super admin reset two-factor authentication on your account\. Sign in again and set it up again\.$/, () => 'Un super admin a réinitialisé l’authentification à deux facteurs de votre compte. Reconnectez-vous et configurez-la de nouveau.'],
   [/^Your store is open again and takes new orders\.$/, () => 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.'],
   [/^Your store badge is now (\w+) \(was (\w+)\)\.$/, (m) => `Le badge de votre boutique est maintenant ${pick(BADGES, m[1])} (avant : ${pick(BADGES, m[2])}).`],
   // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins

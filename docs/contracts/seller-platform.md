@@ -139,11 +139,12 @@ HMAC-SHA1, 30 s steps, 6 digits, ±1 step tolerance, a code works once. Secret e
 
 | event | payload → data |
 |---|---|
-| `auth:2fa:status` | `{}` → `{ enabled, pending, recoveryRemaining, required }` (`required`: the platform requires it for this account) |
+| `auth:2fa:status` | `{}` → `{ enabled, pending, recoveryRemaining, required, requiredFor }` (`required`: the platform requires it for this account; `requiredFor`: `'seller'`, `'staff'` or `null`) |
 | `auth:2fa:setup` | `{}` → `{ secret, otpauthUrl, issuer, account }` (render a QR of `otpauthUrl`; nothing is enforced yet) |
 | `auth:2fa:enable` | `{ code }` → `{ enabled: true, recoveryCodes: string[] }` (**shown once**) |
 | `auth:2fa:disable` | `{ code }` (TOTP or recovery code) → `{ enabled: false }`; refused for a seller owner while `seller2faRequired` is on |
 | `auth:2fa:recovery` | `{ code }` → `{ recoveryCodes }` (new set; the old ones stop working) |
+| `auth:2fa:reset` | `{ userId }` → `{ id, twofaEnabled: false }`. **Super admin only.** Switches off another staff member's 2FA (admin roles, warehouse staff, riders; never yourself, never customers or sellers), signs them out everywhere (`tokenVersion`), drops their sockets, sends a security notice, audits `staff.2fa.reset` |
 
 Every `user` object (`/auth/me`, login, `ready`, `me:get`) now carries `twofaEnabled`.
 
@@ -156,10 +157,17 @@ Five wrong codes lock the account's 2FA attempts for 10 minutes (HTTP 429 `Too m
 `seller2faRequired` (admin setting, `true|false`, default off): store owners without 2FA can sign in and use `sellers:mine`, `team:me`, `auth:2fa:*`
 but every other seller call returns the "Two-factor authentication is required…" error until they enable it.
 
+**Staff** (admin roles) use the same events and the same sign-in step-up; the admin account page (`/admin/account`) is the enrolment screen.
+`requireStaffTwoFactor` (admin setting, default off, **only the super admin can change it, and only once their own 2FA is on**): an admin
+account without 2FA can sign in but every socket event except `auth:*`, `me:*`, `notifications:*`, `devices:*` and `settings:get` is answered
+`{ ok: false, error: "Two-factor authentication is required for staff accounts…", code: "twofa_required" }` (a Socket.IO packet middleware in
+`SocketIoAdapter`, so it covers every gateway). Staff cannot turn their own 2FA off while it is required. Customers, sellers, riders and warehouse
+staff are not affected by this setting.
+
 Errors: `That code is not right. Check the time on your phone and try again.` · `Two-factor authentication is already on. Turn it off first to set it up again.` ·
 `Start the setup first.` · `Two-factor authentication is not on.` · `Two-factor authentication is not on for this account.` ·
 `This sign-in expired. Enter your password again.` · `Two-factor authentication is required for seller accounts and cannot be turned off.`
-Notices (type `security`): *Two-factor authentication enabled / disabled*.
+Notices (type `security`): *Two-factor authentication enabled / disabled / reset*.
 
 ---
 

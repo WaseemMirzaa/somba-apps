@@ -232,9 +232,13 @@ export function TwoFactorCard() {
       {status.required && !status.enabled && (
         <p role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" data-testid="twofa-required">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          {fr
-            ? "L'authentification à deux facteurs est obligatoire pour les comptes vendeur. Activez-la pour retrouver l'accès aux autres pages."
-            : "Two-factor authentication is required for seller accounts. Turn it on to get the other pages back."}
+          {status.requiredFor === "staff"
+            ? fr
+              ? "L'authentification à deux facteurs est obligatoire pour le personnel. Activez-la pour retrouver l'accès aux autres pages."
+              : "Two-factor authentication is required for staff accounts. Turn it on to get the other pages back."
+            : fr
+              ? "L'authentification à deux facteurs est obligatoire pour les comptes vendeur. Activez-la pour retrouver l'accès aux autres pages."
+              : "Two-factor authentication is required for seller accounts. Turn it on to get the other pages back."}
         </p>
       )}
       <div className="flex items-center gap-3">

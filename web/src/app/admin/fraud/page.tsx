@@ -20,22 +20,11 @@ import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { errMsg } from "@/lib/admin-live";
 import { canSuspendAccounts, fraudDialogText, type FraudDialogMode } from "@/lib/fraud-block";
+import { fraudReason, fraudTypeLabel } from "@/lib/fraud-alerts";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
 const SEVERITY_FR: Record<string, string> = { low: "Faible", medium: "Moyenne", high: "Élevée" };
 const STATUS_FR: Record<string, string> = { open: "Ouvert", reviewed: "Examiné", blocked: "Bloqué" };
-const TYPE_FR: Record<string, string> = {
-  cod_risk: "Risque de paiement",
-  otp_fail: "Échec OTP",
-  velocity: "Vélocité",
-  address_block: "Blocage d'adresse",
-};
-const TYPE_EN: Record<string, string> = {
-  cod_risk: "Payment risk",
-  otp_fail: "OTP fail",
-  velocity: "Velocity",
-  address_block: "Address block",
-};
 const STATUS_OPTIONS = [
   { value: "open", label: "Open", labelFr: "Ouvert" },
   { value: "reviewed", label: "Reviewed", labelFr: "Examiné" },
@@ -89,7 +78,7 @@ export default function AdminFraudPage() {
   const filtered = useMemo(
     () =>
       applyListFilters(fraudAlerts, filters, {
-        searchFields: ["id", "customer", "orderId", "type"],
+        searchFields: ["id", "customer", "orderId", "type", "reason", "reasonFr"],
         dateField: "date",
         statusField: "status",
       }),
@@ -98,7 +87,7 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur (ex. commandes COD au-dessus du plafond) — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server (e.g. COD orders above the cap) — review them; blocking suspends the customer's account"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? "Alertes levées par le serveur avec leur raison (paiements échoués, comptes récents, téléphone ou appareil partagé, retours, changements d'adresse) — examinez-les ; bloquer suspend le compte du client" : "Alerts raised by the server, each with its reason (failed payments, new accounts, shared phone or device, returns, address changes) — review them; blocking suspends the customer's account"} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />
@@ -122,7 +111,8 @@ export default function AdminFraudPage() {
           <DataTable
             columns={[
               { key: "id", label: fr ? "Alerte" : "Alert" },
-              { key: "type", label: t("type"), render: (r) => <Badge>{fr ? (TYPE_FR[String(r.type)] ?? String(r.type).replace("_", " ")) : (TYPE_EN[String(r.type)] ?? String(r.type).replace("_", " "))}</Badge> },
+              { key: "type", label: t("type"), render: (r) => <Badge>{fraudTypeLabel(String(r.type), fr)}</Badge> },
+              { key: "reason", label: fr ? "Raison" : "Reason", render: (r) => <span className="block max-w-xs text-sm text-slate-700" data-testid="fraud-reason">{fraudReason(r as { reason?: string | null; reasonFr?: string | null }, fr)}</span> },
               { key: "customer", label: t("customer"), render: (r) => <span>{String(r.customer)}</span> },
               { key: "orderId", label: fr ? "Commande" : "Order", render: (r) => r.orderId ? <Link href={`/admin/orders/${r.orderId}`} className="text-[var(--primary)]">{String(r.orderId)}</Link> : "—" },
               { key: "score", label: "Score", render: (r) => <span className="font-bold text-red-600">{String(r.score)}</span> },

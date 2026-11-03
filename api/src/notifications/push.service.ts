@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 import { DeviceToken, User } from '../database/entities';
 import type { DeviceApp, DevicePlatform } from '../database/entities';
+import { FraudSignalsService } from '../ops/fraud-signals.service';
 
 export interface PushPayload {
   title: string;
@@ -65,6 +66,8 @@ export class PushService {
   constructor(
     @InjectRepository(DeviceToken)
     private readonly tokens: Repository<DeviceToken>,
+    // Records which accounts used which device (the "same device on several accounts" fraud rule).
+    @Optional() private readonly fraudSignals?: FraudSignalsService,
   ) {}
 
   /** True when Firebase credentials are present and initialised. */
@@ -119,7 +122,9 @@ export class PushService {
     row.role = user.role;
     row.platform = input.platform ?? row.platform ?? 'android';
     row.app = input.app ?? row.app ?? 'customer';
-    return this.tokens.save(row);
+    const saved = await this.tokens.save(row);
+    if (user.role === 'customer') await this.fraudSignals?.noteDevice(user.id, token);
+    return saved;
   }
 
   /** Scoped to the owner so one user can't unregister another's device. */

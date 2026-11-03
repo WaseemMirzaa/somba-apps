@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { VerificationToken } from '../database/entities';
+import { Setting, User, VerificationToken } from '../database/entities';
+import { StaffTwoFaPolicy } from './staff-twofa';
 import { VerificationService } from './verification.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -14,7 +15,7 @@ import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([VerificationToken]),
+    TypeOrmModule.forFeature([VerificationToken, Setting, User]),
     UsersModule,
     NotificationsModule,
     PassportModule,
@@ -30,7 +31,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, VerificationService, TwoFaService],
-  exports: [AuthService, VerificationService, TwoFaService],
+  providers: [AuthService, JwtStrategy, VerificationService, TwoFaService, StaffTwoFaPolicy],
+  exports: [AuthService, VerificationService, TwoFaService, StaffTwoFaPolicy],
 })
 export class AuthModule {}

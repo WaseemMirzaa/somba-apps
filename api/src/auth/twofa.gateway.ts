@@ -1,10 +1,14 @@
-import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import type { Server } from 'socket.io';
 import { SettingsService } from '../content/settings.service';
+import { AuditService } from '../ops/audit.service';
+import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { SellerContextService } from '../sellers/seller-context';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import type { AuthedSocket } from '../sellers/gateway-support';
 import { UsersService } from '../users/users.service';
 import { TwoFaService } from './twofa.service';
+import { StaffTwoFaPolicy, isStaff2faRole } from './staff-twofa';
 
 /**
  * Two-factor authentication events (docs/contracts/seller-platform.md §2). Same Socket.IO server as RealtimeGateway.
@@ -17,10 +21,16 @@ export class TwoFaGateway {
     private readonly users: UsersService,
     private readonly settings: SettingsService,
     private readonly sellerCtx: SellerContextService,
+    private readonly staffPolicy: StaffTwoFaPolicy,
+    private readonly audit: AuditService,
   ) {}
 
-  /** Is two-factor authentication mandatory for this account? (seller owners, when the platform switched it on). */
+  @WebSocketServer()
+  server: Server;
+
+  /** Is two-factor authentication mandatory for this account? (seller owners and staff, when the platform switched it on). */
   private async required(userId: string, role: string): Promise<boolean> {
+    if (isStaff2faRole(role)) return this.staffPolicy.required(role);
     if (role !== 'seller' || (await this.settings.get('seller2faRequired')) !== 'true') return false;
     return (await this.sellerCtx.membership(userId))?.member === 'owner';
   }
@@ -31,7 +41,7 @@ export class TwoFaGateway {
       const u = requireUser(client);
       const row = await this.users.findById(u.id);
       if (!row) return fail('Account not found.');
-      return ok({ ...this.twofa.status(row), required: await this.required(u.id, u.role) });
+      return ok({ ...this.twofa.status(row), required: await this.required(u.id, u.role), requiredFor: isStaff2faRole(u.role) ? 'staff' : u.role === 'seller' ? 'seller' : null });
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -62,7 +72,9 @@ export class TwoFaGateway {
   async disable(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { code?: string }) {
     try {
       const u = requireUser(client);
-      if (await this.required(u.id, u.role)) return fail('Two-factor authentication is required for seller accounts and cannot be turned off.');
+      if (await this.required(u.id, u.role)) {
+        return fail(isStaff2faRole(u.role) ? 'Two-factor authentication is required for staff accounts and cannot be turned off.' : 'Two-factor authentication is required for seller accounts and cannot be turned off.');
+      }
       return ok(await this.twofa.disable(u.id, String(body?.code ?? '')));
     } catch (e) {
       return fail((e as Error).message);
@@ -74,6 +86,23 @@ export class TwoFaGateway {
   async recovery(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { code?: string }) {
     try {
       return ok(await this.twofa.regenerateRecovery(requireUser(client).id, String(body?.code ?? '')));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * `{ userId }`: the super admin switches off another staff member's two-factor authentication (lost phone and recovery
+   * codes). The person is signed out everywhere and must set it up again; the reset is audited and the person is told.
+   */
+  @SubscribeMessage('auth:2fa:reset')
+  async reset(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { userId?: string }) {
+    try {
+      const u = requireUser(client);
+      const done = await this.twofa.resetForStaff(u, String(body?.userId ?? ''));
+      await this.audit.record({ actor: u.name, role: u.role, action: 'staff.2fa.reset', entity: 'user', entityId: done.id, detail: `${done.role} ${done.email}` });
+      this.server?.in(RealtimeEmitter.userRoom(done.id)).disconnectSockets(true); // their open sessions end now
+      return ok({ id: done.id, twofaEnabled: false });
     } catch (e) {
       return fail((e as Error).message);
     }

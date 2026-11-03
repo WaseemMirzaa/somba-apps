@@ -63,3 +63,19 @@ test("staff:setActive errors map to French in the portal too", () => {
   assert.equal(frenchServerMessage("Account not found."), "Compte introuvable.");
   assert.equal(englishServerMessage("Super admin only."), "Super admin only.");
 });
+
+test("staff two-factor and fraud-threshold errors map to French", () => {
+  assert.equal(
+    frenchServerMessage("Two-factor authentication is required for staff accounts. Turn it on under Account > Security to continue."),
+    "L'authentification à deux facteurs est obligatoire pour le personnel. Activez-la dans Compte > Sécurité pour continuer.",
+  );
+  assert.equal(
+    frenchServerMessage("Two-factor authentication is required for staff accounts and cannot be turned off."),
+    "L'authentification à deux facteurs est obligatoire pour le personnel et ne peut pas être désactivée.",
+  );
+  assert.match(frenchServerMessage("Only the super admin can change the staff two-factor requirement."), /^Seul le super administrateur/);
+  assert.match(frenchServerMessage("Turn on two-factor authentication on your own account first, or this requirement would lock you out."), /^Activez d'abord/);
+  assert.match(frenchServerMessage('Use "Turn off" on your own account page to change your own two-factor authentication.'), /^Utilisez « Désactiver »/);
+  assert.equal(frenchServerMessage("Only staff accounts can be reset here."), "Seuls les comptes du personnel peuvent être réinitialisés ici.");
+  assert.equal(frenchServerMessage("Fraud threshold must be a whole number between 2 and 100."), "Seuil de fraude : un nombre entier entre 2 et 100.");
+});

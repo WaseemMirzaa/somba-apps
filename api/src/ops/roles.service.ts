@@ -81,6 +81,7 @@ export class RolesService {
         active: u.active,
         hubId: u.hubId ?? null,
         warehouseTier: u.role === 'warehouse_staff' ? tierOf(u.warehouseTier) : null,
+        twofaEnabled: !!u.twofaEnabled,
       }));
   }
 

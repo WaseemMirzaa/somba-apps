@@ -170,15 +170,17 @@ describe('fraud:setStatus and customers:wallet (gateway)', () => {
   });
 
   it('only the roles behind customers:setActive can suspend: the fraud group\'s other roles are passed as unable', async () => {
-    // The fraud group is admin, finance, operations and moderation; of those only the super admin may suspend accounts.
+    // The fraud group is admin, finance, operations, moderation and support; of those only the super admin and support may suspend accounts.
     for (const role of ['admin_finance', 'admin_operations', 'admin_moderation']) {
       await gw.fraudSetStatus(as(role), { id: 'f1', status: 'reviewed' });
       expect(fraud.setStatus.mock.calls.at(-1)![2]).toMatchObject({ canSuspend: false, confirmed: false });
       // the same roles are refused by customers:setActive itself
       expect(await gw.customersSetActive(as(role), { id: 'c1', active: false })).toEqual({ ok: false, error: 'Not allowed.' });
     }
-    await gw.fraudSetStatus(as('admin'), { id: 'f1', status: 'reviewed' });
-    expect(fraud.setStatus.mock.calls.at(-1)![2]).toMatchObject({ canSuspend: true });
+    for (const role of ['admin', 'admin_support']) {
+      await gw.fraudSetStatus(as(role), { id: 'f1', status: 'reviewed' });
+      expect(fraud.setStatus.mock.calls.at(-1)![2]).toMatchObject({ canSuspend: true });
+    }
     for (const role of ['admin', 'admin_support']) {
       expect(await gw.customersSetActive(as(role), { id: 'c1', active: false })).toMatchObject({ ok: true });
     }
@@ -186,13 +188,26 @@ describe('fraud:setStatus and customers:wallet (gateway)', () => {
   });
 
   it('roles outside the fraud group and bad statuses are refused before the service is called; no kick without a block', async () => {
-    for (const role of ['admin_support', 'admin_marketing', 'customer', 'seller', 'rider', 'warehouse_staff']) {
+    for (const role of ['admin_marketing', 'customer', 'seller', 'rider', 'warehouse_staff']) {
       expect(await gw.fraudSetStatus(as(role), { id: 'f1', status: 'blocked', confirm: true })).toEqual({ ok: false, error: 'Not allowed.' });
     }
     expect(await gw.fraudSetStatus(as('admin'), { id: 'f1', status: 'nonsense' as never })).toMatchObject({ ok: false });
     expect(fraud.setStatus).not.toHaveBeenCalled();
     await gw.fraudSetStatus(as('admin'), { id: 'f1', status: 'reviewed' });
     expect(disconnectSockets).not.toHaveBeenCalled();
+  });
+
+  it('Support (which can suspend accounts) sees the alerts and can block; fraud:list is the same group', async () => {
+    const list = jest.fn(async () => [{ id: 'f1' }]);
+    Object.assign(gw, { fraud: { ...fraud, list } });
+    for (const role of ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support']) {
+      expect(await gw.fraudList(as(role))).toEqual({ ok: true, data: [{ id: 'f1' }] });
+    }
+    for (const role of ['admin_marketing', 'customer', 'seller', 'rider', 'warehouse_staff']) {
+      expect(await gw.fraudList(as(role))).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(await gw.fraudSetStatus(as('admin_support', 'sup1'), { id: 'f1', status: 'blocked', confirm: true })).toMatchObject({ ok: true });
+    expect(fraud.setStatus).toHaveBeenCalledWith('f1', 'blocked', { id: 'sup1', name: 'admin_support name', role: 'admin_support', canSuspend: true, confirmed: true });
   });
 
   it('a service refusal is the ack error and no socket is dropped', async () => {

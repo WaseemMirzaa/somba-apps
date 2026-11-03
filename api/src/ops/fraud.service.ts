@@ -36,6 +36,18 @@ export class FraudService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** The rules engine registers itself here when the app starts (it needs this service, so it cannot be injected back). */
+  private rules: { afterOrder(customer: { id: string; name: string }, order: { id: string; paymentMethod: string; totalUsd: number }): Promise<void> } | null = null;
+
+  useRules(rules: NonNullable<FraudService['rules']>): void {
+    this.rules = rules;
+  }
+
+  /** An order was just placed: run the fraud rules for its customer (the cash-on-delivery cap only while COD is offered). Never throws. */
+  async afterOrder(customer: { id: string; name: string }, order: { id: string; paymentMethod: string; totalUsd: number }): Promise<void> {
+    await this.rules?.afterOrder(customer, order);
+  }
+
   list(): Promise<FraudAlert[]> {
     return this.repo.find({ order: { createdAt: 'DESC' }, take: 200 });
   }
@@ -46,6 +58,7 @@ export class FraudService {
     orderId: string,
     amountUsd: number,
     capUsd: number,
+    customerId?: string,
   ): Promise<FraudAlert | null> {
     if (amountUsd <= capUsd) return null;
     const alert = await this.repo.save(
@@ -53,7 +66,10 @@ export class FraudService {
         type: 'cod_risk',
         severity: amountUsd > capUsd * 2 ? 'high' : 'medium',
         customer,
+        customerId: customerId ?? null,
         orderId,
+        reason: `Cash-on-delivery order of $${amountUsd.toFixed(2)} is above the $${capUsd.toFixed(2)} cap.`,
+        reasonFr: `Commande à payer à la livraison de ${amountUsd.toFixed(2)} $ au-dessus du plafond de ${capUsd.toFixed(2)} $.`,
         score: Math.min(99, Math.round((amountUsd / capUsd) * 40)),
         status: 'open',
       }),
@@ -62,8 +78,9 @@ export class FraudService {
     return alert;
   }
 
-  /** The account an alert is about: the customer of the order that raised it. */
+  /** The account an alert is about: the customer it names, or else the customer of the order that raised it. */
   private async accountOf(alert: FraudAlert): Promise<User | null> {
+    if (alert.customerId) return this.users.findOne({ where: { id: alert.customerId } });
     if (!alert.orderId) return null;
     const order = await this.orders.findOne({ where: { id: alert.orderId }, select: ['id', 'customerId'] });
     return order ? this.users.findOne({ where: { id: order.customerId } }) : null;
@@ -72,8 +89,8 @@ export class FraudService {
   /** Other alerts still blocking this account (through their orders). */
   private async otherBlocks(alertId: string, accountId: string): Promise<number> {
     const orderIds = (await this.orders.find({ where: { customerId: accountId }, select: ['id'] })).map((o) => o.id);
-    if (!orderIds.length) return 0;
-    return (await this.repo.find({ where: { status: 'blocked', orderId: In(orderIds) }, select: ['id'] })).filter((a) => a.id !== alertId).length;
+    const where = [{ status: 'blocked' as const, customerId: accountId }, ...(orderIds.length ? [{ status: 'blocked' as const, orderId: In(orderIds) }] : [])];
+    return (await this.repo.find({ where, select: ['id'] })).filter((a) => a.id !== alertId).length;
   }
 
   /**

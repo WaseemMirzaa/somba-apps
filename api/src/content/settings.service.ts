@@ -7,12 +7,13 @@ import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { num, oneOf, str } from '../common/validate';
 import { validatePlans } from './plans';
 import { cardPaymentsMode } from '../payments/stripe.config';
+import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
 export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
+const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', ...FRAUD_SETTING_KEYS] as const;
 
 /**
  * Key/value platform config: FX rate, COD cap, delivery fee numbers,
@@ -62,6 +63,7 @@ export class SettingsService {
       case 'codEnabled':
         return oneOf(String(value), ['true', 'false'] as const, 'COD flag');
       case 'seller2faRequired':
+      case 'requireStaffTwoFactor':
       case 'allowInterCityDelivery':
       case 'requireDeliveryCode':
       case 'requireVerifiedForCheckout':
@@ -92,8 +94,12 @@ export class SettingsService {
       case 'requirePinnedAddress':
       case 'requireSellerPickupPin':
         return oneOf(String(value), ['true', 'false'] as const, 'Pinned address flag');
-      default:
+      default: {
+        // Fraud-rule thresholds: whole numbers inside the range each rule allows (ops/fraud-rules.config.ts).
+        const rule = Object.values(FRAUD_THRESHOLDS).find((t) => t.key === key);
+        if (rule) return String(num(value, 'Fraud threshold', { min: rule.min, max: rule.max, int: true }));
         throw new Error('Unknown setting.');
+      }
     }
   }
 
