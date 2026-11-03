@@ -46,6 +46,16 @@ export class WarehouseOpsGateway {
     return { id: u.id, role: u.role, name: u.name, hubId: row.hubId, tier: tierOf(row.warehouseTier) };
   }
 
+  /** "Now" for a request. Outside production a test may pass `asOf` to move the clock (the aged-parcel job and board read it); in production it is ignored. */
+  private clock(asOf: unknown): Date {
+    if (typeof asOf === 'string' && asOf && process.env.NODE_ENV !== 'production') {
+      const at = new Date(asOf);
+      if (Number.isNaN(at.getTime())) throw new Error('asOf must be a date.');
+      return at;
+    }
+    return new Date();
+  }
+
   /** The warehouse a request is about: the staff member's own (a hub they pass is ignored); an admin names it (null = all, where allowed). */
   private hubOf(me: Actor, asked: unknown, required: boolean): string | null {
     if (me.hubId) return me.hubId;
@@ -82,11 +92,11 @@ export class WarehouseOpsGateway {
 
   /** For the aged-parcels page: the alert ages, the level each open leg has reached, when it was alerted, and the counts per level. Supervisors and above. */
   @SubscribeMessage('aged:summary')
-  async summary(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
+  async summary(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string; asOf?: string }) {
     try {
       const me = await this.actor(client);
       if (!tierAllows(me.role, me.tier, 'oversee')) return fail('Only supervisors and managers can see this.');
-      return ok(await this.aged.summary(this.hubOf(me, body?.hubId, false)));
+      return ok(await this.aged.summary(this.hubOf(me, body?.hubId, false), this.clock(body?.asOf)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -106,11 +116,11 @@ export class WarehouseOpsGateway {
 
   /** On-time rate, average time per leg and per-rider counts for a period (`from` / `to` as YYYY-MM-DD, default the last 30 days). Managers and admins. */
   @SubscribeMessage('analytics:legs')
-  async legs(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string; from?: string; to?: string }) {
+  async legs(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string; from?: string; to?: string; asOf?: string }) {
     try {
       const me = await this.actor(client);
       if (!tierAllows(me.role, me.tier, 'manage')) return fail('Only managers can see this.');
-      return ok(await this.analytics.legs(this.hubOf(me, body?.hubId, false), body));
+      return ok(await this.analytics.legs(this.hubOf(me, body?.hubId, false), body, this.clock(body?.asOf)));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -125,12 +135,7 @@ export class WarehouseOpsGateway {
     try {
       const me = await this.actor(client);
       if (!HUB_OPS_ADMINS.includes(me.role)) return fail('Not allowed.');
-      let at = new Date();
-      if (body?.asOf && process.env.NODE_ENV !== 'production') {
-        at = new Date(body.asOf);
-        if (Number.isNaN(at.getTime())) return fail('asOf must be a date.');
-      }
-      return ok(await this.job.run(at));
+      return ok(await this.job.run(this.clock(body?.asOf)));
     } catch (e) {
       return fail((e as Error).message);
     }

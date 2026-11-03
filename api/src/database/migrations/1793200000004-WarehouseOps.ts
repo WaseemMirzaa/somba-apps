@@ -11,10 +11,11 @@ export class WarehouseOps1793200000004 implements MigrationInterface {
 
   public async up(q: QueryRunner): Promise<void> {
     const sqlite = q.connection.options.type === 'better-sqlite3' || q.connection.options.type === 'sqlite';
-    const stamp = (name: string) =>
+    // `updatedAt` is an @UpdateDateColumn: MySQL keeps it current itself (ON UPDATE), exactly as the entity expects.
+    const stamp = (name: string, onUpdate = false) =>
       sqlite
         ? { name, type: 'datetime', isNullable: false, default: "datetime('now')" }
-        : { name, type: 'datetime', precision: 6, isNullable: false, default: 'CURRENT_TIMESTAMP(6)' };
+        : { name, type: 'datetime', precision: 6, isNullable: false, default: 'CURRENT_TIMESTAMP(6)', ...(onUpdate ? { onUpdate: 'CURRENT_TIMESTAMP(6)' } : {}) };
 
     await q.createTable(
       new Table({
@@ -34,7 +35,7 @@ export class WarehouseOps1793200000004 implements MigrationInterface {
           { name: 'deliveryTargetHours', type: 'double', isNullable: false, default: 24 },
           { name: 'updatedById', type: 'varchar', length: '36', isNullable: true },
           { name: 'updatedByName', type: 'varchar', length: '100', isNullable: true },
-          stamp('updatedAt'),
+          stamp('updatedAt', true),
         ],
       }),
       true,

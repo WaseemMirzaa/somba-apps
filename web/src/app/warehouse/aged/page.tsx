@@ -27,20 +27,22 @@ export default function WarehouseAgedPage() {
   const ops = useOpsPath();
   const base = useOpsBase();
   const q = useDeskQueue({ status: "open" });
-  const { canAssign, isAdmin } = useHubScope();
+  const { canAssign, isAdmin, effectiveHubId } = useHubScope();
   // The ages come from the warehouse's own settings (default 24 / 48 / 72 h); the board is for supervisors and above.
   const summaryQ = useAgedSummary(canAssign || isAdmin);
   const levels = summaryQ.data?.levels ?? DEFAULT_LEVELS;
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
-  const [minAge, setMinAge] = useState("first");
+  const [minAge, setMinAge] = useState("1");
   const [returning, setReturning] = useState<{ id: string; code: string; orderReference: string } | null>(null);
   const minAgeOptions = [
     { value: "0", en: "All open legs", fr: "Tous les trajets ouverts" },
-    { value: "first", en: `Alert level 1 and above (${levels[0]} h)`, fr: `Niveau d'alerte 1 et plus (${levels[0]} h)` },
-    { value: "second", en: `Alert level 2 and above (${levels[1]} h)`, fr: `Niveau d'alerte 2 et plus (${levels[1]} h)` },
-    { value: "third", en: `Escalated, level 3 (${levels[2]} h)`, fr: `Remonté, niveau 3 (${levels[2]} h)` },
+    { value: "1", en: `Alert level 1 and above (${levels[0]} h)`, fr: `Niveau d'alerte 1 et plus (${levels[0]} h)` },
+    { value: "2", en: `Alert level 2 and above (${levels[1]} h)`, fr: `Niveau d'alerte 2 et plus (${levels[1]} h)` },
+    { value: "3", en: `Escalated, level 3 (${levels[2]} h)`, fr: `Remonté, niveau 3 (${levels[2]} h)` },
   ];
-  const minHours = minAge === "first" ? levels[0] : minAge === "second" ? levels[1] : minAge === "third" ? levels[2] : 0;
+  const minLevel = Number(minAge);
+  // One warehouse in view: its ages apply to every row (and tick over live). All warehouses (admins): each row follows ITS warehouse's ages, as the server worked them out.
+  const scoped = !!effectiveHubId;
 
   const rows = useMemo(
     () =>
@@ -50,21 +52,21 @@ export default function WarehouseAgedPage() {
           ...t,
           code: parcelCode(t),
           ageHours: legAgeHours(t),
-          level: levelOfAge(legAgeHours(t), levels),
+          level: scoped || !summaryQ.data ? levelOfAge(legAgeHours(t), levels) : (summaryQ.data.byTask[t.id]?.level ?? 0),
           alertedAt: summaryQ.data?.byTask[t.id]?.alertedAt ?? null,
           canReturn: (canAssign || isAdmin) && canReturnLeg(t),
           route: `${endpointName(t.from, fr)} → ${endpointName(t.to, fr)}`,
           riderText: riderLabel(t, fr),
         }))
         .sort((a, b) => b.ageHours - a.ageHours),
-    [q.tasks, fr, levels, summaryQ.data, canAssign, isAdmin],
+    [q.tasks, fr, levels, summaryQ.data, canAssign, isAdmin, scoped],
   );
   const filtered = useMemo(() => {
-    return applyListFilters(rows.filter((p) => p.ageHours >= minHours), filters, {
+    return applyListFilters(rows.filter((p) => p.level >= minLevel), filters, {
       searchFields: ["code", "orderReference", "route", "sellerName", "riderText"],
       statusField: "status",
     });
-  }, [rows, filters, minHours]);
+  }, [rows, filters, minLevel]);
 
   return (
     <>

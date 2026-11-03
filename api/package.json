@@ -42,7 +42,8 @@
     "smoke:i18n": "node test/i18n-smoke.cjs",
     "smoke:commerce": "node test/commerce-smoke.cjs",
     "smoke:aftersale": "node test/after-sale-smoke.cjs",
-    "smoke:sellerplatform": "node test/seller-platform-smoke.cjs"
+    "smoke:sellerplatform": "node test/seller-platform-smoke.cjs",
+    "smoke:warehouseops": "node test/warehouse-ops-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
