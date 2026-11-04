@@ -45,6 +45,26 @@ beforeEach(async () => {
 });
 afterEach(async () => ds.destroy());
 
+describe('a fraud check started by a signal', () => {
+  it('logs a failed check and never leaves an unhandled rejection', async () => {
+    let listener: ((userId: string) => unknown) | undefined;
+    const source = { onSignal: (fn: (userId: string) => unknown) => void (listener = fn) };
+    const settings = { get: async () => null };
+    const r = new FraudRulesService(
+      ds.getRepository(FraudAlert), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Payment), ds.getRepository(Dispute),
+      ds.getRepository(PaymentRefund), ds.getRepository(FraudSignal), settings as never, fraud, emitter as never, source as never,
+    );
+    r.onModuleInit();
+    jest.spyOn(r, 'evaluate').mockRejectedValue(new Error('db down'));
+    const warn = jest.spyOn((r as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation(() => undefined);
+    const out = listener!('u1');
+    expect(out).toBeInstanceOf(Promise);
+    await expect(out).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('db down'));
+    r.onModuleDestroy();
+  });
+});
+
 describe('fraud rule: many failed payment attempts in 24 hours', () => {
   it('raises one alert with the reason once the default limit (5) is reached, not before', async () => {
     const u = await addUser();

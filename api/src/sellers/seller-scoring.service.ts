@@ -3,7 +3,7 @@ import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, OrderItem, Product, Review, Seller } from '../database/entities';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SellersService } from '../ops/sellers.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { averageRating, badgeFor, fulfilmentRateOf } from './seller-scoring';
@@ -81,7 +81,7 @@ export class SellerScoringService implements OnModuleInit, OnModuleDestroy {
     const saved = await this.sellers.save(seller);
     if (changed) {
       const view = await this.sellersSvc.withPlanState(saved);
-      this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', view);
+      SellersService.pushViewToAdmins(this.emitter, view);
       if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', view);
     }
     if (badgeChanged && saved.userId) {

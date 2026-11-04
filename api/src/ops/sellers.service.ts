@@ -239,15 +239,23 @@ export class SellersService {
   static forStaff<T extends object>(view: T, role: string): T {
     if (KYC_REVIEWERS.includes(role)) return view;
     const out = { ...view } as Record<string, unknown>;
-    for (const k of PRIVATE_SELLER_KEYS) delete out[k];
+    // `userId` is an internal id, not KYC data: payouts and other admin pages are keyed by it, so every admin role keeps it.
+    for (const k of PRIVATE_SELLER_KEYS) if (k !== 'userId') delete out[k];
     return out as T;
+  }
+
+  /**
+   * Every live `seller:updated` push to the admin rooms goes through here: reviewers get the full record, the other admin
+   * roles the public profile (no legal name, ID, tax numbers, papers or phone).
+   */
+  static pushViewToAdmins(emitter: Pick<RealtimeEmitter, 'toRoles'>, full: object): void {
+    emitter.toRoles([...KYC_REVIEWERS], 'seller:updated', full);
+    emitter.toRoles(ADMIN_ROLES.filter((r) => !KYC_REVIEWERS.includes(r)), 'seller:updated', SellersService.forStaff(full, 'none'));
   }
 
   /** Tell the admins a store changed: reviewers get the full record, the other admin roles the public profile. */
   private async pushToAdmins(seller: Seller): Promise<void> {
-    const full = await this.adminView(seller);
-    this.emitter.toRoles([...KYC_REVIEWERS], 'seller:updated', full);
-    this.emitter.toRoles(ADMIN_ROLES.filter((r) => !KYC_REVIEWERS.includes(r)), 'seller:updated', SellersService.forStaff(full, 'none'));
+    SellersService.pushViewToAdmins(this.emitter, await this.adminView(seller));
   }
 
   /** Admin list: KYC (documentUrls parsed) and the last decision reason for a reviewer's role; the public profile for any other. */

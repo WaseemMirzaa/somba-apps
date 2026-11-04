@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Seller } from '../database/entities';
 import { str } from '../common/validate';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SellersService } from '../ops/sellers.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { TranslationService } from '../translation/translation.service';
@@ -101,7 +101,7 @@ export class StorefrontService implements OnModuleInit, OnModuleDestroy {
   /** Tell the owner's screens, the admins and (when the open/away state flipped) shoppers. */
   private async publish(saved: Seller, wasAway: boolean): Promise<void> {
     const view = await this.sellersSvc.withPlanState(saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', view);
+    SellersService.pushViewToAdmins(this.emitter, view);
     if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', view);
     const away = onVacation(saved);
     if (away !== wasAway || away) {

@@ -15,3 +15,6 @@ export const CASH_DESK_ADMINS: readonly string[] = ['admin', 'admin_finance', 'a
 
 /** Is the role a store-application reviewer? */
 export const isKycReviewer = (role: string | null | undefined): boolean => KYC_REVIEWERS.includes(role ?? '');
+
+/** Admin roles that send an aged parcel back to its seller (the same two that run the warehouse job and edit warehouse settings). */
+export const RETURN_TO_SELLER_ADMINS: readonly string[] = ['admin', 'admin_operations'];

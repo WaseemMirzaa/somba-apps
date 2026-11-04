@@ -165,7 +165,12 @@ const login = async (email) => {
   ok(a.ok && a.data.canReceive && a.data.lines.length >= 1 && a.data.lines.some((l) => l.productId === prod2.id && l.qty === 2 && l.remaining === 2), 'the parcel shows what it carries and that it can be put away', a.error ?? '');
   a = await req(op.sock, 'stock:receiveParcel', { taskId: pick.id, binId: binB.id, lines: [{ productId: prod2.id, qty: 5 }], clientRef: `p0-${tag}` });
   ok(!a.ok && /carries 2 more/.test(a.error ?? ''), 'putting away more than the parcel carries is refused', a.error ?? '');
-  a = await req(op.sock, 'stock:receiveParcel', { taskId: pick.id, binId: binB.id, clientRef: `p1-${tag}` });
+  // Two people scan the same parcel at the same moment (different requests): the parcel row is locked, so only one put-away lands.
+  const sockP = (await login('operator@somba.app')).sock;
+  const both = await Promise.all([req(op.sock, 'stock:receiveParcel', { taskId: pick.id, binId: binB.id, clientRef: `p1-${tag}` }), req(sockP, 'stock:receiveParcel', { taskId: pick.id, binId: binB.id, clientRef: `p1b-${tag}` })]);
+  sockP.close();
+  ok(both.filter((r) => r.ok).length === 1 && both.filter((r) => !r.ok).every((r) => /already in stock/.test(r.error ?? '')), 'the same parcel put away by two people at once lands exactly once', JSON.stringify(both.map((r) => r.ok ? 'ok' : r.error)));
+  a = both.find((r) => r.ok) ?? both[0];
   ok(a.ok && a.data.lines.every((l) => l.reason === 'parcel' && l.taskId === pick.id && l.orderId === orderId), 'the parcel is put away into B (each line carries the parcel and the order)', a.error ?? '');
   ok((await total(mgr.sock, prod2.id)) === before + (a.data?.lines ?? []).filter((l) => l.productId === prod2.id).reduce((s, l) => s + l.qty, 0) && (await binQty(mgr.sock, prod2.id, B)) === 2, 'B now holds the 2 units');
   a = await req(op.sock, 'stock:receiveParcel', { taskId: pick.id, binId: binB.id });

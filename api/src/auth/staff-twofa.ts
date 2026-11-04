@@ -7,8 +7,28 @@ import { Setting, User } from '../database/entities';
 export const STAFF_2FA_ROLES: readonly string[] = ['admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation'];
 export const isStaff2faRole = (role: string | null | undefined): boolean => STAFF_2FA_ROLES.includes(role ?? '');
 
-/** Socket events a staff member without two-factor authentication may still use while the platform requires it (enrol, password, notices). */
-export const STAFF_2FA_OPEN_EVENTS: readonly string[] = ['auth:', 'me:', 'notifications:', 'devices:', 'settings:get'];
+/**
+ * The exact socket events a staff member without two-factor authentication may still use while the platform requires it:
+ * enrolling (status, setup, enable), their own profile and password, the bell, push registration and reading settings.
+ * Nothing else under `auth:` is open: `auth:2fa:reset` (super admin only) and `auth:2fa:disable` / `recovery` (they need
+ * an enrolled account) wait until the person has enrolled.
+ */
+export const STAFF_2FA_OPEN_EVENTS: readonly string[] = [
+  'auth:2fa:status',
+  'auth:2fa:setup',
+  'auth:2fa:enable',
+  'me:get',
+  'me:update',
+  'me:prefs',
+  'me:setPrefs',
+  'me:changePassword',
+  'notifications:list',
+  'notifications:markRead',
+  'notifications:markAllRead',
+  'devices:register',
+  'devices:unregister',
+  'settings:get',
+];
 
 export const STAFF_2FA_REQUIRED_MESSAGE = 'Two-factor authentication is required for staff accounts. Turn it on under Account > Security to continue.';
 
@@ -49,14 +69,16 @@ export class StaffTwoFaPolicy {
    */
   async refusal(user: { id: string; role: string }, event: string, body: unknown): Promise<string | null> {
     if (!isStaff2faRole(user.role)) return null;
-    if (event === 'settings:set' && (body as { key?: unknown } | null)?.key === 'requireStaffTwoFactor') {
+    // Same key the `settings:set` handler uses (`String(body.key)`), so an array or other wrapper cannot slip past this check.
+    if (event === 'settings:set' && String((body as { key?: unknown } | null)?.key ?? '') === 'requireStaffTwoFactor') {
       if (user.role !== 'admin') return 'Only the super admin can change the staff two-factor requirement.';
       if (String((body as { value?: unknown }).value) === 'true' && !(await this.enrolled(user.id))) {
         return 'Turn on two-factor authentication on your own account first, or this requirement would lock you out.';
       }
+      // Switching it off is no way round the rule: a super admin held at enrolment enrols first (the hold check below).
+    } else if (STAFF_2FA_OPEN_EVENTS.includes(event)) {
       return null;
     }
-    if (STAFF_2FA_OPEN_EVENTS.some((p) => event === p || (p.endsWith(':') && event.startsWith(p)))) return null;
     return (await this.mustEnrol(user.id, user.role)) ? STAFF_2FA_REQUIRED_MESSAGE : null;
   }
 }

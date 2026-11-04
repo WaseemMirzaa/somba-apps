@@ -11,6 +11,23 @@ describe('attachments', () => {
     }
   });
 
+  describe('with PUBLIC_API_URL set (production)', () => {
+    const saved = process.env.PUBLIC_API_URL;
+    beforeEach(() => void (process.env.PUBLIC_API_URL = 'https://api.example.com'));
+    afterEach(() => void (saved === undefined ? delete process.env.PUBLIC_API_URL : (process.env.PUBLIC_API_URL = saved)));
+
+    it('accepts this platform\'s own URL or the /uploads path, and refuses the same path on another host', () => {
+      const path = '/uploads/0b9c3b3a-1c5e-4d34-9d6b-0a1b2c3d4e5f.jpg';
+      expect(isUploadUrl(UP)).toBe(true);
+      expect(isUploadUrl(path)).toBe(true);
+      expect(isUploadUrl(`http://evil.example${path}`)).toBe(false);
+      expect(isUploadUrl(`https://api.example.com.evil.example${path}`)).toBe(false);
+      expect(isUploadUrl(`https://api.example.com:8443${path}`)).toBe(false);
+      expect(isUploadUrl(`https://api.example.com@evil.example${path}`)).toBe(false);
+      expect(() => cleanAttachments([`http://evil.example${path}`])).toThrow('uploaded through the app');
+    });
+  });
+
   it('cleans a list: nothing means none, duplicates drop, too many or foreign ones are refused', () => {
     expect(cleanAttachments(undefined)).toEqual([]);
     expect(cleanAttachments(null)).toEqual([]);
