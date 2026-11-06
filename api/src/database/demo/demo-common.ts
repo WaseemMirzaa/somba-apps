@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  chmodSync,
+} from 'fs';
 import { dirname } from 'path';
 
 /**
@@ -8,7 +14,8 @@ import { dirname } from 'path';
  */
 export const DEMO_DOMAIN = 'demo.sombateka.test';
 export const demoEmail = (local: string) => `${local}@${DEMO_DOMAIN}`;
-export const isDemoEmail = (email: string | null | undefined) => (email ?? '').toLowerCase().endsWith(`@${DEMO_DOMAIN}`);
+export const isDemoEmail = (email: string | null | undefined) =>
+  (email ?? '').toLowerCase().endsWith(`@${DEMO_DOMAIN}`);
 
 /** Prefix of the keys, codes and names that belong to the demo but are not users (CMS blocks, promo codes, bins). */
 export const DEMO_KEY = 'demo-';
@@ -45,8 +52,13 @@ export interface CredentialEntry {
  * The credentials file: plain text blocks, root-only on a server (mode 600). It is read back on a re-run so an account
  * that already exists keeps the password it was given.
  */
-export function readCredentials(path: string): Map<string, { password: string | null; recoveryCodes: string[] }> {
-  const out = new Map<string, { password: string | null; recoveryCodes: string[] }>();
+export function readCredentials(
+  path: string,
+): Map<string, { password: string | null; recoveryCodes: string[] }> {
+  const out = new Map<
+    string,
+    { password: string | null; recoveryCodes: string[] }
+  >();
   if (!existsSync(path)) return out;
   let email = '';
   for (const raw of readFileSync(path, 'utf8').split('\n')) {
@@ -67,13 +79,22 @@ export function readCredentials(path: string): Map<string, { password: string | 
   return out;
 }
 
-export function writeCredentials(path: string, entries: CredentialEntry[], header: string[]): void {
+export function writeCredentials(
+  path: string,
+  entries: CredentialEntry[],
+  header: string[],
+): void {
   mkdirSync(dirname(path), { recursive: true });
   const lines = [...header.map((h) => `# ${h}`), ''];
   for (const e of entries) {
-    lines.push(`[${e.email}]`, `role = ${e.role}`, `password = ${e.password ?? '(unknown)'}`);
+    lines.push(
+      `[${e.email}]`,
+      `role = ${e.role}`,
+      `password = ${e.password ?? '(unknown)'}`,
+    );
     if (e.totpKey) lines.push(`totp_key = ${e.totpKey}`);
-    if (e.recoveryCodes?.length) lines.push(`recovery_codes = ${e.recoveryCodes.join(' ')}`);
+    if (e.recoveryCodes?.length)
+      lines.push(`recovery_codes = ${e.recoveryCodes.join(' ')}`);
     lines.push(`scenario = ${e.scenario}`, '');
   }
   writeFileSync(path, lines.join('\n'), { mode: 0o600 });

@@ -2,12 +2,22 @@
 import './demo/demo-quiet';
 import { NestFactory } from '@nestjs/core';
 import type { INestApplicationContext } from '@nestjs/common';
-import { DataSource, In, IsNull, Not } from 'typeorm';
+import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from '../app.module';
-import { Address, Category, GeoArea, Hub, HubCoverage, PrivateFile, Product, Seller, SellerTeamMember, Setting, User } from './entities';
+import {
+  Category,
+  Hub,
+  HubCoverage,
+  PrivateFile,
+  Product,
+  Seller,
+  SellerTeamMember,
+  Setting,
+  User,
+} from './entities';
 import { UsersService } from '../users/users.service';
 import { SellersService } from '../ops/sellers.service';
 import { ProductsService, cleanListing } from '../products/products.service';
@@ -24,7 +34,6 @@ import {
   CredentialEntry,
   DEMO_HUB_NAME,
   demoEmail,
-  isDemoEmail,
   log,
   randomPassword,
   readCredentials,
@@ -32,7 +41,7 @@ import {
 } from './demo/demo-common';
 import { DEMO_ACCOUNTS, DEMO_TEAM } from './demo/demo-accounts';
 import type { DemoAccount } from './demo/demo-accounts';
-import { DEMO_PRODUCTS, DEMO_STORES, PINS } from './demo/demo-catalog';
+import { DEMO_PRODUCTS, DEMO_STORES } from './demo/demo-catalog';
 import type { DemoStore } from './demo/demo-catalog';
 import { DemoImages } from './demo/demo-images';
 import { seedCommerce } from './demo/demo-commerce';
@@ -60,26 +69,56 @@ const EXPECTED: Record<string, string> = {
   codEnabled: 'false',
 };
 
-async function preflight(ds: DataSource): Promise<{ warnings: string[]; mainHub: Hub }> {
-  const settings = new Map((await ds.getRepository(Setting).find()).map((s) => [s.key, s.value]));
-  if (!settings.has('requireVerifiedForCheckout') || !settings.has('commissionPct')) {
-    throw new Error('The platform settings are missing. Run the bootstrap first (npm run bootstrap:prod), then run this again.');
+async function preflight(
+  ds: DataSource,
+): Promise<{ warnings: string[]; mainHub: Hub }> {
+  const settings = new Map(
+    (await ds.getRepository(Setting).find()).map((s) => [s.key, s.value]),
+  );
+  if (
+    !settings.has('requireVerifiedForCheckout') ||
+    !settings.has('commissionPct')
+  ) {
+    throw new Error(
+      'The platform settings are missing. Run the bootstrap first (npm run bootstrap:prod), then run this again.',
+    );
   }
-  if (!(await ds.getRepository(User).count({ where: { role: 'admin' } }))) throw new Error('There is no admin account yet. Run the bootstrap first (npm run bootstrap:prod).');
-  if (!(await ds.getRepository(Category).count())) throw new Error('There are no categories yet. Run the bootstrap first (npm run bootstrap:prod).');
+  if (!(await ds.getRepository(User).count({ where: { role: 'admin' } })))
+    throw new Error(
+      'There is no admin account yet. Run the bootstrap first (npm run bootstrap:prod).',
+    );
+  if (!(await ds.getRepository(Category).count()))
+    throw new Error(
+      'There are no categories yet. Run the bootstrap first (npm run bootstrap:prod).',
+    );
   const hubs = await ds.getRepository(Hub).find({ where: { active: true } });
   const mainHub = hubs.find((h) => h.name !== DEMO_HUB_NAME);
-  if (!mainHub) throw new Error('There is no warehouse yet. Run the bootstrap first (npm run bootstrap:prod).');
-  if (!(await ds.getRepository(HubCoverage).count({ where: { hubId: mainHub.id } }))) throw new Error(`${mainHub.name} covers no area. Run the bootstrap first, or assign its areas in Admin > Warehouses.`);
+  if (!mainHub)
+    throw new Error(
+      'There is no warehouse yet. Run the bootstrap first (npm run bootstrap:prod).',
+    );
+  if (
+    !(await ds
+      .getRepository(HubCoverage)
+      .count({ where: { hubId: mainHub.id } }))
+  )
+    throw new Error(
+      `${mainHub.name} covers no area. Run the bootstrap first, or assign its areas in Admin > Warehouses.`,
+    );
   const warnings: string[] = [];
   for (const [k, v] of Object.entries(EXPECTED)) {
-    if (settings.get(k) !== v) warnings.push(`Setting ${k} is "${settings.get(k) ?? 'not set'}" (the demo is written for "${v}"). It was NOT changed; some scenarios will behave differently.`);
+    if (settings.get(k) !== v)
+      warnings.push(
+        `Setting ${k} is "${settings.get(k) ?? 'not set'}" (the demo is written for "${v}"). It was NOT changed; some scenarios will behave differently.`,
+      );
   }
   return { warnings, mainHub };
 }
 
 async function run() {
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn'],
+  });
   try {
     await main(app);
   } finally {
@@ -89,17 +128,21 @@ async function run() {
 
 async function main(app: INestApplicationContext) {
   const ds = app.get(DataSource);
-  const credFile = process.env.DEMO_CREDENTIALS_FILE ?? '/etc/somba/demo-credentials.txt';
+  const credFile =
+    process.env.DEMO_CREDENTIALS_FILE ?? '/etc/somba/demo-credentials.txt';
   const resetPasswords = process.env.DEMO_RESET_PASSWORDS === '1';
   const supplied = process.env.DEMO_PASSWORD;
-  if (supplied !== undefined && supplied.length < 12) throw new Error('DEMO_PASSWORD must be at least 12 characters.');
+  if (supplied !== undefined && supplied.length < 12)
+    throw new Error('DEMO_PASSWORD must be at least 12 characters.');
 
   const { warnings, mainHub } = await preflight(ds);
   for (const w of warnings) log(`! ${w}`);
 
   const images = new DemoImages();
   const copied = images.install();
-  log(`• pictures: ${copied.written} copied to ${images.dir}, ${copied.present} already there`);
+  log(
+    `• pictures: ${copied.written} copied to ${images.dir}, ${copied.present} already there`,
+  );
 
   const password = supplied ?? randomPassword();
   const passwordHash = await bcrypt.hash(password, 12);
@@ -126,7 +169,23 @@ async function main(app: INestApplicationContext) {
   };
 
   // ── accounts ────────────────────────────────────────────────────────────────
-  const ensureUser = async (def: { key: string; email: string; name: string; role: User['role']; phone?: string; locale?: 'en' | 'fr'; verified: boolean; active?: boolean; twofa?: boolean; hubId?: string | null; tier?: User['warehouseTier'] }, scenario: string, roleLabel: string): Promise<User> => {
+  const ensureUser = async (
+    def: {
+      key: string;
+      email: string;
+      name: string;
+      role: User['role'];
+      phone?: string;
+      locale?: 'en' | 'fr';
+      verified: boolean;
+      active?: boolean;
+      twofa?: boolean;
+      hubId?: string | null;
+      tier?: User['warehouseTier'];
+    },
+    scenario: string,
+    roleLabel: string,
+  ): Promise<User> => {
     const hash = UsersService.emailHash(def.email);
     let user = await userRepo.findOne({ where: { emailHash: hash } });
     let pw: string | null;
@@ -157,9 +216,12 @@ async function main(app: INestApplicationContext) {
         patch.tokenVersion = (user.tokenVersion ?? 0) + 1;
         pw = password;
       } else pw = previous.get(def.email)?.password ?? null;
-      if (def.hubId !== undefined && user.hubId !== def.hubId) patch.hubId = def.hubId;
-      if (def.tier !== undefined && user.warehouseTier !== def.tier) patch.warehouseTier = def.tier;
-      if (user.active !== (def.active ?? true)) patch.active = def.active ?? true;
+      if (def.hubId !== undefined && user.hubId !== def.hubId)
+        patch.hubId = def.hubId;
+      if (def.tier !== undefined && user.warehouseTier !== def.tier)
+        patch.warehouseTier = def.tier;
+      if (user.active !== (def.active ?? true))
+        patch.active = def.active ?? true;
       if (Object.keys(patch).length) {
         await userRepo.update({ id: user.id }, patch);
         user = (await userRepo.findOne({ where: { id: user.id } }))!;
@@ -171,12 +233,27 @@ async function main(app: INestApplicationContext) {
       if (!user.twofaEnabled || !user.twofaSecret) {
         const secret = newTotpSecret();
         recovery = newRecoveryCodes();
-        await userRepo.update({ id: user.id }, { twofaSecret: secret as never, twofaEnabled: true, twofaRecovery: JSON.stringify(recovery.map(hashRecovery)), twofaLastStep: 0 });
+        await userRepo.update(
+          { id: user.id },
+          {
+            twofaSecret: secret as never,
+            twofaEnabled: true,
+            twofaRecovery: JSON.stringify(recovery.map(hashRecovery)),
+            twofaLastStep: 0,
+          },
+        );
         user = (await userRepo.findOne({ where: { id: user.id } }))!;
       }
       totp = user.twofaSecret;
     }
-    credentials.set(def.email, { email: def.email, role: roleLabel, password: pw, totpKey: totp, recoveryCodes: recovery ?? previous.get(def.email)?.recoveryCodes, scenario });
+    credentials.set(def.email, {
+      email: def.email,
+      role: roleLabel,
+      password: pw,
+      totpKey: totp,
+      recoveryCodes: recovery ?? previous.get(def.email)?.recoveryCodes,
+      scenario,
+    });
     ctx.users.set(def.key, user);
     return user;
   };
@@ -188,34 +265,99 @@ async function main(app: INestApplicationContext) {
   let demoHub = await hubRepo.findOne({ where: { name: DEMO_HUB_NAME } });
   if (!demoHub) {
     const maluku = await ctx.area('CD-KN-MLK');
-    demoHub = await hubRepo.save(hubRepo.create({ name: DEMO_HUB_NAME, city: 'Kinshasa', country: 'DRC', capacity: 200, address: 'Maluku (demo warehouse)', areaId: maluku.id, lat: -4.4614, lng: 16.0786 }));
-    const covered = await ds.getRepository(HubCoverage).findOne({ where: { areaId: maluku.id } });
-    if (!covered) await coverage.assign({ hubId: demoHub.id, areaIds: [maluku.id] });
+    demoHub = await hubRepo.save(
+      hubRepo.create({
+        name: DEMO_HUB_NAME,
+        city: 'Kinshasa',
+        country: 'DRC',
+        capacity: 200,
+        address: 'Maluku (demo warehouse)',
+        areaId: maluku.id,
+        lat: -4.4614,
+        lng: 16.0786,
+      }),
+    );
+    const covered = await ds
+      .getRepository(HubCoverage)
+      .findOne({ where: { areaId: maluku.id } });
+    if (!covered)
+      await coverage.assign({ hubId: demoHub.id, areaIds: [maluku.id] });
     log(`✓ demo warehouse ${DEMO_HUB_NAME} (covers Maluku only)`);
   }
   ctx.demoHub = demoHub;
   const lanes = app.get(LanesService);
   if (!(await lanes.list(demoHub.id)).length) {
-    await lanes.upsert({ fromHubId: mainHub.id, toHubId: demoHub.id, transitHours: 8, bidirectional: true });
+    await lanes.upsert({
+      fromHubId: mainHub.id,
+      toHubId: demoHub.id,
+      transitHours: 8,
+      bidirectional: true,
+    });
     log('✓ lane between the two warehouses');
   }
   const opsSettings = app.get(HubOpsSettingsService);
   if ((await opsSettings.view(demoHub.id)).isDefault) {
-    await opsSettings.update({ id: 'demo-seed', role: 'admin', name: 'Demo seed', hubId: null, tier: null } as never, demoHub.id, { workStart: '07:00', workEnd: '19:00', workDays: [1, 2, 3, 4, 5, 6], batchSize: 12 });
+    await opsSettings.update(
+      {
+        id: 'demo-seed',
+        role: 'admin',
+        name: 'Demo seed',
+        hubId: null,
+        tier: null,
+      } as never,
+      demoHub.id,
+      {
+        workStart: '07:00',
+        workEnd: '19:00',
+        workDays: [1, 2, 3, 4, 5, 6],
+        batchSize: 12,
+      },
+    );
   }
 
   // ── accounts: staff, customers, store owners, team ─────────────────────────────
-  const hubOf = (h?: 'main' | 'demo') => (h === 'main' ? mainHub.id : h === 'demo' ? demoHub!.id : undefined);
+  const hubOf = (h?: 'main' | 'demo') =>
+    h === 'main' ? mainHub.id : h === 'demo' ? demoHub!.id : undefined;
   for (const acc of DEMO_ACCOUNTS as DemoAccount[]) {
-    await ensureUser({ ...acc, hubId: hubOf(acc.hub), tier: acc.tier }, acc.scenario, roleLabelOf(acc));
+    await ensureUser(
+      { ...acc, hubId: hubOf(acc.hub), tier: acc.tier },
+      acc.scenario,
+      roleLabelOf(acc),
+    );
   }
   for (const s of DEMO_STORES) {
-    await ensureUser({ key: `seller.${s.key.toLowerCase()}`, email: s.email, name: s.ownerName, role: 'seller', phone: s.phone, verified: true, twofa: s.twofa }, `Store owner. ${s.scenario}`, `seller owner, store ${s.key}: ${s.storeName}`);
+    await ensureUser(
+      {
+        key: `seller.${s.key.toLowerCase()}`,
+        email: s.email,
+        name: s.ownerName,
+        role: 'seller',
+        phone: s.phone,
+        verified: true,
+        twofa: s.twofa,
+      },
+      `Store owner. ${s.scenario}`,
+      `seller owner, store ${s.key}: ${s.storeName}`,
+    );
   }
   for (const t of DEMO_TEAM) {
-    await ensureUser({ key: t.key, email: demoEmail(t.key), name: t.name, role: 'seller', phone: t.phone, verified: true, twofa: false }, `Member of Maison Kinshasa (store A) with the "${t.role}" role.`, `seller team member (${t.role}), store A`);
+    await ensureUser(
+      {
+        key: t.key,
+        email: demoEmail(t.key),
+        name: t.name,
+        role: 'seller',
+        phone: t.phone,
+        verified: true,
+        twofa: false,
+      },
+      `Member of Maison Kinshasa (store A) with the "${t.role}" role.`,
+      `seller team member (${t.role}), store A`,
+    );
   }
-  log(`✓ accounts: ${counts.created} created, ${counts.existing} already there`);
+  log(
+    `✓ accounts: ${counts.created} created, ${counts.existing} already there`,
+  );
 
   // ── stores ─────────────────────────────────────────────────────────────────────
   await seedStores(ctx);
@@ -239,7 +381,9 @@ async function main(app: INestApplicationContext) {
     ],
   );
   const unknown = [...credentials.values()].filter((c) => !c.password).length;
-  log(`\n✅ Demo data ready. Credentials: ${credFile} (${credentials.size} accounts${unknown ? `, ${unknown} with an unknown password` : ''}).`);
+  log(
+    `\n✅ Demo data ready. Credentials: ${credFile} (${credentials.size} accounts${unknown ? `, ${unknown} with an unknown password` : ''}).`,
+  );
 }
 
 function roleLabelOf(a: DemoAccount): string {
@@ -261,15 +405,25 @@ function roleLabelOf(a: DemoAccount): string {
 // Stores
 // ─────────────────────────────────────────────────────────────────────────────────
 
-const KYC_DOCS = ['sample-id-card.jpg', 'sample-rccm.jpg', 'sample-tax-certificate.jpg'];
+const KYC_DOCS = [
+  'sample-id-card.jpg',
+  'sample-rccm.jpg',
+  'sample-tax-certificate.jpg',
+];
 
 async function kycDocuments(ctx: DemoCtx, owner: User): Promise<string[]> {
   const files = ctx.app.get(PrivateFilesService);
-  const rows = await ctx.ds.getRepository(PrivateFile).find({ where: { ownerUserId: owner.id } });
+  const rows = await ctx.ds
+    .getRepository(PrivateFile)
+    .find({ where: { ownerUserId: owner.id } });
   const urls: string[] = [];
   if (rows.length) return rows.map((r) => files.urlFor(r.id, ctx.images.base));
   const dir = join(__dirname, '..', '..', '..', 'deploy', 'demo', 'kyc');
-  for (const f of KYC_DOCS.slice(0, 2)) urls.push((await files.save(owner.id, readFileSync(join(dir, f)), ctx.images.base)).url);
+  for (const f of KYC_DOCS.slice(0, 2))
+    urls.push(
+      (await files.save(owner.id, readFileSync(join(dir, f)), ctx.images.base))
+        .url,
+    );
   return urls;
 }
 
@@ -285,19 +439,16 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
     const fresh = !seller;
     if (!seller) {
       const docs = await kycDocuments(ctx, owner);
-      await sellers.register(
-        { id: owner.id, name: owner.name },
-        {
-          name: s.storeName,
-          legalName: `${s.storeName} SARL (demo)`,
-          phone: s.phone,
-          idNumber: `DEMO-ID-0${s.key.charCodeAt(0)}`,
-          rccm: `CD/KIN/RCCM/DEMO-0${s.key.charCodeAt(0)}`,
-          taxNumber: `A0000${s.key.charCodeAt(0)}D`,
-          documentUrls: docs,
-          acceptTerms: true,
-        } as never,
-      );
+      await sellers.register({ id: owner.id, name: owner.name }, {
+        name: s.storeName,
+        legalName: `${s.storeName} SARL (demo)`,
+        phone: s.phone,
+        idNumber: `DEMO-ID-0${s.key.charCodeAt(0)}`,
+        rccm: `CD/KIN/RCCM/DEMO-0${s.key.charCodeAt(0)}`,
+        taxNumber: `A0000${s.key.charCodeAt(0)}D`,
+        documentUrls: docs,
+        acceptTerms: true,
+      } as never);
       seller = (await sellerRepo.findOne({ where: { userId: owner.id } }))!;
       ctx.created.created++;
     }
@@ -306,15 +457,23 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
 
     if (s.status === 'pending') continue; // D waits for an admin
     if (s.status === 'rejected') {
-      await sellers.setStatus(seller.id, 'rejected', 'The ID document is unreadable and the RCCM number does not match the legal name. Please upload clear copies and submit again.');
+      await sellers.setStatus(
+        seller.id,
+        'rejected',
+        'The ID document is unreadable and the RCCM number does not match the legal name. Please upload clear copies and submit again.',
+      );
       continue;
     }
     await sellers.setStatus(seller.id, 'approved', 'Approved for the demo.');
     // Pickup location (this decides the origin warehouse), logo, banner and the description in both languages.
     if (s.pickup) {
       const area = await ctx.area(s.pickup.areaCode);
-      const logo = ['A', 'B', 'C', 'F', 'G', 'H'].includes(s.key) ? ctx.images.url(`logo-${s.key}.jpg`) : undefined;
-      const banner = ['A', 'B', 'C', 'F', 'G'].includes(s.key) ? ctx.images.url(`banner-${s.key}.jpg`) : undefined;
+      const logo = ['A', 'B', 'C', 'F', 'G', 'H'].includes(s.key)
+        ? ctx.images.url(`logo-${s.key}.jpg`)
+        : undefined;
+      const banner = ['A', 'B', 'C', 'F', 'G'].includes(s.key)
+        ? ctx.images.url(`banner-${s.key}.jpg`)
+        : undefined;
       await sellers.updateProfile(owner.id, {
         pickupAddress: s.pickup.address,
         pickupLat: s.pickup.lat,
@@ -326,38 +485,73 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
         descriptionFr: s.descriptionFr,
       });
     } else if (s.key === 'H') {
-      await sellers.updateProfile(owner.id, { logoUrl: ctx.images.url('logo-H.jpg'), description: s.description, descriptionFr: s.descriptionFr });
+      await sellers.updateProfile(owner.id, {
+        logoUrl: ctx.images.url('logo-H.jpg'),
+        description: s.description,
+        descriptionFr: s.descriptionFr,
+      });
     }
     seller = (await sellerRepo.findOne({ where: { id: seller.id } }))!;
-    await sellerRepo.update({ id: seller.id }, { badge: s.key === 'A' ? 'somba_assured' : s.key === 'B' ? 'silver' : 'bronze' });
+    await sellerRepo.update(
+      { id: seller.id },
+      {
+        badge:
+          s.key === 'A' ? 'somba_assured' : s.key === 'B' ? 'silver' : 'bronze',
+      },
+    );
     // Plan: store A buys Pro with its wallet (a real plan payment), the others stay on Free.
     if (s.plan === 'pro') {
-      await wallet.apply(owner.id, 'credit', 150, 'Demo starter credit (not real money)');
+      await wallet.apply(
+        owner.id,
+        'credit',
+        150,
+        'Demo starter credit (not real money)',
+      );
       await sellers.subscribe(owner.id, { plan: 'pro', method: 'wallet' });
     }
-    ctx.stores.set(s.key, (await sellerRepo.findOne({ where: { id: seller.id } }))!);
+    ctx.stores.set(
+      s.key,
+      (await sellerRepo.findOne({ where: { id: seller.id } }))!,
+    );
   }
 
   // Storefront settings that need the seller context (so they pass the same checks as the portal).
   const ctxOf = (key: string) => {
     const u = ctx.users.get(`seller.${key.toLowerCase()}`)!;
-    return sellerContext({ id: u.id, role: 'seller', name: u.name }, 'storefront');
+    return sellerContext(
+      { id: u.id, role: 'seller', name: u.name },
+      'storefront',
+    );
   };
   const A = await ctxOf('A');
   if (!A.seller.returnsPolicy) {
     await storefront.update(A, {
       handlingDays: 1,
-      returnsPolicy: 'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.',
-      returnsPolicyFr: 'Les retours sont acceptés dans les 7 jours suivant la livraison pour les articles non utilisés dans leur emballage d’origine. Les produits alimentaires et de beauté doivent être non ouverts.',
-      shippingPolicy: 'We pack every order within one working day and hand it to the Somba&Teka warehouse in Gombe.',
+      returnsPolicy:
+        'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.',
+      returnsPolicyFr:
+        'Les retours sont acceptés dans les 7 jours suivant la livraison pour les articles non utilisés dans leur emballage d’origine. Les produits alimentaires et de beauté doivent être non ouverts.',
+      shippingPolicy:
+        'We pack every order within one working day and hand it to the Somba&Teka warehouse in Gombe.',
     } as never);
     await storefront.setGoals(A, { revenueUsd: 2000, orders: 60, rating: 4.5 });
-    await storefront.setPayoutAccount(A, { method: 'mobile_money', account: '+243 900 000 301' });
+    await storefront.setPayoutAccount(A, {
+      method: 'mobile_money',
+      account: '+243 900 000 301',
+    });
   }
   const G = await ctxOf('G');
-  const wantBack = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
-  if (!G.seller.vacationUntil || new Date(G.seller.vacationUntil).getTime() < Date.now() + 5 * 86_400_000) {
-    await storefront.update(G, { vacationUntil: wantBack, handlingDays: 3 } as never);
+  const wantBack = new Date(Date.now() + 45 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  if (
+    !G.seller.vacationUntil ||
+    new Date(G.seller.vacationUntil).getTime() < Date.now() + 5 * 86_400_000
+  ) {
+    await storefront.update(G, {
+      vacationUntil: wantBack,
+      handlingDays: 3,
+    } as never);
   }
   // Store F is suspended after its listings and orders exist (so the suspension takes its listings off the shop); see seedProducts.
 
@@ -368,16 +562,52 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
   for (const t of DEMO_TEAM) {
     const member = ctx.users.get(t.key)!;
     const hash = UsersService.emailHash(member.email);
-    if (!(await teamRepo.findOne({ where: { sellerId: storeA.id, emailHash: hash } }))) {
-      await teamRepo.save(teamRepo.create({ sellerId: storeA.id, userId: member.id, emailHash: hash, email: member.email, name: member.name, role: t.role, status: 'active', inviteTokenHash: null, inviteExpiresAt: null, invitedBy: ownerA.id, acceptedAt: new Date(Date.now() - 20 * 86_400_000) }));
+    if (
+      !(await teamRepo.findOne({
+        where: { sellerId: storeA.id, emailHash: hash },
+      }))
+    ) {
+      await teamRepo.save(
+        teamRepo.create({
+          sellerId: storeA.id,
+          userId: member.id,
+          emailHash: hash,
+          email: member.email,
+          name: member.name,
+          role: t.role,
+          status: 'active',
+          inviteTokenHash: null,
+          inviteExpiresAt: null,
+          invitedBy: ownerA.id,
+          acceptedAt: new Date(Date.now() - 20 * 86_400_000),
+        }),
+      );
     }
   }
   const invitedEmail = demoEmail('team.invited');
   const invitedHash = UsersService.emailHash(invitedEmail);
-  if (!(await teamRepo.findOne({ where: { sellerId: storeA.id, emailHash: invitedHash } }))) {
-    await teamRepo.save(teamRepo.create({ sellerId: storeA.id, userId: null, emailHash: invitedHash, email: invitedEmail, name: 'Invited (pending)', role: 'orders', status: 'invited', inviteTokenHash: UsersService.emailHash(`nobody-can-accept-${storeA.id}`), inviteExpiresAt: new Date(Date.now() + 5 * 86_400_000), invitedBy: ownerA.id }));
+  if (
+    !(await teamRepo.findOne({
+      where: { sellerId: storeA.id, emailHash: invitedHash },
+    }))
+  ) {
+    await teamRepo.save(
+      teamRepo.create({
+        sellerId: storeA.id,
+        userId: null,
+        emailHash: invitedHash,
+        email: invitedEmail,
+        name: 'Invited (pending)',
+        role: 'orders',
+        status: 'invited',
+        inviteTokenHash: UsersService.emailHash(
+          `nobody-can-accept-${storeA.id}`,
+        ),
+        inviteExpiresAt: new Date(Date.now() + 5 * 86_400_000),
+        invitedBy: ownerA.id,
+      }),
+    );
   }
-  void PINS;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────
@@ -392,10 +622,16 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
     const store = ctx.stores.get(p.store);
     if (!store || store.status === 'pending') continue;
     const urls = ctx.images.productUrls(p.sku, p.pictures);
-    const existing = await repo.findOne({ where: { sellerId: store.id, sku: p.sku } });
+    const existing = await repo.findOne({
+      where: { sellerId: store.id, sku: p.sku },
+    });
     if (existing) {
       // The address of the pictures depends on PUBLIC_API_URL: follow it if the server moved to a domain.
-      if (JSON.stringify(existing.images ?? []) !== JSON.stringify(urls)) await repo.update({ id: existing.id }, { images: urls, image: urls[0] ?? null });
+      if (JSON.stringify(existing.images ?? []) !== JSON.stringify(urls))
+        await repo.update(
+          { id: existing.id },
+          { images: urls, image: urls[0] ?? null },
+        );
       ctx.products.set(p.sku, existing);
       continue;
     }
@@ -420,19 +656,20 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
       },
       { partial: false, allowStatus: false },
     );
-    const served = await products.create(clean, { sellerId: store.id, status: p.state, actorId: ctx.users.get(`seller.${p.store.toLowerCase()}`)?.id ?? null });
-    ctx.products.set(p.sku, (await repo.findOne({ where: { id: served.id } }))!);
+    const served = await products.create(clean, {
+      sellerId: store.id,
+      status: p.state,
+      actorId: ctx.users.get(`seller.${p.store.toLowerCase()}`)?.id ?? null,
+    });
+    ctx.products.set(
+      p.sku,
+      (await repo.findOne({ where: { id: served.id } }))!,
+    );
     created++;
   }
-  log(`✓ products: ${created} created, ${DEMO_PRODUCTS.length - created} already there`);
-  void IsNull;
-  void Not;
-  void In;
-  void Address;
-  void GeoArea;
-  void existsSync;
-  void isDemoEmail;
-  void PINS;
+  log(
+    `✓ products: ${created} created, ${DEMO_PRODUCTS.length - created} already there`,
+  );
 }
 
 run().catch((err) => {
