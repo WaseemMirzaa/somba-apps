@@ -9,10 +9,22 @@ export const MAX_ATTACHMENTS = 6;
  */
 export const UPLOAD_PATH = /^\/uploads\/[0-9a-f-]{36}\.(png|jpe?g|webp|heic)$/i;
 
+/**
+ * A stored upload as a client sends it back: the `/uploads/...` path, or the absolute URL `POST /api/v1/uploads` answered.
+ * That URL starts with `PUBLIC_API_URL` when it is set (production always sets it), so then the host must be this
+ * platform's own; a look-alike path on another host is refused. With `PUBLIC_API_URL` unset (local development) the upload
+ * endpoint answers with the request's host, which the server cannot know here, so any host is accepted as before.
+ * Reading stored values never goes through here, so URLs saved earlier keep working.
+ */
 export function isUploadUrl(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 500) return false;
+  if (value.startsWith('/')) return UPLOAD_PATH.test(value);
   try {
-    return UPLOAD_PATH.test(new URL(value).pathname);
+    const url = new URL(value);
+    if (!UPLOAD_PATH.test(url.pathname)) return false;
+    const own = process.env.PUBLIC_API_URL;
+    if (!own) return true;
+    return url.host === new URL(own).host;
   } catch {
     return false;
   }

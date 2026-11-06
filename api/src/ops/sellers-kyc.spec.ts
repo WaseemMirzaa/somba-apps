@@ -237,7 +237,7 @@ describe('SellersService.setStatus', () => {
 });
 
 describe('what each admin role sees of a store (KYC is for the reviewers)', () => {
-  const PAPERS = ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls', 'phone', 'userId', 'kycSubmittedAt', 'termsAcceptedAt', 'payoutAccountMasked'];
+  const PAPERS = ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls', 'phone', 'kycSubmittedAt', 'termsAcceptedAt', 'payoutAccountMasked'];
   const REVIEWERS = ['admin', 'admin_moderation', 'admin_operations'];
   const OTHERS = ['admin_finance', 'admin_support', 'admin_marketing'];
   const store = () => ({
@@ -268,7 +268,8 @@ describe('what each admin role sees of a store (KYC is for the reviewers)', () =
       const [row] = await svc.list(undefined, {}, role);
       expect(row).toMatchObject({ id: 's1', name: 'Mama Store', status: 'pending', description: 'Fresh produce from Kinshasa' });
       for (const k of PAPERS) expect(row).not.toHaveProperty(k);
-      expect(JSON.stringify(row)).not.toMatch(/SARL|ID-123456|RCCM|A1234567K|uploads|owner1|0812345678/);
+      expect(JSON.stringify(row)).not.toMatch(/SARL|ID-123456|RCCM|A1234567K|uploads|0812345678/);
+      expect(row).toHaveProperty('userId', 'owner1'); // an internal id, not KYC: payouts are keyed by it
     }
   });
 
@@ -300,6 +301,6 @@ describe('what each admin role sees of a store (KYC is for the reviewers)', () =
     expect([...pub.roles].sort()).toEqual([...OTHERS].sort());
     expect(full.payload).toMatchObject({ legalName: 'Mama Store SARL', idNumber: 'ID-123456' });
     for (const k of PAPERS) expect(pub.payload).not.toHaveProperty(k);
-    expect(pub.payload).toMatchObject({ id: 's1', name: 'Mama Store', status: 'approved' });
+    expect(pub.payload).toMatchObject({ id: 's1', name: 'Mama Store', status: 'approved', userId: 'owner1' });
   });
 });

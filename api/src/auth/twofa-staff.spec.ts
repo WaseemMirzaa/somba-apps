@@ -197,7 +197,33 @@ describe('requireStaffTwoFactor (platform setting)', () => {
     for (const open of ['auth:2fa:status', 'auth:2fa:setup', 'auth:2fa:enable', 'me:changePassword', 'notifications:list', 'devices:register', 'settings:get']) {
       expect(await policy.refusal(a, open, {})).toBeNull();
     }
+    // the rest of `auth:` and `me:` is not an enrolment step
+    for (const shut of ['auth:2fa:reset', 'auth:2fa:disable', 'auth:2fa:recovery', 'auth:other', 'me:delete', 'devices:test']) {
+      expect(await policy.refusal(a, shut, { userId: 'x' })).toBe(STAFF_2FA_REQUIRED_MESSAGE);
+    }
     expect(await policy.refusal({ id: withTfa.id, role: 'admin_support' }, 'orders:list', {})).toBeNull();
+  });
+
+  it('a key wrapped in an array cannot slip past the requirement guard', async () => {
+    const fin = await account('admin_finance', 'wrap');
+    const sup = await account('admin', 'wrapboss');
+    for (const key of [['requireStaffTwoFactor'], new String('requireStaffTwoFactor')]) {
+      expect(await policy.refusal({ id: fin.id, role: 'admin_finance' }, 'settings:set', { key, value: 'false' })).toMatch(/Only the super admin/);
+      expect(await policy.refusal({ id: sup.id, role: 'admin' }, 'settings:set', { key, value: 'true' })).toMatch(/your own account first/);
+    }
+  });
+
+  it('a super admin held at enrolment cannot switch the rule off or reset anyone: they enrol first, and enrolling stays open', async () => {
+    const sup = await account('admin', 'heldboss');
+    await enrol(sup);
+    await setSetting('requireStaffTwoFactor', 'true');
+    await ds.getRepository(User).update({ id: sup.id }, { twofaEnabled: false, twofaSecret: null as never, twofaRecovery: null as never }); // 2FA lost: held again
+    const who = { id: sup.id, role: 'admin' };
+    expect(await policy.refusal(who, 'settings:set', { key: 'requireStaffTwoFactor', value: 'false' })).toBe(STAFF_2FA_REQUIRED_MESSAGE);
+    expect(await policy.refusal(who, 'auth:2fa:reset', { userId: 'someone' })).toBe(STAFF_2FA_REQUIRED_MESSAGE);
+    for (const step of ['auth:2fa:status', 'auth:2fa:setup', 'auth:2fa:enable']) expect(await policy.refusal(who, step, {})).toBeNull();
+    await enrol(sup);
+    expect(await policy.refusal(who, 'settings:set', { key: 'requireStaffTwoFactor', value: 'false' })).toBeNull();
   });
 
   it('applies to every admin role and to no one else (customers, sellers, riders, warehouse staff)', async () => {

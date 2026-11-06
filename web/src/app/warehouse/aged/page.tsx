@@ -14,6 +14,7 @@ import { isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue, useHubSco
 import { shortDate } from "@/lib/warehouse-live";
 import { useAgedSummary } from "@/lib/warehouse-ops";
 import { ageText, canReturnLeg, levelOfAge } from "@/lib/warehouse-ops-format";
+import { useRealtime } from "@/context/realtime-context";
 import { ReturnToSellerDialog } from "@/components/warehouse/return-to-seller-dialog";
 
 /** Until the warehouse's own ages arrive (or for a warehouse that never changed them). */
@@ -28,6 +29,9 @@ export default function WarehouseAgedPage() {
   const base = useOpsBase();
   const q = useDeskQueue({ status: "open" });
   const { canAssign, isAdmin, effectiveHubId } = useHubScope();
+  // The server lets only the super admin and the operations admin (and supervisors and managers) send a parcel back.
+  const role = useRealtime().user?.role;
+  const mayReturn = isAdmin ? role === "admin" || role === "admin_operations" : canAssign;
   // The ages come from the warehouse's own settings (default 24 / 48 / 72 h); the board is for supervisors and above.
   const summaryQ = useAgedSummary(canAssign || isAdmin);
   const levels = summaryQ.data?.levels ?? DEFAULT_LEVELS;
@@ -54,12 +58,12 @@ export default function WarehouseAgedPage() {
           ageHours: legAgeHours(t),
           level: scoped || !summaryQ.data ? levelOfAge(legAgeHours(t), levels) : (summaryQ.data.byTask[t.id]?.level ?? 0),
           alertedAt: summaryQ.data?.byTask[t.id]?.alertedAt ?? null,
-          canReturn: (canAssign || isAdmin) && canReturnLeg(t),
+          canReturn: mayReturn && canReturnLeg(t),
           route: `${endpointName(t.from, fr)} → ${endpointName(t.to, fr)}`,
           riderText: riderLabel(t, fr),
         }))
         .sort((a, b) => b.ageHours - a.ageHours),
-    [q.tasks, fr, levels, summaryQ.data, canAssign, isAdmin, scoped],
+    [q.tasks, fr, levels, summaryQ.data, mayReturn, scoped],
   );
   const filtered = useMemo(() => {
     return applyListFilters(rows.filter((p) => p.level >= minLevel), filters, {

@@ -58,6 +58,14 @@ export function ledgerId(now = Date.now()): string {
   return `${hex.slice(0, 8)}-${hex.slice(8)}-7${seq.toString(16).padStart(3, '0')}-${tail.slice(0, 4)}-${tail.slice(4)}`;
 }
 
+/** MySQL gave up on a lock: a deadlock victim or a lock wait timeout. The whole transaction was rolled back and can be run again. */
+export function isLockFailure(e: unknown): boolean {
+  const err = e as { code?: string; errno?: number; driverError?: { code?: string; errno?: number } } | null;
+  const code = err?.code ?? err?.driverError?.code;
+  const errno = err?.errno ?? err?.driverError?.errno;
+  return code === 'ER_LOCK_DEADLOCK' || errno === 1213 || code === 'ER_LOCK_WAIT_TIMEOUT' || errno === 1205;
+}
+
 const short = (s: string): string => createHash('sha1').update(s).digest('hex').slice(0, 28);
 
 export interface StockLine {
@@ -157,6 +165,12 @@ export class WarehouseStockService implements OnModuleInit {
 
   private turn: Promise<void> = Promise.resolve();
 
+  /** Lock the parcel's row until this transaction ends (MySQL; SQLite runs one transaction at a time anyway). */
+  protected async lockTask(m: EntityManager, taskId: string): Promise<void> {
+    if (!this.isMysql) return;
+    await m.getRepository(DeliveryTask).createQueryBuilder('t').setLock('pessimistic_write').where('t.id = :taskId', { taskId }).getOne();
+  }
+
   /**
    * Two moves in opposite directions between the same two bins can lock the rows in opposite order; MySQL then picks one
    * as the deadlock victim and rolls it back whole. Nothing was written, so it is simply run again (a few times).
@@ -166,11 +180,7 @@ export class WarehouseStockService implements OnModuleInit {
       try {
         return await fn();
       } catch (e) {
-        const err = e as { code?: string; errno?: number; driverError?: { code?: string; errno?: number } };
-        const code = err.code ?? err.driverError?.code;
-        const errno = err.errno ?? err.driverError?.errno;
-        const deadlock = code === 'ER_LOCK_DEADLOCK' || errno === 1213 || code === 'ER_LOCK_WAIT_TIMEOUT' || errno === 1205;
-        if (!deadlock || attempt >= 4) throw e;
+        if (!isLockFailure(e) || attempt >= 4) throw e;
         await new Promise((r) => setTimeout(r, 15 * attempt + Math.floor(Math.random() * 25)));
       }
     }
@@ -241,7 +251,9 @@ export class WarehouseStockService implements OnModuleInit {
     if ((await raise()).affected) return;
     try {
       await m.getRepository(WarehouseStock).insert({ hubId, binId, productId, variant, qty: n });
-    } catch {
+    } catch (e) {
+      // A deadlock or lock timeout is not "someone created it first": rethrow so the transaction is run again.
+      if (isLockFailure(e)) throw e;
       if (!(await raise()).affected) throw new BadRequestException('This bin was just updated. Refresh and try again.');
     }
   }
@@ -501,6 +513,8 @@ export class WarehouseStockService implements OnModuleInit {
 
     const result = await this.tx(async (m) => {
       const bin = await this.binOf(m, c.hubId, input, { create: true, active: true });
+      // Two people putting away one parcel queue here: the second reads what the first committed, so the stock is never doubled.
+      await this.lockTask(m, task.id);
       const done = await this.stockedOf(task.id, c.hubId, m);
       const out: WarehouseLedger[] = [];
       let i = 0;
