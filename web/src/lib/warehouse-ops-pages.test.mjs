@@ -42,6 +42,7 @@ test("the settings card saves through the server, validates first, and answers e
 test("the aged board shows the alert level, offers Return to seller only to supervisors, and confirms before sending a parcel back", () => {
   assert.match(aged, /useAgedSummary\(canAssign \|\| isAdmin\)/);
   assert.match(aged, /canReturnLeg\(t\)/);
+  assert.match(aged, /role === "admin" \|\| role === "admin_operations"/); // only these two admins may send a parcel back, as the server decides
   assert.match(aged, /Retourner au vendeur/);
   assert.match(aged, /<ReturnToSellerDialog/);
   assert.match(dialog, /returnToSeller\(parcel\.id\)/);

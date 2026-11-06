@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { RETURN_TO_SELLER_ADMINS } from '../common/staff-access';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 import { In, IsNull, Not, Repository } from 'typeorm';
@@ -991,12 +992,14 @@ export class LogisticsService {
   }
 
   /** Give an open task to a rider (the checks are the caller's): claim it atomically, tell the old rider, audit, announce. */
-  private async giveTo(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>, actor: Actor): Promise<DeliveryTask> {
+  private async giveTo(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>, actor: Actor, opts: { onlyUnassigned?: boolean } = {}): Promise<DeliveryTask> {
+    // The system only fills an empty slot: a supervisor who assigned the leg while the sweep was working keeps their choice.
+    const open = opts.onlyUnassigned ? "status = 'unassigned' AND runId IS NULL" : "status IN ('unassigned','assigned')";
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
       .set({ riderId: rider.id, status: 'assigned' })
-      .where("id = :id AND status IN ('unassigned','assigned')", { id: task.id })
+      .where(`id = :id AND ${open}`, { id: task.id })
       .execute();
     if (!claim.affected) throw new BadRequestException('This delivery is no longer available.');
     const saved = (await this.tasks.findOne({ where: { id: task.id } }))!;
@@ -1040,7 +1043,7 @@ export class LogisticsService {
       if (!ops.autoAssign || !isWorkingNow(ops, at)) return null;
       const rider = pickLeastBusy(await this.candidatesFor(task));
       if (!rider) return null;
-      return await this.giveTo(task, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR);
+      return await this.giveTo(task, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR, { onlyUnassigned: true });
     } catch (e) {
       // Someone else (or a second sweep) got there first, or the rider vanished: the leg stays in the queue for staff.
       this.logger.debug(`auto-assign ${task.id}: ${(e as Error).message}`);
@@ -1071,6 +1074,7 @@ export class LogisticsService {
    */
   async returnToSeller(taskId: string, actor: Actor): Promise<{ closed: DeliveryTask; legs: DeliveryTask[] }> {
     if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can return a parcel to its seller.');
+    if (actor.role.startsWith('admin') && !RETURN_TO_SELLER_ADMINS.includes(actor.role)) throw new BadRequestException('Only the super admin and the operations admin can return a parcel to its seller.');
     const task = await this.tasks.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('Delivery task not found.');
     if (!this.actorManages(actor, task)) throw new BadRequestException('This task belongs to another warehouse.');

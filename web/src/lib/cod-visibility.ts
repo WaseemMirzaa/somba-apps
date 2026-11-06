@@ -13,3 +13,8 @@ export function codOffered(value: unknown): boolean {
 export function withoutCodWhenOff<T extends { cod?: boolean }>(items: readonly T[], offered: boolean): T[] {
   return offered ? [...items] : items.filter((i) => !i.cod);
 }
+
+/** The payment methods a picker or filter lists: `cod` is left out while COD is not offered. */
+export function withoutCodMethod<T extends string>(ids: readonly T[], offered: boolean): T[] {
+  return offered ? [...ids] : ids.filter((id) => id !== "cod");
+}

@@ -7,7 +7,7 @@ import ts from "typescript";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(read("./cod-visibility.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const { codOffered, withoutCodWhenOff } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { codOffered, withoutCodWhenOff, withoutCodMethod } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 test("COD is offered only when the setting is exactly true", () => {
   assert.equal(codOffered(true), true);
@@ -70,4 +70,11 @@ test("admin settings: a read-only 'Not offered' line instead of the toggle, and 
 
 test("no public page mentions cash on delivery as available", () => {
   assert.doesNotMatch(read("./product-landing.ts"), /cash on delivery|paiement à la livraison/i);
+});
+
+test("the payment filter in the admin orders page lists cash on delivery only while COD is offered", () => {
+  const ids = ["wallet", "cod", "stripe_card"];
+  assert.deepEqual(withoutCodMethod(ids, false), ["wallet", "stripe_card"]);
+  assert.deepEqual(withoutCodMethod(ids, true), ids);
+  assert.match(read("../app/admin/orders/page.tsx"), /withoutCodMethod\(PAYMENT_METHOD_IDS, codOffered\)/);
 });

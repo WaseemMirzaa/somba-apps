@@ -373,6 +373,15 @@ describe('warehouse operations', () => {
       expect(audit.detail).toContain(`-> ${r2.name}`);
     });
 
+    it('never overwrites a supervisor who assigned the leg while the sweep was deciding (it claims unassigned legs only)', async () => {
+      await on();
+      const t = await mkTask(); // the sweep read it as unassigned ...
+      await ds.getRepository(DeliveryTask).update({ id: t.id }, { riderId: r3.id, status: 'assigned' }); // ... then a supervisor gave it to Cy
+      expect(await logistics.autoAssign(t, NOW)).toBeNull();
+      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t.id })).toMatchObject({ riderId: r3.id, status: 'assigned' });
+      expect(await ds.getRepository(AuditLog).count({ where: { action: 'task.assigned' } })).toBe(0);
+    });
+
     it('counts picked-up and in-transit tasks as busy, but not delivered, failed or unassigned ones', async () => {
       await on();
       await busy(r1, 2, 'delivered');
@@ -481,6 +490,16 @@ describe('warehouse operations', () => {
       );
     });
     const delivery = (over: Partial<DeliveryTask> = {}) => mkTask({ orderId: order.id, orderReference: order.reference, ...over });
+
+    it('is for the super admin, operations admin and warehouse supervisors and managers; no other admin role', async () => {
+      for (const role of ['admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation']) {
+        const t = await delivery();
+        await expect(logistics.returnToSeller(t.id, admin(role))).rejects.toThrow(/Only the super admin and the operations admin/);
+        expect((await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t.id })).status).toBe('unassigned');
+      }
+      const ok1 = await delivery();
+      await expect(logistics.returnToSeller(ok1.id, admin('admin'))).resolves.toBeTruthy();
+    });
 
     it('closes the stuck delivery and opens one return leg per seller, from the warehouse, with that seller\'s goods', async () => {
       const t = await delivery({ age: 80 });

@@ -54,7 +54,13 @@ export class FraudRulesService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.fraud.useRules(this);
-    this.signalSource?.onSignal((userId) => void this.evaluate(userId));
+    // A failed check (a database error) is logged, never an unhandled rejection that would end the process.
+    this.signalSource?.onSignal((userId) =>
+      this.evaluate(userId).then(
+        () => undefined,
+        (e) => this.logger.warn(`fraud check after a signal failed: ${(e as Error).message}`),
+      ),
+    );
     const every = sweepMs();
     if (every > 0) {
       this.sweeper = setInterval(() => void this.sweep().catch((e) => this.logger.warn(`sweep failed: ${(e as Error).message}`)), every);

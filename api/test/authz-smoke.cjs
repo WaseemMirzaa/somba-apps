@@ -621,7 +621,8 @@ const register = async (label, role = 'customer') => {
   for (const [name, u] of Object.entries(notReviewers)) {
     const list = (await req(u.sock, 'sellers:list', { limit: 200 })).data ?? [];
     ok(list.length > 0 && list.some((x) => x.id === withKyc?.id && x.name), `${name}: sellers:list still lists the stores (public profile)`);
-    ok(list.every((x) => PAPERS.every((k) => !(k in x)) && !('phone' in x) && !('userId' in x) && !('payoutAccountMasked' in x)), `${name}: no identity papers, phone, owner or payout details in the list`);
+    ok(list.every((x) => PAPERS.every((k) => !(k in x)) && !('phone' in x) && !('payoutAccountMasked' in x)), `${name}: no identity papers, phone or payout details in the list`);
+    ok(list.every((x) => typeof x.userId === 'string' || x.userId === null), `${name}: the owner's account id stays (an internal id: payouts are keyed by it)`);
     a = await req(u.sock, 'sellers:get', { id: withKyc.id });
     ok(a.ok && a.data.name === withKyc.name && PAPERS.every((k) => !(k in a.data)) && !JSON.stringify(a.data).includes(withKyc.idNumber), `${name}: sellers:get returns the public profile only`, a.error ?? '');
   }

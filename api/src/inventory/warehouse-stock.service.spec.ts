@@ -3,7 +3,7 @@ import { commerceWorld } from '../testing/commerce-db';
 import type { World } from '../testing/commerce-db';
 import { AuditLog, DeliveryTask, Hub, Product, WarehouseBin, WarehouseLedger, WarehouseStock } from '../database/entities';
 import type { Actor, LogisticsEvent } from '../logistics/logistics.service';
-import { WarehouseStockService, binCode, ledgerId, skuOf, units } from './warehouse-stock.service';
+import { WarehouseStockService, binCode, isLockFailure, ledgerId, skuOf, units } from './warehouse-stock.service';
 
 const SIZE_S = 'Size: S';
 const SIZE_M = 'Size: M';
@@ -447,6 +447,19 @@ const parcel = (over: Partial<DeliveryTask> = {}) =>
   );
 
 describe('receiving from a scanned parcel', () => {
+  it('locks the parcel row inside the transaction before reading what is already stocked (two people cannot double the stock)', async () => {
+    const a = await bin('A-lock');
+    const t = await parcel();
+    const order: string[] = [];
+    const priv = svc as unknown as { lockTask: (m: unknown, id: string) => Promise<void>; stockedOf: (...a: unknown[]) => Promise<unknown> };
+    const realStocked = priv.stockedOf.bind(svc);
+    const lock = jest.spyOn(priv, 'lockTask').mockImplementation(async () => void order.push('lock'));
+    jest.spyOn(priv, 'stockedOf').mockImplementation((...args: unknown[]) => (order.push('read'), realStocked(...args)));
+    await svc.receiveParcel(operator(), { taskId: t.id, binId: a.id });
+    expect(lock).toHaveBeenCalledWith(expect.anything(), t.id);
+    expect(order.slice(0, 2)).toEqual(['lock', 'read']);
+  });
+
   it('shows what the parcel carries and puts it away, once, with the parcel and the order on every line', async () => {
     const a = await bin('A-01');
     const t = await parcel();
@@ -624,5 +637,21 @@ describe('reading', () => {
     const sent = w.emitter.sent.filter((s) => s.event === 'stock:updated');
     expect(sent.map((s) => s.to)).toEqual(expect.arrayContaining([`hub:${hub.id}`]));
     expect(sent[0].payload).toMatchObject({ hubId: hub.id, productIds: [phone.id] });
+  });
+});
+
+
+describe('a deadlock while creating a stock row', () => {
+  it('is rethrown (so the transaction is run again), not turned into "this bin was just updated"', async () => {
+    const deadlock = Object.assign(new Error('Deadlock found'), { code: 'ER_LOCK_DEADLOCK', errno: 1213 });
+    const m = {
+      createQueryBuilder: () => ({ update: () => ({ set: () => ({ where: () => ({ execute: async () => ({ affected: 0 }) }) }) }) }),
+      getRepository: () => ({ insert: async () => { throw deadlock; } }),
+    };
+    const addTo = (svc as unknown as { addTo: (...a: unknown[]) => Promise<void> }).addTo.bind(svc);
+    await expect(addTo(m, 'h', 'b', 'p', '', 1)).rejects.toBe(deadlock);
+    expect(isLockFailure(deadlock)).toBe(true);
+    expect(isLockFailure({ driverError: { errno: 1205 } })).toBe(true);
+    expect(isLockFailure(new Error('Duplicate entry'))).toBe(false);
   });
 });

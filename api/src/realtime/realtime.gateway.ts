@@ -1352,7 +1352,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'config')) return fail('Not allowed.');
-      const all = await this.settings.set(String(body?.key ?? ''), body?.value);
+      // A key is a string; an array or object would stringify into a real key and slip past the per-key guards upstream.
+      if (typeof body?.key !== 'string') return fail('Unknown setting.');
+      const all = await this.settings.set(body.key, body.value);
       await this.audit.record({ actor: user.name, role: user.role, action: 'settings.set', entity: 'setting', entityId: body.key, detail: String(all[body.key]).slice(0, 200) });
       return ok(all);
     } catch (e) {

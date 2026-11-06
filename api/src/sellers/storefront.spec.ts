@@ -163,7 +163,7 @@ describe('storefront with a database', () => {
       const emitter = recordingEmitter();
       const notices: { to: string; title: string }[] = [];
       const translations = testTranslations(ds);
-      const sellersSvc = { withPlanState: async (s: Seller) => ({ id: s.id, onVacation: onVacation(s), vacationUntil: s.vacationUntil, handlingDays: s.handlingDays, returnsPolicy: s.returnsPolicy }) };
+      const sellersSvc = { withPlanState: async (s: Seller) => ({ id: s.id, legalName: 'Mama SARL', idNumber: 'ID-1', rccm: 'RC-1', taxNumber: 'TX-1', documentUrls: ['/uploads/x'], phone: '+243800000000', onVacation: onVacation(s), vacationUntil: s.vacationUntil, handlingDays: s.handlingDays, returnsPolicy: s.returnsPolicy }) };
       const svc = new StorefrontService(ds.getRepository(Seller), sellersSvc as never, emitter as never, { toUser: async (to: string, n: { title: string }) => void notices.push({ to, title: n.title }) } as never, translations);
       return { svc, emitter, notices, translations };
     }
@@ -183,6 +183,19 @@ describe('storefront with a database', () => {
       const reopened = await svc.update(ctxOf(s), { vacationUntil: null });
       expect(reopened).toMatchObject({ onVacation: false, vacationUntil: null, handlingDays: 2 });
       expect(emitter.sent.find((e) => e.event === 'store:vacation')?.payload).toMatchObject({ onVacation: false, notice: null, sellerIds: [s.id, 'owner-1'] });
+    });
+
+    it('the seller:updated push gives the identity papers to the KYC reviewers only, never to Marketing, Support or Finance', async () => {
+      const { svc, emitter } = make();
+      const s = await addSeller(ds, { userId: 'owner-1' });
+      await svc.update(ctxOf(s), { handlingDays: 2 });
+      const pushes = emitter.sent.filter((e) => e.event === 'seller:updated' && !e.to.startsWith('user:'));
+      const rooms = pushes.flatMap((p) => p.to.split(','));
+      expect(rooms).toEqual(expect.arrayContaining(['admin', 'admin_moderation', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing']));
+      for (const p of pushes) {
+        const reviewer = p.to.split(',').every((r) => ['admin', 'admin_moderation', 'admin_operations'].includes(r));
+        for (const k of ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls', 'phone']) expect(k in p.payload).toBe(reviewer);
+      }
     });
 
     it('a change that does not flip the state does not spam shoppers (handling time only)', async () => {
