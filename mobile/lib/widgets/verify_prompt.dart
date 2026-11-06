@@ -49,13 +49,13 @@ Future<bool> ensureVerified(BuildContext context, {required bool forTopUp, bool 
       actionsAlignment: MainAxisAlignment.center,
       actionsOverflowDirection: VerticalDirection.down,
       actions: [
-        if (phoneOn) FilledButton(key: const ValueKey('verify-phone-btn'), onPressed: () => Navigator.pop(ctx, 'phone'), child: Text(s.verifyPhoneBtn)),
+        if (phoneOn) FilledButton(key: const ValueKey('verify-phone-btn'), onPressed: () => Navigator.pop(ctx, 'phone'), child: _Label(s.verifyPhoneBtn)),
         // One filled button per dialog: email is the primary only when there is no phone channel to verify.
         if (emailOn && phoneOn)
-          OutlinedButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: Text(s.verifyEmailBtn))
+          OutlinedButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: _Label(s.verifyEmailBtn))
         else if (emailOn)
-          FilledButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: Text(s.verifyEmailBtn)),
-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.verifyLater)),
+          FilledButton(key: const ValueKey('verify-email-btn'), onPressed: () => Navigator.pop(ctx, 'email'), child: _Label(s.verifyEmailBtn)),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: _Label(s.verifyLater)),
       ],
     ),
   );
@@ -111,4 +111,12 @@ class _StatusRow extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// A dialog button label that shrinks to one line instead of wrapping (French runs longer, text may be enlarged).
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label(this.text);
+  @override
+  Widget build(BuildContext context) => FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1));
 }

@@ -404,6 +404,24 @@ When you change an entity, generate a migration and commit it (see
 - [ ] Enable automatic security updates (`unattended-upgrades`).
 - [ ] Take DigitalOcean backups / a managed MySQL if this goes real.
 
+## Verification codes, translation and maps: what must be set on the server
+
+The apps ask the server what it can do (`settings:get` returns `smsVerification`, `emailVerification` and `translation` as
+`on` or `off`, computed from the environment) and say so instead of showing a code that was never sent or a "See translation"
+link that can only fail.
+
+| What | Set on the server | If missing |
+|---|---|---|
+| Phone codes by SMS | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | the verification screen says text messages are not available and offers e-mail |
+| E-mail links (verify, reset password) | `SMTP_HOST` (+ `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`) | same, for e-mail |
+| Chat, question and review translation | `GOOGLE_TRANSLATE_API_KEY` (Cloud Translation API enabled for its project); optional `TRANSLATE_DAILY_CHAR_LIMIT` | translation links are hidden |
+| Maps in the customer and rider apps | the same Maps key in `mobile/android/local.properties` and `mobile/ios/Flutter/Secrets.xcconfig` (and the rider app's) at build time, plus `--dart-define=GOOGLE_MAPS_API_KEY` | the app offers "Use my current position" instead of the map |
+| Map on the web | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `/etc/somba/web.env`, then rebuild the web; the key's HTTP referrers must include the site's address | the address form asks for manual entry |
+
+With `requireVerifiedForCheckout` on and neither SMS nor e-mail configured, no customer can ever verify, so no one can order: set at least one.
+Release builds of the customer app need the Kotlin keep rules in `mobile/android/app/proguard-rules.pro`; without them R8 removed
+classes SharedPreferences needs and sign-up ended in "Something went wrong" after the account had been created.
+
 ## Mobile money, payouts and delivery zones (production)
 
 | Variable | Purpose |

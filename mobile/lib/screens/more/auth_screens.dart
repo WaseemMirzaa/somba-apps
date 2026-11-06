@@ -97,79 +97,78 @@ class _AuthPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
     return Scaffold(
       body: AuthBackdrop(
         child: SafeArea(
-          child: Stack(children: [
-            if (showBack)
-              Positioned(
-                left: 8,
-                top: 4,
-                child: Material(
+          // The back and language buttons sit in a bar of their own: content scrolls below it, never under it.
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+              child: Row(children: [
+                if (showBack)
+                  Material(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                          padding: EdgeInsets.all(9),
+                          child: Icon(Icons.arrow_back_rounded,
+                              color: Colors.white, size: 22)),
+                    ),
+                  ),
+                const Spacer(),
+                Material(
                   color: Colors.white.withValues(alpha: 0.2),
-                  shape: const CircleBorder(),
+                  shape: const StadiumBorder(),
                   child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: const Padding(
-                        padding: EdgeInsets.all(9),
-                        child: Icon(Icons.arrow_back_rounded,
-                            color: Colors.white, size: 22)),
+                    key: const ValueKey('lang-toggle'),
+                    customBorder: const StadiumBorder(),
+                    onTap: () =>
+                        Strings.setLang(Strings.of(context).isFr ? 'en' : 'fr'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.translate_rounded,
+                            color: Colors.white, size: 18),
+                        const SizedBox(width: 6),
+                        // Each language is named in its own language.
+                        Text(Strings.of(context).langSwitchTo,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13)),
+                      ]),
+                    ),
                   ),
                 ),
-              ),
-            ListView(
-              padding:
-                  EdgeInsets.fromLTRB(22, top + (showBack ? 8 : 40), 22, 30),
-              children: [
-                const Center(child: BrandLogo(size: 78, radius: 22)),
-                const SizedBox(height: 18),
-                Text(title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'PlusJakartaSans',
-                        letterSpacing: -0.5)),
-                const SizedBox(height: 6),
-                Text(subtitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 14)),
-                const SizedBox(height: 24),
-                GlassCard(child: form),
-              ],
+              ]),
             ),
-            Positioned(
-              right: 8,
-              top: 4,
-              child: Material(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: const StadiumBorder(),
-                child: InkWell(
-                  key: const ValueKey('lang-toggle'),
-                  customBorder: const StadiumBorder(),
-                  onTap: () =>
-                      Strings.setLang(Strings.of(context).isFr ? 'en' : 'fr'),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.translate_rounded,
-                          color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      // Each language is named in its own language.
-                      Text(Strings.of(context).langSwitchTo,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13)),
-                    ]),
-                  ),
-                ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(22, showBack ? 8 : 24, 22, 30),
+                children: [
+                  const Center(child: BrandLogo(size: 78, radius: 22)),
+                  const SizedBox(height: 18),
+                  Text(title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'PlusJakartaSans',
+                          letterSpacing: -0.5)),
+                  const SizedBox(height: 6),
+                  Text(subtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          fontSize: 14)),
+                  const SizedBox(height: 24),
+                  GlassCard(child: form),
+                ],
               ),
             ),
           ]),
@@ -317,11 +316,11 @@ Future<bool> askTwoFactor(BuildContext context, String challenge) async {
                     width: 18,
                     child: CircularProgressIndicator(
                         strokeWidth: 2.2, color: Colors.white))
-                : Text(s.tfSubmit),
+                : FittedBox(fit: BoxFit.scaleDown, child: Text(s.tfSubmit, maxLines: 1)),
           ),
           TextButton(
               onPressed: busy ? null : () => Navigator.pop(ctx, false),
-              child: Text(s.tfCancel)),
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(s.tfCancel, maxLines: 1))),
         ],
       );
     }),
@@ -434,8 +433,11 @@ class _LoginScreenState extends State<LoginScreen> {
               MaterialPageRoute(
                   builder: (_) => PhoneLoginScreen(onAuthed: widget.onAuthed))),
           style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          child: Text(s.phoneLoginLink,
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+          child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(s.phoneLoginLink,
+                  maxLines: 1,
+                  style: const TextStyle(fontWeight: FontWeight.w700))),
         ),
         const SizedBox(height: 22),
         Center(
@@ -559,12 +561,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _confirmErr = m;
         }
       });
-      showSnack(context, m,
-          action: exists
-              ? SnackBarAction(
-                  label: s.regGoSignin,
-                  onPressed: () => Navigator.of(context).maybePop())
-              : null);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+            content: Text(m),
+            persist: false,
+            action: exists
+                ? SnackBarAction(
+                    label: s.regGoSignin,
+                    onPressed: () => Navigator.of(context).maybePop())
+                : null));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -34,7 +34,7 @@ const _failed = SendResult(sent: false, reason: 'failed');
 
 /// A button that opens [open] once pumped, so a dialog is on screen for the checks.
 Widget _opener(Future<void> Function(BuildContext) open) => Builder(
-      builder: (ctx) => Scaffold(body: Center(child: TextButton(key: const ValueKey('open'), onPressed: () => open(ctx), child: const Text('open')))),
+      builder: (ctx) => Scaffold(body: Align(alignment: Alignment.topLeft, child: SafeArea(child: TextButton(key: const ValueKey('open'), onPressed: () => open(ctx), child: const Text('open'))))),
     );
 
 Future<void> _seed(String lang) async {

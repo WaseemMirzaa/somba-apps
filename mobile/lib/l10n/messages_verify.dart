@@ -43,7 +43,7 @@ const Map<String, (String, String)> kMessagesVerify = {
   've_wait': ('You can ask for another link in {time}.', 'Vous pourrez demander un autre lien dans {time}.'),
   // checkout / wallet prompt
   'vp_phone_row': ('Phone', 'Téléphone'),
-  'vp_email_row': ('E-mail', 'E-mail'),
+  'vp_email_row': ('Email address', 'Adresse e-mail'),
   'vp_verified': ('Verified', 'Vérifié'),
   'vp_not_verified': ('Not verified', 'Non vérifié'),
   'vp_no_phone': ('No number yet', 'Pas encore de numéro'),
@@ -52,7 +52,7 @@ const Map<String, (String, String)> kMessagesVerify = {
   // two-step sign-in
   'tf_title': ('Two-step sign-in', 'Connexion en deux étapes'),
   'tf_body': ('Enter the 6-digit code from your authenticator app, or one of your recovery codes.', 'Saisissez le code à 6 chiffres de votre application d’authentification, ou l’un de vos codes de secours.'),
-  'tf_code': ('Code', 'Code'),
+  'tf_code': ('Code', 'Code à saisir'),
   'tf_code_hint': ('6 digits or a recovery code', '6 chiffres ou un code de secours'),
   'tf_submit': ('Confirm', 'Confirmer'),
   'tf_cancel': ('Cancel', 'Annuler'),
