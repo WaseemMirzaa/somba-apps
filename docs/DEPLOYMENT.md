@@ -419,6 +419,42 @@ link that can only fail.
 | Map on the web | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `/etc/somba/web.env`, then rebuild the web; the key's HTTP referrers must include the site's address | the address form asks for manual entry |
 
 With `requireVerifiedForCheckout` on and neither SMS nor e-mail configured, no customer can ever verify, so no one can order: set at least one.
+
+### Turning on SMS codes with Twilio
+
+What the code sends: `POST https://api.twilio.com/2010-04-01/Accounts/<SID>/Messages.json` with the Account SID and Auth Token as
+basic auth. The `To` number is cleaned to `+` and digits first (people type "+243 900 000 101" or "0900000101"; Twilio refuses both
+as typed), so every number that normalises as a phone number works. Codes live 10 minutes, allow 5 wrong tries, and a resend is
+throttled per account.
+
+From the Twilio console (Account Info and Phone Numbers), take three values:
+
+| Variable | What it is | Shape |
+|---|---|---|
+| `TWILIO_ACCOUNT_SID` | Account SID (not an API key SID, which starts with `SK`) | `AC` + 32 hex characters |
+| `TWILIO_AUTH_TOKEN` | Auth Token of the same account | 32 hex characters |
+| `TWILIO_FROM` | the sender: a Twilio number, a Messaging Service SID, or an alphanumeric sender name | `+15551234567`, or `MG` + 32 hex, or 3 to 11 letters/digits with a letter |
+
+Set them on the server, as root. The tool checks the shape of each value, writes both `/etc/somba/api.extra.env` (which survives
+deploys) and `/opt/somba/api/.env` in one step, reloads the API, and shows only the last four characters of the token:
+
+```bash
+bash /opt/somba/deploy/set-secret.sh TWILIO_ACCOUNT_SID     # hidden prompt, then the same for the other two
+bash /opt/somba/deploy/set-secret.sh TWILIO_AUTH_TOKEN
+bash /opt/somba/deploy/set-secret.sh TWILIO_FROM
+```
+
+Then check, without sending anything: the apps' `settings:get` now reports `smsVerification: on` and the verification screen offers
+text messages. `pm2 logs somba-api` shows a failed send as `SMS to +243•••01 failed: HTTP 400, Twilio error <code>`; the number and
+the code are never logged. Look the code up in Twilio's error list; the usual ones are 21211 (not a valid number), 21608 (trial
+account sending to an unverified number), 21408 (country not enabled for this account), 20003 (wrong SID or token) and 21606
+(the sender is not an SMS-capable Twilio number).
+
+Things to settle in Twilio before real customers: enable **Geo permissions** for the Democratic Republic of the Congo (and any
+other country you sell in), check the sender type the country accepts (a US number, a local number, or a registered sender name),
+and upgrade from the trial account (a trial can only text numbers you have verified in the console and adds a "trial" prefix).
+Sending costs money per message; set a spending limit in Twilio. To try it with your own phone, give the account your own number first.
+
 Release builds of the customer app need the Kotlin keep rules in `mobile/android/app/proguard-rules.pro`; without them R8 removed
 classes SharedPreferences needs and sign-up ended in "Something went wrong" after the account had been created.
 
