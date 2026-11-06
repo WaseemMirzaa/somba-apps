@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
 import { LEG_KIND, pickL } from "@/lib/logistics";
-import type { RiderTask, RiderTaskStatus } from "@/lib/rider";
+import { useCodEnabled, type RiderTask, type RiderTaskStatus } from "@/lib/rider";
+import { showTaskCash } from "@/lib/rider-cod";
 
 export const RIDER_STATUS_LABEL: Record<RiderTaskStatus, { en: string; fr: string }> = {
   assigned: { en: "Assigned", fr: "Assigné" },
@@ -41,6 +42,7 @@ export function RiderTaskCard({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const label = RIDER_STATUS_LABEL[task.status];
+  const codEnabled = useCodEnabled();
   return (
     <div className="card-premium p-4">
       <Link href={`/rider/tasks/${task.id}`} className="block">
@@ -49,7 +51,7 @@ export function RiderTaskCard({
           <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
           <Badge variant={riderStatusVariant(task.status)}>{fr ? label.fr : label.en}</Badge>
           {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
-          {task.codAmount > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
+          {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
           {task.collectOld && <Badge variant="info">{fr ? "Reprise de l'ancien article" : "Collect the old unit"}</Badge>}
         </div>
         <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-slate-700">

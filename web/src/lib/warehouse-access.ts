@@ -30,6 +30,7 @@ import {
   Truck,
 } from "lucide-react";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
+import { withoutCodWhenOff } from "@/lib/cod-visibility";
 
 /** Escalating access levels — a role can reach every tier at or below its own. */
 const ROLE_LEVEL: Record<WarehouseStaffRole, number> = {
@@ -49,6 +50,8 @@ export type WarehouseNavItem = {
   tier: number;
   /** Whether to show this item in the sidebar (false = access-only route). */
   nav: boolean;
+  /** A cash-on-delivery page: hidden from the menu while COD is not offered. */
+  cod?: boolean;
 };
 
 const T = { operator: 1, supervisor: 2, manager: 3 } as const;
@@ -63,7 +66,7 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/custody", label: "custody", icon: Boxes, tier: T.operator, nav: true },
   { href: "/warehouse/runs", label: "transferRuns", icon: Truck, tier: T.operator, nav: true },
   { href: "/warehouse/tasks", label: "parcels", icon: Boxes, tier: T.operator, nav: false },
-  { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: false },
+  { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: true },
   { href: "/warehouse/notifications", label: "notifications", icon: Bell, tier: T.operator, nav: true },
   { href: "/warehouse/support", label: "support", icon: Headphones, tier: T.operator, nav: true },
   // Retired pages that only redirect to the desk: reachable by everyone so old links keep working.
@@ -80,7 +83,7 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/exchanges", label: "exchanges", icon: ArrowLeftRight, tier: T.supervisor, nav: true },
   { href: "/warehouse/aged", label: "agedParcels", icon: AlertTriangle, tier: T.supervisor, nav: true },
   { href: "/warehouse/exceptions", label: "exceptions", icon: AlertTriangle, tier: T.supervisor, nav: true },
-  { href: "/warehouse/reconcile", label: "COD cash", plainLabel: true, icon: Banknote, tier: T.supervisor, nav: true },
+  { href: "/warehouse/reconcile", label: "COD cash", plainLabel: true, icon: Banknote, tier: T.supervisor, nav: true, cod: true },
   { href: "/warehouse/analytics", label: "analytics", icon: BarChart3, tier: T.manager, nav: true },
   { href: "/warehouse/hubs", label: "myWarehouse", icon: Warehouse, tier: T.manager, nav: true },
   { href: "/warehouse/settings", label: "settings", icon: Settings, tier: T.manager, nav: true },
@@ -88,10 +91,10 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
 
 export type WarehouseNavLink = { href: string; label: string; icon: LucideIcon; i18n: boolean };
 
-/** Sidebar items visible to a warehouse role (tier at or below the role). */
-export function getWarehouseNav(role: WarehouseStaffRole): WarehouseNavLink[] {
+/** Sidebar items visible to a warehouse role (tier at or below the role). The COD cash page shows only while COD is offered. */
+export function getWarehouseNav(role: WarehouseStaffRole, codOffered = false): WarehouseNavLink[] {
   const level = ROLE_LEVEL[role] ?? ROLE_LEVEL.manager;
-  return WAREHOUSE_ROUTES.filter((r) => r.nav && r.tier <= level).map((r) => ({
+  return withoutCodWhenOff(WAREHOUSE_ROUTES, codOffered).filter((r) => r.nav && r.tier <= level).map((r) => ({
     href: r.href,
     label: r.label,
     icon: r.icon,

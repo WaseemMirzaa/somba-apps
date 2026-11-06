@@ -8,7 +8,8 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { errorMessage } from "@/lib/warehouse-live";
 import { parseCashAmount } from "@/lib/cash-amount";
 import { formatCurrency } from "@/lib/utils";
-import type { RiderTask } from "@/lib/rider";
+import { useCodEnabled, type RiderTask } from "@/lib/rider";
+import { showTaskCash } from "@/lib/rider-cod";
 import { FAIL_REASONS, canReportFailure, failedPayload, nextStep, stepPayload } from "@/lib/rider-actions";
 
 /** Run one rider action and report the real outcome. Resolves true only after the server acknowledged. */
@@ -78,7 +79,9 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
   const [code, setCode] = useState("");
   // Cash on delivery: the amount taken at the door, which starts at the amount due. The server refuses any other amount.
   const [cash, setCash] = useState(() => (task.codAmount > 0 ? task.codAmount.toFixed(2) : ""));
-  const cod = task.codAmount > 0;
+  const codEnabled = useCodEnabled();
+  // COD is not offered: the cash field only appears while it is on, or while this very task still has cash due.
+  const cod = showTaskCash(codEnabled, task);
   // The API flags every customer delivery `needsCode`; the code is only enforced when the platform setting is on.
   const [requireCode, setRequireCode] = useState(false);
   useEffect(() => {

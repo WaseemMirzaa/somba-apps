@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
 import { Tabs } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/data-table";
+import { AttachmentGallery } from "@/components/seller/attachments";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote, Modal } from "@/components/admin/modal";
 import { useLocale } from "@/context/locale-context";
@@ -261,6 +262,7 @@ function ReviewsInner() {
                       return (
                         <div className="max-w-md space-y-2">
                           <TranslatableText kind="review" id={r.id} text={r.text} className="whitespace-pre-line break-words text-slate-700" />
+                          <AttachmentGallery urls={r.photos} />
                           {r.sellerReply && (
                             <div className="rounded-lg border-l-2 border-[var(--primary)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
                               <p className="font-semibold text-slate-700">

@@ -142,6 +142,8 @@ export interface StaffRow {
   hubId?: string | null;
   /** Warehouse staff only: operator / supervisor / manager. */
   warehouseTier?: "operator" | "supervisor" | "manager" | null;
+  /** Two-factor authentication is on for this account. */
+  twofaEnabled?: boolean;
 }
 export interface SupportMessage {
   id?: string;

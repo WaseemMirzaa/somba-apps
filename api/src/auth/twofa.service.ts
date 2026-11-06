@@ -1,9 +1,10 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
+import { isStaff2faRole } from './staff-twofa';
 import { hashRecovery, looksLikeRecovery, newRecoveryCodes, newTotpSecret, otpauthUrl, verifyTotp } from './totp';
 
 export interface TwoFaChallenge {
@@ -156,6 +157,35 @@ export class TwoFaService {
     user.twofaRecovery = JSON.stringify(codes.map(hashRecovery));
     await this.users.save(user);
     return { recoveryCodes: codes };
+  }
+
+  /**
+   * The super admin switches off another staff member's two-factor authentication (a lost phone and lost recovery codes).
+   * The person is signed out everywhere, told by a security notice, and must set it up again (at once, if the platform requires
+   * it). The caller audits it and drops the person's open sockets. Staff means the admin roles, warehouse staff and riders.
+   */
+  async resetForStaff(actor: { id: string; role: string }, targetId: string): Promise<{ id: string; name: string; email: string; role: User['role'] }> {
+    if (actor.role !== 'admin') throw new ForbiddenException('Super admin only.');
+    if (actor.id === targetId) throw new BadRequestException('Use "Turn off" on your own account page to change your own two-factor authentication.');
+    const target = await this.users.findById(targetId);
+    if (!target) throw new BadRequestException('Account not found.');
+    if (!isStaff2faRole(target.role) && target.role !== 'warehouse_staff' && target.role !== 'rider') {
+      throw new BadRequestException('Only staff accounts can be reset here.');
+    }
+    if (!target.twofaEnabled && !target.twofaSecret) throw new BadRequestException('Two-factor authentication is not on for this account.');
+    target.twofaEnabled = false;
+    target.twofaSecret = null;
+    target.twofaRecovery = null;
+    target.twofaLastStep = 0;
+    target.tokenVersion = (target.tokenVersion ?? 0) + 1; // every session and pending sign-in challenge of theirs dies
+    await this.users.save(target);
+    this.failures.delete(target.id);
+    await this.tell(target.id, {
+      title: 'Two-factor authentication reset',
+      body: 'A super admin reset two-factor authentication on your account. Sign in again and set it up again.',
+      type: 'security',
+    });
+    return { id: target.id, name: target.name, email: target.email, role: target.role };
   }
 
   // ── Login step-up ────────────────────────────────────────────────────────

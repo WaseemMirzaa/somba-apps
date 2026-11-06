@@ -122,7 +122,7 @@ export class EngagementGateway {
   }
 
   @SubscribeMessage('reviews:create')
-  async create(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { productId: string; rating: number; text: string }) {
+  async create(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { productId: string; rating: number; text: string; photos?: string[] }) {
     try {
       const user = requireUser(client);
       return ok(await this.reviews.create({ id: user.id, name: user.name }, body));

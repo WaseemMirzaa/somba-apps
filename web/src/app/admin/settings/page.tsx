@@ -13,6 +13,8 @@ import { PlansEditor } from "@/components/admin/plans-editor";
 import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { codOffered } from "@/lib/cod-visibility";
+import { errMessage } from "@/lib/seller-labels";
 
 type Values = Record<string, string>;
 
@@ -71,7 +73,7 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Retours et vendeurs",
     fields: [
       { key: "returnWindowDays", kind: "text", label: "Return window (days)", labelFr: "Délai de retour (jours)", hint: "Whole days 0 to 90 after delivery. 0 closes returns.", hintFr: "Jours entiers de 0 à 90 après la livraison. 0 ferme les retours.", inputMode: "numeric", range: { min: 0, max: 90, integer: true } },
-      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, the customer may escalate to Somba support.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader au support Somba.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
+      { key: "sellerResponseHours", kind: "text", label: "Seller response time (hours)", labelFr: "Délai de réponse du vendeur (heures)", hint: "0.001 to 720. After it, a return can be escalated by the customer to Somba support; for a dispute, replacement or exchange the customer, the seller and support are told.", hintFr: "0,001 à 720. Passé ce délai, le client peut escalader un retour au support Somba ; pour un litige, un remplacement ou un échange, le client, le vendeur et le support sont prévenus.", inputMode: "decimal", range: { min: 0.001, max: 720 } },
       { key: "seller2faRequired", kind: "toggle", label: "Require two-factor authentication for store owners", labelFr: "Exiger l'authentification à deux facteurs pour les propriétaires", hint: "On: store owners without 2FA can only open Settings > Security until they turn it on.", hintFr: "Activé : un propriétaire sans 2FA ne peut ouvrir que Paramètres > Sécurité tant qu'il ne l'a pas activée." },
     ],
   },
@@ -91,6 +93,35 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     titleFr: "Catalogue",
     fields: [
       { key: "productModeration", kind: "toggle", label: "Moderate new seller products", labelFr: "Modérer les nouveaux produits vendeurs", hint: "On: new listings wait for approval. Off: they go live at once.", hintFr: "Activé : les nouvelles annonces attendent une approbation. Désactivé : publication immédiate." },
+    ],
+  },
+  {
+    title: "Staff security",
+    titleFr: "Sécurité du personnel",
+    fields: [
+      { key: "requireStaffTwoFactor", kind: "toggle", label: "Require two-factor authentication for staff", labelFr: "Exiger l'authentification à deux facteurs pour le personnel", hint: "On: an admin without 2FA can sign in but can only open My account until they set it up. Only the super admin can change this, and only once their own 2FA is on.", hintFr: "Activé : un admin sans 2FA peut se connecter mais ne peut ouvrir que Mon compte tant qu'il ne l'a pas configurée. Seul le super admin peut le modifier, et seulement une fois sa propre 2FA activée." },
+    ],
+  },
+  {
+    title: "Fraud rules",
+    titleFr: "Règles de fraude",
+    fields: [
+      { key: "fraudFailedPayments24h", kind: "text", label: "Failed payments in 24 hours", labelFr: "Paiements échoués en 24 heures", hint: "2 to 100. At or above this, one alert per customer per day.", hintFr: "2 à 100. À partir de ce nombre, une alerte par client et par jour.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+      { key: "fraudNewAccountOrders24h", kind: "text", label: "Orders in 24 hours from a new account", labelFr: "Commandes en 24 heures d'un compte récent", hint: "2 to 100. Applies to accounts younger than the number of days below.", hintFr: "2 à 100. Concerne les comptes plus récents que le nombre de jours ci-dessous.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+      { key: "fraudNewAccountDays", kind: "text", label: "A new account is younger than (days)", labelFr: "Un compte est récent s'il a moins de (jours)", hint: "1 to 90.", hintFr: "1 à 90.", inputMode: "numeric", range: { min: 1, max: 90, integer: true } },
+      { key: "fraudSharedAccounts", kind: "text", label: "Accounts sharing a phone or device", labelFr: "Comptes partageant un téléphone ou un appareil", hint: "2 to 50. The same phone number or the same device on this many customer accounts.", hintFr: "2 à 50. Le même numéro ou le même appareil sur ce nombre de comptes clients.", inputMode: "numeric", range: { min: 2, max: 50, integer: true } },
+      { key: "fraudReturnRatePct", kind: "text", label: "Return / refund rate over 30 days (%)", labelFr: "Taux de retours / remboursements sur 30 jours (%)", hint: "1 to 100. Share of the last 30 days' orders that were returned, disputed or refunded.", hintFr: "1 à 100. Part des commandes des 30 derniers jours retournées, contestées ou remboursées.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
+      { key: "fraudReturnMinOrders", kind: "text", label: "Fewest orders before the return rate counts", labelFr: "Minimum de commandes avant de juger le taux de retours", hint: "1 to 100. Below this many orders in 30 days the rate is not judged.", hintFr: "1 à 100. En dessous de ce nombre de commandes sur 30 jours, le taux n'est pas jugé.", inputMode: "numeric", range: { min: 1, max: 100, integer: true } },
+      { key: "fraudAddressChanges24h", kind: "text", label: "Address changes in 24 hours before delivery", labelFr: "Changements d'adresse en 24 heures avant livraison", hint: "2 to 100. Counted only while one of the customer's orders is still on its way.", hintFr: "2 à 100. Comptés seulement tant qu'une commande du client est encore en route.", inputMode: "numeric", range: { min: 2, max: 100, integer: true } },
+    ],
+  },
+  {
+    title: "Help and contact (customer app)",
+    titleFr: "Aide et contact (application client)",
+    fields: [
+      { key: "supportPhone", kind: "text", label: "Support phone", labelFr: "Téléphone du support", hint: "Shown in the app's Help screen as a Call us row. Leave empty to hide it.", hintFr: "Affiché dans l'écran Aide de l'application (ligne « Nous appeler »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportEmail", kind: "text", label: "Support e-mail", labelFr: "E-mail du support", hint: "Shown in Help as a Send an e-mail row. Leave empty to hide it.", hintFr: "Affiché dans Aide (ligne « Envoyer un e-mail »). Laissez vide pour le masquer.", inputMode: "text" },
+      { key: "supportWhatsapp", kind: "text", label: "WhatsApp number", labelFr: "Numéro WhatsApp", hint: "With the country code, e.g. +243 970 000 000. Help opens a WhatsApp chat with it. Leave empty to hide it.", hintFr: "Avec l'indicatif du pays, ex. +243 970 000 000. Aide ouvre une discussion WhatsApp. Laissez vide pour le masquer.", inputMode: "text" },
     ],
   },
 ];
@@ -177,7 +208,7 @@ export default function AdminSettingsPage() {
       setDraft((d) => ({ ...d, [key]: all[key] ?? d[key] }));
       return true;
     } catch (e) {
-      setErrors((er) => ({ ...er, [key]: errMsg(e) }));
+      setErrors((er) => ({ ...er, [key]: errMessage(e) }));
       return false;
     } finally {
       setSavingKey(null);
@@ -204,6 +235,8 @@ export default function AdminSettingsPage() {
   }
 
   const anyDirty = GROUPS.some((g) => g.fields.some((f) => dirty(f.key)));
+  // Cash on delivery is not offered unless the server value is "true": then the toggle gives way to a read-only line and the cap is hidden.
+  const codOff = !codOffered(saved.codEnabled);
 
   return (
     <div className="space-y-6">
@@ -222,9 +255,18 @@ export default function AdminSettingsPage() {
             <div key={g.title} className="card-premium space-y-4 p-6">
               <h3 className="font-semibold">{fr ? g.titleFr : g.title}</h3>
               <div className="grid gap-5 lg:grid-cols-2">
-                {g.fields.map((f) => {
+                {g.fields.filter((f) => !(codOff && f.key === "codCapUsd")).map((f) => {
                   const err = errors[f.key];
                   const busy = savingKey === f.key;
+                  if (codOff && f.key === "codEnabled") {
+                    return (
+                      <div key={f.key} className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>
+                        <p className="text-sm text-slate-600" data-testid="cod-not-offered">{fr ? "Non proposé" : "Not offered"}</p>
+                        <p className="text-xs text-slate-400">{fr ? "Le paiement à la livraison n'est pas proposé sur cette plateforme." : "Cash on delivery is not offered on this platform."}</p>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={f.key} className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>

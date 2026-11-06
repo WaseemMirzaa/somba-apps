@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain HTTP is allowed ONLY to the test server's IP (no domain/HTTPS yet). Every other host must use HTTPS.
+     Remove the domain-config once the API has a domain with a certificate. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">107.170.116.169</domain>
+    </domain-config>
+</network-security-config>

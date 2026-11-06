@@ -61,6 +61,19 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['SOM-1001: pickup is now in your tasks.', 'SOM-1001 : tâche « enlèvement » ajoutée à vos tâches.'],
     ['SOM-1001: return to seller is now in your tasks.', 'SOM-1001 : tâche « retour au vendeur » ajoutée à vos tâches.'],
   ],
+  '{}: {} has been open for {} hours.': [
+    ['SOM-1001: delivery has been open for 26 hours.', 'SOM-1001 : tâche « livraison » ouverte depuis 26 heures.'],
+    ['SOM-1001: return to seller has been open for 50 hours.', 'SOM-1001 : tâche « retour au vendeur » ouverte depuis 50 heures.'],
+  ],
+  '{}: {} has been open for {} hours and needs a decision.': [
+    ['SOM-1001: delivery has been open for 74 hours and needs a decision.', 'SOM-1001 : tâche « livraison » ouverte depuis 74 heures, une décision est nécessaire.'],
+  ],
+  '{}: the customer parcel is going back to the seller. Review the order.': [
+    ['SOM-1001: the customer parcel is going back to the seller. Review the order.', 'SOM-1001 : le colis du client retourne chez le vendeur. Vérifiez la commande.'],
+  ],
+  '{} could not be delivered and is going back to the seller. Our team will contact you about your order.': [
+    ['SOM-1001 could not be delivered and is going back to the seller. Our team will contact you about your order.', 'SOM-1001 n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.'],
+  ],
   '{}: a rider will collect your package.': [['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.']],
   '{}: your package reached the warehouse.': [['SOM-1001: your package reached the warehouse.', 'SOM-1001 : votre colis est arrivé à l’entrepôt.']],
   '{}: the delivery address has no map pin, so it was routed to {}.': [
@@ -278,6 +291,9 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   ],
   'Two-factor authentication was turned off on your account.': [
     ['Two-factor authentication was turned off on your account.', 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
+  ],
+  'A super admin reset two-factor authentication on your account. Sign in again and set it up again.': [
+    ['A super admin reset two-factor authentication on your account. Sign in again and set it up again.', 'Un super admin a réinitialisé l’authentification à deux facteurs de votre compte. Reconnectez-vous et configurez-la de nouveau.'],
   ],
   'Your store is open again and takes new orders.': [['Your store is open again and takes new orders.', 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.']],
   'Your store badge is now {} (was {}).': [

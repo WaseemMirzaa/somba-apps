@@ -342,7 +342,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok((await req(warehouse.sock, 'warehouse:reconcile')).ok, 'warehouse:reconcile (cash per rider)');
   a = await req(warehouse.sock, 'warehouse:riders');
   ok(a.ok && a.data.some((r) => r.name), 'warehouse:riders lists active riders');
-  for (const ev of ['warehouse:hubs', 'warehouse:parcels', 'warehouse:aged', 'warehouse:inventory', 'warehouse:reconcile', 'warehouse:riders', 'warehouse:batches', 'warehouse:transfers']) {
+  for (const ev of ['warehouse:hubs', 'warehouse:parcels', 'warehouse:aged', 'warehouse:inventory', 'warehouse:reconcile', 'warehouse:riders', 'warehouse:batches']) {
     ok(!(await req(cust.sock, ev)).ok && !(await req(rider.sock, ev)).ok, `${ev} is closed to customers and riders`);
   }
   // batch
@@ -359,13 +359,6 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(a.ok && a.data.length > 0, 'warehouse:batches lists it');
   const moved = (await req(warehouse.sock, 'delivery:list')).data.find((t) => t.id === tb.id);
   ok(moved.status === 'assigned' && moved.riderId === rid.id, 'the parcel is now assigned to that rider');
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'Entrepôt Kinshasa', toHub: 'Entrepôt Limete', sku: 'SKU-1', productName: 'Thing', qty: 5, status: 'received', id: 'evil' });
-  ok(a.ok && a.data.status === 'requested' && a.data.id !== 'evil', 'a stock transfer is created (client cannot set status or id)');
-  ok(!(await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'A', toHub: 'A', sku: 's', qty: 1 })).ok, 'a transfer to the same hub is refused');
-  ok(!(await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: 'A', toHub: 'B', sku: 's', qty: -3 })).ok, 'a negative transfer quantity is refused');
-  a = await req(warehouse.sock, 'warehouse:transfers');
-  ok(a.ok && a.data.length > 0, 'warehouse:transfers lists transfers');
-
   a = await req(warehouse.sock, 'exceptions:create', { orderReference: ob.reference, taskId: tb.id, type: 'damaged', severity: 'high', hub: 'Entrepôt Kinshasa', notes: 'Box crushed' });
   ok(a.ok && a.data.status === 'open', 'warehouse raises an exception');
   const exc = a.data;
@@ -572,11 +565,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(a.ok && a.data.active === false, 'admin deactivates the hub');
   ok(!(await req(warehouse.sock, 'warehouse:hubs', { activeOnly: true })).data.some((h) => h.id === hub.id), 'activeOnly hides it');
   ok((await req(warehouse.sock, 'warehouse:hubs')).data.some((h) => h.id === hub.id && h.active === false), 'the directory still lists it as inactive');
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Entrepôt Kinshasa', sku: 'SKU-1', qty: 2 });
-  ok(!a.ok && /deactivated/.test(a.error ?? ''), 'a deactivated hub cannot take transfers', a.error ?? '');
   await req(admin.sock, 'warehouse:setHubActive', { id: hub.id, active: true });
-  a = await req(warehouse.sock, 'warehouse:createTransfer', { fromHub: hub.name, toHub: 'Entrepôt Kinshasa', sku: 'SKU-1', qty: 2 });
-  ok(a.ok, 'once reactivated it can again');
 
   section('List pagination (limit / offset), same array shape');
   const all = (await req(cust.sock, 'products:list')).data;

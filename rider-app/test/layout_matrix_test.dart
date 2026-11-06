@@ -12,7 +12,12 @@ import 'package:somba_rider/screens/work_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/profile_screen.dart';
 import 'package:somba_rider/screens/support_screen.dart';
+import 'package:somba_rider/screens/location_access_screen.dart';
+import 'package:somba_rider/screens/task_route_screen.dart';
+import 'package:somba_rider/services/location_reporter.dart';
+import 'package:somba_rider/services/maps_config.dart';
 import 'package:somba_rider/services/models.dart';
+import 'package:somba_rider/services/route_line.dart';
 import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/services/support_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
@@ -21,7 +26,7 @@ import 'layout_checks.dart';
 import 'task_fixtures.dart';
 
 /// What a screen is shown with.
-enum _Scenario { cards, single, empty, runs }
+enum _Scenario { cards, single, empty, runs, noCod }
 
 Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   SharedPreferences.setMockInitialValues({});
@@ -30,6 +35,8 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean-Pierre Mukendi', role: 'rider', phone: '+243810000000');
   store.loaded = true;
   store.requireDeliveryCode = true;
+  store.codEnabled = scenario != _Scenario.noCod;
+  MapsConfig.debugEnabledOverride = true; // the "Route map" button is on every active card
   store.stats = const WorkStatsDto(
     totalTasks: 128,
     completed: 117,
@@ -53,7 +60,7 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.myTasks.clear();
   store.debugResetSession();
   switch (scenario) {
-    case _Scenario.cards:
+    case _Scenario.cards || _Scenario.noCod:
       store.myTasks.addAll([
         leg('pickup', id: 'a1'),
         leg('transfer', id: 'a2', status: 'picked_up'),
@@ -134,6 +141,8 @@ void main() {
     store.notifications.clear();
     store.assignment = null;
     store.requireDeliveryCode = false;
+    store.codEnabled = false;
+    MapsConfig.debugEnabledOverride = null;
     store.stats = const WorkStatsDto();
     resetSupport();
   });
@@ -159,6 +168,13 @@ void main() {
     'deliveries: nothing assigned': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.empty),
     'profile': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.cards),
     'my work': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.cards),
+    'deliveries: active cards, COD off': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.noCod),
+    'my work, COD off': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.noCod),
+    'location access: why we ask': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.denied), initial: LocationAccess.denied), null, _Scenario.cards),
+    'location access: turned off, open settings': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.deniedForever), initial: LocationAccess.deniedForever), null, _Scenario.cards),
+    'location access: GPS off': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.serviceOff), initial: LocationAccess.serviceOff), null, _Scenario.cards),
+    'route map: stop, distance and straight-line note': ((l) => TaskRouteScreen(task: leg('delivery', id: 'a3', status: 'in_transit', cod: 125.5), mapBuilder: (c, d) => const ColoredBox(color: Color(0xFFDDE6F5)), routes: RouteService(apiKey: ''), positionOnce: () async => (lat: -4.3217, lng: 15.3125)), null, _Scenario.cards),
+    'route map: no pin and no position': ((l) => TaskRouteScreen(task: leg('delivery', id: 'a3', status: 'in_transit', legacy: true), mapBuilder: (c, d) => const ColoredBox(color: Color(0xFFDDE6F5)), routes: RouteService(apiKey: ''), positionOnce: () async => null), null, _Scenario.cards),
     'sign in': ((l) => const RiderLoginScreen(), null, _Scenario.cards),
     'forgot password': ((l) => const ForgotPasswordScreen(), null, _Scenario.cards),
     'failure sheet': ((l) => const Scaffold(body: SingleChildScrollView(child: FailReasonSheet())), null, _Scenario.cards),

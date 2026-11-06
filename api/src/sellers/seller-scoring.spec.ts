@@ -61,7 +61,7 @@ describe('SellerScoringService', () => {
       ds.getRepository(Product),
       emitter as never,
       { toUser: async (to: string, n: { title: string; body: string }) => void notices.push({ to, ...n }) } as never,
-      { withPlanState: async (s: Seller) => ({ id: s.id, rating: s.rating, badge: s.badge }) } as never,
+      { withPlanState: async (s: Seller) => ({ id: s.id, rating: s.rating, badge: s.badge, legalName: 'Mama SARL', idNumber: 'ID-1', taxNumber: 'TX-1', documentUrls: ['/uploads/x'], phone: '+243800000000' }) } as never,
     );
   });
   afterEach(() => ds.destroy());
@@ -112,6 +112,13 @@ describe('SellerScoringService', () => {
     expect(saved.scoreUpdatedAt).toBeInstanceOf(Date);
     expect(emitter.sent.some((e) => e.to === 'user:o1' && e.event === 'seller:updated')).toBe(true);
     expect(emitter.sent.some((e) => e.event === 'seller:updated' && e.to.includes('admin'))).toBe(true);
+    // the identity papers only reach the KYC reviewers' rooms, not Marketing, Support or Finance
+    const adminPushes = emitter.sent.filter((e) => e.event === 'seller:updated' && !e.to.startsWith('user:'));
+    expect(adminPushes.length).toBeGreaterThan(1);
+    for (const p of adminPushes) {
+      const reviewer = p.to.split(',').every((r) => ['admin', 'admin_moderation', 'admin_operations'].includes(r));
+      for (const k of ['legalName', 'idNumber', 'taxNumber', 'documentUrls', 'phone']) expect(k in p.payload).toBe(reviewer);
+    }
     expect(notices).toMatchObject([{ to: 'o1', title: 'Seller badge updated', body: 'Your store badge is now silver (was bronze).' }]);
     // nothing changed: nothing announced
     emitter.sent.length = 0;

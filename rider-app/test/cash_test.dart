@@ -51,6 +51,7 @@ void main() {
     store.requireDeliveryCode = false;
     store.myTasks.clear();
     store.cash = const CashDto();
+    store.codEnabled = true; // these tests are about COD being on; cod_hidden_test.dart covers it off
     store.transport = (event, body) async {
       calls.add(event);
       sent.add(body);
@@ -81,6 +82,7 @@ void main() {
     store.user = null;
     store.myTasks.clear();
     store.cash = const CashDto();
+    store.codEnabled = false;
     store.requireDeliveryCode = false;
     resetSupport();
   });

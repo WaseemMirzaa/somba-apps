@@ -34,6 +34,7 @@ import {
   Bell,
   Globe2,
   Route,
+  ShieldCheck,
 } from "lucide-react";
 
 export type AdminDepartment =
@@ -70,6 +71,7 @@ const SUPER_SECTION: AdminNavSection = {
     { href: "/admin", label: "dashboard", icon: LayoutDashboard, i18n: true },
     { href: "/admin/roles", label: "roles", icon: Users, i18n: true },
     { href: "/admin/notifications", label: "notifications", icon: Bell, i18n: true },
+    { href: "/admin/account", label: "myAccount", icon: ShieldCheck, i18n: true },
     { href: "/admin/audit", label: "auditLog", icon: FileText, i18n: true },
     { href: "/admin/settings", label: "settings", icon: Settings, i18n: true },
   ],
@@ -151,6 +153,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
+      // Support may suspend accounts (`customers:setActive`), so it sees the fraud alerts whose action is a block.
+      { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },
     ],
   },
 ];
@@ -160,11 +164,14 @@ const NOTIFICATIONS_SECTION: AdminNavSection = {
   id: "super",
   titleEn: "Account",
   titleFr: "Compte",
-  items: [{ href: "/admin/notifications", label: "notifications", icon: Bell, i18n: true }],
+  items: [
+    { href: "/admin/notifications", label: "notifications", icon: Bell, i18n: true },
+    { href: "/admin/account", label: "myAccount", icon: ShieldCheck, i18n: true },
+  ],
 };
 
 /** Pages open to every department. */
-const SHARED_PATHS = ["/admin/notifications"];
+const SHARED_PATHS = ["/admin/notifications", "/admin/account"];
 
 const SECTION_BY_ID = new Map<AdminDepartment, AdminNavSection>(
   DEPARTMENT_SECTIONS.map((s) => [s.id, s])

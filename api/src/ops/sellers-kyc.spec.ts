@@ -41,9 +41,10 @@ function setup(seed: { sellers?: Record<string, unknown>[]; products?: Record<st
     },
   };
   const emitted: [string, string][] = [];
+  const rolePushes: { roles: string[]; ev: string; payload: any }[] = [];
   const notified: any[] = [];
   const emitter = {
-    toRoles: (_r: unknown, ev: string, payload: any) => emitted.push([ev, payload?.id]),
+    toRoles: (roles: string[], ev: string, payload: any) => (rolePushes.push({ roles, ev, payload }), emitted.push([ev, payload?.id])),
     toUser: (_u: unknown, ev: string, payload: any) => emitted.push([ev, payload?.id]),
   };
   // Listings are re-published composed by ProductsService; here we only record that they were.
@@ -64,7 +65,7 @@ function setup(seed: { sellers?: Record<string, unknown>[]; products?: Record<st
     {} as never,
     productsSvc as never,
   );
-  return { svc, sellers, products, emitted, notified };
+  return { svc, sellers, products, emitted, notified, rolePushes };
 }
 
 // `In(...)` builds a FindOperator; the fake repo only needs its value list.
@@ -232,5 +233,74 @@ describe('SellersService.setStatus', () => {
       p6: 'draft',
     });
     expect(sellers[0]).toMatchObject({ status: 'approved', suspendedListingIds: null, statusReason: 'Documents verified' });
+  });
+});
+
+describe('what each admin role sees of a store (KYC is for the reviewers)', () => {
+  const PAPERS = ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls', 'phone', 'kycSubmittedAt', 'termsAcceptedAt', 'payoutAccountMasked'];
+  const REVIEWERS = ['admin', 'admin_moderation', 'admin_operations'];
+  const OTHERS = ['admin_finance', 'admin_support', 'admin_marketing'];
+  const store = () => ({
+    id: 's1',
+    userId: 'owner1',
+    name: 'Mama Store',
+    description: 'Fresh produce from Kinshasa',
+    status: 'pending',
+    legalName: 'Mama Store SARL',
+    phone: '+243812345678',
+    idNumber: 'ID-123456',
+    rccm: 'CD/KIN/RCCM/12345',
+    taxNumber: 'A1234567K',
+    documentUrls: JSON.stringify([UP(0)]),
+    kycSubmittedAt: new Date(),
+    termsAcceptedAt: new Date(),
+    payoutAccount: '0812345678',
+    createdAt: new Date(),
+  });
+
+  it('sellers:list: reviewers get legal name, ID, RCCM, tax number and document links; every other admin role gets the public profile', async () => {
+    const { svc } = setup({ sellers: [store()] });
+    for (const role of REVIEWERS) {
+      const [row] = await svc.list(undefined, {}, role);
+      expect(row).toMatchObject({ id: 's1', name: 'Mama Store', legalName: 'Mama Store SARL', idNumber: 'ID-123456', rccm: 'CD/KIN/RCCM/12345', taxNumber: 'A1234567K', documentUrls: [UP(0)] });
+    }
+    for (const role of OTHERS) {
+      const [row] = await svc.list(undefined, {}, role);
+      expect(row).toMatchObject({ id: 's1', name: 'Mama Store', status: 'pending', description: 'Fresh produce from Kinshasa' });
+      for (const k of PAPERS) expect(row).not.toHaveProperty(k);
+      expect(JSON.stringify(row)).not.toMatch(/SARL|ID-123456|RCCM|A1234567K|uploads|0812345678/);
+      expect(row).toHaveProperty('userId', 'owner1'); // an internal id, not KYC: payouts are keyed by it
+    }
+  });
+
+  it('an unknown role is treated like a non-reviewer (least privilege by default)', async () => {
+    const { svc } = setup({ sellers: [store()] });
+    const [row] = await svc.list(undefined, {}, 'customer');
+    for (const k of PAPERS) expect(row).not.toHaveProperty(k);
+  });
+
+  it('sellers:get: the same split, and the plan in force stays visible to everyone', async () => {
+    const { svc } = setup({ sellers: [store()] });
+    for (const role of REVIEWERS) expect(await svc.getForAdmin('s1', role)).toMatchObject({ legalName: 'Mama Store SARL', documentUrls: [UP(0)], activePlan: expect.any(String) });
+    for (const role of OTHERS) {
+      const row = await svc.getForAdmin('s1', role);
+      expect(row).toMatchObject({ id: 's1', name: 'Mama Store', activePlan: expect.any(String) });
+      for (const k of PAPERS) expect(row).not.toHaveProperty(k);
+    }
+    await expect(svc.getForAdmin('nope', 'admin')).rejects.toThrow('Seller not found.');
+  });
+
+  it('the live seller:updated push: the full record to the reviewers’ rooms, the public profile to the other admin rooms', async () => {
+    const { svc, rolePushes } = setup({ sellers: [{ ...store(), id: 's1' }] });
+    await svc.setStatus('s1', 'approved');
+    const pushes = rolePushes.filter((p) => p.ev === 'seller:updated');
+    expect(pushes).toHaveLength(2);
+    const full = pushes.find((p) => p.roles.includes('admin'))!;
+    const pub = pushes.find((p) => p.roles.includes('admin_finance'))!;
+    expect([...full.roles].sort()).toEqual([...REVIEWERS].sort());
+    expect([...pub.roles].sort()).toEqual([...OTHERS].sort());
+    expect(full.payload).toMatchObject({ legalName: 'Mama Store SARL', idNumber: 'ID-123456' });
+    for (const k of PAPERS) expect(pub.payload).not.toHaveProperty(k);
+    expect(pub.payload).toMatchObject({ id: 's1', name: 'Mama Store', status: 'approved', userId: 'owner1' });
   });
 });

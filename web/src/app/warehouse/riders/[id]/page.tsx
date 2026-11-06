@@ -14,6 +14,7 @@ import { BATCH_STATUS, batchTaskIds, pick, useOpsQuery, type BatchRow } from "@/
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { useCodOffered } from "@/lib/use-cod-offered";
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,7 @@ export default function WarehouseRiderDetailPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
+  const codOffered = useCodOffered();
   const { riders, ridersLoading } = useWarehouseData();
   const parcels = useDeskQueue({ status: "all" }).tasks;
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
@@ -79,7 +81,7 @@ export default function WarehouseRiderDetailPage() {
           <InfoGrid columns={3} items={[
             { label: fr ? "Livrées" : "Delivered", value: delivered.length },
             { label: fr ? "Échouées" : "Failed", value: failed.length },
-            { label: fr ? "COD encaissé" : "COD collected", value: formatCurrency(cod, locale) },
+            ...(codOffered ? [{ label: fr ? "COD encaissé" : "COD collected", value: formatCurrency(cod, locale) }] : []),
           ]} />
         </DetailGridSection>
 

@@ -715,6 +715,23 @@ export class ProductsService {
     return { name: base.name ?? null, description: base.description ?? null, variants: base.variants ?? null };
   }
 
+  private readonly liveListeners: ((p: ServedProduct) => void | Promise<void>)[] = [];
+
+  /**
+   * Run `fn` whenever a listing becomes visible to shoppers: created live, or approved/restored from another status.
+   * Failures are logged by the caller's own code, never thrown into the listing change.
+   */
+  onWentLive(fn: (p: ServedProduct) => void | Promise<void>): void {
+    this.liveListeners.push(fn);
+  }
+
+  private wentLive(p: ServedProduct): void {
+    for (const fn of this.liveListeners) {
+      // A listener that throws (now or later) never breaks the listing change.
+      void (async () => fn(p))().catch(() => undefined);
+    }
+  }
+
   /**
    * Create a listing. Words: `name` / `nameFr` (at least one: C-I1), `description` / `descriptionFr`, options.
    * Only the English given -> sourceLang en; only the French -> fr. The other language, if typed, is an author
@@ -764,6 +781,7 @@ export class ProductsService {
     // Shoppers only hear about listings that are live; staff see every new one
     // (a pending listing lands in the moderation queue).
     this.emitter.toRoles(product.status === 'live' ? ['customer', ...STAFF_ROLES] : STAFF_ROLES, 'product:created', product);
+    if (product.status === 'live') this.wentLive(product);
     return product;
   }
 
@@ -827,6 +845,7 @@ export class ProductsService {
     this.corpus = null;
     const product = await this.get(id);
     if (product) this.emitter.toRoles(this.roomsFor(product.status, before.status === 'live'), 'product:updated', product);
+    if (product && product.status === 'live' && before.status !== 'live') this.wentLive(product);
     return product;
   }
 

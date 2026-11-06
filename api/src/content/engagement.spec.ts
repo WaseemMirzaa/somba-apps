@@ -215,3 +215,57 @@ describe('product questions', () => {
     expect(await svc.answer('missing', 'x', 'y')).toBeNull();
   });
 });
+
+describe('photos in reviews', () => {
+  const P = (n: number) => `http://x/uploads/00000000-0000-4000-8000-00000000000${n}.jpg`;
+
+  it('keeps up to 4 uploaded photos, in order, and every list returns them as a list', async () => {
+    await delivered();
+    const r = await svc.create(customer, { productId: product.id, rating: 5, text: 'Great, see the photos', photos: [P(1), P(2), P(3), P(4)] });
+    expect(r.photos).toEqual([P(1), P(2), P(3), P(4)]);
+    expect(((await svc.listForProduct(product.id))[0] as Review).photos).toEqual([P(1), P(2), P(3), P(4)]);
+    expect((await svc.listForSeller(s1.id))[0].photos).toHaveLength(4);
+    expect((await svc.listForModeration({}))[0].photos).toHaveLength(4);
+    // Pushed to shoppers, the seller and moderators with the photos.
+    expect(events('user:su1', 'review:created')[0].payload.photos).toHaveLength(4);
+  });
+
+  it('a review without photos has an empty list, not null', async () => {
+    await delivered();
+    expect((await svc.create(customer, { productId: product.id, rating: 4, text: 'Fine' })).photos).toEqual([]);
+    expect((await svc.listForProduct(product.id))[0].photos).toEqual([]);
+  });
+
+  it('refuses a fifth photo, a link that is not an upload, and anything that is not a list, saving nothing', async () => {
+    await delivered();
+    await expect(svc.create(customer, { productId: product.id, rating: 5, text: 'Too many photos', photos: [P(1), P(2), P(3), P(4), P(5)] })).rejects.toThrow('up to 4 photos');
+    await expect(svc.create(customer, { productId: product.id, rating: 5, text: 'A stranger link', photos: ['https://evil.example/x.jpg'] })).rejects.toThrow('uploaded through the app');
+    await expect(svc.create(customer, { productId: product.id, rating: 5, text: 'Not a list', photos: P(1) as never })).rejects.toThrow('list of uploaded images');
+    expect(await ds.getRepository(Review).count()).toBe(0);
+  });
+
+  it('the same photo twice counts once', async () => {
+    await delivered();
+    expect((await svc.create(customer, { productId: product.id, rating: 5, text: 'Dupes', photos: [P(1), P(1)] })).photos).toEqual([P(1)]);
+  });
+
+  it('photos still need a delivered order, like the rest of the review', async () => {
+    await expect(svc.create(customer, { productId: product.id, rating: 5, text: 'Not bought', photos: [P(1)] })).rejects.toThrow('after it has been delivered');
+  });
+
+  it('a reported review is hidden with its photos: shoppers get no content, staff and the seller keep the record', async () => {
+    await delivered();
+    const r = await svc.create(customer, { productId: product.id, rating: 1, text: 'Awful, look at this', photos: [P(1), P(2)] });
+    await svc.report(sellerOne, r.id, 'The photo is not of our product');
+    await svc.setStatus(r.id, 'hidden', 'Photo is not the product');
+    expect(await svc.listForProduct(product.id)).toHaveLength(0);
+    expect(await svc.listForSeller(s1.id)).toHaveLength(0);
+    const shopper = emitter.sent.filter((e) => e.event === 'review:updated' && e.to === 'customer,guest').pop()!;
+    expect(shopper.payload).toEqual({ id: r.id, productId: product.id, status: 'hidden' });
+    expect(JSON.stringify(shopper.payload)).not.toContain('uploads');
+    // Moderators can still open it, photos included, and restore it.
+    expect((await svc.listForModeration({ status: 'hidden' }))[0].photos).toEqual([P(1), P(2)]);
+    await svc.setStatus(r.id, 'visible');
+    expect((await svc.listForProduct(product.id))[0].photos).toEqual([P(1), P(2)]);
+  });
+});

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
-import { useSellerPlan } from "@/lib/seller";
+import { useSellerAccess, useSellerPlan } from "@/lib/seller";
 import { cn } from "@/lib/utils";
 
 export function planName(plan: { name: string; nameFr?: string } | null, id: string, fr: boolean): string {
@@ -23,6 +23,8 @@ export function PlanSummary({ className }: { className?: string }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { plan, planId, expiresAt, used, max, atLimit, loaded } = useSellerPlan();
+  // Changing the plan belongs to the owner (`account`); a team member only sees where the store stands.
+  const canChange = useSellerAccess().can("account");
   if (!loaded) return null;
   const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
 
@@ -62,9 +64,11 @@ export function PlanSummary({ className }: { className?: string }) {
         )}
       </div>
 
-      <Link href="/seller/subscribe" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-        {atLimit ? (fr ? "Passer à une offre supérieure" : "Upgrade plan") : fr ? "Voir les offres" : "See plans"}
-      </Link>
+      {canChange && (
+        <Link href="/seller/subscribe" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          {atLimit ? (fr ? "Passer à une offre supérieure" : "Upgrade plan") : fr ? "Voir les offres" : "See plans"}
+        </Link>
+      )}
     </div>
   );
 }

@@ -203,7 +203,7 @@ a staff member's list holds their own hub only).
 - `delivery:updateStatus { taskId, status: 'delivered', cashUsd }`: on a cash-on-delivery customer delivery (`codAmountUsd > 0`) `cashUsd` is required and must equal the amount due, otherwise the call is refused with both figures ("The cash you entered ($35.00) is not the amount to collect ($40.00). ..."). On a prepaid delivery `cashUsd` must be absent or 0. The server writes `codCollectedUsd`, `codCollectedAt`, `codCollectedById` on the task in the same update that delivers it; a repeated "delivered" changes nothing. The payment turns "succeeded" (`PaymentsService.markCollected`) and the audit trail gets `payment.cod_collected` (entity payment) and `cod.collected` (entity delivery). A delivery closed by hand by an admin (`orders:updateStatus` to delivered) records the cash as taken and settled by that admin.
 - Task views carry `codCollectedUsd`, `codCollectedAt`, `codHandedOverUsd` (null / 0 before any, and for sellers).
 - `cash:mine` (rider) -> `{ collectedUsd, handedOverUsd, heldUsd, openTasks, handovers: [{ id, amountUsd, heldBeforeUsd, heldAfterUsd, receivedByName, note, createdAt }] }` (latest 20). The rider is pushed `cash:updated` when a hand-over is recorded.
-- `cash:handover { riderId, amountUsd, note?, clientRef? }` (supervisor or manager of the rider's warehouse, or an admin; `tierAllows(.., 'assign')`) -> `{ handover, balance }`. Partial amounts are fine, never more than the rider holds; the same `clientRef` is recorded once. Audit action `cod.handover`. `cash:history { hubId?, riderId?, limit? }` (any staff of the warehouse; admins all) -> the receipts, newest first.
+- `cash:handover { riderId, amountUsd, note?, clientRef? }` (supervisor or manager of the rider's warehouse, or `admin` / `admin_finance` / `admin_operations`; `tierAllows(.., 'assign')`) -> `{ handover, balance }`. Partial amounts are fine, never more than the rider holds; the same `clientRef` is recorded once. Audit action `cod.handover`. `cash:history { hubId?, riderId?, limit? }` (supervisors and managers of the warehouse; `admin` / `admin_finance` / `admin_operations` all warehouses; operators and the other admin roles are refused) -> the receipts, newest first.
 - `warehouse:reconcile` rows are `{ riderId, parcels, codUsd (due), collectedUsd, handedOverUsd, heldUsd, lastHandoverAt }`. Deliveries made before the record existed count in `codUsd` only.
 - Storage: `delivery_tasks.codCollectedUsd/codCollectedAt/codCollectedById/codHandedOverUsd` and the ledger table `cod_handovers` (migration `1793100000001-CodCashRecord`).
 
@@ -320,3 +320,52 @@ existed have `originBySeller: null`; the customer view reads them back from the 
 
 **Migration** `1792990000001-IntegrationFixes`: `warehouse_exceptions.hubId` (+ index; existing incidents are matched through their parcel, then the
 hub name), `orders.originBySeller` (text, JSON), `exchanges.attachments`.
+
+## 14. Warehouse operations (round 2, workstream D): settings, aged parcels, auto-assignment, analytics
+
+New gateway `warehouse-ops.gateway.ts` (same Socket.IO server). Riders are salaried and the warehouse assigns every task: nothing here has a
+rider accept, refuse or switch on duty, and analytics carry **counts and times only, never pay**.
+
+**Per-warehouse settings** (`hub_ops_settings`, one row per warehouse; none saved = defaults). A manager of the warehouse and `admin` /
+`admin_operations` edit them; the rest of the warehouse team and every admin read them. A staff member's own warehouse is always used (a
+`hubId` they send is ignored); an admin names it.
+
+| Event | Who | Notes |
+|---|---|---|
+| `hubSettings:get {hubId?}` | warehouse staff (own hub), admins (name the hub) | `{ hubId, workStart, workEnd, workDays[1..7], timezone, batchSize, autoAssign, autoAssignRule: 'least_busy', agedLevels: [h1,h2,h3], deliveryTargetHours, isDefault, openNow, updatedAt, updatedByName, canEdit }` |
+| `hubSettings:update {hubId?, ...patch}` | manager of that hub, `admin`, `admin_operations` | validated, audited (`hub.settings.updated`, before -> after), pushes `hubSettings:updated` to the hub room and admins |
+
+Defaults: Mon-Sat 08:00-18:00 `Africa/Kinshasa`, batch size 20, auto-assignment **off**, alert ages 24 / 48 / 72 h, delivery target 24 h.
+Validation: times `HH:MM` with closing after opening; at least one weekday (1 = Monday .. 7 = Sunday); a real IANA time zone; batch size 1..200;
+`autoAssign` boolean; `autoAssignRule` one of `least_busy`; `agedLevels` three whole hours 1..720, strictly increasing; target 1..240 h.
+The batch size is enforced by `WarehouseService.buildBatch` ("A batch at this warehouse holds at most N parcels.").
+
+**Aged parcels.** An open leg (any kind, age = hours since `createdAt`) that passes the warehouse's ages raises alert level 1, 2, 3
+(`aged_alerts`, unique per task and level). Levels 1 and 2 notify the warehouse's active **supervisors** (the managers if there are none),
+in-app and push (type `task`, opens the leg); level 3, the last, escalates to the warehouse **manager** and **every admin**. A leg first seen past
+several levels records the lower ones silently and alerts once, at the highest. The job (`WarehouseOpsJob`, every `WAREHOUSE_OPS_SWEEP_MS`,
+default 5 min, `0` = off, overlapping runs skipped) is idempotent: a level is claimed by inserting its row, so re-running, a second API instance
+or a restart tells nobody twice. `aged:summary {hubId?}` (supervisors and above, admins) -> `{ levels, counts: [n1,n2,n3], byTask: { [taskId]: { level, alertedAt } } }`.
+`warehouseOps:runNow {asOf?}` (`admin`, `admin_operations`) runs the job now; `asOf` moves the job's clock and is honoured **outside production only**
+(smokes use it to age parcels without waiting).
+
+**Return to seller** `aged:returnToSeller {taskId}` (supervisor or manager of the managing warehouse, admins): only a customer-bound leg
+(`delivery`, `replacement_delivery`) that is `unassigned` or `assigned` and not in a run. The leg is closed (`failed`, `failureReason: 'Returned to seller'`)
+and one `return_to_seller` leg per seller (their share of the order's goods, cancelled lines excluded) is opened from the warehouse
+(`parentTaskId` = the closed leg), for staff or auto-assignment to give a rider. Idempotent per parcel. The order is **not** cancelled or refunded:
+the admins ("Parcel returned to seller") and the customer ("Order update") are told; money stays with the admin tools.
+-> `{ closed: TaskView, legs: TaskView[] }`.
+
+**Auto-assignment.** When a warehouse has it on and is open (working day, between opening and closing in its zone), a new leg of kind `pickup`,
+`delivery`, `return_pickup`, `return_to_seller` or `replacement_delivery` is assigned on creation to the **least busy** active rider of that warehouse:
+fewest open tasks (`assigned`, `picked_up`, `in_transit`), ties to whoever was given fewer tasks in the last 24 h, then by name and id. It is an
+ordinary assignment (same claim, audit as "Auto-assignment", the rider gets "New task assigned to you"; staff get no "Task to assign"). Transfers are
+planned into runs and are not auto-assigned. Legs that waited (closed hours, switch off) are given out by the job once the warehouse is open.
+
+**Analytics** `analytics:legs {hubId?, from?, to?}` (managers, admins; `from` / `to` as `YYYY-MM-DD` UTC days, default the last 30 days, at most 366 days):
+`{ hubId, range, targetHours, onTime: { deliveries, onTime, late, ratePct }, legs: [{ kind, completed, failed, avgHours, avgTransitMinutes }], riders: [{ riderId, name, completed, failed, successRatePct }], totals: { completed, failed, voided } }`.
+A leg belongs to the warehouse that manages it. On time = a customer delivery handed over within the warehouse's target of the leg opening. A leg closed by
+the system or staff (order cancelled, seller cancelled, returned to seller, missing from a run) counts as `voided`, not as the rider's failure.
+
+Migration `1793200000004-WarehouseOps` (`hub_ops_settings`, `aged_alerts`; QueryRunner API, MySQL + SQLite). Notifications added (French in `localize.ts`):
+`Aged parcel`, `Parcel escalated`, `Parcel returned to seller`.

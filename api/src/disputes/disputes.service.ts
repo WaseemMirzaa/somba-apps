@@ -26,6 +26,7 @@ import type {
 } from '../database/entities';
 import { cleanAttachments, firstName, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
+import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { SettingsService } from '../content/settings.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -41,7 +42,8 @@ import { PartialRefundService } from './partial-refund.service';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
-const SWEEP_MS = Number(process.env.AFTER_SALE_SWEEP_MS ?? 60_000);
+/** Read when the module starts (not when the file loads), so a value from `.env` counts too. */
+const sweepMs = () => Number(process.env.AFTER_SALE_SWEEP_MS ?? 60_000);
 
 export const DISPUTE_CATEGORIES = ['missing', 'damaged', 'wrong_item', 'not_received', 'other'] as const;
 export const RETURN_CATEGORIES = ['damaged', 'wrong_item', 'not_as_described', 'changed_mind', 'defective', 'other'] as const;
@@ -94,6 +96,8 @@ interface Viewer {
   id: string;
   role: string;
   name?: string;
+  /** Warehouse staff only: the warehouse they belong to. A return is theirs when it is received there. */
+  hubId?: string | null;
 }
 
 @Injectable()
@@ -119,8 +123,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    if (SWEEP_MS > 0) {
-      this.sweeper = setInterval(() => void this.sweep().catch((e) => this.logger.warn(`sweep failed: ${(e as Error).message}`)), SWEEP_MS);
+    const every = sweepMs();
+    if (every > 0) {
+      this.sweeper = setInterval(() => void this.sweep().catch((e) => this.logger.warn(`sweep failed: ${(e as Error).message}`)), every);
       this.sweeper.unref?.();
     }
   }
@@ -146,7 +151,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   /** When the goods reached the customer: the delivered task's time, else when the order last changed. */
   private async deliveredAt(order: Order): Promise<Date> {
-    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered' }, select: ['id', 'deliveredAt', 'updatedAt'] });
+    // Only the leg that brought the goods to the customer counts: a pickup, a return leg or a replacement that was
+    // delivered later must not push the end of the return window further out.
+    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered', kind: 'delivery' }, select: ['id', 'deliveredAt', 'updatedAt'] });
     const times = rows.map((t) => (t.deliveredAt ?? t.updatedAt)?.getTime?.() ?? 0).filter(Boolean);
     return times.length ? new Date(Math.max(...times)) : order.updatedAt;
   }
@@ -265,9 +272,22 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return (await this.sellerUsersOf(d)).includes(user.id);
   }
 
+  /**
+   * The warehouse a return belongs to: where the rider brings the goods from the customer (the return pickup's receiving
+   * warehouse), or the order's destination warehouse while no pickup exists. Null when neither is known.
+   */
+  async hubOfReturn(d: Pick<Dispute, 'pickupTaskId' | 'orderId'>): Promise<string | null> {
+    if (d.pickupTaskId) {
+      const t = await this.tasks.findOne({ where: { id: d.pickupTaskId }, select: ['id', 'hubId', 'toHubId'] });
+      if (t) return t.toHubId ?? t.hubId ?? null;
+    }
+    return (await this.orders.findOne({ where: { id: d.orderId }, select: ['id', 'destinationHubId'] }))?.destinationHubId ?? null;
+  }
+
   private async canSee(user: Viewer, d: Dispute): Promise<boolean> {
     if (user.role.startsWith('admin')) return true;
-    if (user.role === 'warehouse_staff') return d.type === 'return';
+    // Warehouse staff see the returns of their own warehouse only (their customers' names and addresses are in them).
+    if (user.role === 'warehouse_staff') return d.type === 'return' && !!user.hubId && (await this.hubOfReturn(d)) === user.hubId;
     if (d.customerId === user.id) return true;
     return this.isSellerOf(user, d);
   }
@@ -285,7 +305,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   private async publish(dispute: Dispute, event: 'dispute:created' | 'dispute:updated'): Promise<DisputeView> {
     const [view] = await this.present([dispute]);
     this.emitter.toUser(dispute.customerId, event, view);
-    this.emitter.toRoles(dispute.type === 'return' ? [...ADMIN_ROLES, 'warehouse_staff'] : ADMIN_ROLES, event, view);
+    this.emitter.toRoles(ADMIN_ROLES, event, view);
+    // A return also goes to the staff of the warehouse it belongs to, and to nobody else's.
+    if (dispute.type === 'return') {
+      const hub = await this.hubOfReturn(dispute);
+      if (hub) this.emitter.toHub(hub, event, view);
+    }
     for (const id of await this.sellerUsersOf(dispute)) this.emitter.toUser(id, event, DisputesService.forSeller(view, id));
     return view;
   }
@@ -502,7 +527,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (user.role.startsWith('admin')) {
       // everything
     } else if (user.role === 'warehouse_staff') {
-      qb.andWhere("d.type = 'return'");
+      // Only the returns that arrive at their own warehouse (no warehouse on the account: none).
+      qb.andWhere(
+        "d.type = 'return' AND :hub <> '' AND (d.pickupTaskId IN (SELECT t.id FROM delivery_tasks t WHERE COALESCE(t.toHubId, t.hubId) = :hub) " +
+          'OR (d.pickupTaskId IS NULL AND d.orderId IN (SELECT o.id FROM orders o WHERE o.destinationHubId = :hub)))',
+        { hub: user.hubId ?? '' },
+      );
     } else if (user.role === 'seller') {
       const keys = await sellerKeys(user.id, this.sellers);
       // Their store's requests, their own purchases, and requests that name no store on an order holding their goods
@@ -844,8 +874,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
    * back while the goods are still with the customer. `restock` (the desk's old button) also puts everything back on
    * the shelf as resellable; the logistics scan-in calls {@link onReturnReceived} and grades afterwards.
    */
-  async markReceived(disputeId: string, restock = true): Promise<DisputeView> {
-    const dispute = await this.disputes.findOne({ where: { id: disputeId } });
+  async markReceived(disputeId: string, restock = true, actor?: Viewer): Promise<DisputeView> {
+    // With an actor (the desk), the return must be one that person may see: staff reach their own warehouse's returns only.
+    const dispute = actor ? await this.loadFor(actor, disputeId) : await this.disputes.findOne({ where: { id: disputeId } });
     if (!dispute) throw new NotFoundException('Dispute not found.');
     if (dispute.type !== 'return') throw new BadRequestException('Only returns have goods to receive.');
     if (dispute.status !== 'open') throw new BadRequestException('This request was already handled.');
@@ -884,9 +915,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     grades: { itemId: string; condition: string; restockQty?: number }[],
     note?: unknown,
   ): Promise<DisputeView> {
-    if (user.role !== 'warehouse_staff' && !user.role.startsWith('admin')) throw new BadRequestException('Warehouse staff only.');
-    const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
-    if (!d) throw new NotFoundException('Dispute not found.');
+    if (user.role !== 'warehouse_staff' && !RETURNS_DESK_ADMINS.includes(user.role)) throw new BadRequestException('Warehouse staff only.');
+    // Staff grade the returns of their own warehouse only; the same answer for "missing" and "not yours".
+    const d = await this.loadFor(user, id);
     if (d.type !== 'return') throw new BadRequestException('Only returns have goods to grade.');
     if (!d.receivedAt) throw new BadRequestException('Receive the returned goods first.');
     if (d.gradedAt) throw new BadRequestException('These goods were already graded.');
@@ -1048,6 +1079,36 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
       await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
       await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
+    }
+    return moved + (await this.sweepDisputes(now));
+  }
+
+  /**
+   * A dispute has no accept or reject, so a seller who never replies does not move it anywhere: it was already with
+   * support. When the time runs out, the customer, the seller and support are told once (`sellerLapsedAt` is the mark).
+   */
+  private async sweepDisputes(now: Date): Promise<number> {
+    const due = await this.disputes
+      .createQueryBuilder('d')
+      .where("d.type = 'dispute' AND d.status = 'open' AND d.stage = 'awaiting_seller' AND d.sellerLapsedAt IS NULL AND d.sellerDueAt IS NOT NULL AND d.sellerDueAt < :now", { now })
+      .take(100)
+      .getMany();
+    let moved = 0;
+    for (const d of due) {
+      const res = await this.disputes
+        .createQueryBuilder()
+        .update(Dispute)
+        .set({ sellerLapsedAt: now })
+        .where("id = :id AND stage = 'awaiting_seller' AND status = 'open' AND sellerLapsedAt IS NULL", { id: d.id })
+        .execute();
+      if (!res.affected) continue;
+      moved++;
+      const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
+      await this.publish(saved, 'dispute:updated');
+      const body = `${saved.reference} · ${saved.orderReference}`;
+      await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
+      await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
+      await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
     }
     return moved;
   }

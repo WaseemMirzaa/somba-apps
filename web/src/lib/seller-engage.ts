@@ -18,6 +18,8 @@ export interface EngageReview {
   author: string;
   rating: number;
   text: string;
+  /** Photos the customer attached (upload URLs). */
+  photos?: string[];
   sourceLang?: string | null;
   status?: "visible" | "hidden";
   sellerReply?: string | null;

@@ -7,6 +7,7 @@ import { Star, ThumbsUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/shop/translatable-text";
+import { AttachmentGallery, AttachmentPicker } from "@/components/seller/attachments";
 import { useProduct } from "@/lib/catalog";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
@@ -27,6 +28,7 @@ export default function ProductReviewsPage() {
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [voted, setVoted] = useState<string[]>([]);
 
@@ -51,11 +53,12 @@ export default function ProductReviewsPage() {
     }
     setSaving(true);
     try {
-      const created = await socketClient.request<LiveReview>("reviews:create", { productId: id, rating, text: reviewText.trim() });
+      const created = await socketClient.request<LiveReview>("reviews:create", { productId: id, rating, text: reviewText.trim(), ...(photos.length ? { photos } : {}) });
       put(created);
       setShowForm(false);
       setRating(0);
       setReviewText("");
+      setPhotos([]);
       toast(fr ? "Avis publié — merci !" : "Review published — thank you!");
     } catch (e) {
       toast((e as Error).message, "error");
@@ -103,6 +106,10 @@ export default function ProductReviewsPage() {
             ))}
           </div>
           <textarea className="input-premium w-full px-4 py-3 text-sm" rows={4} placeholder={fr ? "Partagez votre expérience..." : "Share your experience..."} value={reviewText} onChange={(e) => setReviewText(e.target.value)} />
+          <div>
+            <p className="mb-1 text-xs font-medium text-slate-600">{fr ? "Photos (facultatif, 4 au maximum)" : "Photos (optional, up to 4)"}</p>
+            <AttachmentPicker value={photos} onChange={setPhotos} max={4} disabled={saving} />
+          </div>
           <div className="flex gap-2">
             <Button onClick={submit} disabled={saving}>{saving ? "…" : fr ? "Soumettre l'avis" : "Submit Review"}</Button>
             <Button variant="ghost" onClick={() => setShowForm(false)}>{fr ? "Annuler" : "Cancel"}</Button>
@@ -143,6 +150,7 @@ export default function ProductReviewsPage() {
             </div>
             <div className="mt-3">
               <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="text-sm text-slate-700" />
+              <AttachmentGallery urls={r.photos} className="mt-3" />
             </div>
             {r.sellerReply && (
               <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">

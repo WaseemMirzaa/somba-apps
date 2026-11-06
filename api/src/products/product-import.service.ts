@@ -7,6 +7,7 @@ import { CategoriesService } from '../catalog/categories.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { activePlanId } from '../content/plans';
 import { SellersService } from '../ops/sellers.service';
+import { inRoleGroup } from '../common/role-groups';
 import { parseCsv } from './csv';
 import { isPrivateHost } from './image-url';
 import { ProductsService, cleanListing, cleanSku } from './products.service';
@@ -249,6 +250,8 @@ export class ProductImportService {
   async import(user: { id: string; role: string }, input: { rows?: unknown; csv?: unknown; csvUrl?: unknown; dryRun?: unknown; sellerId?: unknown }): Promise<ImportReport> {
     const admin = user.role.startsWith('admin');
     if (user.role !== 'seller' && !admin) throw new BadRequestException('Only sellers or admins can import products.');
+    // Importing for a store is listing products as the platform: the Super Admin and Moderation, like `products:create`.
+    if (admin && !inRoleGroup(user.role, 'productModeration')) throw new BadRequestException('Only moderators can import products for a store.');
     const seller = admin && input.sellerId ? await this.sellers.findOne({ where: { id: String(input.sellerId) } }) : await this.sellersSvc.byUser(user.id);
     if (!seller) throw new BadRequestException(admin ? 'Choose a store (sellerId).' : 'Open a store first.');
     if (user.role === 'seller' && seller.status !== 'approved') {

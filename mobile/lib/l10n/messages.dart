@@ -4,6 +4,7 @@ import 'messages_aftersale.dart';
 import 'messages_areas.dart';
 import 'messages_engage.dart';
 import 'messages_logistics.dart';
+import 'messages_r2f.dart';
 import 'messages_social.dart';
 
 /// key -> (English, French). Placeholders are written {name}.
@@ -632,4 +633,5 @@ const Map<String, (String, String)> kMessages = {
   ...kMessagesSocial,
   ...kMessagesEngage,
   ...kMessagesAreas,
+  ...kMessagesR2f,
 };

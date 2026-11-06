@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { RETURN_TO_SELLER_ADMINS } from '../common/staff-access';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 import { In, IsNull, Not, Repository } from 'typeorm';
@@ -41,6 +42,8 @@ import {
   touchesHub,
 } from './leg-rules';
 import { tierAllows } from './tiers';
+import { HubOpsSettingsService } from './hub-ops-settings.service';
+import { AUTO_ASSIGN_KINDS, Candidate, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
 import { pushOrderToOps } from './hub-scope';
 import { frenchLineNames } from '../translation/line-names';
 import { TranslationService } from '../translation/translation.service';
@@ -179,6 +182,7 @@ export class LogisticsService {
     private readonly emitter: RealtimeEmitter,
     private readonly settings?: SettingsService,
     @Optional() private readonly translations?: TranslationService,
+    @Optional() private readonly hubOps?: HubOpsSettingsService,
   ) {}
 
   // ── listeners (after-sale and others follow the legs) ────────────────────────
@@ -453,9 +457,15 @@ export class LogisticsService {
     return saved;
   }
 
-  /** Tell the managing warehouse's staff (and the live feeds) that a leg is waiting for a rider. */
+  /**
+   * Tell the managing warehouse (and the live feeds) that a leg is waiting for a rider. When the warehouse switched
+   * auto-assignment on and is open, the leg is given to its least busy rider right away instead (no "task to assign" notice:
+   * there is nothing left for staff to do).
+   */
   private async announce(task: DeliveryTask): Promise<void> {
     await this.emitTask(task);
+    await this.fire('created', task);
+    if (await this.autoAssign(task)) return;
     try {
       const staff = await this.staffIds(task.hubId, 'supervisor');
       const all = staff.length ? staff : await this.staffIds(task.hubId);
@@ -469,7 +479,6 @@ export class LogisticsService {
     } catch {
       /* best effort: the task is already in the queue */
     }
-    await this.fire('created', task);
   }
 
   private async groupBySeller(order: Order): Promise<Map<string, OrderItem[]>> {
@@ -979,11 +988,18 @@ export class LogisticsService {
     if (!rider || rider.role !== 'rider' || !rider.active) throw new BadRequestException('Choose an active rider.');
     if (!riderFits(task, rider.hubId)) throw new BadRequestException('This rider works at another warehouse.');
     if (!['unassigned', 'assigned'].includes(task.status)) throw new BadRequestException('This delivery is no longer available.');
+    return this.giveTo(task, rider, actor);
+  }
+
+  /** Give an open task to a rider (the checks are the caller's): claim it atomically, tell the old rider, audit, announce. */
+  private async giveTo(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>, actor: Actor, opts: { onlyUnassigned?: boolean } = {}): Promise<DeliveryTask> {
+    // The system only fills an empty slot: a supervisor who assigned the leg while the sweep was working keeps their choice.
+    const open = opts.onlyUnassigned ? "status = 'unassigned' AND runId IS NULL" : "status IN ('unassigned','assigned')";
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
       .set({ riderId: rider.id, status: 'assigned' })
-      .where("id = :id AND status IN ('unassigned','assigned')", { id: task.id })
+      .where(`id = :id AND ${open}`, { id: task.id })
       .execute();
     if (!claim.affected) throw new BadRequestException('This delivery is no longer available.');
     const saved = (await this.tasks.findOne({ where: { id: task.id } }))!;
@@ -995,6 +1011,140 @@ export class LogisticsService {
     this.audit(actor, 'task.assigned', saved, `${saved.orderReference} ${saved.kind} -> ${rider.name}`);
     await this.afterAssigned(saved, rider);
     return saved;
+  }
+
+  // ── auto-assignment ──────────────────────────────────────────────────────────
+  /** Who the system acts as when it assigns (audit trail). */
+  static readonly AUTO_ACTOR: Actor = { id: 'system:auto-assign', role: 'system', name: 'Auto-assignment', hubId: null, tier: null };
+
+  /**
+   * Riders of a warehouse that can take work, with what they carry now: active riders of THAT warehouse (riders have no on-duty
+   * switch and never accept or refuse; a rider who is switched off is not offered work). Sorted into {@link Candidate}s.
+   */
+  private async candidatesFor(task: DeliveryTask): Promise<Candidate[]> {
+    const riders = (await this.users.find({ where: { role: 'rider', active: true, hubId: task.hubId as string } })).filter((r) => riderFits(task, r.hubId));
+    if (!riders.length) return [];
+    const ids = riders.map((r) => r.id);
+    const open = await this.tasks.find({ where: { riderId: In(ids), status: In(['assigned', 'picked_up', 'in_transit']) }, select: ['id', 'riderId'] });
+    const since = new Date(Date.now() - 86_400_000);
+    const recent = await this.tasks.createQueryBuilder('t').select('t.riderId', 'riderId').addSelect('COUNT(*)', 'n').where('t.riderId IN (:...ids) AND t.createdAt >= :since', { ids, since }).groupBy('t.riderId').getRawMany<{ riderId: string; n: string }>();
+    return riders.map((r) => ({ id: r.id, name: r.name, open: open.filter((t) => t.riderId === r.id).length, recent: Number(recent.find((x) => x.riderId === r.id)?.n ?? 0) }));
+  }
+
+  /**
+   * The warehouse's auto-assignment (when it is switched on and open now): give an unassigned leg to the least busy active rider
+   * of the warehouse. Returns the assigned task, or null when it did nothing (off, closed, not a kind it handles, in a transfer run,
+   * already taken, nobody to give it to). Safe to call again and again (it only ever acts on an unassigned leg) and never throws.
+   */
+  async autoAssign(task: DeliveryTask, at: Date = new Date()): Promise<DeliveryTask | null> {
+    try {
+      if (!this.hubOps || !task.hubId || task.status !== 'unassigned' || task.runId || !AUTO_ASSIGN_KINDS.includes(task.kind)) return null;
+      const ops = await this.hubOps.ops(task.hubId);
+      if (!ops.autoAssign || !isWorkingNow(ops, at)) return null;
+      const rider = pickLeastBusy(await this.candidatesFor(task));
+      if (!rider) return null;
+      return await this.giveTo(task, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR, { onlyUnassigned: true });
+    } catch (e) {
+      // Someone else (or a second sweep) got there first, or the rider vanished: the leg stays in the queue for staff.
+      this.logger.debug(`auto-assign ${task.id}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Auto-assign the legs already waiting (made while the warehouse was closed or the switch was off). Returns how many were given out. */
+  async autoAssignWaiting(at: Date = new Date()): Promise<number> {
+    if (!this.hubOps) return 0;
+    const saved = await this.hubOps.allSaved();
+    let given = 0;
+    for (const [hubId, ops] of saved) {
+      if (!ops.autoAssign || !isWorkingNow(ops, at)) continue;
+      const waiting = await this.tasks.find({ where: { hubId, status: 'unassigned', runId: IsNull(), kind: In([...AUTO_ASSIGN_KINDS]) }, order: { createdAt: 'ASC' }, take: 500 });
+      for (const t of waiting) if (await this.autoAssign(t, at)) given++;
+    }
+    return given;
+  }
+
+  // ── return to seller (aged parcels) ──────────────────────────────────────────
+  /**
+   * Send a parcel that nobody could deliver back to its seller(s): the stuck customer leg is closed ("Returned to seller") and a
+   * `return_to_seller` leg is opened from this warehouse for each seller's share of the goods, for the warehouse to give a rider.
+   * Supervisors and managers of the warehouse that manages the leg (admins any). Only a customer-bound leg that no rider has
+   * collected yet can go back; doing it twice returns the same legs. The order itself is NOT cancelled or refunded here: the admins
+   * are told to decide (money is never touched by the warehouse desk).
+   */
+  async returnToSeller(taskId: string, actor: Actor): Promise<{ closed: DeliveryTask; legs: DeliveryTask[] }> {
+    if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can return a parcel to its seller.');
+    if (actor.role.startsWith('admin') && !RETURN_TO_SELLER_ADMINS.includes(actor.role)) throw new BadRequestException('Only the super admin and the operations admin can return a parcel to its seller.');
+    const task = await this.tasks.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Delivery task not found.');
+    if (!this.actorManages(actor, task)) throw new BadRequestException('This task belongs to another warehouse.');
+    const already = await this.tasks.find({ where: { parentTaskId: task.id, kind: 'return_to_seller' }, order: { createdAt: 'ASC' } });
+    if (already.length) return { closed: task, legs: already };
+    if (task.runId) throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
+    if (!canReturnToSeller(task)) {
+      throw new BadRequestException(
+        task.kind === 'delivery' || task.kind === 'replacement_delivery' ? 'A rider already has this parcel, or it is closed. Only a parcel still at the warehouse can be returned.' : 'Only the delivery to the customer can be returned to the seller.',
+      );
+    }
+    if (!task.hubId) throw new BadRequestException('This parcel is not tied to a warehouse.');
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    // Who gets what, worked out BEFORE anything is closed so a problem leaves the parcel untouched.
+    const groups = new Map<string, CargoLine[]>();
+    const lines: CargoLine[] =
+      task.kind === 'replacement_delivery'
+        ? LogisticsService.cargoOf(task)
+        : (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled').map((i) => ({ ...LogisticsService.cargoLine(i, i.productNameFr), sellerId: i.sellerId ?? null }));
+    for (const l of lines) {
+      let key = l.sellerId ?? null;
+      if (!key && typeof l.productId === 'string' && !l.productId.startsWith('ext:')) key = (await this.products.findOne({ where: { id: l.productId }, select: ['id', 'sellerId'] }))?.sellerId ?? null;
+      groups.set(key ?? NO_SELLER, [...(groups.get(key ?? NO_SELLER) ?? []), { ...l, sellerId: key }]);
+    }
+    if (!groups.size) groups.set(NO_SELLER, []);
+
+    const claim = await this.tasks
+      .createQueryBuilder()
+      .update(DeliveryTask)
+      .set({ status: 'failed', failureReason: RETURN_TO_SELLER_REASON })
+      .where("id = :id AND status IN ('unassigned','assigned') AND runId IS NULL", { id: task.id })
+      .execute();
+    if (!claim.affected) throw new BadRequestException('This parcel was just updated. Refresh and try again.');
+    const closed = (await this.tasks.findOne({ where: { id: task.id } }))!;
+    if (task.riderId) {
+      const gone = { id: closed.id, orderId: closed.orderId, orderReference: closed.orderReference, kind: closed.kind, status: 'unassigned', removed: true, reason: 'reassigned' };
+      for (const ev of ['task:updated', 'delivery:updated']) this.emitter.toUser(task.riderId, ev, gone);
+    }
+    const hubAddress = await this.hubAddressText(task.hubId);
+    const legs: DeliveryTask[] = [];
+    for (const [key, part] of groups) {
+      const seller = key === NO_SELLER ? null : await this.sellerRow(key);
+      const leg = await this.make({
+        kind: 'return_to_seller',
+        orderId: order.id,
+        orderReference: order.reference,
+        sellerId: key === NO_SELLER ? null : key,
+        parentTaskId: task.id,
+        fromHubId: task.hubId,
+        hubId: task.hubId,
+        pickupAddress: hubAddress,
+        address: seller?.pickupAddress ?? null,
+        itemsJson: JSON.stringify(part),
+      });
+      legs.push(leg);
+    }
+    this.audit(actor, 'parcel.returned_to_seller', closed, `${closed.orderReference} ${closed.kind} -> ${legs.length} return leg${legs.length === 1 ? '' : 's'}`);
+    await this.emitTask(closed);
+    await this.fire('voided', closed);
+    for (const leg of legs) await this.announce(leg);
+    await this.notifications
+      .toAdmins({ title: 'Parcel returned to seller', body: `${closed.orderReference}: the customer parcel is going back to the seller. Review the order.`, type: 'task', entityId: closed.id })
+      .catch(() => undefined);
+    if (closed.kind === 'delivery') {
+      await this.notifications
+        .toUser(order.customerId, { title: 'Order update', body: `${order.reference} could not be delivered and is going back to the seller. Our team will contact you about your order.`, type: 'order', entityId: order.id })
+        .catch(() => undefined);
+    }
+    return { closed, legs };
   }
 
   private async afterAssigned(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>): Promise<void> {

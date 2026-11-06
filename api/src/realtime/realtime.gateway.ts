@@ -58,6 +58,7 @@ import type { Actor } from '../logistics/logistics.service';
 import { tierAllows, tierOf } from '../logistics/tiers';
 import type { DeskAction } from '../logistics/tiers';
 import { ROLE_GROUPS } from '../common/role-groups';
+import { CASH_DESK_ADMINS } from '../common/staff-access';
 import { RiderService } from '../warehouse/rider.service';
 import { CampaignsService } from '../flows/campaigns.service';
 import { ReplacementsService } from '../flows/replacements.service';
@@ -94,7 +95,8 @@ const GROUPS = {
   people: ['admin', 'admin_support', 'admin_operations', 'admin_finance'],
   insight: ['admin', 'admin_operations', 'admin_finance'],
   audit: ['admin', 'admin_operations'],
-  fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation'],
+  // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.
+  fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support'],
   /** Money screens: confirm/decline payments, finance dashboard. */
   finance: ['admin', 'admin_finance'],
   /** Hide / restore customer reviews. */
@@ -411,8 +413,9 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (user.role !== 'seller' && !user.role.startsWith('admin')) {
-        return fail('Only sellers or admins can publish products.');
+      // An admin lists a product as the platform only from the moderation desk (Super Admin and Moderation).
+      if (user.role !== 'seller' && !this.can(user.role, 'productModeration')) {
+        return fail('Only sellers or moderators can publish products.');
       }
       // Products are keyed to the Seller entity (not the user row) so seller
       // dashboards, stats, and payouts all join on the same id.
@@ -557,7 +560,7 @@ export class RealtimeGateway
       if (!existing) return fail('Product not found.');
       const seller = await this.sellerFor(user, 'catalog');
       const isOwner = existing.sellerId === user.id || (seller != null && existing.sellerId === seller.id);
-      if (!isOwner && !this.isAdmin(user.role)) return fail('You can only retranslate your own products.');
+      if (!isOwner && !this.can(user.role, 'productModeration')) return fail('You can only retranslate your own products.');
       if (!this.translations.enabled) return fail('Automatic translation is not available right now.');
       return ok(await this.products.retranslate(existing.id));
     } catch (e) {
@@ -571,7 +574,7 @@ export class RealtimeGateway
   async translationStatus(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'productModeration')) return fail('Not allowed.');
       return ok(await this.translations.status());
     } catch (e) {
       return fail((e as Error).message);
@@ -586,7 +589,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role)) return fail('Admins only.');
+      if (!this.can(user.role, 'productModeration')) return fail('Not allowed.');
       return ok(await this.translations.retry(body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
@@ -650,11 +653,8 @@ export class RealtimeGateway
         { id: user.id, name: user.name },
         body,
       );
-      // Raise a COD-risk fraud alert for large cash orders.
-      if (order.paymentMethod === 'cod') {
-        const cap = Number((await this.settings.get('codCapUsd')) ?? '500');
-        await this.fraud.flagCodRisk(user.name, order.id, order.totalUsd, cap);
-      }
+      // Fraud rules: the COD cap (only while COD is offered), failed payments, new-account bursts, shared phone/device, returns, address changes.
+      await this.fraud.afterOrder({ id: user.id, name: user.name }, order);
       // The same view the customer's list and pushes carry (journey and warehouse names).
       return ok((await this.orders.customerViews([order]))[0] ?? order);
     } catch (e) {
@@ -1352,7 +1352,9 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'config')) return fail('Not allowed.');
-      const all = await this.settings.set(String(body?.key ?? ''), body?.value);
+      // A key is a string; an array or object would stringify into a real key and slip past the per-key guards upstream.
+      if (typeof body?.key !== 'string') return fail('Unknown setting.');
+      const all = await this.settings.set(body.key, body.value);
       await this.audit.record({ actor: user.name, role: user.role, action: 'settings.set', entity: 'setting', entityId: body.key, detail: String(all[body.key]).slice(0, 200) });
       return ok(all);
     } catch (e) {
@@ -1417,13 +1419,14 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role)) return fail('Admins only.');
-      return ok(await this.sellersSvc.list(body?.status as never, body));
+      // KYC reviewers get the identity papers; every other admin role gets the public profile.
+      return ok(await this.sellersSvc.list(body?.status as never, body, user.role));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
-  /** Admin: one store with its KYC (documentUrls parsed). */
+  /** Admin: one store, with its KYC (documentUrls parsed) for a KYC reviewer and the public profile for any other admin role. */
   @SubscribeMessage('sellers:get')
   async sellersGet(
     @ConnectedSocket() client: AuthedSocket,
@@ -1432,7 +1435,7 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isAdmin(user.role)) return fail('Admins only.');
-      return ok(await this.sellersSvc.getForAdmin(String(body?.id ?? '')));
+      return ok(await this.sellersSvc.getForAdmin(String(body?.id ?? ''), user.role));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2021,31 +2024,10 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.isOps(user.role)) return fail('Staff only.');
+      // Rider cash: the Super Admin, Finance and Operations, or a supervisor or manager of their own warehouse (hubScope).
+      if (this.isAdmin(user.role) && !CASH_DESK_ADMINS.includes(user.role)) return fail('Not allowed.');
       if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
       return ok(await this.warehouse.reconcile(await this.hubScope(user, body?.hubId)));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('warehouse:transfers')
-  async whTransfers(@ConnectedSocket() client: AuthedSocket) {
-    try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.listTransfers());
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('warehouse:createTransfer')
-  async whCreateTransfer(
-    @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: Record<string, unknown>,
-  ) {
-    try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
-      return ok(await this.warehouse.createTransfer(body));
     } catch (e) {
       return fail((e as Error).message);
     }

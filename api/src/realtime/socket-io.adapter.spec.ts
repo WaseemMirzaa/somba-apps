@@ -51,7 +51,7 @@ describe('SocketIoAdapter listener limits', () => {
     const adapter = new SocketIoAdapter(appWith(16));
     const sockets = new EventEmitter();
     adapter.bindClientConnect({ sockets, on: sockets.on.bind(sockets) } as never, () => undefined);
-    expect(sockets.getMaxListeners()).toBe(16);
+    expect(sockets.getMaxListeners()).toBe(17); // one per gateway, plus the staff two-factor guard
     expect(sockets.listenerCount('connection')).toBe(1);
   });
 
@@ -64,5 +64,20 @@ describe('SocketIoAdapter listener limits', () => {
     const c2 = new EventEmitter() as never as import('socket.io').Socket;
     broken.bindClientDisconnect(c2, () => undefined);
     expect((c2 as unknown as EventEmitter).getMaxListeners()).toBe(10);
+  });
+});
+
+describe('SocketIoAdapter staff two-factor guard', () => {
+  it('every new connection gets the guard (a packet middleware), whichever gateway will handle its events', () => {
+    const adapter = new SocketIoAdapter(appWith(3));
+    const server = new EventEmitter();
+    // What createIOServer does after building the Socket.IO server: listen for connections and guard each socket.
+    jest.spyOn(Object.getPrototypeOf(SocketIoAdapter.prototype), 'createIOServer').mockReturnValue(server);
+    adapter.createIOServer(0);
+    const used: unknown[] = [];
+    const socket = { data: {}, use: (fn: unknown) => void used.push(fn) };
+    server.emit('connection', socket);
+    expect(used).toHaveLength(1);
+    expect(typeof used[0]).toBe('function');
   });
 });

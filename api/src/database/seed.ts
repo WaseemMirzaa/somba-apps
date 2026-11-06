@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -272,6 +273,8 @@ async function run() {
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
     setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),
+    setRepo.create({ key: 'requireStaffTwoFactor', value: 'false' }),
+    ...Object.values(FRAUD_THRESHOLDS).map((t) => setRepo.create({ key: t.key, value: String(t.default) })),
     // Dev/demo accounts are not verified, so the policy is off here; bootstrap-prod turns it on.
     setRepo.create({ key: 'requireVerifiedForCheckout', value: 'false' }),
     // After-sale: returns are accepted for 7 days after delivery; a seller has 48 hours to answer.

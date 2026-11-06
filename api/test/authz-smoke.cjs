@@ -583,6 +583,72 @@ const register = async (label, role = 'customer') => {
   if (excId) ok((await req(supervisor.sock, 'exceptions:setStatus', { id: excId, status: 'resolved' })).ok === false, "a supervisor of another warehouse still cannot touch this warehouse's incident");
   ok((await req(manager.sock, 'exceptions:setStatus', { id: excId, status: 'resolved', resolution: 'Smoke' })).ok, 'the warehouse manager resolves it');
   ok(!(await req(rider.sock, 'warehouse:aged', {})).ok && !(await req(cust.sock, 'warehouse:reconcile', {})).ok, 'riders and customers never');
+
+  section('Round 2 least privilege: listing as the platform, translations, store identity papers, rider cash');
+  const reviewers = { admin, moderation, ops };
+  const notReviewers = { finance, support, marketing };
+  const platformListers = { admin, moderation };
+  const notListers = { finance, ops, support, marketing };
+  // products:create as the platform: Super Admin and Moderation only.
+  for (const [name, u] of Object.entries(notListers)) {
+    a = await req(u.sock, 'products:create', { name: `Platform item ${name} ${tag}`, price: 9, category: 'Electronics', stock: 1 });
+    ok(!a.ok && /sellers or moderators/.test(a.error ?? ''), `${name} admin cannot list a product as the platform`, a.error ?? 'was allowed');
+  }
+  ok(!(await req(cust.sock, 'products:create', { name: 'x', price: 5, category: 'x' })).ok, 'a customer never can');
+  for (const [name, u] of Object.entries(platformListers)) {
+    a = await req(u.sock, 'products:create', { name: `Platform item ${name} ${tag}`, price: 9, category: 'Electronics', stock: 1 });
+    ok(a.ok, `the ${name} admin can`, a.error ?? '');
+  }
+  a = await req(ops.sock, 'products:import', { sellerId: sellerA.store.id, rows: [{ name: `Ops import ${tag}`, price: 3, category: 'Electronics' }] });
+  ok(!a.ok && /moderators/.test(a.error ?? ''), 'operations cannot import products for a store either', a.error ?? 'was allowed');
+  // translation:status / translation:retry: Super Admin and Moderation only.
+  for (const [name, u] of Object.entries({ ...notListers, seller: sellerA, customer: cust })) {
+    ok(!(await req(u.sock, 'translation:status')).ok && !(await req(u.sock, 'translation:retry', {})).ok, `${name} cannot read or retry the translation queue`);
+  }
+  for (const [name, u] of Object.entries(platformListers)) {
+    ok((await req(u.sock, 'translation:status')).ok && (await req(u.sock, 'translation:retry', {})).ok, `the ${name} admin can`);
+  }
+  // sellers:list / sellers:get: KYC papers only for the reviewers (Super Admin, Moderation, Operations).
+  const PAPERS = ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls'];
+  const withKyc = (await req(admin.sock, 'sellers:list', { limit: 200 })).data?.find((x) => x.legalName && x.idNumber && Array.isArray(x.documentUrls) && x.documentUrls.length);
+  ok(!!withKyc, 'setup: the super admin sees a store with its identity papers');
+  for (const [name, u] of Object.entries(reviewers)) {
+    const row = (await req(u.sock, 'sellers:list', { limit: 200 })).data?.find((x) => x.id === withKyc?.id);
+    ok(!!row && PAPERS.every((k) => row[k]), `${name}: sellers:list carries legal name, ID, RCCM / tax and documents`);
+    a = await req(u.sock, 'sellers:get', { id: withKyc.id });
+    ok(a.ok && a.data.legalName === withKyc.legalName && a.data.documentUrls.length > 0, `${name}: sellers:get carries the KYC`, a.error ?? '');
+  }
+  for (const [name, u] of Object.entries(notReviewers)) {
+    const list = (await req(u.sock, 'sellers:list', { limit: 200 })).data ?? [];
+    ok(list.length > 0 && list.some((x) => x.id === withKyc?.id && x.name), `${name}: sellers:list still lists the stores (public profile)`);
+    ok(list.every((x) => PAPERS.every((k) => !(k in x)) && !('phone' in x) && !('payoutAccountMasked' in x)), `${name}: no identity papers, phone or payout details in the list`);
+    ok(list.every((x) => typeof x.userId === 'string' || x.userId === null), `${name}: the owner's account id stays (an internal id: payouts are keyed by it)`);
+    a = await req(u.sock, 'sellers:get', { id: withKyc.id });
+    ok(a.ok && a.data.name === withKyc.name && PAPERS.every((k) => !(k in a.data)) && !JSON.stringify(a.data).includes(withKyc.idNumber), `${name}: sellers:get returns the public profile only`, a.error ?? '');
+  }
+  ok(!(await req(cust.sock, 'sellers:list')).ok && !(await req(sellerA.sock, 'sellers:get', { id: withKyc.id })).ok, 'customers and sellers cannot ask');
+  // Rider cash (cash:handover, cash:history, warehouse:reconcile): Super Admin, Finance, Operations, and supervisors / managers of the rider's own warehouse.
+  const cashAdmins = { admin, finance, ops };
+  const notCash = { support, marketing, moderation };
+  for (const [name, u] of Object.entries(notCash)) {
+    a = await req(u.sock, 'cash:history');
+    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot read cash hand-overs`, a.error ?? 'was allowed');
+    a = await req(u.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
+    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot record a hand-over`, a.error ?? 'was allowed');
+    a = await req(u.sock, 'warehouse:reconcile', {});
+    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot open the cash reconciliation`, a.error ?? 'was allowed');
+  }
+  for (const [name, u] of Object.entries(cashAdmins)) {
+    ok((await req(u.sock, 'cash:history')).ok && (await req(u.sock, 'warehouse:reconcile', {})).ok, `the ${name} admin reads the cash history and reconciliation`);
+    a = await req(u.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
+    ok(!/Not allowed|Staff only/.test(a.error ?? ''), `the ${name} admin passes the role check (any refusal is about the cash, not the role)`, a.error ?? '');
+  }
+  a = await req(operator.sock, 'cash:history');
+  ok(!a.ok && /supervisors and managers/.test(a.error ?? ''), 'an operator cannot read the cash hand-overs', a.error ?? 'was allowed');
+  ok((await req(supervisor.sock, 'cash:history')).ok && (await req(manager.sock, 'cash:history')).ok, 'a supervisor and a manager of a warehouse can');
+  ok(!(await req(cust.sock, 'cash:history')).ok && !(await req(rider.sock, 'cash:history')).ok, 'customers and riders never');
+  a = await req(supervisor.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
+  ok(!a.ok && /another warehouse|holds no cash|no cash/.test(a.error ?? ''), "a supervisor can only take cash from their own warehouse's riders", a.error ?? 'was allowed');
   for (const u of [moderation, marketing, support, operator, supervisor]) u.sock.close();
 
   section('List limits cannot be abused');

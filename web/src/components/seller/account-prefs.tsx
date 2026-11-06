@@ -9,7 +9,8 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { sellerRequest } from "@/lib/seller-api";
-import { NOTIFY_KINDS, NOTIFY_LABEL, type NotifyKind, type PayoutAccount, type Prefs } from "@/lib/seller-account";
+import { useSellerAccess } from "@/lib/seller";
+import { NOTIFY_KINDS, NOTIFY_LABEL, NOTIFY_PERMISSION, type NotifyKind, type PayoutAccount, type Prefs } from "@/lib/seller-account";
 import { errMessage } from "@/lib/seller-labels";
 import { payoutMethodLabel } from "@/lib/seller-labels";
 
@@ -37,6 +38,7 @@ export function NotificationPrefs() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { status } = useRealtime();
+  const access = useSellerAccess();
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function NotificationPrefs() {
         <Switch checked={pushOn} disabled={saving === "push"} label={fr ? "Alertes push" : "Push alerts"} onChange={(v) => void change("push", { push: v }, (p) => ({ ...p, push: v }))} />
       </div>
       <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-        {NOTIFY_KINDS.map((k: NotifyKind) => {
+        {NOTIFY_KINDS.filter((k) => access.can(NOTIFY_PERMISSION[k])).map((k: NotifyKind) => {
           const on = prefs.notify?.[k] !== false;
           const l = NOTIFY_LABEL[k];
           return (

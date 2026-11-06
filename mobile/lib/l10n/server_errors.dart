@@ -1,5 +1,6 @@
 import 'server_errors_areas.dart';
 import 'server_errors_features.dart';
+import 'server_errors_r2f.dart';
 import 'strings.dart';
 
 /// Server errors reach the app in English. The common ones are shown in the
@@ -24,6 +25,7 @@ final Map<String, String> _exactFr = {
   ...kServerErrorsAfterSale,
   ...kServerErrorsSocial,
   ...kServerErrorsEngage,
+  ...kServerErrorsR2f,
   ...kServerErrorsAreas,
   // areas contract, second pass (docs/contracts/areas.md, "Errors"): validation, warehouse directory and desk sentences the first list omitted
   "Flatten must be 'commune'.": 'Le paramètre « flatten » doit être « commune ».',

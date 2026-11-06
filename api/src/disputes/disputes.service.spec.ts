@@ -23,7 +23,9 @@ const sellerOne = { id: 'su1', role: 'seller', name: 'Seller One' };
 const sellerTwo = { id: 'su2', role: 'seller', name: 'Seller Two' };
 const agent = { id: 'a1', role: 'admin_support', name: 'Agent' };
 const admin = { id: 'a0', role: 'admin', name: 'Admin' };
-const warehouse = { id: 'w1', role: 'warehouse_staff', name: 'Desk' };
+const warehouse = { id: 'w1', role: 'warehouse_staff', name: 'Desk', hubId: 'hub-k' };
+const otherWarehouse = { id: 'w2', role: 'warehouse_staff', name: 'Other desk', hubId: 'hub-l' };
+const unlinkedStaff = { id: 'w3', role: 'warehouse_staff', name: 'Nowhere', hubId: null };
 
 let s1: Seller;
 let s2: Seller;
@@ -37,6 +39,7 @@ async function makeOrder(lines: { sellerId: string; productId: string; qty: numb
       customerId: customer.id,
       customerName: customer.name,
       status: 'delivered',
+      destinationHubId: 'hub-k',
       totalUsd: subtotal + 3,
       subtotalUsd: subtotal,
       deliveryFeeUsd: 3,
@@ -192,7 +195,10 @@ describe('opening a return', () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Not what I expected' });
     expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'user:su1')).toBe(true);
-    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(true);
+    // The return goes to the staff of the warehouse it belongs to, and to no other warehouse's.
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'hub:hub-k')).toBe(true);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(false);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'hub:hub-l')).toBe(false);
     expect(notices.some((n) => n.to === 'role:warehouse_staff')).toBe(false);
   });
 });
@@ -408,6 +414,23 @@ describe('goods back, grading and the refund', () => {
     expect(restocks).toHaveLength(1);
   });
 
+  it('the returns desk: receiving and grading work on the return of the staff’s own warehouse only; support has no part in handling goods', async () => {
+    const { d } = await approved();
+    await expect(svc.markReceived(d.id, true, otherWarehouse)).rejects.toThrow('Dispute not found.');
+    await expect(svc.markReceived(d.id, true, unlinkedStaff)).rejects.toThrow('Dispute not found.');
+    expect((await ds.getRepository(Dispute).findOneByOrFail({ id: d.id })).receivedAt).toBeNull();
+    expect(refundCalls).toHaveLength(0);
+    const done = await svc.markReceived(d.id, false, warehouse);
+    expect(done.receivedAt).toBeTruthy();
+    const item = (await ds.getRepository(DisputeItem).find({ where: { disputeId: d.id } }))[0];
+    await expect(svc.grade(otherWarehouse, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Dispute not found.');
+    await expect(svc.grade({ ...agent }, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Warehouse staff only');
+    await expect(svc.grade({ id: 'm', role: 'admin_marketing', name: 'M' }, d.id, [{ itemId: item.id, condition: 'resellable' }])).rejects.toThrow('Warehouse staff only');
+    expect(restocks).toHaveLength(0);
+    const graded = await svc.grade({ id: 'o1', role: 'admin_operations', name: 'Ops' }, d.id, [{ itemId: item.id, condition: 'resellable', restockQty: 1 }]);
+    expect(graded.gradedAt).toBeTruthy();
+  });
+
   it('cannot be graded before the goods arrive', async () => {
     const { d } = await approved();
     await expect(svc.grade(warehouse, d.id, [{ itemId: 'x', condition: 'resellable' }])).rejects.toThrow('Receive the returned goods first');
@@ -517,6 +540,33 @@ describe('who sees what', () => {
     expect(await svc.list(agent, { status: 'resolved' })).toHaveLength(0);
   });
 
+  it('warehouse staff see the returns of their own warehouse only: list, detail and the live push; staff linked to none see nothing', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+    const l = await makeOrder([{ sellerId: s1.id, productId: 'p2', qty: 1, price: 20 }], { destinationHubId: 'hub-l' });
+    const dl = await svc.open(customer, { orderId: l.id, type: 'return', reason: 'Strap is torn' });
+    expect((await svc.list(warehouse)).map((x) => x.id)).toEqual([d.id]);
+    expect((await svc.list(otherWarehouse)).map((x) => x.id)).toEqual([dl.id]);
+    expect(await svc.list(unlinkedStaff)).toEqual([]);
+    expect(await svc.list({ id: 'w9', role: 'warehouse_staff' })).toEqual([]); // no hub on the viewer at all
+    expect((await svc.get(warehouse, d.id)).id).toBe(d.id);
+    await expect(svc.get(warehouse, dl.id)).rejects.toThrow('Dispute not found.');
+    await expect(svc.get(otherWarehouse, d.id)).rejects.toThrow('Dispute not found.');
+    await expect(svc.get(unlinkedStaff, d.id)).rejects.toThrow('Dispute not found.');
+    expect(emitter.sent.filter((e) => e.event === 'dispute:created' && e.to === 'hub:hub-l').map((e) => e.payload.id)).toEqual([dl.id]);
+    expect(emitter.sent.filter((e) => e.event === 'dispute:created' && e.to === 'hub:hub-k').map((e) => e.payload.id)).toEqual([d.id]);
+  });
+
+  it('a return belongs to the warehouse its pickup task brings the goods to, not only to the order’s destination', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const task = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: o.id, orderReference: o.reference, kind: 'return_pickup', toHubId: 'hub-l', hubId: 'hub-l' }));
+    pickupAnswer = { id: task.id };
+    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+    await svc.sellerRespond(sellerOne, d.id, true, '');
+    expect((await svc.list(otherWarehouse)).map((x) => x.id)).toEqual([d.id]);
+    expect(await svc.list(warehouse)).toEqual([]);
+  });
+
   it('a dispute that names no lines on a two-store order is visible to both stores', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }, { sellerId: s2.id, productId: 'p2', qty: 1, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Parcel arrived crushed' });
@@ -533,5 +583,182 @@ describe('who sees what', () => {
     await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: [{ itemId: o.items[0].id, qty: 3 }] });
     expect(await svc.eligibility(customer.id, o.id)).toMatchObject({ eligible: false, reason: 'You already have an open request for this order.' });
     await expect(svc.eligibility('other', o.id)).rejects.toThrow('Order not found.');
+  });
+});
+
+// ── Time limits on a fake clock ───────────────────────────────────────────────
+// Only `Date` is faked (the in-memory database and the promise queue keep running); the sweeper's own timer is
+// tested separately with every timer faked and `sweep` stubbed.
+const ONLY_DATE = ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'performance', 'hrtime'] as const;
+const T0 = new Date('2026-11-03T08:00:00Z');
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+const at = (ms: number) => jest.setSystemTime(new Date(T0.getTime() + ms));
+
+async function deliveredLeg(orderId: string, kind: 'delivery' | 'return_pickup' | 'pickup' | 'replacement_delivery', deliveredAt: Date) {
+  const repo = ds.getRepository(DeliveryTask);
+  return repo.save(repo.create({ orderId, orderReference: 'SOM-T', status: 'delivered', kind, deliveredAt }));
+}
+
+describe('time limits on a fake clock: the return deadline', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: T0, doNotFake: [...ONLY_DATE] });
+  });
+  afterEach(() => jest.useRealTimers());
+
+  async function deliveredOrder() {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 2, price: 20 }, { sellerId: s1.id, productId: 'p2', qty: 1, price: 5 }]);
+    await deliveredLeg(o.id, 'delivery', T0);
+    return o;
+  }
+
+  it('the window is open until exactly the end of day 7 after delivery, then closed for good', async () => {
+    const o = await deliveredOrder();
+    at(7 * DAY - 1000);
+    const open = await svc.eligibility(customer.id, o.id);
+    expect(open).toMatchObject({ eligible: true, windowDays: 7 });
+    expect(open.endsAt!.getTime()).toBe(T0.getTime() + 7 * DAY);
+    at(7 * DAY + 1000);
+    expect(await svc.eligibility(customer.id, o.id)).toMatchObject({ eligible: false, reason: 'Returns are accepted within 7 days of delivery, and that time has passed.' });
+    await expect(svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' })).rejects.toThrow('within 7 days');
+  });
+
+  it('follows the platform setting: a 3-day window, and a window changed while the clock runs', async () => {
+    settingsMap.returnWindowDays = '3';
+    const o = await deliveredOrder();
+    at(3 * DAY - 1000);
+    expect((await svc.eligibility(customer.id, o.id)).eligible).toBe(true);
+    at(3 * DAY + 1000);
+    expect((await svc.eligibility(customer.id, o.id)).eligible).toBe(false);
+    settingsMap.returnWindowDays = '10';
+    expect((await svc.eligibility(customer.id, o.id)).eligible).toBe(true);
+  });
+
+  it('a later leg (a return pickup, a replacement, the seller pickup) never pushes the end of the window out', async () => {
+    const o = await deliveredOrder();
+    // Day 1: the customer returns the first line; day 6: the warehouse collects it (that leg is "delivered" at the warehouse).
+    at(DAY);
+    const first = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: [{ itemId: o.items[0].id, qty: 2 }] });
+    expect(first.stage).toBe('awaiting_seller');
+    await deliveredLeg(o.id, 'return_pickup', new Date(T0.getTime() + 6 * DAY));
+    await deliveredLeg(o.id, 'replacement_delivery', new Date(T0.getTime() + 6.5 * DAY));
+    await deliveredLeg(o.id, 'pickup', new Date(T0.getTime() + 6.8 * DAY));
+    at(8 * DAY);
+    const e = await svc.eligibility(customer.id, o.id);
+    expect(e.endsAt!.getTime()).toBe(T0.getTime() + 7 * DAY);
+    expect(e.eligible).toBe(false);
+    await expect(svc.open(customer, { orderId: o.id, type: 'return', reason: 'Charger is dead', items: [{ itemId: o.items[1].id, qty: 1 }] })).rejects.toThrow('within 7 days');
+  });
+
+  it('the window counts from the last delivery leg when an order was delivered in several parcels', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    await deliveredLeg(o.id, 'delivery', T0);
+    await deliveredLeg(o.id, 'delivery', new Date(T0.getTime() + 2 * DAY));
+    at(8 * DAY);
+    expect((await svc.eligibility(customer.id, o.id)).eligible).toBe(true);
+    at(9 * DAY + 1000);
+    expect((await svc.eligibility(customer.id, o.id)).eligible).toBe(false);
+  });
+});
+
+describe('time limits on a fake clock: the seller response time', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: T0, doNotFake: [...ONLY_DATE] });
+  });
+  afterEach(() => jest.useRealTimers());
+
+  async function openReturn(over: { qty?: number } = {}) {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: over.qty ?? 1, price: 20 }]);
+    return svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+  }
+
+  it('gives the seller 48 hours by default and sweeps nothing before then', async () => {
+    const r = await openReturn();
+    expect(r.sellerDueAt!.getTime()).toBe(T0.getTime() + 48 * HOUR);
+    at(48 * HOUR - 1000);
+    expect(await svc.sweep()).toBe(0);
+    expect((await svc.get(customer, r.id)).stage).toBe('awaiting_seller');
+    // The seller can still answer right up to the deadline.
+    expect((await svc.sellerRespond(sellerOne, r.id, true, '')).stage).not.toBe('awaiting_seller');
+  });
+
+  it('one second past the deadline the return times out, everyone is told once, and the customer may escalate', async () => {
+    const r = await openReturn();
+    at(48 * HOUR + 1000);
+    expect(await svc.sweep()).toBe(1);
+    expect(await svc.sweep()).toBe(0); // idempotent: a second pass finds nothing
+    const seen = await svc.get(customer, r.id);
+    expect(seen).toMatchObject({ stage: 'seller_timeout', canEscalate: true, canCancel: true });
+    for (const to of ['user:c1', 'user:su1', 'role:admin_support']) expect(titles(to).filter((t) => t === 'Seller did not respond')).toHaveLength(1);
+    expect(emitter.sent.some((e) => e.event === 'dispute:updated' && e.to === 'user:c1' && (e.payload as { stage: string }).stage === 'seller_timeout')).toBe(true);
+    await expect(svc.sellerRespond(sellerOne, r.id, true, '')).rejects.toThrow('response time has passed');
+    expect((await svc.escalate(customer, r.id, 'Still waiting')).stage).toBe('escalated');
+    expect(await svc.sweep()).toBe(0); // an escalated request is support's now
+  });
+
+  it('follows the platform setting (2 hours) and ignores a request the seller already answered', async () => {
+    settingsMap.sellerResponseHours = '2';
+    const a = await openReturn();
+    const b = await openReturn({ qty: 2 });
+    expect(a.sellerDueAt!.getTime()).toBe(T0.getTime() + 2 * HOUR);
+    await svc.sellerRespond(sellerOne, b.id, false, 'Not covered by the policy');
+    at(2 * HOUR + 1000);
+    expect(await svc.sweep()).toBe(1);
+    expect((await svc.get(admin, a.id)).stage).toBe('seller_timeout');
+    expect((await svc.get(admin, b.id)).stage).toBe('seller_rejected');
+  });
+
+  it('a request the customer cancelled never times out', async () => {
+    const r = await openReturn();
+    await svc.cancel(customer, r.id);
+    at(60 * HOUR);
+    expect(await svc.sweep()).toBe(0);
+    expect((await svc.get(admin, r.id)).stage).toBe('closed');
+  });
+
+  it('a dispute: once its response time passes the customer, the seller and support are told, once', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'The charger never arrived', category: 'missing' });
+    at(47 * HOUR);
+    expect(await svc.sweep()).toBe(0);
+    at(49 * HOUR);
+    expect(await svc.sweep()).toBe(1);
+    expect(await svc.sweep()).toBe(0);
+    for (const to of ['user:c1', 'user:su1', 'role:admin_support']) expect(titles(to).filter((t) => t === 'Seller did not respond')).toHaveLength(1);
+    const row = await ds.getRepository(Dispute).findOneByOrFail({ id: d.id });
+    expect(row.sellerLapsedAt!.getTime()).toBe(T0.getTime() + 49 * HOUR);
+    // Unlike a return it does not move stage: it was already with support, and the seller may still reply.
+    expect(row.stage).toBe('awaiting_seller');
+    expect((await svc.reply(sellerOne, d.id, 'Shipped Monday, see the label')).role).toBe('seller');
+  });
+
+  it('a dispute the seller answered in time is not reported', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'The charger never arrived', category: 'missing' });
+    at(10 * HOUR);
+    await svc.reply(sellerOne, d.id, 'Shipped Monday, see the label');
+    at(60 * HOUR);
+    expect(await svc.sweep()).toBe(0);
+    expect(titles('role:admin_support').filter((t) => t === 'Seller did not respond')).toHaveLength(0);
+  });
+});
+
+describe('time limits: the sweeper timer', () => {
+  afterEach(() => jest.useRealTimers());
+
+  it('runs a sweep every AFTER_SALE_SWEEP_MS (60 s by default), survives a failing sweep and stops on shutdown', async () => {
+    jest.useFakeTimers();
+    const sweep = jest.spyOn(svc, 'sweep').mockResolvedValueOnce(0).mockRejectedValueOnce(new Error('db down')).mockResolvedValue(0);
+    svc.onModuleInit();
+    await jest.advanceTimersByTimeAsync(59_999);
+    expect(sweep).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(sweep).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(60_000); // the rejected sweep is swallowed (logged), the next one still runs
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(sweep).toHaveBeenCalledTimes(3);
+    svc.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(5 * 60_000);
+    expect(sweep).toHaveBeenCalledTimes(3);
   });
 });

@@ -7,7 +7,9 @@ import '../../services/realtime_store.dart';
 import '../../data/promos.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
+import '../../widgets/photo_picker.dart';
 import '../../widgets/product_actions.dart';
 import 'browse.dart';
 
@@ -216,27 +218,35 @@ class ReviewComposeScreen extends StatefulWidget {
 class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
   int _rating = 5;
   final _ctrl = TextEditingController();
+  /// Up to 4 photos, uploaded as they are picked (`POST /api/v1/uploads`, the same path as support tickets).
+  final _photos = PhotoAttachments(max: 4);
   bool _busy = false;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _photos.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final p = widget.product;
     if (p == null) return;
+    if (_photos.busy) {
+      showSnack(context, Strings.of(context).rvPhotosWait);
+      return;
+    }
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
     try {
-      await RealtimeStore.instance.addReview(p.uuid, _rating, _ctrl.text);
+      await RealtimeStore.instance.addReview(p.uuid, _rating, _ctrl.text, photos: _photos.urls);
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(Strings.of(context).reviewThanks)));
+      showSnack(context, Strings.of(context).reviewThanks);
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(Strings.current.errorText(e))));
+      if (mounted) {
+        setState(() => _busy = false);
+        showError(context, e);
+      }
     }
   }
 
@@ -277,6 +287,8 @@ class _ReviewComposeScreenState extends State<ReviewComposeScreen> {
           maxLines: 5,
           decoration: AppInput.multiline(hint: s.reviewHint),
         ),
+        const SizedBox(height: 16),
+        PhotoPickerField(attachments: _photos, label: s.rvPhotosLabel),
         const SizedBox(height: 8),
         Text(s.reviewAfterDelivery, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(height: 20),

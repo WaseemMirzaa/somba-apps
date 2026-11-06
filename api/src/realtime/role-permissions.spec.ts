@@ -19,6 +19,9 @@ const STAFF: Record<string, { hubId: string; warehouseTier: string | null }> = {
 
 function gateway() {
   const products = {
+    create: jest.fn(async (clean: { columns?: object }) => ({ id: 'p9', status: 'live', name: 'Lamp', ...(clean as object) })),
+    getRaw: jest.fn(async () => ({ id: 'p1', sellerId: 'store1' })),
+    retranslate: jest.fn(async () => ({ id: 'p1' })),
     get: jest.fn(async () => ({ id: 'p1', sellerId: 'store1', status: 'pending', basePrice: 10, name: 'Lamp', sellerName: 'Shop' })),
     update: jest.fn(async (id: string, clean: { columns: object }) => ({ id, ...clean.columns })),
     remove: jest.fn(async () => ({ id: 'p1' })),
@@ -37,14 +40,20 @@ function gateway() {
   };
   const analytics = { warehouseStats: jest.fn(async () => ({ totalParcels: 3 })) };
   const users = { findById: jest.fn(async (id: string) => STAFF[id] ?? null) };
-  const sellersSvc = { byUser: jest.fn(async () => null), get: jest.fn(async () => ({ userId: 'owner' })) };
+  const sellersSvc = {
+    byUser: jest.fn(async () => null),
+    get: jest.fn(async () => ({ userId: 'owner' })),
+    list: jest.fn(async (_status: unknown, _paging: unknown, role: string) => [{ id: 'store1', role }]),
+    getForAdmin: jest.fn(async (id: string, role: string) => ({ id, role })),
+  };
+  const translations = { enabled: true, status: jest.fn(async () => ({ pending: 0 })), retry: jest.fn(async () => ({ requeued: 1 })) };
   const notifications = { toUser: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined) };
   const kit = { ctx: { resolve: jest.fn(async () => ({ seller: { id: 'store1', status: 'approved' }, actor: { id: 'owner', name: 'Shop', role: 'seller' } })) } };
   const settings = { get: jest.fn(async () => 'true') };
   // Moderation and campaign decisions are audited (admin-audit.spec.ts covers the entries themselves).
   const audit = { record: jest.fn(async () => undefined) };
-  const gw = Object.assign(Object.create(RealtimeGateway.prototype), { products, campaigns, warehouse, analytics, users, sellersSvc, notifications, kit, settings, audit }) as RealtimeGateway;
-  return { gw, products, campaigns, warehouse, analytics };
+  const gw = Object.assign(Object.create(RealtimeGateway.prototype), { products, campaigns, warehouse, analytics, users, sellersSvc, notifications, kit, settings, audit, translations }) as RealtimeGateway;
+  return { gw, products, campaigns, warehouse, analytics, sellersSvc, translations };
 }
 
 describe('product moderation (products:update, products:delete)', () => {
@@ -172,5 +181,88 @@ describe('warehouse tiers on the socket', () => {
     for (const [role, id] of [['warehouse_staff', 'mgr'], ['admin', 'a'], ['admin_finance', 'a']] as const) {
       expect(await gw.analyticsWarehouse(as(role, id), {})).toEqual({ ok: true, data: { totalParcels: 3 } });
     }
+  });
+});
+
+describe('round 2 least privilege: listing as the platform, translations, store identity papers, rider cash', () => {
+  const MODERATION = ['admin', 'admin_moderation'];
+  const KYC = ['admin', 'admin_moderation', 'admin_operations'];
+
+  it('products:create by an admin: the Super Admin and Moderation only; sellers still list their own', async () => {
+    const { gw, products } = gateway();
+    for (const role of OTHER_ADMINS(MODERATION)) {
+      expect(await gw.productsCreate(as(role), { name: 'Platform lamp', price: 9, category: 'Home' })).toEqual({ ok: false, error: 'Only sellers or moderators can publish products.' });
+    }
+    for (const role of ['customer', 'rider', 'warehouse_staff']) expect((await gw.productsCreate(as(role), { name: 'x lamp', price: 9, category: 'Home' })).ok).toBe(false);
+    expect(products.create).not.toHaveBeenCalled();
+    for (const role of MODERATION) {
+      expect(await gw.productsCreate(as(role), { name: 'Platform lamp', price: 9, category: 'Home' })).toMatchObject({ ok: true });
+    }
+    expect(products.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('translation:status and translation:retry: the Super Admin and Moderation only', async () => {
+    const { gw, translations } = gateway();
+    for (const role of [...OTHER_ADMINS(MODERATION), 'seller', 'customer', 'rider', 'warehouse_staff']) {
+      expect(await gw.translationStatus(as(role))).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.translationRetry(as(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(translations.status).not.toHaveBeenCalled();
+    expect(translations.retry).not.toHaveBeenCalled();
+    for (const role of MODERATION) {
+      expect(await gw.translationStatus(as(role))).toEqual({ ok: true, data: { pending: 0 } });
+      expect(await gw.translationRetry(as(role), { entityType: 'product', entityId: 'p1' })).toEqual({ ok: true, data: { requeued: 1 } });
+    }
+  });
+
+  it('products:retranslate: the owner as today; another seller’s product only by the Super Admin and Moderation', async () => {
+    const { gw, products } = gateway();
+    for (const role of OTHER_ADMINS(MODERATION)) {
+      expect(await gw.productsRetranslate(as(role), { id: 'p1' })).toEqual({ ok: false, error: 'You can only retranslate your own products.' });
+    }
+    expect(products.retranslate).not.toHaveBeenCalled();
+    for (const role of MODERATION) expect((await gw.productsRetranslate(as(role), { id: 'p1' })).ok).toBe(true);
+    // The store owner (sellerFor resolves their store, whose id owns the product).
+    expect((await gw.productsRetranslate(as('seller', 'owner'), { id: 'p1' })).ok).toBe(true);
+    expect(products.retranslate).toHaveBeenCalledTimes(3);
+  });
+
+  it('sellers:list and sellers:get: every admin role may ask, but the service is told the role so only KYC reviewers get the identity papers', async () => {
+    const { gw, sellersSvc } = gateway();
+    for (const role of ['customer', 'seller', 'rider', 'warehouse_staff']) {
+      expect(await gw.sellersList(as(role), {})).toEqual({ ok: false, error: 'Admins only.' });
+      expect(await gw.sellersGet(as(role), { id: 'store1' })).toEqual({ ok: false, error: 'Admins only.' });
+    }
+    expect(sellersSvc.list).not.toHaveBeenCalled();
+    expect(sellersSvc.getForAdmin).not.toHaveBeenCalled();
+    for (const role of ADMIN_ROLES) {
+      expect(await gw.sellersList(as(role), { status: 'pending' })).toMatchObject({ ok: true, data: [{ id: 'store1', role }] });
+      expect(await gw.sellersGet(as(role), { id: 'store1' })).toMatchObject({ ok: true, data: { id: 'store1', role } });
+    }
+    expect(sellersSvc.list).toHaveBeenCalledTimes(ADMIN_ROLES.length);
+    expect(KYC.every((r) => ADMIN_ROLES.includes(r))).toBe(true);
+  });
+
+  it('warehouse:reconcile (rider cash): the Super Admin, Finance, Operations and supervisors and above; other admin roles and operators are refused', async () => {
+    const { gw, warehouse } = gateway();
+    const CASH = ['admin', 'admin_finance', 'admin_operations'];
+    for (const role of OTHER_ADMINS(CASH)) {
+      expect(await gw.whReconcile(as(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(await gw.whReconcile(as('warehouse_staff', 'op'), {})).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
+    expect(warehouse.reconcile).not.toHaveBeenCalled();
+    for (const role of CASH) expect((await gw.whReconcile(as(role), {})).ok).toBe(true);
+    expect((await gw.whReconcile(as('warehouse_staff', 'sup'), {})).ok).toBe(true);
+    expect((await gw.whReconcile(as('warehouse_staff', 'mgr'), {})).ok).toBe(true);
+    // Staff are limited to their own warehouse, whatever hub they ask for.
+    expect(warehouse.reconcile).toHaveBeenLastCalledWith('h1');
+    await gw.whReconcile(as('warehouse_staff', 'sup'), { hubId: 'other-hub' });
+    expect(warehouse.reconcile).toHaveBeenLastCalledWith('h1');
+  });
+
+  it('the legacy stock-transfer events are gone', () => {
+    const proto = RealtimeGateway.prototype as unknown as Record<string, unknown>;
+    expect(proto.whTransfers).toBeUndefined();
+    expect(proto.whCreateTransfer).toBeUndefined();
   });
 });

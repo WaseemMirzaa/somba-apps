@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { sellerRequest } from "@/lib/seller-api";
+import type { SellerPermission } from "@/lib/seller-access";
 
 /** A warehouse as the public hub directory lists it (`hubs:list`). */
 export interface HubInfo {
@@ -44,6 +45,21 @@ export function useHubs(): HubInfo[] {
 export const NOTIFY_KINDS = ["order", "payout", "stock", "review", "question", "message", "product", "promo"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
+/**
+ * The permission a kind of notice belongs to: the server only sends a team member the notices their role handles
+ * (`permissionForNotice` in api/src/sellers/seller-permissions.ts), so a switch for any other kind is left out.
+ */
+export const NOTIFY_PERMISSION: Record<NotifyKind, SellerPermission> = {
+  order: "orders",
+  payout: "finance",
+  stock: "catalog",
+  review: "support",
+  question: "support",
+  message: "support",
+  product: "catalog",
+  promo: "catalog",
+};
+
 export const NOTIFY_LABEL: Record<NotifyKind, { en: string; fr: string; descEn: string; descFr: string }> = {
   order: { en: "Orders and deliveries", fr: "Commandes et livraisons", descEn: "New orders, pickups, returns, disputes, replacements and exchanges.", descFr: "Nouvelles commandes, collectes, retours, litiges, remplacements et échanges." },
   payout: { en: "Payouts and finance", fr: "Versements et finance", descEn: "Payout requests, payments and commission invoices.", descFr: "Demandes de versement, paiements et factures de commission." },
@@ -69,6 +85,8 @@ export interface TwoFaStatus {
   pending: boolean;
   recoveryRemaining: number;
   required: boolean;
+  /** Who the platform requires it from: store owners or staff (admin roles). */
+  requiredFor?: "seller" | "staff" | null;
 }
 
 export interface TwoFaSetup {

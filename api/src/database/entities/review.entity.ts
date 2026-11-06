@@ -8,6 +8,20 @@ import {
 
 export type ReviewStatus = 'visible' | 'hidden';
 
+/** Review photos are stored as a JSON list of upload URLs in one text column and read back as an array. */
+export const photoList = {
+  to: (v: string[] | null | undefined): string | null => (Array.isArray(v) && v.length ? JSON.stringify(v) : null),
+  from: (v: string | null | undefined): string[] => {
+    if (!v) return [];
+    try {
+      const x = JSON.parse(v);
+      return Array.isArray(x) ? x.filter((u) => typeof u === 'string') : [];
+    } catch {
+      return [];
+    }
+  },
+};
+
 @Entity('reviews')
 export class Review {
   @PrimaryGeneratedColumn('uuid')
@@ -36,6 +50,10 @@ export class Review {
   /** Moderation: hidden reviews are excluded from public lists and from the product rating. */
   @Column({ type: 'varchar', length: 10, default: 'visible' })
   status: ReviewStatus;
+
+  /** Up to 4 photos the customer attached (upload URLs). Hidden together with the review. */
+  @Column({ type: 'text', nullable: true, transformer: photoList })
+  photos: string[];
 
   /** The seller's public answer to the review. */
   @Column({ type: 'text', nullable: true })

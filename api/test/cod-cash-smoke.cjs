@@ -194,8 +194,10 @@ const register = async (label, role = 'customer') => {
   ok(row && row.heldUsd === 0 && row.handedOverUsd >= held && !!row.lastHandoverAt, 'the count sheet shows the hand-over and the last time', JSON.stringify(row));
   const done2 = await taskOf(t1.id);
   ok(done2.codHandedOverUsd > 0 && done2.codHandedOverUsd <= done2.codCollectedUsd, 'the delivery shows how much of its cash was handed in');
-  const hist = (await req(opK.sock, 'cash:history')).data ?? [];
-  ok(hist.length >= 2 && hist.every((h) => h.hubId === hist[0].hubId) && hist.some((h) => h.note === 'first part'), 'any staff of the warehouse can read the receipts', JSON.stringify(hist.length));
+  a = await req(opK.sock, 'cash:history');
+  ok(!a.ok && /supervisors and managers/.test(a.error ?? ''), 'an operator cannot read the receipts (supervisor tier)', a.error ?? 'was allowed');
+  const hist = (await req(mgrK.sock, 'cash:history')).data ?? [];
+  ok(hist.length >= 2 && hist.every((h) => h.hubId === hist[0].hubId) && hist.some((h) => h.note === 'first part'), 'a manager of the warehouse can read the receipts', JSON.stringify(hist.length));
   ok(((await req(supL.sock, 'cash:history')).data ?? []).every((h) => h.riderId !== rider.user.id), "another warehouse does not see this warehouse's receipts");
   ok(!(await req(cust.sock, 'cash:history')).ok, 'a customer cannot read the receipts');
   const audit2 = (await req(admin.sock, 'audit:list')).data ?? [];

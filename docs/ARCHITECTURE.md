@@ -1871,7 +1871,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `sellers:list` | Any admin_* role | `{ status?: string }` |  |
+| `sellers:list` | Any admin_* role | `{ status?: string }` | `admin`, `admin_moderation`, `admin_operations` (KYC reviewers) get legal name, ID, RCCM, tax number, document links, owner, pickup and payout details; every other admin role gets the public profile only. `sellers:get` and the `seller:updated` push follow the same split |
 | `sellers:storefront` | Public | `{ id: string }` | Approved store + its live products |
 | `sellers:register` | seller (user) | `{ name?: string }` | Creates the Seller row in `pending` |
 | `sellers:setStatus` | admin, admin_moderation, admin_operations | `{ id: string; status: 'approved' \| 'rejected' \| 'suspended' \| 'pending' }` | Approve / reject / suspend; suspension revokes sessions |
@@ -1934,9 +1934,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `warehouse:inventory` | Ops (any admin_* role, warehouse_staff) | `—` | Stock view from products |
 | `warehouse:batches` | Ops (any admin_* role, warehouse_staff) | `—` |  |
 | `warehouse:buildBatch` | Ops (any admin_* role, warehouse_staff) | `{ hubId?: string; taskIds: string[]; riderId: string; riderName?: string }` | Groups task ids for one rider |
-| `warehouse:reconcile` | Ops (any admin_* role, warehouse_staff) | `—` | COD cash reconciliation |
-| `warehouse:transfers` | Ops (any admin_* role, warehouse_staff) | `—` |  |
-| `warehouse:createTransfer` | Ops (any admin_* role, warehouse_staff) | object — fields validated server-side |  |
+| `warehouse:reconcile` | `admin`, `admin_finance`, `admin_operations`; warehouse supervisors and managers (own warehouse) | `—` | COD cash reconciliation |
 
 #### `rider:*`
 

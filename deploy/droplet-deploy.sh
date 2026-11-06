@@ -151,8 +151,9 @@ chown -R "$APP_USER:$APP_USER" "$DATA_DIR"
 chmod 700 "$DATA_DIR/uploads-private"
 
 # NEXT_PUBLIC_* are baked into the web bundle at BUILD time.
-# Firebase web settings (incl. NEXT_PUBLIC_FIREBASE_VAPID_KEY, needed for web push) live in
-# $WEB_EXTRA, root-only, so they survive redeploys. Only NEXT_PUBLIC_FIREBASE_* lines are copied.
+# Firebase web settings (incl. NEXT_PUBLIC_FIREBASE_VAPID_KEY, needed for web push) and the Google Maps browser key
+# (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, optional NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID) live in $WEB_EXTRA, root-only, so they
+# survive redeploys. Only NEXT_PUBLIC_FIREBASE_* and those two NEXT_PUBLIC_GOOGLE_MAPS_* lines are copied.
 WEB_EXTRA="$CONF_DIR/web.env"
 {
   cat <<EOF
@@ -160,7 +161,7 @@ NEXT_PUBLIC_API_URL=$BASE_URL
 NEXT_PUBLIC_SOCKET_URL=$BASE_URL
 NEXT_PUBLIC_DEMO_MODE=false
 EOF
-  if [[ -f "$WEB_EXTRA" ]]; then grep -E '^NEXT_PUBLIC_FIREBASE_[A-Z_]+=[^"[:space:]]*$' "$WEB_EXTRA" || true; fi
+  if [[ -f "$WEB_EXTRA" ]]; then grep -E '^(NEXT_PUBLIC_FIREBASE_[A-Z_]+|NEXT_PUBLIC_GOOGLE_MAPS_API_KEY|NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID)=[^"[:space:]]*$' "$WEB_EXTRA" || true; fi
 } > "$APP_DIR/web/.env.local"
 chown "$APP_USER:$APP_USER" "$APP_DIR/web/.env.local"
 chmod 600 "$APP_DIR/web/.env.local"

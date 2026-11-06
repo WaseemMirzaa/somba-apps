@@ -9,6 +9,7 @@ import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/engage_widgets.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/follow_button.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
 import '../../widgets/product_actions.dart';
@@ -234,7 +235,11 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
             ),
           ),
-        if (storeId != null) MessageSellerButton(sellerId: storeId, storeName: _name(s), locale: widget.locale),
+        if (storeId != null) ...[
+          FollowStoreButton(sellerId: storeId, storeName: _name(s)),
+          const SizedBox(height: 10),
+          MessageSellerButton(sellerId: storeId, storeName: _name(s), locale: widget.locale),
+        ],
       ]),
     );
   }

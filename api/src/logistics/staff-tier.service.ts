@@ -12,6 +12,13 @@ import { DeskAction, tierAllows } from './tiers';
 export class StaffTierService {
   constructor(@InjectRepository(User) private readonly users: Repository<User>) {}
 
+  /** The warehouse a staff member belongs to, as the database holds it now (null for admins and for staff not linked to one). */
+  async hubOf(user: { id: string; role: string }): Promise<string | null> {
+    if (user.role !== 'warehouse_staff') return null;
+    const row = await this.users.findOne({ where: { id: user.id }, select: ['id', 'hubId'] });
+    return row?.hubId ?? null;
+  }
+
   async allows(user: { id: string; role: string }, action: DeskAction): Promise<boolean> {
     if (user.role.startsWith('admin')) return true;
     if (user.role !== 'warehouse_staff') return false;

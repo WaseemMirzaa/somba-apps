@@ -15,6 +15,7 @@ import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import '../payment_pending_screen.dart';
 import 'aftersale_dispute_form.dart';
+import '../../util/payment_label.dart';
 import 'order_after_sale.dart';
 import 'returns_extra.dart';
 import 'support_extra.dart';
@@ -155,7 +156,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${_paymentState(s, payment, cod: o.isCod)} · ${s.paymentLabel(o.paymentMethod)}',
+                        '${_paymentState(s, payment, cod: showsCod(o.isCod))} · ${shownPaymentLabel(s, o.paymentMethod)}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                     ),

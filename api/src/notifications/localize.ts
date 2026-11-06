@@ -249,6 +249,9 @@ const TITLES: Record<string, string> = {
   'Transfer run on its way': 'Tournée de transfert en route',
   'Parcel missing from run': 'Colis manquant dans une tournée',
   'Task needs attention': 'Tâche à vérifier',
+  'Aged parcel': 'Colis en attente depuis longtemps',
+  'Parcel escalated': 'Colis remonté à la direction',
+  'Parcel returned to seller': 'Colis retourné au vendeur',
   'Seller package ready': 'Colis vendeur prêt',
   'Item cancelled by the seller': 'Article annulé par le vendeur',
   'Seller cancelled items': 'Articles annulés par le vendeur',
@@ -327,8 +330,11 @@ const TITLES: Record<string, string> = {
   'New message from the seller': 'Nouveau message du vendeur',
   'Two-factor authentication enabled': 'Authentification à deux facteurs activée',
   'Two-factor authentication disabled': 'Authentification à deux facteurs désactivée',
+  'Two-factor authentication reset': 'Authentification à deux facteurs réinitialisée',
   'Vacation mode ended': 'Fin du mode vacances',
   'Seller badge updated': 'Badge vendeur mis à jour',
+  // Customers: a store they follow has a new product
+  'New from a store you follow': 'Nouveau chez une boutique que vous suivez',
 };
 
 function titlePattern(title: string): string | null {
@@ -356,11 +362,16 @@ const BODIES: Rule[] = [
   [/^(.+) left your store team\.$/, (m) => `${m[1]} a quitté l’équipe de votre boutique.`],
   [/^Signing in to your account now asks for a code from your authenticator app\.$/, () => 'La connexion à votre compte demande maintenant un code de votre application d’authentification.'],
   [/^Two-factor authentication was turned off on your account\.$/, () => 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
+  [/^A super admin reset two-factor authentication on your account\. Sign in again and set it up again\.$/, () => 'Un super admin a réinitialisé l’authentification à deux facteurs de votre compte. Reconnectez-vous et configurez-la de nouveau.'],
   [/^Your store is open again and takes new orders\.$/, () => 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.'],
   [/^Your store badge is now (\w+) \(was (\w+)\)\.$/, (m) => `Le badge de votre boutique est maintenant ${pick(BADGES, m[1])} (avant : ${pick(BADGES, m[2])}).`],
   // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins
   [/^(\S+): ([a-z ]+) needs a rider\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » à confier à un livreur.`],
   [/^(\S+): ([a-z ]+) is now in your tasks\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ajoutée à vos tâches.`],
+  [/^(\S+): ([a-z ]+) has been open for (\d+) hours and needs a decision\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures, une décision est nécessaire.`],
+  [/^(\S+): ([a-z ]+) has been open for (\d+) hours\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures.`],
+  [/^(\S+): the customer parcel is going back to the seller\. Review the order\.$/, (m) => `${m[1]} : le colis du client retourne chez le vendeur. Vérifiez la commande.`],
+  [/^(\S+) could not be delivered and is going back to the seller\. Our team will contact you about your order\.$/, (m) => `${m[1]} n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.`],
   [/^(\S+): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
   [/^(\S+): your package reached the warehouse\.$/, (m) => `${m[1]} : votre colis est arrivé à l’entrepôt.`],
   [

@@ -2,6 +2,7 @@
 // sections 6 and 7), tickets (after-sale.md section 6), and the fakes the support screens run against.
 import 'dart:convert';
 
+import 'package:somba_rider/services/location_reporter.dart';
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/support_models.dart';
 import 'package:somba_rider/services/support_store.dart';
@@ -298,3 +299,38 @@ Map<String, dynamic> parcelJson(String id, String runId, {String status = 'picke
       if (hop != null) 'hop': hop,
       if (hops != null) 'hops': hops,
     };
+
+
+/// A location reporter whose permission the test controls; it never touches a sensor and records what was asked of it.
+class FakeLocationReporter extends LocationReporter {
+  FakeLocationReporter(this.access);
+
+  /// What the phone says now (a test changes it to play "the rider allowed it in the settings").
+  LocationAccess access;
+
+  /// What the phone's prompt answers when it is raised.
+  LocationAccess promptAnswer = LocationAccess.granted;
+  var checks = 0;
+  var prompts = 0;
+  final settingsOpened = <LocationAccess>[];
+  bool settingsCanOpen = true;
+
+  @override
+  Future<LocationAccess> checkAccess() async {
+    checks++;
+    return access;
+  }
+
+  @override
+  Future<LocationAccess> ensureAccess() async {
+    prompts++;
+    if (access == LocationAccess.denied) access = promptAnswer;
+    return access;
+  }
+
+  @override
+  Future<bool> openSettings(LocationAccess a) async {
+    settingsOpened.add(a);
+    return settingsCanOpen;
+  }
+}

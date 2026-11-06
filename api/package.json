@@ -31,6 +31,7 @@
     "smoke:flows": "node test/flows-smoke.cjs",
     "smoke:cod": "node test/cod-cash-smoke.cjs",
     "smoke:race": "node test/race-smoke.cjs",
+    "smoke:stock": "node test/warehouse-stock-smoke.cjs",
     "smoke:coverage": "node test/coverage-smoke.cjs",
     "smoke:routing": "node test/warehouse-routing-smoke.cjs",
     "smoke:areas": "node test/warehouse-areas-smoke.cjs",
@@ -42,7 +43,9 @@
     "smoke:i18n": "node test/i18n-smoke.cjs",
     "smoke:commerce": "node test/commerce-smoke.cjs",
     "smoke:aftersale": "node test/after-sale-smoke.cjs",
-    "smoke:sellerplatform": "node test/seller-platform-smoke.cjs"
+    "smoke:sellerplatform": "node test/seller-platform-smoke.cjs",
+    "smoke:staff2fa": "node test/staff-2fa-fraud-smoke.cjs",
+    "smoke:warehouseops": "node test/warehouse-ops-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

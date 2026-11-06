@@ -20,6 +20,7 @@ import '../widgets/product_image.dart';
 import '../widgets/translatable_text.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
+import 'more/aftersale_widgets.dart' show RemotePhotos;
 import 'more/chat_entry.dart';
 import 'more/engage_qa.dart';
 import 'more/shop_extra.dart';
@@ -516,6 +517,10 @@ Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxi
       ]),
       const SizedBox(height: 8),
       TranslatableText(kind: 'review', id: r.id, text: r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+      if (r.photos.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        RemotePhotos(key: ValueKey('review-photos-${r.id}'), urls: r.photos, size: 64, semantic: s.rvPhotoAlt),
+      ],
       if (r.sellerReply != null)
         Container(
           key: const ValueKey('seller-reply'),

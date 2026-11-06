@@ -18,6 +18,7 @@ import {
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { DEMO_MODE } from "@/lib/demo-mode";
+import { useCodOffered } from "@/lib/use-cod-offered";
 import type {
   DeliveryStatus,
   DeliveryTask,
@@ -65,6 +66,7 @@ function StatusPill({ status }: { status: string }) {
 
 export default function LiveConsolePage() {
   const rt = useRealtime();
+  const codOffered = useCodOffered();
   const [email, setEmail] = useState(DEMO_MODE ? "customer@somba.app" : "");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [busy, setBusy] = useState(false);
@@ -350,13 +352,15 @@ export default function LiveConsolePage() {
                   <Package className="h-4 w-4" /> Storefront
                 </h2>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => placeTestOrder("cod")}
-                    disabled={busy || !rt.products.length}
-                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    Order (COD)
-                  </button>
+                  {codOffered && (
+                    <button
+                      onClick={() => placeTestOrder("cod")}
+                      disabled={busy || !rt.products.length}
+                      className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Order (COD)
+                    </button>
+                  )}
                   <button
                     onClick={() => placeTestOrder("wallet")}
                     disabled={busy || !rt.products.length}

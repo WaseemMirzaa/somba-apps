@@ -268,6 +268,13 @@ add("Two-factor authentication is not on for this account", "L'authentification 
 add("This sign-in expired. Enter your password again", "Cette connexion a expiré. Saisissez à nouveau votre mot de passe.");
 add("Two-factor authentication is required for seller accounts and cannot be turned off", "L'authentification à deux facteurs est obligatoire pour les comptes vendeur et ne peut pas être désactivée.");
 add("Too many wrong codes. Try again in a few minutes", "Trop de codes erronés. Réessayez dans quelques minutes.");
+// Staff two-factor authentication (admin account page, roles page, settings)
+add("Two-factor authentication is required for staff accounts. Turn it on under Account > Security to continue", "L'authentification à deux facteurs est obligatoire pour le personnel. Activez-la dans Compte > Sécurité pour continuer.");
+add("Two-factor authentication is required for staff accounts and cannot be turned off", "L'authentification à deux facteurs est obligatoire pour le personnel et ne peut pas être désactivée.");
+add("Only the super admin can change the staff two-factor requirement", "Seul le super administrateur peut modifier l'obligation de l'authentification à deux facteurs du personnel.");
+add("Turn on two-factor authentication on your own account first, or this requirement would lock you out", "Activez d'abord l'authentification à deux facteurs sur votre propre compte, sinon cette obligation vous bloquerait.");
+add('Use "Turn off" on your own account page to change your own two-factor authentication', "Utilisez « Désactiver » sur la page de votre propre compte pour modifier votre authentification à deux facteurs.");
+add("Only staff accounts can be reset here", "Seuls les comptes du personnel peuvent être réinitialisés ici.");
 
 add("Only shoppers can message a store", "Seuls les clients peuvent écrire à une boutique.");
 add("Store not found", "Boutique introuvable.");
@@ -342,6 +349,7 @@ const AREA_FIELDS_FR: Record<string, string> = {
 const AREA_LEVEL_ADD_FR: Record<string, string> = { country: "un pays", province: "une province", city: "une ville", district: "un district", commune: "une commune", quartier: "un quartier" };
 const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 const RULES: Rule[] = [
+  [/^Fraud threshold must be a whole number between (\d+) and (\d+)\.?$/i, (m) => `Seuil de fraude : un nombre entier entre ${m[1]} et ${m[2]}.`],
   [/^(.+) must be (\d+)-(\d+) characters\.?$/i, (m) => `${areaField(m[1])} : ${m[2]} à ${m[3]} caractères.`],
   [/^(.+) must be (?:a number|a whole number) between (\d+) and (\d+)\.?$/i, (m) => `${areaField(m[1])} : un nombre entre ${m[2]} et ${m[3]}.`],
   [/^Level must be one of: .+$/i, () => "Le niveau doit être : pays, province, ville, district, commune ou quartier."],

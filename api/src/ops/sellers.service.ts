@@ -21,6 +21,7 @@ import type { SellerStatus, SellerView } from '../database/entities/seller.entit
 import { normalizePhone } from '../common/phone/phone-hash';
 import { onVacation, vacationNotice } from '../sellers/storefront';
 import { privateIdOf } from '../sellers/private-url';
+import { KYC_REVIEWERS } from '../common/staff-access';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import {
   ADMIN_ROLES,
@@ -167,7 +168,7 @@ export class SellersService {
     this.translations?.registerRepublisher('seller', async (id) => {
       const seller = await this.sellers.findOne({ where: { id } });
       if (!seller) return;
-      this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(seller));
+      await this.pushToAdmins(seller);
       if (seller.userId) this.emitter.toUser(seller.userId, 'seller:updated', await this.withPlanState(seller));
     });
   }
@@ -230,8 +231,35 @@ export class SellersService {
     return (await this.present([sellerView(seller)]))[0];
   }
 
-  /** Admin list: includes KYC and the last decision reason (documentUrls parsed). */
-  async list(status?: SellerStatus, paging?: unknown) {
+  /**
+   * What an admin role sees of a store. A KYC reviewer (`KYC_REVIEWERS`) gets the full record: legal name, ID, RCCM, tax
+   * number, document links, owner, pickup and payout details. Every other role gets the public profile only (what shoppers
+   * see on the storefront, plus the status): it cannot even tell where the identity papers are.
+   */
+  static forStaff<T extends object>(view: T, role: string): T {
+    if (KYC_REVIEWERS.includes(role)) return view;
+    const out = { ...view } as Record<string, unknown>;
+    // `userId` is an internal id, not KYC data: payouts and other admin pages are keyed by it, so every admin role keeps it.
+    for (const k of PRIVATE_SELLER_KEYS) if (k !== 'userId') delete out[k];
+    return out as T;
+  }
+
+  /**
+   * Every live `seller:updated` push to the admin rooms goes through here: reviewers get the full record, the other admin
+   * roles the public profile (no legal name, ID, tax numbers, papers or phone).
+   */
+  static pushViewToAdmins(emitter: Pick<RealtimeEmitter, 'toRoles'>, full: object): void {
+    emitter.toRoles([...KYC_REVIEWERS], 'seller:updated', full);
+    emitter.toRoles(ADMIN_ROLES.filter((r) => !KYC_REVIEWERS.includes(r)), 'seller:updated', SellersService.forStaff(full, 'none'));
+  }
+
+  /** Tell the admins a store changed: reviewers get the full record, the other admin roles the public profile. */
+  private async pushToAdmins(seller: Seller): Promise<void> {
+    SellersService.pushViewToAdmins(this.emitter, await this.adminView(seller));
+  }
+
+  /** Admin list: KYC (documentUrls parsed) and the last decision reason for a reviewer's role; the public profile for any other. */
+  async list(status: SellerStatus | undefined, paging: unknown, role: string) {
     const { take, skip } = pageOf(paging);
     const rows = await this.sellers.find({
       where: status ? { status } : undefined,
@@ -239,14 +267,14 @@ export class SellersService {
       take,
       skip,
     });
-    return this.present(rows.map((r) => sellerView(r)));
+    return (await this.present(rows.map((r) => sellerView(r)))).map((v) => SellersService.forStaff(v, role));
   }
 
-  /** Admin: one store with its KYC. */
-  async getForAdmin(id: string) {
+  /** Admin: one store, with its KYC for a reviewer's role and the public profile for any other. */
+  async getForAdmin(id: string, role: string) {
     const seller = await this.sellers.findOne({ where: { id } });
     if (!seller) throw new NotFoundException('Seller not found.');
-    return this.withPlanState(seller);
+    return SellersService.forStaff(await this.withPlanState(seller), role);
   }
 
   /**
@@ -312,7 +340,7 @@ export class SellersService {
     seller.plan = payment.subject;
     seller.planExpiresAt = extendExpiry(renewing ? seller.planExpiresAt : null, months);
     const saved = await this.sellers.save(seller);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    await this.pushToAdmins(saved);
     if (saved.userId) {
       this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
       await this.notifications.toUser(saved.userId, {
@@ -349,7 +377,7 @@ export class SellersService {
         kycSubmittedAt: now,
       }),
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(seller));
+    await this.pushToAdmins(seller);
     this.emitter.toUser(user.id, 'seller:updated', await this.withPlanState(seller));
     await this.notifications.toRole('admin_moderation', {
       title: 'New seller application',
@@ -395,7 +423,7 @@ export class SellersService {
       kycSubmittedAt: now,
     });
     const saved = await this.sellers.save(seller);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    await this.pushToAdmins(saved);
     this.emitter.toUser(userId, 'seller:updated', await this.withPlanState(saved));
     await this.notifications.toRole('admin_moderation', {
       title: 'Seller resubmitted',
@@ -467,7 +495,7 @@ export class SellersService {
       return row;
     });
     if (plan?.touched) await this.translations?.enqueue('seller', saved.id);
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    await this.pushToAdmins(saved);
     if (saved.userId) this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
     return this.withPlanState(saved);
   }
@@ -518,7 +546,7 @@ export class SellersService {
       await this.productsSvc.publishUpdated(restored);
     }
 
-    this.emitter.toRoles(ADMIN_ROLES, 'seller:updated', await this.adminView(saved));
+    await this.pushToAdmins(saved);
     if (saved.userId) {
       this.emitter.toUser(saved.userId, 'seller:updated', await this.withPlanState(saved));
       await this.notifications.toUser(saved.userId, {

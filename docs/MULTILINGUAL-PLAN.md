@@ -174,8 +174,8 @@ Editing rules:
     same rooms as today.
 - **Budget:** `TRANSLATE_DAILY_CHAR_LIMIT` (default 300 000, about $6/day at $20 per million characters).
   Over the limit, jobs stay pending until the next day. Usage is logged.
-- **Admin:** `translation:status` returns counts by state plus today's characters. `translation:retry {entityType?, entityId?}`
-  re-queues one record or every failed job. The owning seller can call `products:retranslate {id}`.
+- **Admin:** (Super Admin and Moderation only) `translation:status` returns counts by state plus today's characters. `translation:retry {entityType?, entityId?}`
+  re-queues one record or every failed job. The owning seller (and Super Admin / Moderation for any product) can call `products:retranslate {id}`.
 - **Backfill:** `npm run translate:backfill [-- --dry-run]` queues every record missing a language, prints the
   character count and estimated cost, then lets the worker run.
 - **On demand (reviews / Q&A):** `translate:text { kind: 'review'|'review_reply'|'question'|'answer', id, target }`.

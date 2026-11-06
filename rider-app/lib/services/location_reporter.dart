@@ -66,30 +66,46 @@ class LocationReporter {
   bool get running => _sub != null;
   String? get taskId => _taskId;
 
-  Future<LocationAccess> ensureAccess() async {
+  /// False once the rider declined the explanation screen: the system prompt is then not raised again by [start]; the
+  /// card says location is off and offers "Open settings" instead. Set back to true at sign-out.
+  bool promptsAllowed = true;
+
+  /// Where the permission stands, WITHOUT asking (no system prompt).
+  Future<LocationAccess> checkAccess() async {
     try {
-      return await _ensureAccess();
+      if (!await Geolocator.isLocationServiceEnabled()) return LocationAccess.serviceOff;
+      return _access(await Geolocator.checkPermission());
     } catch (_) {
       // No location plugin on this platform (tests, unsupported desktop): treat as off.
       return LocationAccess.serviceOff;
     }
   }
 
-  Future<LocationAccess> _ensureAccess() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return LocationAccess.serviceOff;
-    var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
-    return switch (p) {
-      LocationPermission.deniedForever => LocationAccess.deniedForever,
-      LocationPermission.denied || LocationPermission.unableToDetermine => LocationAccess.denied,
-      _ => LocationAccess.granted,
-    };
+  /// Where the permission stands after asking once if it can still be asked (the system prompt).
+  Future<LocationAccess> ensureAccess() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return LocationAccess.serviceOff;
+      var p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
+      return _access(p);
+    } catch (_) {
+      return LocationAccess.serviceOff;
+    }
   }
+
+  /// "While using the app" is enough on both platforms: the Android foreground service and the iOS background-location
+  /// mode both keep a stream that was started in the foreground alive with the screen off. `ACCESS_BACKGROUND_LOCATION` /
+  /// "Always" is never requested (see rider-app/docs/BACKGROUND-LOCATION.md).
+  static LocationAccess _access(LocationPermission p) => switch (p) {
+        LocationPermission.deniedForever => LocationAccess.deniedForever,
+        LocationPermission.denied || LocationPermission.unableToDetermine => LocationAccess.denied,
+        _ => LocationAccess.granted,
+      };
 
   /// Start reporting for [taskId]. [send] pushes one fix to the server. Fixes are
   /// throttled to one every 4 s and only when the rider moved at least 10 m.
   Future<LocationAccess> start(String taskId, Future<void> Function(double lat, double lng) send, {required TrackingNotice notice}) async {
-    final access = await ensureAccess();
+    final access = promptsAllowed ? await ensureAccess() : await checkAccess();
     if (access != LocationAccess.granted) return access;
     if (_taskId == taskId && _sub != null) return access;
     await stop();

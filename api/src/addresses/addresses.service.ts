@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Address } from '../database/entities';
 import type { AddressGeo } from '../database/entities/address.entity';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { AreaChainView, GeoService } from '../geo/geo.service';
+import { FraudSignalsService } from '../ops/fraud-signals.service';
 
 /** Only these may be set by the client — never `id`, `userId` or `createdAt`. (`areaId` is validated on its own.) */
 const EDITABLE = [
@@ -44,6 +45,8 @@ export class AddressesService {
     @InjectRepository(Address) private readonly repo: Repository<Address>,
     private readonly emitter: RealtimeEmitter,
     private readonly geo: GeoService,
+    // Counts address changes made while an order is on its way (the "many address changes" fraud rule).
+    @Optional() private readonly fraudSignals?: FraudSignalsService,
   ) {}
 
   /** Add each address's area chain and served flag. */
@@ -105,6 +108,7 @@ export class AddressesService {
       }),
     );
     if (address.isDefault) await this.clearOtherDefaults(userId, address.id);
+    await this.fraudSignals?.noteAddressChange(userId, address.id);
     await this.push(userId);
     return (await this.decorate([address]))[0];
   }
@@ -129,6 +133,13 @@ export class AddressesService {
       }
     }
     if (clean.isDefault) await this.clearOtherDefaults(userId, id);
+    // Changing where an address is (not its label or default flag) counts for the fraud rules.
+    if (current) {
+      const now = clean as Record<string, unknown>;
+      const before = current as unknown as Record<string, unknown>;
+      const moved = ['line1', 'line2', 'city', 'commune', 'region', 'geo', 'postalCode'].some((k) => now[k] !== undefined && JSON.stringify(now[k]) !== JSON.stringify(before[k]));
+      if (moved) await this.fraudSignals?.noteAddressChange(userId, id);
+    }
     await this.push(userId);
     const row = await this.repo.findOne({ where: { id, userId } });
     return row ? (await this.decorate([row]))[0] : null;

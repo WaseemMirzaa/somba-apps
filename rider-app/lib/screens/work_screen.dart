@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../l10n/strings.dart';
+import '../services/cod_visibility.dart';
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -83,6 +84,7 @@ class WorkScreen extends StatelessWidget {
                     ),
                   ]),
                 ),
+                if (showCashSummary(store.codEnabled)) ...[
                 const SizedBox(height: 12),
                 SurfaceCard(
                   child: Row(children: [
@@ -138,6 +140,7 @@ class WorkScreen extends StatelessWidget {
                     ),
                   ]),
                 ),
+                ],
               ]),
             ),
           ]),

@@ -43,6 +43,7 @@ void main() {
   tearDown(() {
     RiderStore.instance.stats = const WorkStatsDto();
     RiderStore.instance.cash = const CashDto();
+    RiderStore.instance.codEnabled = false;
   });
 
   Future<void> show(WidgetTester tester, String lang, {double width = 402, double textScale = 1.0}) async {
@@ -119,6 +120,7 @@ void main() {
         final s = Strings(lang);
         RiderStore.instance.stats = WorkStatsDto.fromJson(_serverAnswer);
         RiderStore.instance.cash = const CashDto(heldUsd: 50, collectedUsd: 70, handedOverUsd: 20);
+        RiderStore.instance.codEnabled = true; // the cash card only exists while COD is on (see cod_hidden_test.dart)
         await show(tester, lang);
 
         final dollars = find.byWidgetPredicate((w) => w is Text && (w.data ?? '').contains('\$') && !(w.data ?? '').contains('{'));
