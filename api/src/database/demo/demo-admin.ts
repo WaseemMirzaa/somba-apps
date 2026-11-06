@@ -1,5 +1,6 @@
 import { CmsBlock, FlashSale, FraudAlert, FraudSignal, Promo, Campaign, WarehouseException, WarehouseBin } from '../entities';
-import type { Seller } from '../entities';
+import { Seller } from '../entities';
+import { SellersService } from '../../ops/sellers.service';
 import { CmsService } from '../../content/cms.service';
 import { PromosService } from '../../content/promos.service';
 import { CampaignsService } from '../../flows/campaigns.service';
@@ -21,6 +22,7 @@ export async function seedAdminQueues(ctx: DemoCtx): Promise<void> {
   await fraud(ctx);
   await warehouse(ctx);
   await stockAdjustments(ctx);
+  await suspendStoreF(ctx);
   log('✓ admin queues: banners, promo codes, flash sales, campaigns, fraud alerts, incidents, warehouse stock');
 }
 
@@ -137,4 +139,13 @@ async function stockAdjustments(ctx: DemoCtx): Promise<void> {
   await inv.adjust(who, { productId: ctx.products.get('MK-COF')!.id, delta: 10, reason: 'manual_adjust', note: 'Supplier delivery' });
   await inv.adjust(who, { productId: ctx.products.get('MK-PLM')!.id, delta: -3, reason: 'manual_adjust', note: 'Leaking bottles removed' });
   await inv.adjust(who, { productId: ctx.products.get('MK-SNK')!.id, delta: 3, variant: 'Size: 44', reason: 'manual_adjust', note: 'Recount' });
+}
+
+/** Store F is suspended last: its listings and its past orders exist first, then the suspension takes the listings off the shop. */
+async function suspendStoreF(ctx: DemoCtx): Promise<void> {
+  const f = ctx.stores.get('F');
+  if (!f) return;
+  const fresh = await ctx.ds.getRepository(Seller).findOneOrFail({ where: { id: f.id } });
+  if (fresh.status !== 'approved') return;
+  await ctx.app.get(SellersService).setStatus(f.id, 'suspended', 'Several customers reported items that never arrived. The store is suspended while we investigate.');
 }

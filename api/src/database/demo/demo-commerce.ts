@@ -410,6 +410,7 @@ export function orderSpecs(): OrderSpec[] {
         await review(c, 'MB-PNT', 4, 'Fresh and crunchy, well salted.', { agoH: 25 * 24 });
       },
     },
+    { key: 'P5', customer: 'reviewer.2', lines: [{ sku: 'MF-WCH' }, { sku: 'MF-RNG' }], address: 'kalamu', stage: 'delivered', placedAgoH: 18 * 24, deliveredAgoH: 16 * 24 },
     {
       key: 'P4', customer: 'reviewer.4', lines: [{ sku: 'MK-BAG' }, { sku: 'MK-LMP' }, { sku: 'MB-TOW' }], address: 'kintambo', stage: 'delivered', placedAgoH: 26 * 24, deliveredAgoH: 24 * 24,
       after: async (c) => {

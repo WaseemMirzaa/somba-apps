@@ -2,6 +2,7 @@
 import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { AppModule } from '../../app.module';
 import { Seller, User } from '../entities';
 import { UsersService } from '../../users/users.service';
@@ -23,7 +24,7 @@ async function run() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
   const ds = app.get(DataSource);
   const users = ds.getRepository(User);
-  const hash = await bcrypt.hash('Real-Fixture-Pw-1234', 10);
+  const hash = await bcrypt.hash(randomBytes(18).toString('hex'), 10);
   const mk = (email: string, name: string, role: User['role']) => users.save(users.create({ email, emailHash: UsersService.emailHash(email), passwordHash: hash, name, role, emailVerified: true }));
   const customer = await mk('real.customer@example.org', 'Real Customer', 'customer');
   const owner = await mk('real.seller@example.org', 'Real Seller', 'seller');
