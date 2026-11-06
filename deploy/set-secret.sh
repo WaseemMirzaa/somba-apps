@@ -29,9 +29,9 @@ API_ENV="${SOMBA_API_ENV:-/opt/somba/api/.env}"
 APP_USER=somba
 PM2_APP=somba-api
 
-ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON"
+ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM"
 # Names whose value is a credential: the confirmation shows its last 4 characters.
-SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON "
+SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_AUTH_TOKEN "
 
 die() { printf 'set-secret: %s\n' "$*" >&2; exit 1; }
 
@@ -75,6 +75,10 @@ valid_value() {
     GOOGLE_TRANSLATE_API_KEY) [[ "$value" =~ ^AIza[0-9A-Za-z_-]{30,}$ ]] ;;
     TRANSLATE_DAILY_CHAR_LIMIT) [[ "$value" =~ ^[1-9][0-9]{0,8}$ ]] ;;
     FIREBASE_SERVICE_ACCOUNT_JSON) [[ "$value" =~ ^(\{.+\}|[A-Za-z0-9+/=]{100,})$ ]] ;;
+    TWILIO_ACCOUNT_SID) [[ "$value" =~ ^AC[0-9a-fA-F]{32}$ ]] ;;
+    TWILIO_AUTH_TOKEN) [[ "$value" =~ ^[0-9a-fA-F]{32}$ ]] ;;
+    # A Twilio number (+ and digits), a Messaging Service SID (MG…), or an alphanumeric sender name (3 to 11 letters/digits, at least one letter).
+    TWILIO_FROM) [[ "$value" =~ ^\+[1-9][0-9]{6,14}$ || "$value" =~ ^MG[0-9a-fA-F]{32}$ || ( "$value" =~ ^[A-Za-z0-9]{3,11}$ && "$value" =~ [A-Za-z] ) ]] ;;
     *) return 1 ;;
   esac
 }
@@ -95,6 +99,9 @@ why_invalid() {
     GOOGLE_TRANSLATE_API_KEY) echo "must look like AIza… (a Google API key, restricted to Cloud Translation)" ;;
     TRANSLATE_DAILY_CHAR_LIMIT) echo "must be a whole number of characters, 1 to 999999999" ;;
     FIREBASE_SERVICE_ACCOUNT_JSON) echo "must be the service-account JSON, or its base64 on one line" ;;
+    TWILIO_ACCOUNT_SID) echo "must be the Twilio Account SID: AC followed by 32 letters/digits (Twilio console, Account Info; not an API key SID that starts with SK)" ;;
+    TWILIO_AUTH_TOKEN) echo "must be the Twilio Auth Token: 32 letters/digits (Twilio console, Account Info)" ;;
+    TWILIO_FROM) echo "must be a Twilio phone number like +15551234567, a Messaging Service SID (MG followed by 32 letters/digits), or a sender name of 3 to 11 letters/digits with at least one letter" ;;
   esac
 }
 

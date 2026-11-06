@@ -1,5 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
+import { normalizePhone } from '../common/phone/phone-hash';
+
+/**
+ * The number as Twilio wants it: `+` and digits only. A stored number is whatever the person typed ("+243 900 000 101",
+ * "0812345678"), and Twilio refuses spaces and national formats (error 21211), so it is cleaned here, the same way
+ * logins match it. Null when it cannot be a phone number.
+ */
+export function toE164(raw: string | null | undefined): string | null {
+  const n = normalizePhone(raw);
+  return n ? `+${n}` : null;
+}
+
+/** `TWILIO_FROM` may name a Messaging Service (`MG` + 32 hex), which Twilio takes in a different field than a number or sender name. */
+const MESSAGING_SERVICE_SID = /^MG[0-9a-f]{32}$/i;
 
 /** Whether this server has an SMTP host / a Twilio account, from the environment (also sent to the apps as a setting). */
 export const emailProviderConfigured = (env: NodeJS.ProcessEnv = process.env): boolean => !!env.SMTP_HOST;
@@ -80,8 +94,14 @@ export class MessagingService {
 
   async deliverSms(to: string, text: string): Promise<Delivery> {
     if (!this.smsConfigured) return this.undelivered('sms', to, text);
+    const e164 = toE164(to);
+    if (!e164) {
+      this.logger.error(`SMS to ${mask(to)} not sent: not a valid phone number.`);
+      return 'failed';
+    }
     try {
       const sid = process.env.TWILIO_ACCOUNT_SID!;
+      const from = process.env.TWILIO_FROM!;
       const res = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
         {
@@ -93,14 +113,17 @@ export class MessagingService {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            To: to,
-            From: process.env.TWILIO_FROM!,
+            To: e164,
+            ...(MESSAGING_SERVICE_SID.test(from) ? { MessagingServiceSid: from } : { From: from }),
             Body: text,
           }),
         },
       );
       if (!res.ok) {
-        this.logger.error(`SMS to ${mask(to)} failed: HTTP ${res.status}`);
+        // Twilio's error code says why (21211 bad number, 21608 trial account and unverified number, 21408 country not
+        // enabled, 20003 wrong credentials). Its message can name the number, so only the code is logged.
+        const code = ((await res.json().catch(() => null)) as { code?: number } | null)?.code;
+        this.logger.error(`SMS to ${mask(e164)} failed: HTTP ${res.status}${code ? `, Twilio error ${code}` : ''}`);
         return 'failed';
       }
       return 'sent';
