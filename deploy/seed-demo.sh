@@ -63,7 +63,7 @@ case "$cmd" in
   remove)
     shift || true
     ( cd "$APP_DIR/api" && run_as_app npm run --silent seed:demo:remove:prod -- "$@" )
-    [[ " $* " == *" --yes "* ]] && { rm -f "$CRED"; echo "Credentials file removed."; reload_api; }
+    if [[ " $* " == *" --yes "* ]]; then rm -f "$CRED"; echo "Credentials file removed."; reload_api; fi
     ;;
   *) die "unknown command '$cmd' (seed, reset, remove, code)";;
 esac

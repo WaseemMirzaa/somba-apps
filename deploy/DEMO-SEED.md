@@ -6,6 +6,8 @@ This puts a complete set of test data on a running Somba&Teka server, so you can
 - Run it twice and the second run adds nothing.
 - One command removes it again, and leaves your real customers, orders and stores exactly as they were.
 
+**Remove the demo before real orders start.** While it is installed the second demo warehouse (Entrepôt Maluku, démo) serves the commune of Maluku, so a real customer pinned there is routed to it.
+
 **While the demo is installed, real visitors can see it.** The demo stores and products show in the shop, and a real customer could add a demo product to a cart. The demo also sends notices to your real admins (new orders, new products to review). Install it for testing and remove it before you launch.
 
 **The demo super admin (`admin.super@demo.sombateka.test`) can do everything, including creating staff. Remove the demo before launch.**
@@ -20,8 +22,16 @@ Everything the demo creates belongs to an account with an e-mail ending in `@dem
 
 ## Commands (on the server, as root, in this order)
 
+**First deploy `main` with this change.** `seed-demo.sh` runs the compiled code in `/opt/somba/api/dist`, so a plain `git pull` is not enough (it does not rebuild). Run the normal deploy, the same one you used before. It is safe on a server that already runs: your admin is left unchanged, secrets are kept, data is kept.
+
 ```bash
-cd /opt/somba && git pull            # or run the normal deploy first
+curl -fsSL https://raw.githubusercontent.com/waseemmirzaa/somba-apps/main/deploy/droplet-deploy.sh -o deploy.sh
+DOMAIN=107.170.116.169 ADMIN_EMAIL=<your admin e-mail> SSL=0 bash deploy.sh
+```
+
+Then, from the same shell:
+
+```bash
 bash /opt/somba/deploy/seed-demo.sh  # add the demo (about 30 seconds); reloads the API at the end
 sudo cat /etc/somba/demo-credentials.txt   # every account, its password, its two-factor key
 ```
@@ -34,6 +44,8 @@ sudo cat /etc/somba/demo-credentials.txt   # every account, its password, its tw
 | See what a removal would delete (changes nothing) | `bash /opt/somba/deploy/seed-demo.sh remove` |
 | Remove the demo | `bash /opt/somba/deploy/seed-demo.sh remove --yes` |
 | Refresh the dates (see "Time") | remove with `--yes`, then add again |
+
+Customers and store owners share one random password (the one you may hand to a client). Staff (all six admins, warehouse, riders) share a different one. `DEMO_PASSWORD` instead sets one password for everyone.
 
 The credentials file is readable by root only (mode 600). It is never in git and never printed by the script. Run the add again later and accounts that exist keep their password; only `reset` changes them.
 
@@ -111,6 +123,10 @@ Use any e-mail ending in `@demo.sombateka.test` so the removal also takes it out
 | Documents | `deploy/demo/kyc/sample-id-card.jpg` and `sample-rccm.jpg` (also `sample-tax-certificate.jpg`). They say SPECIMEN and carry made-up data. |
 
 Then sign in as `admin.super` (or moderation, operations), open **Sellers**, approve it. The owner then needs two-factor, pins the pickup location on the map, and can add a product (it goes to the moderation queue). This path is tested end to end by `api/test/demo-signup-check.cjs`.
+
+## Phone numbers and SMS
+
+The demo phone numbers (`+243 900 000 xxx`) are made up, but a number is a number: when Twilio is live, a code sent to one could reach a stranger. Seeding itself sends no SMS or e-mail. **To test SMS or phone-code sign-in, first put your own number on the account** (profile > phone), and in the live sign-up samples below use your own number instead of the sample ones.
 
 ## What cannot work without keys
 

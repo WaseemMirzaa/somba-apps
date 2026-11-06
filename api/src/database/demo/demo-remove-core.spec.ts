@@ -1,3 +1,4 @@
+import { AuditLog, WarehouseBatch } from '../entities';
 import { mkdtempSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -38,19 +39,15 @@ describe('demo removal', () => {
   afterEach(async () => ds.destroy());
 
   const user = (email: string, role: User['role'], name: string) =>
-    ds
-      .getRepository(User)
-      .save(
-        ds
-          .getRepository(User)
-          .create({
-            email,
-            emailHash: `h-${email}`,
-            passwordHash: 'x',
-            name,
-            role,
-          }),
-      );
+    ds.getRepository(User).save(
+      ds.getRepository(User).create({
+        email,
+        emailHash: `h-${email}`,
+        passwordHash: 'x',
+        name,
+        role,
+      }),
+    );
 
   async function world() {
     const cat = await ds
@@ -63,94 +60,74 @@ describe('demo removal', () => {
       'Real Buyer',
     );
     const realOwner = await user('shop@gmail.com', 'seller', 'Real Owner');
-    const realSeller = await ds
-      .getRepository(Seller)
-      .save(
-        ds
-          .getRepository(Seller)
-          .create({
-            name: 'Real Store',
-            userId: realOwner.id,
-            status: 'approved',
-          }),
-      );
-    const realProduct = await ds
-      .getRepository(Product)
-      .save(
-        ds
-          .getRepository(Product)
-          .create({
-            name: 'Real thing',
-            price: 5,
-            categoryId: cat.id,
-            sellerId: realSeller.id,
-            rating: 5,
-            reviewsCount: 1,
-          }),
-      );
+    const realSeller = await ds.getRepository(Seller).save(
+      ds.getRepository(Seller).create({
+        name: 'Real Store',
+        userId: realOwner.id,
+        status: 'approved',
+      }),
+    );
+    const realProduct = await ds.getRepository(Product).save(
+      ds.getRepository(Product).create({
+        name: 'Real thing',
+        price: 5,
+        categoryId: cat.id,
+        sellerId: realSeller.id,
+        rating: 5,
+        reviewsCount: 1,
+      }),
+    );
     const mkOrder = async (
       customerId: string,
       ref: string,
       productId: string,
       sellerId: string,
     ) =>
-      ds
-        .getRepository(Order)
-        .save(
-          ds
-            .getRepository(Order)
-            .create({
-              reference: ref,
-              customerId,
-              customerName: 'x',
-              status: 'confirmed',
-              paymentMethod: 'wallet',
-              totalUsd: 5,
-              items: [
-                Object.assign(new OrderItem(), {
-                  productId,
-                  productName: 'p',
-                  variant: 'Default',
-                  qty: 1,
-                  priceUsd: 5,
-                  sellerId,
-                  sellerName: 's',
-                  fulfilment: 'open',
-                }),
-              ],
+      ds.getRepository(Order).save(
+        ds.getRepository(Order).create({
+          reference: ref,
+          customerId,
+          customerName: 'x',
+          status: 'confirmed',
+          paymentMethod: 'wallet',
+          totalUsd: 5,
+          items: [
+            Object.assign(new OrderItem(), {
+              productId,
+              productName: 'p',
+              variant: 'Default',
+              qty: 1,
+              priceUsd: 5,
+              sellerId,
+              sellerName: 's',
+              fulfilment: 'open',
             }),
-        );
+          ],
+        }),
+      );
     const realOrder = await mkOrder(
       realCustomer.id,
       'SOM-REAL',
       realProduct.id,
       realSeller.id,
     );
-    await ds
-      .getRepository(Notification)
-      .save(
-        ds
-          .getRepository(Notification)
-          .create({
-            role: 'admin',
-            title: 'New order',
-            body: 'real',
-            entityId: realOrder.id,
-          }),
-      );
-    await ds
-      .getRepository(WalletTransaction)
-      .save(
-        ds
-          .getRepository(WalletTransaction)
-          .create({
-            userId: realCustomer.id,
-            type: 'topup',
-            amount: 5,
-            balance: 5,
-            description: 'real',
-          }),
-      );
+    await ds.getRepository(Notification).save(
+      ds.getRepository(Notification).create({
+        role: 'admin',
+        title: 'New order',
+        body: 'real',
+        entityId: realOrder.id,
+      }),
+    );
+    await ds.getRepository(WalletTransaction).save(
+      ds.getRepository(WalletTransaction).create({
+        userId: realCustomer.id,
+        type: 'topup',
+        amount: 5,
+        balance: 5,
+        description: 'real',
+      }),
+    );
 
     const dCust = await user(
       'customer.full@demo.sombateka.test',
@@ -162,29 +139,21 @@ describe('demo removal', () => {
       'seller',
       'Demo Owner',
     );
-    const dSeller = await ds
-      .getRepository(Seller)
-      .save(
-        ds
-          .getRepository(Seller)
-          .create({
-            name: 'Demo Store',
-            userId: dOwner.id,
-            status: 'approved',
-          }),
-      );
-    const dProduct = await ds
-      .getRepository(Product)
-      .save(
-        ds
-          .getRepository(Product)
-          .create({
-            name: 'Demo thing',
-            price: 5,
-            categoryId: cat.id,
-            sellerId: dSeller.id,
-          }),
-      );
+    const dSeller = await ds.getRepository(Seller).save(
+      ds.getRepository(Seller).create({
+        name: 'Demo Store',
+        userId: dOwner.id,
+        status: 'approved',
+      }),
+    );
+    const dProduct = await ds.getRepository(Product).save(
+      ds.getRepository(Product).create({
+        name: 'Demo thing',
+        price: 5,
+        categoryId: cat.id,
+        sellerId: dSeller.id,
+      }),
+    );
     const dOrder = await mkOrder(dCust.id, 'SOM-DEMO', dProduct.id, dSeller.id);
     const demoOnReal = await mkOrder(
       dCust.id,
@@ -192,31 +161,23 @@ describe('demo removal', () => {
       realProduct.id,
       realSeller.id,
     );
-    await ds
-      .getRepository(Notification)
-      .save(
-        ds
-          .getRepository(Notification)
-          .create({
-            role: 'admin',
-            title: 'New order',
-            body: 'demo',
-            entityId: dOrder.id,
-          }),
-      );
-    await ds
-      .getRepository(Review)
-      .save(
-        ds
-          .getRepository(Review)
-          .create({
-            productId: realProduct.id,
-            userId: dCust.id,
-            author: 'd',
-            rating: 1,
-            text: 'demo review on a real product',
-          }),
-      );
+    await ds.getRepository(Notification).save(
+      ds.getRepository(Notification).create({
+        role: 'admin',
+        title: 'New order',
+        body: 'demo',
+        entityId: dOrder.id,
+      }),
+    );
+    await ds.getRepository(Review).save(
+      ds.getRepository(Review).create({
+        productId: realProduct.id,
+        userId: dCust.id,
+        author: 'd',
+        rating: 1,
+        text: 'demo review on a real product',
+      }),
+    );
     await ds
       .getRepository(Hub)
       .save(
@@ -288,32 +249,28 @@ describe('demo removal', () => {
     const sellerA = await ds
       .getRepository(Seller)
       .findOneOrFail({ where: { name: 'Demo Store' } });
-    await ds
-      .getRepository(Order)
-      .save(
-        ds
-          .getRepository(Order)
-          .create({
-            reference: 'SOM-REAL2',
-            customerId: d.id,
-            customerName: 'x',
-            status: 'confirmed',
-            paymentMethod: 'wallet',
-            totalUsd: 5,
-            items: [
-              Object.assign(new OrderItem(), {
-                productId: w.dProduct.id,
-                productName: 'p',
-                variant: 'Default',
-                qty: 1,
-                priceUsd: 5,
-                sellerId: sellerA.id,
-                sellerName: 's',
-                fulfilment: 'open',
-              }),
-            ],
+    await ds.getRepository(Order).save(
+      ds.getRepository(Order).create({
+        reference: 'SOM-REAL2',
+        customerId: d.id,
+        customerName: 'x',
+        status: 'confirmed',
+        paymentMethod: 'wallet',
+        totalUsd: 5,
+        items: [
+          Object.assign(new OrderItem(), {
+            productId: w.dProduct.id,
+            productName: 'p',
+            variant: 'Default',
+            qty: 1,
+            priceUsd: 5,
+            sellerId: sellerA.id,
+            sellerName: 's',
+            fulfilment: 'open',
           }),
-      );
+        ],
+      }),
+    );
     const res = await removeDemo(ds, {
       yes: true,
       uploadDir: dirs.up,
@@ -329,19 +286,15 @@ describe('demo removal', () => {
     const hub = await ds
       .getRepository(Hub)
       .findOneOrFail({ where: { name: DEMO_HUB_NAME } });
-    await ds
-      .getRepository(DeliveryTask)
-      .save(
-        ds
-          .getRepository(DeliveryTask)
-          .create({
-            orderId: 'real-order',
-            orderReference: 'SOM-REAL',
-            kind: 'delivery',
-            status: 'unassigned',
-            hubId: hub.id,
-          }),
-      );
+    await ds.getRepository(DeliveryTask).save(
+      ds.getRepository(DeliveryTask).create({
+        orderId: 'real-order',
+        orderReference: 'SOM-REAL',
+        kind: 'delivery',
+        status: 'unassigned',
+        hubId: hub.id,
+      }),
+    );
     const plan = await planRemoval(ds);
     expect(plan.blockers.join(' ')).toMatch(/demo warehouse/);
   });
@@ -355,5 +308,207 @@ describe('demo removal', () => {
     });
     expect(res.counts).toEqual([]);
     expect(await ds.getRepository(User).count()).toBe(1);
+  });
+
+  describe('real data that points at the demo', () => {
+    it('refuses, and deletes nothing, when a real order has a delivery assigned to a demo rider', async () => {
+      const w = await world();
+      const rider = await user(
+        'rider@demo.sombateka.test',
+        'rider',
+        'Demo Rider',
+      );
+      const task = await ds.getRepository(DeliveryTask).save(
+        ds.getRepository(DeliveryTask).create({
+          orderId: w.realOrder.id,
+          orderReference: 'SOM-REAL',
+          kind: 'delivery',
+          status: 'assigned',
+          riderId: rider.id,
+        }),
+      );
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.blockers.join(' ')).toMatch(/SOM-REAL/);
+      expect(res.deleted).toEqual([]);
+      expect(
+        await ds.getRepository(DeliveryTask).count({ where: { id: task.id } }),
+      ).toBe(1);
+    });
+
+    it('refuses when a batch of a demo rider holds a parcel of a real order', async () => {
+      const w = await world();
+      const rider = await user(
+        'rider@demo.sombateka.test',
+        'rider',
+        'Demo Rider',
+      );
+      const realTask = await ds.getRepository(DeliveryTask).save(
+        ds.getRepository(DeliveryTask).create({
+          orderId: w.realOrder.id,
+          orderReference: 'SOM-REAL',
+          kind: 'delivery',
+          status: 'unassigned',
+        }),
+      );
+      await ds.getRepository(WarehouseBatch).save(
+        ds.getRepository(WarehouseBatch).create({
+          reference: 'B-1',
+          riderId: rider.id,
+          taskIds: JSON.stringify([realTask.id]),
+        }),
+      );
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.blockers.join(' ')).toMatch(/batch/);
+      expect(await ds.getRepository(WarehouseBatch).count()).toBe(1);
+    });
+
+    it('removes a batch of a demo rider that holds only demo parcels', async () => {
+      const w = await world();
+      const rider = await user(
+        'rider@demo.sombateka.test',
+        'rider',
+        'Demo Rider',
+      );
+      const demoTask = await ds.getRepository(DeliveryTask).save(
+        ds.getRepository(DeliveryTask).create({
+          orderId: w.dOrder.id,
+          orderReference: 'SOM-DEMO',
+          kind: 'delivery',
+          status: 'unassigned',
+        }),
+      );
+      await ds.getRepository(WarehouseBatch).save(
+        ds.getRepository(WarehouseBatch).create({
+          reference: 'B-2',
+          riderId: rider.id,
+          taskIds: JSON.stringify([demoTask.id]),
+        }),
+      );
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.blockers).toEqual([]);
+      expect(await ds.getRepository(WarehouseBatch).count()).toBe(0);
+    });
+
+    it('refuses while a real staff member belongs to the demo warehouse, and while a real order is routed to it', async () => {
+      const w = await world();
+      const hub = await ds
+        .getRepository(Hub)
+        .findOneOrFail({ where: { name: DEMO_HUB_NAME } });
+      await ds.getRepository(User).save(
+        ds.getRepository(User).create({
+          email: 'ops@company.com',
+          emailHash: 'h-ops',
+          passwordHash: 'x',
+          name: 'Real Rider',
+          role: 'rider',
+          hubId: hub.id,
+        }),
+      );
+      await ds
+        .getRepository(Order)
+        .update({ id: w.realOrder.id }, { destinationHubId: hub.id });
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.blockers.join(' ')).toMatch(/real staff member/);
+      expect(res.blockers.join(' ')).toMatch(/routed to the demo warehouse/);
+      expect(res.deleted).toEqual([]);
+    });
+
+    it('clears the origin warehouse of a real store that pointed at the demo warehouse', async () => {
+      await world();
+      const hub = await ds
+        .getRepository(Hub)
+        .findOneOrFail({ where: { name: DEMO_HUB_NAME } });
+      await ds
+        .getRepository(Seller)
+        .update({ name: 'Real Store' }, { originHubId: hub.id });
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.sellersReset).toBe(1);
+      expect(
+        (
+          await ds
+            .getRepository(Seller)
+            .findOneOrFail({ where: { name: 'Real Store' } })
+        ).originHubId,
+      ).toBeNull();
+    });
+  });
+
+  describe('lines matched by name', () => {
+    const audit = (actor: string) =>
+      ds.getRepository(AuditLog).save(
+        ds.getRepository(AuditLog).create({
+          actor,
+          role: 'admin',
+          action: 'x',
+          entity: 'e',
+          entityId: null,
+          detail: null,
+        }),
+      );
+
+    it('removes audit lines written under a demo name', async () => {
+      await world();
+      await audit('Demo Customer');
+      await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(await ds.getRepository(AuditLog).count()).toBe(0);
+    });
+
+    it('keeps the audit lines of a real person who has the same name as a demo account', async () => {
+      await world();
+      await user('namesake@gmail.com', 'admin', 'Demo Customer');
+      await audit('Demo Customer');
+      await audit('Demo seed');
+      await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      const left = await ds.getRepository(AuditLog).find();
+      expect(left.map((l) => l.actor)).toEqual(['Demo Customer']);
+    });
+  });
+});
+
+/** Demo phone numbers cannot be told apart from real ones by the SMS provider: seeding must never send a message. */
+describe('demo seed sends no message', () => {
+  it('does not use the messaging or verification services', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readdirSync, readFileSync } = require('fs') as typeof import('fs');
+    const dir = __dirname;
+    const files = [
+      ...readdirSync(dir)
+        .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
+        .map((f) => join(dir, f)),
+      join(dir, '..', 'seed-demo.ts'),
+      join(dir, '..', 'seed-demo-remove.ts'),
+    ];
+    for (const f of files)
+      expect(readFileSync(f, 'utf8')).not.toMatch(
+        /messaging\.service|VerificationService|sendSms|sendEmail|MessagingService/,
+      );
   });
 });

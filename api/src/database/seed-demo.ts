@@ -144,8 +144,17 @@ async function main(app: INestApplicationContext) {
     `• pictures: ${copied.written} copied to ${images.dir}, ${copied.present} already there`,
   );
 
-  const password = supplied ?? randomPassword();
-  const passwordHash = await bcrypt.hash(password, 12);
+  // Two passwords per run: one for customers and store owners (what you may hand to a client), one for staff (admins,
+  // warehouse, riders). DEMO_PASSWORD, when given, is used for everyone.
+  const publicPassword = supplied ?? randomPassword();
+  const staffPassword = supplied ?? randomPassword();
+  const hashes = {
+    public: await bcrypt.hash(publicPassword, 12),
+    staff: supplied ? null : await bcrypt.hash(staffPassword, 12),
+  };
+  if (!hashes.staff) hashes.staff = hashes.public;
+  const groupOf = (role: string): 'public' | 'staff' =>
+    role === 'customer' || role === 'seller' ? 'public' : 'staff';
   const previous = readCredentials(credFile);
   const userRepo = ds.getRepository(User);
   const credentials = new Map<string, CredentialEntry>();
@@ -194,7 +203,7 @@ async function main(app: INestApplicationContext) {
         userRepo.create({
           email: def.email,
           emailHash: hash,
-          passwordHash,
+          passwordHash: hashes[groupOf(def.role)] as string,
           name: def.name,
           role: def.role,
           phone: def.phone ?? null,
@@ -206,15 +215,15 @@ async function main(app: INestApplicationContext) {
           warehouseTier: def.tier ?? null,
         }),
       );
-      pw = password;
+      pw = groupOf(def.role) === 'public' ? publicPassword : staffPassword;
       counts.created++;
     } else {
       counts.existing++;
       const patch: Partial<User> = {};
       if (resetPasswords) {
-        patch.passwordHash = passwordHash;
+        patch.passwordHash = hashes[groupOf(def.role)] as string;
         patch.tokenVersion = (user.tokenVersion ?? 0) + 1;
-        pw = password;
+        pw = groupOf(def.role) === 'public' ? publicPassword : staffPassword;
       } else pw = previous.get(def.email)?.password ?? null;
       if (def.hubId !== undefined && user.hubId !== def.hubId)
         patch.hubId = def.hubId;
@@ -374,6 +383,7 @@ async function main(app: INestApplicationContext) {
     [...credentials.values()],
     [
       'Somba&Teka DEMO credentials. Treat this file as a secret (it is root-only on a server).',
+      'Customers and store owners share one password; staff (admins, warehouse, riders) share another. Hand out only the first kind.',
       `Written ${new Date().toISOString()}. Every demo account uses the e-mail domain @${'demo.sombateka.test'}.`,
       'totp_key = the key to add to an authenticator app (Google Authenticator, 1Password...): "Enter a setup key", time based, 6 digits.',
       'recovery_codes = one-time codes that work instead of an app code.',

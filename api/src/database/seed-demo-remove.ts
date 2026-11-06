@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../app.module';
 import { removeDemo } from './demo/demo-remove-core';
 import { loadManifest } from './demo/demo-images';
+import { CoverageService } from '../geo/coverage.service';
 import { PRIVATE_UPLOAD_DIR } from '../sellers/private-files.service';
 import { UPLOAD_DIR } from '../uploads/uploads.controller';
 
@@ -56,6 +57,12 @@ async function run() {
         '\nNothing was deleted. Run it again with --yes to delete exactly the rows above.',
       );
       return;
+    }
+    if (res.sellersReset) {
+      await app.get(CoverageService).recomputeSellerOrigins();
+      console.log(
+        `${res.sellersReset} real store(s) had the demo warehouse as origin: their origin was recomputed.`,
+      );
     }
     const total = res.deleted.reduce((t, [, n]) => t + n, 0);
     console.log(

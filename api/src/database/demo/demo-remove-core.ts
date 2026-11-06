@@ -88,11 +88,15 @@ export interface RemovalPlan {
 export interface RemovalResult extends RemovalPlan {
   deleted: [string, number][];
   filesRemoved: { public: number; private: number };
+  /** Real stores whose collection warehouse was the demo one and are now to be recomputed (their origin is cleared). */
+  sellersReset: number;
 }
 
 interface Ids {
   users: string[];
   userNames: string[];
+  batches: string[];
+  blockedBatches: string[];
   sellers: string[];
   /** Ids a store's rows may carry: the store id and, on older data, the owner's user id. */
   owners: string[];
@@ -141,16 +145,24 @@ const uniq = (a: (string | null | undefined)[]) => [
   ...new Set(a.filter((x): x is string => !!x)),
 ];
 
-/** Every id the demo owns, found by following the demo users: nothing is matched by name or by date. */
+/**
+ * Every id the demo owns, found by following the demo users (and the demo warehouse). Nothing is matched by date. The
+ * only match by name is on `audit_logs.actor` and `warehouse_exceptions.raisedBy`, which store a display name and no id;
+ * a name that a real (non-demo) user also holds is left out, so a real "Grace Mbuyi" keeps her audit lines.
+ */
 async function collect(ds: DataSource): Promise<Ids> {
   const ids = {} as Ids;
-  const users = (
-    await ds
-      .getRepository(User)
-      .find({ select: { id: true, email: true, name: true } })
-  ).filter((u) => isDemoEmail(u.email));
+  const allUsers = await ds
+    .getRepository(User)
+    .find({ select: { id: true, email: true, name: true } });
+  const users = allUsers.filter((u) => isDemoEmail(u.email));
   ids.users = users.map((u) => u.id);
-  ids.userNames = uniq(users.map((u) => u.name));
+  const realNames = new Set(
+    allUsers.filter((u) => !isDemoEmail(u.email)).map((u) => u.name),
+  );
+  ids.userNames = uniq(users.map((u) => u.name)).filter(
+    (n) => !realNames.has(n),
+  );
   const col = async <T extends ObjectLiteral>(
     entity: EntityTarget<T>,
     field: string,
@@ -195,8 +207,37 @@ async function collect(ds: DataSource): Promise<Ids> {
     ['disputeId', ids.disputes],
     ['exchangeId', ids.exchanges],
     ['replacementId', ids.replacements],
+  ]);
+  // Batches of the demo warehouse or of a demo rider: the demo's only when every parcel in them is a demo parcel.
+  const batchTerms = where([
+    ['hubId', ids.hubs],
     ['riderId', ids.users],
   ]);
+  ids.batches = [];
+  ids.blockedBatches = [];
+  if (batchTerms) {
+    const demoTasks = new Set(ids.tasks);
+    const rows = await ds
+      .getRepository(WarehouseBatch)
+      .createQueryBuilder('x')
+      .where(
+        batchTerms.sql.replace(/\b([a-zA-Z]+) IN/g, 'x.$1 IN'),
+        batchTerms.params,
+      )
+      .getMany();
+    for (const b of rows) {
+      let list: unknown = [];
+      try {
+        list = JSON.parse(b.taskIds || '[]');
+      } catch {
+        /* unreadable: treated as empty */
+      }
+      const foreign =
+        Array.isArray(list) &&
+        list.some((t) => typeof t === 'string' && !demoTasks.has(t));
+      (foreign ? ids.blockedBatches : ids.batches).push(b.id);
+    }
+  }
   // A bin is the demo's when it is in the demo warehouse or carries the demo prefix (the real warehouse holds demo bins too).
   ids.bins = uniq([
     ...(await col(WarehouseBin, 'id', [['hubId', ids.hubs]])),
@@ -470,10 +511,7 @@ function steps(i: Ids): Step[] {
     {
       label: 'warehouse_batches',
       entity: WarehouseBatch,
-      terms: [
-        ['hubId', i.hubs],
-        ['riderId', i.users],
-      ],
+      terms: [['id', i.batches]],
     },
     { label: 'delivery_tasks', entity: DeliveryTask, terms: [['id', i.tasks]] },
     {
@@ -602,12 +640,10 @@ async function blockersOf(ds: DataSource, i: Ids): Promise<string[]> {
     const real = rows.map((r) => r.orderId).filter((o) => !demoOrders.has(o));
     if (real.length) {
       const refs = (
-        await ds
-          .getRepository(Order)
-          .find({
-            where: real.slice(0, 20).map((id) => ({ id })),
-            select: { reference: true },
-          })
+        await ds.getRepository(Order).find({
+          where: real.slice(0, 20).map((id) => ({ id })),
+          select: { reference: true },
+        })
       ).map((o) => o.reference);
       out.push(
         `${real.length} real order(s) contain demo products (${refs.join(', ')}${real.length > 20 ? ', ...' : ''}). Finish or cancel them first, then run this again.`,
@@ -640,6 +676,46 @@ async function blockersOf(ds: DataSource, i: Ids): Promise<string[]> {
         )
           .slice(0, 10)
           .join(', ')}). Reassign or finish them first.`,
+      );
+  }
+  if (i.blockedBatches.length)
+    out.push(
+      `${i.blockedBatches.length} warehouse batch(es) of the demo warehouse or a demo rider hold parcels of real orders. Finish or reassign them first.`,
+    );
+  const staffTerms = where([['hubId', i.hubs]]);
+  if (staffTerms) {
+    const staff = (
+      await ds
+        .getRepository(User)
+        .createQueryBuilder('x')
+        .where(
+          staffTerms.sql.replace(/\b([a-zA-Z]+) IN/g, 'x.$1 IN'),
+          staffTerms.params,
+        )
+        .getMany()
+    ).filter((u) => !isDemoEmail(u.email));
+    if (staff.length)
+      out.push(
+        `${staff.length} real staff member(s) or rider(s) belong to the demo warehouse (${staff
+          .slice(0, 5)
+          .map((u) => u.name)
+          .join(', ')}). Move them to a real warehouse first (Admin > Staff).`,
+      );
+    const routed = await ds
+      .getRepository(Order)
+      .createQueryBuilder('x')
+      .where(
+        staffTerms.sql.replace(/\bhubId IN/g, 'x.destinationHubId IN'),
+        staffTerms.params,
+      )
+      .getMany();
+    const real = routed.filter((o) => !demoOrders.has(o.id));
+    if (real.length)
+      out.push(
+        `${real.length} real order(s) are routed to the demo warehouse (${real
+          .slice(0, 10)
+          .map((o) => o.reference)
+          .join(', ')}). Finish them first.`,
       );
   }
   return out;
@@ -777,6 +853,7 @@ export async function removeDemo(
     ...plan,
     deleted: [],
     filesRemoved: { public: 0, private: 0 },
+    sellersReset: 0,
   };
   if (
     !opts.yes ||
@@ -787,6 +864,21 @@ export async function removeDemo(
   const ids = await collect(ds);
   const toRate = await ratedElsewhere(ds, ids);
   await ds.transaction(async (m) => {
+    // Real stores whose origin warehouse was the demo one (adding the demo warehouse re-derives every store's origin):
+    // cleared here, recomputed by the caller (CoverageService.recomputeSellerOrigins).
+    if (ids.hubs.length) {
+      const r = await m
+        .getRepository(Seller)
+        .createQueryBuilder()
+        .update()
+        .set({ originHubId: null })
+        .where('originHubId IN (:...h)', { h: ids.hubs })
+        .andWhere('id NOT IN (:...s)', {
+          s: ids.sellers.length ? ids.sellers : ['-'],
+        })
+        .execute();
+      result.sellersReset = r.affected ?? 0;
+    }
     for (const s of steps(ids)) {
       const w = where(s.terms);
       if (!w) continue;
@@ -800,12 +892,10 @@ export async function removeDemo(
     }
     // A real product's rating followed the demo reviews: recompute it from the reviews that are left.
     for (const productId of toRate) {
-      const rows = await m
-        .getRepository(Review)
-        .find({
-          where: { productId, status: 'visible' },
-          select: { rating: true },
-        });
+      const rows = await m.getRepository(Review).find({
+        where: { productId, status: 'visible' },
+        select: { rating: true },
+      });
       const rating = rows.length
         ? Math.round(
             (rows.reduce((t, r) => t + r.rating, 0) / rows.length) * 10,

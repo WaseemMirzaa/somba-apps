@@ -106,6 +106,9 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
   }
   const S = sessions;
 
+  section('Passwords');
+  ok(acct('customer.full').password !== acct('admin.super').password && acct('seller.a').password === acct('customer.full').password && acct('rider').password === acct('admin.super').password, 'customers and store owners share one password, staff another');
+
   section('Customer: full');
   if (S['customer.full']) {
     const s = S['customer.full'].sock;
