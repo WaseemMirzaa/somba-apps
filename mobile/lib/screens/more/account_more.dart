@@ -149,7 +149,8 @@ class AddressBookScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              if (store.addresses.isEmpty) Panel(child: Text(s.addrNone, style: const TextStyle(color: AppColors.muted))),
+              if (store.addresses.isEmpty)
+                Padding(padding: const EdgeInsets.only(bottom: AppSpace.md), child: Panel(child: Text(s.addrNone, style: const TextStyle(color: AppColors.muted)))),
               ...store.addresses.map((a) {
                 final chosen = pickMode && (a.id == selectedId || (selectedId == null && a.isDefault));
                 return Padding(
@@ -232,7 +233,7 @@ class AddressBookScreen extends StatelessWidget {
                   ),
                 );
               }),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpace.sm),
               OutlinedButton(
                   key: const ValueKey('add-address'),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddressFormScreen(locale: locale))),

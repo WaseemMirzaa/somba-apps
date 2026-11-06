@@ -81,7 +81,14 @@ class Strings {
 
   /// What to show for a failure: the API's message in the user's language, or a
   /// neutral sentence for anything unexpected (never a raw exception dump).
-  String errorText(Object e) => e is ApiException ? e.toString() : t('err_unexpected');
+  ///
+  /// Anything unexpected is written to the device log first (`debugPrint` also reaches logcat in release builds), so a
+  /// "Something went wrong" always leaves a trace to find it by.
+  String errorText(Object e, [StackTrace? stack]) {
+    if (e is ApiException) return e.toString();
+    debugPrint('Unexpected error (${e.runtimeType}): $e${stack == null ? '' : '\n$stack'}');
+    return t('err_unexpected');
+  }
 
   /// A server message (always English) in the user's language; unknown messages pass through.
   String serverError(String raw) => translateServerError(raw, this);

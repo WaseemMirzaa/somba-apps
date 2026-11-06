@@ -17,6 +17,16 @@ export class AuthApiError extends Error {
 }
 
 /**
+ * What the server did with a request to send a code or a link. `reason` says why nothing went out: `not_configured`
+ * (this server has no SMS / e-mail provider yet) or `failed` (the provider refused it). `to` is where it went, masked.
+ */
+export interface SendOutcome {
+  sent: boolean;
+  reason?: "not_configured" | "failed";
+  to?: string;
+}
+
+/**
  * The account has two-factor authentication on: the password was right, now ask for the 6-digit code (or a
  * recovery code) and finish with `authApi.login2fa(challenge, code)`. The challenge is valid for 5 minutes.
  */
@@ -87,7 +97,7 @@ export const authApi = {
   // ---- account recovery + verification (one-shot REST) ----
   /** Always succeeds — never reveals whether the email has an account. */
   forgotPassword(email: string) {
-    return post<{ sent: boolean }>("/api/v1/auth/forgot", { email });
+    return post<SendOutcome>("/api/v1/auth/forgot", { email });
   },
   resetPassword(token: string, password: string) {
     return post<{ reset: boolean }>("/api/v1/auth/reset", { token, password });
@@ -96,10 +106,10 @@ export const authApi = {
     return post<{ verified: boolean }>("/api/v1/auth/email/verify", { token });
   },
   sendEmailVerification() {
-    return post<{ sent: boolean }>("/api/v1/auth/email/send", {}, authApi.getAccess());
+    return post<SendOutcome>("/api/v1/auth/email/send", {}, authApi.getAccess());
   },
   sendPhoneOtp() {
-    return post<{ sent: boolean }>("/api/v1/auth/phone/send", {}, authApi.getAccess());
+    return post<SendOutcome>("/api/v1/auth/phone/send", {}, authApi.getAccess());
   },
   verifyPhoneOtp(code: string) {
     return post<{ verified: boolean }>("/api/v1/auth/phone/verify", { code }, authApi.getAccess());

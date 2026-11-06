@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../l10n/strings.dart';
+import '../services/device_location.dart';
 import '../services/maps_config.dart';
 import '../services/places_client.dart';
 import '../theme/app_theme.dart';
+import '../widgets/feedback.dart';
 import '../widgets/kit.dart';
 
 /// The map under the fixed centre pin. Tests pass their own (the native map cannot run there).
@@ -206,28 +207,25 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   Future<void> _useMyLocation({bool quiet = false}) async {
-    final s = Strings.of(context);
     _closeSearch();
     setState(() => _locating = true);
     try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        if (!quiet && mounted) _snack(s.addrMapLocationDenied);
-        if (mounted) await _lookup();
-        return;
-      }
-      final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)));
+      final p = await currentPosition();
       if (!mounted) return;
-      final pos = LatLng(p.latitude, p.longitude);
+      final pos = LatLng(p.lat, p.lng);
       if (_map == null) {
         _center = pos;
         await _lookup();
       } else {
         await _moveTo(pos); // the camera's idle event does the lookup
       }
-    } catch (_) {
-      if (!quiet && mounted) _snack(s.addrMapLocationDenied);
+    } on LocationException catch (e) {
+      // Services off, permission refused or blocked, no signal: each says what to do. The map stays usable by hand.
+      if (!quiet && mounted) showLocationProblem(context, e.problem);
+      if (mounted) await _lookup();
+    } catch (e) {
+      debugPrint('Locate failed: $e');
+      if (!quiet && mounted) showLocationProblem(context, LocationProblem.unavailable);
       if (mounted) await _lookup();
     } finally {
       if (mounted) setState(() => _locating = false);

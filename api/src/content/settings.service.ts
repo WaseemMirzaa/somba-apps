@@ -7,6 +7,8 @@ import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { num, oneOf, str } from '../common/validate';
 import { validatePlans } from './plans';
 import { cardPaymentsMode } from '../payments/stripe.config';
+import { emailProviderConfigured, smsProviderConfigured } from '../messaging/messaging.service';
+import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
@@ -51,10 +53,19 @@ export class SettingsService {
 
   /**
    * What the apps are sent (`settings:get`, `settings:updated`): the public settings plus `cardPayments`
-   * ('stripe' | 'off'), computed from the Stripe configuration and never stored, so no setting can switch the card option on.
+   * ('stripe' | 'off'), computed from the Stripe configuration and never stored, so no setting can switch the card option on,
+   * and `translation`, `smsVerification`, `emailVerification` ('on' | 'off'), computed from the server's environment.
    */
   async clientView(): Promise<Record<string, string>> {
-    return { ...(await this.publicView()), cardPayments: cardPaymentsMode() };
+    return {
+      ...(await this.publicView()),
+      cardPayments: cardPaymentsMode(),
+      // What this server can actually do, from its environment (never stored): the apps use them to say "not available"
+      // instead of offering a code that cannot be sent or a translation that cannot happen.
+      translation: translationMode(),
+      smsVerification: smsProviderConfigured() ? 'on' : 'off',
+      emailVerification: emailProviderConfigured() ? 'on' : 'off',
+    };
   }
 
   /** Validate a settings change; returns the normalised string to store. */

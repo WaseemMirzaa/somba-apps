@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
 
+/** Whether this server has an SMTP host / a Twilio account, from the environment (also sent to the apps as a setting). */
+export const emailProviderConfigured = (env: NodeJS.ProcessEnv = process.env): boolean => !!env.SMTP_HOST;
+export const smsProviderConfigured = (env: NodeJS.ProcessEnv = process.env): boolean => !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM);
+
+/** What happened to one message: handed to the provider, nothing configured to send it, or the provider refused it. */
+export type Delivery = 'sent' | 'not_configured' | 'failed';
+
 /**
  * Outbound email + SMS. Both providers are OPTIONAL:
  *
@@ -19,14 +26,10 @@ export class MessagingService {
   private mailer: Transporter | null | undefined;
 
   get emailConfigured(): boolean {
-    return !!process.env.SMTP_HOST;
+    return emailProviderConfigured();
   }
   get smsConfigured(): boolean {
-    return !!(
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_FROM
-    );
+    return smsProviderConfigured();
   }
 
   private get isProd(): boolean {
@@ -50,6 +53,11 @@ export class MessagingService {
 
   /** Returns true if handed to a provider. Never throws into the caller's flow. */
   async sendEmail(to: string, subject: string, text: string): Promise<boolean> {
+    return (await this.deliverEmail(to, subject, text)) === 'sent';
+  }
+
+  /** Like {@link sendEmail} but says WHY nothing was sent, so a screen can tell "not set up" from "provider refused". */
+  async deliverEmail(to: string, subject: string, text: string): Promise<Delivery> {
     const mailer = this.getMailer();
     if (!mailer) return this.undelivered('email', to, text);
     try {
@@ -59,14 +67,18 @@ export class MessagingService {
         subject,
         text,
       });
-      return true;
+      return 'sent';
     } catch (err) {
       this.logger.error(`Email to ${mask(to)} failed: ${(err as Error).message}`);
-      return false;
+      return 'failed';
     }
   }
 
   async sendSms(to: string, text: string): Promise<boolean> {
+    return (await this.deliverSms(to, text)) === 'sent';
+  }
+
+  async deliverSms(to: string, text: string): Promise<Delivery> {
     if (!this.smsConfigured) return this.undelivered('sms', to, text);
     try {
       const sid = process.env.TWILIO_ACCOUNT_SID!;
@@ -89,16 +101,16 @@ export class MessagingService {
       );
       if (!res.ok) {
         this.logger.error(`SMS to ${mask(to)} failed: HTTP ${res.status}`);
-        return false;
+        return 'failed';
       }
-      return true;
+      return 'sent';
     } catch (err) {
       this.logger.error(`SMS to ${mask(to)} failed: ${(err as Error).message}`);
-      return false;
+      return 'failed';
     }
   }
 
-  private undelivered(channel: 'email' | 'sms', to: string, text: string): boolean {
+  private undelivered(channel: 'email' | 'sms', to: string, text: string): Delivery {
     if (this.isProd) {
       this.logger.warn(
         `${channel.toUpperCase()} provider not configured — message to ${mask(to)} NOT delivered.`,
@@ -106,7 +118,7 @@ export class MessagingService {
     } else {
       this.logger.warn(`[dev ${channel}] to=${to}\n${text}`);
     }
-    return false;
+    return 'not_configured';
   }
 }
 

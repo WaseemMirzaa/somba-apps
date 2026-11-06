@@ -104,7 +104,8 @@ class _TranslatableTextState extends State<TranslatableText> {
     if (_translation != null && _translatedFor != s.lang) _reset();
     final t = _translation;
     final showing = _showTranslated && t != null;
-    final hideLink = t != null && t.same;
+    // No translation service on this server: the text stands alone (a link that only ever fails is worse than none).
+    final hideLink = (t != null && t.same) || !RealtimeStore.instance.translationAvailable;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
       Text(showing ? t.text : widget.text, key: ValueKey('tt-text-${widget.kind}-${widget.id}'), style: widget.style),
       if (showing) const MachineNote(),

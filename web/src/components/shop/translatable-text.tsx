@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { useTranslationEnabled } from "@/lib/shop-live";
 
 /** What the server can translate on demand: stored records only (the request carries an id, never free text). */
 export type TranslateKind = "review" | "review_reply" | "question" | "answer";
@@ -41,6 +42,7 @@ export function TranslatableText({
 }) {
   const { locale } = useLocale();
   const { toast } = useToast();
+  const translationOn = useTranslationEnabled();
   const fr = locale === "fr";
   const key = `${kind}:${id}:${locale}`;
   const [state, setState] = useState<View | null>(null);
@@ -71,7 +73,7 @@ export function TranslatableText({
   }
 
   const alreadyReadable = !!sourceLang && sourceLang === locale;
-  const showLink = !alreadyReadable && !view?.same;
+  const showLink = translationOn && !alreadyReadable && !view?.same;
 
   return (
     <>

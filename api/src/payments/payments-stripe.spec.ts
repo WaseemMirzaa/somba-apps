@@ -614,9 +614,9 @@ describe('the public settings carry cardPayments', () => {
   it('is "stripe" when the three keys are set, "off" otherwise, and never a stored setting', async () => {
     const { svc } = service();
     Object.assign(process.env, GOOD_ENV);
-    expect(await svc.clientView()).toEqual({ codEnabled: 'true', cardPayments: 'stripe' });
+    expect(await svc.clientView()).toMatchObject({ codEnabled: 'true', cardPayments: 'stripe' });
     process.env.STRIPE_WEBHOOK_SECRET = '';
-    expect(await svc.clientView()).toEqual({ codEnabled: 'true', cardPayments: 'off' });
+    expect(await svc.clientView()).toMatchObject({ codEnabled: 'true', cardPayments: 'off' });
     expect(await svc.publicView()).toEqual({ codEnabled: 'true' }); // the stored view is unchanged
     await expect(svc.set('cardPayments', 'stripe')).rejects.toThrow('Unknown setting.');
   });
@@ -625,11 +625,11 @@ describe('the public settings carry cardPayments', () => {
     const { svc, sent } = service();
     Object.assign(process.env, GOOD_ENV);
     const gateway = Object.assign(Object.create(RealtimeGateway.prototype), { settings: svc, can: (role: string) => role === 'admin' });
-    expect(await gateway.settingsGet({ data: {} })).toEqual({ ok: true, data: { codEnabled: 'true', cardPayments: 'stripe' } });
+    expect(await gateway.settingsGet({ data: {} })).toMatchObject({ ok: true, data: { codEnabled: 'true', cardPayments: 'stripe' } });
     expect(await gateway.settingsGet({ data: { user: { role: 'customer' } } })).toMatchObject({ data: { cardPayments: 'stripe' } });
     expect(await gateway.settingsGet({ data: { user: { role: 'admin' } } })).toEqual({ ok: true, data: { codEnabled: 'true', commissionPct: '12' } });
     await svc.set('codEnabled', 'true');
-    expect(sent.find((s) => s.roles.includes('customer'))!.payload).toEqual({ codEnabled: 'true', cardPayments: 'stripe' });
+    expect(sent.find((s) => s.roles.includes('customer'))!.payload).toMatchObject({ codEnabled: 'true', cardPayments: 'stripe' });
     expect(sent.find((s) => s.roles.includes('admin'))!.payload).not.toHaveProperty('cardPayments');
   });
 });

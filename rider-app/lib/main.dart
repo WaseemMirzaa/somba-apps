@@ -6,6 +6,7 @@ import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
 import 'screens/rider_shell.dart';
 import 'screens/more/rider_auth.dart';
+import 'services/maps_config.dart';
 import 'services/push_service.dart';
 import 'services/rider_store.dart';
 import 'theme/app_theme.dart';
@@ -14,6 +15,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // The saved language, else the phone's (French → French, anything else → English).
   await Strings.restore();
+  await MapsConfig.probeNativeKey(); // the route map is offered only when the native Maps SDK has its key too
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,

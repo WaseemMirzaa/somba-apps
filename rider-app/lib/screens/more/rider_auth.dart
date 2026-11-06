@@ -93,8 +93,12 @@ class _RiderLoginScreenState extends State<RiderLoginScreen> {
       await RiderStore.instance.login(_id.text.trim(), _pass.text);
       if (!mounted) return;
       widget.onSignedIn?.call();
-    } catch (e) {
-      if (mounted) setState(() => _error = Strings.current.errorText(e));
+    } catch (e, st) {
+      if (mounted) {
+        final m = Strings.current.errorText(e, st);
+        setState(() => _error = m);
+        showSnack(context, m); // the inline text is additive: a failure is always announced too
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -204,15 +208,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _msg = null;
     });
     try {
-      final dev = await RiderStore.instance.forgotPassword(_email.text.trim());
+      final r = await RiderStore.instance.forgotPassword(_email.text.trim());
       if (!mounted) return;
+      // No e-mail service on this server: say so instead of "a link is on its way" (a local dev server still shows its token).
+      if (r.notConfigured && !(kDebugMode && r.devToken != null)) {
+        final m = Strings.of(context).forgotOff;
+        setState(() => _msg = m);
+        showSnack(context, m);
+        return;
+      }
       setState(() {
         _sent = true;
         _msg = Strings.of(context).forgotSent;
-        if (kDebugMode && dev != null) _token.text = dev;
+        if (kDebugMode && r.devToken != null) _token.text = r.devToken!;
       });
-    } catch (e) {
-      if (mounted) setState(() => _msg = Strings.current.errorText(e));
+      showSnack(context, Strings.of(context).forgotSent);
+    } catch (e, st) {
+      if (mounted) {
+        final m = Strings.current.errorText(e, st);
+        setState(() => _msg = m);
+        showSnack(context, m);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -230,10 +246,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await RiderStore.instance.resetPassword(_token.text, _pass.text);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Strings.of(context).passwordUpdated)));
+      showSnack(context, Strings.of(context).passwordUpdated);
       Navigator.pop(context);
-    } catch (e) {
-      if (mounted) setState(() => _msg = Strings.current.errorText(e));
+    } catch (e, st) {
+      if (mounted) {
+        final m = Strings.current.errorText(e, st);
+        setState(() => _msg = m);
+        showSnack(context, m);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
