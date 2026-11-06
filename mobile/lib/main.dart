@@ -11,6 +11,7 @@ import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
 import 'screens/more/auth_screens.dart';
 import 'screens/notice_router.dart';
+import 'services/maps_config.dart';
 import 'services/push_service.dart';
 import 'services/realtime_store.dart';
 import 'theme/app_theme.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting();
   await Strings.restore();
+  await MapsConfig.probeNativeKey(); // the map is offered only when the native Maps SDK has its key too
   await ShopState.instance.load();
   // Keep the cart's prices/stock in step with the live catalogue.
   RealtimeStore.instance.addListener(ShopState.instance.syncWithCatalog);

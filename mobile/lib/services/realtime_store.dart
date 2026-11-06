@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../data/market_profiles.dart';
+import '../l10n/strings.dart';
 import '../util/format.dart' show marketNotifier;
 import 'auth_service.dart';
 import 'feature_hooks.dart';
@@ -83,6 +84,13 @@ class RealtimeStore extends ChangeNotifier {
   String cardPayments = 'off';
   bool get cardPaymentsEnabled => cardPayments == 'stripe';
 
+  /// Public settings `translation`, `smsVerification`, `emailVerification` ('on' | 'off', computed by the server from its
+  /// environment). A server that does not send them (an older one) is taken to have everything on. With translation off
+  /// the "See translation" links are hidden; with SMS or e-mail off the verification screens say so up front.
+  bool translationAvailable = true;
+  bool smsAvailable = true;
+  bool emailAvailable = true;
+
   /// True when the app should send the user to verification instead of the server refusing the order/top-up.
   bool get needsVerification {
     final u = user;
@@ -121,8 +129,12 @@ class RealtimeStore extends ChangeNotifier {
     notifyListeners();
     try {
       await _begin(await _auth.login(email, password));
-    } catch (e) {
-      error = e.toString();
+    } on TwoFactorRequired {
+      status = ConnStatus.disconnected; // the password was right: the screen asks for the code, this is no failure
+      notifyListeners();
+      rethrow;
+    } catch (e, st) {
+      error = Strings.current.errorText(e, st);
       status = ConnStatus.error;
       notifyListeners();
       rethrow;
@@ -136,15 +148,34 @@ class RealtimeStore extends ChangeNotifier {
     notifyListeners();
     try {
       await _begin(await _auth.loginWithCode(phone, code));
-    } catch (e) {
-      error = e.toString();
+    } on TwoFactorRequired {
+      status = ConnStatus.disconnected; // the password was right: the screen asks for the code, this is no failure
+      notifyListeners();
+      rethrow;
+    } catch (e, st) {
+      error = Strings.current.errorText(e, st);
       status = ConnStatus.error;
       notifyListeners();
       rethrow;
     }
   }
 
-  Future<String?> sendLoginCode(String phone) => _auth.sendLoginCode(phone);
+  Future<SendResult> sendLoginCode(String phone) => _auth.sendLoginCode(phone);
+
+  /// Second sign-in step for an account with two-factor authentication (after [TwoFactorRequired]).
+  Future<void> loginWithTwoFactor(String challenge, String code) async {
+    error = null;
+    status = ConnStatus.connecting;
+    notifyListeners();
+    try {
+      await _begin(await _auth.loginWithTwoFactor(challenge, code));
+    } catch (e, st) {
+      error = Strings.current.errorText(e, st);
+      status = ConnStatus.error;
+      notifyListeners();
+      rethrow;
+    }
+  }
 
   Future<void> register({
     required String email,
@@ -164,8 +195,8 @@ class RealtimeStore extends ChangeNotifier {
         phone: phone,
         locale: locale,
       ));
-    } catch (e) {
-      error = e.toString();
+    } catch (e, st) {
+      error = Strings.current.errorText(e, st);
       status = ConnStatus.error;
       notifyListeners();
       rethrow;
@@ -184,7 +215,8 @@ class RealtimeStore extends ChangeNotifier {
     } on ApiException catch (e) {
       if (e.status == 401 || e.status == 403) await _auth.clear();
       return false;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('Could not restore the session (${e.runtimeType}): $e\n$st');
       return false; // storage / network trouble: show the sign-in screen
     }
   }
@@ -219,8 +251,19 @@ class RealtimeStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Writes the tokens to the device. Never throws: see [_begin].
+  Future<void> _saveTokens(AuthResult r) async {
+    try {
+      await _auth.saveTokens(r);
+    } catch (e, st) {
+      debugPrint('Could not store the session on this device (${e.runtimeType}): $e\n$st');
+    }
+  }
+
   Future<void> _begin(AuthResult result) async {
-    await _auth.saveTokens(result);
+    // Keeping the session across launches is a convenience: a phone that cannot store it (a platform fault) still
+    // gets the account the server just opened. Failing here used to leave a created account behind a generic error.
+    await _saveTokens(result);
     _access = result.accessToken;
     _refresh = result.refreshToken;
     user = result.user;
@@ -239,7 +282,7 @@ class RealtimeStore extends ChangeNotifier {
     if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
     try {
       final r = await _auth.refresh(refresh);
-      await _auth.saveTokens(r);
+      await _saveTokens(r);
       _access = r.accessToken;
       _refresh = r.refreshToken;
       return r.accessToken;
@@ -264,7 +307,7 @@ class RealtimeStore extends ChangeNotifier {
     if (refresh == null) return;
     try {
       final r = await _auth.refresh(refresh);
-      await _auth.saveTokens(r);
+      await _saveTokens(r);
       _access = r.accessToken;
       _refresh = r.refreshToken;
     } on ApiException catch (e) {
@@ -407,6 +450,9 @@ class RealtimeStore extends ChangeNotifier {
     if (m.containsKey('supportEmail')) supportEmail = '${m['supportEmail'] ?? ''}'.trim();
     if (m.containsKey('supportWhatsapp')) supportWhatsapp = '${m['supportWhatsapp'] ?? ''}'.trim();
     if (m.containsKey('cardPayments')) cardPayments = '${m['cardPayments']}' == 'stripe' ? 'stripe' : 'off';
+    if (m.containsKey('translation')) translationAvailable = '${m['translation']}' != 'off';
+    if (m.containsKey('smsVerification')) smsAvailable = '${m['smsVerification']}' != 'off';
+    if (m.containsKey('emailVerification')) emailAvailable = '${m['emailVerification']}' != 'off';
   }
 
   Future<void> _hydrate() async {
@@ -667,7 +713,7 @@ class RealtimeStore extends ChangeNotifier {
   Future<void> changePassword(String current, String next) async {
     final res = _map(await _socket.request('me:changePassword', {'current': current, 'next': next}));
     final r = AuthResult.fromJson(res);
-    await _auth.saveTokens(r);
+    await _saveTokens(r);
     _access = r.accessToken;
     _refresh = r.refreshToken;
   }
@@ -758,8 +804,12 @@ class RealtimeStore extends ChangeNotifier {
   }
 
   // ---- account verification (REST, needs the access token) ----
-  Future<String?> sendEmailVerification() async => _auth.sendEmailVerification(await freshAccessToken());
-  Future<String?> sendPhoneOtp() async => _auth.sendPhoneOtp(await freshAccessToken());
+  /// Tests stand in for the server on the two "send a code / link" calls.
+  @visibleForTesting
+  Future<SendResult> Function()? debugSendEmail, debugSendPhone;
+
+  Future<SendResult> sendEmailVerification() async => (debugSendEmail ?? () async => _auth.sendEmailVerification(await freshAccessToken()))();
+  Future<SendResult> sendPhoneOtp() async => (debugSendPhone ?? () async => _auth.sendPhoneOtp(await freshAccessToken()))();
 
   Future<void> verifyEmailToken(String token) async {
     await _auth.verifyEmail(token);
@@ -779,7 +829,7 @@ class RealtimeStore extends ChangeNotifier {
     return user?.emailVerified ?? false;
   }
 
-  Future<String?> forgotPassword(String email) => _auth.forgotPassword(email);
+  Future<SendResult> forgotPassword(String email) => _auth.forgotPassword(email);
   Future<void> resetPassword(String token, String password) => _auth.resetPassword(token, password);
 
   // ---- helpers ----

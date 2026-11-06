@@ -14,6 +14,7 @@ import { useToast } from "@/context/toast-context";
 import { useSellerAccess } from "@/lib/seller";
 import { assetUrl, sellerRequest, useLiveQuery, useSocketEvent } from "@/lib/seller-api";
 import { errMessage } from "@/lib/seller-labels";
+import { useTranslationEnabled } from "@/lib/shop-live";
 import {
   agoText,
   CHAT_MAX_CHARS,
@@ -134,6 +135,7 @@ interface Translation {
 
 export function ChatThread({ id }: { id: string }) {
   const { locale } = useLocale();
+  const translationOn = useTranslationEnabled();
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
@@ -306,7 +308,7 @@ export function ChatThread({ id }: { id: string }) {
                   </p>
                 )}
                 {m.attachments?.length > 0 && <AttachmentGallery urls={m.attachments} className="mt-2" />}
-                {!mine && m.text && (
+                {translationOn && !mine && m.text && (
                   <button type="button" onClick={() => void translate(m)} disabled={t?.busy} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--primary)] hover:underline disabled:opacity-60">
                     <Languages className="h-3 w-3" aria-hidden="true" />
                     {t?.busy

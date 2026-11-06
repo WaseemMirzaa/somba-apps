@@ -145,9 +145,21 @@ export class AddressesService {
     return row ? (await this.decorate([row]))[0] : null;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
+  /**
+   * Deletes one of the customer's addresses; false when there is no such address (so the client is told, not
+   * answered "ok"). Deleting the default hands the default to the oldest address left, so checkout always
+   * has one to preselect.
+   */
+  async remove(userId: string, id: string): Promise<boolean> {
+    const row = typeof id === 'string' && id ? await this.repo.findOne({ where: { id, userId } }) : null;
+    if (!row) return false;
     await this.repo.delete({ id, userId });
+    if (row.isDefault) {
+      const next = await this.repo.findOne({ where: { userId }, order: { createdAt: 'ASC' } });
+      if (next) await this.repo.update({ id: next.id, userId }, { isDefault: true });
+    }
     await this.push(userId);
+    return true;
   }
 
   private async clearOtherDefaults(userId: string, keepId: string) {

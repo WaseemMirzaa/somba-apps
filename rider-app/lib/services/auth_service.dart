@@ -81,6 +81,8 @@ class AuthService {
         if (decoded is Map<String, dynamic>) json = decoded;
       } catch (_) {/* non-JSON error page */}
     }
+    if (res.statusCode == 429) throw ApiException.local('err_rate_limit', status: 429); // the throttler's own text is English
+    if (res.statusCode >= 500) throw ApiException.local('err_server', status: res.statusCode);
     if (res.statusCode >= 400) {
       // Nest returns `message` as a string, or a list for validation errors.
       final m = json['message'];
@@ -104,7 +106,12 @@ class AuthService {
   // ---- recovery + verification ----
   /// Always succeeds from the user's point of view (the API never reveals
   /// whether an address has an account).
-  Future<String?> forgotPassword(String email) async => (await _call('/api/v1/auth/forgot', {'email': email}))['devToken'] as String?;
+  /// `devToken` is the dev-only reset token (null in production); `notConfigured` is true when this server has no e-mail
+  /// provider yet, so no link can have been sent.
+  Future<({String? devToken, bool notConfigured})> forgotPassword(String email) async {
+    final j = await _call('/api/v1/auth/forgot', {'email': email});
+    return (devToken: j['devToken'] as String?, notConfigured: j['reason'] == 'not_configured');
+  }
 
   Future<void> resetPassword(String token, String password) =>
       _call('/api/v1/auth/reset', {'token': token.trim(), 'password': password});

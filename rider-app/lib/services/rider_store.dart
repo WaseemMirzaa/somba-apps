@@ -182,8 +182,18 @@ class RiderStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Writes the tokens to the device. Never throws: keeping the session across launches is a convenience, and a phone
+  /// that cannot store it must still get the session the server just opened.
+  Future<void> _saveTokens(AuthResult r) async {
+    try {
+      await _auth.saveTokens(r);
+    } catch (e, st) {
+      debugPrint('Could not store the session on this device (${e.runtimeType}): $e\n$st');
+    }
+  }
+
   Future<void> _begin(AuthResult r) async {
-    await _auth.saveTokens(r);
+    await _saveTokens(r);
     _access = r.accessToken;
     _refresh = r.refreshToken;
     user = r.user;
@@ -200,7 +210,7 @@ class RiderStore extends ChangeNotifier {
     if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
     try {
       final r = await _auth.refresh(refresh);
-      await _auth.saveTokens(r);
+      await _saveTokens(r);
       _access = r.accessToken;
       _refresh = r.refreshToken;
       return r.accessToken;
@@ -233,7 +243,7 @@ class RiderStore extends ChangeNotifier {
     try {
       final r = await _auth.refresh(refresh);
       if (r.user.role != 'rider') return unawaited(_endSession());
-      await _auth.saveTokens(r);
+      await _saveTokens(r);
       _access = r.accessToken;
       _refresh = r.refreshToken;
     } on ApiException catch (e) {
@@ -623,7 +633,7 @@ class RiderStore extends ChangeNotifier {
   Future<void> changePassword({required String current, required String next}) async {
     final res = await request('me:changePassword', {'current': current, 'next': next});
     final r = AuthResult.fromJson(_map(res));
-    await _auth.saveTokens(r);
+    await _saveTokens(r);
     _access = r.accessToken;
     _refresh = r.refreshToken;
     _applyAccount(_map(res)['user']);
@@ -640,7 +650,7 @@ class RiderStore extends ChangeNotifier {
     } catch (_) {/* malformed push: keep what is known */}
   }
 
-  Future<String?> forgotPassword(String email) => _auth.forgotPassword(email);
+  Future<({String? devToken, bool notConfigured})> forgotPassword(String email) => _auth.forgotPassword(email);
   Future<void> resetPassword(String token, String password) => _auth.resetPassword(token, password);
 
   Map<String, dynamic> _map(dynamic d) => (d as Map).map((k, v) => MapEntry(k.toString(), v));

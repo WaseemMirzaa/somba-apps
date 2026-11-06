@@ -48,6 +48,9 @@ export interface PublicSettings {
   deliveryTransferUsd: number;
   /** An address with no map pin cannot check out. */
   requirePinnedAddress: boolean;
+  /** This server can send verification codes by SMS / links by e-mail (false = say so instead of "sent"). */
+  smsVerification: boolean;
+  emailVerification: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -64,6 +67,8 @@ const EMPTY_SETTINGS: PublicSettings = {
   deliveryMaxUsd: 15,
   deliveryTransferUsd: 1.5,
   requirePinnedAddress: false,
+  smsVerification: true,
+  emailVerification: true,
 };
 
 const num = (v: string | undefined, d: number) => {
@@ -86,7 +91,42 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     deliveryMaxUsd: num(raw.deliveryMaxUsd, 15),
     deliveryTransferUsd: num(raw.deliveryTransferUsd, 1.5),
     requirePinnedAddress: raw.requirePinnedAddress === "true",
+    smsVerification: raw.smsVerification !== "off",
+    emailVerification: raw.emailVerification !== "off",
   };
+}
+
+// What the server can do, from its environment (`settings:get` → `translation`, `smsVerification`, `emailVerification`:
+// 'on' | 'off'). One request per page load however many components ask. A server that does not send them is taken to have everything on.
+let serverFlags: { translation: boolean; sms: boolean; email: boolean } | null = null;
+let serverFlagsRequest: Promise<void> | null = null;
+
+/** Whether this server can translate. With it off the "See translation" links are hidden: they could only fail. */
+export function useTranslationEnabled(): boolean {
+  const rt = useRealtime();
+  const [on, setOn] = useState(serverFlags?.translation ?? true);
+  useEffect(() => {
+    if (rt.status !== "connected") return;
+    if (serverFlags) {
+      setOn(serverFlags.translation); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    serverFlagsRequest ??= socketClient
+      .request<Record<string, string>>("settings:get")
+      .then((raw) => {
+        serverFlags = { translation: raw.translation !== "off", sms: raw.smsVerification !== "off", email: raw.emailVerification !== "off" };
+      })
+      .catch(() => {})
+      .finally(() => {
+        serverFlagsRequest = null;
+      });
+    let alive = true;
+    void serverFlagsRequest.then(() => alive && serverFlags && setOn(serverFlags.translation));
+    return () => {
+      alive = false;
+    };
+  }, [rt.status]);
+  return on;
 }
 
 /** Public platform settings (COD flag, return window, delivery fee rules...) — live via `settings:updated`. */
@@ -126,6 +166,8 @@ export function usePublicSettings(): PublicSettings {
         deliveryMaxUsd: raw.deliveryMaxUsd ?? str("deliveryMaxUsd"),
         deliveryTransferUsd: raw.deliveryTransferUsd ?? str("deliveryTransferUsd"),
         requirePinnedAddress: raw.requirePinnedAddress ?? str("requirePinnedAddress"),
+        smsVerification: raw.smsVerification ?? (cur.smsVerification ? "on" : "off"),
+        emailVerification: raw.emailVerification ?? (cur.emailVerification ? "on" : "off"),
       });
     });
   });

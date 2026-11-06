@@ -30,6 +30,7 @@ extension StringsKeys on Strings {
   String get passwordHint => t('password_hint');
   String get loginMissing => t('login_missing');
   String get forgotPassword => t('forgot_password');
+  String get forgotOff => t('forgot_off');
   String get accountsNote => t('accounts_note');
   String get langSwitchTo => t('lang_switch_to');
   String get resetTitle => t('reset_title');

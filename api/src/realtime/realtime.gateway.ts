@@ -1188,7 +1188,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.addresses.update(user.id, body.id, body.patch));
+      const updated = await this.addresses.update(user.id, String(body?.id ?? ''), body?.patch ?? {});
+      return updated ? ok(updated) : fail('Address not found.');
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1201,8 +1202,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      await this.addresses.remove(user.id, body.id);
-      return ok({ id: body.id });
+      return (await this.addresses.remove(user.id, body?.id)) ? ok({ id: body.id }) : fail('Address not found.');
     } catch (e) {
       return fail((e as Error).message);
     }

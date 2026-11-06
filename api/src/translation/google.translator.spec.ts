@@ -1,4 +1,5 @@
 import { chooseTranslator } from './translation.module';
+import { translationMode } from './translation-mode';
 import { GoogleTranslator, MAX_CHARS, MAX_SEGMENTS, batchTexts, parseServiceAccount } from './google.translator';
 import { FakeTranslator, OffTranslator } from './fake.translator';
 
@@ -119,5 +120,23 @@ describe('credentials and provider choice', () => {
     const off = new OffTranslator();
     expect(off.enabled).toBe(false);
     expect(await off.translate(['x'])).toEqual(['x']);
+  });
+});
+
+describe('translationMode (what the apps are told)', () => {
+  it('is on for the fake provider and for google with a credential, off otherwise', () => {
+    expect(translationMode({ TRANSLATE_PROVIDER: 'fake' })).toBe('on');
+    expect(translationMode({ GOOGLE_TRANSLATE_API_KEY: 'k' })).toBe('on');
+    expect(translationMode({ TRANSLATE_PROVIDER: 'google', GOOGLE_TRANSLATE_API_KEY: 'k' })).toBe('on');
+    expect(translationMode({})).toBe('off');
+    expect(translationMode({ TRANSLATE_PROVIDER: 'google' })).toBe('off');
+    expect(translationMode({ TRANSLATE_PROVIDER: 'off', GOOGLE_TRANSLATE_API_KEY: 'k' })).toBe('off');
+    expect(translationMode({ TRANSLATE_PROVIDER: 'nonsense', GOOGLE_TRANSLATE_API_KEY: 'k' })).toBe('off');
+  });
+
+  it('agrees with chooseTranslator', () => {
+    for (const env of [{}, { TRANSLATE_PROVIDER: 'fake' }, { GOOGLE_TRANSLATE_API_KEY: 'k' }, { TRANSLATE_PROVIDER: 'off' }]) {
+      expect(translationMode(env) === 'on').toBe(chooseTranslator(env).enabled);
+    }
   });
 });

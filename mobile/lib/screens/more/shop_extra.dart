@@ -283,7 +283,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   }
 
   void _onPush() {
-    if (mounted) setState(() => _future = RealtimeStore.instance.reviewsFor(widget.product.uuid));
+    if (mounted) setState(() { _future = RealtimeStore.instance.reviewsFor(widget.product.uuid); }); // a block: an arrow would hand setState the Future (debug assert)
   }
 
   @override
@@ -342,7 +342,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         child: PrimaryButton(s.reviewTitle,
             onPressed: () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => ReviewComposeScreen(locale: widget.locale, product: widget.product)));
-              if (mounted) setState(() => _future = RealtimeStore.instance.reviewsFor(widget.product.uuid));
+              if (mounted) setState(() { _future = RealtimeStore.instance.reviewsFor(widget.product.uuid); }); // a block: an arrow would hand setState the Future (debug assert)
             }),
       ),
     );

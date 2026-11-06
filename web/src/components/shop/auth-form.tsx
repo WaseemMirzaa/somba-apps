@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useAuth } from "@/context/auth-context";
 import { useRealtime } from "@/context/realtime-context";
-import { authApi } from "@/lib/realtime/auth-api";
+import { authApi, TwoFactorRequired } from "@/lib/realtime/auth-api";
 import { authErrorText } from "@/lib/auth-errors";
 
 type AuthMode = "register" | "login" | "otp" | "verify-email" | "forgot" | "reset";
@@ -15,12 +15,23 @@ type AuthMode = "register" | "login" | "otp" | "verify-email" | "forgot" | "rese
 /** A message in both languages, so what is on screen follows the language toggle even if it is flipped afterwards. */
 type Msg = { en: string; fr: string };
 const msg = (en: string, fr: string): Msg => ({ en, fr });
+/** What to tell the person when the server could not send a code or link (null when it did). */
+const notSent = (r: { sent: boolean; reason?: string }, channel: "sms" | "email"): Msg | null =>
+  r.sent && r.reason !== "not_configured"
+    ? null
+    : r.reason === "not_configured"
+      ? channel === "sms"
+        ? msg("Text messages are not available yet. Use your email to verify instead.", "Les SMS ne sont pas encore disponibles. Utilisez plutôt votre e-mail pour vérifier.")
+        : msg("E-mail is not set up on this server yet, so no link could be sent. Please contact support.", "L'envoi d'e-mails n'est pas encore configuré sur ce serveur : aucun lien n'a pu être envoyé. Contactez le support.")
+      : channel === "sms"
+        ? msg("The code could not be sent. Check the number and try again.", "Le code n'a pas pu être envoyé. Vérifiez le numéro et réessayez.")
+        : msg("The email could not be sent. Try again in a moment.", "L'e-mail n'a pas pu être envoyé. Réessayez dans un instant.");
 const msgFromError = (e: unknown): Msg => ({ en: authErrorText(e, false), fr: authErrorText(e, true) });
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const { locale } = useLocale();
   const { signInReal } = useAuth();
-  const { login: realLogin, register: realRegister } = useRealtime();
+  const { login: realLogin, login2fa, register: realRegister } = useRealtime();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +39,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<Msg | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set when the password was right but the account has two-step sign-in: the form then asks for the code.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const [notice, setNotice] = useState<Msg | null>(null);
   const fr = locale === "fr";
   const verifyRan = useRef(false);
@@ -65,19 +79,32 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         setError(msg("Please fill in all fields.", "Veuillez remplir tous les champs."));
         return;
       }
+      if (challenge && !code.trim()) {
+        setError(msg("Enter the 6-digit code from your authenticator app.", "Saisissez le code à 6 chiffres de votre application d'authentification."));
+        return;
+      }
       setBusy(true);
       try {
         const user =
           mode === "register"
             ? await realRegister({ email, password, name, role: "customer", locale })
-            : await realLogin(email, password);
+            : challenge
+              ? await login2fa(challenge, code.trim())
+              : await realLogin(email, password);
         const persona = signInReal(user.role, { name: user.name, email: user.email });
         // Come back to the page that asked for an account (cart, checkout...), else the account page.
         const next = new URLSearchParams(window.location.search).get("next");
         const safeNext = next && next.startsWith("/shop") && !next.startsWith("//") ? next : null;
         router.push(user.role === "customer" ? safeNext ?? "/shop/account" : persona.portal || "/shop/account");
       } catch (e) {
-        setError(msgFromError(e));
+        if (e instanceof TwoFactorRequired) {
+          setChallenge(e.challenge);
+          setCode("");
+        } else {
+          // A sign-in that expired (or locked) goes back to the password step.
+          if (challenge && /expired/i.test(e instanceof Error ? e.message : "")) setChallenge(null);
+          setError(msgFromError(e));
+        }
       } finally {
         setBusy(false);
       }
@@ -87,8 +114,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     try {
       if (mode === "forgot") {
         if (!email) { setError(msg("Enter your email.", "Saisissez votre e-mail.")); return; }
-        await authApi.forgotPassword(email);
-        // Same message whether or not the account exists (no enumeration).
+        const sent = await authApi.forgotPassword(email);
+        // The same for every address (no enumeration): only "this server cannot send e-mail" differs, and that is true for everyone.
+        const problem = sent.reason === "not_configured" ? notSent(sent, "email") : null;
+        if (problem) { setError(problem); return; }
         setNotice(msg("If an account exists for that email, a reset link is on its way.", "Si un compte existe, un lien de réinitialisation vient d'être envoyé."));
       } else if (mode === "reset") {
         const token = linkToken;
@@ -100,7 +129,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         router.push("/shop/verify-email");
       } else if (mode === "verify-email") {
         if (linkToken) router.push("/shop/account");
-        else { await authApi.sendEmailVerification(); setNotice(msg("Verification email sent.", "E-mail de vérification renvoyé.")); }
+        else {
+          const sent = await authApi.sendEmailVerification();
+          const problem = notSent(sent, "email");
+          if (problem) setError(problem);
+          else setNotice(msg("Verification email sent.", "E-mail de vérification renvoyé."));
+        }
       }
     } catch (e) {
       setError(msgFromError(e));
@@ -112,8 +146,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   async function resendOtp() {
     setError(null);
     try {
-      await authApi.sendPhoneOtp();
-      setNotice(msg("A new code was sent.", "Nouveau code envoyé."));
+      const sent = await authApi.sendPhoneOtp();
+      const problem = notSent(sent, "sms");
+      if (problem) setError(problem);
+      else setNotice(msg("A new code was sent.", "Nouveau code envoyé."));
     } catch (e) {
       setError(msgFromError(e));
     }
@@ -140,6 +176,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         )}
         {(mode === "register" || mode === "login" || mode === "reset") && (
           <input className="input-premium w-full px-4 py-2.5 text-sm" type="password" placeholder={fr ? "Mot de passe" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} />
+        )}
+        {mode === "login" && challenge && (
+          <div className="space-y-2">
+            <p className="text-sm text-slate-600">{fr ? "Connexion en deux étapes : saisissez le code de votre application d'authentification, ou un code de secours." : "Two-step sign-in: enter the code from your authenticator app, or a recovery code."}</p>
+            <input className="input-premium w-full px-4 py-2.5 text-sm" inputMode="numeric" autoComplete="one-time-code" placeholder={fr ? "Code à 6 chiffres" : "6-digit code"} aria-label={fr ? "Code de vérification" : "Verification code"} value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} />
+          </div>
         )}
         {mode === "otp" && (
           <input className="input-premium w-full px-4 py-2.5 text-sm" placeholder="123456" value={otp} onChange={(e) => setOtp(e.target.value)} maxLength={6} />

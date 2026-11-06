@@ -354,12 +354,12 @@ void main() {
     });
 
     test('email verification and phone code', () async {
-      final token = await store.sendEmailVerification();
+      final token = (await store.sendEmailVerification()).devToken;
       expect(token, isNotNull, reason: 'dev builds of the API return the token');
       await store.verifyEmailToken(token!);
       expect(store.user!.emailVerified, isTrue);
 
-      final code = await store.sendPhoneOtp();
+      final code = (await store.sendPhoneOtp()).devToken;
       expect(code, isNotNull);
       await expectLater(store.verifyPhoneOtp('000000'), throwsA(isA<ApiException>()));
       await store.verifyPhoneOtp(code!);
@@ -370,7 +370,7 @@ void main() {
       await store.setPref('market', 'FR');
       marketNotifier.value = MarketProfileId.drc; // as at a fresh launch
       await store.logout();
-      final dev = await store.forgotPassword(email);
+      final dev = (await store.forgotPassword(email)).devToken;
       expect(dev, isNotNull);
       await store.resetPassword(dev!, 'Flutter-Reset-2026');
       await expectLater(store.login(email, password), throwsA(isA<ApiException>()), reason: 'old password no longer works');

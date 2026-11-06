@@ -22,6 +22,8 @@ const Map<String, (String, String)> kMessages = {
   'err_no_response': ('The server did not respond. Please try again.', 'Le serveur n’a pas répondu. Veuillez réessayer.'),
   'err_no_connection': ('Not connected to the server.', 'Pas de connexion au serveur.'),
   'err_signed_out': ('You were signed out. Please sign in again.', 'Vous avez été déconnecté. Veuillez vous reconnecter.'),
+  'forgot_off': ('E-mail is not set up on this server yet, so no reset link could be sent. Please contact support.', 'L’envoi d’e-mails n’est pas encore configuré sur ce serveur : aucun lien n’a pu être envoyé. Contactez l’assistance.'),
+  'err_server': ('The server had a problem. Please try again in a moment.', 'Le serveur a rencontré un problème. Réessayez dans un instant.'),
   'err_unexpected': ('Something went wrong. Please try again.', 'Une erreur est survenue. Veuillez réessayer.'),
   'err_not_rider': ('This app is for Somba&Teka riders. Use the customer app instead.', 'Cette application est réservée aux livreurs Somba&Teka. Utilisez l’application client.'),
   'splash_subtitle': ('Rider partner', 'Partenaire livreur'),

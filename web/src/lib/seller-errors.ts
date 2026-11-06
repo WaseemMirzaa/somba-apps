@@ -288,6 +288,8 @@ add("Conversation not found", "Conversation introuvable.");
 add("Attach up to 4 photos", "Joignez 4 photos au maximum.");
 add("Attachment must be an image uploaded through the platform", "La pièce jointe doit être une image téléversée via la plateforme.");
 add("Nothing to translate", "Rien à traduire.");
+add("Translation is not available right now. Try again later", "La traduction n'est pas disponible pour le moment. Réessayez plus tard.");
+add("Choose English or French", "Choisissez l'anglais ou le français.");
 
 add("Handling time must be a whole number of days from 0 to 14", "Le délai de préparation doit être un nombre entier de jours de 0 à 14.");
 add("Enter a valid return date, or clear it to reopen the store", "Saisissez une date de retour valide, ou effacez-la pour rouvrir la boutique.");

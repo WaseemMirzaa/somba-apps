@@ -12,6 +12,7 @@ export 'strings_social.dart';
 export 'strings_engage.dart';
 export 'strings_areas.dart';
 export 'strings_r2f.dart';
+export 'strings_verify.dart';
 
 /// UI texts in English and French. Every text lives in `messages.dart`
 /// (key -> (English, French)); the typed accessors in `strings_keys.dart`
@@ -100,7 +101,14 @@ class Strings {
 
   /// What to show for a failure: the API's message in the user's language, or a
   /// neutral sentence for anything unexpected (never a raw exception dump).
-  String errorText(Object e) => e is ApiException ? e.toString() : t('err_unexpected');
+  /// The text for a failure. An [ApiException] is already worded for the user; anything else is a bug or a platform
+  /// fault, so it is written to the device log (`debugPrint` also reaches logcat in release builds) before the generic
+  /// message is shown: a "Something went wrong" must always leave a trace to find it by.
+  String errorText(Object e, [StackTrace? stack]) {
+    if (e is ApiException) return e.toString();
+    debugPrint('Unexpected error (${e.runtimeType}): $e${stack == null ? '' : '\n$stack'}');
+    return t('err_unexpected');
+  }
 
   /// A server message (always English) in the user's language; unknown messages pass through.
   String serverError(String raw) => translateServerError(raw, this);

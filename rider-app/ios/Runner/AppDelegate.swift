@@ -4,6 +4,10 @@ import GoogleMaps
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  /// True once the Google Maps SDK was given a key. Creating a map without one aborts the app, so the Dart side asks
+  /// (channel `com.somba/maps`, method `hasNativeKey`) before it ever shows a map.
+  private var mapsKeyProvided = false
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -13,11 +17,20 @@ import GoogleMaps
     if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
        !key.isEmpty, !key.hasPrefix("$(") {
       GMSServices.provideAPIKey(key)
+      mapsKeyProvided = true
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let maps = FlutterMethodChannel(name: "com.somba/maps", binaryMessenger: engineBridge.applicationRegistrar.messenger())
+    maps.setMethodCallHandler { [weak self] call, result in
+      if call.method == "hasNativeKey" {
+        result(self?.mapsKeyProvided ?? false)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }

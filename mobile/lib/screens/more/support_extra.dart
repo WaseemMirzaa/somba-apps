@@ -11,6 +11,7 @@ import '../../services/models.dart';
 import '../../services/places_client.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
+import '../../services/device_location.dart';
 import '../../services/maps_config.dart';
 import '../location_picker_screen.dart';
 import '../../widgets/kit.dart';
@@ -144,6 +145,27 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     if (picked != null && mounted) _applyPick(picked);
   }
 
+  bool _locating = false;
+
+  /// Without the map: the pin is the phone's own position (still the exact spot the rider goes to).
+  Future<void> _pinFromGps() async {
+    final s = Strings.of(context);
+    setState(() => _locating = true);
+    try {
+      final p = await currentPosition();
+      if (!mounted) return;
+      _applyPick(PickedPlace(lat: p.lat, lng: p.lng));
+      showSnack(context, s.addrGpsDone);
+    } on LocationException catch (e) {
+      if (mounted) showLocationProblem(context, e.problem, withMap: false);
+    } catch (e, st) {
+      if (mounted) showError(context, ApiException.local('err_unexpected'));
+      debugPrint('Pin from position failed: $e\n$st');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   /// A map pick pre-fills the typed fields (still editable) and keeps the pin for saving.
   void _applyPick(PickedPlace p) {
     setState(() {
@@ -256,7 +278,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     final phone = _phone.text.trim();
     setState(() {
       // With maps available the exact spot is mandatory: the rider goes to the pin.
-      _pinErr = MapsConfig.enabled && _pin == null ? s.addrPinRequired : null;
+      // When the server insists on a pin (`requirePinnedAddress`) it is mandatory even without a map: the phone's own
+      // position is the way to give one, so an address that checkout would refuse is not saved by accident.
+      _pinErr = _pin != null
+          ? null
+          : MapsConfig.enabled
+              ? s.addrPinRequired
+              : (RealtimeStore.instance.requirePinnedAddress ? s.addrPinNeededNoMap : null);
       _lineErr = streetAddressError(_line1.text, s);
       _cityErr = (_showTyped ? _city.text.trim().isEmpty : _sel.city == null) ? s.addrErrCity : null;
       _phoneErr = phone.isEmpty ? null : validateMobileNumber(phone, s);
@@ -381,22 +409,46 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   /// Without a Maps key: a notice, and the address is typed by hand. With one: the card that opens the picker.
   Widget _pinCard(Strings s) {
     if (!MapsConfig.enabled) {
-      return Container(
-        key: const ValueKey('map-unavailable'),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFDE68A))),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.location_off_outlined, size: 20, color: Color(0xFF92400E)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(s.addrMapUnavailable, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF92400E))),
-              const SizedBox(height: 2),
-              Text(s.addrMapTypeBelow, style: const TextStyle(fontSize: 12.5, color: Color(0xFF92400E))),
-            ]),
+      final pin = _pin;
+      final needsPin = RealtimeStore.instance.requirePinnedAddress;
+      final err = _pinErr;
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          key: const ValueKey('map-unavailable'),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(14), border: Border.all(color: err != null ? AppColors.dangerStrong : const Color(0xFFFDE68A), width: err != null ? 1.5 : 1)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.location_off_outlined, size: 20, color: Color(0xFF92400E)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(s.addrMapUnavailable, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF92400E))),
+                const SizedBox(height: 2),
+                Text(needsPin && pin == null ? s.addrPinNeededNoMap : s.addrMapTypeBelow, style: const TextStyle(fontSize: 12.5, color: Color(0xFF92400E))),
+                if (pin != null) ...[
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text(s.addrGpsPinned, key: const ValueKey('gps-pinned'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.success))),
+                  ]),
+                ],
+              ]),
+            ),
+          ]),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const ValueKey('pin-from-gps'),
+            onPressed: _locating ? null : _pinFromGps,
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            child: _locating
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.2))
+                : Text(s.addrUseGps, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
-        ]),
-      );
+        ),
+      ]);
     }
     final pin = _pin;
     final err = _pinErr;

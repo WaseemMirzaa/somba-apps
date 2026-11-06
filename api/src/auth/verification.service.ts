@@ -11,8 +11,10 @@ import { IsNull, MoreThan, Repository } from 'typeorm';
 import { User, VerificationToken } from '../database/entities';
 import type { VerificationKind } from '../database/entities';
 import { MessagingService } from '../messaging/messaging.service';
+import type { Delivery } from '../messaging/messaging.service';
 import { UsersService } from '../users/users.service';
 import { normalizePhone, phoneHash } from '../common/phone/phone-hash';
+import { mask } from '../messaging/messaging.service';
 
 const MIN = 60_000;
 export const TTL: Record<VerificationKind, number> = {
@@ -41,8 +43,22 @@ export const smsText = {
 /** What the API returns; `devToken` is only ever present outside production. */
 export interface SendResult {
   sent: boolean;
+  /**
+   * Why nothing went out: `not_configured` (this server has no SMS / e-mail provider set up yet) or `failed` (the
+   * provider refused it). Absent when `sent`. Lets the app say so instead of "code sent" for a code nobody got.
+   */
+  reason?: 'not_configured' | 'failed';
+  /** Where it went, masked (`+243•••56`, `a***@b.com`), so the screen can say what was sent and to whom. */
+  to?: string;
   devToken?: string;
 }
+
+/** The part of a {@link SendResult} that says what became of the message. */
+const outcome = (d: Delivery, to: string): Pick<SendResult, 'sent' | 'reason' | 'to'> => ({
+  sent: d === 'sent',
+  ...(d === 'sent' ? {} : { reason: d }),
+  to: mask(to),
+});
 
 @Injectable()
 export class VerificationService {
@@ -95,12 +111,12 @@ export class VerificationService {
       throw new HttpException('Please wait before requesting another email.', HttpStatus.TOO_MANY_REQUESTS);
     }
     const link = `${this.webUrl}/shop/verify-email?token=${secret}`;
-    const sent = await this.messaging.sendEmail(
+    const d = await this.messaging.deliverEmail(
       user.email,
       'Verify your Somba&Teka email',
       `Hello ${user.name},\n\nConfirm your email address:\n${link}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this message.`,
     );
-    return { sent, ...(this.expose ? { devToken: secret } : {}) };
+    return { ...outcome(d, user.email), ...(this.expose ? { devToken: secret } : {}) };
   }
 
   async verifyEmail(token: string): Promise<{ verified: true }> {
@@ -119,8 +135,8 @@ export class VerificationService {
     if (!(await this.issue(user.id, 'phone', code, true))) {
       throw new HttpException('Please wait before requesting another code.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    const sent = await this.messaging.sendSms(user.phone, smsText.verify(code, user.locale));
-    return { sent, ...(this.expose ? { devToken: code } : {}) };
+    const d = await this.messaging.deliverSms(user.phone, smsText.verify(code, user.locale));
+    return { ...outcome(d, user.phone), ...(this.expose ? { devToken: code } : {}) };
   }
 
   async verifyPhoneOtp(user: User, code: string): Promise<{ verified: true }> {
@@ -160,13 +176,15 @@ export class VerificationService {
   async sendLoginCode(phone: string): Promise<SendResult> {
     if (!normalizePhone(phone)) throw new BadRequestException('Enter a valid phone number.');
     const user = await this.customerForPhone(phone);
-    if (!user) return { sent: true };
+    if (!user) return { sent: true, ...(this.messaging.smsConfigured ? {} : { reason: 'not_configured' as const }) };
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     if (!(await this.issue(user.id, 'login', code, true))) {
       throw new HttpException('Please wait before requesting another code.', HttpStatus.TOO_MANY_REQUESTS);
     }
-    await this.messaging.sendSms(user.phone!, smsText.signIn(code, user.locale));
-    return { sent: true, ...(this.expose ? { devToken: code } : {}) };
+    const d = await this.messaging.deliverSms(user.phone!, smsText.signIn(code, user.locale));
+    // Same reply for every number, so it never says whether the number has an account; an unconfigured gateway is
+    // the same for everyone, so saying so reveals nothing.
+    return { sent: true, ...(d === 'not_configured' ? { reason: 'not_configured' as const } : {}), ...(this.expose ? { devToken: code } : {}) };
   }
 
   /** Checks a login code and returns the account it unlocks (one use, 5 attempts, 10 minutes). */
@@ -193,16 +211,18 @@ export class VerificationService {
   /** Always reports `sent:true` — never reveals whether the email has an account. */
   async forgotPassword(email: string): Promise<SendResult> {
     const user = await this.users.findByEmail(email);
-    if (!user || (user.role === 'customer' && !user.active)) return { sent: true };
+    // The same reply for every address (no account enumeration); "no e-mail provider on this server" is the same for everyone.
+    const unconfigured = this.messaging.emailConfigured ? {} : { reason: 'not_configured' as const };
+    if (!user || (user.role === 'customer' && !user.active)) return { sent: true, ...unconfigured };
     const secret = randomBytes(32).toString('hex');
-    if (!(await this.issue(user.id, 'reset', secret, true))) return { sent: true };
+    if (!(await this.issue(user.id, 'reset', secret, true))) return { sent: true, ...unconfigured };
     const link = `${this.webUrl}/shop/reset?token=${secret}`;
     await this.messaging.sendEmail(
       user.email,
       'Reset your Somba&Teka password',
       `Hello ${user.name},\n\nReset your password:\n${link}\n\nThis link expires in 1 hour and works once. If you didn't ask for this, ignore this message — your password is unchanged.`,
     );
-    return { sent: true, ...(this.expose ? { devToken: secret } : {}) };
+    return { sent: true, ...unconfigured, ...(this.expose ? { devToken: secret } : {}) };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<{ reset: true }> {
