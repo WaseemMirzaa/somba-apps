@@ -1377,12 +1377,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           title: s.veFailedTitle,
           body: s.veFailedBody);
     }
+    // Only the server saying it went out earns "we sent it". With no answer yet (the call threw, the error is shown
+    // below) or a bare "not sent", this screen must not claim a link is on its way.
+    if (r == null || !r.sent) return const SizedBox.shrink();
     return _VerifyNotice(
       key: const ValueKey('email-sent'),
       tone: _NoticeTone.info,
       icon: Icons.mark_email_read_rounded,
       title: s.veCheckInbox,
-      body: '${s.veSentTo(r?.to ?? maskEmail(email))} ${s.veCheckHint}',
+      body: '${s.veSentTo(r.to ?? maskEmail(email))} ${s.veCheckHint}',
     );
   }
 
