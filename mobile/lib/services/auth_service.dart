@@ -37,6 +37,9 @@ class TwoFactorRequired implements Exception {
 /// What the server did with a request to send a code or a link. [sent] is false when nothing went out: [reason] says
 /// why (`not_configured`: this server has no SMS / e-mail provider set up yet; `failed`: the provider refused it), so
 /// a screen never says "code sent" for a code nobody got. [to] is where it went, already masked by the server.
+///
+/// An older server answers only `{sent: false}` with no reason. Nothing went out, so that counts as [failed]: the
+/// screens must never fall back to "we sent it" because the reason is missing.
 class SendResult {
   final bool sent;
   final String? reason;
@@ -45,7 +48,7 @@ class SendResult {
   const SendResult({required this.sent, this.reason, this.to, this.devToken});
 
   bool get notConfigured => !sent && reason == 'not_configured';
-  bool get failed => !sent && reason == 'failed';
+  bool get failed => !sent && reason != 'not_configured';
 
   factory SendResult.fromJson(Map<String, dynamic> j) => SendResult(
         sent: j['sent'] != false,

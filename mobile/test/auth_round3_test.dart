@@ -79,8 +79,12 @@ void main() {
       final ok = SendResult.fromJson({'sent': true, 'to': 'a***@b.cd'});
       expect(ok.sent, isTrue);
       expect(ok.notConfigured, isFalse);
-      // An older server sends only `sent`.
-      expect(SendResult.fromJson({'sent': false}).notConfigured, isFalse);
+      expect(ok.failed, isFalse);
+      // An older server sends only `sent`: nothing went out, so it is a failure, never "sent".
+      final bare = SendResult.fromJson({'sent': false});
+      expect(bare.sent, isFalse);
+      expect(bare.notConfigured, isFalse);
+      expect(bare.failed, isTrue);
     });
   });
 
@@ -136,6 +140,34 @@ void main() {
       await t.pump();
       final digits = [for (var i = 0; i < 6; i++) (t.widget<TextField>(find.byKey(ValueKey('otp-$i'))).controller!.text)];
       expect(digits, ['1', '2', '3', '4', '5', '6']);
+    });
+
+    testWidgets('e-mail screen: an older server that sends only {sent: false} never claims a link was sent', (t) async {
+      RealtimeStore.instance.debugSendEmail = () async => SendResult.fromJson({'sent': false});
+      await pump(t, const VerifyEmailScreen());
+      expect(find.byKey(const ValueKey('email-sent')), findsNothing);
+      expect(find.byKey(const ValueKey('email-failed')), findsOneWidget);
+    });
+
+    testWidgets('e-mail screen: a send that throws shows the error, not "we sent a link"', (t) async {
+      RealtimeStore.instance.debugSendEmail = () async => throw ApiException('Please wait before requesting another email.', 429);
+      await pump(t, const VerifyEmailScreen());
+      expect(find.byKey(const ValueKey('email-sent')), findsNothing);
+      expect(find.byKey(const ValueKey('email-failed')), findsNothing);
+    });
+
+    testWidgets('e-mail screen: the server saying it went out is the only way to see "check your inbox"', (t) async {
+      RealtimeStore.instance.debugSendEmail = () async => const SendResult(sent: true, to: 'a***@b.cd');
+      await pump(t, const VerifyEmailScreen());
+      expect(find.byKey(const ValueKey('email-sent')), findsOneWidget);
+      expect(find.textContaining('a***@b.cd'), findsWidgets);
+    });
+
+    testWidgets('phone screen: a bare {sent: false} says it was not sent, and shows no "code sent" line', (t) async {
+      RealtimeStore.instance.debugSendPhone = () async => SendResult.fromJson({'sent': false});
+      await pump(t, const OtpScreen(phone: '+243812345678'));
+      expect(find.byKey(const ValueKey('otp-sent')), findsNothing);
+      expect(find.byKey(const ValueKey('otp-failed')), findsOneWidget);
     });
 
     testWidgets('skip on the e-mail screen returns false, so a checkout does not take it for "verified"', (t) async {
