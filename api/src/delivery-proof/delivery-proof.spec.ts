@@ -242,7 +242,8 @@ describe('proof of delivery over HTTP and sockets', () => {
     expect((await request(app.getHttpServer()).get(url).set('Authorization', `Bearer t-${rider.id}`)).status).toBe(404);
     const link = new URL((await svc.links(admin, task.id, 'http://x'))!.photoUrl!);
     expect((await request(app.getHttpServer()).get(link.pathname + link.search)).status).toBe(200);
-    expect((await request(app.getHttpServer()).get(link.pathname + link.search.replace(/sig=./, 'sig=0'))).status).toBe(401);
+    // Change the first signature character to a DIFFERENT one: a fixed 'sig=0' leaves the link valid 1 time in 16.
+    expect((await request(app.getHttpServer()).get(link.pathname + link.search.replace(/sig=(.)/, (_m, c: string) => `sig=${c === '0' ? '1' : '0'}`))).status).toBe(401);
     expect((await request(app.getHttpServer()).get(`/api/v1/delivery-proofs/${task.id}/signature${link.search}`)).status).toBe(401);
   });
 
