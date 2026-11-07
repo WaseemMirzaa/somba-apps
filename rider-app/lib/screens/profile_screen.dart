@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/notification_text.dart';
+import '../l10n/shift_strings.dart';
 import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/rider_store.dart';
@@ -8,6 +9,7 @@ import '../l10n/compliance_strings.dart';
 import '../services/compliance_store.dart';
 import 'account_screen.dart';
 import 'documents_screen.dart';
+import 'shift_screen.dart';
 import 'vehicle_screen.dart';
 import 'support_screen.dart';
 import '../theme/app_theme.dart';
@@ -85,6 +87,15 @@ class ProfileScreen extends StatelessWidget {
                 subtitle: s.changePasswordSub,
                 route: kChangePasswordRoute,
                 screen: const ChangePasswordScreen(),
+              ),
+              const SizedBox(height: 12),
+              _AccountEntry(
+                key: const ValueKey('shift-entry'),
+                icon: Icons.schedule_rounded,
+                title: s.shiftTitle,
+                subtitle: s.shiftEntrySub,
+                route: kShiftRoute,
+                screen: const ShiftScreen(),
               ),
               const SizedBox(height: 12),
               _WhereIWork(assignment: store.assignment),
