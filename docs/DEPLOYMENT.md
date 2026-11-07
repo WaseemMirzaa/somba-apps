@@ -247,6 +247,36 @@ MySQL with its time zone on UTC.
 > where you deliberately ran `npm run seed`. On production, the only login is the
 > admin you create above; create staff via the admin panel.
 
+#### Changing or recreating the admin account
+
+The admin panel only lets a signed-in admin change their own **password** and
+two-factor settings (Admin → My account) — there's no "change e-mail" field, and
+`bootstrap:prod` only ever creates the *first* admin, leaving an existing one
+alone. To change an admin's e-mail, or remove one and start fresh, run
+`manage:admin` on the server (safe to run any time; `list` and a `remove` without
+`--yes` change nothing):
+
+```bash
+cd ~/somba-apps/api
+
+# see every admin account
+npm run manage:admin:prod -- list
+
+# change an existing admin's e-mail (keeps the same password, name, 2FA)
+npm run manage:admin:prod -- update-email old@yourdomain.com new@yourdomain.com
+
+# remove an admin — first a dry run (shows who, changes nothing)
+npm run manage:admin:prod -- remove old@yourdomain.com
+# then, once you're sure:
+npm run manage:admin:prod -- remove old@yourdomain.com --yes
+
+# create a replacement admin (bootstrap:prod only creates if none exists)
+ADMIN_EMAIL=new@yourdomain.com ADMIN_PASSWORD='a-long-random-passphrase-12+chars' npm run bootstrap:prod
+```
+
+It only ever touches accounts with `role = admin` — pointing it at a seller,
+rider or customer's e-mail by mistake fails loudly instead of changing them.
+
 ### 6b. (Optional) Firebase push notifications
 
 1. Firebase console → *Project settings → Service accounts → Generate new private key*.
