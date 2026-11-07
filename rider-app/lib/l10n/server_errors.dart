@@ -176,6 +176,16 @@ final Map<String, String> _exactFr = {
   'Only JPEG, PNG, WebP or HEIC images are allowed.': 'Seules les images JPEG, PNG, WebP ou HEIC sont acceptées.',
   'No file uploaded (field name "file").': 'Aucun fichier envoyé.',
   'File too large': 'Fichier trop volumineux (5 Mo maximum).',
+  // proof of delivery (docs/contracts/delivery-proof.md)
+  'Add a photo or a signature.': 'Ajoutez une photo ou une signature.',
+  'Add a photo or a signature (fields "photo", "signature").': 'Ajoutez une photo ou une signature.',
+  'Proof of delivery is only taken on a delivery to the customer.': 'La preuve de livraison ne se prend que lors d’une remise au client.',
+  'Proof can only be added while the delivery is under way.': 'La preuve ne peut être ajoutée que pendant la livraison.',
+  'The photo is too large (4 MB at most).': 'La photo est trop volumineuse (4 Mo maximum).',
+  'The signature is too large (1 MB at most).': 'La signature est trop volumineuse (1 Mo maximum).',
+  'The photo must be a JPEG or PNG image.': 'La photo doit être une image JPEG ou PNG.',
+  'The signature must be a PNG image.': 'La signature doit être une image PNG.',
+  'Your account is not active.': 'Votre compte n’est pas actif.',
   'A valid device token is required.': 'Un jeton d’appareil valide est requis.',
   // network (generated on the device)
   'Socket not connected.': 'Pas de connexion au serveur.',

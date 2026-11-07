@@ -90,6 +90,7 @@ export { Conversation } from './conversation.entity';
 export { ConversationMessage } from './conversation-message.entity';
 export type { ChatSide } from './conversation-message.entity';
 export { PrivateFile } from './private-file.entity';
+export { DeliveryProof } from './delivery-proof.entity';
 export type { PrivateFileKind } from './private-file.entity';
 export { StockMovement, STOCK_REASONS, MANUAL_REASONS } from './stock-movement.entity';
 export type { StockReason } from './stock-movement.entity';
@@ -162,6 +163,7 @@ import { SellerTeamMember } from './seller-team.entity';
 import { Conversation } from './conversation.entity';
 import { ConversationMessage } from './conversation-message.entity';
 import { PrivateFile } from './private-file.entity';
+import { DeliveryProof } from './delivery-proof.entity';
 import { HubOpsSettings } from './hub-ops-settings.entity';
 import { AgedAlert } from './aged-alert.entity';
 
@@ -229,4 +231,5 @@ export const ENTITIES = [
   Conversation,
   ConversationMessage,
   PrivateFile,
+  DeliveryProof,
 ];

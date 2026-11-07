@@ -3,4 +3,4 @@
 "NSLocationWhenInUseUsageDescription" = "Somba&Teka Livreur partage votre position avec le client pendant une livraison, même lorsque l’écran est éteint. Le partage s’arrête à la fin de la livraison.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Somba&Teka Livreur partage votre position avec le client pendant une livraison, même lorsque l’écran est éteint. Le partage s’arrête à la fin de la livraison.";
 "NSPhotoLibraryUsageDescription" = "Somba&Teka Livreur vous permet de joindre à un ticket d’assistance des photos de votre photothèque, par exemple un colis abîmé ou un problème à une adresse.";
-"NSCameraUsageDescription" = "Somba&Teka Livreur utilise l’appareil photo pour prendre une photo à joindre à un ticket d’assistance, par exemple un colis abîmé ou un problème à une adresse.";
+"NSCameraUsageDescription" = "Somba&Teka Livreur utilise l’appareil photo pour photographier un colis à la porte comme preuve de livraison, ou pour prendre une photo à joindre à un ticket d’assistance, par exemple un colis abîmé ou un problème à une adresse.";
