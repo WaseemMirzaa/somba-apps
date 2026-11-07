@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { RiderShifts1793300000001 } from './migrations/1793300000001-RiderShifts';
+import { RiderShifts1793310000001 } from './migrations/1793310000001-RiderShifts';
 
 /** The rider-shifts migration runs on SQLite (tests, local dev) as well as MySQL: it only uses the QueryRunner table API. */
 describe('RiderShifts migration (SQLite)', () => {
@@ -13,7 +13,7 @@ describe('RiderShifts migration (SQLite)', () => {
   const run = async (dir: 'up' | 'down') => {
     const q = ds.createQueryRunner();
     try {
-      await new RiderShifts1793300000001()[dir](q);
+      await new RiderShifts1793310000001()[dir](q);
     } finally {
       await q.release();
     }

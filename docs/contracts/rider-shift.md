@@ -73,6 +73,6 @@ Push for the staff pages: `attendance:updated { riderId, status, since }` to the
 
 ## 5. Database
 
-Migration `1793300000001-RiderShifts`: table `rider_shifts` (`id, riderId, hubId, openRiderId, startedAt, endedAt, breakMinutes,
+Migration `1793310000001-RiderShifts`: table `rider_shifts` (`id, riderId, hubId, openRiderId, startedAt, endedAt, breakMinutes,
 breakStartedAt, endReason, createdAt`), indexes on `(riderId, startedAt)`, `hubId`, and the unique `openRiderId`. Reversible; no
 data is created or changed.

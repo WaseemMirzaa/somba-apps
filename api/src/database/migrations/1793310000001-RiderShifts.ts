@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
  * Written with the QueryRunner table API (no raw MySQL), so it runs on MySQL in production and on SQLite in tests.
  * No data is touched or invented: riders simply have no shifts until they clock in. Reversible.
  */
-export class RiderShifts1793300000001 implements MigrationInterface {
-  name = 'RiderShifts1793300000001';
+export class RiderShifts1793310000001 implements MigrationInterface {
+  name = 'RiderShifts1793310000001';
 
   public async up(q: QueryRunner): Promise<void> {
     const sqlite = q.connection.options.type === 'better-sqlite3' || q.connection.options.type === 'sqlite';
