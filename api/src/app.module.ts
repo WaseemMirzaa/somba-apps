@@ -38,6 +38,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { WarehouseStockModule } from './inventory/warehouse-stock.module';
 import { TranslationModule } from './translation/translation.module';
 import { SellerPlatformModule } from './sellers/seller-platform.module';
+import { RiderComplianceModule } from './rider-compliance/rider-compliance.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { SellerPlatformModule } from './sellers/seller-platform.module';
     FinanceModule,
     CommerceModule,
     SellerPlatformModule,
+    RiderComplianceModule,
     AfterSaleModule,
     FollowsModule,
     RealtimeModule,

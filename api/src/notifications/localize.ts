@@ -205,6 +205,15 @@ export function resolutionFr(resolution: string | null | undefined): string | nu
 }
 const RESOLUTION_RE = new RegExp(`^(\\S+)( · \\S+)?: (${Object.keys(RESOLUTIONS).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`);
 
+/** The rider compliance documents, as the English notices name them. */
+const RIDER_DOCUMENTS: Record<string, string> = {
+  'driver licence': 'permis de conduire',
+  'vehicle insurance': 'assurance du véhicule',
+  'vehicle registration': 'carte grise',
+  ID: 'pièce d’identité',
+  document: 'document',
+};
+
 // ── Titles ───────────────────────────────────────────────────────────────
 
 const TITLES: Record<string, string> = {
@@ -309,6 +318,9 @@ const TITLES: Record<string, string> = {
   'Product approved': 'Produit approuvé',
   'Product rejected': 'Produit refusé',
   'Product updated': 'Produit mis à jour',
+  // Rider vehicle and compliance documents (rider-compliance/rider-compliance.service.ts)
+  'Document approved': 'Document approuvé',
+  'Document rejected': 'Document refusé',
   // Fraud: the account a fraud alert suspended or reinstated
   'Account blocked': 'Compte bloqué',
   'Account unblocked': 'Compte débloqué',
@@ -450,6 +462,9 @@ const BODIES: Rule[] = [
     /^(.+) was edited by (.+) and needs moderation again\.$/,
     (m) => `${m[1]} a été modifié par ${m[2] === 'a seller' ? 'un vendeur' : m[2]} et doit être modéré à nouveau.`,
   ],
+  // A rider's compliance document was approved or rejected (the rejection reason is the reviewer's own words)
+  [/^Your (driver licence|vehicle insurance|vehicle registration|ID|document) was approved\.$/, (m) => `Votre document « ${RIDER_DOCUMENTS[m[1]]} » a été approuvé.`],
+  [/^Your (driver licence|vehicle insurance|vehicle registration|ID|document) was rejected: (.+)$/, (m) => `Votre document « ${RIDER_DOCUMENTS[m[1]]} » a été refusé : ${m[2]}`],
   [/^(.+) is now (live|rejected|draft|removed)\.$/, (m) => `${m[1]} est maintenant ${pick(PRODUCT_STATUSES, m[2])}.`],
 
   // Order status ("SOM-12345 is now out for delivery.")
