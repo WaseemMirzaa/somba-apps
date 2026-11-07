@@ -2,6 +2,7 @@
 // ignore_for_file: prefer_single_quote_strings
 import 'messages_aftersale.dart';
 import 'messages_areas.dart';
+import 'messages_cartstore.dart';
 import 'messages_engage.dart';
 import 'messages_logistics.dart';
 import 'messages_r2f.dart';
@@ -636,4 +637,5 @@ const Map<String, (String, String)> kMessages = {
   ...kMessagesAreas,
   ...kMessagesR2f,
   ...kMessagesVerify,
+  ...kMessagesCartStore,
 };

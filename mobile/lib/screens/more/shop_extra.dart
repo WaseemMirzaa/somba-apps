@@ -15,6 +15,7 @@ import '../../widgets/common.dart';
 import '../../widgets/product_actions.dart';
 import '../../widgets/translatable_text.dart' show MachineNote;
 import '../product_detail_screen.dart' show reviewTile;
+import 'browse.dart' show BrowseSearchField, ProductQuery, runQuery;
 import 'catalog_extra.dart';
 import 'chat_entry.dart';
 
@@ -35,6 +36,15 @@ class _StoreScreenState extends State<StoreScreen> {
 
   /// Policies, handling time and vacation of the store (from the same `sellers:storefront` answer).
   StoreFront? _front;
+
+  /// The shopper's search inside this store (filters the store's own listings on the phone).
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -78,20 +88,49 @@ class _StoreScreenState extends State<StoreScreen> {
       builder: (context, _) {
         final s = Strings.of(context);
         final items = liveCatalog().where((p) => p.sellerId == widget.sellerId).toList();
+        // The search box narrows the grid only: the header still counts every product of the store.
+        final shown = runQuery(items, ProductQuery(text: _search.text));
         final rating = (_seller?['rating'] as num?)?.toDouble() ?? 0;
         final badge = _badge(s, _seller?['badge'] as String?);
         return Scaffold(
           body: CustomScrollView(slivers: [
             SliverToBoxAdapter(child: _header(context, s, items.length, rating, badge)),
             SliverToBoxAdapter(child: _details(context, s, items)),
+            if (items.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: BrowseSearchField(
+                    key: const ValueKey('store-search'),
+                    controller: _search,
+                    hint: s.storeSearchHint,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ),
             if (items.isEmpty)
               SliverFillRemaining(hasScrollBody: false, child: Center(child: Text(s.storeNoProducts, style: const TextStyle(color: AppColors.muted))))
+            else if (shown.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.search_off_rounded, size: 48, color: AppColors.faint),
+                      const SizedBox(height: 10),
+                      Text(s.storeSearchNone(_search.text.trim()),
+                          key: const ValueKey('store-search-none'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted)),
+                    ]),
+                  ),
+                ),
+              )
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-                  delegate: SliverChildBuilderDelegate((_, i) => productCard(context, items[i], widget.locale), childCount: items.length),
+                  delegate: SliverChildBuilderDelegate((_, i) => productCard(context, shown[i], widget.locale), childCount: shown.length),
                 ),
               ),
           ]),

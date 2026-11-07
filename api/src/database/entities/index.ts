@@ -55,6 +55,9 @@ export { FraudSignal } from './fraud-signal.entity';
 export type { FraudSignalKind } from './fraud-signal.entity';
 export { Broadcast } from './broadcast.entity';
 export { Hub } from './hub.entity';
+export { RiderVehicle } from './rider-vehicle.entity';
+export { RiderDocument } from './rider-document.entity';
+export type { RiderDocumentStatus } from './rider-document.entity';
 export { HubOpsSettings } from './hub-ops-settings.entity';
 export { AgedAlert } from './aged-alert.entity';
 export { GeoArea } from './geo-area.entity';
@@ -158,6 +161,8 @@ import { Translation } from './translation.entity';
 import { TranslationJob } from './translation-job.entity';
 import { StockMovement } from './stock-movement.entity';
 import { TaxDocument } from './tax-document.entity';
+import { RiderVehicle } from './rider-vehicle.entity';
+import { RiderDocument } from './rider-document.entity';
 
 import { SellerTeamMember } from './seller-team.entity';
 import { Conversation } from './conversation.entity';
@@ -209,6 +214,8 @@ export const ENTITIES = [
   Hub,
   HubOpsSettings,
   AgedAlert,
+  RiderVehicle,
+  RiderDocument,
   GeoArea,
   HubCoverage,
   HubLane,

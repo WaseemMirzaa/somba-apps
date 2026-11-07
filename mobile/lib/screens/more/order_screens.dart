@@ -324,6 +324,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ]),
         const SizedBox(height: 10),
         ...pkg.items.map((i) => _line(s, i)),
+        // What this store's live lines add up to (cancelled lines are refunded, so they do not count).
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Flexible(child: Text(s.storeSubtotal, style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))),
+          const SizedBox(width: 8),
+          Text(money(pkg.subtotalUsd), key: ValueKey('package-subtotal-$n'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+        ]),
       ],
     );
   }
