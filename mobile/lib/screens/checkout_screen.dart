@@ -92,29 +92,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<CartItem> get _lines => widget.lines ?? shop.cart;
   double get _subtotal => _lines.fold(0.0, (s, i) => s + i.product.price * i.qty);
 
-  /// How many distinct sellers will pack this order (the cart may mix sellers).
-  int get _sellerCount => _lines.map((l) => l.product.sellerId ?? l.product.sellerName).whereType<String>().toSet().length;
+  /// The lines per store (the cart may mix sellers; the server packs one package per seller).
+  List<StoreGroup> get _groups => groupByStore(_lines);
+
+  /// How many distinct sellers will pack this order.
+  int get _sellerCount => _groups.where((g) => g.key.isNotEmpty).length;
 
   Widget _summaryLine(Strings s, String lang, CartItem line) {
-    final seller = line.product.sellerName ?? '';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${line.qty} × ${line.product.displayName(lang)}',
-                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-            if (seller.isNotEmpty)
-              Text(s.soldBy(seller),
-                  key: ValueKey('checkout-sold-by-${line.product.id}'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
+          child: Text('${line.qty} × ${line.product.displayName(lang)}',
+              maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
         ),
         const SizedBox(width: 8),
         Text(money(line.product.price * line.qty), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
       ]),
+    );
+  }
+
+  /// One store's block of the order summary: its name, its lines and (when several stores) what they add up to.
+  /// Matches the packages the server splits the order into (one per seller).
+  Widget _summaryStore(Strings s, String lang, StoreGroup g, {required bool showSubtotal, required bool first}) {
+    final name = (g.name ?? '').isEmpty ? s.storeOtherItems : g.name!;
+    return Column(
+      key: ValueKey('checkout-store-${g.key}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!first) const Divider(height: 22),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            const Icon(Icons.storefront_rounded, size: 16, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(name,
+                  key: ValueKey('checkout-store-name-${g.key}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.inkSoft)),
+            ),
+          ]),
+        ),
+        for (final line in g.lines) _summaryLine(s, lang, line),
+        if (showSubtotal)
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Flexible(child: Text(s.storeSubtotal, style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))),
+            const SizedBox(width: 8),
+            Text(money(g.subtotal), key: ValueKey('checkout-store-subtotal-${g.key}'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+          ]),
+      ],
     );
   }
 
@@ -485,7 +513,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           _card(
             child: Column(children: [
-              for (final line in _lines) _summaryLine(s, lang, line),
+              for (final (n, g) in _groups.indexed) _summaryStore(s, lang, g, showSubtotal: _groups.length > 1, first: n == 0),
               if (_lines.isNotEmpty) const Divider(height: 22),
               _row(s.subtotal, money(subtotal)),
               if (savings > 0)

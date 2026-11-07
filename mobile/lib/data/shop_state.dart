@@ -36,6 +36,35 @@ class CartItem {
   Map<String, dynamic> toJson() => {'u': product.uuid, 'v': variant, 'q': qty, if (priceWhenAdded != null) 'p': priceWhenAdded};
 }
 
+/// The cart (or checkout) lines of ONE store. The server packs and ships per seller, so the cart shows them this way.
+class StoreGroup {
+  /// Seller id, else the seller name, else '' (lines whose listing has no seller).
+  final String key;
+  final String? sellerId;
+  final String? name;
+
+  /// Positions of the lines in the list that was grouped (what `removeAt` / `saveForLater` expect).
+  final List<int> indices = [];
+  final List<CartItem> lines = [];
+  StoreGroup(this.key, this.sellerId, this.name);
+
+  double get subtotal => lines.fold(0.0, (sum, l) => sum + l.product.price * l.qty);
+  int get units => lines.fold(0, (sum, l) => sum + l.qty);
+}
+
+/// [lines] grouped by store, in the order each store first appears.
+List<StoreGroup> groupByStore(List<CartItem> lines) {
+  final groups = <String, StoreGroup>{};
+  for (var i = 0; i < lines.length; i++) {
+    final p = lines[i].product;
+    final key = p.sellerId ?? p.sellerName ?? '';
+    final g = groups.putIfAbsent(key, () => StoreGroup(key, p.sellerId, p.sellerName));
+    g.indices.add(i);
+    g.lines.add(lines[i]);
+  }
+  return groups.values.toList();
+}
+
 /// Device-local shopping state: the cart, recently viewed items and the chosen
 /// delivery address. Everything that belongs to the ACCOUNT (wishlist,
 /// addresses, orders, wallet) lives in [RealtimeStore], pushed by the server.

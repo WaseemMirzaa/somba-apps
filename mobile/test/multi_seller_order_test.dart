@@ -284,18 +284,18 @@ void main() {
     group('cart, checkout and list ($lang)', () {
       setUp(() => Strings.setLang(lang, persist: false));
 
-      testWidgets('cart shows "Sold by" under each line and keeps lines from several sellers', (tester) async {
+      testWidgets('cart groups the lines under a header per store and keeps lines from several sellers', (tester) async {
         final shop = ShopState.instance;
         shop.addToCart(productByUuid('p1')!);
         shop.addToCart(productByUuid('p2')!);
         expect(shop.cart, hasLength(2), reason: 'adding from another seller never clears the cart');
         await show(tester, CartScreen(locale: Locale(lang)), lang);
-        expect(find.text(s.soldBy('Boutique Kin')), findsOneWidget);
-        expect(find.text(s.soldBy('Mama Tech')), findsOneWidget);
+        expect(find.descendant(of: find.byKey(const ValueKey('cart-store-s1')), matching: find.text('Boutique Kin')), findsOneWidget);
+        expect(find.descendant(of: find.byKey(const ValueKey('cart-store-s2')), matching: find.text('Mama Tech')), findsOneWidget);
         expect(overflows, isEmpty);
       });
 
-      testWidgets('checkout shows "Sold by" and the one-delivery note for 2+ sellers', (tester) async {
+      testWidgets('checkout shows a block per store and the one-delivery note for 2+ sellers', (tester) async {
         final shop = ShopState.instance;
         shop.addToCart(productByUuid('p1')!);
         shop.addToCart(productByUuid('p2')!);
@@ -303,8 +303,10 @@ void main() {
         await show(tester, CheckoutScreen(locale: Locale(lang)), lang);
         await tester.drag(find.byType(ListView), const Offset(0, -3000));
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.text(s.soldBy('Boutique Kin')), findsOneWidget);
-        expect(find.text(s.soldBy('Mama Tech')), findsNWidgets(2));
+        expect(find.descendant(of: find.byKey(const ValueKey('checkout-store-s1')), matching: find.text('Boutique Kin')), findsOneWidget);
+        expect(find.descendant(of: find.byKey(const ValueKey('checkout-store-s2')), matching: find.text('Mama Tech')), findsOneWidget);
+        // Mama Tech has two lines, Boutique Kin one.
+        expect(find.descendant(of: find.byKey(const ValueKey('checkout-store-s2')), matching: find.textContaining(lang == 'fr' ? 'Article p' : 'Item p')), findsNWidgets(2));
         expect(find.text(s.checkoutOneDelivery(2)), findsOneWidget);
         expect(overflows, isEmpty);
       });
@@ -317,7 +319,7 @@ void main() {
         await tester.drag(find.byType(ListView), const Offset(0, -3000));
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.byKey(const ValueKey('checkout-sellers-note')), findsNothing);
-        expect(find.text(s.soldBy('Mama Tech')), findsNWidgets(2));
+        expect(find.descendant(of: find.byKey(const ValueKey('checkout-store-s2')), matching: find.textContaining(lang == 'fr' ? 'Article p' : 'Item p')), findsNWidgets(2));
       });
 
       testWidgets('the order list hints at cancelled items only on orders that are not cancelled', (tester) async {
