@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 
+import 'compliance_messages.dart' show translateComplianceError;
 import 'strings.dart';
 
 /// Server errors reach the app in English. The common ones are shown in the
@@ -9,6 +10,8 @@ String translateServerError(String raw, Strings s) {
   final text = raw.trim();
   final exact = _exactFr[text];
   if (exact != null) return exact;
+  final compliance = translateComplianceError(text);
+  if (compliance != null) return compliance;
   for (final p in _patternsFr) {
     final m = p.$1.firstMatch(text);
     if (m != null) return p.$2(m);

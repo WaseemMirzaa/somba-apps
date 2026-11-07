@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../l10n/strings.dart';
 import 'auth_service.dart';
+import 'compliance_store.dart';
 import 'cod_visibility.dart' show parseCodEnabled;
 import 'location_reporter.dart';
 import 'models.dart';
@@ -171,6 +172,7 @@ class RiderStore extends ChangeNotifier {
     _runsOnRoad.clear();
     notifications.clear();
     SupportStore.instance.clear();
+    ComplianceStore.instance.clear();
     stats = const WorkStatsDto();
     cash = const CashDto();
     requireDeliveryCode = false;
@@ -264,6 +266,7 @@ class RiderStore extends ChangeNotifier {
       status = ConnStatus.connected;
       notifyListeners();
       unawaited(refresh());
+      unawaited(ComplianceStore.instance.load()); // the documents reminder on the profile row
       // Push: asks for the permission and registers this device (no-op without Firebase).
       unawaited(PushService.instance.start(
         register: registerDevice,
@@ -316,6 +319,9 @@ class RiderStore extends ChangeNotifier {
     // An administrator changed a public setting (COD on or off, the delivery code): the screens follow at once.
     _socket.on('settings:updated', applySettingsPush);
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
+    // The warehouse edited the vehicle, or approved or rejected a document (docs/contracts/rider-compliance.md).
+    _socket.on('rider:vehicle:updated', (d) => ComplianceStore.instance.applyVehiclePush(d));
+    _socket.on('rider:document:updated', (d) => ComplianceStore.instance.applyDocumentPush(d));
     // The rider's own account changed (here, or on another phone or the web portal).
     _socket.on('me:updated', _applyAccount);
     _socket.on('notification:new', (d) {
