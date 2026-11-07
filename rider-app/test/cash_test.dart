@@ -16,6 +16,7 @@ import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
 import 'task_fixtures.dart';
+import 'proof_helpers.dart';
 
 const _cashAnswer = {
   'collectedUsd': 70,
@@ -152,6 +153,7 @@ void main() {
       expect(tester(t).controller.text, '20.00');
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered', 'cashUsd': 20.0});
       expect(find.text(Strings('en').doneDelivered), findsOneWidget);
     });
@@ -161,6 +163,7 @@ void main() {
       await t.enterText(find.byKey(const ValueKey('cash-amount-field')), '18,50');
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')]!['cashUsd'], 18.5);
     });
 
@@ -170,6 +173,7 @@ void main() {
       await t.enterText(find.byKey(const ValueKey('cash-amount-field')), '18.50');
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(find.textContaining('is not the amount to collect (\$20.00)'), findsOneWidget);
     });
 
@@ -196,6 +200,7 @@ void main() {
       await open(t);
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       await t.enterText(find.byKey(const ValueKey('delivery-code-field')), '4321');
       await t.tap(find.byKey(const ValueKey('delivery-code-submit')));
       await t.pumpAndSettle();
@@ -205,6 +210,7 @@ void main() {
     testWidgets('a delivery that is already paid asks for no cash and sends none', (t) async {
       await open(t, cod: 0);
       expect(find.byKey(const ValueKey('cash-amount-field')), findsNothing);
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered'});
     });
   });

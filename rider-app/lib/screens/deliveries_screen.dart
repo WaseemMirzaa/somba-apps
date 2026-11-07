@@ -11,7 +11,9 @@ import '../services/navigation_link.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
+import '../services/delivery_proof.dart';
 import '../widgets/ui.dart';
+import 'delivery_proof_sheet.dart';
 import 'location_access_screen.dart';
 import 'task_route_screen.dart';
 
@@ -190,6 +192,17 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         if (cashUsd == null || !mounted) return;
       }
       if (t.collectOld && !await _confirm(s.collectOldTitle, s.collectOldBody(t.customerName ?? s.theCustomer))) return;
+      // Optional proof at the door: a photo and the customer's signature, saved on the server before the leg is completed.
+      // The code and the cash below are checked exactly as before; the sheet only adds the proof.
+      if (t.takesProof && mounted) {
+        final go = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (ctx) => DeliveryProofSheet(taskId: t.id),
+        );
+        if (go != true || !mounted) return;
+      }
       // The customer's code is asked on the customer delivery only (never on a hub-bound leg, a return or a replacement).
       if (t.needsCode && store.requireDeliveryCode) return _askCode(t, cashUsd: cashUsd);
       try {

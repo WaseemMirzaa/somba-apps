@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { DeliveryProofCard } from "@/components/warehouse/delivery-proof-card";
 import { ExceptionForm } from "@/components/warehouse/exception-form";
 import { LegActions } from "@/components/warehouse/leg-actions";
 import { LegBadges, LegRoute } from "@/components/warehouse/leg-card";
@@ -192,6 +193,8 @@ export default function WarehouseLegDetailPage() {
             </div>
           )}
         </DetailGridSection>
+
+        <DeliveryProofCard task={task} />
 
         <DetailGridSection title={fr ? "Chronologie" : "Timeline"}>
           <ActivityTimeline

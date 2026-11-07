@@ -15,6 +15,7 @@ import 'package:somba_rider/services/rider_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
 import 'task_fixtures.dart';
+import 'proof_helpers.dart';
 
 const _cash = {
   'collectedUsd': 70,
@@ -214,6 +215,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('next-d')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('cash-amount-field')), findsNothing);
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered'});
     });
 
@@ -226,6 +228,7 @@ void main() {
       expect(find.byKey(const ValueKey('cash-amount-field')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered', 'cashUsd': 20.0});
     });
 

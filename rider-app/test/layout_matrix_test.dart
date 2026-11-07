@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/deliveries_screen.dart';
+import 'package:somba_rider/screens/delivery_proof_sheet.dart';
+import 'package:somba_rider/services/auth_service.dart' show ApiException;
 import 'package:somba_rider/screens/work_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/profile_screen.dart';
@@ -23,6 +25,7 @@ import 'package:somba_rider/services/support_store.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
 import 'layout_checks.dart';
+import 'proof_fakes.dart';
 import 'task_fixtures.dart';
 
 /// What a screen is shown with.
@@ -178,6 +181,13 @@ void main() {
     'sign in': ((l) => const RiderLoginScreen(), null, _Scenario.cards),
     'forgot password': ((l) => const ForgotPasswordScreen(), null, _Scenario.cards),
     'failure sheet': ((l) => const Scaffold(body: SingleChildScrollView(child: FailReasonSheet())), null, _Scenario.cards),
+    'proof of delivery sheet': ((l) => Scaffold(body: SingleChildScrollView(child: DeliveryProofSheet(taskId: 'd', camera: FakeProofCamera(), uploader: FakeProofUploader()))), null, _Scenario.cards),
+    'proof of delivery sheet: photo taken, save failed': ((l) => Scaffold(body: SingleChildScrollView(child: DeliveryProofSheet(taskId: 'd', camera: FakeProofCamera(), uploader: FakeProofUploader(error: ApiException.local('err_offline'))))), (t) async {
+          await t.tap(find.byKey(const ValueKey('proof-photo')));
+          await t.pump(const Duration(milliseconds: 300));
+          await t.tap(find.byKey(const ValueKey('proof-continue')));
+          await t.pump(const Duration(milliseconds: 300));
+        }, _Scenario.cards),
     'delivery code dialog': ((l) => Scaffold(body: Center(child: DeliveryCodeDialog(onSubmit: (_) async {}))), null, _Scenario.cards),
     'support: ticket list': ((l) => const SupportScreen(), null, _Scenario.cards),
     'support: no ticket yet': ((l) => const SupportScreen(), (t) async {
