@@ -353,6 +353,18 @@ const EXACT: Record<string, string> = {
   "A rider must collect this parcel before it can be scanned in.": "Un livreur doit d'abord récupérer ce colis avant qu'il puisse être scanné.",
   "A replacement or an exchange is required.": "Un remplacement ou un échange est requis.",
 
+  // ── rider vehicle and compliance documents (docs/contracts/rider-compliance.md) ──
+  "Only supervisors and managers can see or change rider documents.": "Seuls les superviseurs et les responsables peuvent voir ou modifier les documents des livreurs.",
+  "Document not found.": "Document introuvable.",
+  "Decision must be approve or reject.": "La décision doit être « approuver » ou « refuser ».",
+  "Give a reason of 3-300 characters.": "Indiquez un motif de 3 à 300 caractères.",
+  "This document is already approved.": "Ce document est déjà approuvé.",
+  "Upload the file first, then send it with its file id.": "Téléversez d'abord le fichier, puis envoyez-le avec son identifiant.",
+  "Upload the file again and retry.": "Téléversez à nouveau le fichier puis réessayez.",
+  "Only JPEG, PNG or PDF files are accepted.": "Seuls les fichiers JPEG, PNG ou PDF sont acceptés.",
+  "This file was already sent. Upload a new one.": "Ce fichier a déjà été envoyé. Téléversez-en un nouveau.",
+  "You have reached the limit of documents. Ask your warehouse to review the ones you sent.": "Vous avez atteint la limite de documents. Demandez à votre entrepôt de traiter ceux déjà envoyés.",
+
   // ── misc existing ──
   "Not enough stock": "Stock insuffisant",
   "Order not found": "Commande introuvable",
@@ -379,11 +391,19 @@ const AREA_FIELDS_FR: Record<string, string> = {
   Address: "L'adresse",
   Capacity: "La capacité",
   Case: "Le dossier",
+  Model: "Le modèle",
+  Plate: "La plaque",
+  Colour: "La couleur",
+  Odometer: "Le compteur",
+  "Document number": "Le numéro du document",
 };
 const AREA_LEVEL_ADD_FR: Record<string, string> = { country: "un pays", province: "une province", city: "une ville", district: "un district", commune: "une commune", quartier: "un quartier" };
 const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 
 const PATTERNS: Rule[] = [
+  // ── rider vehicle and compliance documents ──
+  [/^(Insurance valid until|Last service|Next service|Expiry date) must be a date written YYYY-MM-DD\.$/, (m) => `${{ "Insurance valid until": "La fin de l'assurance", "Last service": "Le dernier entretien", "Next service": "Le prochain entretien", "Expiry date": "La date d'expiration" }[m[1]]} : une date au format AAAA-MM-JJ.`],
+  [/^(Type|Fuel|Document type) must be one of: .+\.$/, (m) => `${{ Type: "Le type de véhicule", Fuel: "Le carburant", "Document type": "Le type de document" }[m[1]]} n'est pas valide.`],
   // ── warehouse stock ledger ──
   [/^Bin (.+) holds only (\d+) of (.+): you cannot take (\d+)\.$/, (m) => `L'emplacement ${m[1]} ne contient que ${m[2]} × ${m[3]} : vous ne pouvez pas en prendre ${m[4]}.`],
   [/^Bin (.+) holds no (.+)\.$/, (m) => `L'emplacement ${m[1]} ne contient aucun ${m[2]}.`],
