@@ -129,3 +129,15 @@ test("the cash-on-delivery sentences are French (C-cod)", () => {
   const m = "The cash you entered ($35.00) is not the amount to collect ($40.00). Collect exactly $40.00, or ask the warehouse if the amount changed.";
   assert.equal(localizeApiError(m, "en"), m);
 });
+
+test("rider vehicle and document errors map to French (docs/contracts/rider-compliance.md)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Give a reason of 3-300 characters."), "Indiquez un motif de 3 à 300 caractères.");
+  assert.equal(fr("Rider not found."), "Livreur introuvable.");
+  assert.equal(fr("Only JPEG, PNG or PDF files are accepted."), "Seuls les fichiers JPEG, PNG ou PDF sont acceptés.");
+  assert.equal(fr("Odometer must be a whole number between 0 and 5000000."), "Le compteur : un nombre entre 0 et 5000000.");
+  assert.equal(fr("Plate must be 1-20 characters."), "La plaque : 1 à 20 caractères.");
+  assert.equal(fr("Next service must be a date written YYYY-MM-DD."), "Le prochain entretien : une date au format AAAA-MM-JJ.");
+  assert.equal(fr("Fuel must be one of: petrol, diesel, electric, hybrid, none."), "Le carburant n'est pas valide.");
+  assert.equal(localizeApiError("Give a reason of 3-300 characters.", "en"), "Give a reason of 3-300 characters.");
+});

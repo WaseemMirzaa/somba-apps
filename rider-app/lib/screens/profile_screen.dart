@@ -5,8 +5,12 @@ import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/rider_store.dart';
 import '../services/support_store.dart';
+import '../l10n/compliance_strings.dart';
+import '../services/compliance_store.dart';
 import 'account_screen.dart';
+import 'documents_screen.dart';
 import 'shift_screen.dart';
+import 'vehicle_screen.dart';
 import 'support_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
@@ -97,6 +101,17 @@ class ProfileScreen extends StatelessWidget {
               _WhereIWork(assignment: store.assignment),
               const SizedBox(height: 12),
               const _SupportEntry(),
+              const SizedBox(height: 12),
+              _AccountEntry(
+                key: const ValueKey('vehicle-entry'),
+                icon: Icons.two_wheeler_rounded,
+                title: s.vehicleTitle,
+                subtitle: s.vehicleSub,
+                route: kVehicleRoute,
+                screen: const RiderVehicleScreen(),
+              ),
+              const SizedBox(height: 12),
+              const _DocumentsEntry(),
               const SizedBox(height: 18),
               Text(store.unreadCount > 0 ? s.notificationsNew(store.unreadCount) : s.notifications, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 10),
@@ -281,6 +296,47 @@ class _SupportEntry extends StatelessWidget {
           ]),
         );
       },
+    );
+  }
+}
+
+/// The way into the rider's documents, with a reminder when one has expired or expires within 30 days (a reminder only).
+class _DocumentsEntry extends StatefulWidget {
+  const _DocumentsEntry();
+  @override
+  State<_DocumentsEntry> createState() => _DocumentsEntryState();
+}
+
+class _DocumentsEntryState extends State<_DocumentsEntry> {
+  // The store is read once the socket is ready (RiderStore), so the reminder shows without this row asking for anything.
+  final _store = ComplianceStore.instance;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Strings.of(context);
+    return ListenableBuilder(
+      listenable: _store,
+      builder: (context, _) => SurfaceCard(
+        key: const ValueKey('documents-entry'),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(settings: const RouteSettings(name: kDocumentsRoute), builder: (_) => const RiderDocumentsScreen())),
+        child: Row(children: [
+          const Icon(Icons.folder_copy_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(s.docTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+              const SizedBox(height: 2),
+              Text(s.docSub, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+            ]),
+          ),
+          if (_store.hasWarnings) ...[
+            const SizedBox(width: 8),
+            Pill(s.docAttention, key: const ValueKey('documents-attention'), color: AppColors.accent, textColor: AppColors.ink),
+          ],
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+        ]),
+      ),
     );
   }
 }

@@ -20,6 +20,7 @@ import 'package:somba_rider/theme/app_theme.dart';
 
 import 'button_rules.dart';
 import 'task_fixtures.dart';
+import 'proof_helpers.dart';
 
 void main() {
   setUpAll(() async {
@@ -324,6 +325,7 @@ void main() {
       await show(t, 'en', [leg('delivery', id: 'd', status: 'in_transit')], code: true);
       await t.tap(find.byKey(const ValueKey('next-d')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(find.byKey(const ValueKey('delivery-code-field')), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('delivery-code-field')), '4321');
       await t.tap(find.byKey(const ValueKey('delivery-code-submit')));
@@ -337,6 +339,7 @@ void main() {
       await show(t, 'en', [leg('delivery', id: 'd', status: 'in_transit')]);
       await t.tap(find.byKey(const ValueKey('next-d')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(find.byKey(const ValueKey('delivery-code-field')), findsNothing);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered'});
 
@@ -349,6 +352,7 @@ void main() {
       expect(find.byKey(const ValueKey('delivery-code-field')), findsNothing);
       await t.tap(find.byKey(const ValueKey('confirm-dialog')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'rp', 'status': 'delivered'});
     });
 
@@ -361,6 +365,7 @@ void main() {
       };
       await t.tap(find.byKey(const ValueKey('next-d')));
       await t.pumpAndSettle();
+      await continueWithoutProof(t);
       expect(find.byKey(const ValueKey('delivery-code-field')), findsOneWidget);
     });
 

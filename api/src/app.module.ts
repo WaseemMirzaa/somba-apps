@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { DeliveryProofModule } from './delivery-proof/delivery-proof.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -39,6 +40,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { WarehouseStockModule } from './inventory/warehouse-stock.module';
 import { TranslationModule } from './translation/translation.module';
 import { SellerPlatformModule } from './sellers/seller-platform.module';
+import { RiderComplianceModule } from './rider-compliance/rider-compliance.module';
 
 @Module({
   imports: [
@@ -57,6 +59,7 @@ import { SellerPlatformModule } from './sellers/seller-platform.module';
     ProductsModule,
     OrdersModule,
     DeliveryModule,
+    DeliveryProofModule,
     NotificationsModule,
     WalletModule,
     PaymentsModule,
@@ -80,6 +83,7 @@ import { SellerPlatformModule } from './sellers/seller-platform.module';
     FinanceModule,
     CommerceModule,
     SellerPlatformModule,
+    RiderComplianceModule,
     AfterSaleModule,
     FollowsModule,
     RealtimeModule,

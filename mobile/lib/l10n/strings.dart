@@ -11,6 +11,7 @@ export 'strings_aftersale.dart';
 export 'strings_social.dart';
 export 'strings_engage.dart';
 export 'strings_areas.dart';
+export 'strings_cartstore.dart';
 export 'strings_r2f.dart';
 export 'strings_verify.dart';
 

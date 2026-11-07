@@ -551,6 +551,9 @@ class OrderPackage {
   final String status;
 
   const OrderPackage({required this.sellerId, required this.sellerName, required this.items, required this.status});
+
+  /// What the package's live (not cancelled) lines cost.
+  double get subtotalUsd => items.where((i) => !i.isCancelled).fold(0.0, (sum, i) => sum + i.priceUsd * i.qty);
 }
 
 /// The step of one package, given the order and its lines (mirrors the server's rule).

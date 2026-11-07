@@ -2,10 +2,12 @@
 // ignore_for_file: prefer_single_quote_strings
 
 import 'shift_messages.dart';
+import 'compliance_messages.dart' show kComplianceMessages;
 
 /// key -> (English, French). Placeholders are written {name}.
 const Map<String, (String, String)> kMessages = {
   ...kShiftMessages,
+  ...kComplianceMessages,
   'close': ('Close', 'Fermer'),
   'cancel': ('Cancel', 'Annuler'),
   'email': ('Email', 'E-mail'),
@@ -263,6 +265,21 @@ const Map<String, (String, String)> kMessages = {
   'photo_unavailable': ('Photo unavailable', 'Photo indisponible'),
   'err_photo_too_big': ('That photo is larger than 5 MB.', 'Cette photo dépasse 5 Mo.'),
   'err_photo_pick': ('Could not open your photos. Check the photo permission in the phone settings.', 'Impossible d’ouvrir vos photos. Vérifiez l’autorisation d’accès aux photos dans les réglages du téléphone.'),
+  'pod_title': ('Proof of delivery', 'Preuve de livraison'),
+  'pod_body': ('Optional: a photo of the parcel at the door and the customer’s signature.', 'Facultatif : une photo du colis à la porte et la signature du client.'),
+  'pod_photo_label': ('Photo of the parcel', 'Photo du colis'),
+  'pod_photo_alt': ('Photo of the delivered parcel', 'Photo du colis livré'),
+  'pod_retake': ('Retake', 'Reprendre'),
+  'pod_signature_label': ('Customer signature', 'Signature du client'),
+  'pod_signature_alt': ('Signature pad', 'Zone de signature'),
+  'pod_sign_here': ('Ask the customer to sign here', 'Demandez au client de signer ici'),
+  'pod_clear': ('Clear', 'Effacer'),
+  'pod_continue': ('Continue', 'Continuer'),
+  'pod_skip': ('Deliver without proof', 'Livrer sans preuve'),
+  'pod_save_failed': ('The proof was not saved.', 'La preuve n’a pas été enregistrée.'),
+  'pod_camera_denied': ('The camera is off for this app. Allow it in the phone settings, or continue without a photo.', 'L’appareil photo est désactivé pour cette application. Autorisez-le dans les réglages du téléphone, ou continuez sans photo.'),
+  'pod_camera_failed': ('Could not open the camera.', 'Impossible d’ouvrir l’appareil photo.'),
+  'pod_photo_big': ('That photo is larger than 4 MB.', 'Cette photo dépasse 4 Mo.'),
   'thread_hint': ('Write a message…', 'Écrivez un message…'),
   'thread_send': ('Send', 'Envoyer'),
   'thread_closed': ('This ticket is {status}. Open a new ticket if you still need help.', 'Ce ticket est {status}. Ouvrez-en un nouveau si vous avez encore besoin d’aide.'),

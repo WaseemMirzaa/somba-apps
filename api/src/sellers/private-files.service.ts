@@ -154,10 +154,26 @@ export class PrivateFilesService implements OnModuleInit {
     return file.ownerUserId === user.id || KYC_REVIEWERS.includes(user.role);
   }
 
+  /**
+   * A module that owns a kind of private file (rider compliance documents) says who else may read it, beyond the owner. For such
+   * a kind the store-application reviewers get NO automatic access: only the owner and what the module allows.
+   */
+  registerReader(kind: string, mayRead: (user: { id: string; role: string }, file: PrivateFile) => Promise<boolean>): void {
+    this.kindReaders.set(kind, mayRead);
+  }
+
+  private readonly kindReaders = new Map<string, (user: { id: string; role: string }, file: PrivateFile) => Promise<boolean>>();
+
+  private async mayRead(user: { id: string; role: string }, f: PrivateFile): Promise<boolean> {
+    const custom = this.kindReaders.get(f.kind);
+    if (custom) return f.ownerUserId === user.id || (await custom(user, f));
+    return this.canRead(user, f);
+  }
+
   async open(user: { id: string; role: string }, id: string): Promise<{ path: string; mime: string; name: string }> {
     const f = id && /^[0-9a-f-]{36}$/.test(id) ? await this.files.findOne({ where: { id } }) : null;
     // Same answer for "no such file" and "not yours", so ids cannot be probed.
-    if (!f || !this.canRead(user, f)) throw new NotFoundException('File not found.');
+    if (!f || !(await this.mayRead(user, f))) throw new NotFoundException('File not found.');
     const path = join(PRIVATE_UPLOAD_DIR, basename(f.storedName));
     if (!existsSync(path)) throw new NotFoundException('File not found.');
     return { path, mime: f.mime, name: f.storedName };

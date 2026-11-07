@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../util/format.dart';
 import '../util/variants.dart' show defaultVariant;
 import 'more/account_more.dart' show AddressBookScreen;
+import 'more/shop_extra.dart' show StoreScreen;
 import '../widgets/common.dart';
 import '../widgets/kit.dart';
 import '../widgets/not_served_notice.dart';
@@ -223,9 +224,10 @@ class _CartScreenState extends State<CartScreen> {
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Center(child: Text(s.cartEmpty, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600))),
           ),
-        for (var i = 0; i < shop.cart.length; i++) ...[
-          _cartLine(s, lang, i),
-          const SizedBox(height: 12),
+        // One section per store: the server packs and ships per seller, so the shopper sees it the same way.
+        for (final g in groupByStore(shop.cart)) ...[
+          _storeSection(s, lang, g),
+          const SizedBox(height: 8),
         ],
         if (shop.savedForLater.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -237,6 +239,52 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(height: 10),
           ],
         ],
+      ],
+    );
+  }
+
+  /// A store's section: its name, its lines, and what they add up to.
+  Widget _storeSection(Strings s, String lang, StoreGroup g) {
+    final name = (g.name ?? '').isEmpty ? s.storeOtherItems : g.name!;
+    final id = g.sellerId;
+    final head = Padding(
+      padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+      child: Row(children: [
+        const Icon(Icons.storefront_rounded, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        ),
+        const SizedBox(width: 8),
+        Text(s.storeItems(g.units), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        if (id != null) const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.faint),
+      ]),
+    );
+    return Column(
+      key: ValueKey('cart-store-${g.key}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        id == null
+            ? head
+            : InkWell(
+                key: ValueKey('cart-store-open-${g.key}'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StoreScreen(locale: widget.locale, sellerId: id, sellerName: g.name))),
+                child: Semantics(label: s.storeGroupOpen(name), child: head),
+              ),
+        for (final i in g.indices) ...[
+          _cartLine(s, lang, i),
+          const SizedBox(height: 12),
+        ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Flexible(child: Text(s.storeSubtotal, style: const TextStyle(color: AppColors.muted, fontSize: 13.5, fontWeight: FontWeight.w600))),
+            const SizedBox(width: 8),
+            Text(money(g.subtotal),
+                key: ValueKey('cart-store-subtotal-${g.key}'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+          ]),
+        ),
       ],
     );
   }
@@ -329,12 +377,6 @@ class _CartScreenState extends State<CartScreen> {
                         Text(item.variantText(s),
                             style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       ],
-                      if ((item.product.sellerName ?? '').isNotEmpty)
-                        Text(s.soldBy(item.product.sellerName),
-                            key: ValueKey('cart-sold-by-${item.product.id}'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -375,14 +417,14 @@ class _CartScreenState extends State<CartScreen> {
                               style: TextStyle(
                                   color: item.priceChange < 0 ? AppColors.success : AppColors.danger, fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
-                      Row(children: [
+                      // Wrap: with large text the second action drops to the next line instead of overflowing.
+                      Wrap(spacing: 14, children: [
                         TextButton(
                           key: ValueKey('save-later-${item.product.id}'),
                           style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
                           onPressed: () => _saveForLater(i),
                           child: Text(s.cartSaveLater, style: const TextStyle(fontSize: 12.5)),
                         ),
-                        const SizedBox(width: 14),
                         TextButton(
                           key: ValueKey('remove-${item.product.id}'),
                           style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact, foregroundColor: AppColors.muted),

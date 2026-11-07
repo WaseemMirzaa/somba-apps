@@ -27,6 +27,16 @@ const TITLE_TEMPLATES: Record<string, string[]> = {
  * instances and their French. Bodies that are only data (references, names, free text) need no entry.
  */
 const BODY_CASES: Record<string, [sample: string, french: string][]> = {
+  // Rider vehicle and compliance documents
+  'Your {} was approved.': [
+    ['Your driver licence was approved.', 'Votre document « permis de conduire » a été approuvé.'],
+    ['Your vehicle insurance was approved.', 'Votre document « assurance du véhicule » a été approuvé.'],
+    ['Your ID was approved.', 'Votre document « pièce d’identité » a été approuvé.'],
+  ],
+  'Your {} was rejected: {}': [
+    ['Your vehicle registration was rejected: Photo is blurry', 'Votre document « carte grise » a été refusé : Photo is blurry'],
+    ['Your document was rejected: illisible', 'Votre document « document » a été refusé : illisible'],
+  ],
   // Fraud: an alert suspended or reinstated an account
   '{} was suspended after a fraud alert.': [['Awa Diallo was suspended after a fraud alert.', 'Awa Diallo a été suspendu après une alerte de fraude.']],
   '{} was reactivated after a fraud alert.': [['Awa Diallo was reactivated after a fraud alert.', 'Awa Diallo a été réactivé après une alerte de fraude.']],
