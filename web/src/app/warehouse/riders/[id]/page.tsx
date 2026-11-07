@@ -15,6 +15,7 @@ import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useCodOffered } from "@/lib/use-cod-offered";
+import { RiderAttendanceCard } from "@/components/warehouse/rider-attendance-card";
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -84,6 +85,8 @@ export default function WarehouseRiderDetailPage() {
             ...(codOffered ? [{ label: fr ? "COD encaissé" : "COD collected", value: formatCurrency(cod, locale) }] : []),
           ]} />
         </DetailGridSection>
+
+        <RiderAttendanceCard riderId={rider.id} />
 
         <DetailGridSection title={fr ? "Lots assignés" : "Assigned Batches"}>
           <DataTable

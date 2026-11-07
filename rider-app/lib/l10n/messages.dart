@@ -1,8 +1,11 @@
 // Generated copy of the UI strings: every key has an English and a French text.
 // ignore_for_file: prefer_single_quote_strings
 
+import 'shift_messages.dart';
+
 /// key -> (English, French). Placeholders are written {name}.
 const Map<String, (String, String)> kMessages = {
+  ...kShiftMessages,
   'close': ('Close', 'Fermer'),
   'cancel': ('Cancel', 'Annuler'),
   'email': ('Email', 'E-mail'),

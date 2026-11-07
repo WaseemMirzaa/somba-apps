@@ -16,6 +16,8 @@ export { Payment } from './payment.entity';
 export type { PaymentStatus, PaymentPurpose } from './payment.entity';
 export { PaymentRefund } from './payment-refund.entity';
 export { CodHandover } from './cod-handover.entity';
+export { RiderShift } from './rider-shift.entity';
+export type { ShiftEndReason } from './rider-shift.entity';
 export { WarehouseBin } from './warehouse-bin.entity';
 export { WarehouseStock } from './warehouse-stock.entity';
 export { WarehouseLedger, LEDGER_KINDS, RECEIVE_REASONS, OUT_REASONS } from './warehouse-ledger.entity';
@@ -111,6 +113,7 @@ import { WalletTransaction } from './wallet-transaction.entity';
 import { Payment } from './payment.entity';
 import { PaymentRefund } from './payment-refund.entity';
 import { CodHandover } from './cod-handover.entity';
+import { RiderShift } from './rider-shift.entity';
 import { WarehouseBin } from './warehouse-bin.entity';
 import { WarehouseStock } from './warehouse-stock.entity';
 import { WarehouseLedger } from './warehouse-ledger.entity';
@@ -177,6 +180,7 @@ export const ENTITIES = [
   Payment,
   PaymentRefund,
   CodHandover,
+  RiderShift,
   WarehouseBin,
   WarehouseStock,
   WarehouseLedger,

@@ -22,6 +22,7 @@ import { AddressesModule } from './addresses/addresses.module';
 import { ContentModule } from './content/content.module';
 import { OpsModule } from './ops/ops.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
+import { ShiftsModule } from './shifts/shifts.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { GeoModule } from './geo/geo.module';
 import { FlowsModule } from './flows/flows.module';
@@ -66,6 +67,7 @@ import { SellerPlatformModule } from './sellers/seller-platform.module';
     ContentModule,
     OpsModule,
     WarehouseModule,
+    ShiftsModule,
     GeoModule,
     LogisticsModule,
     FlowsModule,

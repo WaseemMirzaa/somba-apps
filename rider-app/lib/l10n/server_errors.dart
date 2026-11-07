@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 
+import 'shift_messages.dart' show kShiftServerErrorsFr;
 import 'strings.dart';
 
 /// Server errors reach the app in English. The common ones are shown in the
@@ -20,6 +21,7 @@ String translateServerError(String raw, Strings s) {
 Iterable<String> get knownServerErrors => _exactFr.keys;
 
 final Map<String, String> _exactFr = {
+  ...kShiftServerErrorsFr,
   // delivery areas and warehouse coverage (docs/contracts/areas.md, "Errors": geography and coverage)
   'Choose where this warehouse is.': 'Choisissez l’emplacement de cet entrepôt.',
   'Area not found.': 'Zone introuvable.',

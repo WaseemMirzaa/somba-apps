@@ -9,6 +9,7 @@ import 'models.dart';
 import 'push_service.dart';
 import 'rider_focus.dart';
 import 'socket_service.dart';
+import 'shift_store.dart';
 import 'support_store.dart';
 
 enum ConnStatus { disconnected, connecting, connected, error }
@@ -171,6 +172,7 @@ class RiderStore extends ChangeNotifier {
     _runsOnRoad.clear();
     notifications.clear();
     SupportStore.instance.clear();
+    ShiftStore.instance.clear();
     stats = const WorkStatsDto();
     cash = const CashDto();
     requireDeliveryCode = false;
@@ -316,6 +318,8 @@ class RiderStore extends ChangeNotifier {
     // An administrator changed a public setting (COD on or off, the delivery code): the screens follow at once.
     _socket.on('settings:updated', applySettingsPush);
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
+    // The rider's shift changed (here, on another phone, or the server closed a forgotten shift).
+    _socket.on('shift:updated', ShiftStore.instance.applyPush);
     // The rider's own account changed (here, or on another phone or the web portal).
     _socket.on('me:updated', _applyAccount);
     _socket.on('notification:new', (d) {
@@ -479,6 +483,7 @@ class RiderStore extends ChangeNotifier {
         await _readSettings();
         await _readAssignment();
         unawaited(SupportStore.instance.load()); // the unread badge
+        unawaited(ShiftStore.instance.load());
       }
       loaded = true;
       status = ConnStatus.connected;
