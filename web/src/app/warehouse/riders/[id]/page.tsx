@@ -15,6 +15,7 @@ import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useCodOffered } from "@/lib/use-cod-offered";
+import { RiderComplianceSection } from "@/components/warehouse/rider-compliance";
 
 export default function WarehouseRiderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -98,6 +99,8 @@ export default function WarehouseRiderDetailPage() {
             data={batches.map((b) => ({ ...b, count: batchTaskIds(b).length })) as unknown as Record<string, unknown>[]}
           />
         </DetailGridSection>
+
+        <RiderComplianceSection riderId={rider.id} />
 
         <DetailGridSection title={fr ? "Trajets de ce livreur" : "This rider's legs"} span={3}>
           <DataTable

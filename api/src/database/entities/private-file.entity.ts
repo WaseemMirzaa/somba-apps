@@ -1,9 +1,9 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type PrivateFileKind = 'kyc';
+export type PrivateFileKind = 'kyc' | 'rider_doc';
 
 /**
- * A file that is NOT served from the public /uploads/ folder: store KYC documents. It is downloaded only through
+ * A file that is NOT served from the public /uploads/ folder: store KYC documents and rider compliance documents. It is downloaded only through
  * `GET /api/v1/private-uploads/:id` by its owner, a moderator or an admin.
  */
 @Entity('private_files')
