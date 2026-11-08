@@ -443,7 +443,7 @@ link that can only fail.
 | What | Set on the server | If missing |
 |---|---|---|
 | Phone codes by SMS | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | the verification screen says text messages are not available and offers e-mail |
-| E-mail links (verify, reset password) | `SMTP_HOST` (+ `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`) | same, for e-mail |
+| E-mail links (verify, reset password) | `SMTP_HOST` (+ `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`); see "Turning on e-mail with SendGrid" below | same, for e-mail |
 | Chat, question and review translation | `GOOGLE_TRANSLATE_API_KEY` (Cloud Translation API enabled for its project); optional `TRANSLATE_DAILY_CHAR_LIMIT` | translation links are hidden |
 | Maps in the customer and rider apps | the same Maps key in `mobile/android/local.properties` and `mobile/ios/Flutter/Secrets.xcconfig` (and the rider app's) at build time, plus `--dart-define=GOOGLE_MAPS_API_KEY` | the app offers "Use my current position" instead of the map |
 | Map on the web | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `/etc/somba/web.env`, then rebuild the web; the key's HTTP referrers must include the site's address | the address form asks for manual entry |
@@ -481,12 +481,54 @@ account sending to an unverified number), 21408 (country not enabled for this ac
 (the sender is not an SMS-capable Twilio number).
 
 Things to settle in Twilio before real customers: enable **Geo permissions** for the Democratic Republic of the Congo (and any
-other country you sell in), check the sender type the country accepts (a US number, a local number, or a registered sender name),
-and upgrade from the trial account (a trial can only text numbers you have verified in the console and adds a "trial" prefix).
-Sending costs money per message; set a spending limit in Twilio. To try it with your own phone, give the account your own number first.
+other country you sell in), check the sender type the country accepts, and upgrade from the trial account (a trial can only text
+numbers you have verified in the console and adds a "trial" prefix). Sending costs money per message; set a spending limit in
+Twilio. To try it with your own phone, give the account your own number first.
+
+**Sender for the DRC: you do not need to buy a number.** Twilio's own [guidelines for the DRC](https://www.twilio.com/guidelines/cd/sms)
+recommend an alphanumeric sender name (for example `Somba`; avoid generic names such as INFO, Verify or Notify), say that
+messages from a numeric sender are not delivered to Airtel subscribers, and say two-way SMS is not supported there (one-way codes
+do not need it). Put the name in `TWILIO_FROM`; no Messaging Service is required. Twilio's page lists no registration for sender
+names, but another source says Vodacom wants one: ask Twilio support to confirm, then send a test code to a Vodacom and an Airtel
+number before launch. Twilio's phone-number search may show no `+243` numbers at all; that is not a problem for this setup.
 
 Release builds of the customer app need the Kotlin keep rules in `mobile/android/app/proguard-rules.pro`; without them R8 removed
 classes SharedPreferences needs and sign-up ended in "Something went wrong" after the account had been created.
+
+### Turning on e-mail with SendGrid (SMTP)
+
+The API sends e-mail over SMTP (nodemailer), so SendGrid works through its SMTP relay with no code change. In the SendGrid console:
+
+1. **Sender Authentication.** Authenticate your domain (you add the DNS records SendGrid shows; best for delivery), or at minimum
+   verify a single sender address. The address you use as `MAIL_FROM` must be one of these.
+2. **API Keys, Create API Key, Restricted Access**, with only *Mail Send* turned on. Copy the key (it starts with `SG.`) at once:
+   SendGrid shows it only one time.
+
+| Variable | Value for SendGrid |
+|---|---|
+| `SMTP_HOST` | `smtp.sendgrid.net` |
+| `SMTP_PORT` | `587` (also accepted: 465, 2525, 25; the API uses TLS directly only on 465 and STARTTLS otherwise) |
+| `SMTP_USER` | the word `apikey`, exactly |
+| `SMTP_PASS` | the API key (`SG.…`) |
+| `MAIL_FROM` | the verified address, as `no-reply@yourdomain.com` or `Somba&Teka <no-reply@yourdomain.com>` |
+
+Set them on the server, as root. The same tool as for Twilio checks each value, writes both env files, reloads the API and shows only
+the last four characters of the password. It warns, without refusing, when a SendGrid host is used with a user other than `apikey`
+or a password that does not start with `SG.`:
+
+```bash
+bash /opt/somba/deploy/set-secret.sh SMTP_HOST      # hidden prompt, then the same for each of the other four
+bash /opt/somba/deploy/set-secret.sh SMTP_PORT
+bash /opt/somba/deploy/set-secret.sh SMTP_USER
+bash /opt/somba/deploy/set-secret.sh SMTP_PASS
+bash /opt/somba/deploy/set-secret.sh MAIL_FROM
+```
+
+Values are stored unquoted, so the tool refuses a password with spaces, quotes, a backslash, `$`, a backtick or `#`, and a
+`MAIL_FROM` containing `#` or quotes. Then check: `settings:get` reports `emailVerification: on`, and a sign-up e-mail arrives. A
+failed send shows in `pm2 logs somba-api`; the usual causes are a sender address that is not verified in SendGrid and a key without
+the Mail Send permission. Share the API key through a password manager, never in chat or a ticket. The tool's checks can be tried on
+temp files, touching nothing real, with `bash deploy/tests/set-secret-smtp.test.sh`.
 
 ## Mobile money, payouts and delivery zones (production)
 
