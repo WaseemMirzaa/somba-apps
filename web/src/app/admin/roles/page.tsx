@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { SecretBox } from "@/components/admin/copy-box";
+import { StaffAccountActions } from "@/components/admin/staff-account-actions";
 import { NoticeBar } from "@/components/admin/notice-bar";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { ErrorNote, Modal } from "@/components/admin/modal";
@@ -63,7 +64,7 @@ export default function AdminRolesPage() {
   const fr = locale === "fr";
   const isSuper = role === "admin";
   const [defs, setDefs] = useState<RoleDef[]>([]);
-  const { items: staff, reload, error: staffError, loading } = useServerList<StaffRow>("roles:staff", { enabled: isSuper });
+  const { items: staff, setItems: setStaff, reload, error: staffError, loading } = useServerList<StaffRow>("roles:staff", { enabled: isSuper });
   const [form, setForm] = useState({ name: "", email: "", phone: "", role: "admin_support", hubId: "", tier: "operator" as WarehouseTier });
   const [hubError, setHubError] = useState<string | null>(null);
   const [promoting, setPromoting] = useState<{ user: StaffRow; role: "rider" | "warehouse_staff" } | null>(null);
@@ -324,6 +325,15 @@ export default function AdminRolesPage() {
                   </div>
                 );
               },
+            },
+            {
+              key: "account",
+              label: fr ? "Compte" : "Account",
+              render: (row) => (
+                <div className="flex flex-wrap items-center gap-2">
+                  <StaffAccountActions person={row as unknown as StaffRow} selfId={rt.user?.id} onEmailChanged={(id, email) => setStaff((cur) => cur.map((x) => (x.id === id ? { ...x, email } : x)))} />
+                </div>
+              ),
             },
             {
               key: "hubId",

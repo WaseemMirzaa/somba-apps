@@ -109,7 +109,7 @@ class HttpProofUploader implements ProofUploader {
     } catch (_) {/* not JSON */}
     final m = json['message'];
     final text = m is List ? m.join('\n') : m?.toString();
-    throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode);
+    throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode, json['code'] is String ? json['code'] as String : null);
   }
 }
 

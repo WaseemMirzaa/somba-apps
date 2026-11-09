@@ -86,6 +86,12 @@ extension StringsKeys on Strings {
   String get errSamePassword => t('err_same_password');
   String get passwordOtherPhones => t('password_other_phones');
   String get passwordChanged => t('password_changed');
+  String get forcedPasswordTitle => t('forced_password_title');
+  String get forcedPasswordBody => t('forced_password_body');
+  String get temporaryPassword => t('temporary_password');
+  String get errTemporaryPassword => t('err_temporary_password');
+  String get errSameAsTemporary => t('err_same_as_temporary');
+  String get forcedPasswordSave => t('forced_password_save');
   String get historySearchHint => t('history_search_hint');
   String get historyAnyDate => t('history_any_date');
   String get historyClear => t('history_clear');

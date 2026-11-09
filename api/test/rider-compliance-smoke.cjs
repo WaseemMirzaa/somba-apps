@@ -4,6 +4,7 @@
  *   API_URL=http://localhost:3001 ADMIN_EMAIL=... ADMIN_PASSWORD=... node test/rider-compliance-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@somba.app';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Somba@2026';
@@ -60,6 +61,7 @@ const uploadPrivate = async (token, buf, type = 'image/png', name = 'scan.png') 
 const day = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
 
 (async () => {
+  await settlePassword(API, ADMIN_EMAIL, ADMIN_PASSWORD, { keep: true }); // a bootstrap admin starts on a password that must be changed
   const admin = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const hub = async (name) => (await req(admin.sock, 'warehouse:saveHub', { name: `${name} ${tag}`, city: 'Kinshasa', country: 'CD', address: '1 Test Road', capacity: 100, lat: -4.3, lng: 15.3 })).data;
   const [h1, h2] = [await hub('Compliance A'), await hub('Compliance B')];
@@ -67,7 +69,8 @@ const day = (offset) => new Date(Date.now() + offset * 86400000).toISOString().s
   const staff = async (role, hubId, tier, label) => {
     const c = await req(admin.sock, 'roles:createStaff', { email: `${label}${tag}@smoke.test`, name: `${label} ${tag}`, role, hubId, warehouseTier: tier });
     if (!c.ok) throw new Error(`createStaff ${label}: ${c.error}`);
-    return { id: c.data.id, ...(await login(c.data.email, c.data.tempPassword)) };
+    // A created account must change its temporary password before it can do anything (audit AD-02).
+    return { id: c.data.id, ...(await login(c.data.email, await settlePassword(API, c.data.email, c.data.tempPassword))) };
   };
   const r1 = await staff('rider', h1.id, undefined, 'riderone');
   const r2 = await staff('rider', h2.id, undefined, 'ridertwo');

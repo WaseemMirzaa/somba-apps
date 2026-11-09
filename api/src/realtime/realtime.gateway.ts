@@ -75,6 +75,8 @@ interface SocketUser {
   id: string;
   role: string;
   name: string;
+  /** The account still has an admin-made temporary password: every event but the password change is refused (auth/password-change.ts). */
+  mustChangePassword?: boolean;
 }
 
 type AuthedSocket = Socket & { data: { user?: SocketUser } };
@@ -295,12 +297,12 @@ export class RealtimeGateway
         id: user.id,
         role: user.role,
         name: user.name,
+        ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
       };
       client.data.user = socketUser;
       await client.join(RealtimeEmitter.userRoom(user.id));
-      await client.join(RealtimeEmitter.roleRoom(user.role));
-      // Warehouse staff follow the tasks of their own warehouse (`task:updated` goes to this room).
-      if (user.role === 'warehouse_staff' && user.hubId) await client.join(RealtimeEmitter.hubRoom(user.hubId));
+      // Held at the password change: no role or warehouse rooms, so the live feeds of the role stay closed until it is done.
+      if (!user.mustChangePassword) await this.joinSharedRooms(client, socketUser, user.hubId);
       // The socket lives only as long as its access token (audit A-02): see `watchExpiry` and `auth:reauth`.
       this.watchExpiry(client, payload.exp);
       client.use((packet, next) => {
@@ -317,6 +319,12 @@ export class RealtimeGateway
       client.emit('unauthorized', { message: 'Invalid or missing token.' });
       client.disconnect(true);
     }
+  }
+
+  /** The rooms a signed-in account shares with its role: the role room and, for warehouse staff, their warehouse's tasks (`task:updated`). */
+  private async joinSharedRooms(client: AuthedSocket, user: SocketUser, hubId: string | null | undefined): Promise<void> {
+    await client.join(RealtimeEmitter.roleRoom(user.role));
+    if (user.role === 'warehouse_staff' && hubId) await client.join(RealtimeEmitter.hubRoom(hubId));
   }
 
   handleDisconnect(client: AuthedSocket): void {
@@ -2025,6 +2033,45 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * `roles:resetPassword { userId }`: the super admin issues a NEW temporary password for a staff member, rider or department
+   * admin who lost theirs. Only the super admin (same as creating staff: operations admins cannot take over a login), never
+   * for oneself. The password is made on the server, comes back in this reply ONCE and is never logged or audited; the
+   * account must change it at the next sign-in and every session and socket of the person ends now.
+   */
+  @SubscribeMessage('roles:resetPassword')
+  async rolesResetPassword(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { userId?: string }) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin') return fail('Super admin only.');
+      const id = String(body?.userId ?? '');
+      if (id === user.id) return fail('You cannot reset your own password here. Change it under Account.');
+      const out = await this.roles.reissuePassword(id);
+      await this.auth.revokeSessions(id); // refresh tokens and new connections stop working
+      this.kick(id); // and every open socket goes now
+      await this.audit.record({ actor: user.name, role: user.role, action: 'staff.password_reissued', entity: 'user', entityId: id, detail: `${out.role} ${out.email}` });
+      return ok(out);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** `roles:updateStaff { userId, email }`: the super admin corrects the e-mail of a staff member or rider (never a customer or seller, never their own). */
+  @SubscribeMessage('roles:updateStaff')
+  async rolesUpdateStaff(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { userId?: string; email?: string }) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'admin') return fail('Super admin only.');
+      const id = String(body?.userId ?? '');
+      if (id === user.id) return fail('You cannot change your own e-mail here.');
+      const out = await this.roles.updateStaffEmail(id, str(body?.email, 'Email', { max: 200 }));
+      await this.audit.record({ actor: user.name, role: user.role, action: 'staff.email_changed', entity: 'user', entityId: id, detail: `${out.role} ${out.previousEmail} -> ${out.email}`.slice(0, 500) });
+      return ok({ id: out.id, email: out.email, role: out.role });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   // ---- Warehouse (staff/admin) -------------------------------------------
   @SubscribeMessage('warehouse:hubs')
   async whHubs(
@@ -2522,7 +2569,11 @@ export class RealtimeGateway
     }
   }
 
-  /** Returns FRESH tokens: other devices are signed out, this one continues. */
+  /**
+   * Returns FRESH tokens: other devices are signed out, this one continues. For an account that still had its temporary
+   * password (`mustChangePassword`) this is the one call that is open: it lifts the hold on this socket and the socket
+   * only now joins the role's rooms.
+   */
   @SubscribeMessage('me:changePassword')
   async meChangePassword(
     @ConnectedSocket() client: AuthedSocket,
@@ -2531,7 +2582,13 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       // Every other device of the account is signed out now (refresh tokens revoked, sockets closed); this one keeps going.
-      return ok(await this.auth.changePassword(user.id, body?.current, body?.next, client.id));
+      const out = await this.auth.changePassword(user.id, body?.current, body?.next, client.id);
+      if (user.mustChangePassword) {
+        client.data.user = { id: user.id, role: user.role, name: user.name };
+        await this.joinSharedRooms(client, user, (await this.users.findById(user.id))?.hubId);
+        await this.audit.record({ actor: user.name, role: user.role, action: 'password.changed_first', entity: 'user', entityId: user.id, detail: 'temporary password replaced' });
+      }
+      return ok(out);
     } catch (e) {
       return fail((e as Error).message);
     }

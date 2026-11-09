@@ -3,8 +3,8 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { DeliveryTask, Hub, User } from '../database/entities';
+import { In, IsNull, Repository } from 'typeorm';
+import { DeliveryTask, Hub, User, VerificationToken } from '../database/entities';
 import { WAREHOUSE_TIERS, WarehouseTier, tierOf } from '../logistics/tiers';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -33,6 +33,21 @@ export const ROLE_DEFS: RoleDef[] = [
   { key: 'rider', label: 'Rider', scope: 'Deliveries, GPS, work stats', scopeFr: 'Livraisons, GPS, statistiques' },
 ];
 
+/** Accounts an administrator manages here: every role except the ones people sign up for themselves. */
+const MANAGED_ROLES: readonly UserRole[] = ['admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'];
+
+/** A fresh temporary password: 12 random characters from the URL-safe alphabet. Never logged, never stored in clear. */
+const newTempPassword = () => randomBytes(9).toString('base64url');
+
+/** What `roles:resetPassword` answers; `tempPassword` is shown to the admin this once. */
+export interface ReissuedPassword {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  tempPassword: string;
+}
+
 @Injectable()
 export class RolesService {
   constructor(
@@ -41,6 +56,7 @@ export class RolesService {
     private readonly emitter: RealtimeEmitter,
     @InjectRepository(Hub) private readonly hubs: Repository<Hub>,
     @InjectRepository(DeliveryTask) private readonly tasks?: Repository<DeliveryTask>,
+    @InjectRepository(VerificationToken) private readonly tokens?: Repository<VerificationToken>,
   ) {}
 
   /**
@@ -85,6 +101,8 @@ export class RolesService {
         hubId: u.hubId ?? null,
         warehouseTier: u.role === 'warehouse_staff' ? tierOf(u.warehouseTier) : null,
         twofaEnabled: !!u.twofaEnabled,
+        /** Still on the temporary password an administrator made (has not chosen their own yet). */
+        mustChangePassword: !!u.mustChangePassword,
       }));
   }
 
@@ -146,7 +164,8 @@ export class RolesService {
 
   /**
    * A super admin creates a staff / rider account. The generated password is
-   * returned ONCE; the person should change it after the first sign-in.
+   * returned ONCE and is a temporary one: the account is flagged `mustChangePassword`, so the person can do nothing
+   * but change it at their first sign-in (see auth/password-change.ts).
    */
   async createStaff(data: { email: string; name: string; role: UserRole; phone?: string | null; hubId?: string | null; warehouseTier?: string | null }): Promise<{ id: string; email: string; role: UserRole; tempPassword: string; hubId: string | null; warehouseTier: WarehouseTier | null }> {
     if (await this.usersSvc.findByEmail(data.email)) throw new Error('An account with this email already exists.');
@@ -163,7 +182,7 @@ export class RolesService {
         tier = (data.warehouseTier as WarehouseTier | null | undefined) ?? 'operator';
       }
     }
-    const tempPassword = randomBytes(9).toString('base64url');
+    const tempPassword = newTempPassword();
     const user = await this.usersSvc.create({
       email: data.email,
       passwordHash: await bcrypt.hash(tempPassword, 12),
@@ -172,10 +191,64 @@ export class RolesService {
       phone: data.phone ?? null,
     });
     user.emailVerified = true;
+    user.mustChangePassword = true;
     user.hubId = hubId;
     user.warehouseTier = tier;
     await this.usersSvc.save(user);
     this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id: user.id, role: user.role, hubId, warehouseTier: tier });
     return { id: user.id, email: data.email, role: user.role, tempPassword, hubId, warehouseTier: tier };
+  }
+
+  /**
+   * The account behind a staff action: must exist and be one an administrator manages here. Customers and sellers are
+   * never touched (their password and e-mail are theirs).
+   */
+  private async managedAccount(id: string): Promise<User> {
+    const target = id ? await this.users.findOne({ where: { id } }) : null;
+    if (!target) throw new Error('Account not found.');
+    if (!MANAGED_ROLES.includes(target.role)) throw new Error('Only staff, riders and administrators are managed here. Customers and sellers manage their own account.');
+    return target;
+  }
+
+  /** Links in an e-mail sent before the change (password reset, verification) must not outlive it. */
+  private async burnPendingLinks(userId: string): Promise<void> {
+    await this.tokens?.update({ userId, usedAt: IsNull() }, { usedAt: new Date() });
+  }
+
+  /**
+   * Issue a NEW temporary password for a staff member, rider or department admin who lost theirs. The password is generated
+   * here, returned once to the caller and nowhere else (not logged, not audited, only its hash is stored). The account
+   * is flagged `mustChangePassword` again and its sessions end (`tokenVersion`); the caller drops the open sockets.
+   * Two-factor authentication stays as it was: the new password alone does not sign anyone in past a second factor.
+   */
+  async reissuePassword(id: string): Promise<ReissuedPassword> {
+    const target = await this.managedAccount(id);
+    const tempPassword = newTempPassword();
+    await this.users.update({ id }, { passwordHash: await bcrypt.hash(tempPassword, 12), mustChangePassword: true, tokenVersion: (target.tokenVersion ?? 0) + 1 });
+    await this.burnPendingLinks(id);
+    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role: target.role, mustChangePassword: true }); // the staff lists show "temporary password" again
+    return { id, email: target.email, name: target.name, role: target.role, tempPassword };
+  }
+
+  /**
+   * Correct the e-mail of a staff member, rider or administrator: trimmed and lower-cased like at creation, unique across
+   * all accounts, and valid. The new address counts as not verified yet, and any link sent to the old one stops working.
+   */
+  async updateStaffEmail(id: string, rawEmail: string): Promise<{ id: string; email: string; previousEmail: string; role: UserRole }> {
+    const target = await this.managedAccount(id);
+    const email = String(rawEmail ?? '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) throw new Error('Enter a valid email.');
+    const emailHash = UsersService.emailHash(email);
+    const clash = await this.users.findOne({ where: { emailHash } });
+    if (clash && clash.id !== id) throw new Error('An account with this email already exists.');
+    const previousEmail = target.email;
+    if (clash) return { id, email, previousEmail, role: target.role }; // same address: nothing to change
+    target.email = email;
+    target.emailHash = emailHash;
+    target.emailVerified = false;
+    await this.users.save(target);
+    await this.burnPendingLinks(id);
+    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role: target.role });
+    return { id, email, previousEmail, role: target.role };
   }
 }

@@ -27,12 +27,16 @@ export interface BackendUser {
   /** Warehouse staff only: operator scans, supervisor also assigns riders, manager also runs the hub. */
   warehouseTier?: "operator" | "supervisor" | "manager" | null;
   twofaEnabled?: boolean;
+  /** Still on the temporary password an administrator made: the server refuses everything but changing it. */
+  mustChangePassword?: boolean;
 }
 
 export interface AuthResult {
   user: BackendUser;
   accessToken: string;
   refreshToken: string;
+  /** Same as `user.mustChangePassword`: show the "change your password" screen at once. */
+  mustChangePassword?: boolean;
 }
 
 export type OrderStatus =

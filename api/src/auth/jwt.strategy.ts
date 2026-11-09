@@ -35,6 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || (payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) throw new UnauthorizedException('Session has been revoked.');
     assertActiveAccount(user);
     // The role as it is now (a role change also revokes the token, so this only matters for a race).
-    return { id: user.id, role: user.role, email: user.email };
+    // Still on a temporary password: read from the account itself, so the hold lifts the moment it is changed.
+    return { id: user.id, role: user.role, email: user.email, ...(user.mustChangePassword ? { mustChangePassword: true } : {}) };
   }
 }

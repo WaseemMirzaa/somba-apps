@@ -9,6 +9,7 @@
 const { io } = require('socket.io-client');
 const { kyc } = require('./kyc.cjs');
 const { hubId, tasksOf, receiveAtHub } = require('./journey.cjs');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -51,7 +52,7 @@ const staffLogin = async (admin, email, envPw, role) => {
   const r = await req(admin.sock, 'roles:createStaff', { email: fresh, name: `Smoke ${role}`, role, hubId: await hubId(admin) });
   if (!r.ok) throw new Error(`could not sign in ${email} nor create a ${role}: ${r.error}`);
   console.log(`  (${email} not usable here: using a fresh ${role} ${fresh})`);
-  return login(fresh, r.data.tempPassword);
+  return login(fresh, await settlePassword(API, fresh, r.data.tempPassword)); // a created account must change its temporary password first
 };
 const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 

@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/landing/brand-mark";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
+import { PasswordChangeGate } from "@/components/layout/password-change-gate";
 import { PortalGuard } from "@/components/layout/portal-guard";
 import { useOpsTickets } from "@/lib/ops-support";
 import { NotificationBell } from "@/components/layout/notification-bell";
@@ -37,6 +38,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
 
   return (
     <PortalGuard>
+    <PasswordChangeGate>
     <div className="min-h-screen bg-[var(--background)]">
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-4">
@@ -83,6 +85,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
         </div>
       </nav>
     </div>
+    </PasswordChangeGate>
     </PortalGuard>
   );
 }

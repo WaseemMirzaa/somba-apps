@@ -28,6 +28,7 @@ import {
   Headphones,
   Warehouse,
   Truck,
+  UserRound,
 } from "lucide-react";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import { withoutCodWhenOff } from "@/lib/cod-visibility";
@@ -69,6 +70,8 @@ const WAREHOUSE_ROUTES: WarehouseNavItem[] = [
   { href: "/warehouse/inventory", label: "inventory", icon: Boxes, tier: T.operator, nav: true },
   { href: "/warehouse/notifications", label: "notifications", icon: Bell, tier: T.operator, nav: true },
   { href: "/warehouse/support", label: "support", icon: Headphones, tier: T.operator, nav: true },
+  // Everyone's own account (password): open to every tier.
+  { href: "/warehouse/account", label: "myAccount", icon: UserRound, tier: T.operator, nav: true },
   // Retired pages that only redirect to the desk: reachable by everyone so old links keep working.
   { href: "/warehouse/inbound", label: "inbound", icon: Inbox, tier: T.operator, nav: false },
   { href: "/warehouse/receiving", label: "receiving", icon: ClipboardCheck, tier: T.operator, nav: false },

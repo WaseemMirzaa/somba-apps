@@ -51,9 +51,11 @@ async function run() {
         passwordHash: await bcrypt.hash(password, 12),
         name: process.env.ADMIN_NAME?.trim() || 'Administrator',
         role: 'admin',
+        // ADMIN_PASSWORD sits in a deploy file or CI secret: the first admin must pick their own at the first sign-in.
+        mustChangePassword: true,
       }),
     );
-    console.log(`✓ created super-admin ${email}`);
+    console.log(`✓ created super-admin ${email} (must change the password at the first sign-in)`);
   }
 
   // 2) Categories (only if the table is empty).

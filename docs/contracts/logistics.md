@@ -95,7 +95,21 @@ Changing a hub's position or active flag recomputes every pinned seller's `origi
   `roles:setHub {userId, hubId}` — `hubId: null` is refused; `preferredZones` is gone.
   `roles:setRole {id, role, hubId?}` — turning someone into a rider / staff needs a `hubId` (given or already set).
   `roles:staff` rows: `{id,name,email,phone,role,active,hubId,warehouseTier}` (no `preferredZones`).
-- `me:get` / `ready.user` (public user): `hubId`, `warehouseTier` (null unless `warehouse_staff`); `preferredZones` removed.
+- **Temporary passwords (forced change).** `roles:createStaff` makes a random password, returned once, and flags the account
+  `users.mustChangePassword`. The same flag is set by `roles:resetPassword` and by `bootstrap:prod` for the first admin.
+  Sign-in works and answers `mustChangePassword: true` (top level and on `user`), but the server then refuses every socket event
+  except `me:changePassword`, `me:get` and `devices:unregister` with `{ ok:false, error, code:'password_change_required' }`, and
+  every REST route except `GET /auth/me` and `POST /auth/logout-all` with 403 `{ code:'password_change_required' }`
+  (one guard per transport: `auth/password-change.ts`). A held socket joins only its own room, no role or warehouse rooms.
+  `me:changePassword {current, next}` needs the temporary password as `current`, the 8-character policy, and `next` different from it;
+  it clears the flag, ends every other session (token version, open sockets) and answers fresh tokens. A password reset through
+  the e-mail link clears the flag too. Existing accounts are not flagged by the migration; the demo seeds (`seed`, `seed:demo`) do not flag.
+  `roles:resetPassword {userId}` (super admin only, never oneself, staff / riders / administrators only): a NEW temporary password is
+  generated on the server and returned once as `tempPassword`; it is never logged or audited (`staff.password_reissued` holds the role and e-mail);
+  the account is flagged, its sessions and sockets end, and reset links sent earlier stop working.
+  `roles:updateStaff {userId, email}` (super admin only, never oneself, never customers or sellers): the e-mail is trimmed, lower-cased,
+  unique, marked unverified; audited as `staff.email_changed` (old -> new); links sent to the old address stop working.
+- `me:get` / `ready.user` (public user): `mustChangePassword`, `hubId`, `warehouseTier` (null unless `warehouse_staff`); `preferredZones` removed.
 - **Tiers** (enforced on the API): `operator` scans parcels in/out; `supervisor` also assigns riders; `manager` also
   manages the hub (hub settings, staff tiers). Admins can do everything. Existing staff were migrated to `manager`;
   new staff default to `operator`.

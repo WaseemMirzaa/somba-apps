@@ -6,6 +6,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 import { Server, ServerOptions, Socket } from 'socket.io';
+import { guardPasswordChange } from '../auth/password-change';
 import { StaffTwoFaPolicy, guardStaffTwoFa } from '../auth/staff-twofa';
 
 /**
@@ -47,8 +48,12 @@ export class SocketIoAdapter extends IoAdapter {
     };
     const server = super.createIOServer(port, { ...options, cors }) as Server;
     if (this.redisAdapter) server.adapter(this.redisAdapter);
-    // Staff two-factor rule (requireStaffTwoFactor) for every event of every gateway; see auth/staff-twofa.ts.
-    server.on('connection', (socket) => guardStaffTwoFa(socket, () => this.app.get(StaffTwoFaPolicy, { strict: false })));
+    // Both rules apply to every event of every gateway: first "change the temporary password" (auth/password-change.ts),
+    // then the staff two-factor rule (requireStaffTwoFactor, auth/staff-twofa.ts).
+    server.on('connection', (socket) => {
+      guardPasswordChange(socket);
+      guardStaffTwoFa(socket, () => this.app.get(StaffTwoFaPolicy, { strict: false }));
+    });
     return server;
   }
 

@@ -8,7 +8,11 @@ class BackendUser {
   final String role;
   final String? phone;
 
-  BackendUser({required this.id, required this.email, required this.name, required this.role, this.phone});
+  /// Still on the temporary password an administrator made: the server refuses everything except changing it, so the app
+  /// shows only the change-password screen (false on an older server that never says it).
+  final bool mustChangePassword;
+
+  BackendUser({required this.id, required this.email, required this.name, required this.role, this.phone, this.mustChangePassword = false});
 
   factory BackendUser.fromJson(Map<String, dynamic> j) => BackendUser(
         id: j['id'] as String,
@@ -16,7 +20,12 @@ class BackendUser {
         name: j['name'] as String? ?? '',
         role: j['role'] as String? ?? 'rider',
         phone: j['phone'] as String?,
+        mustChangePassword: j['mustChangePassword'] == true,
       );
+
+  /// The same account, held at (or released from) the password change.
+  BackendUser withMustChangePassword(bool value) =>
+      BackendUser(id: id, email: email, name: name, role: role, phone: phone, mustChangePassword: value);
 }
 
 /// A non-empty, trimmed text field; null when missing, blank or not a string (older servers omit the new fields).

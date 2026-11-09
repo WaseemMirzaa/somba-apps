@@ -67,8 +67,8 @@ describe('SocketIoAdapter listener limits', () => {
   });
 });
 
-describe('SocketIoAdapter staff two-factor guard', () => {
-  it('every new connection gets the guard (a packet middleware), whichever gateway will handle its events', () => {
+describe('SocketIoAdapter connection guards', () => {
+  it('every new connection gets the password-change guard and the staff two-factor guard (packet middlewares), whichever gateway will handle its events', () => {
     const adapter = new SocketIoAdapter(appWith(3));
     const server = new EventEmitter();
     // What createIOServer does after building the Socket.IO server: listen for connections and guard each socket.
@@ -77,7 +77,7 @@ describe('SocketIoAdapter staff two-factor guard', () => {
     const used: unknown[] = [];
     const socket = { data: {}, use: (fn: unknown) => void used.push(fn) };
     server.emit('connection', socket);
-    expect(used).toHaveLength(1);
-    expect(typeof used[0]).toBe('function');
+    expect(used).toHaveLength(2); // password change first, then staff two-factor
+    expect(used.map((f) => typeof f)).toEqual(['function', 'function']);
   });
 });

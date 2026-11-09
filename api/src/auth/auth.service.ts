@@ -26,6 +26,8 @@ export interface JwtPayload {
   typ?: 'access' | 'refresh';
   /** Set only on short-lived special tokens, for example the 2FA sign-in challenge (`purpose: '2fa'`). */
   purpose?: string;
+  /** Access tokens only: the account must still change its temporary password (`users.mustChangePassword`); see auth/password-change.ts. */
+  pwc?: boolean;
   /**
    * Refresh tokens only: the id of the stored record that rotation tracks (see {@link SessionsService}). Refresh tokens
    * issued before rotation existed have none and keep working, unrotated, until they expire.
@@ -60,6 +62,8 @@ export interface AuthResult {
   user: PublicUser;
   accessToken: string;
   refreshToken: string;
+  /** True while the account must change its temporary password before anything else (also in `user`); clients show that screen at once. */
+  mustChangePassword: boolean;
 }
 
 @Injectable()
@@ -194,7 +198,12 @@ export class AuthService {
     if (!next || next.length < 8) {
       throw new BadRequestException('New password must be at least 8 characters.');
     }
+    // The temporary password was made by an administrator and may have been seen by them: the new one must be a different one.
+    if (user.mustChangePassword && next === current) {
+      throw new BadRequestException('Choose a new password that is different from the temporary one.');
+    }
     user.passwordHash = await bcrypt.hash(next, 12);
+    user.mustChangePassword = false;
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
     await this.sessions?.endSessions(user.id, { exceptSocketId: keepSocketId });
@@ -280,20 +289,21 @@ export class AuthService {
 
   /** A new sign-in: an access token and a refresh token that starts a new family (or an untracked one without sessions). */
   private async issue(user: User, opts: { refresh?: boolean } = {}): Promise<AuthResult> {
-    const accessToken = await this.jwt.signAsync({ ...this.claims(user), typ: 'access' }, {
+    const accessToken = await this.jwt.signAsync({ ...this.claims(user), typ: 'access', ...(user.mustChangePassword ? { pwc: true } : {}) }, {
       secret: this.config.get<string>('jwt.secret'),
       // `expiresIn` accepts vercel/ms strings ("15m") at runtime; the typing
       // wants a template-literal union, so widen from the env string.
       expiresIn: this.config.get<string>('jwt.accessTtl') as unknown as number,
     });
-    if (opts.refresh === false) return { user: UsersService.toPublic(user), accessToken, refreshToken: '' };
+    const mustChangePassword = !!user.mustChangePassword;
+    if (opts.refresh === false) return { user: UsersService.toPublic(user), accessToken, refreshToken: '', mustChangePassword };
     const refreshToken = this.sessions
       ? (await this.mintRefresh(user, this.sessions.newId())).token
       : await this.jwt.signAsync({ ...this.claims(user), typ: 'refresh' }, {
           secret: this.config.get<string>('jwt.refreshSecret'),
           expiresIn: this.config.get<string>('jwt.refreshTtl') as unknown as number,
         });
-    return { user: UsersService.toPublic(user), accessToken, refreshToken };
+    return { user: UsersService.toPublic(user), accessToken, refreshToken, mustChangePassword };
   }
 
   /** Sign a tracked refresh token in `familyId` and remember it. */
