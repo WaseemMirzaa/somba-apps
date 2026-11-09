@@ -195,6 +195,15 @@ describe('C-01: orders:create is idempotent per checkout attempt', () => {
       expect(charges).toHaveLength(1);
     });
 
+    it('an identical cart that arrives AFTER the first order finished is a new order (cancel and order again, or buy twice on purpose)', async () => {
+      const a = await createOld(input());
+      const b = await createOld(input());
+      expect(a.status).toBe('confirmed');
+      expect(b.status).toBe('confirmed');
+      expect(b.id).not.toBe(a.id);
+      expect(charges).toHaveLength(2);
+    });
+
     it('a different cart is a different order', async () => {
       const a = await createOld(input());
       const b = await createOld({ ...input(), items: [{ productId, qty: 2 }] });

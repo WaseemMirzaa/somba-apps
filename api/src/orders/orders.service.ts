@@ -95,12 +95,11 @@ const REPLAY_POLL_MS = 150;
 const ABANDONED_CLAIM_MS = 2 * 60_000;
 /**
  * Older apps send no key. An identical cart (same lines, payment method, phone, address and code) from the same
- * customer is then treated as the same attempt while the first one is still running and for this long after it
- * finished: the old app gives up after 8 s and the shopper taps again, while the server may still be waiting up to
- * 15-30 s on the payment provider. A genuine second identical purchase seconds later is rare, and the shopper still
- * sees their (first) order; after the window an identical cart is a new order again.
+ * customer is then treated as the same attempt only WHILE THE FIRST ONE IS STILL RUNNING: the old app gives up after
+ * 8 s and the shopper taps again, while the server may still be waiting 15-30 s on the payment provider. A request
+ * that arrives after the first one has finished is a new order: the shopper cancelled and ordered again, or bought the
+ * same thing twice on purpose, and must not be handed the earlier (maybe cancelled) order back.
  */
-const AUTO_DEDUP_WINDOW_MS = 30_000;
 export const STILL_PROCESSING = 'Your order is still being processed. Check My orders in a moment before trying again.';
 export const PREVIOUS_ATTEMPT_FAILED = 'This checkout did not go through and nothing was charged. Please place the order again.';
 
@@ -271,6 +270,7 @@ export class OrdersService {
    */
   private async claimRequest(customerId: string, key: string, orderId: string, auto: boolean): Promise<Order | null> {
     const deadline = Date.now() + ORDER_REPLAY.waitMs;
+    let waited = false; // this request saw the earlier one still running
     for (;;) {
       try {
         await this.requests.insert({ customerId, requestKey: key, orderId, startedAt: new Date(), finishedAt: null, outcome: null });
@@ -282,8 +282,9 @@ export class OrdersService {
       if (!row) continue; // the earlier request gave its key back (refused before writing an order): ours now
       const takeOver = () => this.requests.delete({ customerId, requestKey: key, orderId: row.orderId }); // only THAT claim
       if (row.outcome) {
-        // An older app's identical cart counts as the same attempt for a short while only.
-        if (auto && Date.now() - new Date(row.finishedAt ?? row.startedAt).getTime() > AUTO_DEDUP_WINDOW_MS) {
+        // An older app's identical cart is the same attempt only for a request that WAITED for the first one to finish
+        // (a double tap or retry while it ran). One that arrives afterwards is a new order.
+        if (auto && !waited) {
           await takeOver();
           continue;
         }
@@ -299,6 +300,7 @@ export class OrdersService {
         continue;
       }
       if (Date.now() >= deadline) throw new OrderStillProcessingException();
+      waited = true;
       await sleep(REPLAY_POLL_MS);
     }
   }
