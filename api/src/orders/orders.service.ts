@@ -1096,6 +1096,10 @@ export class OrdersService {
       return;
     }
 
+    // The order is cancelled FIRST and its stock put back second, on purpose: stock and orders are separate writes, and a
+    // crash between them must lose a unit (visible in the stock ledger, fixed by a count) rather than release stock for an
+    // order that could still be confirmed by a late payment and so oversell. The order shows "cancelled" for a few
+    // milliseconds before the stock is back; anything that checks both (tests, smoke) waits for the restock.
     order.status = 'cancelled';
     const saved = await this.orders.save(order);
     for (const item of saved.items ?? []) {

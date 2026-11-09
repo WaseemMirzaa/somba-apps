@@ -1,7 +1,9 @@
 # Somba&Teka — full local stack (MySQL + API + Web).
 #
 #   docker compose up --build
-#   docker compose exec api npm run seed     # first run: create demo data
+#   docker compose exec -e I_UNDERSTAND_THIS_WIPES_EVERYTHING=1 api npm run seed   # first run: create demo data
+#     (this stack runs with NODE_ENV=production, where the seed refuses unless you say it may wipe everything;
+#      only ever do that on this throw-away demo stack, never on a real server)
 #
 # Web → http://localhost:3000   API → http://localhost:3001
 # For production put nginx in front (see docs/DEPLOYMENT.md) and override the
