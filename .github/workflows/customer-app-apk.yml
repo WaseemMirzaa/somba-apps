@@ -28,6 +28,9 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
+    env:
+      # Whether the release key is configured as a repository secret (a secret cannot be tested in a step condition).
+      HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     defaults:
       run:
         working-directory: mobile
@@ -59,6 +62,36 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+      # Release signing (docs/ANDROID-RELEASE-SIGNING.md). Only when the repository secret ANDROID_KEYSTORE_BASE64 is set,
+      # and never on pull requests (they publish nothing and should not be handed the key). Without the secret nothing
+      # here runs and the build is exactly as before (debug-signed, with Gradle's warning).
+      - name: Configure release signing
+        if: github.event_name != 'pull_request' && env.HAS_RELEASE_KEYSTORE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is set but ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS or ANDROID_KEY_PASSWORD is missing. See docs/ANDROID-RELEASE-SIGNING.md."
+            exit 1
+          fi
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          echo "::add-mask::$KEY_ALIAS"
+          echo "::add-mask::$KEY_PASSWORD"
+          keystore="$RUNNER_TEMP/somba-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "REQUIRE_RELEASE_SIGNING=true"
+          } >> "$GITHUB_ENV"
 
       - name: Build release APK (universal)
         run: flutter build apk --release
