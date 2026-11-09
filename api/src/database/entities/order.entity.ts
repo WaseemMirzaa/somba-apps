@@ -31,6 +31,7 @@ export type PaymentMethod =
 
 @Index('IDX_orders_status_created', ['status', 'createdAt'])
 @Index('IDX_orders_created', ['createdAt'])
+@Index('UQ_orders_customer_request', ['customerId', 'clientRequestId'], { unique: true })
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid')
@@ -115,6 +116,14 @@ export class Order {
   /** Expected delivery day (YYYY-MM-DD, Kinshasa): order day + the slowest line's seller-set delivery days. */
   @Column({ type: 'varchar', length: 10, nullable: true })
   estimatedDeliveryDate: string | null;
+
+  /**
+   * The checkout attempt's idempotency key the app sent (a UUID made once per attempt and resent on every retry of
+   * it), or null for older apps. Unique per customer (C-01): the same attempt can never become two orders. The claim
+   * that serializes concurrent requests with one key is `order_requests`.
+   */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  clientRequestId: string | null;
 
   /** Assigned rider (set when a delivery task is accepted). */
   @Column({ type: 'varchar', nullable: true })

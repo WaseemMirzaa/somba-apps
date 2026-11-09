@@ -228,6 +228,10 @@ extension StringsKeys on Strings {
   String get errGeneric => t('err_generic');
   String get errNoResponse => t('err_no_response');
   String get errNoConnection => t('err_no_connection');
+  String get errOrderProcessing => t('err_order_processing');
+  String get errOrderUnknown => t('err_order_unknown');
+  String get errOrderNotSent => t('err_order_not_sent');
+  String get errOrderFailed => t('err_order_failed');
   String get errSignedOut => t('err_signed_out');
   String get errAccountDeleted => t('err_account_deleted');
   String get errSettleTimeout => t('err_settle_timeout');

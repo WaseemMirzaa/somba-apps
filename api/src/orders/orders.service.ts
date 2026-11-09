@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import {
   DeliveryTask,
   Hub,
   Order,
   OrderItem,
+  OrderRequest,
   OrderStatus,
   Payment,
   PaymentMethod,
@@ -28,7 +29,7 @@ import { CouponsService } from '../content/coupons.service';
 import { SettingsService } from '../content/settings.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { DEFAULT_VARIANT, checkVariant, hasNoOptions, localizeVariantLabel, storedVariantGroups } from '../common/variants/variants';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { availableFor } from '../products/variant-stock';
 import { cityOf, sellerTracking } from './seller-tracking';
 import type { HubName, SellerTracking } from './seller-tracking';
@@ -70,7 +71,50 @@ export interface CreateOrderInput {
   paymentPhone?: string;
   /** Promo code; validated and applied by the SERVER (the app only previews it). */
   promoCode?: string;
+  /**
+   * Idempotency key of this checkout attempt (C-01): a UUID the app makes once per attempt and resends unchanged on
+   * every retry of it. The same key from the same customer always means the same order: never a second order or a
+   * second charge. Optional for older apps (they get a short de-duplication window on an identical cart instead).
+   */
+  clientRequestId?: string;
 }
+
+/** What `orders:byRequest` knows about a checkout attempt. */
+export interface OrderRequestState {
+  /** none = never arrived (safe to send again with the same key); processing = still running; placed = an order exists; failed = its payment failed. */
+  state: 'none' | 'processing' | 'placed' | 'failed';
+  order?: Order;
+}
+
+/** A key the app may send: a UUID, or any 8-64 letters, digits, '-' and '_' (C-01). */
+const CLIENT_REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;
+/** How long a request waits for an earlier one with the same key to finish before saying "still processing". */
+export const ORDER_REPLAY = { waitMs: Number(process.env.ORDER_REPLAY_WAIT_MS ?? 30_000) };
+const REPLAY_POLL_MS = 150;
+/** A claim this old whose request never finished belongs to a request that died (process restart): it is taken over. */
+const ABANDONED_CLAIM_MS = 2 * 60_000;
+/**
+ * Older apps send no key. An identical cart (same lines, payment method, phone, address and code) from the same
+ * customer is then treated as the same attempt while the first one is still running and for this long after it
+ * finished: the old app gives up after 8 s and the shopper taps again, while the server may still be waiting up to
+ * 15-30 s on the payment provider. A genuine second identical purchase seconds later is rare, and the shopper still
+ * sees their (first) order; after the window an identical cart is a new order again.
+ */
+const AUTO_DEDUP_WINDOW_MS = 30_000;
+export const STILL_PROCESSING = 'Your order is still being processed. Check My orders in a moment before trying again.';
+export const PREVIOUS_ATTEMPT_FAILED = 'This checkout did not go through and nothing was charged. Please place the order again.';
+
+/** An earlier request with the same key is still running: the outcome is not known yet (ack `code: 'order_processing'`). */
+export class OrderStillProcessingException extends BadRequestException {
+  readonly code = 'order_processing';
+  constructor() {
+    super(STILL_PROCESSING);
+  }
+}
+
+const isDuplicateKey = (e: unknown): boolean =>
+  e instanceof QueryFailedError && /UNIQUE|Duplicate entry|ER_DUP_ENTRY|SQLITE_CONSTRAINT/i.test(String((e as Error).message));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The rider the customer may phone: only while the parcel is on its way. */
 export interface RiderContact {
@@ -142,9 +186,134 @@ export class OrdersService {
     return this.routingSvc as RoutingService;
   }
 
+  /** Place an order (see {@link place}); returns the order, also when it is the replay of an earlier request. */
   async create(
     customer: { id: string; name: string },
     input: CreateOrderInput,
+  ): Promise<Order> {
+    return (await this.place(customer, input)).order;
+  }
+
+  /**
+   * Place an order, idempotently (C-01). The checkout attempt is claimed FIRST with an insert on `order_requests`
+   * (primary key = customer + key), so of N concurrent requests with one key exactly one does the work and charges;
+   * the others wait for it and get the same order back (`replayed`). A refusal before any order was written frees the
+   * key again (the shopper can fix the cart and retry); a payment that failed is remembered so a retry with the same
+   * key reports it instead of making another cancelled order.
+   */
+  async place(
+    customer: { id: string; name: string },
+    input: CreateOrderInput,
+    opts: { dedupWithoutKey?: boolean } = {},
+  ): Promise<{ order: Order; replayed: boolean }> {
+    const claim = this.requestKeyOf(customer.id, input, !!opts.dedupWithoutKey);
+    const orderId = randomUUID(); // known before the order exists, so a waiting duplicate knows which order to look for
+    if (claim) {
+      const earlier = await this.claimRequest(customer.id, claim.key, orderId, claim.auto);
+      if (earlier) return { order: earlier, replayed: true };
+    }
+    const progress = { written: false };
+    try {
+      const order = await this.createClaimed(customer, input, orderId, claim && !claim.auto ? claim.clientRequestId : null, progress);
+      if (claim) await this.finishRequest(customer.id, claim.key, orderId, 'placed');
+      return { order, replayed: false };
+    } catch (err) {
+      if (claim) {
+        const row = progress.written ? await this.orders.findOne({ where: { id: orderId } }) : null;
+        if (row && row.status !== 'cancelled') await this.finishRequest(customer.id, claim.key, orderId, 'placed'); // it exists (a later step failed)
+        else if (row && !claim.auto) await this.finishRequest(customer.id, claim.key, orderId, 'failed');
+        else await this.requests.delete({ customerId: customer.id, requestKey: claim.key, orderId });
+      }
+      throw err;
+    }
+  }
+
+  /** What became of a checkout attempt, by the key the app sent (`orders:byRequest`): the app asks this after a timeout. */
+  async findByRequest(customerId: string, clientRequestId: unknown): Promise<OrderRequestState> {
+    const id = String(clientRequestId ?? '').trim();
+    if (!CLIENT_REQUEST_ID.test(id)) throw new BadRequestException('Invalid checkout reference. Please try again.');
+    const claim = await this.requests.findOne({ where: { customerId, requestKey: `k:${id}` } });
+    const order = await this.orders.findOne({ where: claim ? { id: claim.orderId } : { customerId, clientRequestId: id } });
+    if (!claim) return order ? { state: 'placed', order } : { state: 'none' };
+    if (claim.outcome === 'failed') return order ? { state: 'failed', order } : { state: 'failed' };
+    if (claim.outcome === 'placed' && order) return { state: 'placed', order };
+    return { state: 'processing' };
+  }
+
+  private get requests(): Repository<OrderRequest> {
+    return this.orders.manager.getRepository(OrderRequest);
+  }
+
+  /**
+   * The claim key of a request: the app's own key, or (an older app on the socket, `dedupWithoutKey`) a fingerprint of
+   * the cart. Server-side callers (the demo seed) place identical carts on purpose and pass neither.
+   */
+  private requestKeyOf(customerId: string, input: CreateOrderInput, dedupWithoutKey: boolean): { key: string; auto: boolean; clientRequestId: string } | null {
+    if (input.clientRequestId != null && input.clientRequestId !== '') {
+      const id = String(input.clientRequestId).trim();
+      if (!CLIENT_REQUEST_ID.test(id)) throw new BadRequestException('Invalid checkout reference. Please try again.');
+      return { key: `k:${id}`, auto: false, clientRequestId: id };
+    }
+    if (!dedupWithoutKey || !Array.isArray(input.items) || !input.items.length) return null; // (no items: refused below anyway)
+    const lines = input.items
+      .map((l) => [l?.productId ?? '', l?.name ?? '', l?.priceUsd ?? '', l?.qty ?? '', l?.variant ?? ''].map(String).join('\u0001'))
+      .sort();
+    const fp = createHash('sha256')
+      .update(JSON.stringify([customerId, lines, input.paymentMethod ?? '', input.paymentPhone ?? '', input.shippingAddress ?? '', String(input.promoCode ?? '').trim().toUpperCase()]))
+      .digest('hex');
+    return { key: `fp:${fp}`, auto: true, clientRequestId: '' };
+  }
+
+  /**
+   * Claim a checkout attempt. Returns null when THIS request owns it (go ahead), or the order of the earlier request
+   * with the same key once that one has finished. Throws {@link PREVIOUS_ATTEMPT_FAILED} when the earlier one's payment
+   * failed, and {@link STILL_PROCESSING} when it is still running after `ORDER_REPLAY.waitMs`.
+   */
+  private async claimRequest(customerId: string, key: string, orderId: string, auto: boolean): Promise<Order | null> {
+    const deadline = Date.now() + ORDER_REPLAY.waitMs;
+    for (;;) {
+      try {
+        await this.requests.insert({ customerId, requestKey: key, orderId, startedAt: new Date(), finishedAt: null, outcome: null });
+        return null;
+      } catch (e) {
+        if (!isDuplicateKey(e)) throw e;
+      }
+      const row = await this.requests.findOne({ where: { customerId, requestKey: key } });
+      if (!row) continue; // the earlier request gave its key back (refused before writing an order): ours now
+      const takeOver = () => this.requests.delete({ customerId, requestKey: key, orderId: row.orderId }); // only THAT claim
+      if (row.outcome) {
+        // An older app's identical cart counts as the same attempt for a short while only.
+        if (auto && Date.now() - new Date(row.finishedAt ?? row.startedAt).getTime() > AUTO_DEDUP_WINDOW_MS) {
+          await takeOver();
+          continue;
+        }
+        const order = await this.orders.findOne({ where: { id: row.orderId } });
+        if (row.outcome === 'failed' || !order) throw new BadRequestException(PREVIOUS_ATTEMPT_FAILED);
+        return order;
+      }
+      if (Date.now() - new Date(row.startedAt).getTime() > ABANDONED_CLAIM_MS) {
+        const order = await this.orders.findOne({ where: { id: row.orderId } });
+        if (order && order.status !== 'cancelled') return order;
+        if (order && !auto) throw new BadRequestException(PREVIOUS_ATTEMPT_FAILED); // its key is on that order for good
+        await takeOver();
+        continue;
+      }
+      if (Date.now() >= deadline) throw new OrderStillProcessingException();
+      await sleep(REPLAY_POLL_MS);
+    }
+  }
+
+  private async finishRequest(customerId: string, key: string, orderId: string, outcome: 'placed' | 'failed'): Promise<void> {
+    await this.requests.update({ customerId, requestKey: key, orderId }, { outcome, finishedAt: new Date() });
+  }
+
+  /** The order itself, once its attempt is claimed: `orderId` is fixed in advance, `progress.written` says whether the row exists. */
+  private async createClaimed(
+    customer: { id: string; name: string },
+    input: CreateOrderInput,
+    orderId: string,
+    clientRequestId: string | null,
+    progress: { written: boolean },
   ): Promise<Order> {
     if (!input.items?.length) {
       throw new BadRequestException('An order needs at least one item.');
@@ -318,7 +487,7 @@ export class OrdersService {
 
     // Take the stock ATOMICALLY (the UPDATE only succeeds while enough is left),
     // so concurrent orders can never oversell. Released again on any failure.
-    const orderId = randomUUID(); // known before the order exists, so the stock ledger can name it
+    // `orderId` is known before the order exists, so the stock ledger can name it.
     const reserved: { productId: string; qty: number; variant: string }[] = [];
     const release = async () => {
       for (const r of reserved) await this.products.restock(r.productId, r.qty, { variant: r.variant, orderId, reason: 'cancel_restock' });
@@ -355,12 +524,16 @@ export class OrdersService {
       routeBySeller: route.routeBySeller,
       estimatedDeliveryDate: estimatedDeliveryDate(lineDays, new Date(), route.extraDays),
       shippingAddress: input.shippingAddress ?? null,
+      clientRequestId,
       items,
     });
     let saved: Order;
     try {
       // The order and its other-language names are one transaction: a line never exists without its snapshot.
       saved = await this.orders.manager.transaction(async (m) => {
+        // C-03: the code's limits are checked again under a lock on the promo row, FIRST in this transaction, and the
+        // order is written before the lock is released: concurrent checkouts can never use a code more than allowed.
+        if (promoCode) await this.promos.assertRedeemableIn(m, promoCode, customer.id);
         const row = await m.save(order);
         const rows: { entityId: string; field: string; locale: string; value: string }[] = [];
         // `orders.create` copied the lines into entities of its own: the saved ones (with ids) are on the row.
@@ -378,6 +551,7 @@ export class OrdersService {
       await release();
       throw err;
     }
+    progress.written = true;
 
     // Charge for the order. Wallet confirms immediately; COD stays pending
     // until the rider collects; mobile money stays pending until the subscriber

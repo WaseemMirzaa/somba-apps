@@ -189,6 +189,23 @@ const Map<String, (String, String)> _kMessagesBase = {
   'err_no_connection': ('Not connected to the server.', 'Pas de connexion au serveur.'),
   'err_signed_out': ('You were signed out. Please sign in again.', 'Vous avez été déconnecté. Veuillez vous reconnecter.'),
   'err_account_deleted': ('Your account was deleted.', 'Votre compte a été supprimé.'),
+  // Placing an order whose outcome the app could not read (C-01). The same attempt key is kept, so a retry never makes a second order.
+  'err_order_processing': (
+    'We have not heard back yet: your order may still be going through. Check My orders before you try again.',
+    'Nous n’avons pas encore de réponse : votre commande est peut-être en cours. Consultez Mes commandes avant de réessayer.'
+  ),
+  'err_order_unknown': (
+    'We could not find out whether your order was placed. Check My orders before you try again.',
+    'Nous n’avons pas pu savoir si votre commande a été passée. Consultez Mes commandes avant de réessayer.'
+  ),
+  'err_order_not_sent': (
+    'Your order did not reach us and nothing was charged. Check your connection and try again.',
+    'Votre commande ne nous est pas parvenue et rien n’a été débité. Vérifiez votre connexion et réessayez.'
+  ),
+  'err_order_failed': (
+    'This order did not go through and nothing was charged. Please place it again.',
+    'Cette commande n’a pas abouti et rien n’a été débité. Veuillez la passer à nouveau.'
+  ),
   'err_settle_timeout': ('We could not confirm the payment in time.', 'Nous n’avons pas pu confirmer le paiement à temps.'),
   'settings_notifications': ('Notifications', 'Notifications'),
   'settings_push': ('Push notifications', 'Notifications push'),

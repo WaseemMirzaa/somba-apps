@@ -80,7 +80,8 @@ socket.on('ready', ({ user }) => { /* connected */ });
 | `products:list` | `{category?, status?}` | all |
 | `products:get` | `{id}` | all |
 | `orders:list` | – | scoped by role |
-| `orders:create` | `{items:[{productId,qty,variant?}], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress?}` | customer |
+| `orders:create` | `{items:[{productId,qty,variant?}], paymentMethod, shippingAddress?, paymentPhone?, promoCode?, clientRequestId?}` — `clientRequestId` is the checkout attempt's idempotency key (a UUID made once per attempt, resent on every retry): the same key returns the same order and never charges twice | customer |
+| `orders:byRequest` | `{clientRequestId}` → `{state: none / processing / placed / failed, order?}` (ask after an `orders:create` timeout) | customer |
 | `orders:updateStatus` | `{orderId, status}` | admin/warehouse |
 | `delivery:list` / `delivery:unassigned` | – | rider/ops |
 | `delivery:accept` | `{taskId}` | rider |

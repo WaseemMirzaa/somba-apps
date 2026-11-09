@@ -32,6 +32,7 @@ import { notServedArea, notServedCityNames, notServedFromError, notServedText, t
 import { pinRequiredText } from "@/components/shop/address-pin-editor";
 import { formatCurrency } from "@/lib/utils";
 import type { Order } from "@/lib/realtime/types";
+import { newAttemptKey, outcomeUnknown, placeOrderAttempt } from "@/lib/checkout-attempt";
 
 function PaymentContent() {
   const { locale } = useLocale();
@@ -72,6 +73,10 @@ function PaymentContent() {
   const [orderNotServed, setOrderNotServed] = useState<NotServedInfo | null>(null);
   const [created, setCreated] = useState<Order | null>(null);
   const snapshot = useRef<CartLine[]>([]);
+  // C-01: the idempotency key of the checkout attempt in progress, sent unchanged on every retry until the server gives
+  // a definite answer, so a retry never becomes a second order; `submitting` stops a second click before React re-renders.
+  const attemptKey = useRef<string | null>(null);
+  const submitting = useRef(false);
 
   // Default method: wallet when it covers the total, otherwise Airtel Money.
   // A cash-on-delivery pick falls back to the default once COD is no longer offered (the setting can change while the page is open).
@@ -109,6 +114,16 @@ function PaymentContent() {
   }, [addToCart, router]);
 
   async function placeOrder() {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      await placeOrderOnce();
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  async function placeOrderOnce() {
     setError(null);
     setOrderNotServed(null);
     if (verification.blocked) {
@@ -145,13 +160,20 @@ function PaymentContent() {
       const shipping = JSON.parse(addressToShipping(address)) as Record<string, unknown>;
       if (note.trim()) shipping.note = note.trim();
       shipping.openBox = openBox;
-      const order = await socketClient.request<Order>("orders:create", {
-        items: lines.map((l) => ({ productId: l.id, qty: l.qty, variant: l.variant })),
-        paymentMethod: chosen,
-        shippingAddress: JSON.stringify(shipping),
-        ...(promoCode ? { promoCode } : {}),
-        ...(mobile ? { paymentPhone: msisdn.trim() } : {}),
-      });
+      attemptKey.current ??= newAttemptKey();
+      const order = await placeOrderAttempt<Order>(
+        socketClient.request.bind(socketClient),
+        {
+          items: lines.map((l) => ({ productId: l.id, qty: l.qty, variant: l.variant })),
+          paymentMethod: chosen,
+          shippingAddress: JSON.stringify(shipping),
+          ...(promoCode ? { promoCode } : {}),
+          ...(mobile ? { paymentPhone: msisdn.trim() } : {}),
+        },
+        attemptKey.current,
+        fr,
+      );
+      attemptKey.current = null; // placed: the next order is a new attempt
       // The order exists: only now is the cart emptied.
       snapshot.current = lines;
       clearCart();
@@ -162,6 +184,8 @@ function PaymentContent() {
       toast(fr ? "Commande passée" : "Order placed");
       router.replace(`/shop/orders/${order.reference}/confirmed`);
     } catch (e) {
+      // A definite answer from the server ends the attempt; an unknown outcome keeps its key for the retry.
+      if (!outcomeUnknown(e)) attemptKey.current = null;
       // A refusal for an unserved area carries the area and the served cities: the sentence is built here, in the UI language.
       const refused = notServedFromError(e);
       if (refused) {
