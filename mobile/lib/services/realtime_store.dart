@@ -234,6 +234,7 @@ class RealtimeStore extends ChangeNotifier {
       unawaited(_socket.request('devices:unregister', {'token': _deviceToken}).catchError((_) {}));
     }
     _deviceToken = null;
+    endTopUpAttempt();
     await PushService.instance.stop();
     await _auth.clear();
     _socket.disconnect();
@@ -689,14 +690,59 @@ class RealtimeStore extends ChangeNotifier {
     _upsertOrder(await _socket.request('orders:cancel', {'orderId': orderId}));
   }
 
+  /// The idempotency key of the top-up attempt in progress, and what that attempt is for (see [topUpKey]).
+  String? _topUpAttemptKey;
+  String? _topUpAttemptFor;
+
+  /// The key of the top-up attempt in progress, if any (tests read it; nothing else should).
+  @visibleForTesting
+  String? get topUpAttemptKey => _topUpAttemptKey;
+
+  /// The idempotency key for a top-up of [amountUsd] through [method] to [phone]: made on the first tap and returned
+  /// unchanged for every retry of that same intent (a double tap, a retry after "failed to reach the network"), so the
+  /// server answers with the first top-up instead of opening a second approval prompt. Asking for a different amount,
+  /// network or phone is a new intent and gets a new key. Kept here (not on the sheet) so closing and reopening the
+  /// sheet with the same values is still the same attempt, like [checkoutKey].
+  String topUpKey(double amountUsd, {required String method, required String phone}) {
+    final intent = '${user?.id}|$method|${amountUsd.toStringAsFixed(2)}|${phone.trim()}';
+    if (_topUpAttemptFor != intent || _topUpAttemptKey == null) {
+      _topUpAttemptFor = intent;
+      _topUpAttemptKey = newCheckoutKey();
+    }
+    return _topUpAttemptKey!;
+  }
+
+  /// The attempt reached a final outcome (started, or refused): the next tap is a new top-up with a new key.
+  void endTopUpAttempt() {
+    _topUpAttemptKey = null;
+    _topUpAttemptFor = null;
+  }
+
+  /// Whether a failed [topUpWallet] leaves the result open (the request may or may not have reached the server): the
+  /// same key must then be kept for the retry. A refusal the server sent is final, and the server replays a failed
+  /// attempt's reason for its key, so the next try needs a new key.
+  static bool topUpOutcomeUnknown(Object e) =>
+      e is! ApiException || const {'err_no_response', 'err_no_connection'}.contains(e.localKey);
+
   /// Start a wallet top-up through mobile money. The wallet is credited only
   /// when the network confirms; [wallet:updated] then pushes the new balance.
+  ///
+  /// Sends the attempt's [topUpKey] as `clientRequestId`, so a repeat of this same top-up returns the first one.
   Future<PaymentDto> topUpWallet(double amountUsd, {required String method, required String phone}) async {
-    final res = await _socket.request('wallet:topup', {
-      'amountUsd': amountUsd,
-      'method': method,
-      'phone': phone,
-    });
+    final key = topUpKey(amountUsd, method: method, phone: phone);
+    final dynamic res;
+    try {
+      res = await call('wallet:topup', {
+        'amountUsd': amountUsd,
+        'method': method,
+        'phone': phone,
+        'clientRequestId': key,
+      });
+    } catch (e) {
+      if (!topUpOutcomeUnknown(e)) endTopUpAttempt();
+      rethrow;
+    }
+    endTopUpAttempt();
     final p = PaymentDto.fromJson(_map(res));
     _upsertPayment(res);
     return p;
