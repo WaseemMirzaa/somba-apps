@@ -9,6 +9,7 @@ import { CardRefundRefusedError, PaymentsService } from '../payments/payments.se
 import { NOTHING_LEFT_TO_REFUND, recordRefund, refundTooMuch, refundableUsd, revertRefund } from '../payments/refund-ledger';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
+import { pushOrderToReaders } from '../logistics/hub-scope';
 
 const FINANCE_ROLES = ['admin', 'admin_finance'];
 const cents = (n: number) => Number(n.toFixed(2));
@@ -149,7 +150,8 @@ export class PartialRefundService {
     const fresh = await this.orders.findOne({ where: { id: order.id } });
     if (fresh) {
       this.emitter.toUser(fresh.customerId, 'order:updated', fresh);
-      this.emitter.toRoles(FINANCE_ROLES, 'order:updated', fresh);
+      // Finance follows the refund on the order without the customer's address.
+      pushOrderToReaders(this.emitter, 'order:updated', fresh);
     }
     await this.notifications.toUser(saved.userId, {
       title: 'Refund issued',

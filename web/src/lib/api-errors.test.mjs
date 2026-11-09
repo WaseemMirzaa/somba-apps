@@ -151,3 +151,10 @@ test("a refused account deletion is French sentence by sentence; an unknown reas
   assert.equal(localizeApiError(raw, "en"), raw);
   assert.equal(localizeApiError(`${raw} Something new is pending.`, "fr"), `${raw} Something new is pending.`);
 });
+
+test("the warehouse desk and order-reading refusals are French (least privilege)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Only operations admins and warehouse staff can work the warehouse desk."), "Seuls les administrateurs des opérations et le personnel d'entrepôt peuvent utiliser le poste de l'entrepôt.");
+  assert.equal(fr("Your role cannot read orders."), "Votre rôle ne permet pas de consulter les commandes.");
+  assert.equal(localizeApiError("Your role cannot read orders.", "en"), "Your role cannot read orders.");
+});

@@ -1,5 +1,7 @@
 import type { FindOptionsWhere } from 'typeorm';
 import type { DeliveryTask } from '../database/entities';
+import { ROLE_GROUPS } from '../common/role-groups';
+import { withoutAddress } from '../common/order-access';
 
 /**
  * Tasks a warehouse sees: the ones it manages, sends or receives. `hubId` null/undefined = no limit (admins).
@@ -23,17 +25,29 @@ export function hubsOfOrder(order: { destinationHubId?: string | null; originHub
   return [...new Set(ids.filter((x): x is string => typeof x === 'string' && x.length > 0))];
 }
 
+type OrderEmitter = { toRoles(roles: string[], event: string, payload: unknown): void; toRolesOnly(roles: string[], event: string, payload: unknown): void; toHub(hubId: string, event: string, payload: unknown): void };
+
 /**
- * Tell the people who run an order: every admin, plus the staff of each warehouse the order concerns (and nobody else's).
- * Replaces the old "all warehouse staff" role push, which showed every order to every warehouse.
+ * Tell the admin roles that may read orders, each what it may see (`common/order-access.ts`): the super admin, operations and
+ * support get the order, finance and moderation get it without the customer's address, marketing gets nothing.
  */
-export function pushOrderToOps(
-  emitter: { toRoles(roles: string[], event: string, payload: unknown): void; toHub(hubId: string, event: string, payload: unknown): void },
-  adminRoles: string[],
+export function pushOrderToReaders<T extends { shippingAddress?: string | null }>(emitter: Pick<OrderEmitter, 'toRoles' | 'toRolesOnly'>, event: string, order: T): void {
+  // The full copy goes through the fan-out (sellers hear about their orders once, from the full order); the reduced copy does not.
+  emitter.toRoles([...ROLE_GROUPS.orderDetail], event, order);
+  emitter.toRolesOnly([...ROLE_GROUPS.orderAmounts], event, withoutAddress(order));
+}
+
+/**
+ * Tell the people who run an order: the admin roles that may read orders (see {@link pushOrderToReaders}), plus the staff of
+ * each warehouse the order concerns (and nobody else's). Replaces the old "all warehouse staff" role push, which showed every
+ * order to every warehouse, and the "every admin" push, which showed every address to marketing.
+ */
+export function pushOrderToOps<T extends { destinationHubId?: string | null; originHubIds?: string[] | null; shippingAddress?: string | null }>(
+  emitter: OrderEmitter,
   event: string,
-  order: { destinationHubId?: string | null; originHubIds?: string[] | null },
+  order: T,
 ): void {
-  emitter.toRoles(adminRoles, event, order);
+  pushOrderToReaders(emitter, event, order);
   for (const hubId of hubsOfOrder(order)) emitter.toHub(hubId, event, order);
 }
 

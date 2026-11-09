@@ -22,6 +22,25 @@ export const ROLE_GROUPS = {
   exchangeDesk: ['admin', 'admin_operations'],
   /** Approve or reject an exchange or replacement on a silent seller's behalf (support is told when a seller lapses). */
   exchangeDecide: ['admin', 'admin_operations', 'admin_support'],
+  /**
+   * The warehouse and logistics desk (Operations: Fulfilment): assign, reassign or unassign a rider, scan a parcel in or out,
+   * build batches and transfer runs, raise and close incidents, read the delivery tasks and the warehouse lists (parcels,
+   * custody, aged parcels, inventory, riders), and read the customer's address and phone on a task. Warehouse staff do the
+   * same for their own warehouse and by tier (`logistics/tiers.ts`); no other admin role does, whatever its department.
+   */
+  logisticsDesk: ['admin', 'admin_operations'],
+  /**
+   * Read an order in full, customer address and phone included, READ-ONLY (Operations: Orders). Support is here because
+   * a ticket, a dispute or a return about a delivery cannot be answered without seeing where the parcel goes; it still
+   * cannot change an order, dispatch or scan (`orderOps` / `logisticsDesk`). Finance reads amounts only (`orderAmounts`).
+   */
+  orderDetail: ['admin', 'admin_operations', 'admin_support'],
+  /**
+   * Read an order's amounts, payment and lines but NOT where it goes: the customer's address (and the phone in it) is blanked.
+   * Finance needs the amounts for refunds, payouts and dashboards; Moderation for the sales shown on a seller's page.
+   * Marketing is in neither group: its screens run on campaign figures, not on orders.
+   */
+  orderAmounts: ['admin_finance', 'admin_moderation'],
 } as const;
 
 export type RoleGroup = keyof typeof ROLE_GROUPS;

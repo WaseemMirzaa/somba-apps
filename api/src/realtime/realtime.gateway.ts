@@ -56,9 +56,10 @@ import { RolesService } from '../ops/roles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { LogisticsService } from '../logistics/logistics.service';
 import type { Actor } from '../logistics/logistics.service';
-import { tierAllows, tierOf } from '../logistics/tiers';
+import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows, tierOf } from '../logistics/tiers';
 import type { DeskAction } from '../logistics/tiers';
 import { ROLE_GROUPS } from '../common/role-groups';
+import { ORDER_ACCESS_DENIED, orderAudienceOf } from '../common/order-access';
 import { CASH_DESK_ADMINS } from '../common/staff-access';
 import { RiderService } from '../warehouse/rider.service';
 import { CampaignsService } from '../flows/campaigns.service';
@@ -186,14 +187,21 @@ export class RealtimeGateway
 
   /** The caller as the warehouse desk sees them (warehouse and tier come from the database, not the socket). */
   private async deskActor(user: SocketUser): Promise<Actor> {
-    if (this.isAdmin(user.role)) return { id: user.id, role: user.role, name: user.name, hubId: null, tier: null };
+    if (this.isAdmin(user.role)) {
+      if (!isDeskAdmin(user.role)) throw new Error(DESK_ADMINS_ONLY);
+      return { id: user.id, role: user.role, name: user.name, hubId: null, tier: null };
+    }
     const row = await this.users.findById(user.id);
     if (user.role !== 'warehouse_staff' || !row?.hubId) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
     return { id: user.id, role: user.role, name: user.name, hubId: row.hubId, tier: tierOf(row.warehouseTier) };
   }
 
+  /**
+   * Works the warehouse desk: the desk admins (super admin, operations: group `logisticsDesk`) and warehouse staff.
+   * Marketing, moderation, support and finance admins do not, whatever their department.
+   */
   private isOps(role: string) {
-    return role.startsWith('admin') || role === 'warehouse_staff';
+    return isDeskAdmin(role) || role === 'warehouse_staff';
   }
 
   private isAdmin(role: string) {
@@ -201,11 +209,11 @@ export class RealtimeGateway
   }
 
   /**
-   * May this caller do a warehouse action at this tier? Admins always; warehouse staff by the tier in the database
+   * May this caller do a warehouse action at this tier? The desk admins; warehouse staff by the tier in the database
    * (it can change while they are connected); everyone else never. The same table the web hides pages by.
    */
   private async tierOk(user: SocketUser, action: DeskAction): Promise<boolean> {
-    if (this.isAdmin(user.role)) return true;
+    if (this.isAdmin(user.role)) return isDeskAdmin(user.role);
     if (user.role !== 'warehouse_staff') return false;
     return tierAllows(user.role, (await this.users.findById(user.id))?.warehouseTier, action);
   }
@@ -631,7 +639,9 @@ export class RealtimeGateway
         // A team member sees the store's orders as the owner does; an account with no store sees none.
         return ok(await this.orders.list(ctx ? ctx.actor : user, ctx?.seller.id, query));
       }
-      // Warehouse staff get their own warehouse's orders only; admins get every order.
+      // Warehouse staff get their own warehouse's orders only. Of the admin roles, operations and support get every order in
+      // full (support read-only), finance and moderation the same without the customer's address, marketing none.
+      if (this.isAdmin(user.role) && orderAudienceOf(user.role) === 'none') return fail(ORDER_ACCESS_DENIED);
       return ok(await this.orders.list(user, undefined, body, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
     } catch (e) {
       return fail((e as Error).message);
@@ -737,7 +747,7 @@ export class RealtimeGateway
       if (user.role === 'rider') {
         return ok(await this.delivery.listForRider(user.id, body));
       }
-      if (!this.isOps(user.role)) return fail('Not allowed.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       // Warehouse staff see their own warehouse's parcels (and unbound ones); admins may filter by warehouse.
       return ok(await this.delivery.listAll(body, await this.hubScope(user, (body as { hubId?: string })?.hubId)));
     } catch (e) {
@@ -754,7 +764,7 @@ export class RealtimeGateway
       // Tasks carry customers' delivery addresses: ops only. Riders have no open pool any more (the warehouse assigns).
       const user = this.requireUser(client);
       if (user.role === 'rider') return ok([]);
-      if (!this.isOps(user.role)) return fail('Not allowed.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.delivery.listUnassigned(body, await this.hubScope(user, (body as { hubId?: string })?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -816,7 +826,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       const me = await this.deskActor(user);
       const taskId = String(body?.taskId ?? '');
       const hubId = me.hubId ?? (await this.logistics.getTask(taskId)).toHubId;
@@ -1595,10 +1605,10 @@ export class RealtimeGateway
   async analyticsWarehouse(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
       const user = this.requireUser(client);
-      if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') {
-        return fail('Staff only.');
-      }
-      if (!(await this.tierOk(user, 'manage'))) return fail('Only managers can see this.');
+      // The admin roles with the insight dashboards (super admin, operations, finance) read the figures; warehouse staff need a manager tier.
+      if (this.isAdmin(user.role) && !this.can(user.role, 'insight')) return fail('Not allowed.');
+      if (!this.isAdmin(user.role) && user.role !== 'warehouse_staff') return fail('Staff only.');
+      if (!this.isAdmin(user.role) && !(await this.tierOk(user, 'manage'))) return fail('Only managers can see this.');
       // Staff see their own warehouse's figures; admins see all, or one warehouse when they ask.
       return ok(await this.analytics.warehouseStats(await this.hubScope(user, body?.hubId)));
     } catch (e) {
@@ -1888,7 +1898,7 @@ export class RealtimeGateway
   async warehouseRiders(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.rider.activeRiders(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -1929,7 +1939,7 @@ export class RealtimeGateway
     @MessageBody() body?: { activeOnly?: boolean },
   ) {
     try {
-      if (!this.isOps(this.requireUser(client).role)) return fail('Staff only.');
+      if (!this.isOps(this.requireUser(client).role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.warehouse.listHubs({ activeOnly: body?.activeOnly === true }));
     } catch (e) {
       return fail((e as Error).message);
@@ -1978,7 +1988,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       // Staff see their own warehouse's parcels; admins may look at one warehouse.
       return ok(await this.warehouse.parcels(body?.stage, body, await this.hubScope(user, body?.hubId)));
     } catch (e) {
@@ -1993,7 +2003,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
       return ok(await this.warehouse.aged(body, await this.hubScope(user, body?.hubId)));
     } catch (e) {
@@ -2008,7 +2018,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.warehouse.inventory(body, await this.hubScope(user, (body as { hubId?: string })?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -2019,7 +2029,7 @@ export class RealtimeGateway
   async whBatches(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.warehouse.listBatches(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -2035,7 +2045,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       const rider = await this.users.findById(String(body?.riderId ?? ''));
       if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
       if (!Array.isArray(body.taskIds) || body.taskIds.length === 0 || body.taskIds.length > 200) return fail('Select 1–200 parcels.');
@@ -2049,10 +2059,10 @@ export class RealtimeGateway
   async whReconcile(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Staff only.');
       // Rider cash: the Super Admin, Finance and Operations, or a supervisor or manager of their own warehouse (hubScope).
-      if (this.isAdmin(user.role) && !CASH_DESK_ADMINS.includes(user.role)) return fail('Not allowed.');
-      if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
+      const cashAdmin = CASH_DESK_ADMINS.includes(user.role);
+      if (!cashAdmin && user.role !== 'warehouse_staff') return fail('Not allowed.');
+      if (!cashAdmin && !(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
       return ok(await this.warehouse.reconcile(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
@@ -2196,7 +2206,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       // The incident list is a supervisor page; an operator may read the incidents of ONE parcel (its detail screen).
       const taskId = typeof body?.taskId === 'string' && body.taskId ? body.taskId : null;
       if (!taskId && !(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
@@ -2221,7 +2231,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       if (!body?.notes) return fail('notes is required.');
       return ok(await this.warehouse.createException(user.name, body, user.role === 'warehouse_staff' ? await this.hubScope(user) : null));
     } catch (e) {
@@ -2241,7 +2251,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       if (!(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can do this.');
       return ok(
         await this.warehouse.setExceptionStatus(body.id, body.status, body.resolution, user.role === 'warehouse_staff' ? await this.hubScope(user) : null),
@@ -2357,7 +2367,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      if (!this.isOps(user.role)) return fail('Ops only.');
+      if (!this.isOps(user.role)) return fail(DESK_ADMINS_ONLY);
       // Same rules as `logistics:assign`: supervisor tier or above, the task's warehouse, a rider who may run it.
       return ok(await this.logistics.assign(String(body?.taskId ?? ''), String(body?.riderId ?? ''), await this.deskActor(user)));
     } catch (e) {

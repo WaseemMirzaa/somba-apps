@@ -90,6 +90,8 @@ const allDay = { workStart: '00:00', workEnd: '23:59', workDays: [1, 2, 3, 4, 5,
   ok(!(await req(operator.sock, 'hubSettings:update', { batchSize: 7 })).ok, 'an operator cannot change them');
   ok(!(await req(limete.sock, 'hubSettings:update', { hubId: kin, batchSize: 7 })).ok, "a supervisor of another warehouse cannot change this warehouse's settings (hubId ignored, not a manager)");
   ok(!(await req(finance.sock, 'hubSettings:update', { hubId: kin, batchSize: 7 })).ok, 'a finance admin cannot change them');
+  a = await req(finance.sock, 'hubSettings:get', { hubId: kin });
+  ok(!a.ok && /warehouse desk/.test(a.error ?? ''), 'or read them: the warehouse desk is for operations admins and warehouse staff', a.error ?? 'was allowed');
   ok(!(await req(rider.sock, 'hubSettings:get')).ok, 'a rider cannot read them');
   ok(!(await req(cust.sock, 'hubSettings:get')).ok, 'a customer cannot read them');
   a = await req(admin.sock, 'hubSettings:get');
@@ -153,7 +155,8 @@ const allDay = { workStart: '00:00', workEnd: '23:59', workDays: [1, 2, 3, 4, 5,
   ok(!(await req(manager.sock, 'analytics:legs', { from: '2015-01-01', to: today })).ok, 'a period longer than a year is refused');
   ok(!(await req(manager.sock, 'analytics:legs', { from: 'soon' })).ok, 'a bad date is refused');
   ok(!(await req(operator.sock, 'analytics:legs', {})).ok, 'an operator cannot read the analytics');
-  ok((await req(finance.sock, 'analytics:legs', { hubId: kin })).ok, 'an admin can, for one warehouse');
+  ok((await req(ops.sock, 'analytics:legs', { hubId: kin })).ok && (await req(admin.sock, 'analytics:legs', { hubId: kin })).ok, 'the operations admin and the super admin can, for one warehouse');
+  ok(!(await req(finance.sock, 'analytics:legs', { hubId: kin })).ok && !(await req(finance.sock, 'aged:summary', { hubId: kin })).ok, 'a finance admin cannot read the leg analytics or the aged board (not the warehouse desk)');
   ok(!(await req(rider.sock, 'analytics:legs', {})).ok, 'a rider cannot');
 
   // ── aged parcels ────────────────────────────────────────────────────────────

@@ -111,6 +111,14 @@ export class RealtimeEmitter {
     this.fanout(event, payload);
   }
 
+  /**
+   * Like {@link toRoles} but WITHOUT the fan-out to individual accounts (sellers). For a second, reduced copy of an event whose
+   * full copy already went through `toRoles`: the fan-out must see the full payload once, not the reduced one again.
+   */
+  toRolesOnly(roles: string[], event: string, payload: unknown): void {
+    for (const role of roles) this.emit(RealtimeEmitter.roleRoom(role), event, payload);
+  }
+
   /** Push to every connected client (guests included), whatever their role. For reference data everybody follows. */
   broadcast(event: string, payload: unknown): void {
     if (!this.server) {

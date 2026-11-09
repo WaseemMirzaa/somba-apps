@@ -31,3 +31,14 @@ test("departments with no business in fraud still do not see it; Finance and the
   assert.equal(canAdminAccess("finance", "/admin/fraud"), true);
   assert.equal(canAdminAccess("super", "/admin/fraud"), true);
 });
+
+test("Support, Finance and Moderation open one order read-only (their 'View order' links); the Orders list stays with Operations", () => {
+  for (const d of ["support", "finance", "moderation"]) {
+    assert.equal(canAdminAccess(d, "/admin/orders/abc-123"), true, `${d} opens an order`);
+    assert.equal(canAdminAccess(d, "/admin/orders"), false, `${d} has no Orders list`);
+    assert.equal(canAdminAccess(d, "/admin/orders/abc/extra"), false, `${d}: only the order page itself`);
+  }
+  for (const d of ["marketing", "warehouse"]) assert.equal(canAdminAccess(d, "/admin/orders/abc-123"), false, `${d} has no business with an order`);
+  for (const d of ["super", "operations"]) assert.equal(canAdminAccess(d, "/admin/orders/abc-123"), true, d);
+  assert.equal(canAdminAccess("support", "/admin/fulfillment/desk"), false); // the desk stays closed
+});

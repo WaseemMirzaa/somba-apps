@@ -9,9 +9,9 @@ import { cleanPoint } from '../common/geo/geo';
 import { CoverageService } from '../geo/coverage.service';
 import { AreaView, GeoService } from '../geo/geo.service';
 import { RoutingService } from './routing.service';
-import { WAREHOUSE_TIERS, WarehouseTier, tierAllows } from './tiers';
+import { DESK_ROLES, WAREHOUSE_TIERS, WarehouseTier, isDeskAdmin, tierAllows } from './tiers';
 
-const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
+const OPS_ROOMS = [...DESK_ROLES, 'warehouse_staff'];
 
 /**
  * A warehouse as the directory shows it: `riders` / `staff` are the active head counts (`activeRiders` / `staffCount`
@@ -170,7 +170,7 @@ export class HubsService {
     if (typeof tier !== 'string' || !(WAREHOUSE_TIERS as readonly string[]).includes(tier)) throw new Error(`Tier must be one of: ${WAREHOUSE_TIERS.join(', ')}.`);
     const target = await this.users.findOne({ where: { id: userId } });
     if (!target || target.role !== 'warehouse_staff') throw new Error('Only warehouse staff have a tier.');
-    const isAdmin = actor.role.startsWith('admin');
+    const isAdmin = isDeskAdmin(actor.role);
     if (!isAdmin) {
       if (target.id === actor.id) throw new Error('You cannot change your own tier.');
       if (!actor.hubId || target.hubId !== actor.hubId) throw new Error('This person works at another warehouse.');

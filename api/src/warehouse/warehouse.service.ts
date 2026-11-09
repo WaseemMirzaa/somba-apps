@@ -24,7 +24,7 @@ import { HubsService } from '../logistics/hubs.service';
 import { HubOpsSettingsService } from '../logistics/hub-ops-settings.service';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { riderFits } from '../logistics/leg-rules';
-import { tierAllows } from '../logistics/tiers';
+import { DESK_ROLES, isDeskAdmin, tierAllows } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
@@ -61,7 +61,7 @@ export class WarehouseService {
 
   /** Tell the admins and the staff of the incident's own warehouse (nobody else's). */
   private pushException(exc: WarehouseException): void {
-    this.emitter.toRoles(ADMIN_ROLES, 'exception:updated', exc);
+    this.emitter.toRoles(DESK_ROLES, 'exception:updated', exc);
     if (exc.hubId) this.emitter.toHub(exc.hubId, 'exception:updated', exc);
   }
 
@@ -221,7 +221,7 @@ export class WarehouseService {
     for (const id of ids) {
       const task = await this.tasks.findOne({ where: { id } });
       if (!task) throw new BadRequestException('Delivery task not found.');
-      if (!actor.role.startsWith('admin') && task.hubId !== actor.hubId) throw new BadRequestException('This task belongs to another warehouse.');
+      if (!isDeskAdmin(actor.role) && task.hubId !== actor.hubId) throw new BadRequestException('This task belongs to another warehouse.');
       if (!riderFits(task, rider.hubId)) throw new BadRequestException('This rider works at another warehouse.');
       if (!['unassigned', 'assigned'].includes(task.status)) continue;
       tasks.push(task);
@@ -243,7 +243,7 @@ export class WarehouseService {
         status: 'dispatched',
       }),
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'batch:updated', batch);
+    this.emitter.toRoles(DESK_ROLES, 'batch:updated', batch);
     if (hubId) this.emitter.toHub(hubId, 'batch:updated', batch);
     return batch;
   }

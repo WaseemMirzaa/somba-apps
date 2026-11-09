@@ -127,16 +127,17 @@ describe('hub scoping of orders, incidents and inventory', () => {
       expect(a.originBySeller).toEqual({ sellerA: gombe.id, sellerB: limete.id }); // the raw order (ops, staff) carries it too
     });
 
-    it('order pushes go to the admins and the warehouses of that order, never to every warehouse', () => {
-      pushOrderToOps(emitter as never, ['admin', 'admin_operations'], 'order:updated', { destinationHubId: 'd', originHubIds: ['o', 'd'] });
+    it('order pushes go to the admin roles that read orders and the warehouses of that order, never to every warehouse or every admin', () => {
+      pushOrderToOps(emitter as never, 'order:updated', { destinationHubId: 'd', originHubIds: ['o', 'd'] });
       expect(emitter.sent.map((e) => [e.to, e.event])).toEqual([
-        ['admin,admin_operations', 'order:updated'],
+        ['admin,admin_operations,admin_support', 'order:updated'],
+        ['admin_finance,admin_moderation', 'order:updated'],
         ['hub:d', 'order:updated'],
         ['hub:o', 'order:updated'],
       ]);
       emitter.sent.length = 0;
-      pushOrderToOps(emitter as never, ['admin'], 'order:created', { destinationHubId: null, originHubIds: null });
-      expect(emitter.sent.map((e) => e.to)).toEqual(['admin']);
+      pushOrderToOps(emitter as never, 'order:created', { destinationHubId: null, originHubIds: null });
+      expect(emitter.sent.map((e) => e.to)).toEqual(['admin,admin_operations,admin_support', 'admin_finance,admin_moderation']);
     });
   });
 

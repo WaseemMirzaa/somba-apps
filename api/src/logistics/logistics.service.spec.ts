@@ -30,7 +30,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
   let world: Awaited<ReturnType<typeof geoWorld>>;
   let setting: Record<string, string>;
   const notif = { toUser: jest.fn(async () => undefined), toUsers: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined), toRole: jest.fn(async () => undefined) };
-  const emitter = { toUser: jest.fn(), toRoles: jest.fn(), toHub: jest.fn() };
+  const emitter = { toUser: jest.fn(), toRoles: jest.fn(), toRolesOnly: jest.fn(), toHub: jest.fn() };
   const payments = { markCollected: jest.fn(async () => undefined) };
 
   let gombe: Hub;

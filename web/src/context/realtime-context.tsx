@@ -12,6 +12,7 @@ import {
 import { authApi, AuthApiError } from "@/lib/realtime/auth-api";
 import { isTransientAuthStatus, refreshFailureAction } from "@/lib/session-errors";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { canListDeliveries, canReadOrders } from "@/lib/staff-access";
 import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
 import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
 import type {
@@ -297,8 +298,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           failure ??= e instanceof Error && e.message ? e.message : "Request failed.";
           return [];
         };
+        // The server refuses orders to marketing and the delivery tasks to every admin but operations: do not ask, or the
+        // page would carry a permanent error banner (`listError`).
+        const role = userRoleRef.current;
         const [ord, notif] = await Promise.all([
-          socketClient.request<Order[]>("orders:list", { limit: PAGE_SIZE }).catch(keep),
+          canReadOrders(role) ? socketClient.request<Order[]>("orders:list", { limit: PAGE_SIZE }).catch(keep) : Promise.resolve([] as Order[]),
           socketClient
             .request<AppNotification[]>("notifications:list")
             .catch(() => []),
@@ -309,10 +313,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setNotifications(withSeen(userIdRef.current, notif));
         // A browser that turned alerts on keeps getting them for whoever is signed in now.
         void syncWebPush();
-        // Delivery tasks are listed for riders and staff only: the server answers anyone else "Not allowed.", which
-        // would show up as a permanent error banner on a customer's orders page.
-        const role = userRoleRef.current;
-        const mayListDeliveries = !role || role === "rider" || role === "warehouse_staff" || role.startsWith("admin");
+        // Delivery tasks are listed for riders, warehouse staff and the desk admins (super admin, operations) only: the
+        // server answers anyone else a refusal, which would show up as a permanent error banner on the page.
+        const mayListDeliveries = !role || canListDeliveries(role);
         const del = mayListDeliveries
           ? await socketClient.request<DeliveryTask[]>("delivery:list", { limit: PAGE_SIZE }).catch(keep)
           : [];
@@ -511,6 +514,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const reloadLists = useCallback(() => hydrateRef.current(), []);
 
   const loadMoreOrders = useCallback(async () => {
+    if (!canReadOrders(userRoleRef.current)) return;
     const rows = await socketClient.request<Order[]>("orders:list", {
       limit: PAGE_SIZE,
       offset: fetched.current.orders,

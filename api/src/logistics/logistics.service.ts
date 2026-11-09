@@ -41,7 +41,7 @@ import {
   riderFits,
   touchesHub,
 } from './leg-rules';
-import { tierAllows } from './tiers';
+import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
 import { AUTO_ASSIGN_KINDS, Candidate, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
 import { pushOrderToOps } from './hub-scope';
@@ -415,7 +415,7 @@ export class LogisticsService {
       const hubIds = [...new Set([fresh.hubId, fresh.fromHubId, fresh.toHubId].filter((x): x is string => !!x))];
       for (const ev of ['task:updated', 'delivery:updated']) {
         for (const h of hubIds) this.emitter.toHub(h, ev, view);
-        this.emitter.toRoles(ADMIN_ROLES, ev, view);
+        this.emitter.toRoles(DESK_ROLES, ev, view);
         if (fresh.riderId) this.emitter.toUser(fresh.riderId, ev, view);
       }
       // The customer follows their parcel: the order goes out again, and their view of it (OrdersService.customerViews)
@@ -688,11 +688,23 @@ export class LogisticsService {
   }
 
   /**
+   * Scanning is warehouse work: a desk admin (any warehouse) or warehouse staff of THAT warehouse. The gateways already build
+   * the actor that way; this is the same rule where the work is done, so no other caller (and no other admin role) can scan.
+   * A call with no actor is the system itself (seed, demo, jobs).
+   */
+  private assertMayScan(actor: Actor | null, hubId: string): void {
+    if (!actor) return;
+    if (!tierAllows(actor.role, actor.tier, 'scan')) throw new BadRequestException(DESK_ADMINS_ONLY);
+    if (!isDeskAdmin(actor.role) && actor.hubId !== hubId) throw new BadRequestException('This parcel is not due at your warehouse.');
+  }
+
+  /**
    * Staff of `hubId` scanned a parcel in. A hub-bound leg is finished ("delivered" = at the warehouse) and the next
    * leg is created when it is due: pickup scanned at the origin -> a transfer to the destination (when they differ);
    * the delivery leg once EVERY parcel of the order is at the destination; return legs run back the other way.
    */
   async onScanIn(taskId: string, hubId: string, actor: Actor | null = null): Promise<{ task: DeliveryTask; next: DeliveryTask[] }> {
+    this.assertMayScan(actor, hubId);
     const task = await this.tasks.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('Delivery task not found.');
     if (!isHubBound(task.kind)) throw new BadRequestException('This task is finished by the rider, not scanned in.');
@@ -970,7 +982,7 @@ export class LogisticsService {
   // ── assigning, scanning out, rider progress ──────────────────────────────────
   /** May `actor` manage (see / assign) this task's warehouse? */
   private actorManages(actor: Actor, task: DeliveryTask): boolean {
-    if (actor.role.startsWith('admin')) return true;
+    if (isDeskAdmin(actor.role)) return true;
     return !!actor.hubId && task.hubId === actor.hubId;
   }
 
@@ -1073,8 +1085,8 @@ export class LogisticsService {
    * are told to decide (money is never touched by the warehouse desk).
    */
   async returnToSeller(taskId: string, actor: Actor): Promise<{ closed: DeliveryTask; legs: DeliveryTask[] }> {
-    if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can return a parcel to its seller.');
     if (actor.role.startsWith('admin') && !RETURN_TO_SELLER_ADMINS.includes(actor.role)) throw new BadRequestException('Only the super admin and the operations admin can return a parcel to its seller.');
+    if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can return a parcel to its seller.');
     const task = await this.tasks.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('Delivery task not found.');
     if (!this.actorManages(actor, task)) throw new BadRequestException('This task belongs to another warehouse.');
@@ -1156,7 +1168,7 @@ export class LogisticsService {
         await this.orders.update({ id: order.id }, { riderId: rider.id });
         const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
         this.emitter.toUser(saved.customerId, 'order:updated', saved);
-        pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+        pushOrderToOps(this.emitter, 'order:updated', saved);
         await this.notifications.toUser(saved.customerId, { title: 'Rider assigned', body: `${rider.name} is handling ${saved.reference}.`, type: 'delivery', entityId: saved.id });
       }
     }
@@ -1179,6 +1191,7 @@ export class LogisticsService {
 
   /** Staff hand the parcel to its rider at the warehouse ("scan out"): assigned -> picked_up. */
   async scanOut(taskId: string, hubId: string, actor: Actor | null = null): Promise<DeliveryTask> {
+    this.assertMayScan(actor, hubId);
     const task = await this.tasks.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('Delivery task not found.');
     if (!OUTBOUND_KINDS.includes(task.kind) || task.fromHubId !== hubId) throw new BadRequestException('This parcel does not leave from your warehouse.');
@@ -1225,7 +1238,7 @@ export class LogisticsService {
     if (!claim.affected) return order;
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     if (opts.notice === 'warehouse') {
       await this.notifications
         .toUser(saved.customerId, { title: 'Parcel at our warehouse', body: `${saved.reference} reached the Somba&Teka warehouse and will be on its way soon.`, type: 'delivery', entityId: saved.id })
@@ -1353,8 +1366,8 @@ export class LogisticsService {
 
   /** What a staff member may do with each task (for the buttons on the desk). */
   desk(task: Pick<DeliveryTask, 'kind' | 'status' | 'hubId' | 'fromHubId' | 'toHubId' | 'riderId'>, actor: Actor): { assign: boolean; scanIn: boolean; scanOut: boolean } {
-    const hubId = actor.role.startsWith('admin') ? (null as string | null) : (actor.hubId ?? null);
-    const manages = actor.role.startsWith('admin') || (!!hubId && task.hubId === hubId);
+    const hubId = isDeskAdmin(actor.role) ? (null as string | null) : (actor.hubId ?? null);
+    const manages = isDeskAdmin(actor.role) || (!!hubId && task.hubId === hubId);
     return {
       assign: manages && tierAllows(actor.role, actor.tier, 'assign') && ['unassigned', 'assigned'].includes(task.status),
       scanIn: tierAllows(actor.role, actor.tier, 'scan') && (hubId ? canScanInAt(task, hubId) : isHubBound(task.kind) && COLLECTED_STATUSES.includes(task.status)),

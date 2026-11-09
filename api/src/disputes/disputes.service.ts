@@ -1031,7 +1031,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     order.status = 'returned';
     await this.orders.save(order);
     this.emitter.toUser(order.customerId, 'order:updated', order);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', order);
+    pushOrderToOps(this.emitter, 'order:updated', order);
   }
 
   /** Goods are back on an approved return: refund the items and close the request. On failure it waits for finance. */

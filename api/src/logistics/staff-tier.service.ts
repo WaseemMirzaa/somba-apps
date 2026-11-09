@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../database/entities';
-import { DeskAction, tierAllows } from './tiers';
+import { DeskAction, isDeskAdmin, tierAllows } from './tiers';
 
 /**
  * Tier check for gateways that do not load the caller's warehouse row themselves (after-sale, disputes). Admins pass;
@@ -20,7 +20,7 @@ export class StaffTierService {
   }
 
   async allows(user: { id: string; role: string }, action: DeskAction): Promise<boolean> {
-    if (user.role.startsWith('admin')) return true;
+    if (isDeskAdmin(user.role)) return true;
     if (user.role !== 'warehouse_staff') return false;
     const row = await this.users.findOne({ where: { id: user.id }, select: ['id', 'warehouseTier'] });
     return tierAllows(user.role, row?.warehouseTier, action);

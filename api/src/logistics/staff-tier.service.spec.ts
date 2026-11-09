@@ -19,9 +19,10 @@ describe('StaffTierService', () => {
     expect(await s.hubOf({ id: 'op', role: 'rider' })).toBeNull();
   });
 
-  it('allows: admins everything, staff by tier, everyone else nothing', async () => {
+  it('allows: the desk admins everything, staff by tier, every other admin role and everyone else nothing', async () => {
     const s = svc();
-    expect(await s.allows({ id: 'x', role: 'admin_support' }, 'oversee')).toBe(true);
+    for (const role of ['admin', 'admin_operations']) expect(await s.allows({ id: 'x', role }, 'oversee')).toBe(true);
+    for (const role of ['admin_support', 'admin_finance', 'admin_marketing', 'admin_moderation']) expect(await s.allows({ id: 'x', role }, 'oversee')).toBe(false);
     expect(await s.allows({ id: 'op', role: 'warehouse_staff' }, 'oversee')).toBe(false);
     expect(await s.allows({ id: 'sup', role: 'warehouse_staff' }, 'oversee')).toBe(true);
     expect(await s.allows({ id: 'sup', role: 'warehouse_staff' }, 'manage')).toBe(false);

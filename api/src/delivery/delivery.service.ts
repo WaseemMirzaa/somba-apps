@@ -12,6 +12,7 @@ import { tasksOfHub } from '../logistics/hub-scope';
 import { isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
 import { LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
+import { DESK_ROLES } from '../logistics/tiers';
 
 /** Called when a rider reports a failed attempt (OrdersService re-opens the leg or cancels the order). */
 export type DeliveryFailedHandler = (task: DeliveryTask, reason: string) => Promise<void>;
@@ -226,7 +227,7 @@ export class DeliveryService {
       if (order) this.emitter.toUser(order.customerId, 'delivery:location', payload);
     }
     for (const h of new Set([task.hubId, task.fromHubId, task.toHubId].filter((x): x is string => !!x))) this.emitter.toHub(h, 'delivery:location', payload);
-    this.emitter.toRoles(ADMIN_ROLES, 'delivery:location', payload);
+    this.emitter.toRoles(DESK_ROLES, 'delivery:location', payload);
   }
 
   /** The handover code (select:false column, so it is only ever read here and by the customer endpoint). */

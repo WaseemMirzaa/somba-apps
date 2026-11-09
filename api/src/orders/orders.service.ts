@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, QueryFailedError, Repository } from 'typeorm';
 import {
@@ -45,6 +45,7 @@ import { isOrderFlow } from '../logistics/leg-rules';
 import { ORDER_HUB_SQL, hubsOfOrder, orderHubParams, pushOrderToOps } from '../logistics/hub-scope';
 import { parseAddressPin } from '../common/geo/geo';
 import { inRoleGroup } from '../common/role-groups';
+import { ORDER_ACCESS_DENIED, OrderAudience, orderAudienceOf, withoutAddress } from '../common/order-access';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -616,7 +617,7 @@ export class OrdersService {
 
   /** Tell the warehouse, admins and sellers about a new order. (The pickup tasks tell their own warehouse's staff.) */
   private async announceOrder(order: Order): Promise<void> {
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:created', order);
+    pushOrderToOps(this.emitter, 'order:created', order);
     await this.notifications.toAdmins({
       title: 'New order',
       body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
@@ -898,7 +899,7 @@ export class OrdersService {
     if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
     const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toAdmins({
       title: allReady ? 'Parcel ready for pickup' : 'Seller package ready',
       body: allReady
@@ -998,7 +999,7 @@ export class OrdersService {
     }
 
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     const names = targets.map((i) => i.productName).join(', ');
     await this.notifications.toUser(saved.customerId, {
       title: 'Item cancelled by the seller',
@@ -1051,7 +1052,7 @@ export class OrdersService {
       }
       await this.logistics.voidOrderTasks(saved.id);
       this.emitter.toUser(saved.customerId, 'order:updated', saved);
-      pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+      pushOrderToOps(this.emitter, 'order:updated', saved);
       await this.notifications.toUser(saved.customerId, {
         title: 'Order cancelled',
         body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded > 0 ? ` $${refunded.toFixed(2)} was refunded to your wallet.` : ''}`,
@@ -1066,7 +1067,7 @@ export class OrdersService {
     const saved = await this.orders.save(order);
     const next = await this.logistics.reopen(task);
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Delivery attempt failed',
       body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}). You can also cancel the order.`,
@@ -1105,7 +1106,7 @@ export class OrdersService {
     }
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
     // Sellers saw the order as awaiting payment: the fanout tells them it is gone.
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
       body: `${saved.reference} was cancelled: ${payment.failureReason ?? 'payment was not completed'}.`,
@@ -1180,7 +1181,7 @@ export class OrdersService {
 
     // Everyone who cares about this order hears about it instantly.
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     if (saved.riderId) {
       this.emitter.toUser(saved.riderId, 'order:updated', saved);
     }
@@ -1266,7 +1267,7 @@ export class OrdersService {
     await this.logistics.voidOrderTasks(saved.id);
 
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
       body: `${saved.reference} was cancelled${opts.reason ? ` by Somba&Teka support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
@@ -1298,30 +1299,39 @@ export class OrdersService {
       return this.orders.find({ where: { riderId: user.id }, order: { createdAt: 'DESC' }, take, skip });
     }
     if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
-      // Staff queues have always been the newest 200; an explicit limit/offset pages further back.
-      const staff = pageOf(paging, { def: 200 });
-      // Warehouse staff see the orders their own warehouse delivers or collects for; admins (no hub) see all.
-      if (hubId) {
-        const ids = (
-          await this.orders
-            .createQueryBuilder('o')
-            .select('o.id', 'id')
-            .addSelect('o.createdAt', 'createdAt')
-            .where(ORDER_HUB_SQL, orderHubParams(hubId))
-            .orderBy('o.createdAt', 'DESC')
-            .offset(staff.skip)
-            .limit(staff.take)
-            .getRawMany<{ id: string }>()
-        ).map((r) => r.id);
-        if (!ids.length) return [];
-        return this.orders.find({ where: { id: In(ids) }, order: { createdAt: 'DESC' } });
-      }
-      return this.orders.find({ order: { createdAt: 'DESC' }, take: staff.take, skip: staff.skip });
+      // An admin role sees what its department needs: operations and support the whole order, finance and moderation the order without the
+      // customer's address, marketing nothing (the gateway says so; this is the same rule at the data layer).
+      const audience: OrderAudience = user.role === 'warehouse_staff' ? 'full' : orderAudienceOf(user.role);
+      if (audience === 'none') throw new ForbiddenException(ORDER_ACCESS_DENIED);
+      const rows = await this.staffOrders(paging, hubId);
+      return audience === 'full' ? rows : rows.map((o) => withoutAddress(o));
     }
     // The seller's list is paged, searched and filtered in the database (SellerOrdersService registers itself here).
     if (user.role === 'seller' && this.sellerLister) return this.sellerLister(user, sellerId, paging);
     if (user.role === 'seller') return this.listForSeller([...new Set([sellerId ?? user.id, user.id])], { take: pageOf(paging, { def: 200 }).take, skip });
     return [];
+  }
+
+  /** The staff queue: the newest 200 by default (an explicit limit/offset pages further back); one warehouse's orders when `hubId` is given. */
+  private async staffOrders(paging: unknown, hubId?: string | null): Promise<Order[]> {
+    const staff = pageOf(paging, { def: 200 });
+    // Warehouse staff see the orders their own warehouse delivers or collects for; admins (no hub) see all.
+    if (hubId) {
+      const ids = (
+        await this.orders
+          .createQueryBuilder('o')
+          .select('o.id', 'id')
+          .addSelect('o.createdAt', 'createdAt')
+          .where(ORDER_HUB_SQL, orderHubParams(hubId))
+          .orderBy('o.createdAt', 'DESC')
+          .offset(staff.skip)
+          .limit(staff.take)
+          .getRawMany<{ id: string }>()
+      ).map((r) => r.id);
+      if (!ids.length) return [];
+      return this.orders.find({ where: { id: In(ids) }, order: { createdAt: 'DESC' } });
+    }
+    return this.orders.find({ order: { createdAt: 'DESC' }, take: staff.take, skip: staff.skip });
   }
 
   private sellerLister: ((user: { id: string; role: string }, sellerId: string | undefined, paging: unknown) => Promise<unknown[]>) | null = null;

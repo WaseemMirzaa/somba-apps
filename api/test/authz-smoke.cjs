@@ -584,6 +584,64 @@ const register = async (label, role = 'customer') => {
   ok((await req(manager.sock, 'exceptions:setStatus', { id: excId, status: 'resolved', resolution: 'Smoke' })).ok, 'the warehouse manager resolves it');
   ok(!(await req(rider.sock, 'warehouse:aged', {})).ok && !(await req(cust.sock, 'warehouse:reconcile', {})).ok, 'riders and customers never');
 
+  // The warehouse and logistics desk: dispatch, scanning, batches, runs, task reads. Only the super admin, operations and warehouse staff.
+  section('Least privilege: the warehouse desk is for operations and warehouse staff, not for every admin');
+  const deskParcel = (await req(manager.sock, 'warehouse:parcels', { limit: 5 })).data?.find((t) => !['delivered', 'failed'].includes(t.status));
+  ok(!!deskParcel, 'setup: the Kinshasa manager sees a parcel to try the desk on');
+  const parcelState = async () => { const t = (await req(admin.sock, 'warehouse:parcels', { limit: 200 })).data?.find((x) => x.id === deskParcel?.id); return `${t?.status}|${t?.riderId ?? ''}`; };
+  const stateBefore = await parcelState();
+  const notDesk = { finance, support, marketing, moderation };
+  const deskCalls = [
+    ['delivery:list', {}], ['delivery:unassigned', {}], ['delivery:assign', { taskId: deskParcel?.id, riderId: rider.user.id }],
+    ['warehouse:parcels', {}], ['warehouse:inventory', {}], ['warehouse:batches', {}], ['warehouse:riders', {}], ['warehouse:hubs', {}], ['warehouse:aged', {}],
+    ['warehouse:receive', { taskId: deskParcel?.id }], ['warehouse:buildBatch', { taskIds: [deskParcel?.id], riderId: rider.user.id }],
+    ['exceptions:list', {}], ['exceptions:create', { notes: `Not my desk ${tag}`, type: 'damaged' }], ['exceptions:setStatus', { id: 'x', status: 'resolved' }],
+    ['logistics:queue', {}], ['logistics:custody', { hubId: deskParcel?.hubId }], ['logistics:riders', { taskId: deskParcel?.id }],
+    ['logistics:assign', { taskId: deskParcel?.id, riderId: rider.user.id }], ['logistics:scanIn', { taskId: deskParcel?.id }], ['logistics:scanOut', { taskId: deskParcel?.id }],
+    ['logistics:dispatchTransfer', { taskId: deskParcel?.id }], ['logistics:runs', {}], ['logistics:runProposals', { hubId: deskParcel?.hubId }],
+    ['logistics:createRun', { toHubId: deskParcel?.hubId, taskIds: [deskParcel?.id] }], ['logistics:dispatchRun', { runId: 'x' }], ['logistics:receiveRun', { runId: 'x' }],
+    ['lanes:list', {}], ['routes:preview', {}], ['hubs:people', { hubId: deskParcel?.hubId }], ['hubs:setTier', { userId: operator.user.id, tier: 'manager' }],
+    ['hubSettings:get', { hubId: deskParcel?.hubId }], ['aged:summary', {}], ['analytics:legs', {}], ['warehouseOps:runNow', {}],
+  ];
+  for (const [name, u] of Object.entries(notDesk)) {
+    const refused = [];
+    for (const [ev, body] of deskCalls) {
+      a = await req(u.sock, ev, body);
+      if (a.ok) refused.push(`${ev} was allowed`);
+      else if (!/warehouse desk|Not allowed/.test(a.error ?? '')) refused.push(`${ev}: ${a.error}`);
+    }
+    ok(refused.length === 0, `${name} admin is refused at all ${deskCalls.length} desk events (dispatch, scan, batches, runs, task reads, incidents)`, refused.join(' | '));
+  }
+  ok((await parcelState()) === stateBefore, 'so the parcel is exactly as the warehouse left it (nothing was assigned or scanned)');
+  a = await req(notDesk.marketing.sock, 'logistics:assign', { taskId: deskParcel?.id, riderId: rider.user.id });
+  ok(!a.ok && /Only operations admins and warehouse staff can work the warehouse desk/.test(a.error ?? ''), 'the refusal says whose desk it is', a.error ?? '');
+  for (const [name, u] of Object.entries({ admin, ops })) {
+    ok((await req(u.sock, 'delivery:list', {})).ok && (await req(u.sock, 'logistics:queue', {})).ok && (await req(u.sock, 'warehouse:riders', {})).ok && (await req(u.sock, 'exceptions:list', {})).ok, `the ${name} admin still reads the desk, tasks and incidents`);
+  }
+  ok((await req(manager.sock, 'logistics:queue', {})).ok && (await req(operator.sock, 'delivery:list', {})).ok, 'and warehouse staff still work their own warehouse');
+  // The hub directory: the full list (head counts, address) for the desk; the public list for every other admin role.
+  ok((await req(ops.sock, 'hubs:list', {})).data?.every((h) => 'activeRiders' in h), 'operations reads the full hub directory');
+  for (const [name, u] of Object.entries(notDesk)) {
+    const hubs = (await req(u.sock, 'hubs:list', {})).data ?? [];
+    ok(hubs.length > 0 && hubs.every((h) => !('activeRiders' in h) && !('address' in h)), `${name} admin gets the public hub list only`);
+  }
+  // Orders carry the customer's delivery address and phone: super admin, operations and support (read-only) read them; finance and
+  // moderation read the order without it; marketing reads no order.
+  const addressOf = async (u) => ((await req(u.sock, 'orders:list', { limit: 200 })).data ?? []).filter((o) => o.shippingAddress).length;
+  const withAddress = await addressOf(admin);
+  ok(withAddress > 0, 'setup: the super admin reads orders with their addresses');
+  ok((await addressOf(ops)) === withAddress && (await addressOf(support)) === withAddress, 'operations and support read the same orders with their addresses');
+  for (const [name, u] of Object.entries({ finance, moderation })) {
+    a = await req(u.sock, 'orders:list', { limit: 200 });
+    ok(a.ok && a.data.length > 0 && a.data.every((o) => !o.shippingAddress), `${name} admin reads the orders (amounts, lines) without any delivery address`);
+  }
+  a = await req(marketing.sock, 'orders:list', {});
+  ok(!a.ok && /cannot read orders/.test(a.error ?? ''), 'marketing admin reads no order', a.error ?? 'was allowed');
+  ok(!(await req(support.sock, 'orders:updateStatus', { orderId: deskParcel?.orderId, status: 'processing' })).ok, 'support reads orders but cannot change one');
+  a = await req(finance.sock, 'analytics:warehouse', {});
+  ok(a.ok, 'finance keeps the warehouse figures of its analytics page');
+  ok(!(await req(support.sock, 'analytics:warehouse', {})).ok && !(await req(marketing.sock, 'analytics:warehouse', {})).ok && !(await req(moderation.sock, 'analytics:warehouse', {})).ok, 'support, marketing and moderation do not');
+
   section('Round 2 least privilege: listing as the platform, translations, store identity papers, rider cash');
   const reviewers = { admin, moderation, ops };
   const notReviewers = { finance, support, marketing };

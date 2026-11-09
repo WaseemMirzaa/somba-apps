@@ -8,7 +8,7 @@ import { AgedParcelsService } from './aged-parcels.service';
 import { HUB_OPS_ADMINS, HubOpsSettingsService } from './hub-ops-settings.service';
 import { Actor, LogisticsService } from './logistics.service';
 import { OpsAnalyticsService } from './ops-analytics.service';
-import { tierAllows, tierOf } from './tiers';
+import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows, tierOf } from './tiers';
 import { WarehouseOpsJob } from './warehouse-ops.job';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
@@ -39,7 +39,10 @@ export class WarehouseOpsGateway {
   private async actor(client: AuthedSocket): Promise<Actor> {
     const u = client.data?.user;
     if (!u || u.role === 'guest') throw new Error('Sign in to continue.');
-    if (u.role.startsWith('admin')) return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    if (u.role.startsWith('admin')) {
+      if (!isDeskAdmin(u.role)) throw new Error(DESK_ADMINS_ONLY);
+      return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    }
     if (u.role !== 'warehouse_staff') throw new Error('Staff only.');
     const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier', 'active'] });
     if (!row?.hubId || row.active === false) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
