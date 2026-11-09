@@ -110,6 +110,22 @@ jobs:
           STATUS=$?
           kill $SERVER_PID || true
           exit $STATUS
+      # These three smokes age orders / write rows straight into MySQL, so they cannot run on the SQLite job above. The
+      # runner gives each its own throw-away database (created and dropped with the root account), a freshly seeded demo
+      # dataset and its own server; SMOKE_STRICT makes a missing MySQL client a failure instead of a skip.
+      - name: MySQL-only smokes (after-sale, r2f, staff 2FA + fraud)
+        env:
+          DB_USERNAME: root
+          DB_PASSWORD: root
+          SMOKE_STRICT: '1'
+        run: |
+          STATUS=0
+          bash test/run-smokes.sh "$RUNNER_TEMP/mysql-smokes" after-sale-smoke r2f-smoke staff-2fa-fraud-smoke || STATUS=$?
+          cat "$RUNNER_TEMP/mysql-smokes/summary.txt"
+          if [ $STATUS -ne 0 ]; then
+            for f in "$RUNNER_TEMP"/mysql-smokes/*.log; do echo "::group::$(basename "$f")"; tail -n 60 "$f"; echo "::endgroup::"; done
+          fi
+          exit $STATUS
 
   web:
     name: Web (build)
