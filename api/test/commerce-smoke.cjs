@@ -127,7 +127,7 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     ok(a.ok, 'a plan without perks allows everything', a.error ?? '');
 
     const mk = async (shop, over) => req(shop.sock, 'products:create', { name: `Item ${tag}`, price: 10, category, stock: 20, ...over });
-    const order = async (items, promoCode, who = cust) => req(who.sock, 'orders:create', { items, paymentMethod: 'stripe_card', shippingAddress: ADDRESS, ...(promoCode ? { promoCode } : {}) });
+    const order = async (items, promoCode, who = cust) => req(who.sock, 'orders:create', { clientRequestId: require('crypto').randomUUID(), items, paymentMethod: 'stripe_card', shippingAddress: ADDRESS, ...(promoCode ? { promoCode } : {}) });
     const walk = async (id, statuses = ['processing', 'shipped', 'out_for_delivery', 'delivered']) => { for (const s of statuses) { const r = await req(ops.sock, 'orders:updateStatus', { orderId: id, status: s }); if (!r.ok) return r; } return { ok: true }; };
     const prod = async (id) => (await req(cust.sock, 'products:get', { id })).data;
     const sellerNotes = async (shop) => (await req(shop.sock, 'notifications:list')).data ?? [];
