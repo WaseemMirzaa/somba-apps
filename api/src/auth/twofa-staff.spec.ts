@@ -5,6 +5,7 @@ import { Setting, User } from '../database/entities';
 import { testDb } from '../testing/test-db';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { AccountDeletionService } from './account-deletion.service';
 import { StaffTwoFaPolicy, STAFF_2FA_REQUIRED_MESSAGE, guardStaffTwoFa } from './staff-twofa';
 import { base32Decode, hashRecovery, hotp, totpCode, totpStep } from './totp';
 import { TwoFaGateway } from './twofa.gateway';
@@ -37,7 +38,7 @@ beforeEach(async () => {
   notices = [];
   const jwt = new JwtService({});
   svc = new TwoFaService(users, jwt, config as never, { toUser: async (to: string, n: { title: string; type: string }) => void notices.push({ to, ...n }) } as never);
-  auth = new AuthService(users, jwt, config as never, svc);
+  auth = new AuthService(users, jwt, config as never, new AccountDeletionService(ds), svc);
   policy = new StaffTwoFaPolicy(ds.getRepository(Setting), ds.getRepository(User));
 });
 afterEach(() => ds.destroy());

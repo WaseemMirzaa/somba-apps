@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
+import { AccountDeletionService } from './account-deletion.service';
 import { AuthService } from './auth.service';
 import { TwoFaService } from './twofa.service';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -31,7 +32,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, VerificationService, TwoFaService, StaffTwoFaPolicy],
+  providers: [AuthService, AccountDeletionService, JwtStrategy, VerificationService, TwoFaService, StaffTwoFaPolicy],
   exports: [AuthService, VerificationService, TwoFaService, StaffTwoFaPolicy],
 })
 export class AuthModule {}

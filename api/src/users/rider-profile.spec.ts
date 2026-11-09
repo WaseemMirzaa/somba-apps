@@ -2,6 +2,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { ENTITIES, User } from '../database/entities';
+import { AccountDeletionService } from '../auth/account-deletion.service';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from './users.service';
 
@@ -23,7 +24,7 @@ describe('a rider edits their own account', () => {
     ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: ENTITIES, synchronize: true });
     await ds.initialize();
     users = new UsersService(ds.getRepository(User));
-    auth = new AuthService(users, new JwtService({}), config as never);
+    auth = new AuthService(users, new JwtService({}), config as never, new AccountDeletionService(ds));
     const make = async (email: string, role: User['role'], name: string, hubId: string | null) =>
       users.create({ email, passwordHash: await bcrypt.hash('Somba@2026', 4), name, role, phone: '+243810000000' }).then((u) => {
         u.hubId = hubId;

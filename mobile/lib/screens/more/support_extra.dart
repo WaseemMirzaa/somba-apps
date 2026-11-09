@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/mobile_money.dart';
 import '../../widgets/feedback.dart';
+import '../../services/account_deletion.dart';
 import '../../services/area_selection.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/geo_directory.dart';
@@ -16,7 +17,10 @@ import '../../services/maps_config.dart';
 import '../location_picker_screen.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/common.dart';
+import '../orders_screen.dart';
+import '../wallet_screen.dart';
 import 'area_picker.dart';
+import 'returns_extra.dart';
 import 'help_contact.dart';
 
 // The ticket screens (list, detail, new ticket) live in support_screens.dart; imports of this file still see them.
@@ -604,6 +608,10 @@ class HelpScreen extends StatelessWidget {
 }
 
 /// Permanently erases the account (the server checks the password).
+///
+/// Before the customer confirms anything the screen asks the server what is still outstanding (`me:deleteCheck`) and
+/// lists it in words, each with the place to settle it; the delete button stays off while the list is not empty. The
+/// server refuses the deletion itself too, so a refusal that still arrives (an order placed meanwhile) is shown the same way.
 class AccountDeleteScreen extends StatefulWidget {
   /// Called after the account is deleted (returns the app to sign-in).
   final VoidCallback? onDeleted;
@@ -617,10 +625,28 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   bool _busy = false;
   String? _err;
 
+  /// What blocks the deletion; null until the server has answered (or when it could not be asked: the server then still decides).
+  List<DeletionBlocker>? _blockers;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
   @override
   void dispose() {
     _pw.dispose();
     super.dispose();
+  }
+
+  Future<void> _check() async {
+    try {
+      final list = await RealtimeStore.instance.deletionBlockers();
+      if (mounted) setState(() => _blockers = list);
+    } catch (_) {
+      // Offline or an older server: the delete button stays on and the server decides.
+    }
   }
 
   Future<void> _delete() async {
@@ -638,21 +664,70 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
       Navigator.of(context).popUntil((r) => r.isFirst);
       widget.onDeleted?.call();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
+      if (!mounted) return;
+      final refused = DeletionBlocker.fromRefusal(e);
+      setState(() {
+        _busy = false;
+        if (refused != null && refused.isNotEmpty) {
+          _blockers = refused;
+        } else {
           _err = Strings.current.errorText(e);
-        });
-      }
+        }
+      });
     }
   }
+
+  void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
+  /// The places that settle the listed reasons, one button each (no icon: label-only).
+  List<Widget> _ctas(Strings s, List<DeletionBlocker> blockers) {
+    final locale = Locale(s.lang);
+    final has = blockers.map((b) => b.kind).toSet();
+    final ctas = <(String, VoidCallback)>[
+      if (has.contains('wallet_balance') || has.contains('pending_topup') || has.contains('pending_refund'))
+        (s.delaccCtaWallet, () => _open(WalletScreen(locale: locale))),
+      if (has.contains('open_order')) (s.delaccCtaOrders, () => _open(OrdersScreen(locale: locale))),
+      if (has.contains('open_return') || has.contains('open_dispute')) (s.delaccCtaReturns, () => _open(ReturnsListScreen(locale: locale))),
+      if (has.contains('wallet_balance') || has.contains('open_ticket') || has.contains('pending_payout') || has.contains('open_dispute'))
+        (s.delaccCtaSupport, () => _open(SupportListScreen(locale: locale))),
+    ];
+    return [
+      for (final c in ctas)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: SizedBox(width: double.infinity, child: OutlinedButton(onPressed: c.$2, child: ButtonLabel(c.$1))),
+        ),
+    ];
+  }
+
+  Widget _blockedCard(Strings s, List<DeletionBlocker> blockers) => Container(
+        key: const ValueKey('delete-blockers'),
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.accentDark.withValues(alpha: 0.4)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(s.delaccBlockedTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.accentDark)),
+          const SizedBox(height: 6),
+          Text(s.delaccBlockedIntro, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.4)),
+          const SizedBox(height: 10),
+          for (final b in blockers) _Bullet(s.delaccBlocker(b)),
+          ..._ctas(s, blockers),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
+    final blockers = _blockers ?? const <DeletionBlocker>[];
+    final blocked = blockers.isNotEmpty;
     return Scaffold(
       appBar: backAppBar(context, s.delaccTitle),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+        if (blocked) _blockedCard(s, blockers),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
@@ -682,7 +757,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
             child: FilledButton(
               key: const ValueKey('delete-account'),
               style: FilledButton.styleFrom(backgroundColor: AppColors.accentDark),
-              onPressed: _busy ? null : _delete,
+              onPressed: _busy || blocked ? null : _delete,
               child: _busy ? const ButtonSpinner() : Text(s.delaccBtn),
             )),
         const SizedBox(height: 10),

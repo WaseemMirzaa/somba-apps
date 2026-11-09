@@ -17,7 +17,7 @@ function make() {
   };
   const jwt = { signAsync: async () => 'token' };
   const config = { get: () => '15m' };
-  const svc = new AuthService(new UsersService(repo as never), jwt as never, config as never);
+  const svc = new AuthService(new UsersService(repo as never), jwt as never, config as never, {} as never);
   return { svc, stored };
 }
 
