@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { CmsBlock } from '../database/entities';
 import { oneOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
+
+/** Staff who edit marketing content and follow it live: the super admin and Marketing (group `content`). */
+const CONTENT_ROLES: string[] = [...ROLE_GROUPS.content];
 import { TranslationService } from '../translation/translation.service';
 import type { TranslationStatus } from '../translation/translation.service';
 import { planWrite } from '../translation/translatable';
@@ -24,7 +27,7 @@ export class CmsService {
     // A machine finished a block's other language: tell the same rooms as any block change.
     this.translations.registerRepublisher('cms_block', async (id) => {
       const block = await this.blocks.findOne({ where: { id } });
-      if (block) this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'cms:updated', (await this.present([block]))[0]);
+      if (block) this.emitter.toRoles(['customer', ...CONTENT_ROLES], 'cms:updated', (await this.present([block]))[0]);
     });
   }
 
@@ -89,7 +92,7 @@ export class CmsService {
     });
     if (plan.touched || plan.flipped) await this.translations.enqueue('cms_block', saved.id);
     const block = (await this.present([(await this.blocks.findOne({ where: { id: saved.id } }))!]))[0];
-    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'cms:updated', block);
+    this.emitter.toRoles(['customer', ...CONTENT_ROLES], 'cms:updated', block);
     return block;
   }
 }

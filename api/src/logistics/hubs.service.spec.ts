@@ -25,6 +25,16 @@ describe('HubsService', () => {
   });
   afterEach(async () => ds.destroy());
 
+  describe('staff tier change push', () => {
+    it('roles:updated after a tier change goes to the super admin only (the staff lists are theirs), not every admin department or the warehouse', async () => {
+      const hub = await svc.save({ name: 'Gombe', city: 'Kinshasa', lat: 1, lng: 1 });
+      const op = await mkUser('warehouse_staff', hub.id, 'operator');
+      jest.clearAllMocks();
+      await svc.setTier({ id: 'a1', role: 'admin_operations', hubId: null } as never, op.id, 'supervisor');
+      expect(emitter.toRoles).toHaveBeenCalledWith(['admin'], 'roles:updated', expect.objectContaining({ id: op.id, warehouseTier: 'supervisor' }));
+    });
+  });
+
   describe('map position', () => {
     it('stores a valid latitude and longitude, and requires them when asked', async () => {
       const hub = await svc.save({ name: 'Gombe', city: 'Kinshasa', lat: '-4.3105', lng: 15.3136 }, { requirePosition: true });

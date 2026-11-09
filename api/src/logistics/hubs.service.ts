@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { Hub, User } from '../database/entities';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { num, str } from '../common/validate';
 import { cleanPoint } from '../common/geo/geo';
@@ -177,7 +176,8 @@ export class HubsService {
       if (tier === 'manager') throw new Error('Only an administrator can make someone a manager.');
     }
     await this.users.update({ id: target.id }, { warehouseTier: tier as WarehouseTier });
-    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', { id: target.id, role: target.role, hubId: target.hubId ?? null, warehouseTier: tier });
+    this.emitter.toRoles(['admin'], 'roles:updated', { // the staff lists are the Super Admin's
+      id: target.id, role: target.role, hubId: target.hubId ?? null, warehouseTier: tier });
     return { id: target.id, warehouseTier: tier as WarehouseTier };
   }
 }

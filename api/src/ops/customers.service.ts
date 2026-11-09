@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Order, User, WalletTransaction } from '../database/entities';
 import { localizeWalletDescription } from '../notifications/localize';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
 import { pageOf } from '../common/paging';
 
 export interface CustomerRow {
@@ -82,6 +82,7 @@ export class CustomersService {
       throw new Error('Staff accounts are managed in Roles.');
     }
     await this.users.update({ id }, { active, tokenVersion: (target.tokenVersion ?? 0) + 1 });
-    this.emitter.toRoles(ADMIN_ROLES, 'customer:updated', { id, active });
+    // The customer list (Support) and the fraud pages (Finance, Support) follow it; no other department reads either.
+    this.emitter.toRoles([...ROLE_GROUPS.fraudAlerts], 'customer:updated', { id, active });
   }
 }

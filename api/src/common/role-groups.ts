@@ -5,6 +5,12 @@
  * menu only follows it. `RealtimeGateway.GROUPS` spreads this table, so `this.can(role, 'support')` works there too.
  */
 export const ROLE_GROUPS = {
+  /** Platform settings: read the full set (the settings page itself is the Super Admin's). */
+  config: ['admin', 'admin_finance', 'admin_operations'],
+  /** Marketing content: promo codes, flash sales, CMS banners, broadcasts, store coupons (Marketing: Flash sales, Promotions, CMS, Broadcasts). */
+  content: ['admin', 'admin_marketing'],
+  /** Categories (Marketing: Categories; Operations may change them too). */
+  catalog: ['admin', 'admin_operations', 'admin_marketing'],
   /** Approve, reject, block or restore a listing, and edit or remove another seller's listing (Moderation: queue + Products). */
   productModeration: ['admin', 'admin_moderation'],
   /** Approve or reject a seller's campaign, and run campaigns as the platform (Marketing: Marketing). */

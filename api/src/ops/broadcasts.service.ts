@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Broadcast, User } from '../database/entities';
-import {
-  ADMIN_ROLES,
-  NotificationsService,
-} from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { str } from '../common/validate';
 import { TranslationService } from '../translation/translation.service';
@@ -125,7 +123,7 @@ export class BroadcastsService {
       fr,
     });
     const served = (await this.present([broadcast]))[0];
-    this.emitter.toRoles(ADMIN_ROLES, 'broadcast:created', served);
+    this.emitter.toRoles([...ROLE_GROUPS.content], 'broadcast:created', served);
     return served;
   }
 }

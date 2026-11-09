@@ -7,7 +7,11 @@ import type { FlashSalePhase } from '../database/entities';
 import type { EntityManager } from 'typeorm';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
+
+/** Staff who run promo codes and flash sales and follow them live: the super admin and Marketing (group `content`). */
+const CONTENT_ROLES: string[] = [...ROLE_GROUPS.content];
 import { ProductsService } from '../products/products.service';
 import { TranslationService } from '../translation/translation.service';
 import type { TranslationStatus } from '../translation/translation.service';
@@ -128,7 +132,7 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     // A machine finished a flash sale's other language: tell the same rooms as any flash-sale change.
     this.translations?.registerRepublisher('flash_sale', async (id) => {
       const fs = await this.flashSales.findOne({ where: { id } });
-      if (fs) this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'flashsale:updated', (await this.presentFlash([fs]))[0]);
+      if (fs) this.emitter.toRoles(['customer', 'guest', ...CONTENT_ROLES], 'flashsale:updated', (await this.presentFlash([fs]))[0]);
     });
   }
 
@@ -262,7 +266,7 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     if (clean.expiresAt && Number.isNaN(clean.expiresAt.getTime())) throw new BadRequestException('Invalid expiry date.');
     if (await this.promos.findOne({ where: { code: clean.code } })) throw new BadRequestException('That code already exists.');
     const promo = await this.promos.save(this.promos.create(clean));
-    this.emitter.toRoles(ADMIN_ROLES, 'promo:updated', promo);
+    this.emitter.toRoles(CONTENT_ROLES, 'promo:updated', promo);
     return promo;
   }
 
@@ -272,7 +276,7 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     if (existing?.sellerId) return null;
     await this.promos.update({ id }, { active });
     const promo = await this.promos.findOne({ where: { id } });
-    if (promo) this.emitter.toRoles(ADMIN_ROLES, 'promo:updated', promo);
+    if (promo) this.emitter.toRoles(CONTENT_ROLES, 'promo:updated', promo);
     return promo;
   }
 
@@ -376,9 +380,9 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
   /** Tell every screen a sale changed: its own event for shoppers and staff, the product's new price for everyone, the owning store. */
   private async announce(sale: FlashSale, opts: { removed?: boolean; now?: number } = {}): Promise<ServedFlashSale | null> {
     const served = opts.removed ? null : (await this.presentFlash([sale], opts.now))[0];
-    if (opts.removed) this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'flashsale:removed', { id: sale.id, productId: sale.productId });
-    else if (served && (sale.status === 'approved' || sale.status === undefined)) this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'flashsale:updated', served);
-    else if (served) this.emitter.toRoles(ADMIN_ROLES, 'flashsale:updated', served);
+    if (opts.removed) this.emitter.toRoles(['customer', 'guest', ...CONTENT_ROLES], 'flashsale:removed', { id: sale.id, productId: sale.productId });
+    else if (served && (sale.status === 'approved' || sale.status === undefined)) this.emitter.toRoles(['customer', 'guest', ...CONTENT_ROLES], 'flashsale:updated', served);
+    else if (served) this.emitter.toRoles(CONTENT_ROLES, 'flashsale:updated', served);
     if (sale.sellerId) {
       const owner = await this.ownerUserId({ sellerId: sale.sellerId } as Product);
       if (owner && served) this.emitter.toUser(owner, 'flashsale:updated', served);

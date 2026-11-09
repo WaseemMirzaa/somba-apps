@@ -42,3 +42,13 @@ test("Support, Finance and Moderation open one order read-only (their 'View orde
   for (const d of ["super", "operations"]) assert.equal(canAdminAccess(d, "/admin/orders/abc-123"), true, d);
   assert.equal(canAdminAccess("support", "/admin/fulfillment/desk"), false); // the desk stays closed
 });
+
+test("Support reaches the replacements and exchanges pages (it may answer them on a seller's behalf); finance, marketing and moderation do not", () => {
+  for (const p of ["/admin/replacements", "/admin/exchanges", "/admin/replacements/r1", "/admin/exchanges/e1"]) {
+    assert.equal(canAdminAccess("support", p), true, p);
+    assert.equal(canAdminAccess("operations", p), true, p);
+    for (const d of ["finance", "marketing", "moderation"]) assert.equal(canAdminAccess(d, p), false, `${d} ${p}`);
+  }
+  assert.ok(hrefs("support").includes("/admin/exchanges") && hrefs("support").includes("/admin/replacements"));
+  assert.equal(getAdminHome("support"), "/admin/support"); // the landing page did not move
+});

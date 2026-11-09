@@ -136,9 +136,12 @@ export class SettingsService {
     const clean = SettingsService.validate(key, value);
     await this.repo.save(this.repo.create({ key, value: clean }));
     const all = await this.all();
-    // Shoppers/guests only ever receive the public subset; admins get everything.
-    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff'], 'settings:updated', await this.clientView());
-    this.emitter.toRoles(ADMIN_ROLES, 'settings:updated', all);
+    // Shoppers/guests only ever receive the public subset. The full set (fraud thresholds, plans, fees...) goes only to the
+    // Super Admin, whose Settings page is the one screen that reads it; every other admin role follows the public subset
+    // (the exchange rate, COD switch...) like the apps do.
+    const view = await this.clientView();
+    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff', ...ADMIN_ROLES.filter((r) => r !== 'admin')], 'settings:updated', view);
+    this.emitter.toRoles(['admin'], 'settings:updated', all);
     return all;
   }
 }

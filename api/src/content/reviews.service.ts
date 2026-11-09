@@ -115,7 +115,7 @@ export class ReviewsService {
       await this.reviews.createQueryBuilder().update(Review).set({ helpful: () => 'helpful + 1' }).where('id = :id', { id }).execute();
     }
     const saved = (await this.reviews.findOne({ where: { id } }))!;
-    if (counted) this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'review:updated', saved);
+    if (counted) this.emitter.toRoles(['customer', ...MODERATORS], 'review:updated', saved);
     return Object.assign(saved, { counted });
   }
 
@@ -178,7 +178,7 @@ export class ReviewsService {
       }),
     );
     await this.recomputeRating(input.productId);
-    this.emitter.toRoles(['customer', ...ADMIN_ROLES], 'review:created', review);
+    this.emitter.toRoles(['customer', ...MODERATORS], 'review:created', review);
     // The seller hears about it at once.
     const product = await this.products.findOne({ where: { id: input.productId } });
     const sellerUser = await this.sellerUserOfProduct(product);
@@ -266,7 +266,7 @@ export class ReviewsService {
       'review:updated',
       status === 'hidden' ? { id: review.id, productId: review.productId, status } : review,
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'review:updated', review);
+    this.emitter.toRoles(MODERATORS, 'review:updated', review);
     if (changed) {
       const product = await this.products.findOne({ where: { id: review.productId } });
       const sellerUser = await this.sellerUserOfProduct(product);
@@ -314,7 +314,7 @@ export class ReviewsService {
     review.sellerReplyAt = new Date();
     const saved = await this.reviews.save(review);
     if (saved.status === 'visible') this.emitter.toRoles(['customer', 'guest'], 'review:updated', saved);
-    this.emitter.toRoles(ADMIN_ROLES, 'review:updated', saved);
+    this.emitter.toRoles(MODERATORS, 'review:updated', saved);
     this.emitter.toUser(saved.userId, 'review:updated', saved);
     if (product?.sellerId) {
       const store = await this.sellers.findOne({ where: { id: product.sellerId } });
@@ -393,7 +393,7 @@ export class ReviewsService {
     );
     // Shoppers get the public view (first name, no ids); the store and the admins get the full row.
     this.emitter.toRoles(['customer'], 'question:created', publicQuestion(q));
-    this.emitter.toRoles(ADMIN_ROLES, 'question:created', q);
+    this.emitter.toRoles(MODERATORS, 'question:created', q);
     const sellerUser = await this.sellerUserOfProduct(product);
     if (sellerUser) {
       this.emitter.toUser(sellerUser, 'question:created', q);
@@ -442,7 +442,7 @@ export class ReviewsService {
     const q = await this.questions.findOne({ where: { id } });
     if (!q) return null;
     this.emitter.toRoles(['customer', 'guest'], 'question:updated', publicQuestion(q));
-    this.emitter.toRoles(ADMIN_ROLES, 'question:updated', q);
+    this.emitter.toRoles(MODERATORS, 'question:updated', q);
     const product = await this.products.findOne({ where: { id: q.productId } });
     const sellerUser = await this.sellerUserOfProduct(product);
     if (sellerUser) this.emitter.toUser(sellerUser, 'question:updated', q);

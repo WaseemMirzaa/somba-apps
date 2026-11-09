@@ -11,12 +11,14 @@ let fake: FakeTranslator;
 let translations: TranslationService;
 let notices: { role: string; n: { title: string; body: string; type?: string; fr?: { title: string; body: string } } }[];
 let svc: BroadcastsService;
+let emitter: ReturnType<typeof recordingEmitter>;
 
 const build = (provider: TranslatorProvider) => {
   translations = testTranslations(ds, provider);
   notices = [];
+  emitter = recordingEmitter();
   const notifications = { toRole: async (role: string, n: never) => void notices.push({ role, n }) };
-  svc = new BroadcastsService(ds.getRepository(Broadcast), ds.getRepository(User), notifications as never, recordingEmitter() as never, translations);
+  svc = new BroadcastsService(ds.getRepository(Broadcast), ds.getRepository(User), notifications as never, emitter as never, translations);
 };
 
 beforeEach(async () => {
@@ -25,6 +27,13 @@ beforeEach(async () => {
   build(fake);
 });
 afterEach(async () => ds.destroy());
+
+describe('who follows a new broadcast live', () => {
+  it('broadcast:created goes to the super admin and Marketing only (the Broadcasts page is Marketing\'s)', async () => {
+    await svc.send('Admin', { title: 'Big sale', body: 'Free delivery this weekend' });
+    expect(emitter.sent.filter((e) => e.event === 'broadcast:created').map((e) => e.to)).toEqual(['admin,admin_marketing']);
+  });
+});
 
 describe('sending a broadcast', () => {
   it('English: the French is translated while sending and handed to notifications as NoticeInput.fr', async () => {
