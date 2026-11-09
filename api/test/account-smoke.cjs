@@ -312,7 +312,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const mpesa = must(a, 'placing the M-Pesa order');
   const declined = await until(async () => { const o = await orderOf(mpesa.id); return o?.status === 'cancelled' ? o : null; });
   ok(!!declined, 'declined payment → order CANCELLED');
-  ok((await req(s, 'products:get', { id: pid })).data.stock === stock2, 'declined payment → stock released');
+  // The order shows CANCELLED a moment before its stock is put back, so wait for the restock rather than read once.
+  const restocked = await until(async () => ((await req(s, 'products:get', { id: pid })).data.stock === stock2 ? true : null));
+  ok(!!restocked, 'declined payment → stock released');
 
   console.log('\n— Webhook security + idempotency');
   const body = (ref, extra = {}) => ({ reference: ref, status: 'succeeded', providerRef: `agg_${ref}`, ...extra });
