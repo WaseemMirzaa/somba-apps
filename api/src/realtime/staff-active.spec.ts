@@ -40,7 +40,7 @@ describe('staff:setActive (gateway)', () => {
   it('switching off: replies with the person, audits it, and kicks every open socket of theirs', async () => {
     const res = await gw.staffSetActive(as('admin'), { userId: 'u1', active: false });
     expect(res).toEqual({ ok: true, data: { ...done, id: 'u1', active: false } });
-    expect(roles.setStaffActive).toHaveBeenCalledWith('u1', false);
+    expect(roles.setStaffActive).toHaveBeenCalledWith('u1', false, 'a1');
     expect(audit.record).toHaveBeenCalledWith({ actor: 'admin name', role: 'admin', action: 'staff.deactivate', entity: 'user', entityId: 'u1', detail: 'rider marc@somba.app' });
     expect(room).toHaveBeenCalledWith(RealtimeEmitter.userRoom('u1'));
     expect(disconnectSockets).toHaveBeenCalledWith(true);
@@ -54,8 +54,8 @@ describe('staff:setActive (gateway)', () => {
   });
 
   it('a refusal from the service is the ack error, with no audit and no kick', async () => {
-    roles.setStaffActive.mockRejectedValueOnce(new Error('Only riders and warehouse staff can be switched on or off here.'));
-    expect(await gw.staffSetActive(as('admin'), { userId: 'c1', active: false })).toEqual({ ok: false, error: 'Only riders and warehouse staff can be switched on or off here.' });
+    roles.setStaffActive.mockRejectedValueOnce(new Error('Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.'));
+    expect(await gw.staffSetActive(as('admin'), { userId: 'c1', active: false })).toEqual({ ok: false, error: 'Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.' });
     expect(audit.record).not.toHaveBeenCalled();
     expect(disconnectSockets).not.toHaveBeenCalled();
   });

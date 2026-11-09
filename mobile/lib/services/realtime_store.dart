@@ -22,7 +22,11 @@ class RealtimeStore extends ChangeNotifier {
   RealtimeStore._();
   static final RealtimeStore instance = RealtimeStore._();
 
-  final _auth = AuthService();
+  AuthService _auth = AuthService();
+
+  /// Tests: the sign-in calls (refresh, token storage) answered by a fake.
+  @visibleForTesting
+  set debugAuth(AuthService auth) => _auth = auth;
   final _socket = SocketService();
 
   ConnStatus status = ConnStatus.disconnected;
@@ -276,18 +280,40 @@ class RealtimeStore extends ChangeNotifier {
     _connect();
   }
 
-  /// A currently valid access token, refreshing it when it is about to expire.
-  Future<String> freshAccessToken() async {
-    final token = _access;
-    if (token != null && !_expiresWithin(token, const Duration(seconds: 45))) return token;
-    final refresh = _refresh ?? await _auth.getRefresh();
-    if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
-    try {
+  Future<AuthResult>? _rotating;
+
+  /// Trades the refresh token for new tokens and keeps BOTH, on the device and in memory. The server rotates refresh
+  /// tokens: the one just used stops working seconds later, and sending it again after that signs the account out
+  /// everywhere. So callers that need a refresh at the same moment (the reconnect, `reauth`, the session check) share
+  /// this one request instead of each sending the same token.
+  Future<AuthResult> _rotateTokens() async {
+    final pending = _rotating;
+    if (pending != null) return pending;
+    final run = () async {
+      final refresh = _refresh ?? await _auth.getRefresh();
+      if (refresh == null) throw ApiException.local('err_signed_out', status: 401);
       final r = await _auth.refresh(refresh);
       await _saveTokens(r);
       _access = r.accessToken;
       _refresh = r.refreshToken;
-      return r.accessToken;
+      return r;
+    }();
+    _rotating = run;
+    try {
+      return await run;
+    } finally {
+      if (identical(_rotating, run)) _rotating = null;
+    }
+  }
+
+  /// A currently valid access token, refreshing it when it is about to expire (or always, with [force]).
+  Future<String> freshAccessToken({bool force = false}) async {
+    final token = _access;
+    if (!force && token != null && !_expiresWithin(token, const Duration(seconds: 45))) return token;
+    // No session stored on this device: say so, without ending anything (only a refusal from the server ends a session).
+    if (_refresh == null && await _auth.getRefresh() == null) throw ApiException.local('err_signed_out', status: 401);
+    try {
+      return (await _rotateTokens()).accessToken;
     } on ApiException catch (e) {
       if (e.status == 401 || e.status == 403) {
         // Revoked / suspended / deleted: end the session instead of retrying forever.
@@ -305,17 +331,35 @@ class RealtimeStore extends ChangeNotifier {
     final now = DateTime.now();
     if ((!force && now.difference(_lastVerify) < const Duration(seconds: 3)) || user == null) return;
     _lastVerify = now;
-    final refresh = _refresh ?? await _auth.getRefresh();
-    if (refresh == null) return;
+    if (_refresh == null && await _auth.getRefresh() == null) return;
     try {
-      final r = await _auth.refresh(refresh);
-      await _saveTokens(r);
-      _access = r.accessToken;
-      _refresh = r.refreshToken;
+      await _rotateTokens();
     } on ApiException catch (e) {
       if (e.status == 401 || e.status == 403) await _endSession();
     } catch (_) {/* offline: keep retrying */}
   }
+
+  /// The server asks for a fresh access token shortly before the socket's one runs out (`reauth`): rotate the tokens and
+  /// hand the new access token to the SAME connection (`auth:reauth`), so nothing is re-downloaded. A refused refresh
+  /// ends the session (see [freshAccessToken]); any other failure is left to the server, which closes the socket at its
+  /// deadline, and the reconnect below then refreshes and connects again.
+  Future<void> _renewSocket() async {
+    if (user == null) return;
+    try {
+      final token = await freshAccessToken(force: true);
+      await call('auth:reauth', {'token': token});
+    } catch (e) {
+      debugPrint('Socket re-authentication failed (${e.runtimeType}): $e');
+    }
+  }
+
+  /// Tests: what the app does on the server's `reauth`.
+  @visibleForTesting
+  Future<void> debugReauth() => _renewSocket();
+
+  /// Tests: the check that follows a refused connection (is the session still valid?).
+  @visibleForTesting
+  Future<void> debugVerifySession() => _verifySession(force: true);
 
   Future<void> _endSession({String? messageKey}) async {
     if (user == null) return;
@@ -371,6 +415,8 @@ class RealtimeStore extends ChangeNotifier {
       // The server may be refusing us on purpose (suspended / revoked): ask it.
       unawaited(_verifySession());
     });
+    // The access token behind this socket expires soon: renew it on the same connection.
+    socket.on('reauth', (_) => unawaited(_renewSocket()));
 
     // Server pushes — no polling.
     _socket.on('order:created', _upsertOrder);

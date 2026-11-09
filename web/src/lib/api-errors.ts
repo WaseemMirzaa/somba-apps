@@ -25,6 +25,13 @@ const EXACT: Record<string, string> = {
   "Warehouse staff only.": "Réservé au personnel d'entrepôt.",
   "Too many requests — slow down.": "Trop de requêtes. Ralentissez un instant.",
   "Too many requests - slow down.": "Trop de requêtes. Ralentissez un instant.",
+  // sessions (sign out everywhere, refresh rotation, socket re-authentication)
+  "Session has been revoked.": "Votre session a été fermée. Reconnectez-vous.",
+  "Invalid or expired token.": "Votre session a expiré. Reconnectez-vous.",
+  "Invalid or expired refresh token.": "Votre session a expiré. Reconnectez-vous.",
+  "Your session expired. Sign in again.": "Votre session a expiré. Reconnectez-vous.",
+  "This token belongs to another account.": "Ce jeton appartient à un autre compte.",
+  "This account has been suspended. Contact support.": "Ce compte est suspendu. Contactez l'assistance.",
 
   // ── warehouse stock ledger (docs/contracts/warehouse-stock.md) ──
   "Enter a whole number of units, at least 1.": "Saisissez un nombre entier d'unités, au moins 1.",
@@ -111,6 +118,9 @@ const EXACT: Record<string, string> = {
   "Account not found.": "Compte introuvable.",
   "Super admin only.": "Réservé au super administrateur.",
   "Only riders and warehouse staff can be switched on or off here.": "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.",
+  "Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.": "Seuls les comptes du personnel (livreurs, personnel d'entrepôt et administrateurs) peuvent être activés ou désactivés ici.",
+  "You cannot switch off your own account.": "Vous ne pouvez pas désactiver votre propre compte.",
+  "You cannot switch off the last active super admin.": "Vous ne pouvez pas désactiver le dernier super administrateur actif.",
   "Lane not found.": "Liaison introuvable.",
   "Run not found.": "Tournée introuvable.",
   "That parcel is not in this run.": "Ce colis n'est pas dans cette tournée.",

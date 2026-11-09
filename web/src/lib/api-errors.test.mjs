@@ -151,3 +151,13 @@ test("a refused account deletion is French sentence by sentence; an unknown reas
   assert.equal(localizeApiError(raw, "en"), raw);
   assert.equal(localizeApiError(`${raw} Something new is pending.`, "fr"), `${raw} Something new is pending.`);
 });
+
+test("session and staff-suspension errors map to French", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("You cannot switch off your own account."), "Vous ne pouvez pas désactiver votre propre compte.");
+  assert.equal(fr("You cannot switch off the last active super admin."), "Vous ne pouvez pas désactiver le dernier super administrateur actif.");
+  assert.equal(fr("Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here."), "Seuls les comptes du personnel (livreurs, personnel d'entrepôt et administrateurs) peuvent être activés ou désactivés ici.");
+  assert.equal(fr("Session has been revoked."), "Votre session a été fermée. Reconnectez-vous.");
+  assert.equal(fr("Your session expired. Sign in again."), "Votre session a expiré. Reconnectez-vous.");
+  assert.equal(fr("This token belongs to another account."), "Ce jeton appartient à un autre compte.");
+});

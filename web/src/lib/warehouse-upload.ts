@@ -19,11 +19,10 @@ export async function uploadPhoto(file: File): Promise<string> {
   };
   let res = await send(authApi.getAccess());
   if (res.status === 401) {
-    const refresh = authApi.getRefresh();
-    if (refresh) {
+    if (authApi.getRefresh()) {
       try {
-        const fresh = await authApi.refresh(refresh);
-        authApi.saveTokens(fresh);
+        // Rotates the refresh token and stores the new pair (shared with any other refresh in flight in this tab).
+        const fresh = await authApi.refreshStored();
         res = await send(fresh.accessToken);
       } catch {
         /* fall through with the 401 */

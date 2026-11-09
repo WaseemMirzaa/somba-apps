@@ -28,6 +28,8 @@ export const STAFF_2FA_OPEN_EVENTS: readonly string[] = [
   'devices:register',
   'devices:unregister',
   'settings:get',
+  // Renewing the socket's access token (A-02): without it a staff member held at enrolment would be disconnected every 15 minutes.
+  'auth:reauth',
 ];
 
 export const STAFF_2FA_REQUIRED_MESSAGE = 'Two-factor authentication is required for staff accounts. Turn it on under Account > Security to continue.';
