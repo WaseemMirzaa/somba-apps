@@ -75,6 +75,8 @@ const EXACT: Record<string, string> = {
   "Your warehouse assigns your tasks. You cannot accept a task yourself.": "Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.",
   "Your account is not linked to a warehouse. Ask an administrator.": "Votre compte n'est lié à aucun entrepôt. Contactez un administrateur.",
   "Only supervisors and managers can assign riders.": "Seuls les superviseurs et les responsables peuvent assigner des livreurs.",
+  "Only operations admins and warehouse staff can work the warehouse desk.": "Seuls les administrateurs des opérations et le personnel d'entrepôt peuvent utiliser le poste de l'entrepôt.",
+  "Your role cannot read orders.": "Votre rôle ne permet pas de consulter les commandes.",
   "Only supervisors and managers can see this.": "Seuls les superviseurs et les responsables peuvent voir ceci.",
   "Only supervisors and managers can do this.": "Seuls les superviseurs et les responsables peuvent effectuer cette action.",
   "Only managers can see this.": "Seuls les responsables peuvent voir ceci.",

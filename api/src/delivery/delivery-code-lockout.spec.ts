@@ -354,7 +354,7 @@ describe('delivery code lockout (RD-01)', () => {
       expect(await gw.deliveryResetCode(as(rider), { taskId: task.id })).toEqual({ ok: false, error: 'Ops only.' });
       expect(await gw.deliveryResetCode(as({ id: 'g', role: 'customer', name: 'C' }), { taskId: task.id })).toEqual({ ok: false, error: 'Ops only.' });
       expect(await gw.deliveryResetCode(as(operator), { taskId: task.id })).toMatchObject({ ok: false, error: expect.stringMatching(/^Only a warehouse supervisor/) });
-      expect(await gw.deliveryResetCode(as(marketing), { taskId: task.id })).toMatchObject({ ok: false, error: expect.stringMatching(/^Only a warehouse supervisor/) });
+      expect(await gw.deliveryResetCode(as(marketing), { taskId: task.id })).toEqual({ ok: false, error: 'Ops only.' });
       expect((await counters()).codeFailures).toBe(5);
       const done = await gw.deliveryResetCode(as(supervisor), { taskId: task.id });
       expect(done).toMatchObject({ ok: true, data: { id: task.id, codeFailures: 0, codeLocked: false } });

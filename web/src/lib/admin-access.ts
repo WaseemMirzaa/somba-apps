@@ -208,12 +208,22 @@ function allowedPrefixes(dept: AdminDepartment): string[] {
 }
 
 /**
+ * Departments that open ONE order (`/admin/orders/<id>`) from the tickets, disputes, returns, customers, sellers and fraud
+ * alerts they work, without the Orders list: Support (the whole order, read-only), Finance and Moderation (the order
+ * without the customer's delivery address). The server decides what each reads (`orders:list`); the page is read-only
+ * for them. Marketing has no business with an order, so it neither reads nor links to one.
+ */
+const ORDER_VIEW_DEPARTMENTS: AdminDepartment[] = ["support", "finance", "moderation"];
+const ORDER_PAGE = /^\/admin\/orders\/[^/]+\/?$/;
+
+/**
  * Authoritative access check for an admin path. Super Admin reaches everything;
  * every other manager is confined to their department's pages.
  */
 export function canAdminAccess(dept: AdminDepartment, pathname: string): boolean {
   if (!pathname.startsWith("/admin")) return true;
   if (dept === "super") return true;
+  if (ORDER_VIEW_DEPARTMENTS.includes(dept) && ORDER_PAGE.test(pathname)) return true;
   return allowedPrefixes(dept).some(
     (prefix) => pathname === prefix || pathname.startsWith(prefix + "/")
   );

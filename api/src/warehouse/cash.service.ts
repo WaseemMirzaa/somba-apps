@@ -92,7 +92,8 @@ export class CashService {
   /** Latest receipts of a warehouse (every warehouse for an admin), optionally of one rider. Supervisors and managers (and the cash admins) read. */
   async history(actor: Actor, opts: { hubId?: string | null; riderId?: string | null; limit?: number } = {}): Promise<HandoverView[]> {
     this.requireStaff(actor);
-    if (!tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can see cash hand-overs.');
+    // The cash admins (requireStaff) read any warehouse's cash; warehouse staff by tier.
+    if (actor.role === 'warehouse_staff' && !tierAllows(actor.role, actor.tier, 'oversee')) throw new BadRequestException('Only supervisors and managers can see cash hand-overs.');
     const hubId = actor.hubId ?? opts.hubId ?? null;
     const where: Record<string, string> = {};
     if (hubId) where.hubId = String(hubId);
@@ -107,7 +108,7 @@ export class CashService {
    */
   async handOver(actor: Actor, input: { riderId: unknown; amountUsd: unknown; note?: unknown; clientRef?: unknown }): Promise<{ handover: HandoverView; balance: CashBalance }> {
     this.requireStaff(actor);
-    if (!tierAllows(actor.role, actor.tier, 'assign')) throw new BadRequestException("Only supervisors and managers can record a rider's cash hand-over.");
+    if (actor.role === 'warehouse_staff' && !tierAllows(actor.role, actor.tier, 'assign')) throw new BadRequestException("Only supervisors and managers can record a rider's cash hand-over.");
     const amount = CashService.amount(input.amountUsd);
     const note = typeof input.note === 'string' && input.note.trim() ? input.note.trim().slice(0, 200) : null;
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.trim() ? input.clientRef.trim().slice(0, 64) : null;

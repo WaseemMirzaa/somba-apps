@@ -77,7 +77,7 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
 
 (async () => {
   const dbName = process.env.DB_DATABASE ?? 'somba_after';
-  const db = await mysql.createConnection({ host: process.env.DB_HOST ?? 'localhost', user: process.env.DB_USERNAME ?? 'root', password: process.env.DB_PASSWORD ?? '', database: dbName });
+  const db = await mysql.createConnection({ host: process.env.DB_HOST ?? 'localhost', port: Number(process.env.DB_PORT ?? 3306), user: process.env.DB_USERNAME ?? 'root', password: process.env.DB_PASSWORD ?? '', database: dbName });
   const sql = async (q, p = []) => (await db.query(q, p))[0];
 
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);

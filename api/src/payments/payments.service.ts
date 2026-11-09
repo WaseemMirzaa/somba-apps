@@ -19,6 +19,7 @@ import {
   NotificationsService,
 } from '../notifications/notifications.service';
 import { pushOrderToOps } from '../logistics/hub-scope';
+import { DESK_ROLES } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { SettingsService } from '../content/settings.service';
@@ -1152,13 +1153,13 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         task.failureReason = 'Refunded';
         await this.deliveries.save(task);
         // Admins, the warehouses at the ends of the leg (not every warehouse) and the rider hear that it was voided.
-        this.emitter.toRoles(ADMIN_ROLES, 'delivery:updated', task);
+        this.emitter.toRoles(DESK_ROLES, 'delivery:updated', task);
         for (const hub of new Set([task.hubId, task.fromHubId, task.toHubId])) if (hub) this.emitter.toHub(hub, 'delivery:updated', task);
         if (task.riderId) this.emitter.toUser(task.riderId, 'delivery:updated', task);
       }
     }
     this.emitter.toUser(order.customerId, 'order:updated', order);
-    pushOrderToOps(this.emitter, ADMIN_ROLES, 'order:updated', order);
+    pushOrderToOps(this.emitter, 'order:updated', order);
   }
 
   /**

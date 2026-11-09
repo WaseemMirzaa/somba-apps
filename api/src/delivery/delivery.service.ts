@@ -12,7 +12,7 @@ import { tasksOfHub } from '../logistics/hub-scope';
 import { isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
-import { tierAllows } from '../logistics/tiers';
+import { DESK_ROLES, tierAllows } from '../logistics/tiers';
 import { ALERT_FROM, CODE_MESSAGES, CodeLock, isCodeLocked, lockAfter, lockedMessage, sameCode, triesLeft } from './delivery-code-lock';
 
 /** Called when a rider reports a failed attempt (OrdersService re-opens the leg or cancels the order). */
@@ -319,7 +319,7 @@ export class DeliveryService {
       if (order) this.emitter.toUser(order.customerId, 'delivery:location', payload);
     }
     for (const h of new Set([task.hubId, task.fromHubId, task.toHubId].filter((x): x is string => !!x))) this.emitter.toHub(h, 'delivery:location', payload);
-    this.emitter.toRoles(ADMIN_ROLES, 'delivery:location', payload);
+    this.emitter.toRoles(DESK_ROLES, 'delivery:location', payload);
   }
 
   /** The handover code (select:false column, so it is only ever read here and by the customer endpoint). */

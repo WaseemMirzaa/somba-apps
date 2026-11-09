@@ -7,7 +7,7 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { str } from '../common/validate';
 import { DEFAULT_HUB_OPS, EDITABLE_HUB_OPS, HubOps, isWorkingNow, mergeHubOps } from './hub-ops-rules';
 import { Actor } from './logistics.service';
-import { tierAllows } from './tiers';
+import { DESK_ROLES, tierAllows } from './tiers';
 
 /** Admin roles that run warehouses (the same two that edit the hub directory). */
 export const HUB_OPS_ADMINS = ['admin', 'admin_operations'];
@@ -103,7 +103,7 @@ export class HubOpsSettingsService {
     }
     const out = await this.view(hubId);
     this.emitter.toHub(hubId, 'hubSettings:updated', out);
-    this.emitter.toRoles(ADMIN_ROLES, 'hubSettings:updated', out);
+    this.emitter.toRoles(DESK_ROLES, 'hubSettings:updated', out);
     return out;
   }
 }

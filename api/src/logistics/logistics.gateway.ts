@@ -12,7 +12,7 @@ import { notServedFields } from '../geo/geo.service';
 import { HubsService } from './hubs.service';
 import { Actor, LogisticsService } from './logistics.service';
 import { RoutingService } from './routing.service';
-import { tierAllows } from './tiers';
+import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows } from './tiers';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
 
@@ -46,7 +46,11 @@ export class LogisticsGateway {
   /** The caller as the desk sees them: role from the socket, warehouse and tier from the database (they can change while connected). */
   private async actor(client: AuthedSocket): Promise<Actor> {
     const u = this.signedIn(client);
-    if (u.role.startsWith('admin')) return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    // Only the desk admins (super admin, operations) work the desk; marketing, moderation, support and finance do not.
+    if (u.role.startsWith('admin')) {
+      if (!isDeskAdmin(u.role)) throw new Error(DESK_ADMINS_ONLY);
+      return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    }
     if (u.role !== 'warehouse_staff') throw new Error('Staff only.');
     const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier', 'active'] });
     if (!row?.hubId) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
@@ -123,7 +127,8 @@ export class LogisticsGateway {
     try {
       const u = this.signedIn(client);
       const rows = await this.hubsSvc.list({ activeOnly: body?.activeOnly === true });
-      const ops = u.role.startsWith('admin') || u.role === 'warehouse_staff';
+      // The full directory (staff and rider counts, coverage) is for the desk; everyone else, other admin roles included, gets the public list.
+      const ops = isDeskAdmin(u.role) || u.role === 'warehouse_staff';
       return ok(ops ? rows : rows.map((h) => ({ id: h.id, name: h.name, city: h.city, country: h.country, lat: h.lat, lng: h.lng, active: h.active, areaId: h.areaId ?? null })));
     } catch (e) {
       return fail((e as Error).message);

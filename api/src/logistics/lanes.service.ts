@@ -2,13 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Hub, HubLane } from '../database/entities';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { num } from '../common/validate';
 import { LaneEdge, PlannedRoute, planRoute, reverseOverLanes } from './lane-route';
 import type { PlannedHop } from './lane-route';
+import { DESK_ROLES } from './tiers';
 
-const OPS_ROOMS = [...ADMIN_ROLES, 'warehouse_staff'];
+const OPS_ROOMS = [...DESK_ROLES, 'warehouse_staff'];
 const CACHE_MS = 5_000;
 
 /** A lane as clients receive it. */

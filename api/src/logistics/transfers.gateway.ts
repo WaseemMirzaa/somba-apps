@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { User } from '../database/entities';
 import { LanesService } from './lanes.service';
 import { Actor } from './logistics.service';
+import { DESK_ADMINS_ONLY, isDeskAdmin } from './tiers';
 import { RunsService } from './runs.service';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
@@ -34,13 +35,16 @@ export class TransfersGateway {
   }
 
   private isOps(role: string): boolean {
-    return role.startsWith('admin') || role === 'warehouse_staff';
+    return isDeskAdmin(role) || role === 'warehouse_staff';
   }
 
   /** The caller as the desk sees them: warehouse and tier come from the database (they can change while connected). */
   private async actor(client: AuthedSocket): Promise<Actor> {
     const u = this.signedIn(client);
-    if (u.role.startsWith('admin')) return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    if (u.role.startsWith('admin')) {
+      if (!isDeskAdmin(u.role)) throw new Error(DESK_ADMINS_ONLY);
+      return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    }
     if (u.role !== 'warehouse_staff') throw new Error('Staff only.');
     const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier', 'active'] });
     if (!row?.hubId) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');
@@ -51,7 +55,7 @@ export class TransfersGateway {
   @SubscribeMessage('lanes:list')
   async lanesList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
     try {
-      if (!this.isOps(this.signedIn(client).role)) return fail('Staff only.');
+      if (!this.isOps(this.signedIn(client).role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.lanes.list(body?.hubId ? String(body.hubId) : null));
     } catch (e) {
       return fail((e as Error).message);
@@ -81,7 +85,7 @@ export class TransfersGateway {
   @SubscribeMessage('routes:preview')
   async routesPreview(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { fromHubId?: string; toHubId?: string }) {
     try {
-      if (!this.isOps(this.signedIn(client).role)) return fail('Staff only.');
+      if (!this.isOps(this.signedIn(client).role)) return fail(DESK_ADMINS_ONLY);
       return ok(await this.lanes.preview(body?.fromHubId, body?.toHubId));
     } catch (e) {
       return fail((e as Error).message);

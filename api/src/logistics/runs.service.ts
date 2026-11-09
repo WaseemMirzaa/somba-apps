@@ -5,7 +5,7 @@ import { AuditLog, DeliveryTask, Hub, TransferRun, TransferRunStatus, User, Ware
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { Actor, LogisticsService } from './logistics.service';
-import { tierAllows } from './tiers';
+import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 
 /** The legs a run can carry: warehouse-to-warehouse transfers (on the way out and on the way back). */
 const RUN_KINDS = ['transfer', 'return_transfer'] as const;
@@ -110,7 +110,7 @@ export class RunsService {
     const view = await this.view(fresh);
     this.emitter.toHub(fresh.fromHubId, 'run:updated', view);
     this.emitter.toHub(fresh.toHubId, 'run:updated', view);
-    this.emitter.toRoles(ADMIN_ROLES, 'run:updated', view);
+    this.emitter.toRoles(DESK_ROLES, 'run:updated', view);
     for (const id of new Set([fresh.riderId, ...extraRiders].filter((x): x is string => !!x))) this.emitter.toUser(id, 'run:updated', view);
     return view;
   }
@@ -124,12 +124,19 @@ export class RunsService {
   }
 
   // ── permissions ──────────────────────────────────────────────────────────────
+  /** A desk admin (super admin, operations): works any warehouse. Every other admin role is not staff of any run. */
   private isAdmin(actor: Actor): boolean {
-    return actor.role.startsWith('admin');
+    return isDeskAdmin(actor.role);
+  }
+
+  /** The runs belong to the warehouses and the desk admins: marketing, moderation, support and finance admins are refused outright. */
+  private assertNotOtherAdmin(actor: Actor): void {
+    if (actor.role.startsWith('admin') && !isDeskAdmin(actor.role)) throw new BadRequestException(DESK_ADMINS_ONLY);
   }
 
   /** Supervisor+ of the SENDING warehouse (admins: any) may create, change, assign and dispatch a run. */
   private assertSender(actor: Actor, run: Pick<TransferRun, 'fromHubId'>): void {
+    this.assertNotOtherAdmin(actor);
     if (this.isAdmin(actor)) return;
     if (!tierAllows(actor.role, actor.tier, 'assign')) throw new BadRequestException('Only supervisors and managers can assign riders.');
     if (!actor.hubId || actor.hubId !== run.fromHubId) throw new BadRequestException('This task belongs to another warehouse.');
@@ -137,6 +144,7 @@ export class RunsService {
 
   /** Any staff of the RECEIVING warehouse (admins: any) may receive a run. */
   private assertReceiver(actor: Actor, run: Pick<TransferRun, 'toHubId'>): void {
+    this.assertNotOtherAdmin(actor);
     if (this.isAdmin(actor)) return;
     if (!tierAllows(actor.role, actor.tier, 'scan')) throw new BadRequestException('Staff only.');
     if (!actor.hubId || actor.hubId !== run.toHubId) throw new BadRequestException('This parcel is not due at your warehouse.');
@@ -155,6 +163,7 @@ export class RunsService {
   // ── reads ────────────────────────────────────────────────────────────────────
   /** Runs of my warehouse (`direction` out = it sends, in = it receives, both by default). Admins: every run, or one warehouse's. */
   async list(actor: Actor, opts: { status?: string; direction?: string; hubId?: string | null }): Promise<RunView[]> {
+    this.assertNotOtherAdmin(actor);
     const hubId = this.isAdmin(actor) ? (opts.hubId ?? null) : (actor.hubId ?? null);
     if (!this.isAdmin(actor) && !hubId) throw new BadRequestException('Your account is not linked to a warehouse. Ask an administrator.');
     const status = opts.status && opts.status !== 'open' ? (opts.status as TransferRunStatus) : undefined;
@@ -167,6 +176,7 @@ export class RunsService {
 
   /** Transfer legs waiting at my warehouse (not yet in a run), grouped by the next warehouse. */
   async proposals(actor: Actor, hubIdArg?: string | null): Promise<RunProposal[]> {
+    this.assertNotOtherAdmin(actor);
     const hubId = this.isAdmin(actor) ? (hubIdArg ?? null) : (actor.hubId ?? null);
     if (!hubId) throw new BadRequestException(this.isAdmin(actor) ? 'Choose a warehouse.' : 'Your account is not linked to a warehouse. Ask an administrator.');
     const waiting = await this.tasks.find({
@@ -230,6 +240,7 @@ export class RunsService {
   }
 
   async create(actor: Actor, input: { toHubId?: unknown; taskIds?: unknown; fromHubId?: unknown }): Promise<RunView> {
+    this.assertNotOtherAdmin(actor);
     const toHubId = String(input?.toHubId ?? '');
     if (!toHubId || !(await this.hubs.findOne({ where: { id: toHubId } }))) throw new NotFoundException('Hub not found.');
     let fromHubId = actor.hubId ?? null;
@@ -413,6 +424,7 @@ export class RunsService {
    */
   async close(actor: Actor, input: { runId?: unknown }): Promise<RunView> {
     const run = await this.load(input?.runId);
+    this.assertNotOtherAdmin(actor);
     if (!this.isAdmin(actor)) {
       if (!tierAllows(actor.role, actor.tier, 'assign')) throw new BadRequestException('Only supervisors and managers can assign riders.');
       if (actor.hubId !== run.fromHubId && actor.hubId !== run.toHubId) throw new BadRequestException('This task belongs to another warehouse.');
@@ -440,7 +452,7 @@ export class RunsService {
         }),
       );
       this.emitter.toHub(run.toHubId, 'exception:updated', exc);
-      this.emitter.toRoles(ADMIN_ROLES, 'exception:updated', exc);
+      this.emitter.toRoles(DESK_ROLES, 'exception:updated', exc);
     }
     await this.runs.update({ id: run.id }, { status: 'closed', closedAt: new Date(), arrivedAt: run.arrivedAt ?? (missing.length ? null : new Date()) });
     if (missing.length) {

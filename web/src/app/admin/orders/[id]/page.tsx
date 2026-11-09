@@ -46,6 +46,10 @@ import { useLocale } from "@/context/locale-context";
 import { useCodOffered } from "@/lib/use-cod-offered";
 import { localized, variantDisplay } from "@/lib/i18n-fields";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { useAuth } from "@/context/auth-context";
+import { canActOnOrders, canSeeOrderAddress } from "@/lib/staff-access";
+import { getAdminHome } from "@/lib/admin-access";
+import type { AdminDepartment } from "@/lib/admin-access";
 
 const PAYMENT_STATUS_FR: Record<string, string> = {
   succeeded: "Réussi",
@@ -72,6 +76,13 @@ export default function AdminOrderDetailPage() {
   const codOffered = useCodOffered();
   const { toast } = useToast();
   const role = useRole();
+  const { persona } = useAuth();
+  // Operations (and the super admin) run orders. Support, finance and moderation open one from a ticket, a refund, a seller
+  // page... to read it: no status changes, no cancelling, no routing; the delivery address only for support (the server
+  // sends finance and moderation the order without it). Finance keeps its Refund button (money roles, below).
+  const mayAct = canActOnOrders(role);
+  const mayAddress = canSeeOrderAddress(role);
+  const listHref = mayAct ? "/admin/orders" : getAdminHome((persona.department ?? "super") as AdminDepartment);
   const live = rt.orders.find((o) => o.id === id || o.reference === id);
   const task = rt.deliveries.find((d) => live && d.orderId === live.id && (!d.kind || d.kind === "delivery"));
   const payment = rt.payments.find((p) => live && p.orderId === live.id && (p as PaymentRow).purpose !== "topup");
@@ -113,8 +124,8 @@ export default function AdminOrderDetailPage() {
   ];
 
   const orderStatusLabel = liveStatusLabel(order.status, fr);
-  const nextStatuses = nextOrderStatuses(order.status);
-  const canCancel = canAdminCancel(order.status);
+  const nextStatuses = mayAct ? nextOrderStatuses(order.status) : [];
+  const canCancel = mayAct && canAdminCancel(order.status);
   const mayRefund = canMoveMoney(role);
   // What is left to refund: every refund path (returns and seller cancellations too) counts, and the server refuses any more.
   const refundState = payment ? refundFigures(payment as PaymentRow) : null;
@@ -202,10 +213,11 @@ export default function AdminOrderDetailPage() {
       <PageHeader
         title={order.id}
         subtitle={`${order.date} · ${orderStatusLabel} · ${formatCurrency(order.amount, locale)}`}
-        backHref="/admin/orders"
+        backHref={listHref}
         breadcrumbs={[
           adminBreadcrumb(locale),
-          { label: t("orders"), href: "/admin/orders" },
+          // The Orders list is operations'; a read-only viewer has no list to go back to.
+          mayAct ? { label: t("orders"), href: "/admin/orders" } : { label: t("orders") },
           { label: order.id },
         ]}
         actions={<Badge variant={ORDER_STATUS_BADGE[order.status] ?? "info"}>{orderStatusLabel}</Badge>}
@@ -254,7 +266,11 @@ export default function AdminOrderDetailPage() {
                 {paymentRefunded && <Badge variant="default">{fr ? "Paiement déjà remboursé" : "Payment already refunded"}</Badge>}
               </div>
               {nextStatuses.length === 0 && !canCancel && !canRefund && !paymentRefunded && (
-                <p className="text-sm text-slate-500">{fr ? "Aucune action disponible pour ce statut." : "No actions available for this status."}</p>
+                <p className="text-sm text-slate-500">
+                  {mayAct
+                    ? fr ? "Aucune action disponible pour ce statut." : "No actions available for this status."
+                    : fr ? "Lecture seule : les changements sont faits par l'équipe opérations." : "Read-only: changes are made by the operations team."}
+                </p>
               )}
               {canRefund && (
                 <p className="text-xs text-slate-500">
@@ -284,7 +300,7 @@ export default function AdminOrderDetailPage() {
         <DetailGridSection title={t("customer")}>
           <InfoGrid items={[
             { label: fr ? "Nom" : "Name", value: <Link href={`/admin/customers/${order.customerId}`} className="text-[var(--primary)] hover:underline">{order.customer}</Link> },
-            { label: fr ? "Adresse de livraison" : "Shipping address", value: order.address, full: true },
+            { label: fr ? "Adresse de livraison" : "Shipping address", value: mayAddress ? order.address : fr ? "Masquée pour votre rôle" : "Hidden for your role", full: true },
           ]} />
         </DetailGridSection>
 
@@ -303,6 +319,7 @@ export default function AdminOrderDetailPage() {
           ]} />
         </DetailGridSection>
 
+        {mayAct && (
         <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
             { label: fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
@@ -316,10 +333,13 @@ export default function AdminOrderDetailPage() {
               : []),
           ]} />
         </DetailGridSection>
+        )}
 
+        {mayAct && (
         <DetailGridSection title={fr ? "Acheminement par les entrepôts" : "Routing through the warehouses"} span={3}>
           <OrderRouting order={live} sellers={sellerList.items} />
         </DetailGridSection>
+        )}
 
         <DetailGridSection title={fr ? "Montants" : "Amounts"}>
           <InfoGrid columns={3} items={[

@@ -294,6 +294,9 @@ sequenceDiagram
 | insight | admin, admin_operations, admin_finance |
 | audit | admin, admin_operations |
 | fraud | admin, admin_finance, admin_operations, admin_moderation |
+| logisticsDesk | admin, admin_operations (the warehouse and logistics desk: dispatch, scan, batches, runs, delivery tasks, incidents; warehouse staff by tier and warehouse) |
+| orderDetail | admin, admin_operations, admin_support (read an order with the delivery address; support read-only) |
+| orderAmounts | admin_finance, admin_moderation (read an order without the delivery address); `admin_marketing` reads no order |
 
 ---
 
@@ -1752,9 +1755,9 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `orders:list` | Signed-in, role-scoped | `—` | Customer: own; rider: assigned; ops: last 200; seller: only lines of own products, no address, first name only |
+| `orders:list` | Signed-in, role-scoped | `—` | Customer: own; rider: assigned; warehouse staff: their warehouse's, in full; `admin`, `admin_operations`, `admin_support` (read-only): last 200 in full, delivery address included; `admin_finance`, `admin_moderation`: last 200 with `shippingAddress` null; `admin_marketing`: refused ("Your role cannot read orders."); seller: only lines of own products, no address, first name only. Pushes of the order (`order:created`, `order:updated`) follow the same split |
 | `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above `codCapUsd` |
-| `orders:updateStatus` | Ops (any admin_* role, warehouse_staff) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
+| `orders:updateStatus` | `admin`, `admin_operations` (group orderOps) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
 | `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | Refunds what is left on the payment (never more) to the wallet or the paying phone; answers the payment with `refund` (the ledger row of this refund); marks order returned |
 | `orders:cancel` | Order owner only (any role; staff use `orders:adminCancel`) | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
 
@@ -1762,13 +1765,13 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `delivery:list` | Ops (any admin_* role, warehouse_staff), rider (own) | `—` |  |
-| `delivery:unassigned` | Ops (any admin_* role, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
+| `delivery:list` | Desk (`admin`, `admin_operations`, warehouse_staff), rider (own) | `—` |  |
+| `delivery:unassigned` | Desk (`admin`, `admin_operations`, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
 | `delivery:accept` | rider | `{ taskId: string }` | Always refused: "Your warehouse assigns your tasks. You cannot accept a task yourself." |
 | `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered. With `requireDeliveryCode` on, `delivered` takes `code`: 5 wrong codes lock the step 15 min, 10 wrong 1 h, 15 wrong until a supervisor unlocks it (counted per task in `delivery_tasks.codeFailures` / `codeLockedUntil`; the correct code resets it) |
 | `delivery:resetCode` | warehouse supervisor or above of the task's warehouse, `admin`, `admin_operations` | `{ taskId: string }` | Clears the wrong-code counter and lock of a delivery task (audit `delivery.code_unlocked`, the rider is notified). Wrong tries are audited as `delivery.code_failed` / `delivery.code_locked`; from the 3rd the warehouse staff and admins get a notice |
 | `delivery:location` | rider (assigned) | `{ taskId: string; lat: number; lng: number }` | Pushed to the customer and ops as `delivery:location` |
-| `delivery:assign` | Ops (any admin_* role, warehouse_staff) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
+| `delivery:assign` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
 
 #### `wallet:*`
 
@@ -1887,7 +1890,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
 | `analytics:admin` | group insight: admin, admin_operations, admin_finance | `—` | GMV/revenue/AOV, by-category, today / 30-day, refunds, alerts — see [ANALYTICS-API.md](ANALYTICS-API.md) |
-| `analytics:warehouse` | Any admin_* role, warehouse_staff | `—` | + 7-day throughput, pickup→delivery time, failure rate, by zone/hub |
+| `analytics:warehouse` | group insight (`admin`, `admin_operations`, `admin_finance`); warehouse managers (own warehouse) | `—` | + 7-day throughput, pickup→delivery time, failure rate, by zone/hub |
 | `analytics:revenue` | group insight | `{ days? ≤ 90 }` | real UTC daily buckets `{date, revenue, orders}`, zero-filled |
 | `analytics:finance` | admin, admin_finance | `—` | GMV, commission, refunds, payouts, receivables, 30-day series |
 | `analytics:seller` | seller (own store) · insight roles with `sellerId` | `{ days?, sellerId?, top? }` | revenue series, top products, repeat buyers, fulfilment, reviews, health score, funnel |
@@ -1931,12 +1934,12 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `warehouse:hubs` | Ops (any admin_* role, warehouse_staff) | `—` |  |
-| `warehouse:parcels` | Ops (any admin_* role, warehouse_staff) | `{ stage?: string }` | Delivery tasks by stage |
-| `warehouse:aged` | Ops (any admin_* role, warehouse_staff) | `—` | Parcels stuck > threshold |
-| `warehouse:inventory` | Ops (any admin_* role, warehouse_staff) | `—` | Stock view from products |
-| `warehouse:batches` | Ops (any admin_* role, warehouse_staff) | `—` |  |
-| `warehouse:buildBatch` | Ops (any admin_* role, warehouse_staff) | `{ hubId?: string; taskIds: string[]; riderId: string; riderName?: string }` | Groups task ids for one rider |
+| `warehouse:hubs` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` |  |
+| `warehouse:parcels` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ stage?: string }` | Delivery tasks by stage |
+| `warehouse:aged` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` | Parcels stuck > threshold |
+| `warehouse:inventory` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` | Stock view from products |
+| `warehouse:batches` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` |  |
+| `warehouse:buildBatch` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ hubId?: string; taskIds: string[]; riderId: string; riderName?: string }` | Groups task ids for one rider |
 | `warehouse:reconcile` | `admin`, `admin_finance`, `admin_operations`; warehouse supervisors and managers (own warehouse) | `—` | COD cash reconciliation |
 
 #### `rider:*`
@@ -1976,9 +1979,9 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `exceptions:list` | Ops (any admin_* role, warehouse_staff) | `{ status?: string }` |  |
-| `exceptions:create` | Ops (any admin_* role, warehouse_staff) | `{ taskId?: string; orderReference?: string; type?: 'damaged' \| 'missing_item' \| 'wrong_item' \| 'address_issue' \| 'lost' \| 'other'; severity?: 'low' \| 'medium' \| 'high'; hub?: string; notes: string; }` | damaged / missing_item / wrong_item / address_issue / lost … |
-| `exceptions:setStatus` | Ops (any admin_* role, warehouse_staff) | `{ id: string; status: 'open' \| 'investigating' \| 'resolved' \| 'escalated'; resolution?: string; }` | open→investigating→resolved | escalated |
+| `exceptions:list` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ status?: string }` |  |
+| `exceptions:create` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ taskId?: string; orderReference?: string; type?: 'damaged' \| 'missing_item' \| 'wrong_item' \| 'address_issue' \| 'lost' \| 'other'; severity?: 'low' \| 'medium' \| 'high'; hub?: string; notes: string; }` | damaged / missing_item / wrong_item / address_issue / lost … |
+| `exceptions:setStatus` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ id: string; status: 'open' \| 'investigating' \| 'resolved' \| 'escalated'; resolution?: string; }` | open→investigating→resolved | escalated |
 
 #### `wishlist:*`
 
