@@ -517,7 +517,7 @@ describe('warehouse operations', () => {
     it('tells the admins and the customer, audits it, and leaves the order and its money alone', async () => {
       const t = await delivery();
       await logistics.returnToSeller(t.id, admin('admin_operations'));
-      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Parcel returned to seller', entityId: t.id }));
+      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Parcel returned to seller', entityId: t.id }), 'logisticsDesk');
       expect(notif.toUser).toHaveBeenCalledWith('cust1', expect.objectContaining({ title: 'Order update', entityId: order.id }));
       expect(await ds.getRepository(AuditLog).count({ where: { action: 'parcel.returned_to_seller' } })).toBe(1);
       expect((await ds.getRepository(Order).findOneByOrFail({ id: order.id })).status).toBe('confirmed');

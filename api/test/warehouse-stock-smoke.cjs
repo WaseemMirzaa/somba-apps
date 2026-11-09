@@ -70,9 +70,11 @@ const login = async (email) => {
 
   section('Who may do what');
   ok(!(await req(guest.sock, 'stock:onHand')).ok && !(await req(cust.sock, 'stock:onHand')).ok && !(await req(rider.sock, 'stock:onHand')).ok, 'guests, customers and riders cannot read the stock');
-  ok((await req(finance.sock, 'stock:onHand')).ok && (await req(finance.sock, 'stock:history')).ok, 'any admin role can read it (finance reads)');
+  a = await req(finance.sock, 'stock:onHand');
+  ok(!a.ok && /warehouse desk/.test(a.error ?? '') && !(await req(finance.sock, 'stock:history')).ok, 'finance cannot read the warehouse stock either (the desk is the super admin and Operations)', a.error ?? '');
+  ok((await req(ops.sock, 'stock:onHand')).ok && (await req(ops.sock, 'stock:history')).ok && (await req(admin.sock, 'stock:onHand')).ok, 'the operations admin and the super admin read it');
   a = await req(finance.sock, 'stock:receive', { hubId: kin, productId: prod.id, qty: 1 });
-  ok(!a.ok && /operations administrators and warehouse staff/.test(a.error ?? ''), 'but finance cannot change it', a.error ?? '');
+  ok(!a.ok && /operations administrators and warehouse staff/.test(a.error ?? ''), 'and finance cannot change it', a.error ?? '');
   a = await req(ops.sock, 'stock:receive', { productId: prod.id, qty: 1 });
   ok(!a.ok && /Choose a warehouse first/.test(a.error ?? ''), 'an operations admin must name a warehouse', a.error ?? '');
   a = await req(op.sock, 'stock:binCreate', { code: `NOPE-${tag}` });

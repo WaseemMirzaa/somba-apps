@@ -766,7 +766,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       // hop 1 kept its route (it already left); hop 2 is planned over today's lanes: none connects Kinshasa to Kikwit, so it goes direct and admins hear
       expect((await ds.getRepository(DeliveryTask).findOne({ where: { id: hop1.id } }))!).toMatchObject({ toHubId: gombe.id, finalHubId: kikwit.id });
       expect(s2.next[0]).toMatchObject({ kind: 'transfer', fromHubId: gombe.id, toHubId: kikwit.id, hop: 2 });
-      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Warehouses not connected', body: expect.stringContaining('no lane connects Entrepôt Kinshasa to Entrepôt Kikwit') }));
+      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Warehouses not connected', body: expect.stringContaining('no lane connects Entrepôt Kinshasa to Entrepôt Kikwit') }), 'logisticsDesk');
     });
 
     it('a returned parcel runs the same route in reverse, hop by hop, to the seller', async () => {
@@ -973,7 +973,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
         ['missing_item', 'high', limete.id, 'Parcel missing from run TR-0001.'],
         ['missing_item', 'high', limete.id, 'Parcel missing from run TR-0001.'],
       ]);
-      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Parcel missing from run', body: expect.stringContaining('2 parcels did not arrive') }));
+      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Parcel missing from run', body: expect.stringContaining('2 parcels did not arrive') }), 'logisticsDesk');
       expect(notif.toUsers).toHaveBeenCalled();
       // closing twice is harmless
       expect((await runs.close(admin, { runId: run.id })).status).toBe('closed');

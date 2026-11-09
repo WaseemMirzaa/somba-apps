@@ -28,7 +28,7 @@ beforeEach(async () => {
   const notifications = {
     toUser: async (to: string, n: { title: string; body: string }) => void notices.push({ to, ...n }),
     toRole: async (to: string, n: { title: string; body: string }) => void notices.push({ to: `role:${to}`, ...n }),
-    toAdmins: async (n: { title: string; body: string }) => void notices.push({ to: 'role:admins', ...n }),
+    toAdmins: async (n: { title: string; body: string }, audience?: string) => void notices.push({ to: audience ? `role:admins:${audience}` : 'role:admins', ...n }),
   };
   svc = new SupportService(ds.getRepository(SupportTicket), ds.getRepository(SupportMessage), ds.getRepository(Order), ds.getRepository(User), notifications as never, emitter as never);
 });
@@ -99,7 +99,7 @@ describe('opening a ticket', () => {
 
   it('one notice for the admins, and a live update (the whole ticket) for the owner and the support agents only', async () => {
     const t = await svc.open(customer, { subject: 'Hello', message: 'Anyone there?' });
-    expect(titles('role:admins')).toEqual(['New support ticket']);
+    expect(titles('role:admins:support')).toEqual(['New support ticket']); // Support (and the super admin) only: no other department can open the ticket
     expect(emitter.sent.some((e) => e.event === 'support:updated' && e.to === 'user:c1')).toBe(true);
     const toAgents = emitter.sent.find((e) => e.event === 'support:updated' && e.to.includes('admin_support') && e.to.includes('admin'));
     expect((toAgents!.payload as SupportTicket).id).toBe(t.id);

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { pageOf } from '../common/paging';
 
 /** What `audit:list` accepts; every field is optional and they combine with AND. */
@@ -111,7 +111,7 @@ export class AuditService {
         detail: entry.detail ?? null,
       }),
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log);
+    this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log);
     return log;
   }
 }

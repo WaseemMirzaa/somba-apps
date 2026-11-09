@@ -28,7 +28,8 @@ import { cleanAttachments, firstName, parseAttachments, redactForSeller, storeAt
 import { pageOf } from '../common/paging';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { SettingsService } from '../content/settings.service';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { ProductsService } from '../products/products.service';
@@ -285,7 +286,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async canSee(user: Viewer, d: Dispute): Promise<boolean> {
-    if (user.role.startsWith('admin')) return true;
+    // The returns and disputes desk reads every case; marketing and moderation read none (they would see the customer's and seller's messages).
+    if (user.role.startsWith('admin')) return inRoleGroup(user.role, 'disputeDesk');
     // Warehouse staff see the returns of their own warehouse only (their customers' names and addresses are in them).
     if (user.role === 'warehouse_staff') return d.type === 'return' && !!user.hubId && (await this.hubOfReturn(d)) === user.hubId;
     if (d.customerId === user.id) return true;
@@ -305,7 +307,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   private async publish(dispute: Dispute, event: 'dispute:created' | 'dispute:updated'): Promise<DisputeView> {
     const [view] = await this.present([dispute]);
     this.emitter.toUser(dispute.customerId, event, view);
-    this.emitter.toRoles(ADMIN_ROLES, event, view);
+    this.emitter.toRoles([...ROLE_GROUPS.disputeDesk], event, view);
     // A return also goes to the staff of the warehouse it belongs to, and to nobody else's.
     if (dispute.type === 'return') {
       const hub = await this.hubOfReturn(dispute);
@@ -525,7 +527,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (filter.type) qb.andWhere('d.type = :type', { type: filter.type });
     if (filter.stage) qb.andWhere('d.stage = :stage', { stage: filter.stage });
     if (user.role.startsWith('admin')) {
-      // everything
+      // everything, for the desk; no other admin role reads the queue
+      if (!inRoleGroup(user.role, 'disputeDesk')) throw new BadRequestException('Not allowed.');
     } else if (user.role === 'warehouse_staff') {
       // Only the returns that arrive at their own warehouse (no warehouse on the account: none).
       qb.andWhere(
@@ -592,7 +595,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     // The thread goes to everyone on the request, the author included (their other devices).
     const payload = { disputeId: d.id, message: msg };
     this.emitter.toUser(d.customerId, 'dispute:message', payload);
-    this.emitter.toRoles(ADMIN_ROLES, 'dispute:message', payload);
+    this.emitter.toRoles([...ROLE_GROUPS.disputeDesk], 'dispute:message', payload);
     const sellerIds = await this.sellerUsersOf(d);
     for (const sid of sellerIds) {
       this.emitter.toUser(sid, 'dispute:message', sid === user.id ? payload : { disputeId: d.id, message: DisputesService.messageForSeller(msg) });
@@ -656,6 +659,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   /** Somba support approves or refuses a return the seller rejected or let lapse (or any return still undecided). */
   async adminDecideReturn(admin: Viewer, id: string, approve: boolean, rawReason: unknown): Promise<DisputeView> {
     if (!admin.role.startsWith('admin')) throw new BadRequestException('Admins only.');
+    if (!inRoleGroup(admin.role, 'disputeDesk')) throw new BadRequestException('Not allowed.');
     const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
     if (!d) throw new NotFoundException('Dispute not found.');
     if (d.type !== 'return') throw new BadRequestException('Use decide for disputes.');
@@ -739,6 +743,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     canRefund: boolean,
   ): Promise<DisputeView> {
     if (!admin.role.startsWith('admin')) throw new BadRequestException('Admins only.');
+    if (!inRoleGroup(admin.role, 'disputeDesk')) throw new BadRequestException('Not allowed.');
     const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
     if (!d) throw new NotFoundException('Dispute not found.');
     if (d.type !== 'dispute') throw new BadRequestException('Returns are approved or refused with returns:decide.');

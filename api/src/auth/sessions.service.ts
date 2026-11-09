@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { AuditLog, RefreshToken, User } from '../database/entities';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 
 /**
@@ -133,7 +133,7 @@ export class SessionsService {
         detail: `A refresh token used at ${new Date(row.usedAt as Date).toISOString()} was presented again; every session of the account was signed out.`,
       }),
     );
-    this.emitter?.toRoles([...ADMIN_ROLES], 'audit:created', log);
+    this.emitter?.toRoles(AUDIT_ROLES, 'audit:created', log);
   }
 
   /** Rows nobody can use any more: expired, or used / revoked longer ago than {@link KEEP_USED_MS}. */

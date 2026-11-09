@@ -8,10 +8,9 @@ import { ExchangesService, canMoveExchange } from './exchanges.service';
 import type { ExchangeView } from './exchanges.service';
 import { inRoleGroup } from '../common/role-groups';
 import { AuditService } from '../ops/audit.service';
-import { ReplacementsService } from './replacements.service';
+import { ReplacementsService, canWorkReplacements } from './replacements.service';
 
 const SUPERVISORS_ONLY = 'Only supervisors and managers can see this.';
-const isOps = (role: string) => role.startsWith('admin') || role === 'warehouse_staff';
 const REPLACEMENT_STATUSES = ['requested', 'approved', 'received', 'allocated', 'dispatched', 'delivered', 'rejected'] as const;
 const EXCHANGE_STATUSES = ['requested', 'approved', 'received', 'ready', 'dispatched', 'delivered', 'rejected'] as const;
 
@@ -53,6 +52,14 @@ export class AfterSaleGateway {
     return user.role === 'warehouse_staff' && !(await this.tiers.allows(user, 'oversee'));
   }
 
+  /**
+   * Replacements and exchanges are read by the admin roles that decide them (super admin, operations, support: group
+   * `exchangeDecide`); marketing, finance and moderation are refused. Null for everyone else (the service scopes sellers and customers).
+   */
+  private adminRefusal(user: SocketUser): string | null {
+    return user.role.startsWith('admin') && !inRoleGroup(user.role, 'exchangeDecide') ? 'Not allowed.' : null;
+  }
+
   /** A seller account acts as its store (a team member with the orders permission too); everyone else as themselves. */
   private async viewer(user: SocketUser, write: boolean) {
     if (user.role !== 'seller') return user;
@@ -69,6 +76,8 @@ export class AfterSaleGateway {
   async replacementsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.replacements.list(await this.viewer(user, false), body ?? {}));
     } catch (e) {
@@ -90,6 +99,8 @@ export class AfterSaleGateway {
   async replacementsGet(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.replacements.get(await this.viewer(user, false), String(body?.id ?? '')));
     } catch (e) {
@@ -115,7 +126,8 @@ export class AfterSaleGateway {
   async replacementsRespond(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; approve: boolean; reason?: string }) {
     try {
       const user = requireUser(client);
-      if (user.role !== 'seller' && !user.role.startsWith('admin')) return fail('Not allowed.');
+      // The seller, or support / operations on their behalf (group `exchangeDecide`); no other admin department.
+      if (user.role !== 'seller' && !inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
       return ok(await this.replacements.respond(await this.viewer(user, true), String(body?.id ?? ''), body?.approve === true, body?.reason));
     } catch (e) {
       return fail((e as Error).message);
@@ -126,7 +138,8 @@ export class AfterSaleGateway {
   async replacementsSetStatus(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; status: (typeof REPLACEMENT_STATUSES)[number] }) {
     try {
       const user = requireUser(client);
-      if (!isOps(user.role)) return fail('Ops only.');
+      // Like an exchange: the exchange desk and warehouse supervisors move a replacement; no other admin department.
+      if (!canWorkReplacements(user.role)) return fail('Ops only.');
       if (await this.staffBelowSupervisor(user)) return fail('Only supervisors and managers can do this.');
       oneOf(body?.status, REPLACEMENT_STATUSES, 'Status');
       return ok(await this.replacements.setStatus(body.id, body.status));
@@ -140,6 +153,8 @@ export class AfterSaleGateway {
   async exchangesList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.exchanges.list(await this.viewer(user, false), body ?? {}));
     } catch (e) {
@@ -160,6 +175,8 @@ export class AfterSaleGateway {
   async exchangesGet(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
       return ok(await this.exchanges.get(await this.viewer(user, false), String(body?.id ?? '')));
     } catch (e) {

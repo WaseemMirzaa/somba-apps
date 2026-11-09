@@ -1,6 +1,7 @@
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import type { Socket } from 'socket.io';
 import { limitSocket } from '../common/socket-limit';
+import { inRoleGroup } from '../common/role-groups';
 import { sellerContext } from '../sellers/seller-context';
 import { InventoryService } from './inventory.service';
 
@@ -11,7 +12,7 @@ const fail = (error: string) => ({ ok: false as const, error });
 
 /**
  * Inventory events on the same Socket.IO server as RealtimeGateway (which authenticates the socket on connect and
- * puts the user on `client.data.user`). Sellers act on their own products, admins on any.
+ * puts the user on `client.data.user`). Sellers act on their own products; the Super Admin and Operations on any.
  */
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class InventoryGateway {
@@ -25,7 +26,11 @@ export class InventoryGateway {
     limitSocket(client);
     const u = client.data?.user;
     if (!u || u.role === 'guest') throw new Error('Sign in to continue.');
-    if (u.role.startsWith('admin')) return { user: u, by: u.id };
+    // Any store's stock: the Super Admin and Operations (group `logisticsDesk`); the other admin departments have no part in it.
+    if (u.role.startsWith('admin')) {
+      if (!inRoleGroup(u.role, 'logisticsDesk')) throw new Error('Not allowed.');
+      return { user: u, by: u.id };
+    }
     if (u.role !== 'seller') throw new Error('Sellers only.');
     const ctx = await sellerContext({ id: u.id, role: u.role, name: u.name ?? '' }, permission, { write });
     return { user: ctx.actor, by: ctx.user.id };

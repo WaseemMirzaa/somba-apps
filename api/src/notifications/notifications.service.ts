@@ -10,6 +10,8 @@ import { PushService } from './push.service';
 import { TranslationService } from '../translation/translation.service';
 import { TeamDirectory } from '../sellers/team-directory';
 import { noticeCategory } from '../users/notify-prefs';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
+import type { RoleGroup } from '../common/role-groups';
 
 export interface NoticeInput {
   title: string;
@@ -39,6 +41,15 @@ const MOBILE_ROLE_TYPES = new Set(['marketing', 'task']);
 
 /** The `role` of a saved notice for all admin roles at once (see `toAdmins`). */
 export const ALL_ADMINS = 'admins';
+/** The `role` of a saved notice for one audience of admin roles: `admins:<role group>` (see `toAdmins`). */
+const AUDIENCE_PREFIX = `${ALL_ADMINS}:`;
+
+/** The role group an audience row is for, or null for any other row role. */
+function audienceOf(rowRole: string): RoleGroup | null {
+  if (!rowRole.startsWith(AUDIENCE_PREFIX)) return null;
+  const group = rowRole.slice(AUDIENCE_PREFIX.length);
+  return group in ROLE_GROUPS ? (group as RoleGroup) : null;
+}
 
 export const ADMIN_ROLES = [
   'admin',
@@ -224,22 +235,34 @@ export class NotificationsService {
   }
 
   /**
-   * Broadcast to every admin role at once. ONE saved row (role `admins`) that all of them see, each reading it on their
-   * own, so the super admin does not get the same notice six times.
+   * Broadcast to admin roles: ONE saved row that all of them see, each reading it on their own, so the super admin does not
+   * get the same notice six times. `audience` names the role group whose departments own the subject (`orderOps` for a new
+   * order, `support` for a ticket, ...): only those roles (the super admin always among them) are told, live and by push,
+   * and only they list it. Without an audience every admin role hears it; use that only for a notice every department needs.
    */
-  async toAdmins(data: NoticeInput): Promise<void> {
+  async toAdmins(data: NoticeInput, audience?: RoleGroup): Promise<void> {
+    const roles: readonly string[] = audience ? ROLE_GROUPS[audience] : ADMIN_ROLES;
     const n = await this.repo.save(
-      this.repo.create({ role: ALL_ADMINS, title: data.title, body: data.body, type: data.type ?? 'system', entityId: data.entityId ?? null }),
+      this.repo.create({
+        role: audience ? `${AUDIENCE_PREFIX}${audience}` : ALL_ADMINS,
+        title: data.title,
+        body: data.body,
+        type: data.type ?? 'system',
+        entityId: data.entityId ?? null,
+      }),
     );
     await this.keepAuthored(n, data.fr);
-    this.emitter.toRoles(ADMIN_ROLES, 'notification:new', NotificationsService.view(n, linkFor('admin', n.type, n.entityId), data.fr));
-    for (const role of ADMIN_ROLES) void this.pushToRole(role, n, data.extra, data.fr);
+    this.emitter.toRoles([...roles], 'notification:new', NotificationsService.view(n, linkFor('admin', n.type, n.entityId), data.fr));
+    for (const role of roles) void this.pushToRole(role, n, data.extra, data.fr);
   }
 
   /** Which saved role rows a viewer of `role` may see: their own role's, every admin role's for the super admin. */
   private static roleRows(role: string): Record<string, unknown>[] {
     if (role === 'admin') return [{ role: Like('admin%') }];
-    if (role.startsWith('admin_')) return [{ role }, { role: ALL_ADMINS }];
+    if (role.startsWith('admin_')) {
+      const audiences = (Object.keys(ROLE_GROUPS) as RoleGroup[]).filter((g) => inRoleGroup(role, g)).map((g) => ({ role: `${AUDIENCE_PREFIX}${g}` }));
+      return [{ role }, { role: ALL_ADMINS }, ...audiences];
+    }
     return [{ role }];
   }
 
@@ -247,7 +270,10 @@ export class NotificationsService {
   static canSeeRoleRow(viewerRole: string, rowRole: string | null): boolean {
     if (!rowRole) return false;
     if (viewerRole === 'admin') return rowRole.startsWith('admin');
-    if (viewerRole.startsWith('admin_')) return rowRole === viewerRole || rowRole === ALL_ADMINS;
+    if (viewerRole.startsWith('admin_')) {
+      const audience = audienceOf(rowRole);
+      return rowRole === viewerRole || rowRole === ALL_ADMINS || (audience !== null && inRoleGroup(viewerRole, audience));
+    }
     return rowRole === viewerRole;
   }
 

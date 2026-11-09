@@ -9,14 +9,14 @@ import { DEFAULT_VARIANT, checkVariant, storedVariantGroups } from '../common/va
 import { pageOf } from '../common/paging';
 import { Actor, LogisticsEvent, LogisticsService } from '../logistics/logistics.service';
 import { isHubBound } from '../logistics/leg-rules';
-import { tierAllows } from '../logistics/tiers';
+import { DESK_ADMINS_ONLY, DESK_ROLES, tierAllows } from '../logistics/tiers';
 import type { DeskAction } from '../logistics/tiers';
 import { ProductsService } from '../products/products.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
 
-/** Admin roles that may change a warehouse's stock (every admin may read it). Warehouse staff by tier. */
-export const STOCK_ADMINS: readonly string[] = ['admin', 'admin_operations'];
+/** Admin roles that read and change a warehouse's stock: the warehouse desk (group `logisticsDesk`). Warehouse staff by tier; no other admin role. */
+export const STOCK_ADMINS: readonly string[] = ROLE_GROUPS.logisticsDesk;
 export const RECEIVING_BIN = 'RECV';
 export const MAX_QTY = 1_000_000;
 
@@ -118,6 +118,8 @@ export class WarehouseStockService implements OnModuleInit {
   /** Staff are always limited to their own warehouse; an admin names one (required for a write, optional for a read). */
   private async scope(actor: Actor, requested: unknown, write: boolean): Promise<string | null> {
     if (actor.role.startsWith('admin')) {
+      // Reading is held to the same desk as writing: stock levels and the ledger are warehouse data, not every department's.
+      if (!STOCK_ADMINS.includes(actor.role)) throw new ForbiddenException(DESK_ADMINS_ONLY);
       const id = typeof requested === 'string' && requested ? requested : null;
       if (!id) {
         if (write) throw new BadRequestException('Choose a warehouse first.');
@@ -323,7 +325,8 @@ export class WarehouseStockService implements OnModuleInit {
   private done(hubId: string, ...productIds: string[]): void {
     const payload = { hubId, productIds };
     this.emitter.toHub(hubId, 'stock:updated', payload);
-    this.emitter.toRoles([...ADMIN_ROLES], 'stock:updated', payload);
+    // The desk admins only (Operations): marketing, finance, support and moderation do not follow stock.
+    this.emitter.toRoles(DESK_ROLES, 'stock:updated', payload);
   }
 
   // ── bins ──────────────────────────────────────────────────────────────────────

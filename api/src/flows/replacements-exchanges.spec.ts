@@ -412,3 +412,63 @@ describe('exchanges', () => {
     expect((await exchanges.get(admin, ex.id)).customerId).toBe('c1');
   });
 });
+
+describe('who reads and works replacements and exchanges (least privilege)', () => {
+  const staff = (role: string, id = `${role}-1`) => ({ id, name: `${role} name`, role });
+  const READERS = ['admin', 'admin_operations', 'admin_support'];
+  const OTHERS = ['admin_marketing', 'admin_finance', 'admin_moderation'];
+
+  it('super admin, operations and support read every replacement and exchange; marketing, finance and moderation see none and cannot open one', async () => {
+    const o = await order([{ product: hat }]);
+    const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
+    const o2 = await order([{ product: shoe, variant: 'Size: 40' }]);
+    const ex = await exchanges.create(customer, { orderId: o2.id, fromSku: shoe.id, fromName: 'Shoe', toSku: shoe.id, toName: 'Shoe', toVariant: 'Size: 41', reason: 'Too small' });
+    for (const role of READERS) {
+      expect((await replacements.list(staff(role))).map((r) => r.id)).toEqual([rep.id]);
+      expect((await replacements.get(staff(role), rep.id)).id).toBe(rep.id);
+      expect((await exchanges.list(staff(role))).map((x) => x.id)).toEqual([ex.id]);
+      expect((await exchanges.get(staff(role), ex.id)).id).toBe(ex.id);
+    }
+    for (const role of OTHERS) {
+      expect(await replacements.list(staff(role))).toEqual([]);
+      expect(await exchanges.list(staff(role))).toEqual([]);
+      await expect(replacements.get(staff(role), rep.id)).rejects.toThrow('Replacement not found.');
+      await expect(exchanges.get(staff(role), ex.id)).rejects.toThrow('Exchange not found.');
+    }
+  });
+
+  it('warehouse staff, the customer and the seller read as before', async () => {
+    const o = await order([{ product: hat }]);
+    const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
+    expect((await replacements.list(staff('warehouse_staff'))).map((r) => r.id)).toEqual([rep.id]);
+    expect((await replacements.list(customer)).map((r) => r.id)).toEqual([rep.id]);
+    expect((await replacements.list(sellerOne)).map((r) => r.id)).toEqual([rep.id]);
+    expect((await replacements.get(sellerOne, rep.id)).id).toBe(rep.id);
+  });
+
+  it('only the super admin and support/operations answer on the seller’s behalf; marketing, finance and moderation get "not found" and nothing changes', async () => {
+    const o = await order([{ product: hat }]);
+    const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
+    for (const role of OTHERS) await expect(replacements.respond(staff(role), rep.id, true, '')).rejects.toThrow('Replacement not found.');
+    expect((await ds.getRepository(Replacement).findOneByOrFail({ id: rep.id })).status).toBe('requested');
+    expect((await replacements.respond(staff('admin_support'), rep.id, true, '')).status).toBe('approved');
+  });
+
+  it('filing a replacement on a customer’s order is for the exchange desk and the warehouse; support, finance, marketing and moderation are refused', async () => {
+    const o = await order([{ product: hat }]);
+    for (const role of ['admin_support', 'admin_finance', 'admin_marketing', 'admin_moderation']) {
+      await expect(replacements.create(staff(role), { orderId: o.id, sku: hat.id, productName: 'Hat' })).rejects.toThrow('not eligible');
+    }
+    expect(await ds.getRepository(Replacement).count()).toBe(0);
+    expect((await replacements.create(staff('admin_operations'), { orderId: o.id, sku: hat.id, productName: 'Hat' })).status).toBe('requested');
+  });
+
+  it('live updates go to the roles that read them (and the warehouse), not to every admin department', async () => {
+    const o = await order([{ product: hat }]);
+    await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
+    const o2 = await order([{ product: shoe, variant: 'Size: 40' }]);
+    await exchanges.create(customer, { orderId: o2.id, fromSku: shoe.id, fromName: 'Shoe', toSku: shoe.id, toName: 'Shoe', toVariant: 'Size: 41' });
+    const rooms = emitter.sent.filter((e) => e.event === 'replacement:updated' || e.event === 'exchange:updated').map((e) => e.to);
+    expect(rooms.filter((r) => r.startsWith('admin'))).toEqual(['admin,admin_operations,admin_support,warehouse_staff', 'admin,admin_operations,admin_support,warehouse_staff']);
+  });
+});

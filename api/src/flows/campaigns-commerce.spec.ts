@@ -145,14 +145,32 @@ describe('budget', () => {
     expect(campaignRunning({ ...c, budgetUsd: 0, spentUsd: 999 })).toBe(true); // no budget = no limit
   });
 
-  it('every sale tells the owner and marketing the new numbers', async () => {
+  it('every sale tells the owner and marketing (not the other admin departments) the new numbers', async () => {
     const c = await make({ budgetUsd: 500 });
     await w.campaigns.setStatus(c.id, 'active');
     w.emitter.sent.length = 0;
     await w.products.recordCampaignSale(c.id, 80, 20);
     const ev = w.emitter.sent.filter((e) => e.event === 'campaign:updated');
-    expect(ev.map((e) => e.to).sort()).toEqual(['admin,admin_operations,admin_finance,admin_support,admin_marketing,admin_moderation', 'user:u-kt'].sort());
+    expect(ev.map((e) => e.to).sort()).toEqual(['admin,admin_marketing', 'user:u-kt'].sort());
     expect(ev[0].payload).toMatchObject({ orders: 1, revenueUsd: 80, spentUsd: 20, budgetRemainingUsd: 480 });
+  });
+});
+
+describe('who sees and edits campaigns', () => {
+  it('the platform list is for the super admin and Marketing; finance, support, moderation and operations get nothing', async () => {
+    const c = await make();
+    for (const role of ['admin', 'admin_marketing']) expect((await w.campaigns.list({ id: `${role}-1`, role })).map((x) => x.id)).toEqual([c.id]);
+    for (const role of ['admin_finance', 'admin_support', 'admin_moderation', 'admin_operations', 'customer']) expect(await w.campaigns.list({ id: `${role}-1`, role })).toEqual([]);
+    expect((await w.campaigns.list(user)).map((x) => x.id)).toEqual([c.id]); // the seller still sees their own
+  });
+
+  it('only the super admin and Marketing edit another store’s campaign; any other admin role is told it does not exist', async () => {
+    const c = await make();
+    for (const role of ['admin_finance', 'admin_support', 'admin_moderation', 'admin_operations']) {
+      await expect(w.campaigns.update({ id: `${role}-1`, role }, c.id, { discount: 5 })).rejects.toThrow('Campaign not found.');
+    }
+    expect((await row(c.id)).discount).toBe(20);
+    expect((await w.campaigns.update({ id: 'mk-1', role: 'admin_marketing' }, c.id, { discount: 5 })).discount).toBe(5);
   });
 });
 

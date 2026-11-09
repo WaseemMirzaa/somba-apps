@@ -32,7 +32,7 @@ beforeEach(async () => {
   emitter = recordingEmitter();
   notices = [];
   const notifications = {
-    toAdmins: async (n: never) => void notices.push({ to: 'admins', n }),
+    toAdmins: async (n: never, audience?: string) => void notices.push({ to: audience ? `admins:${audience}` : 'admins', n }),
     toUser: async (id: string, n: never) => void notices.push({ to: id, n }),
   };
   const audit = new AuditService(ds.getRepository(AuditLog), emitter as never);
@@ -55,7 +55,7 @@ describe('fraud alerts: Block really blocks', () => {
     expect(await actions()).toEqual([`fraud.blocked:fraud:${alert.id}`, `user.suspend:user:${customer.id}`]);
     const log = await ds.getRepository(AuditLog).findOneOrFail({ where: { action: 'user.suspend' } });
     expect(log).toMatchObject({ actor: 'Support Sam', role: 'admin_support', detail: `Fraud alert ${alert.id}` });
-    expect(notices.map((x) => [x.to, x.n.title])).toEqual([['admins', 'Account blocked'], [customer.id, 'Account suspended']]);
+    expect(notices.map((x) => [x.to, x.n.title])).toEqual([['admins:fraudAlerts', 'Account blocked'], [customer.id, 'Account suspended']]); // finance, support and the super admin: the departments with a fraud page
     expect(emitter.sent.some((s) => s.event === 'customer:updated' && s.payload.active === false)).toBe(true);
   });
 

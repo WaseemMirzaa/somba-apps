@@ -123,7 +123,7 @@ export class AgedParcelsService {
     };
     if (ids.length) await this.notifications.toUsers(ids, notice);
     // The last level goes to the admins too; a parcel no warehouse manages has nobody else to tell.
-    if (last || !hubId) await this.notifications.toAdmins(notice);
+    if (last || !hubId) await this.notifications.toAdmins(notice, 'logisticsDesk');
     return ids.length + (last || !hubId ? 1 : 0);
   }
 

@@ -148,6 +148,42 @@ describe('DisputesGateway', () => {
     expect(svc.resolve).toHaveBeenLastCalledWith('d', expect.anything(), false);
   });
 
+  it('the queue and a case’s thread are for the returns and disputes desk (super admin, operations, support, finance); marketing and moderation are refused and nothing is read', async () => {
+    const { gw, svc } = disputes();
+    for (const role of ['admin_marketing', 'admin_moderation']) {
+      expect(await gw.list(client(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.returnsList(client(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.get(client(role), { id: 'd' })).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.reply(client(role), { id: 'd', message: 'hi' })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(svc.list).not.toHaveBeenCalled();
+    expect(svc.get).not.toHaveBeenCalled();
+    expect(svc.reply).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations', 'admin_support', 'admin_finance']) {
+      expect((await gw.list(client(role), {})).ok).toBe(true);
+      expect((await gw.get(client(role), { id: 'd' })).ok).toBe(true);
+      expect((await gw.reply(client(role), { id: 'd', message: 'hi' })).ok).toBe(true);
+    }
+    // customers and sellers still read their own through the service
+    expect((await gw.list(client('customer'), {})).ok).toBe(true);
+    expect((await gw.list(client('seller'), {})).ok).toBe(true);
+  });
+
+  it('the old resolve and reject buttons keep "Admins only." for non-admins and refuse marketing and moderation with "Not allowed."', async () => {
+    const { gw, svc, audit } = disputes();
+    for (const role of ['admin_marketing', 'admin_moderation']) {
+      expect(await gw.resolve(client(role), { disputeId: 'd', refund: true })).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.reject(client(role), { disputeId: 'd' })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(svc.resolve).not.toHaveBeenCalled();
+    expect(svc.reject).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations', 'admin_support', 'admin_finance']) {
+      expect((await gw.resolve(client(role), { disputeId: 'd' })).ok).toBe(true);
+      expect((await gw.reject(client(role), { disputeId: 'd' })).ok).toBe(true);
+    }
+  });
+
   it('turns a service error into the ack', async () => {
     const { gw, svc } = disputes();
     svc.get.mockRejectedValueOnce(new Error('Dispute not found.'));
@@ -248,6 +284,43 @@ describe('AfterSaleGateway', () => {
     expect(exc.respond).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin_support' }), 'e', false, 'no thanks');
   });
 
+  it('replacements and exchanges are read by the admin roles that decide them (super admin, operations, support); marketing, finance and moderation are refused and nothing is read', async () => {
+    const { gw, rep, exc } = make();
+    for (const role of ['admin_marketing', 'admin_finance', 'admin_moderation']) {
+      expect(await gw.replacementsList(client(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.replacementsGet(client(role), { id: 'r' })).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.exchangesList(client(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
+      expect(await gw.exchangesGet(client(role), { id: 'e' })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    for (const fn of [rep.list, rep.get, exc.list, exc.get]) expect(fn).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations', 'admin_support']) {
+      expect((await gw.replacementsList(client(role), {})).ok).toBe(true);
+      expect((await gw.replacementsGet(client(role), { id: 'r' })).ok).toBe(true);
+      expect((await gw.exchangesList(client(role), {})).ok).toBe(true);
+      expect((await gw.exchangesGet(client(role), { id: 'e' })).ok).toBe(true);
+    }
+  });
+
+  it('a replacement is moved by the exchange desk and warehouse supervisors only; support, finance, marketing and moderation are refused', async () => {
+    const { gw, rep } = make();
+    for (const role of ['admin_support', 'admin_finance', 'admin_marketing', 'admin_moderation']) {
+      expect(await gw.replacementsSetStatus(client(role), { id: 'r', status: 'approved' })).toEqual({ ok: false, error: 'Ops only.' });
+    }
+    expect(rep.setStatus).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations']) expect((await gw.replacementsSetStatus(client(role), { id: 'r', status: 'approved' })).ok).toBe(true);
+    expect(rep.setStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('a replacement is approved on the seller’s behalf by the desk and support only; marketing, moderation and finance are refused', async () => {
+    const { gw, rep } = make();
+    for (const role of ['admin_marketing', 'admin_moderation', 'admin_finance']) {
+      expect(await gw.replacementsRespond(client(role), { id: 'r', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(rep.respond).not.toHaveBeenCalled();
+    for (const role of ['admin', 'admin_operations', 'admin_support']) expect((await gw.replacementsRespond(client(role), { id: 'r', approve: true })).ok).toBe(true);
+    expect(rep.respond).toHaveBeenCalledTimes(3);
+  });
+
   it('mine is always the caller’s own, whatever their role', async () => {
     const { gw, rep, exc } = make();
     await gw.replacementsMine(client('seller', 'sx'), {});
@@ -303,14 +376,19 @@ describe('EngagementGateway', () => {
     expect(reviews.listQuestionsForSeller).toHaveBeenCalledWith(['store-of-s1', 'owner-of-s1'], { status: 'unanswered' });
   });
 
-  it('answering a question: admins; a seller only for their own product; nobody else', async () => {
+  it('answering a question: the moderators (super admin, operations, moderation); a seller only for their own product; nobody else', async () => {
     const { gw, reviews } = make();
     expect(await gw.answer(client('customer'), { id: 'q', answer: 'Sure' })).toEqual({ ok: false, error: 'Not allowed.' });
     expect(await gw.answer(client('seller', 's2'), { id: 'q', answer: 'Not mine' })).toEqual({ ok: false, error: 'Not allowed.' }); // owner is store-of-s1
     expect(await gw.answer(client('seller', 's1'), { id: 'q', answer: '   ' })).toEqual({ ok: false, error: 'Write an answer first.' });
     expect((await gw.answer(client('seller', 's1', 'Shop'), { id: 'q', answer: ' Yes. ' })).ok).toBe(true);
     expect(reviews.answer).toHaveBeenCalledWith('q', 'Yes.', 'Shop');
-    expect((await gw.answer(client('admin_support'), { id: 'q', answer: 'Yes.' })).ok).toBe(true);
+    // Staff answer on any product only when they moderate it: the super admin, operations and moderation. Support, finance and marketing do not.
+    for (const role of ['admin', 'admin_operations', 'admin_moderation']) expect((await gw.answer(client(role), { id: 'q', answer: 'Yes.' })).ok).toBe(true);
+    for (const role of ['admin_support', 'admin_finance', 'admin_marketing']) {
+      expect(await gw.answer(client(role), { id: 'q', answer: 'Yes.' })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(reviews.answer).toHaveBeenCalledTimes(4); // the seller's, then the three moderators
   });
 
   it('helpful votes need an account', async () => {

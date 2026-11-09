@@ -4,7 +4,7 @@ import type { Socket } from 'socket.io';
 import { Repository } from 'typeorm';
 import { AuditLog, User } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { AUDIT_ROLES, ROLE_GROUPS } from '../common/role-groups';
 import { tierAllows } from '../logistics/tiers';
 import { CoverageService } from './coverage.service';
 import { GeoService } from './geo.service';
@@ -14,7 +14,8 @@ type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: 
 const ok = <T>(data: T) => ({ ok: true as const, data });
 const fail = (error: string) => ({ ok: false as const, error });
 
-const GEO_ADMINS = ['admin', 'admin_operations'];
+/** The geography desk: the super admin and Operations (the same two as the warehouse desk). */
+const GEO_ADMINS: readonly string[] = ROLE_GROUPS.logisticsDesk;
 
 /**
  * `geo:*` (the area tree, search, resolve; admins edit), `coverage:*` and the coverage half of the warehouse directory
@@ -48,7 +49,7 @@ export class GeoGateway {
   private audit(u: { name: string; role: string }, action: string, entity: string, entityId: string | null, detail: string): void {
     void this.audits
       .save(this.audits.create({ actor: u.name, role: u.role, action, entity, entityId, detail }))
-      .then((log) => this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log))
+      .then((log) => this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log))
       .catch(() => undefined);
   }
 
@@ -216,7 +217,8 @@ export class GeoGateway {
   async map(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { rootId?: string }) {
     try {
       const role = this.role(client);
-      if (!GEO_ADMINS.includes(role) && !role.startsWith('admin') && role !== 'warehouse_staff') throw new Error('Not allowed.');
+      // The coverage map is the geography desk's (Operations) and the warehouses'; no other admin department reads it.
+      if (!GEO_ADMINS.includes(role) && role !== 'warehouse_staff') throw new Error('Not allowed.');
       return ok(await this.coverage.map(body?.rootId));
     } catch (e) {
       return fail((e as Error).message);

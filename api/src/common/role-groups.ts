@@ -41,6 +41,17 @@ export const ROLE_GROUPS = {
    * Marketing is in neither group: its screens run on campaign figures, not on orders.
    */
   orderAmounts: ['admin_finance', 'admin_moderation'],
+  /**
+   * Returns and disputes: read the queue and a case's thread (the customer's and the seller's messages, the order), reply,
+   * decide, refuse (Operations: Disputes + Returns; Support: Disputes + Returns). Finance is here because it pays the refunds
+   * (`disputes:decide` / `disputes:resolve` with a refund) and its figures count them. The warehouse handles the goods
+   * through its own tier (`RETURNS_DESK_ADMINS`). Marketing and moderation have no part.
+   */
+  disputeDesk: ['admin', 'admin_operations', 'admin_support', 'admin_finance'],
+  /** The audit log: read it and hear new entries live (the log pages themselves sit with the Super Admin; Operations may read it). */
+  audit: ['admin', 'admin_operations'],
+  /** Fraud alerts and the account blocks that follow (Finance: Fraud payments; Support: Fraud, because support may suspend accounts). */
+  fraudAlerts: ['admin', 'admin_finance', 'admin_support'],
 } as const;
 
 export type RoleGroup = keyof typeof ROLE_GROUPS;
@@ -49,3 +60,6 @@ export type RoleGroup = keyof typeof ROLE_GROUPS;
 export function inRoleGroup(role: string | null | undefined, group: RoleGroup): boolean {
   return (ROLE_GROUPS[group] as readonly string[]).includes(role ?? '');
 }
+
+/** Socket rooms of the audit readers (`audit:created` goes to these and to nobody else). */
+export const AUDIT_ROLES: string[] = [...ROLE_GROUPS.audit];

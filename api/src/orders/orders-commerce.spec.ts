@@ -17,6 +17,7 @@ let shop: Seller;
 let other: Seller;
 let orders: OrdersService;
 let payFails: boolean;
+let adminNotices: { title: string; audience?: string }[];
 const customer = { id: 'cust-1', name: 'Jean Mukendi' };
 
 beforeEach(async () => {
@@ -34,7 +35,8 @@ beforeEach(async () => {
     forOrder: async () => null,
     refundCancelledOrder: async () => 0,
   };
-  const notifications = { toUser: async () => undefined, toRole: async () => undefined, toAdmins: async () => undefined, toUsers: async () => undefined };
+  adminNotices = [];
+  const notifications = { toUser: async () => undefined, toRole: async () => undefined, toAdmins: async (n: { title: string }, audience?: string) => void adminNotices.push({ title: n.title, audience }), toUsers: async () => undefined };
   orders = new OrdersService(
     w.ds.getRepository(Order),
     w.ds.getRepository(DeliveryTask),
@@ -58,6 +60,14 @@ afterEach(async () => w.ds.destroy());
 
 const place = (items: { productId: string; qty: number; variant?: string }[], promoCode?: string) => orders.create(customer, { items, paymentMethod: 'wallet', promoCode });
 const stock = async (id: string) => (await w.products.getRaw(id))!;
+
+describe('who hears about a new order', () => {
+  it('a new order is announced to the super admin and Operations only (group orderOps), not to every admin department', async () => {
+    const p = await w.product(shop, { name: 'Case', stock: 5 });
+    await place([{ productId: p.id, qty: 1 }]);
+    expect(adminNotices).toEqual([{ title: 'New order', audience: 'orderOps' }]);
+  });
+});
 
 describe('checkout and stock per option', () => {
   it('takes the stock of the chosen option only, and writes the ledger with the order id', async () => {

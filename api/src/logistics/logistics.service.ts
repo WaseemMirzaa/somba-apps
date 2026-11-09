@@ -19,7 +19,8 @@ import {
   TransferRun,
   User,
 } from '../database/entities';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { isCodeLocked } from '../delivery/delivery-code-lock';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { SettingsService } from '../content/settings.service';
@@ -239,7 +240,7 @@ export class LogisticsService {
     if (!actor) return;
     void this.audits
       .save(this.audits.create({ actor: actor.name, role: actor.role, action, entity: 'delivery', entityId: task.id, detail: detail ?? `${task.orderReference} ${task.kind}` }))
-      .then((log) => this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log))
+      .then((log) => this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log))
       .catch(() => undefined);
   }
 
@@ -570,7 +571,7 @@ export class LogisticsService {
         body: `${orderReference}: no lane connects ${names.get(fromHubId)?.name ?? 'a warehouse'} to ${names.get(toHubId)?.name ?? 'another'}, so the parcel goes direct.`,
         type: 'task',
         entityId: taskId,
-      });
+      }, 'logisticsDesk');
     } catch {
       /* best effort */
     }
@@ -785,7 +786,7 @@ export class LogisticsService {
       // The scan itself stands; a leg that could not be created is logged and shown to admins.
       this.logger.error(`next leg after ${saved.id} failed: ${(e as Error).message}`);
       await this.notifications
-        .toAdmins({ title: 'Task needs attention', body: `${saved.orderReference}: ${kindLabel(saved.kind)} was scanned in but the next leg could not be created.`, type: 'task', entityId: saved.id })
+        .toAdmins({ title: 'Task needs attention', body: `${saved.orderReference}: ${kindLabel(saved.kind)} was scanned in but the next leg could not be created.`, type: 'task', entityId: saved.id }, 'logisticsDesk')
         .catch(() => undefined);
     }
 
@@ -1157,7 +1158,7 @@ export class LogisticsService {
     await this.fire('voided', closed);
     for (const leg of legs) await this.announce(leg);
     await this.notifications
-      .toAdmins({ title: 'Parcel returned to seller', body: `${closed.orderReference}: the customer parcel is going back to the seller. Review the order.`, type: 'task', entityId: closed.id })
+      .toAdmins({ title: 'Parcel returned to seller', body: `${closed.orderReference}: the customer parcel is going back to the seller. Review the order.`, type: 'task', entityId: closed.id }, 'logisticsDesk')
       .catch(() => undefined);
     if (closed.kind === 'delivery') {
       await this.notifications
@@ -1293,7 +1294,7 @@ export class LogisticsService {
   /** Tasks that exhausted their attempts but do not cancel the order (transfers, returns, replacements): staff and admins decide. */
   async alertExhausted(task: DeliveryTask, reason: string): Promise<void> {
     await this.notifications
-      .toAdmins({ title: 'Task needs attention', body: `${task.orderReference}: ${kindLabel(task.kind)} failed after ${task.attempts} attempts (${reason}).`, type: 'task', entityId: task.id })
+      .toAdmins({ title: 'Task needs attention', body: `${task.orderReference}: ${kindLabel(task.kind)} failed after ${task.attempts} attempts (${reason}).`, type: 'task', entityId: task.id }, 'logisticsDesk')
       .catch(() => undefined);
     await this.notifications
       .toUsers(await this.staffIds(task.hubId), { title: 'Task needs attention', body: `${task.orderReference}: ${kindLabel(task.kind)} failed after ${task.attempts} attempts (${reason}).`, type: 'task', entityId: task.id })
@@ -1315,7 +1316,7 @@ export class LogisticsService {
       type: 'task',
       entityId: task.id,
     };
-    await this.notifications.toAdmins(notice).catch(() => undefined);
+    await this.notifications.toAdmins(notice, 'logisticsDesk').catch(() => undefined);
     await this.notifications.toUsers(await this.staffIds(task.hubId), notice).catch(() => undefined);
   }
 

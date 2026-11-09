@@ -3,19 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Exchange, Order, Seller } from '../database/entities';
 import type { ExchangeStatus } from '../database/entities';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { SettingsService } from '../content/settings.service';
 import { WalletService } from '../wallet/wallet.service';
 import { checkVariant, storedVariantGroups } from '../common/variants/variants';
-import { inRoleGroup } from '../common/role-groups';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { EXCHANGE_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
 
-const OPS_ROLES = [...ADMIN_ROLES, 'warehouse_staff'];
+/** Who follows exchanges live and reads them all: the admin roles that decide them (group `exchangeDecide`) and warehouse staff. */
+const OPS_ROLES = [...ROLE_GROUPS.exchangeDecide, 'warehouse_staff'];
 const HOUR_MS = 3_600_000;
 const cents = (n: number) => Number(n.toFixed(2));
 const STALE = 'This exchange was just updated by someone else. Refresh and try again.';
@@ -63,7 +64,7 @@ export class ExchangesService {
   }
 
   async list(user: { id: string; role: string }, paging?: { limit?: number; offset?: number; status?: string }): Promise<ExchangeView[]> {
-    const ops = user.role.startsWith('admin') || user.role === 'warehouse_staff';
+    const ops = OPS_ROLES.includes(user.role);
     const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || (ops ? 200 : 500))));
     const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
     const status = paging?.status ? ({ status: paging.status as ExchangeStatus } as const) : {};
@@ -95,7 +96,7 @@ export class ExchangesService {
   async get(user: { id: string; role: string }, id: string): Promise<ExchangeView> {
     const ex = await this.exchanges.findOne({ where: { id: String(id ?? '') } });
     const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    const allowed = !!ex && (user.role.startsWith('admin') || user.role === 'warehouse_staff' || ex.customerId === user.id || (!!ex.sellerId && keys.includes(ex.sellerId)));
+    const allowed = !!ex && (OPS_ROLES.includes(user.role) || ex.customerId === user.id || (!!ex.sellerId && keys.includes(ex.sellerId)));
     if (!ex || !allowed) throw new NotFoundException('Exchange not found.');
     const [view] = await this.serve([ex]);
     return user.role === 'seller' ? redactForSeller(view, user.id) : view;

@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Dispute, DisputeItem, Order, OrderItem, Replacement, Seller } from '../database/entities';
 import type { ReplacementStatus } from '../database/entities';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { SettingsService } from '../content/settings.service';
@@ -12,7 +13,15 @@ import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { REPLACEMENT_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
 
-const OPS_ROLES = [...ADMIN_ROLES, 'warehouse_staff'];
+/** Who follows replacements live and reads them all: the admin roles that decide them (group `exchangeDecide`: super admin, operations, support) and warehouse staff. */
+const OPS_ROLES = [...ROLE_GROUPS.exchangeDecide, 'warehouse_staff'];
+/** May this role read every replacement? The deciding admin roles and warehouse staff (the gateway also holds staff to a supervisor tier); marketing, finance and moderation do not. */
+const readsAll = (role: string): boolean => inRoleGroup(role, 'exchangeDecide') || role === 'warehouse_staff';
+/**
+ * May this role move a replacement through its steps or file one on a customer's behalf? The exchange desk (super admin,
+ * operations) and warehouse staff (the gateway also requires a supervisor tier to move one).
+ */
+export const canWorkReplacements = (role: string): boolean => inRoleGroup(role, 'exchangeDesk') || role === 'warehouse_staff';
 const HOUR_MS = 3_600_000;
 const STALE = 'This replacement was just updated by someone else. Refresh and try again.';
 /** Statuses a delivery can move on to `delivered`. */
@@ -47,12 +56,12 @@ export class ReplacementsService {
   }
 
   async list(user: { id: string; role: string }, paging?: { limit?: number; offset?: number; status?: string }): Promise<ReplacementView[]> {
-    const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || (user.role.startsWith('admin') || user.role === 'warehouse_staff' ? 200 : 500))));
+    const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || (readsAll(user.role) ? 200 : 500))));
     const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
     const status = paging?.status ? ({ status: paging.status as ReplacementStatus } as const) : {};
-    // Ops (admin roles, warehouse) see all; a seller sees requests about their items (and any they filed);
+    // The deciding admin roles and the warehouse see all; a seller sees requests about their items (and any they filed);
     // everyone else only their own.
-    if (user.role.startsWith('admin') || user.role === 'warehouse_staff') {
+    if (readsAll(user.role)) {
       return this.serve(await this.replacements.find({ where: status, order: { createdAt: 'DESC' }, take, skip }));
     }
     if (user.role === 'seller') {
@@ -82,7 +91,7 @@ export class ReplacementsService {
   async get(user: { id: string; role: string }, id: string): Promise<ReplacementView> {
     const rep = await this.replacements.findOne({ where: { id: String(id ?? '') } });
     const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    const allowed = !!rep && (user.role.startsWith('admin') || user.role === 'warehouse_staff' || rep.customerId === user.id || (!!rep.sellerId && keys.includes(rep.sellerId)));
+    const allowed = !!rep && (readsAll(user.role) || rep.customerId === user.id || (!!rep.sellerId && keys.includes(rep.sellerId)));
     if (!rep || !allowed) throw new NotFoundException('Replacement not found.');
     const [view] = await this.serve([rep]);
     return user.role === 'seller' ? redactForSeller(view, user.id) : view;
@@ -118,7 +127,7 @@ export class ReplacementsService {
     },
   ): Promise<ReplacementView> {
     const order = await this.orders.findOne({ where: { id: String(input?.orderId ?? '') } });
-    const ops = actor.role.startsWith('admin') || actor.role === 'warehouse_staff';
+    const ops = canWorkReplacements(actor.role);
     // Customers may only file for their own DELIVERED orders; ops for any.
     if (!order || (!ops && (order.customerId !== actor.id || order.status !== 'delivered'))) {
       throw new NotFoundException('Order not found or not eligible for a replacement.');
@@ -182,7 +191,7 @@ export class ReplacementsService {
     const rep = await this.replacements.findOne({ where: { id: String(id ?? '') } });
     const keys = actor.role === 'seller' ? await sellerKeys(actor.id, this.sellers) : [];
     const mine = !!rep && actor.role === 'seller' && !!rep.sellerId && keys.includes(rep.sellerId);
-    if (!rep || !(mine || actor.role.startsWith('admin'))) throw new NotFoundException('Replacement not found.');
+    if (!rep || !(mine || inRoleGroup(actor.role, 'exchangeDecide'))) throw new NotFoundException('Replacement not found.');
     if (rep.status !== 'requested') throw new BadRequestException('This request was already handled.');
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this replacement.');

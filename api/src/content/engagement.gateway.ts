@@ -188,7 +188,10 @@ export class EngagementGateway {
     try {
       const user = requireUser(client);
       if (!String(body?.answer ?? '').trim()) return fail('Write an answer first.');
-      if (!user.role.startsWith('admin')) {
+      if (user.role.startsWith('admin')) {
+        // Staff answer on any product: the moderators (super admin, operations, moderation) like the reviews they hide.
+        if (!this.canModerate(user.role)) return fail('Not allowed.');
+      } else {
         // A seller (or a team member with the support permission) may answer questions about THEIR OWN products only.
         if (user.role !== 'seller') return fail('Not allowed.');
         const ctx = await sellerContext(user, 'support');

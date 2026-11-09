@@ -18,7 +18,7 @@ beforeEach(async () => {
   };
   importer = new ProductImportService(w.ds.getRepository('Seller') as never, w.ds.getRepository(Product), w.products, w.categories, sellersSvc as never, w.notes as never);
   // notifications: the importer only calls toAdmins
-  (importer as unknown as { notifications: unknown }).notifications = { toAdmins: async (n: { title: string; body: string }) => void w.notes.push({ to: 'admins', ...n }) };
+  (importer as unknown as { notifications: unknown }).notifications = { toAdmins: async (n: { title: string; body: string }, audience?: string) => void w.notes.push({ to: audience ? `admins:${audience}` : 'admins', ...n }) };
 });
 afterEach(async () => w.ds.destroy());
 
@@ -49,6 +49,7 @@ describe('products:import', () => {
     expect((await w.products.movementsOf(caseId, { take: 5, skip: 0 })).items[0].reason).toBe('import');
     // Admins were told once.
     expect(w.notes.filter((n) => n.title === 'Product awaiting review').map((n) => n.body)).toEqual(['2 products imported by Kinshasa Traders need moderation.']);
+    expect(w.notes.filter((n) => n.title === 'Product awaiting review').map((n) => n.to)).toEqual(['admins:productModeration']); // the moderators, not every department
   });
 
   it('a bad row never blocks the good ones; each bad row says why', async () => {

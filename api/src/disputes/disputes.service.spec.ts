@@ -762,3 +762,48 @@ describe('time limits: the sweeper timer', () => {
     expect(sweep).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('who reads and decides: the returns and disputes desk only', () => {
+  const marketing = { id: 'm1', role: 'admin_marketing', name: 'Mia Marketing' };
+  const moderation = { id: 'm2', role: 'admin_moderation', name: 'Moe Moderation' };
+  const finance = { id: 'f1', role: 'admin_finance', name: 'Fay Finance' };
+  const operations = { id: 'o1', role: 'admin_operations', name: 'Ola Ops' };
+  const OUT = [marketing, moderation];
+  const DESK = [admin, agent, finance, operations];
+
+  async function openCase(type: 'return' | 'dispute' = 'return') {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    return svc.open(customer, { orderId: o.id, type, reason: 'The charger never arrived', ...(type === 'dispute' ? { category: 'missing' } : {}) });
+  }
+
+  it('marketing and moderation cannot list the queue, open a case, reply or decide; the desk and the Super Admin can read', async () => {
+    const d = await openCase();
+    for (const who of OUT) {
+      await expect(svc.list(who)).rejects.toThrow('Not allowed.');
+      await expect(svc.get(who, d.id)).rejects.toThrow('Dispute not found.'); // the same answer as for a case that is not theirs
+      await expect(svc.reply(who, d.id, 'Hello')).rejects.toThrow('Dispute not found.');
+      await expect(svc.adminDecideReturn(who, d.id, true, '')).rejects.toThrow('Not allowed.');
+    }
+    for (const who of DESK) {
+      expect(await svc.list(who)).toHaveLength(1);
+      expect((await svc.get(who, d.id)).id).toBe(d.id);
+    }
+    expect(await ds.getRepository(DisputeMessage).count()).toBe(0);
+  });
+
+  it('a dispute is decided by the desk (refunds by the super admin and finance); marketing and moderation are refused and the case stays open', async () => {
+    const d = await openCase('dispute');
+    for (const who of OUT) await expect(svc.decide(who, d.id, { outcome: 'reject', reason: 'Not credible enough' }, false)).rejects.toThrow('Not allowed.');
+    expect((await ds.getRepository(Dispute).findOneByOrFail({ id: d.id })).status).toBe('open');
+    await expect(svc.decide(agent, d.id, { outcome: 'reject', reason: 'Not credible enough' }, false)).resolves.toMatchObject({ status: 'rejected' });
+  });
+
+  it('live updates and thread messages go to the desk roles, not to every admin department', async () => {
+    const d = await openCase();
+    const desk = ['admin', 'admin_operations', 'admin_support', 'admin_finance'].join(',');
+    expect(emitter.sent.filter((e) => e.event === 'dispute:created' && e.to.startsWith('admin')).map((e) => e.to)).toEqual([desk]);
+    await svc.reply(agent, d.id, 'We are looking into it');
+    expect(emitter.sent.filter((e) => e.event === 'dispute:message' && e.to.startsWith('admin')).map((e) => e.to)).toEqual([desk]);
+    expect(emitter.sent.filter((e) => e.to.includes('admin_marketing') || e.to.includes('admin_moderation'))).toEqual([]);
+  });
+});

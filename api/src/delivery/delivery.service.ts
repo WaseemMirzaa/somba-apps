@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog, DeliveryStatus, DeliveryTask, Order, User } from '../database/entities';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { SettingsService } from '../content/settings.service';
@@ -292,7 +292,7 @@ export class DeliveryService {
       const log = await this.tasks.manager.getRepository(AuditLog).save(
         this.tasks.manager.getRepository(AuditLog).create({ actor: name, role, action, entity: 'delivery', entityId: task.id, detail }),
       );
-      this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log);
+      this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log);
     } catch {
       /* the cash record on the task is the source of truth */
     }
