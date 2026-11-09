@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { EntityManager, In, LessThan, Repository } from 'typeorm';
+import { EntityManager, In, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
 import { AuditLog, DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
 import type { RefundKind } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
@@ -36,6 +36,7 @@ import {
   type WebhookRequest,
 } from './mobile-money.provider';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayRejectedError, PawapayUnavailableError } from './pawapay.provider';
+import { isDuplicateKey, TOPUP_DEDUP_MS, topUpClaim } from './topup-request';
 import {
   STRIPE_CLIENT,
   StripeRejectedError,
@@ -280,36 +281,90 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return payment;
   }
 
-  /** Start a wallet top-up through mobile money. Credits the wallet only when confirmed. */
-  async startTopUp(userId: string, amountUsd: number, method: string, phone: unknown): Promise<Payment> {
+  /**
+   * Start a wallet top-up through mobile money. Credits the wallet only when confirmed. One tap is one top-up: a request
+   * with the same `clientRequestId` (or, from an older app, the same method, amount and phone while the first is still
+   * pending) gets the FIRST payment back instead of a second approval prompt, so a double tap or a retry cannot charge twice.
+   */
+  async startTopUp(userId: string, amountUsd: number, method: string, phone: unknown, clientRequestId?: unknown): Promise<Payment> {
     if (!isMobileMoney(method)) {
       throw new BadRequestException(`Top-up method must be one of: ${MOBILE_MONEY_METHODS.join(', ')}.`);
     }
     await this.assertMethodAllowed(method);
+    const subscriber = PaymentsService.normalisePhone(phone);
+    const claim = topUpClaim(userId, { amountUsd, method, phone: subscriber, clientRequestId }, Date.now());
+    const same = { amountUsd, method, phone: subscriber };
+    const earlier = await this.earlierTopUp(userId, claim.key, claim.explicit, same);
+    if (earlier) return earlier;
     // Don't let one account fire unlimited approval prompts at arbitrary numbers.
     const open = await this.payments.count({ where: { userId, purpose: 'topup', status: 'pending' } });
     if (open >= 3) {
       throw new BadRequestException('You already have pending top-ups. Approve or wait for them to expire first.');
     }
-    const payment = await this.payments.save(
-      this.payments.create({
-        reference: PaymentsService.newReference(),
-        orderId: null,
-        orderReference: null,
-        purpose: 'topup',
-        userId,
-        method,
-        amountUsd,
-        status: 'pending',
-        phone: PaymentsService.normalisePhone(phone),
-      }),
-    );
+    const insert = (requestKey: string | null) =>
+      this.payments.save(
+        this.payments.create({
+          reference: PaymentsService.newReference(),
+          orderId: null,
+          orderReference: null,
+          purpose: 'topup',
+          userId,
+          method,
+          amountUsd,
+          status: 'pending',
+          phone: subscriber,
+          requestKey,
+        }),
+      );
+    let payment: Payment;
+    try {
+      payment = await insert(claim.key);
+    } catch (e) {
+      if (!isDuplicateKey(e)) throw e;
+      // Another request with the same key got in between our look and our insert: that one is the top-up.
+      const winner = await this.earlierTopUp(userId, claim.key, claim.explicit, same);
+      if (winner) return winner;
+      // A fingerprint of an earlier top-up that is over (failed, expired): this is a deliberate retry, not a repeat.
+      if (claim.explicit) throw e;
+      payment = await insert(null);
+    }
     const started = await this.startMobileMoney(payment);
     this.emitter.toUser(userId, 'payment:created', this.view(started));
     if (started.status === 'failed') {
       throw new BadRequestException(started.failureReason ?? 'Payment failed.');
     }
     return started;
+  }
+
+  /**
+   * The top-up this request repeats, if any. With the app's own key: that payment, whatever became of it (a failed one
+   * answers with its reason, as the first request did; a key reused for a different top-up is refused). Without a key: a
+   * still-pending identical top-up from the last minute. A fingerprint claim never blocks a deliberate retry after a failure.
+   */
+  private async earlierTopUp(
+    userId: string,
+    key: string,
+    explicit: boolean,
+    want: { amountUsd: number; method: string; phone: string },
+  ): Promise<Payment | null> {
+    const byKey = await this.payments.findOne({ where: { userId, purpose: 'topup', requestKey: key } });
+    if (byKey) {
+      if (explicit) {
+        if (byKey.method !== want.method || Math.abs(byKey.amountUsd - want.amountUsd) > 0.005) {
+          throw new BadRequestException('This top-up reference was already used for a different top-up.');
+        }
+        if (byKey.status === 'failed') throw new BadRequestException(byKey.failureReason ?? 'Payment failed.');
+        return byKey;
+      }
+      if (byKey.status === 'pending') return byKey;
+    }
+    if (explicit) return null;
+    const recent = await this.payments.find({
+      where: { userId, purpose: 'topup', status: 'pending', createdAt: MoreThanOrEqual(new Date(Date.now() - TOPUP_DEDUP_MS)) },
+      order: { createdAt: 'DESC' },
+      take: 5,
+    });
+    return recent.find((p) => p.method === want.method && Math.abs(p.amountUsd - want.amountUsd) <= 0.005 && p.phone === want.phone) ?? null;
   }
 
   /**

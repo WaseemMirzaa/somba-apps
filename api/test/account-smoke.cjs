@@ -323,6 +323,16 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(a.ok && a.data.status === 'pending' && a.data.purpose === 'topup', 'top-up returns a PENDING payment (wallet not credited yet)', a.error ?? '');
   const topRef = must(a, 'starting the wallet top-up').reference;
   ok((await balance()) === bal0, 'wallet is NOT credited before confirmation');
+  // One tap = one top-up: a double tap or a retry must not send a second approval prompt (the +243…0000 number is declined by the sandbox, so nothing is credited).
+  a = await req(s, 'wallet:topup', { amountUsd: 25, method: 'orange_money', phone: PHONE });
+  ok(a.ok && a.data.reference === topRef, 'a double tap returns the SAME pending top-up, not a second approval prompt', a.error ?? '');
+  const tapKey = `smoke-topup-${Date.now()}`;
+  const k1 = await req(s, 'wallet:topup', { amountUsd: 7, method: 'orange_money', phone: '+243810000000', clientRequestId: tapKey });
+  const k2 = await req(s, 'wallet:topup', { amountUsd: 7, method: 'orange_money', phone: '+243810000000', clientRequestId: tapKey });
+  ok(k1.ok && k2.ok && k1.data.reference === k2.data.reference, 'the same clientRequestId returns the same top-up', k1.error ?? k2.error ?? '');
+  a = await req(s, 'wallet:topup', { amountUsd: 9, method: 'orange_money', phone: '+243810000000', clientRequestId: tapKey });
+  ok(!a.ok && /already used for a different top-up/.test(a.error ?? ''), 'a key reused for a different top-up is refused', a.error ?? '');
+  ok((await balance()) === bal0, 'and the wallet is still untouched by the repeats');
   let w = await webhook(body(topRef), 'wrong-secret');
   ok(w.status === 401, 'webhook with a bad signature is rejected (401)');
   w = await fetch(API + '/api/v1/payments/webhook/mobile-money', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(topRef)) });

@@ -17,6 +17,7 @@ export type PaymentStatus =
   | 'refunded';
 
 @Index('IDX_payments_status_created', ['status', 'createdAt'])
+@Index('UQ_payments_user_request', ['userId', 'requestKey'], { unique: true })
 @Entity('payments')
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
@@ -65,6 +66,10 @@ export class Payment {
 
   @Column({ type: 'varchar', nullable: true })
   failureReason: string | null;
+
+  /** Idempotency key of the request that made this payment (wallet top-ups): UNIQUE with the user, so one tap is one top-up. */
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  requestKey: string | null;
 
   /** Where a refund went: the customer's wallet, back to the paying phone (pawaPay), or back to the card (Stripe). */
   @Column({ type: 'varchar', length: 10, nullable: true })

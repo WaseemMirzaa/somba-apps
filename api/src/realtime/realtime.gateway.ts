@@ -1024,13 +1024,13 @@ export class RealtimeGateway
   @SubscribeMessage('wallet:topup')
   async walletTopup(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { amountUsd: number; method?: string; phone?: string },
+    @MessageBody() body: { amountUsd: number; method?: string; phone?: string; clientRequestId?: string },
   ) {
     try {
       const user = this.requireUser(client);
       await this.assertVerifiedForCheckout(user.id);
       const amount = assertAmount(body?.amountUsd);
-      return ok(await this.payments.startTopUp(user.id, amount, String(body?.method ?? ''), body?.phone));
+      return ok(await this.payments.startTopUp(user.id, amount, String(body?.method ?? ''), body?.phone, body?.clientRequestId));
     } catch (e) {
       return fail((e as Error).message);
     }
