@@ -383,7 +383,7 @@ describe('exchanges', () => {
     expect(walletCalls).toHaveLength(1); // once
   });
 
-  it('ops can settle an item outside the catalogue by hand; a customer’s is free text', async () => {
+  it('an item outside the catalogue is free text for everyone: no price (whatever the client sends), no hold, no stock', async () => {
     const o = await order([{ product: hat }]);
     // a customer's request for an item outside the catalogue is free text: no price, no hold, no stock
     const free = await exchanges.create(customer, { orderId: o.id, fromSku: hat.id, fromName: 'Hat', toSku: 'B', toName: 'Bigger one', priceDiffUsd: 99 });
@@ -391,8 +391,9 @@ describe('exchanges', () => {
     expect((await exchanges.respond(sellerOne, free.id, true, '')).status).toBe('approved');
     expect(reserves).toHaveLength(0);
     await ds.getRepository(Exchange).update({ id: free.id }, { status: 'rejected' });
+    // A-03: staff cannot set a price difference either (it used to be taken as sent, up to -$100,000).
     const ex = await exchanges.create(admin, { orderId: o.id, fromSku: hat.id, fromName: 'Hat', toSku: 'ext:1', toName: 'Special', priceDiffUsd: 12.5 });
-    expect(ex.priceDiffUsd).toBe(12.5);
+    expect(ex.priceDiffUsd).toBe(0);
     // staff filing for a customer move no money: finance settles it
     const o2 = await order([{ product: hat, price: 10 }]);
     const byStaff = await exchanges.create(admin, { orderId: o2.id, fromSku: hat.id, fromName: 'Hat', toSku: pricey.id, toName: 'Boot' });

@@ -11,6 +11,17 @@ export const ROLE_GROUPS = {
   campaignDecisions: ['admin', 'admin_marketing'],
   /** Support tickets: see everyone's, answer, assign, close (Support: Support). */
   support: ['admin', 'admin_support'],
+  /** Money screens: confirm/decline payments, refunds, the finance dashboard (Finance). */
+  finance: ['admin', 'admin_finance'],
+  /** Operators who move orders by hand and cancel them on a customer's behalf (Operations: Orders). */
+  orderOps: ['admin', 'admin_operations'],
+  /**
+   * The exchange desk (Operations: Exchanges): file an exchange for a customer, approve one that refunds money to the
+   * customer's wallet on the seller's behalf, and move an exchange through its steps (warehouse supervisors move it too).
+   */
+  exchangeDesk: ['admin', 'admin_operations'],
+  /** Approve or reject an exchange or replacement on a silent seller's behalf (support is told when a seller lapses). */
+  exchangeDecide: ['admin', 'admin_operations', 'admin_support'],
 } as const;
 
 export type RoleGroup = keyof typeof ROLE_GROUPS;
