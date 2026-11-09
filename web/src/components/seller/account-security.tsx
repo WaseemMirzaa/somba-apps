@@ -8,14 +8,19 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { authApi } from "@/lib/realtime/auth-api";
+import type { AuthResult } from "@/lib/realtime/types";
 import { sellerRequest, useSocketEvent } from "@/lib/seller-api";
 import { copyText, downloadText, type TwoFaSetup, type TwoFaStatus } from "@/lib/seller-account";
 import { errMessage } from "@/lib/seller-labels";
 
 const fieldClass = "input-premium w-full px-4 py-2 text-sm";
 
-/** Change the password (`me:changePassword`): the server answers with fresh tokens, which replace the stored ones. */
-export function ChangePasswordForm() {
+/**
+ * Change the password (`me:changePassword`): the server answers with fresh tokens, which replace the stored ones.
+ * `onChanged` runs with that answer (the forced-change screen uses it to reconnect with the new tokens); `temporary`
+ * words the first field as the temporary password the person was given.
+ */
+export function ChangePasswordForm({ onChanged, temporary = false }: { onChanged?: (res: AuthResult) => void | Promise<void>; temporary?: boolean } = {}) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
@@ -40,6 +45,7 @@ export function ChangePasswordForm() {
       setNext("");
       setAgain("");
       toast(fr ? "Mot de passe modifié" : "Password changed");
+      if (onChanged && res?.accessToken && res?.refreshToken) await onChanged(res as unknown as AuthResult);
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
@@ -59,14 +65,14 @@ export function ChangePasswordForm() {
     >
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">{fr ? "Mot de passe actuel" : "Current password"}</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">{temporary ? (fr ? "Mot de passe temporaire" : "Temporary password") : fr ? "Mot de passe actuel" : "Current password"}</label>
           <input type="password" autoComplete="current-password" className={fieldClass} value={current} onChange={(e) => setCurrent(e.target.value)} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">{fr ? "Nouveau mot de passe" : "New password"}</label>
           <input type="password" autoComplete="new-password" className={fieldClass} value={next} onChange={(e) => setNext(e.target.value)} />
           {next !== "" && !nextOk && <p className="mt-1 text-xs text-red-600">{fr ? "8 caractères au minimum." : "At least 8 characters."}</p>}
-          {nextOk && next === current && <p className="mt-1 text-xs text-red-600">{fr ? "Choisissez un mot de passe différent de l'actuel." : "Choose a password different from the current one."}</p>}
+          {nextOk && next === current && <p className="mt-1 text-xs text-red-600">{temporary ? (fr ? "Choisissez un mot de passe différent du mot de passe temporaire." : "Choose a password different from the temporary one.") : fr ? "Choisissez un mot de passe différent de l'actuel." : "Choose a password different from the current one."}</p>}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">{fr ? "Confirmer le nouveau mot de passe" : "Confirm the new password"}</label>

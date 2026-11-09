@@ -118,6 +118,16 @@ const EXACT: Record<string, string> = {
   // staff:setActive (docs/contracts/areas.md, "Switching a rider or an employee off")
   "Account not found.": "Compte introuvable.",
   "Super admin only.": "Réservé au super administrateur.",
+  // forced password change, password re-issue and e-mail correction (api/src/auth/password-change.ts, roles:resetPassword, roles:updateStaff)
+  "You must set a new password before you can continue.": "Vous devez définir un nouveau mot de passe avant de continuer.",
+  "Choose a new password that is different from the temporary one.": "Choisissez un nouveau mot de passe différent du mot de passe temporaire.",
+  "Current password is incorrect.": "Le mot de passe actuel est incorrect.",
+  "New password must be at least 8 characters.": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
+  "You cannot reset your own password here. Change it under Account.": "Vous ne pouvez pas réinitialiser votre propre mot de passe ici. Modifiez-le dans Mon compte.",
+  "You cannot change your own e-mail here.": "Vous ne pouvez pas modifier votre propre e-mail ici.",
+  "Only staff, riders and administrators are managed here. Customers and sellers manage their own account.": "Seuls le personnel, les livreurs et les administrateurs sont gérés ici. Les clients et les vendeurs gèrent leur propre compte.",
+  "Enter a valid email.": "Saisissez une adresse e-mail valide.",
+  "An account with this email already exists.": "Un compte existe déjà avec cet e-mail.",
   "Only riders and warehouse staff can be switched on or off here.": "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.",
   "Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.": "Seuls les comptes du personnel (livreurs, personnel d'entrepôt et administrateurs) peuvent être activés ou désactivés ici.",
   "You cannot switch off your own account.": "Vous ne pouvez pas désactiver votre propre compte.",

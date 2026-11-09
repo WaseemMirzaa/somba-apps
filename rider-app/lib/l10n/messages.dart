@@ -93,6 +93,15 @@ const Map<String, (String, String)> kMessages = {
   'err_same_password': ('Choose a password different from the current one', 'Choisissez un mot de passe différent de l’actuel'),
   'password_other_phones': ('You stay signed in on this phone. Any other phone is signed out.', 'Vous restez connecté sur ce téléphone. Les autres téléphones sont déconnectés.'),
   'password_changed': ('Password changed', 'Mot de passe modifié'),
+  'forced_password_title': ('Choose your own password', 'Choisissez votre mot de passe'),
+  'forced_password_body': (
+    'Your account was created with a temporary password. Set a password of your own to continue. Nothing else is available until you do.',
+    'Votre compte a été créé avec un mot de passe temporaire. Choisissez un mot de passe personnel pour continuer. Rien d’autre n’est disponible tant que ce n’est pas fait.'
+  ),
+  'temporary_password': ('Temporary password', 'Mot de passe temporaire'),
+  'err_temporary_password': ('Enter the temporary password you were given', 'Saisissez le mot de passe temporaire qui vous a été remis'),
+  'err_same_as_temporary': ('Choose a password different from the temporary one', 'Choisissez un mot de passe différent du mot de passe temporaire'),
+  'forced_password_save': ('Save password', 'Enregistrer le mot de passe'),
   'history_search_hint': ('Search by order reference', 'Rechercher par référence de commande'),
   'history_any_date': ('Any date', 'Toutes les dates'),
   'history_clear': ('Clear', 'Effacer'),

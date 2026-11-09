@@ -13,10 +13,12 @@ import { authApi, AuthApiError } from "@/lib/realtime/auth-api";
 import { isTransientAuthStatus, refreshFailureAction } from "@/lib/session-errors";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { canListDeliveries, canReadOrders } from "@/lib/staff-access";
+import { PASSWORD_CHANGE_EVENT, heldAtPasswordChange } from "@/lib/password-change";
 import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
 import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
 import type {
   AppNotification,
+  AuthResult,
   BackendUser,
   Address,
   Category,
@@ -74,6 +76,11 @@ interface RealtimeValue {
     locale?: "en" | "fr";
   }) => Promise<BackendUser>;
   logout: () => void;
+  /**
+   * The account just replaced its temporary password (`me:changePassword` answered with fresh tokens): keep those tokens and
+   * open a new, unrestricted socket with them, so the portal loads as it would after a normal sign-in.
+   */
+  adoptSession: (result: AuthResult) => Promise<void>;
 
   placeOrder: (input: {
     items: {
@@ -481,6 +488,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [connectWith],
   );
 
+  const adoptSession = useCallback(
+    async (result: AuthResult) => {
+      authApi.saveTokens(result);
+      await connectWith(result.accessToken, result.user);
+    },
+    [connectWith],
+  );
+
+  // Any call the server refuses with `password_change_required` (see lib/password-change.ts): hold the account at the change screen.
+  useEffect(() => {
+    const hold = () => setUser((u) => heldAtPasswordChange(u));
+    window.addEventListener(PASSWORD_CHANGE_EVENT, hold);
+    return () => window.removeEventListener(PASSWORD_CHANGE_EVENT, hold);
+  }, []);
+
   const register = useCallback(
     async (input: {
       email: string;
@@ -707,6 +729,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       login2fa,
       register,
       logout,
+      adoptSession,
       placeOrder,
       updateOrderStatus,
       updateDeliveryStatus,
@@ -754,6 +777,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       login2fa,
       register,
       logout,
+      adoptSession,
       placeOrder,
       updateOrderStatus,
       updateDeliveryStatus,

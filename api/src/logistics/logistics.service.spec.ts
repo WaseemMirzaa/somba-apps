@@ -358,7 +358,8 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       const code = await logistics.proofCodeOf(next[0].id);
       expect(code).toMatch(/^\d{4}$/);
       const view = await logistics.view(next[0]);
-      expect(JSON.stringify(view)).not.toContain(code as string);
+      // Match the code as its own number only: a 4-digit code can also appear inside a random UUID or product id.
+      expect(JSON.stringify(view)).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${code}(?![0-9A-Za-z])`));
       expect(next[0].proofCode ?? null).toBeNull();
     });
 

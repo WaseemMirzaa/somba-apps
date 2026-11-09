@@ -21,6 +21,7 @@ import {
   WarehouseBatch,
   Hub,
   WalletTransaction,
+  VerificationToken,
 } from '../database/entities';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -54,6 +55,7 @@ import { GeoModule } from '../geo/geo.module';
       WarehouseBatch,
       Hub,
       User,
+      VerificationToken,
       Dispute,
       DeliveryTask,
       AuditLog,

@@ -159,6 +159,18 @@ test("the warehouse desk and order-reading refusals are French (least privilege)
   assert.equal(localizeApiError("Your role cannot read orders.", "en"), "Your role cannot read orders.");
 });
 
+test("forced password change, password re-issue and e-mail correction sentences are French", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("You must set a new password before you can continue."), "Vous devez définir un nouveau mot de passe avant de continuer.");
+  assert.equal(fr("Choose a new password that is different from the temporary one."), "Choisissez un nouveau mot de passe différent du mot de passe temporaire.");
+  assert.match(fr("You cannot reset your own password here. Change it under Account."), /propre mot de passe/);
+  assert.match(fr("You cannot change your own e-mail here."), /propre e-mail/);
+  assert.match(fr("Only staff, riders and administrators are managed here. Customers and sellers manage their own account."), /Les clients et les vendeurs/);
+  assert.equal(fr("An account with this email already exists."), "Un compte existe déjà avec cet e-mail.");
+  assert.equal(fr("Enter a valid email."), "Saisissez une adresse e-mail valide.");
+  assert.equal(localizeApiError("Enter a valid email.", "en"), "Enter a valid email.");
+});
+
 test("session and staff-suspension errors map to French", () => {
   const fr = (m) => localizeApiError(m, "fr");
   assert.equal(fr("You cannot switch off your own account."), "Vous ne pouvez pas désactiver votre propre compte.");

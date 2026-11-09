@@ -2,6 +2,7 @@
  * the safe defaults are really in force and manual payment confirmation works.
  *   API_URL=http://localhost:3003 ADMIN_EMAIL=… ADMIN_PASSWORD=… node test/prod-check.cjs */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3003';
 const tag = Date.now().toString().slice(-8);
 let pass = 0; const fails = [];
@@ -10,6 +11,7 @@ const rest = async (path, body) => { const r = await fetch(API + path, { method:
 const conn = (t) => new Promise((res, rej) => { const s = io(API, { auth: t ? { token: t } : {}, transports: ['websocket'], forceNew: true }); s.on('ready', () => res(s)); s.on('connect_error', rej); setTimeout(() => rej(new Error('timeout')), 8000); });
 const req = (s, e, b = {}) => new Promise((r) => s.emit(e, b, r));
 (async () => {
+  await settlePassword(API, process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD, { keep: true }); // the bootstrap admin must change its password first; this puts it back
   const al = await rest('/api/v1/auth/login', { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD });
   ok(al.status === 200, 'the bootstrap admin can sign in');
   const admin = await conn(al.json.accessToken);

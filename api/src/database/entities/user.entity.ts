@@ -134,6 +134,16 @@ export class User {
   @Column({ type: 'int', default: 0 })
   tokenVersion: number;
 
+  /**
+   * Set while the account still has the temporary password an administrator made for it (staff, riders and department
+   * admins created by `roles:createStaff`, a re-issued password, the first admin made by `bootstrap:prod`). The account can sign
+   * in but the server refuses everything except changing the password, reading its own profile and signing out
+   * (see auth/password-change.ts). Cleared by `me:changePassword` and by a password reset through the e-mail link.
+   * Existing rows are false: the migration locks nobody out. Customers and sellers choose their own password and are never flagged.
+   */
+  @Column({ type: 'boolean', default: false })
+  mustChangePassword: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

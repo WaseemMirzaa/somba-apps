@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import type { Ack, RequestError } from "./types";
 import { currentLocale, localizeApiError } from "../api-errors";
+import { PASSWORD_CHANGE_EVENT, PASSWORD_CHANGE_REQUIRED } from "../password-change";
 import { authApi } from "./auth-api";
 
 const SOCKET_URL =
@@ -60,6 +61,9 @@ class SocketClient {
             failure.ack = res as unknown as Record<string, unknown>;
             if (typeof res.code === "string") failure.code = res.code;
           }
+          // The server holds this account at "change your temporary password": whatever call this was, tell the app
+          // (the realtime context flags the user and the portal shows the change screen instead of the page).
+          if (failure.code === PASSWORD_CHANGE_REQUIRED && typeof window !== "undefined") window.dispatchEvent(new Event(PASSWORD_CHANGE_EVENT));
           return reject(failure);
         }
         resolve(res.data);

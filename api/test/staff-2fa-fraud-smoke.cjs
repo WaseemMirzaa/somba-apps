@@ -9,6 +9,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const crypto = require('crypto');
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -82,7 +83,8 @@ const totp = (secret, offset = 0) => {
     const mk = async (label, role) => {
       const r = await req(admin.sock, 'roles:createStaff', { email: `${label}${tag}@staff.test`, name: `${label} staff`, role });
       if (!r.ok) throw new Error(`createStaff ${label}: ${r.error}`);
-      return { id: r.data.id, email: r.data.email, pw: r.data.tempPassword };
+      // A created account must change its temporary password first; from here on its password is the new one.
+      return { id: r.data.id, email: r.data.email, pw: await settlePassword(API, r.data.email, r.data.tempPassword) };
     };
     const s1 = await mk('boss', 'admin_support');
     const s2 = await mk('fin', 'admin_finance');

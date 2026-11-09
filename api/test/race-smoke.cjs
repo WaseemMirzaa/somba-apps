@@ -7,6 +7,7 @@
  *   API_URL=http://localhost:3001 node test/race-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const { kyc } = require('./kyc.cjs');
 const { hubId, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -60,7 +61,7 @@ const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'or
   const warehouse = await login('warehouse@somba.app');
   const rider1 = await login('rider@somba.app');
   const mk = await req(admin.sock, 'roles:createStaff', { email: `rider2${tag}@race.test`, name: 'Second Rider', role: 'rider', hubId: await hubId(admin) });
-  const rider2 = await login(`rider2${tag}@race.test`, mk.data.tempPassword);
+  const rider2 = await login(`rider2${tag}@race.test`, await settlePassword(API, `rider2${tag}@race.test`, mk.data.tempPassword));
   const sellerU = await register('seller', 'seller');
   const store = (await req(sellerU.sock, 'sellers:register', kyc(`Race Store ${tag}`))).data;
   await req(admin.sock, 'sellers:setStatus', { id: store.id, status: 'approved' });

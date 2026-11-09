@@ -26,6 +26,8 @@ export interface PublicUser {
   hubId: string | null;
   /** Warehouse staff tier: operator | supervisor | manager (null for everyone else). */
   warehouseTier: 'operator' | 'supervisor' | 'manager' | null;
+  /** Still on the temporary password an administrator made: the only thing the account may do is change it. */
+  mustChangePassword: boolean;
 }
 
 /** Notification + privacy + market preferences (customer Settings screen). */
@@ -198,6 +200,7 @@ export class UsersService {
       prefs: UsersService.parsePrefs(user.prefs),
       hubId: user.hubId ?? null,
       warehouseTier: user.role === 'warehouse_staff' ? (user.warehouseTier ?? 'operator') : null,
+      mustChangePassword: !!user.mustChangePassword,
     };
   }
 }

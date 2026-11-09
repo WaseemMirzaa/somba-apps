@@ -10,6 +10,7 @@
  *   API_URL=http://localhost:3021 node test/warehouse-routing-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -145,7 +146,7 @@ const addr = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p
       const email = `${role}.goma${tag}@routing.test`;
       const c = await req(admin.sock, 'roles:createStaff', { email, name, role, hubId: gom.id });
       if (!c.ok) throw new Error(`createStaff ${role}: ${c.error}`);
-      return { created: c.data, session: await login(email, c.data.tempPassword) };
+      return { created: c.data, session: await login(email, await settlePassword(API, email, c.data.tempPassword)) };
     };
     const { created: newStaff, session: staffG } = await mkPerson('warehouse_staff', 'Smoke Goma staff'); // a third warehouse's staff
     const { session: riderG } = await mkPerson('rider', 'Smoke Goma rider'); // and rider
