@@ -8,7 +8,8 @@
 # after-sale-smoke, r2f-smoke and staff-2fa-fraud-smoke age orders / write rows straight into the API's MySQL database, so
 # they cannot run on SQLite: when a MySQL server answers (DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD, default root@localhost
 # with no password) they run on a throw-away database with a unique name (somba_smoke_<suite>_<pid>) that is dropped
-# afterwards; without MySQL they are reported SKIP. Nothing else in MySQL is touched.
+# afterwards; without MySQL they are reported SKIP (a failure when SMOKE_STRICT=1, as in CI). Nothing else in MySQL is touched.
+# Exits non-zero when any suite failed.
 set -u
 OUT="${1:?usage: run-smokes.sh <out dir> [suite ...]}"; shift
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
@@ -66,3 +67,7 @@ for s in "${SUITES[@]}"; do
   [ -n "$MYDB" ] && mysql "${MYSQL_ARGS[@]}" -e "DROP DATABASE IF EXISTS \`$MYDB\`"
 done
 echo DONE >> "$OUT/summary.txt"
+# Exit non-zero when a suite failed (and, with SMOKE_STRICT=1 as in CI, when a MySQL suite was skipped for lack of MySQL).
+if grep -qE '^(FAIL|SEED-FAIL)' "$OUT/summary.txt"; then exit 1; fi
+if [ "${SMOKE_STRICT:-0}" = "1" ] && grep -q '^SKIP' "$OUT/summary.txt"; then exit 1; fi
+exit 0
