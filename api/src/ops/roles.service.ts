@@ -8,7 +8,13 @@ import { DeliveryTask, Hub, User, VerificationToken } from '../database/entities
 import { WAREHOUSE_TIERS, WarehouseTier, tierOf } from '../logistics/tiers';
 import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { DESK_ROLES } from '../logistics/tiers';
+
+/**
+ * Who hears that a staff account changed: the Super Admin only. `roles:staff` is the Super Admin's call and the two pages that
+ * follow `roles:updated` (Roles, Warehouse staff) are the Super Admin's; the payload names accounts, roles and warehouses.
+ */
+const STAFF_LIST_ROLES = ['admin'];
 
 /** Staff accounts the super admin can switch off and on with `staff:setActive` (customers and sellers: customers:setActive). */
 export const SWITCHABLE_STAFF_ROLES: readonly string[] = ['rider', 'warehouse_staff', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'admin'];
@@ -75,7 +81,7 @@ export class RolesService {
     await this.users.update({ id: userId }, { hubId });
     const saved = (await this.users.findOne({ where: { id: userId } }))!;
     const view = { id: saved.id, role: saved.role, hubId: saved.hubId ?? null, warehouseTier: saved.role === 'warehouse_staff' ? tierOf(saved.warehouseTier) : null };
-    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', view);
     return view;
   }
 
@@ -135,10 +141,10 @@ export class RolesService {
     }
     const view = { id: target.id, role: target.role, active, hubId: target.hubId ?? null, warehouseTier: target.role === 'warehouse_staff' ? tierOf(target.warehouseTier) : null };
     const openTasks = target.role === 'rider' && this.tasks ? await this.tasks.count({ where: { riderId: id, status: In(['assigned', 'picked_up', 'in_transit']) } }) : 0;
-    this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', view);
     // The directory's rider and staff counts changed with it.
     const hub = target.hubId ? await this.hubs.findOne({ where: { id: target.hubId } }) : null;
-    if (hub) this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'hub:updated', hub);
+    if (hub) this.emitter.toRoles([...DESK_ROLES, 'warehouse_staff'], 'hub:updated', hub);
     return { ...view, name: target.name, email: target.email, openTasks };
   }
 
@@ -159,7 +165,7 @@ export class RolesService {
     }
     // New role => old tokens must stop working (they carry the old privileges).
     await this.users.update({ id }, { role, tokenVersion: (target.tokenVersion ?? 0) + 1 });
-    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role });
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', { id, role });
   }
 
   /**
@@ -195,7 +201,7 @@ export class RolesService {
     user.hubId = hubId;
     user.warehouseTier = tier;
     await this.usersSvc.save(user);
-    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id: user.id, role: user.role, hubId, warehouseTier: tier });
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', { id: user.id, role: user.role, hubId, warehouseTier: tier });
     return { id: user.id, email: data.email, role: user.role, tempPassword, hubId, warehouseTier: tier };
   }
 
@@ -226,7 +232,7 @@ export class RolesService {
     const tempPassword = newTempPassword();
     await this.users.update({ id }, { passwordHash: await bcrypt.hash(tempPassword, 12), mustChangePassword: true, tokenVersion: (target.tokenVersion ?? 0) + 1 });
     await this.burnPendingLinks(id);
-    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role: target.role, mustChangePassword: true }); // the staff lists show "temporary password" again
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', { id, role: target.role, mustChangePassword: true }); // the staff lists show "temporary password" again
     return { id, email: target.email, name: target.name, role: target.role, tempPassword };
   }
 
@@ -248,7 +254,7 @@ export class RolesService {
     target.emailVerified = false;
     await this.users.save(target);
     await this.burnPendingLinks(id);
-    this.emitter.toRoles(ADMIN_ROLES, 'roles:updated', { id, role: target.role });
+    this.emitter.toRoles(STAFF_LIST_ROLES, 'roles:updated', { id, role: target.role });
     return { id, email, previousEmail, role: target.role };
   }
 }

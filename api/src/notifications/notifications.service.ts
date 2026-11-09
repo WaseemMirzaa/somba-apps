@@ -252,7 +252,13 @@ export class NotificationsService {
       }),
     );
     await this.keepAuthored(n, data.fr);
-    this.emitter.toRoles([...roles], 'notification:new', NotificationsService.view(n, linkFor('admin', n.type, n.entityId), data.fr));
+    // Each role is sent the page ITS menu reaches; roles that share a page share one emit.
+    const byLink = new Map<string, string[]>();
+    for (const role of roles) {
+      const link = linkFor(role, n.type, n.entityId);
+      byLink.set(link, [...(byLink.get(link) ?? []), role]);
+    }
+    for (const [link, rooms] of byLink) this.emitter.toRoles(rooms, 'notification:new', NotificationsService.view(n, link, data.fr));
     for (const role of roles) void this.pushToRole(role, n, data.extra, data.fr);
   }
 

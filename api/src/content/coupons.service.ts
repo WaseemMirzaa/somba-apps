@@ -4,7 +4,10 @@ import { In, Repository } from 'typeorm';
 import { Order, Promo, Seller } from '../database/entities';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
+
+/** Staff who follow coupons live: the super admin and Marketing (group `content`). */
+const CONTENT_ROLES: string[] = [...ROLE_GROUPS.content];
 
 /** A store may hold this many coupons at once (active or not). */
 export const MAX_COUPONS_PER_STORE = 50;
@@ -141,7 +144,7 @@ export class CouponsService {
     }
     await this.promos.delete({ id });
     this.emitter.toUser(userId, 'coupon:removed', { id });
-    this.emitter.toRoles(ADMIN_ROLES, 'coupon:removed', { id, sellerId: seller.id });
+    this.emitter.toRoles(CONTENT_ROLES, 'coupon:removed', { id, sellerId: seller.id });
     return { id, deleted: true };
   }
 
@@ -189,7 +192,7 @@ export class CouponsService {
 
   private publish(seller: Seller, coupon: ServedCoupon): void {
     if (seller.userId) this.emitter.toUser(seller.userId, 'coupon:updated', coupon);
-    this.emitter.toRoles(ADMIN_ROLES, 'coupon:updated', coupon);
+    this.emitter.toRoles(CONTENT_ROLES, 'coupon:updated', coupon);
   }
 
   /** Store coupons of several stores (for the admin marketing list). */

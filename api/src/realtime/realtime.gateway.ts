@@ -107,9 +107,6 @@ function fail(error: string) {
 /** Validate a positive money amount (USD), rounded to cents. Throws otherwise. */
 /** Which admin sub-roles may use which feature (least privilege). */
 const GROUPS = {
-  config: ['admin', 'admin_finance', 'admin_operations'],
-  content: ['admin', 'admin_marketing'],
-  catalog: ['admin', 'admin_operations', 'admin_marketing'],
   people: ['admin', 'admin_support', 'admin_operations', 'admin_finance'],
   insight: ['admin', 'admin_operations', 'admin_finance'],
   // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.

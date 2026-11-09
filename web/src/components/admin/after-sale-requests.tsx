@@ -23,6 +23,7 @@ import { errMsg, useServerList } from "@/lib/admin-live";
 import { LEG_KIND, LEG_STATUS, pickL } from "@/lib/logistics";
 import { replacementConditionLabel } from "@/lib/replacement-condition";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { isDeskAdmin } from "@/lib/staff-access";
 import { formatCurrency } from "@/lib/utils";
 
 export type AfterSaleKind = "replacement" | "exchange";
@@ -265,6 +266,10 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
   if (!r) return <div className="p-8 text-center text-slate-500">{fr ? c.notFoundFr : c.notFoundEn}</div>;
 
   const diff = Number(r.priceDiffUsd ?? 0);
+  // Support answers on a seller's behalf, but an exchange that refunds money to the customer's wallet is approved by the exchange desk
+  // (super admin, operations): the server refuses Support too (`exchanges:respond`), so the button is not offered. Support may still reject.
+  const desk = isDeskAdmin(rt.user?.role);
+  const needsDesk = kind === "exchange" && diff < 0 && !desk;
 
   return (
     <div className="space-y-6">
@@ -326,7 +331,9 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
               { label: fr ? "Livré le" : "Delivered", value: r.deliveredAt ? localDateTime(r.deliveredAt) : "—" },
             ]}
           />
-          {legs.length === 0 ? (
+          {!desk ? (
+            <p className="mt-2 text-sm text-slate-500">{fr ? "Les trajets de livraison sont suivis par l'équipe des opérations." : "The delivery legs are followed by the operations team."}</p>
+          ) : legs.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">{fr ? "Aucun trajet pour l'instant : ils sont créés à l'approbation." : "No legs yet: they are created on approval."}</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
@@ -346,8 +353,13 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
               <p className="text-sm text-slate-600">
                 {fr ? "Le vendeur répond normalement. Le support peut répondre à sa place si le délai est dépassé." : "The seller normally answers. Support can answer for them when the time has passed."}
               </p>
+              {needsDesk && (
+                <p className="text-sm text-amber-700">
+                  {fr ? "Cet échange rembourse une différence sur le portefeuille du client : seules les opérations peuvent l'approuver. Vous pouvez le rejeter." : "This exchange refunds a difference to the customer's wallet: only operations can approve it. You can still reject it."}
+                </p>
+              )}
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => { setMode("approve"); setReason(""); setFormError(null); }}>{fr ? "Approuver" : "Approve"}</Button>
+                {!needsDesk && <Button size="sm" onClick={() => { setMode("approve"); setReason(""); setFormError(null); }}>{fr ? "Approuver" : "Approve"}</Button>}
                 <Button size="sm" variant="reject" onClick={() => { setMode("reject"); setReason(""); setFormError(null); }}>{fr ? "Rejeter" : "Reject"}</Button>
               </div>
             </div>

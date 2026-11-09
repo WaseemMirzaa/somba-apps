@@ -43,6 +43,20 @@ beforeEach(async () => {
 });
 afterEach(async () => ds.destroy());
 
+describe('who follows fraud alerts live', () => {
+  const adminRooms = (event: string) => emitter.sent.filter((e) => e.event === event).map((e) => e.to.split(',').filter((r) => r.startsWith('admin')));
+
+  it('fraud:updated goes to the super admin, finance and support (the departments with a fraud page); not operations, moderation or marketing', async () => {
+    await svc.setStatus(alert.id, 'reviewed', as());
+    expect(adminRooms('fraud:updated')).toEqual([['admin', 'admin_finance', 'admin_support']]);
+  });
+
+  it('fraud:created goes to the same three', async () => {
+    await svc.flagCodRisk('Awa Diallo', 'order-9', 900, 300, customer.id);
+    expect(adminRooms('fraud:created')).toEqual([['admin', 'admin_finance', 'admin_support']]);
+  });
+});
+
 describe('fraud alerts: Block really blocks', () => {
   it('blocking suspends the account, revokes its tokens, names the socket to drop, audits and notices', async () => {
     const before = await reload(customer.id);

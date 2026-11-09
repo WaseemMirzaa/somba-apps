@@ -152,6 +152,10 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/support", label: "support", icon: Headphones, i18n: true },
       { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
+      // Support may approve or reject a replacement or an exchange on a silent seller's side (server group `exchangeDecide`), and its
+      // notices open these pages. The pages offer Support only that (read, approve, reject); the desk actions stay Operations'.
+      { href: "/admin/replacements", label: "replacements", icon: RefreshCw, i18n: true },
+      { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
       // Support may suspend accounts (`customers:setActive`), so it sees the fraud alerts whose action is a block.
       { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },

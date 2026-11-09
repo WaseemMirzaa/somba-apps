@@ -50,7 +50,16 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'team') return '/seller/team';
       if (t === 'security') return '/seller/settings';
       return '/seller/notifications';
-    case 'admin':
+    case 'admin': {
+      // The page must be one the recipient's menu reaches (`web/src/lib/admin-access.ts`; `notice-links.spec.ts` checks every audience):
+      // a department that cannot open the usual page for a notice type gets the closest page it can open.
+      const r = role ?? '';
+      // Finance pays refunds but has no Returns or Disputes page: a failed return refund opens the refund ledger.
+      if ((t === 'return' || t === 'dispute') && r === 'admin_finance') return '/admin/refunds';
+      // Operations does not open the product pages (Moderation's), so a low-stock alert has no product page for it.
+      if (t === 'stock' && r === 'admin_operations') return '/admin/notifications';
+      // The Orders list is Operations'; the other departments open one order from a link that names it.
+      if ((t === 'order' || t === 'delivery') && !id && !['admin', 'admin_operations'].includes(r)) return '/admin/notifications';
       if (t === 'order' || t === 'delivery') return pick(`/admin/orders/${id}`, '/admin/orders');
       if (t === 'payment') return '/admin/finance';
       if (t === 'payout') return '/admin/payouts';
@@ -67,6 +76,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'exchange') return pick(`/admin/exchanges/${id}`, '/admin/exchanges');
       if (t === 'replacement') return pick(`/admin/replacements/${id}`, '/admin/replacements');
       return '/admin/notifications';
+    }
     case 'warehouse':
       if (t === 'return' || t === 'dispute') return pick(`/warehouse/returns/${id}`, '/warehouse/returns');
       if (t === 'exchange') return pick(`/warehouse/exchanges/${id}`, '/warehouse/exchanges');

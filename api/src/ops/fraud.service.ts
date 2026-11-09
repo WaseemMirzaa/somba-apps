@@ -4,7 +4,11 @@ import { In, Repository } from 'typeorm';
 import { FraudAlert, Order, User } from '../database/entities';
 import type { FraudStatus } from '../database/entities/fraud-alert.entity';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
+
+/** Who works fraud alerts and follows them live: the super admin, finance and support (group `fraudAlerts`). */
+const FRAUD_ROLES: string[] = [...ROLE_GROUPS.fraudAlerts];
 import { CustomersService } from './customers.service';
 import { AuditService } from './audit.service';
 
@@ -74,7 +78,7 @@ export class FraudService {
         status: 'open',
       }),
     );
-    this.emitter.toRoles(ADMIN_ROLES, 'fraud:created', alert);
+    this.emitter.toRoles(FRAUD_ROLES, 'fraud:created', alert);
     return alert;
   }
 
@@ -134,7 +138,7 @@ export class FraudService {
 
     await this.repo.update({ id }, { status });
     const updated = (await this.repo.findOne({ where: { id } }))!;
-    this.emitter.toRoles(ADMIN_ROLES, 'fraud:updated', updated);
+    this.emitter.toRoles(FRAUD_ROLES, 'fraud:updated', updated);
 
     const entry = { actor: actor.name, role: actor.role };
     if (status !== alert.status) {

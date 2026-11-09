@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { Dispute, FraudAlert, FraudSignal, Order, Payment, PaymentRefund, User } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { ROLE_GROUPS } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { FRAUD_THRESHOLDS, FraudAlertType, FraudThresholdName } from './fraud-rules.config';
 import { FraudService } from './fraud.service';
@@ -251,7 +251,7 @@ export class FraudRulesService implements OnModuleInit, OnModuleDestroy {
           dedupeKey,
         }),
       );
-      this.emitter.toRoles(ADMIN_ROLES, 'fraud:created', alert);
+      this.emitter.toRoles([...ROLE_GROUPS.fraudAlerts], 'fraud:created', alert);
       return alert;
     } catch (e) {
       // Two requests raced to raise the same alert: the unique key kept one, which is what we want.

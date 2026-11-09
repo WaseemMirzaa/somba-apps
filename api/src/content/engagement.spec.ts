@@ -54,6 +54,22 @@ afterEach(async () => ds.destroy());
 const titles = (to: string) => notices.filter((n) => n.to === to).map((n) => n.title);
 const events = (to: string, event: string) => emitter.sent.filter((e) => e.to === to && e.event === event);
 
+describe('who follows reviews and questions live', () => {
+  const adminRoomsOf = (event: string) => emitter.sent.filter((e) => e.event === event).map((e) => e.to.split(',').filter((r) => r.startsWith('admin'))).filter((r) => r.length > 0);
+
+  it('a new review: shoppers and the moderators (super admin, operations, moderation); not finance, support or marketing', async () => {
+    await delivered();
+    await svc.create(customer, { productId: product.id, rating: 4, text: 'Works very well' });
+    expect(adminRoomsOf('review:created')).toEqual([['admin', 'admin_operations', 'admin_moderation']]);
+    expect(emitter.sent.some((e) => e.event === 'review:created' && e.to.startsWith('customer'))).toBe(true);
+  });
+
+  it('a new question reaches the moderators only', async () => {
+    await svc.ask(customer, { productId: product.id, question: 'Does it come with a charger?' });
+    expect(adminRoomsOf('question:created')).toEqual([['admin', 'admin_operations', 'admin_moderation']]);
+  });
+});
+
 describe('reviews reach the seller', () => {
   it('a new review: live push and a notice to the product’s seller, and to nobody else', async () => {
     await delivered();
