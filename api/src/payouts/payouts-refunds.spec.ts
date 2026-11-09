@@ -27,7 +27,7 @@ beforeEach(async () => {
   ds = await testDb();
   const emitter = recordingEmitter();
   Object.assign(settings, { commissionPct: '12', payoutClearanceHours: '0', minPayoutUsd: '5' });
-  const notifications = { toUser: async () => undefined, toRole: async () => undefined };
+  const notifications = { toUser: async () => undefined, toRole: async () => undefined, toAdmins: async () => undefined };
   const wallet = new WalletService(ds.getRepository(User), ds.getRepository(WalletTransaction), emitter as never);
   svc = new PayoutsService(
     ds.getRepository(Payout),

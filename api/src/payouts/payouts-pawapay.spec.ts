@@ -32,7 +32,8 @@ function make(patch: Record<string, unknown> = {}, pawapayOn = true) {
   const financeNotes: string[] = [];
   const notifications = {
     toUser: async (_u: string, n: { title: string }) => sellerNotes.push(n.title),
-    toRole: async (_r: string, n: { title: string }) => financeNotes.push(n.title),
+    toRole: async (_r: string, n: { title: string }) => financeNotes.push(`role:${n.title}`),
+    toAdmins: async (n: { title: string }, audience?: string) => financeNotes.push(`${audience}:${n.title}`),
   };
   const pawapay = {
     newId: () => 'pay-ref-1',
@@ -67,8 +68,8 @@ describe('PayoutsService with pawaPay', () => {
     t.pawapay.check.mockResolvedValue({ found: true, final: true, succeeded: false, failureMessage: 'Recipient not found' });
     await t.svc.reconcilePawapay('pay-ref-1');
     expect(t.row).toMatchObject({ status: 'requested', providerRef: null, note: 'pawaPay: Recipient not found' });
-    // finance staff and the super admin are both told
-    expect(t.financeNotes).toEqual(['pawaPay payout failed', 'pawaPay payout failed']);
+    // finance staff and the super admin are told through ONE notice (two rows would list twice for the super admin)
+    expect(t.financeNotes).toEqual(['finance:pawaPay payout failed']);
   });
 
   it('a refused transfer is undone; an unanswered one waits for the status check', async () => {

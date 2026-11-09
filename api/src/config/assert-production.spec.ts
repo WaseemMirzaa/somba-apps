@@ -37,4 +37,25 @@ describe('assertProductionConfig', () => {
     process.env.NODE_ENV = 'production';
     expect(() => assertProductionConfig(cfg(over))).toThrow(/Refusing to start/);
   });
+
+  it.each([['TRANSLATE_PROVIDER', 'fake'], ['TRANSLATE_PROVIDER', ' FAKE '], ['MM_PROVIDER', 'sandbox']])('refuses to boot with %s=%s (a development-only switch)', (key, value) => {
+    process.env.NODE_ENV = 'production';
+    const before = process.env[key];
+    process.env[key] = value;
+    try {
+      expect(() => assertProductionConfig(cfg())).toThrow(/Refusing to start/);
+    } finally {
+      if (before === undefined) delete process.env[key];
+      else process.env[key] = before;
+    }
+  });
+
+  it('accepts the real translators in production', () => {
+    process.env.NODE_ENV = 'production';
+    for (const v of ['google', 'off', '']) {
+      process.env.TRANSLATE_PROVIDER = v;
+      expect(() => assertProductionConfig(cfg())).not.toThrow();
+    }
+    delete process.env.TRANSLATE_PROVIDER;
+  });
 });

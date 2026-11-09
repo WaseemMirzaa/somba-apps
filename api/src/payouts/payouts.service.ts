@@ -284,8 +284,8 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
         type: 'payout',
         entityId: payout.id,
       };
-      await this.notifications.toRole('admin_finance', notice);
-      await this.notifications.toRole('admin', notice);
+      // One saved row for the finance audience (finance + the super admin): two rows listed twice for the super admin.
+      await this.notifications.toAdmins(notice, 'finance');
       return payout;
     });
   }
@@ -583,8 +583,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
         type: 'payout',
         entityId: saved.id,
       };
-      await this.notifications.toRole('admin_finance', failed);
-      await this.notifications.toRole('admin', failed);
+      await this.notifications.toAdmins(failed, 'finance');
     }
   }
 

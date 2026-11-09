@@ -631,8 +631,11 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(a.ok && a.data.count >= 1, 'mark all read covers role-wide notices', JSON.stringify(a));
   ok((await noticesOf(admin)).every((n) => n.read === true) && others >= 1, 'the super admin has nothing unread now');
   ok((await noticesOf(agent)).some((n) => n.read === false), 'and the agent still has their own unread ones');
-  const adminsRows = await sql("SELECT COUNT(*) AS c FROM notifications WHERE role = 'admins'");
-  ok(Number(adminsRows[0].c) >= 1, 'a notice for every admin role is ONE saved row');
+  // A notice for several admin roles is saved ONCE: `admins` (all of them) or `admins:<audience>` (one group, super admin included).
+  const adminsRows = await sql("SELECT COUNT(*) AS c FROM notifications WHERE role = 'admins' OR role LIKE 'admins:%'");
+  ok(Number(adminsRows[0].c) >= 1, 'a notice for several admin roles is ONE saved row');
+  const returnRows = await sql("SELECT COUNT(*) AS c FROM notifications WHERE title = 'Return requested' AND entityId = ?", [r1.id]);
+  ok(Number(returnRows[0].c) === 1, 'and the return notice the agent and the super admin both see is one row, not one per role', String(returnRows[0].c));
 
   // ======================================================================== SUPPORT
   section('Support: photos, unread counts, agent notices, every role');

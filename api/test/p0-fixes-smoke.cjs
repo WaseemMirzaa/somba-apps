@@ -235,7 +235,8 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     const wRef0 = await wallet();
     await taskOf(o5.id);
     a = await req(admin.sock, 'orders:refund', { orderId: o5.id, toWallet: false });
-    ok(!a.ok && /^(Only mobile-money payments can be refunded to a phone|Refunds to the phone need pawaPay to be connected)\. Refund to the customer's wallet\.$/.test(a.error ?? ''), 'a refund to the phone is refused with the exact copy when it is not possible', a.error);
+    // The order is paid by card (`order` above), so the original method is the card; the phone copies are for the other payment kinds.
+    ok(!a.ok && /^(Only mobile-money payments can be refunded to a phone|Refunds to the phone need pawaPay to be connected|Refunds to the card need Stripe to be connected)\. Refund to the customer's wallet\.$/.test(a.error ?? ''), 'a refund to the original method is refused with the exact copy when it is not possible (card: Stripe not connected)', a.error);
     ok(near(await wallet(), wRef0) && (await view(o5.id)).status === 'confirmed', '…and nothing moved');
     ok(!(await req(ops.sock, 'orders:refund', { orderId: o5.id })).ok && !(await req(mkt.sock, 'orders:refund', { orderId: o5.id })).ok, 'only admin/finance may refund');
     a = await req(admin.sock, 'orders:refund', { orderId: o5.id });

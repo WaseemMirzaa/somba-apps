@@ -63,7 +63,9 @@ const login = async (email) => {
 
   const products = (await req(cust.sock, 'products:list', { limit: 200 })).data ?? [];
   const prod = products.find((p) => (p.sellerName ?? '') === 'Kinshasa Traders' && p.stock > 20) ?? products.find((p) => p.stock > 20);
-  const prod2 = products.find((p) => p.id !== prod.id && p.stock > 20);
+  // The seed gives every fifth listing to Limete Wholesale, whose parcels are collected into the Limete warehouse: the parcel
+  // section below expects the pickup leg to the Kinshasa warehouse, so take another Kinshasa Traders listing (the list order varies).
+  const prod2 = products.find((p) => p.id !== prod.id && (p.sellerName ?? '') === 'Kinshasa Traders' && p.stock > 20) ?? products.find((p) => p.id !== prod.id && p.stock > 20);
   const onHand = async (sock, productId, hubId) => ((await req(sock, 'stock:onHand', { productId, ...(hubId ? { hubId } : {}) })).data?.rows ?? []);
   const binQty = async (sock, productId, code, hubId) => (await onHand(sock, productId, hubId)).flatMap((r) => r.bins).find((b) => b.code === code)?.qty ?? 0;
   const total = async (sock, productId, hubId) => (await onHand(sock, productId, hubId)).reduce((s, r) => s + r.onHand, 0);

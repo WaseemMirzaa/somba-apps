@@ -12,7 +12,7 @@ describe('PayoutsService (stored commission, statements, batch approval)', () =>
   let svc: PayoutsService;
   let setting: Record<string, string>;
   const wallet = { apply: jest.fn(async () => undefined) };
-  const notifications = { toRole: jest.fn(async () => undefined), toUser: jest.fn(async () => undefined) };
+  const notifications = { toRole: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined), toUser: jest.fn(async () => undefined) };
   const emitter = { toUser: jest.fn(), toRoles: jest.fn() };
   const SELLER = { id: 'u1', name: 'Store One' };
   let seq = 0;
@@ -102,6 +102,14 @@ describe('PayoutsService (stored commission, statements, batch approval)', () =>
     await sell(100, { fulfilment: 'cancelled' });
     await sell(50);
     expect(await svc.available(SELLER.id)).toMatchObject({ earned: 45 });
+  });
+
+  it('tells finance and the super admin about a request with ONE notice (two rows listed twice for the super admin)', async () => {
+    await sell(100);
+    const p = await svc.request(SELLER, 50, 'wallet');
+    expect(notifications.toAdmins).toHaveBeenCalledTimes(1);
+    expect(notifications.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Payout requested', type: 'payout', entityId: p.id }), 'finance');
+    expect(notifications.toRole).not.toHaveBeenCalled();
   });
 
   it('builds a statement of sale lines on request and does not settle the same line twice', async () => {

@@ -44,7 +44,8 @@ describe('low-stock notices (once per crossing)', () => {
     expect(seller).toHaveLength(1);
     expect(seller[0]).toMatchObject({ title: 'Low stock', type: 'stock' });
     expect(seller[0].body).toBe('Phone case is down to 10 (alert at 10). Restock soon.');
-    expect(lows().filter((n) => n.title === 'Low stock alert').map((n) => n.to).sort()).toEqual(['role:admin', 'role:admin_operations']);
+    // ONE saved notice for the operations audience (the super admin lists it too), not a row per role
+    expect(lows().filter((n) => n.title === 'Low stock alert').map((n) => n.to)).toEqual(['admins:orderOps']);
     await w.products.reserve(p.id, 1); // 9
     await w.products.reserve(p.id, 1); // 8
     expect(lows().filter((n) => n.to === 'user:u-kt')).toHaveLength(1);
