@@ -44,6 +44,7 @@ import type { Route } from '../logistics/routing.service';
 import { isOrderFlow } from '../logistics/leg-rules';
 import { ORDER_HUB_SQL, hubsOfOrder, orderHubParams, pushOrderToOps } from '../logistics/hub-scope';
 import { parseAddressPin } from '../common/geo/geo';
+import { inRoleGroup } from '../common/role-groups';
 
 /**
  * An order line is EITHER a reference to a seeded product (`productId`, which
@@ -1201,7 +1202,7 @@ export class OrdersService {
   async adminCancel(user: { id: string; role: string }, orderId: string, reasonRaw: string): Promise<Order> {
     const reason = String(reasonRaw ?? '').trim().slice(0, 200);
     if (reason.length < 3) throw new BadRequestException('Give a reason for the cancellation (at least 3 characters).');
-    return this.cancel(user, orderId, { allowProcessing: true, reason });
+    return this.cancel(user, orderId, { allowProcessing: true, reason, asOperator: true });
   }
 
   /**
@@ -1212,11 +1213,13 @@ export class OrdersService {
   async cancel(
     user: { id: string; role: string },
     orderId: string,
-    opts: { allowProcessing?: boolean; reason?: string; bySeller?: boolean } = {},
+    opts: { allowProcessing?: boolean; reason?: string; bySeller?: boolean; asOperator?: boolean } = {},
   ): Promise<Order> {
     const order = await this.orders.findOne({ where: { id: orderId } });
-    // Same answer for "missing" and "not yours" so ids can't be probed.
-    if (!order || (!user.role.startsWith('admin') && order.customerId !== user.id)) {
+    // The order's own customer, or an operator on the explicit operator path (`adminCancel`, `orders:updateStatus`) — never
+    // just "any admin*" (A-04). Same answer for "missing" and "not yours" so ids can't be probed.
+    const operator = opts.asOperator === true && inRoleGroup(user.role, 'orderOps');
+    if (!order || (!operator && order.customerId !== user.id)) {
       throw new NotFoundException('Order not found.');
     }
 
@@ -1275,7 +1278,7 @@ export class OrdersService {
       await this.notifySellers(
         saved,
         'Order cancelled',
-        `${saved.reference} was cancelled${opts.reason ? ` (${opts.reason})` : user.role.startsWith('admin') ? ' by Somba&Teka' : ' by the customer'}. Do not pack it.`,
+        `${saved.reference} was cancelled${opts.reason ? ` (${opts.reason})` : operator ? ' by Somba&Teka' : ' by the customer'}. Do not pack it.`,
       );
     }
     return saved;

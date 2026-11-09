@@ -4,6 +4,7 @@ import { User } from '../database/entities';
 import { testDb } from '../testing/test-db';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { AccountDeletionService } from './account-deletion.service';
 import { MAX_2FA_FAILURES, TwoFaService } from './twofa.service';
 import { base32Decode, hashRecovery, hotp, totpCode, totpStep } from './totp';
 import * as bcrypt from 'bcryptjs';
@@ -33,7 +34,7 @@ beforeEach(async () => {
   notices = [];
   const jwt = new JwtService({});
   svc = new TwoFaService(users, jwt, config as never, { toUser: async (to: string, n: { title: string; type: string }) => void notices.push({ to, ...n }) } as never);
-  auth = new AuthService(users, jwt, config as never, svc);
+  auth = new AuthService(users, jwt, config as never, new AccountDeletionService(ds), svc);
 });
 afterEach(() => ds.destroy());
 

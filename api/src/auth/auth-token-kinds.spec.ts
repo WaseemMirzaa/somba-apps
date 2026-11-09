@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { User } from '../database/entities';
 import { testDb } from '../testing/test-db';
 import { UsersService } from '../users/users.service';
+import { AccountDeletionService } from './account-deletion.service';
 import { AuthService, assertTokenKind } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { totpCode } from './totp';
@@ -25,7 +26,7 @@ const cfg = (sameSecret: boolean) => ({
 const build = (sameSecret: boolean) => {
   jwt = new JwtService({});
   twofa = new TwoFaService(users, jwt, cfg(sameSecret) as never, { toUser: async () => undefined } as never);
-  auth = new AuthService(users, jwt, cfg(sameSecret) as never, twofa);
+  auth = new AuthService(users, jwt, cfg(sameSecret) as never, new AccountDeletionService(ds), twofa);
 };
 const PASSWORD = 'Password-123';
 

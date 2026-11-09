@@ -13,6 +13,7 @@ export 'strings_engage.dart';
 export 'strings_areas.dart';
 export 'strings_cartstore.dart';
 export 'strings_r2f.dart';
+export 'strings_account.dart';
 export 'strings_verify.dart';
 
 /// UI texts in English and French. Every text lives in `messages.dart`

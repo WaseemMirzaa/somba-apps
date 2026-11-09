@@ -18,6 +18,7 @@ import { clampDays } from '../ops/analytics.util';
 import { cleanListing, materialTextChange } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
 import { TranslationService } from '../translation/translation.service';
+import { accountBlockedFields } from '../auth/account-deletion.service';
 import { SellerPlatformKit } from '../sellers/seller-kit';
 import { touchesStorefront } from '../sellers/storefront.service';
 import type { SellerContext } from '../sellers/seller-context';
@@ -97,15 +98,11 @@ const GROUPS = {
   audit: ['admin', 'admin_operations'],
   // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.
   fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support'],
-  /** Money screens: confirm/decline payments, finance dashboard. */
-  finance: ['admin', 'admin_finance'],
   /** Hide / restore customer reviews. */
   moderate: ['admin', 'admin_operations', 'admin_moderation'],
   /** Hub directory (create / edit / deactivate). */
   hubs: ['admin', 'admin_operations'],
-  /** Operators who move orders by hand and cancel them on a customer's behalf. */
-  orderOps: ['admin', 'admin_operations'],
-  /** Product moderation, campaign decisions and support tickets: shared with the other gateways. */
+  /** Product moderation, campaign decisions, support tickets, finance, order and exchange desks: shared with the services and other gateways. */
   ...ROLE_GROUPS,
 } as const;
 const ALL_ROLES = ['customer', 'seller', 'admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'] as const;
@@ -696,8 +693,12 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'orderOps')) return fail('Not allowed.');
-      // Cancelling must restock and refund — route it through the real flow.
-      if (body?.status === 'cancelled') return ok(await this.orders.cancel(user, body.orderId));
+      // Cancelling must restock and refund — route it through the real flow (the operator path), and audit it like orders:adminCancel.
+      if (body?.status === 'cancelled') {
+        const cancelled = await this.orders.cancel(user, String(body?.orderId ?? ''), { asOperator: true });
+        await this.audit.record({ actor: user.name, role: user.role, action: 'order.cancelled', entity: 'order', entityId: cancelled.id, detail: `${cancelled.reference} (status set to cancelled)` });
+        return ok(cancelled);
+      }
       const order = await this.orders.updateStatus(String(body?.orderId ?? ''), body?.status, { id: user.id, name: user.name, role: user.role });
       await this.audit.record({ actor: user.name, role: user.role, action: 'order.status', entity: 'order', entityId: order.id, detail: `${order.reference} -> ${order.status}` });
       return ok(order);
@@ -2251,7 +2252,10 @@ export class RealtimeGateway
   }
 
   // ---- Additional flows (audit gaps) -------------------------------------
-  /** Customer cancels their own order (restock + refund + void delivery). */
+  /**
+   * Customer cancels their own order (restock + refund + void delivery). Only the order's own customer, whatever their
+   * role (A-04): staff cancel through `orders:adminCancel`, which checks the operator role and writes the audit log.
+   */
   @SubscribeMessage('orders:cancel')
   async ordersCancel(
     @ConnectedSocket() client: AuthedSocket,
@@ -2259,7 +2263,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.orders.cancel(user, body.orderId));
+      return ok(await this.orders.cancel(user, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2429,7 +2433,32 @@ export class RealtimeGateway
     }
   }
 
-  /** Customers/sellers erase their own account (staff accounts are managed by admins). */
+  /**
+   * What stops this account from being deleted right now, so the app can show the reasons BEFORE the customer confirms:
+   * `{ canDelete, blockers: [{ kind, count, amountUsd? }] }` (kinds: wallet_balance, open_order, open_return,
+   * open_dispute, open_ticket, pending_payout, pending_refund, pending_topup). Nothing is changed.
+   */
+  @SubscribeMessage('me:deleteCheck')
+  async meDeleteCheck(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'customer' && user.role !== 'seller') {
+        return fail('Staff accounts are removed by an administrator.');
+      }
+      const blockers = await this.auth.deletionBlockers(user.id);
+      return ok({ canDelete: blockers.length === 0, blockers });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * Customers/sellers erase their own account (staff accounts are managed by admins). Refused with
+   * `{ ok:false, error, code:'account_blocked', blockers }` while money, an unfinished order, an open return / dispute /
+   * ticket about an order or a payout / refund / top-up in flight is outstanding (the rule itself lives in
+   * `AuthService.deleteAccount`, so no other caller can bypass it). When it goes through, every open socket of the
+   * account is dropped (this one after the ack has flushed).
+   */
   @SubscribeMessage('me:delete')
   async meDelete(
     @ConnectedSocket() client: AuthedSocket,
@@ -2448,11 +2477,14 @@ export class RealtimeGateway
         await this.addresses.remove(user.id, a.id);
       }
       await this.push.unregisterUser(user.id);
-      // Let the ack flush before dropping the connection.
-      setTimeout(() => client.disconnect(true), 150);
+      // Let the ack flush, then drop EVERY open connection of the account (other phones, the web), not only this one.
+      setTimeout(() => {
+        this.kick(user.id);
+        client.disconnect(true);
+      }, 150);
       return ok({ deleted: true });
     } catch (e) {
-      return fail((e as Error).message);
+      return { ...fail((e as Error).message), ...accountBlockedFields(e) };
     }
   }
 

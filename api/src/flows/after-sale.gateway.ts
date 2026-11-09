@@ -4,7 +4,10 @@ import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import { StaffTierService } from '../logistics/staff-tier.service';
-import { ExchangesService } from './exchanges.service';
+import { ExchangesService, canMoveExchange } from './exchanges.service';
+import type { ExchangeView } from './exchanges.service';
+import { inRoleGroup } from '../common/role-groups';
+import { AuditService } from '../ops/audit.service';
 import { ReplacementsService } from './replacements.service';
 
 const SUPERVISORS_ONLY = 'Only supervisors and managers can see this.';
@@ -23,7 +26,24 @@ export class AfterSaleGateway {
     private readonly replacements: ReplacementsService,
     private readonly exchanges: ExchangesService,
     private readonly tiers: StaffTierService,
+    private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Every staff action on an exchange is audited (A-03), with the wallet credit it causes: a cheaper item is refunded to
+   * the customer's wallet when the exchange is delivered. The customer's and the seller's own actions are not.
+   */
+  private async auditExchange(user: SocketUser, action: string, ex: ExchangeView): Promise<void> {
+    if (user.role === 'customer' || user.role === 'seller' || ex.customerId === user.id) return;
+    const diff = Number(ex.priceDiffUsd) || 0;
+    const money =
+      diff < 0
+        ? ` · $${Math.abs(diff).toFixed(2)} refunded to the customer's wallet${action === 'exchange.delivered' ? '' : ' on delivery'}`
+        : diff > 0
+          ? ` · price difference $${diff.toFixed(2)}`
+          : '';
+    await this.audit.record({ actor: user.name, role: user.role, action, entity: 'exchange', entityId: ex.id, detail: `${ex.reference ?? ''} · ${ex.orderReference ?? ''}${money}` });
+  }
 
   /**
    * Warehouse staff reach replacements and exchanges through the supervisor pages only, so an operator is refused here
@@ -155,7 +175,9 @@ export class AfterSaleGateway {
   ) {
     try {
       const user = requireUser(client);
-      return ok(await this.exchanges.create(user, body));
+      const ex = await this.exchanges.create(user, body);
+      await this.auditExchange(user, 'exchange.create', ex);
+      return ok(ex);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -165,8 +187,11 @@ export class AfterSaleGateway {
   async exchangesRespond(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; approve: boolean; reason?: string }) {
     try {
       const user = requireUser(client);
-      if (user.role !== 'seller' && !user.role.startsWith('admin')) return fail('Not allowed.');
-      return ok(await this.exchanges.respond(await this.viewer(user, true), String(body?.id ?? ''), body?.approve === true, body?.reason));
+      // A-03/A-07: the seller, or the desk / support on their behalf; no other admin department.
+      if (user.role !== 'seller' && !inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
+      const ex = await this.exchanges.respond(await this.viewer(user, true), String(body?.id ?? ''), body?.approve === true, body?.reason);
+      await this.auditExchange(user, ex.status === 'rejected' ? 'exchange.rejected' : 'exchange.approved', ex);
+      return ok(ex);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -176,10 +201,13 @@ export class AfterSaleGateway {
   async exchangesSetStatus(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; status: (typeof EXCHANGE_STATUSES)[number] }) {
     try {
       const user = requireUser(client);
-      if (!isOps(user.role)) return fail('Ops only.');
+      // A-03: delivery credits a cheaper item's difference to the wallet, so only the exchange desk and warehouse supervisors.
+      if (!canMoveExchange(user.role)) return fail('Ops only.');
       if (await this.staffBelowSupervisor(user)) return fail('Only supervisors and managers can do this.');
       oneOf(body?.status, EXCHANGE_STATUSES, 'Status');
-      return ok(await this.exchanges.setStatus(body.id, body.status));
+      const ex = await this.exchanges.setStatus(String(body.id ?? ''), body.status, user);
+      await this.auditExchange(user, `exchange.${ex.status}`, ex);
+      return ok(ex);
     } catch (e) {
       return fail((e as Error).message);
     }

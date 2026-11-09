@@ -159,8 +159,49 @@ describe('AfterSaleGateway', () => {
   function make() {
     const rep = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
     const exc = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
-    return { rep, exc, gw: new AfterSaleGateway(rep as never, exc as never, tiers()) };
+    const audit = { record: jest.fn(async (_entry: { action: string; role: string; entity: string; entityId?: string; detail?: string }) => undefined) };
+    return { rep, exc, audit, gw: new AfterSaleGateway(rep as never, exc as never, tiers(), audit as never) };
   }
+
+  it('A-03: an exchange is moved (and so credited on delivery) by the exchange desk and warehouse supervisors only', async () => {
+    const { gw, exc } = make();
+    for (const role of ['admin_marketing', 'admin_moderation', 'admin_support', 'admin_finance']) {
+      expect(await gw.exchangesSetStatus(client(role), { id: 'e', status: 'delivered' })).toEqual({ ok: false, error: 'Ops only.' });
+    }
+    expect(exc.setStatus).not.toHaveBeenCalled();
+    for (const [role, id] of [['admin', 'a1'], ['admin_operations', 'a2'], ['warehouse_staff', 'sup-1']] as const) {
+      expect((await gw.exchangesSetStatus(client(role, id), { id: 'e', status: 'delivered' })).ok).toBe(true);
+    }
+    // The service gets the caller, so it can refuse too.
+    expect(exc.setStatus).toHaveBeenLastCalledWith('e', 'delivered', expect.objectContaining({ role: 'warehouse_staff', id: 'sup-1' }));
+  });
+
+  it('A-03: respond on the seller’s behalf is for the desk and support only; marketing, moderation and finance are refused', async () => {
+    const { gw, exc } = make();
+    for (const role of ['admin_marketing', 'admin_moderation', 'admin_finance']) {
+      expect(await gw.exchangesRespond(client(role), { id: 'e', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
+    }
+    expect(exc.respond).not.toHaveBeenCalled();
+  });
+
+  it('A-03: staff actions on an exchange are audited, with any wallet credit; a customer’s own are not', async () => {
+    const { gw, exc, audit } = make();
+    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: 0, status: 'requested' } as never);
+    await gw.exchangesCreate(client('customer', 'c1'), { orderId: 'o', toSku: 'x', toName: 'X' });
+    expect(audit.record).not.toHaveBeenCalled();
+    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: 0, status: 'requested' } as never);
+    await gw.exchangesCreate(client('admin_operations', 'a2'), { orderId: 'o', toSku: 'x', toName: 'X' });
+    exc.respond.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: -40, status: 'approved' } as never);
+    await gw.exchangesRespond(client('admin_operations', 'a2'), { id: 'e1', approve: true });
+    exc.setStatus.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: -40, status: 'delivered' } as never);
+    await gw.exchangesSetStatus(client('admin', 'a1'), { id: 'e1', status: 'delivered' });
+    expect(audit.record.mock.calls.map(([e]) => `${e.action}|${e.role}|${e.entity}|${e.entityId}`)).toEqual([
+      'exchange.create|admin_operations|exchange|e1',
+      'exchange.approved|admin_operations|exchange|e1',
+      'exchange.delivered|admin|exchange|e1',
+    ]);
+    expect(audit.record.mock.calls[2][0].detail).toContain('$40.00 refunded to the customer');
+  });
 
   it('the desk steps are ops only; a bad status is refused before it reaches the service', async () => {
     const { gw, rep, exc } = make();

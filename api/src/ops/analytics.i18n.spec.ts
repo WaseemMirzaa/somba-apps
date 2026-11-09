@@ -164,3 +164,26 @@ describe('analytics:admin gmvByCategory carries categoryFr', () => {
     expect(gmvByCategory[0]).toMatchObject({ category: 'Gizmos', categoryFr: 'Bidules' });
   });
 });
+
+describe('SL-01: analytics:seller counts what partial refunds left', () => {
+  it('a return of 2 of 3 units takes their sales and commission out of revenue, commission and best sellers', async () => {
+    const seller = await addSeller(ds);
+    const lamp = await addProduct(ds, { name: 'Lamp', sellerId: seller.id });
+    const repo = ds.getRepository(Order);
+    await repo.save(
+      repo.create({
+        reference: 'SOM-R1',
+        customerId: 'c1',
+        customerName: 'Cust',
+        status: 'delivered',
+        subtotalUsd: 60,
+        totalUsd: 63,
+        items: [{ productId: lamp.id, productName: 'Lamp', variant: 'Default', qty: 3, priceUsd: 20, commissionPct: 12, commissionUsd: 7.2, refundedUsd: 40 }] as OrderItem[],
+      }),
+    );
+    const stats = await analytics.sellerStats(seller, 30, 5);
+    expect(stats.revenue).toBe(20);
+    expect(stats.commissionUsd).toBe(2.4);
+    expect(stats.topProducts[0]).toMatchObject({ productId: lamp.id, revenue: 20 });
+  });
+});

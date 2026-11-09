@@ -164,7 +164,8 @@ describe('exchanges carry fromNameFr and toNameFr', () => {
   });
 
   it('is null for both when nothing matches', async () => {
-    const o = await order([{ product: await product('Hat') }]);
+    // The desk too can only exchange a line that is on the order (A-03): a line whose item is no listing, so nothing has French.
+    const o = await order([{ product: { id: 'A', name: 'Cov Item' } as Product }]);
     const ex = await exchanges.create(admin, { orderId: o.id, fromSku: 'A', fromName: 'Cov Item', toSku: 'B', toName: 'Bigger one' });
     expect(ex).toMatchObject({ fromNameFr: null, toNameFr: null });
   });
@@ -173,7 +174,7 @@ describe('exchanges carry fromNameFr and toNameFr', () => {
     const p = await product('Hat', 'Chapeau');
     const o = await order([{ product: p }]);
     const ex = await exchanges.create(admin, { orderId: o.id, fromSku: p.id, fromName: 'Hat', toSku: p.id, toName: 'Hat' });
-    await exchanges.setStatus(ex.id, 'approved');
+    await exchanges.setStatus(ex.id, 'approved', admin);
     expect((await exchanges.list(admin))[0]).toMatchObject({ fromNameFr: 'Chapeau', toNameFr: 'Chapeau' });
     const events = emitter.sent.filter((e) => e.event === 'exchange:updated');
     expect(events.length).toBeGreaterThanOrEqual(4);

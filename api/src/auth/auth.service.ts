@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { User } from '../database/entities';
 import { PublicUser, UsersService } from '../users/users.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { AccountDeletionService, DELETED_NAME } from './account-deletion.service';
 import { TwoFaService } from './twofa.service';
 import type { TwoFaChallenge } from './twofa.service';
 
@@ -50,6 +51,8 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    // Refuses a deletion while anything is outstanding and anonymises the records that stay (see its class comment).
+    private readonly deletion: AccountDeletionService,
     // Second sign-in step for accounts that turned on two-factor authentication.
     private readonly twofa?: TwoFaService,
   ) {}
@@ -153,8 +156,12 @@ export class AuthService {
   }
 
   /**
-   * Delete an account: personal data is erased and the login is destroyed, but
-   * the row stays so past orders/payments remain consistent for accounting.
+   * Delete an account. REFUSED (`AccountDeletionBlockedException`) while the account still has money in the wallet, an
+   * order that is not finished, an open return / exchange / dispute / support ticket about an order, or a payout,
+   * refund or top-up in flight. Otherwise personal data is erased and the login is destroyed (every session is revoked
+   * by the token version), the row stays so past orders/payments remain consistent for accounting, and the personal
+   * parts of the records that stay are anonymised (see `AccountDeletionService`). Check, anonymisation and the user
+   * row change happen in one transaction.
    */
   async deleteAccount(userId: string, password: string): Promise<void> {
     const user = await this.users.findById(userId);
@@ -162,8 +169,9 @@ export class AuthService {
     if (!(await bcrypt.compare(password ?? '', user.passwordHash))) {
       throw new BadRequestException('Password is incorrect.');
     }
+    await this.deletion.assertCanDelete(userId);
     const tombstone = `deleted+${user.id}@deleted.invalid`;
-    user.name = 'Deleted user';
+    user.name = DELETED_NAME;
     user.email = tombstone;
     user.emailHash = UsersService.emailHash(tombstone);
     user.phone = null;
@@ -178,7 +186,12 @@ export class AuthService {
     user.passwordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     user.active = false;
-    await this.users.save(user);
+    await this.deletion.erase(user);
+  }
+
+  /** What would stop this account from being deleted right now (nothing is changed). Shown before the customer confirms. */
+  deletionBlockers(userId: string) {
+    return this.deletion.blockers(userId);
   }
 
   /** Verify an access token (used by the WebSocket handshake). */

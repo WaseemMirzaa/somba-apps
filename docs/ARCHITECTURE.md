@@ -1709,7 +1709,7 @@ Customers (`customers:list`, `setActive` → kick + revoke), sellers (`sellers:l
 
 ### F18. Account deletion ✅
 
-`me:delete {password}` (customer/seller): PII anonymised (tombstone email, name "Deleted user", phone/address/avatar/prefs cleared), password randomised, `tokenVersion` bumped, `active=false`, sockets closed. Orders are kept for accounting. Missing: data export ("download my data"), grace period / undo.
+`me:delete {password}` (customer/seller): REFUSED with `{ ok:false, error, code:'account_blocked', blockers:[{kind,count,amountUsd?}] }` while the account has wallet money, an unfinished order, an open return/exchange/replacement, an open dispute, an open support ticket about an order, or a payout / phone-or-card refund / wallet top-up in flight (`AccountDeletionService`, enforced in `AuthService.deleteAccount`; `me:deleteCheck` returns the same list without changing anything, for the app to show before the customer confirms). Otherwise: PII anonymised (tombstone email, name "Deleted user", phone/address/avatar/prefs cleared), password randomised, `tokenVersion` bumped, `active=false`, every open socket of the account dropped, wishlist/cart/followed stores deleted. Orders are kept for the sellers, riders and accounting with the customer's name replaced by "Deleted user" and the address reduced to the place (area, province, city, commune); the phone paid from, the names on disputes/exchanges/replacements/tickets, the delivery-task addresses and the review author are cleared the same way. Missing: data export ("download my data"), grace period / undo.
 
 ### F19. Password reset ✅
 
@@ -1754,7 +1754,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above `codCapUsd` |
 | `orders:updateStatus` | Ops (any admin_* role, warehouse_staff) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
 | `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | Refunds what is left on the payment (never more) to the wallet or the paying phone; answers the payment with `refund` (the ledger row of this refund); marks order returned |
-| `orders:cancel` | Order owner, admins | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
+| `orders:cancel` | Order owner only (any role; staff use `orders:adminCancel`) | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
 
 #### `delivery:*`
 
@@ -2002,6 +2002,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `me:setPrefs` | Signed-in | object — fields validated server-side | push / email / sms / personalize / market |
 | `me:changePassword` | Signed-in | `{ current: string; next: string }` | Bumps tokenVersion (other sessions revoked) |
 | `me:delete` | customer, seller | `{ password: string }` | Password confirmation; anonymises PII, revokes sessions |
+| `me:deleteCheck` | customer, seller | none | `{ canDelete, blockers[] }`: what would refuse `me:delete` right now; changes nothing |
 
 #### `devices:*`
 

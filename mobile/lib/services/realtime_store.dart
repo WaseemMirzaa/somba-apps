@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../data/market_profiles.dart';
 import '../l10n/strings.dart';
 import '../util/format.dart' show marketNotifier;
+import 'account_deletion.dart';
 import 'auth_service.dart';
 import 'feature_hooks.dart';
 import 'models.dart';
@@ -782,9 +783,18 @@ class RealtimeStore extends ChangeNotifier {
     _refresh = r.refreshToken;
   }
 
+  /// What stops the account from being deleted right now (empty = nothing). Asked before the customer confirms; the
+  /// server enforces the same list again on `me:delete`.
+  Future<List<DeletionBlocker>> deletionBlockers() async {
+    final res = await call('me:deleteCheck');
+    return DeletionBlocker.listFrom(res is Map ? res['blockers'] : null);
+  }
+
   /// Permanently deletes the account (server also closes this socket).
+  /// A refusal ([ApiException] with `code == 'account_blocked'`, see [DeletionBlocker.fromRefusal]) leaves the session
+  /// untouched: the server erased nothing.
   Future<void> deleteAccount(String password) async {
-    await _socket.request('me:delete', {'password': password});
+    await call('me:delete', {'password': password});
     // Same path as a suspension: clears the session and returns the app to sign-in.
     await _endSession(messageKey: 'err_account_deleted');
   }
