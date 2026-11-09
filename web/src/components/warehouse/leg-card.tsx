@@ -5,7 +5,9 @@ import { ArrowRight, Bike, Clock, MapPin, Navigation, Package, Store, Warehouse,
 import { Badge } from "@/components/ui/badge";
 import { LegActions } from "@/components/warehouse/leg-actions";
 import { useLocale } from "@/context/locale-context";
+import { codeLockLabel } from "@/lib/code-lock";
 import { useOpsPath } from "@/lib/ops-path";
+import { useNow } from "@/lib/use-now";
 import { useCodOffered } from "@/lib/use-cod-offered";
 import {
   LEG_KIND,
@@ -49,12 +51,15 @@ export function LegBadges({ task }: { task: TaskView }) {
   const codOffered = useCodOffered();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const now = useNow(task.codeLockedUntil);
+  const lockText = codeLockLabel(task, fr, now);
   return (
     <>
       <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
       <Badge variant={legStatusVariant(task.status)}>{pickL(LEG_STATUS[task.status], fr)}</Badge>
       {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
       {codOffered && task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}
+      {lockText && <Badge variant="danger" className="max-w-full whitespace-normal text-left">{lockText}</Badge>}
       {task.collectOld && <Badge variant="info">{fr ? "Reprise de l'ancien article" : "Collect the old unit"}</Badge>}
       {runBadgeText(task, fr) && <Badge variant="purple">{runBadgeText(task, fr)}</Badge>}
     </>
@@ -62,7 +67,7 @@ export function LegBadges({ task }: { task: TaskView }) {
 }
 
 /** One leg on the desk / custody lists: what, where to where, who carries it, and the buttons that apply. */
-export function LegCard({ task, onChanged }: { task: DeskTask; onChanged?: () => void }) {
+export function LegCard({ task, onChanged }: { task: DeskTask; onChanged?: (res?: { task?: TaskView }) => void }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const ops = useOpsPath();

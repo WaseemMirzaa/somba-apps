@@ -12,6 +12,7 @@ import { useRealtime } from "@/context/realtime-context";
 import type { Area, AreaChain } from "@/lib/areas";
 import { isSellerAreaRefusal, notServedFromAck, notServedFromError, type NotServedInfo } from "@/lib/not-served";
 import { formatTransit } from "@/lib/quote-text";
+import { canUnlockDeliveryCode } from "@/lib/code-lock";
 
 export { formatTransit };
 
@@ -97,6 +98,10 @@ export interface TaskView {
   collectOld: boolean;
   needsCode: boolean;
   orderFlow: boolean;
+  /** The rider's delivery-code lock (RD-01): wrong tries so far, locked right now, and until when (null = until a supervisor unlocks it). */
+  codeFailures?: number;
+  codeLocked?: boolean;
+  codeLockedUntil?: string | null;
   desk?: DeskFlags;
   /** Transfer runs and multi-hop routes (docs/contracts/areas.md): the run this leg travels in, and its place in the chain. */
   runId?: string | null;
@@ -422,8 +427,11 @@ export function useWarehouseSelf() {
   return {
     hubId: u?.hubId ?? null,
     tier,
+    role: u?.role ?? null,
     isAdmin,
     isStaff: u?.role === "warehouse_staff",
+    /** May unlock a rider's delivery code (supervisor tier and up, and the desk admins). */
+    canUnlockCode: canUnlockDeliveryCode(u?.role, u?.warehouseTier),
     canAssign: tierLevel(tier) >= 2,
     canManage: tierLevel(tier) >= 3,
   };
