@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { Bike, PackageCheck, PackageOpen } from "lucide-react";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
+import { UnlockCodeDialog } from "@/components/warehouse/unlock-code-dialog";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
-import { LEG_KIND, pickL, type TaskView } from "@/lib/logistics";
+import { showUnlockCode } from "@/lib/code-lock";
+import { LEG_KIND, pickL, useWarehouseSelf, type TaskView } from "@/lib/logistics";
+import { useNow } from "@/lib/use-now";
 import { deskActions, parcelCode, useHubScope, type DeskTask } from "@/lib/warehouse";
 import { errorMessage } from "@/lib/warehouse-live";
 
@@ -28,6 +31,10 @@ export function LegActions({
   const { canAssign } = useHubScope();
   const [busy, setBusy] = useState<"in" | "out" | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const { role, tier } = useWarehouseSelf();
+  const now = useNow(task.codeLockedUntil);
+  const canUnlock = showUnlockCode(task, role, tier, now);
   const d = task.desk;
   const pad = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
 
@@ -66,11 +73,11 @@ export function LegActions({
 
   const canAssignNow = d?.assign && canAssign;
   const operatorHint = d?.assign && !canAssign;
-  if (!d || (!d.assign && !d.scanIn && !d.scanOut)) return null;
+  if (!canUnlock && (!d || (!d.assign && !d.scanIn && !d.scanOut))) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {d.scanIn && (
+      {d?.scanIn && (
         <button
           type="button"
           disabled={busy !== null}
@@ -81,7 +88,7 @@ export function LegActions({
           {busy === "in" ? "…" : fr ? "Scanner à l'arrivée" : "Scan in"}
         </button>
       )}
-      {d.scanOut && (
+      {d?.scanOut && (
         <button
           type="button"
           disabled={busy !== null}
@@ -115,6 +122,27 @@ export function LegActions({
               onChanged?.({ task: res });
             }}
           />
+        </>
+      )}
+      {canUnlock && (
+        <>
+          <button
+            type="button"
+            onClick={() => setUnlockOpen(true)}
+            className={`rounded-lg border border-red-200 font-medium text-red-700 hover:bg-red-50 ${pad}`}
+          >
+            {fr ? "Déverrouiller le code" : "Unlock code"}
+          </button>
+          {unlockOpen && (
+            <UnlockCodeDialog
+              parcel={{ code: parcelCode(task), orderReference: task.orderReference }}
+              onClose={() => setUnlockOpen(false)}
+              onConfirm={async () => {
+                const res = await deskActions.unlockCode(task.id);
+                onChanged?.({ task: res });
+              }}
+            />
+          )}
         </>
       )}
       {operatorHint && (

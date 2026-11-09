@@ -75,7 +75,7 @@ export default function WarehouseLegDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <LegBadges task={task} />
-            <LegActions task={task} onChanged={() => void q.reload()} />
+            <LegActions task={task} onChanged={(r) => (r?.task ? q.applyTask(r.task) : void q.reload())} />
           </div>
         }
       />

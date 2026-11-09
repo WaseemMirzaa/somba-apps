@@ -185,7 +185,7 @@ function DeskContent() {
       ) : (
         <div className="space-y-3">
           {rows.map((t) => (
-            <LegCard key={t.id} task={t} onChanged={() => void q.reload()} />
+            <LegCard key={t.id} task={t} onChanged={(r) => (r?.task ? q.applyTask(r.task) : void q.reload())} />
           ))}
         </div>
       )}

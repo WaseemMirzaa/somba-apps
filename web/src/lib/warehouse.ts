@@ -85,19 +85,28 @@ export function useDeskQueue(opts: { status?: string; kind?: string; limit?: num
     push: ["task:updated", "hub:updated"],
   });
   const tasks = useMemo(() => (q.data?.tasks ?? []) as DeskTask[], [q.data]);
-  return { ...q, tasks, counts: q.data?.counts ?? null, hubId: q.data?.hubId ?? null };
+  const { patch } = q;
+  /** Put one task the server just answered (an action's ack) into the list at once, keeping the desk flags the list carries. */
+  const applyTask = useCallback(
+    (t: TaskView) => patch((cur) => (cur ? { ...cur, tasks: cur.tasks.map((x) => (x.id === t.id ? { ...x, ...t, desk: t.desk ?? x.desk } : x)) } : cur)),
+    [patch],
+  );
+  return { ...q, tasks, applyTask, counts: q.data?.counts ?? null, hubId: q.data?.hubId ?? null };
 }
 
 export interface DeskActions {
   assign: (taskId: string, riderId: string) => Promise<TaskView>;
   scanIn: (taskId: string) => Promise<{ task: TaskView; next: TaskView[] }>;
   scanOut: (taskId: string) => Promise<TaskView>;
+  /** `delivery:resetCode`: clears the wrong-code counter and the lock of a delivery; answers the task view. */
+  unlockCode: (taskId: string) => Promise<TaskView>;
 }
 
 export const deskActions: DeskActions = {
   assign: (taskId, riderId) => socketClient.request<TaskView>("logistics:assign", { taskId, riderId }),
   scanIn: (taskId) => socketClient.request<{ task: TaskView; next: TaskView[] }>("logistics:scanIn", { taskId }),
   scanOut: (taskId) => socketClient.request<TaskView>("logistics:dispatchTransfer", { taskId }),
+  unlockCode: (taskId) => socketClient.request<TaskView>("delivery:resetCode", { taskId }),
 };
 
 // ───────────────────────── helpers ─────────────────────────
