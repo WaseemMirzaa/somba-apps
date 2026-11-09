@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Order, OrderItem, Payout, PayoutStatementLine } from '../database/entities';
+import { Order, OrderItem, PaymentRefund, Payout, PayoutStatementLine } from '../database/entities';
 import type { Seller } from '../database/entities';
 import { commerceWorld } from '../testing/commerce-db';
 import type { World } from '../testing/commerce-db';
@@ -474,5 +474,42 @@ describe('seller settings', () => {
     w.settings.minPayoutUsd = '25';
     w.settings.payoutClearanceHours = '72';
     expect(await w.finance.sellerSettings()).toEqual({ currency: 'USD', commissionPct: 12, minPayoutUsd: 25, payoutClearanceHours: 72 });
+  });
+});
+
+describe('SL-01: partial refunds on delivered orders in the seller finance views', () => {
+  /** 3 x $20 at 12% ($7.20), delivered 100 h ago; the customer got $40 back for 2 units at `refundAt`. */
+  async function partlyRefunded(refundAt: Date) {
+    const s = await sale({ price: 20, qty: 3, pct: 12 });
+    await w.ds.getRepository(Order).update({ id: s.order.id }, { subtotalUsd: 60 });
+    await w.ds.getRepository(OrderItem).update({ id: s.item.id }, { refundedUsd: 40 });
+    await w.ds.getRepository(PaymentRefund).save(
+      w.ds.getRepository(PaymentRefund).create({ paymentId: 'pay-1', orderId: s.order.id, orderReference: s.order.reference, userId: 'c1', amountUsd: 40, refundTo: 'wallet', kind: 'return', createdAt: refundAt }),
+    );
+    return s;
+  }
+
+  it('earnings: the line nets what is left, the refunded part counts as returned, and the balance agrees', async () => {
+    const s = await partlyRefunded(new Date());
+    const r = await w.finance.earnings(owner);
+    const line = r.items.find((i) => i.itemId === s.item.id)!;
+    expect(line).toMatchObject({ grossUsd: 60, commissionUsd: 7.2, refundUsd: 35.2, netUsd: 17.6, state: 'available' });
+    expect(r.totals.availableUsd).toBe(17.6);
+    expect(r.totals.returnedUsd).toBe(35.2);
+    expect(r.balance).toMatchObject({ earned: 17.6, available: 17.6 });
+  });
+
+  it('monthly statement and ledger: the refund is a negative line in the month it was paid back, commission credited', async () => {
+    const at = new Date();
+    const s = await partlyRefunded(at);
+    const month = at.toISOString().slice(0, 7);
+    const st = (await w.finance.statements(owner, { month })) as { lines: { kind: string; itemId: string; grossUsd: number; commissionUsd: number; netUsd: number; qty: number }[]; totals: { refundsUsd: number; commissionCreditedUsd: number } };
+    const refund = st.lines.find((l) => l.kind === 'refund' && l.itemId === s.item.id)!;
+    expect(refund).toMatchObject({ grossUsd: -40, commissionUsd: -4.8, netUsd: -35.2, qty: 2 });
+    expect(st.totals).toMatchObject({ refundsUsd: 35.2, commissionCreditedUsd: 4.8 });
+
+    const tx = (await w.finance.transactions(owner)) as { items: { kind: string; amountUsd: number; commissionUsd: number }[]; totals: { refundsUsd: number; salesUsd: number; netUsd: number } };
+    expect(tx.items.filter((e) => e.kind === 'refund')).toEqual([expect.objectContaining({ amountUsd: -35.2, commissionUsd: -4.8 })]);
+    expect(tx.totals).toMatchObject({ salesUsd: 52.8, refundsUsd: -35.2, netUsd: 17.6 });
   });
 });

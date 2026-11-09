@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { Repository, SelectQueryBuilder } from 'typeorm';
-import { Order, OrderItem, Payout, PayoutStatementLine, Product, Seller, TaxDocument, User } from '../database/entities';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Order, OrderItem, PaymentRefund, Payout, PayoutStatementLine, Product, Seller, TaxDocument, User } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { toDate } from '../ops/analytics.util';
 import { PayoutsService, lineGross } from '../payouts/payouts.service';
+import { SQL_KEPT_FRACTION, SQL_REFUNDED_FRACTION, lineRefund } from '../payouts/line-refund';
 import { renderCommissionInvoice } from './commission-invoice';
 import type { InvoiceLine } from './commission-invoice';
 import { csvWords } from './csv-labels';
@@ -18,7 +19,14 @@ import { frenchLineNames } from '../translation/line-names';
 import { EARNING_STATES, OPEN_ORDER_STATUSES, dateInput, fixed2, lastMonths, lineState, monthRange, round2, toCsv } from './finance.util';
 import type { EarningState } from './finance.util';
 
-const SQL_NET = '(i.priceUsd * i.qty - i.couponDiscountUsd - i.commissionUsd)';
+/** A line's net before refunds. */
+const SQL_FULL_NET = '(i.priceUsd * i.qty - i.couponDiscountUsd - i.commissionUsd)';
+/** What the line still earns: the share refunded to the customer (and its commission) is out (SL-01). */
+const SQL_NET = `(${SQL_FULL_NET} * ${SQL_KEPT_FRACTION})`;
+/** What refunds took back: the whole line once the order is returned, else the refunded share of a partial refund. */
+const SQL_REFUNDED_NET = `(CASE WHEN o.status = 'returned' THEN ${SQL_FULL_NET} ELSE ${SQL_FULL_NET} * ${SQL_REFUNDED_FRACTION} END)`;
+/** Refund kinds that pay back part of a delivered order that stays delivered (they write `order_items.refundedUsd`). */
+const PARTIAL_REFUND_KINDS = ['return', 'dispute'];
 
 /** The part of an earnings query that depends on the clock and the hold. */
 interface Clock {
@@ -63,6 +71,9 @@ export interface EarningLine {
   couponUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  /** What partial refunds on this line took back from the seller (the refunded share of the gross less its commission); 0 on a returned order, whose state already says the whole line went back. */
+  refundUsd: number;
+  /** grossUsd - commissionUsd - refundUsd. */
   netUsd: number;
   state: EarningState;
   /** When the money becomes withdrawable (delivered lines only). */
@@ -167,7 +178,10 @@ export class FinanceService {
       .addSelect('i.priceUsd', 'priceUsd')
       .addSelect('i.couponDiscountUsd', 'couponUsd')
       .addSelect('i.commissionPct', 'commissionPct')
-      .addSelect('i.commissionUsd', 'commissionUsd');
+      .addSelect('i.commissionUsd', 'commissionUsd')
+      .addSelect('i.refundedUsd', 'refundedUsd')
+      .addSelect('o.subtotalUsd', 'subtotalUsd')
+      .addSelect('o.discountUsd', 'discountUsd');
     if (withPayout) {
       qb.addSelect('po.id', 'payoutId').addSelect('po.reference', 'payoutReference').addSelect('po.status', 'payoutStatus').addSelect('l.paidOutAt', 'paidOutAt');
     }
@@ -194,6 +208,51 @@ export class FinanceService {
     return lines;
   }
 
+  /** What refunds on a raw line row took back from the seller (see line-refund.ts). */
+  private static refundOf(r: Record<string, unknown>) {
+    return lineRefund(
+      { priceUsd: num(r.priceUsd), qty: num(r.qty), refundedUsd: num(r.refundedUsd), couponDiscountUsd: num(r.couponUsd), commissionUsd: num(r.commissionUsd) },
+      { subtotalUsd: num(r.subtotalUsd), discountUsd: num(r.discountUsd) },
+    );
+  }
+
+  /**
+   * Lines of DELIVERED orders that were partly refunded (a return of some units, an admin's partial refund on a
+   * dispute), each with what the refunds took back and when (the latest such refund on the order; the order's last
+   * change when the ledger has none), keeping those dated inside [from, to]. A returned order is not here: its whole
+   * line is already a refund. The ledger does not say which line each refund paid, so two partial refunds of one line
+   * in different months show as one refund dated at the later.
+   */
+  private async partialRefunds(keys: string[], from: Date | null, to: Date | null) {
+    const qb = this.baseLines(keys).andWhere("o.status = 'delivered' AND i.refundedUsd > 0");
+    const rows = await this.columns(qb, false).getRawMany<Record<string, unknown>>();
+    if (!rows.length) return [];
+    const orderIds = [...new Set(rows.map((r) => String(r.orderId)))];
+    const ledger = await this.items.manager.getRepository(PaymentRefund).find({
+      where: { orderId: In(orderIds), kind: In(PARTIAL_REFUND_KINDS) },
+      select: { orderId: true, createdAt: true },
+    });
+    const lastAt = new Map<string, Date>();
+    for (const e of ledger) {
+      const prev = lastAt.get(String(e.orderId));
+      if (!prev || e.createdAt > prev) lastAt.set(String(e.orderId), e.createdAt);
+    }
+    const out: { row: Record<string, unknown>; at: Date; refund: ReturnType<typeof FinanceService.refundOf> }[] = [];
+    for (const row of rows) {
+      const refund = FinanceService.refundOf(row);
+      if (!(refund.netUsd > 0 || refund.grossUsd > 0)) continue;
+      const at = lastAt.get(String(row.orderId)) ?? toDate(row.orderUpdatedAt) ?? new Date(0);
+      if ((from && at < from) || (to && at > to)) continue;
+      out.push({ row, at, refund });
+    }
+    return out;
+  }
+
+  /** Units a partial refund stands for (a return refunds whole units; a money-only refund shows at least one). */
+  private static refundedUnits(qty: number, fraction: number): number {
+    return Math.max(1, Math.min(qty, Math.round(qty * fraction)));
+  }
+
   private earningOf(r: Record<string, unknown>, clock: Clock): EarningLine {
     const qty = num(r.qty);
     const gross = lineGross({ priceUsd: num(r.priceUsd), qty, couponDiscountUsd: num(r.couponUsd) });
@@ -202,6 +261,8 @@ export class FinanceService {
     const deliveredAt = orderStatus === 'delivered' || orderStatus === 'returned' ? toDate(r.orderUpdatedAt) : null;
     const payoutStatus = r.payoutStatus ? String(r.payoutStatus) : null;
     const { state, clearanceEndsAt } = lineState({ orderStatus, deliveredAt, payoutStatus }, clock.hold);
+    // A returned order's line is taken back whole (its state says so): netUsd stays what it was worth, as before.
+    const refund = orderStatus === 'returned' ? { netUsd: 0 } : FinanceService.refundOf(r);
     return {
       itemId: String(r.itemId),
       orderId: String(r.orderId),
@@ -218,7 +279,8 @@ export class FinanceService {
       couponUsd: round2(num(r.couponUsd)),
       commissionPct: num(r.commissionPct),
       commissionUsd: commission,
-      netUsd: round2(gross - commission),
+      refundUsd: refund.netUsd,
+      netUsd: round2(gross - commission - refund.netUsd),
       state,
       clearanceEndsAt,
       payout: r.payoutId ? { id: String(r.payoutId), reference: String(r.payoutReference), status: String(payoutStatus) } : null,
@@ -253,7 +315,11 @@ export class FinanceService {
     const rows = await this.columns(page, true).orderBy('o.createdAt', 'DESC').addOrderBy('i.id', 'ASC').offset(skip).limit(take).getRawMany<Record<string, unknown>>();
 
     const sums = filtered().select('1', 'one');
-    for (const s of EARNING_STATES) sums.addSelect(`COALESCE(SUM(CASE WHEN ${STATE_SQL[s]} THEN ${SQL_NET} ELSE 0 END), 0)`, `s_${s}`);
+    for (const s of EARNING_STATES) {
+      // `returned` is what refunds took back: whole returned orders, and the refunded share of partly refunded lines.
+      const expr = s === 'returned' ? SQL_REFUNDED_NET : `CASE WHEN ${STATE_SQL[s]} THEN ${SQL_NET} ELSE 0 END`;
+      sums.addSelect(`COALESCE(SUM(${expr}), 0)`, `s_${s}`);
+    }
     const t = (await sums.getRawOne<Record<string, unknown>>()) ?? {};
     const totals = {
       inProgressUsd: round2(num(t.s_in_progress)),
@@ -280,7 +346,7 @@ export class FinanceService {
     const qb = this.baseLines(keys)
       .andWhere("o.status IN ('delivered','returned') AND o.updatedAt >= :start AND o.updatedAt < :end", { start, end });
     const rows = await this.columns(qb, false).orderBy('o.updatedAt', 'ASC').addOrderBy('i.id', 'ASC').getRawMany<Record<string, unknown>>();
-    return rows.map((r) => {
+    const sales: StatementLine[] = rows.map((r) => {
       const gross = lineGross({ priceUsd: num(r.priceUsd), qty: num(r.qty), couponDiscountUsd: num(r.couponUsd) });
       const commission = round2(num(r.commissionUsd));
       const refund = String(r.orderStatus) === 'returned';
@@ -301,6 +367,25 @@ export class FinanceService {
         netUsd: round2(refund ? -(gross - commission) : gross - commission),
       } satisfies StatementLine;
     });
+    // SL-01: partial refunds on delivered orders, in the month they were paid back.
+    const partial = await this.partialRefunds(keys, start, new Date(end.getTime() - 1));
+    const refunds: StatementLine[] = partial.map(({ row: r, at, refund }) => ({
+      itemId: String(r.itemId),
+      kind: 'refund' as const,
+      date: at.toISOString().slice(0, 10),
+      orderReference: String(r.orderReference),
+      productName: String(r.productName),
+      productNameFr: null,
+      variantFr: null,
+      variant: String(r.variant),
+      qty: FinanceService.refundedUnits(num(r.qty), refund.fraction),
+      grossUsd: -refund.grossUsd,
+      commissionPct: num(r.commissionPct),
+      commissionUsd: -refund.commissionUsd,
+      netUsd: -refund.netUsd,
+    }));
+    // Stable: same-day lines keep the delivery order.
+    return [...sales, ...refunds].sort((a, b) => a.date.localeCompare(b.date));
   }
 
   private static totalsOf(lines: StatementLine[]) {
@@ -418,8 +503,8 @@ export class FinanceService {
       description: string;
       /** The same line in French (sales and refunds: the product's French name and option label); clients show the viewer's language. */
       descriptionFr?: string;
-      /** What the description is made of, to write it again in French. */
-      line?: { qty: number; name: string; variant: string };
+      /** What the description is made of, to write it again in French (`itemId`: the order line). */
+      line?: { itemId: string; qty: number; name: string; variant: string };
       grossUsd: number;
       commissionUsd: number;
       amountUsd: number;
@@ -437,11 +522,28 @@ export class FinanceService {
         kind: refund ? 'refund' : 'sale',
         reference: String(r.orderReference),
         description: `${num(r.qty)} × ${r.productName}${String(r.variant) === 'Default' ? '' : ` (${r.variant})`}`,
-        line: { qty: num(r.qty), name: String(r.productName), variant: String(r.variant) },
+        line: { itemId: String(r.itemId), qty: num(r.qty), name: String(r.productName), variant: String(r.variant) },
         grossUsd: refund ? -gross : gross,
         commissionUsd: refund ? -commission : commission,
         amountUsd: round2(refund ? -(gross - commission) : gross - commission),
         status: refund ? 'returned' : 'delivered',
+        counts: true,
+      });
+    }
+    // SL-01: what partial refunds on delivered orders took back (dated when they were paid back).
+    for (const { row: r, at, refund } of await this.partialRefunds(keys, from, to)) {
+      const qty = FinanceService.refundedUnits(num(r.qty), refund.fraction);
+      entries.push({
+        id: `${String(r.itemId)}:refund`,
+        at,
+        kind: 'refund',
+        reference: String(r.orderReference),
+        description: `${qty} × ${r.productName}${String(r.variant) === 'Default' ? '' : ` (${r.variant})`}`,
+        line: { itemId: String(r.itemId), qty, name: String(r.productName), variant: String(r.variant) },
+        grossUsd: -refund.grossUsd,
+        commissionUsd: -refund.commissionUsd,
+        amountUsd: -refund.netUsd,
+        status: 'delivered',
         counts: true,
       });
     }
@@ -462,10 +564,10 @@ export class FinanceService {
     entries.sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id));
     // The ledger is read as raw rows, so the French names of the lines are looked up here, for the rows served only.
     const served = input.format === 'csv' ? entries : entries.slice(skip, skip + take);
-    const names = await frenchLineNames(this.items.manager, served.filter((e) => e.line).map((e) => e.id));
+    const names = await frenchLineNames(this.items.manager, served.filter((e) => e.line).map((e) => e.line!.itemId));
     for (const e of served) {
       if (!e.line) continue;
-      const fr = names.get(e.id);
+      const fr = names.get(e.line.itemId);
       const variant = e.line.variant === 'Default' ? '' : ` (${fr?.variantFr ?? e.line.variant})`;
       e.descriptionFr = `${e.line.qty} × ${fr?.nameFr ?? e.line.name}${variant}`;
     }

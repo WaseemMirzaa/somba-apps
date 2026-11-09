@@ -37,9 +37,13 @@ import {
   startOfUtcDay,
   toDate,
 } from './analytics.util';
+import { SQL_KEPT_FRACTION } from '../payouts/line-refund';
 
 /** Orders that no longer count as sales. */
 const DEAD = "('cancelled','returned')";
+/** A line's sales and commission less the share refunded to the customer (a return of some units, a partial refund: SL-01). */
+const KEPT_REVENUE = `(i.priceUsd * i.qty * ${SQL_KEPT_FRACTION})`;
+const KEPT_COMMISSION = `(i.commissionUsd * ${SQL_KEPT_FRACTION})`;
 /** A parcel is "aged" and an unassigned delivery "stuck" past these. */
 const UNASSIGNED_ALERT_MIN = 60;
 const PENDING_PAYMENT_ALERT_MIN = 30;
@@ -104,18 +108,19 @@ export class AnalyticsService {
 
   /**
    * Commission actually charged: the amount STORED on each order line when it was
-   * placed (never recomputed from today's rate), cancelled lines excluded.
+   * placed (never recomputed from today's rate), cancelled lines excluded, less the share
+   * given back with a partial refund of the line (SL-01).
    */
   private async storedCommission(): Promise<{ collected: number; delivered: number; open: number }> {
     const row = await this.items
       .createQueryBuilder('i')
       .innerJoin(Order, 'o', 'o.id = i.orderId')
       .select(
-        "COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM payments p WHERE p.orderId = o.id AND p.purpose = 'order' AND p.status = 'succeeded') THEN i.commissionUsd ELSE 0 END), 0)",
+        `COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM payments p WHERE p.orderId = o.id AND p.purpose = 'order' AND p.status = 'succeeded') THEN ${KEPT_COMMISSION} ELSE 0 END), 0)`,
         'collected',
       )
-      .addSelect("COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN i.commissionUsd ELSE 0 END), 0)", 'delivered')
-      .addSelect(`COALESCE(SUM(CASE WHEN o.status NOT IN ${DEAD} AND o.status <> 'delivered' THEN i.commissionUsd ELSE 0 END), 0)`, 'open')
+      .addSelect(`COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN ${KEPT_COMMISSION} ELSE 0 END), 0)`, 'delivered')
+      .addSelect(`COALESCE(SUM(CASE WHEN o.status NOT IN ${DEAD} AND o.status <> 'delivered' THEN ${KEPT_COMMISSION} ELSE 0 END), 0)`, 'open')
       .where("i.fulfilment <> 'cancelled'")
       .getRawOne<{ collected: string; delivered: string; open: string }>();
     return { collected: round2(n(row?.collected)), delivered: round2(n(row?.delivered)), open: round2(n(row?.open)) };
@@ -698,15 +703,15 @@ export class AnalyticsService {
     const [seriesRows, totals, top, lifetime, segments, quality, timing, reviewAgg, viewRow] = await Promise.all([
       this.sellerLines(ids)
         .select(AnalyticsService.day('o.createdAt'), 'day')
-        .addSelect('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'revenue')
+        .addSelect(`COALESCE(SUM(${KEPT_REVENUE}), 0)`, 'revenue')
         .addSelect('COUNT(DISTINCT o.id)', 'orders')
         .addSelect('COALESCE(SUM(i.qty), 0)', 'units')
         .andWhere('o.createdAt > :from', { from })
         .groupBy('day')
         .getRawMany<{ day: string; revenue: string; orders: string; units: string }>(),
       this.sellerLines(ids)
-        .select('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'revenue')
-        .addSelect('COALESCE(SUM(i.commissionUsd), 0)', 'commission')
+        .select(`COALESCE(SUM(${KEPT_REVENUE}), 0)`, 'revenue')
+        .addSelect(`COALESCE(SUM(${KEPT_COMMISSION}), 0)`, 'commission')
         .addSelect('COUNT(DISTINCT o.id)', 'orders')
         .addSelect('COALESCE(SUM(i.qty), 0)', 'units')
         .andWhere('o.createdAt > :from', { from })
@@ -715,7 +720,7 @@ export class AnalyticsService {
         .select('i.productId', 'productId')
         .addSelect('MAX(i.productName)', 'name')
         .addSelect('COALESCE(SUM(i.qty), 0)', 'units')
-        .addSelect('COALESCE(SUM(i.priceUsd * i.qty), 0)', 'revenue')
+        .addSelect(`COALESCE(SUM(${KEPT_REVENUE}), 0)`, 'revenue')
         .andWhere('o.createdAt > :from', { from })
         .groupBy('i.productId')
         .orderBy('revenue', 'DESC')

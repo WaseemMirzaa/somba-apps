@@ -17,6 +17,7 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PAWAPAY_CLIENT, PawapayClient, PawapayUnavailableError } from '../payments/pawapay.provider';
+import { lineRefund } from './line-refund';
 
 const FINANCE_ROOMS = ['admin', 'admin_finance'];
 /** Order states whose money is not earned yet (the parcel is still on its way). */
@@ -47,6 +48,26 @@ export interface SellerBalance {
 
 /** What one line is worth to the seller: price x qty, less its share of a store coupon (the seller pays for it). */
 export const lineGross = (i: Pick<OrderItem, 'priceUsd' | 'qty' | 'couponDiscountUsd'>): number => round2(i.priceUsd * i.qty - (Number(i.couponDiscountUsd) || 0));
+
+/**
+ * What one line still earns the seller: gross less the stored commission, less what refunds on it took back (SL-01:
+ * a return of some units or an admin's partial refund keeps the order `delivered`, so the refunded share, net of the
+ * commission the platform gives back on it, comes off here).
+ */
+export function lineEarning(order: Pick<Order, 'subtotalUsd' | 'discountUsd'>, i: OrderItem) {
+  const grossUsd = lineGross(i);
+  const commissionUsd = round2(Number(i.commissionUsd) || 0);
+  const refund = lineRefund(i, order);
+  return {
+    grossUsd,
+    commissionUsd,
+    refund,
+    /** Gross and commission left once the refunded share is out. */
+    keptGrossUsd: round2(grossUsd - refund.grossUsd),
+    keptCommissionUsd: round2(commissionUsd - refund.commissionUsd),
+    netUsd: round2(grossUsd - commissionUsd - refund.netUsd),
+  };
+}
 
 export interface StatementTotals {
   grossUsd: number;
@@ -128,7 +149,8 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
    * were DELIVERED (and have cleared the hold, 48h by default in production),
    * minus the platform commission STORED on each line when the order was placed
    * (so changing the global rate never rewrites past orders), minus everything
-   * already requested or paid.
+   * already requested or paid. The share of a line refunded to the customer (a return of some units, an admin's
+   * partial refund) is out too, with the commission on it (SL-01).
    * Refunds / returns after a payout can push it BELOW zero: `available` is then
    * negative and `owedUsd` is what the seller owes back (nothing can be requested).
    */
@@ -161,7 +183,8 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       for (const o of rows) {
         for (const i of o.items ?? []) {
           if (!mine.has(i.productId) || i.fulfilment === 'cancelled') continue;
-          const net = round2(lineGross(i) - (Number(i.commissionUsd) || 0));
+          const line = lineEarning(o, i);
+          const net = line.netUsd;
           if (o.status !== 'delivered') {
             inProgress += net;
           } else if (o.updatedAt > cutoff) {
@@ -171,8 +194,8 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
             if (!nextClearanceAt || at < nextClearanceAt) nextClearanceAt = at;
           } else {
             eligible.push({ order: o, item: i });
-            gross += lineGross(i);
-            commission += Number(i.commissionUsd) || 0;
+            gross += line.keptGrossUsd;
+            commission += line.keptCommissionUsd;
           }
         }
       }
@@ -268,11 +291,15 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * The statement of a payout being requested: every delivered, cleared, non-cancelled
-   * line not yet on a live (non-rejected) statement is a 'sale' (gross minus the
-   * commission stored on the line); every line settled earlier whose order has since
-   * been returned / cancelled gets one negative 'refund' line (the net previously
-   * settled). A rejected payout's lines are ignored here, so they are settled again.
+   * The statement of a payout being requested. Per order line, what the live (non-rejected) statements already
+   * settled is compared with what the line is worth to the seller now, and only the difference is written:
+   *  - a delivered, cleared line never settled: one 'sale' line (gross, the commission stored on the line, and in
+   *    `refundUsd` what refunds on it already took back, net of the commission given back: SL-01);
+   *  - a line settled earlier that is now worth less (its order was returned or the line cancelled: worth 0; or a
+   *    partial refund since: worth its kept share): one 'refund' line for the difference (negative net);
+   *  - a line settled earlier, still delivered but back inside the hold window: left as it is.
+   * Each refund is therefore deducted exactly once, whether it came before or after the payout that settled the line.
+   * A rejected payout's lines are ignored here, so they are settled again.
    */
   private async buildStatement(
     m: EntityManager,
@@ -282,19 +309,45 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
   ) {
     const live = await m.find(Payout, { where: { sellerId: sellerUserId, status: In([...LIVE_PAYOUT]) }, select: { id: true } });
     const prior = live.length ? await m.find(PayoutStatementLine, { where: { payoutId: In(live.map((p) => p.id)) } }) : [];
-    const sold = new Map<string, PayoutStatementLine>();
-    const clawed = new Set<string>();
+    /** Per order line: its first settled sale line and the net settled so far (sales minus refunds). */
+    const settled = new Map<string, { sale: PayoutStatementLine | null; first: PayoutStatementLine; netUsd: number }>();
     for (const l of prior) {
-      if (l.kind === 'sale') sold.set(l.orderItemId, l);
-      else clawed.add(l.orderItemId);
+      const s = settled.get(l.orderItemId) ?? { sale: null, first: l, netUsd: 0 };
+      if (l.kind === 'sale' && !s.sale) s.sale = l;
+      s.netUsd = round2(s.netUsd + (Number(l.netUsd) || 0));
+      settled.set(l.orderItemId, s);
     }
     const lines: PayoutStatementLine[] = [];
     const eligibleIds = new Set(eligible.map((e) => e.item.id));
+    /** A refund line: `delta` is the (negative) change in what the line is worth to the seller. */
+    const refundLine = (base: PayoutStatementLine, delta: number) =>
+      m.create(PayoutStatementLine, {
+        payoutId,
+        sellerId: sellerUserId,
+        orderItemId: base.orderItemId,
+        orderId: base.orderId,
+        orderReference: base.orderReference,
+        productName: base.productName,
+        variant: base.variant,
+        qty: base.qty,
+        kind: 'refund',
+        grossUsd: 0,
+        commissionPct: base.commissionPct,
+        commissionUsd: 0,
+        refundUsd: round2(-delta),
+        netUsd: round2(delta),
+        deliveredAt: base.deliveredAt,
+      });
 
     for (const { order, item } of eligible) {
-      if (sold.has(item.id)) continue;
-      const grossUsd = lineGross(item);
-      const commissionUsd = round2(Number(item.commissionUsd) || 0);
+      const worth = lineEarning(order, item);
+      const before = settled.get(item.id);
+      if (before) {
+        const delta = round2(worth.netUsd - before.netUsd);
+        // A positive difference (a refund undone after the line was settled) gives the money back the same way.
+        if (Math.abs(delta) >= 0.01) lines.push(refundLine(before.sale ?? before.first, delta));
+        continue;
+      }
       lines.push(
         m.create(PayoutStatementLine, {
           payoutId,
@@ -306,47 +359,29 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
           variant: item.variant,
           qty: item.qty,
           kind: 'sale',
-          grossUsd,
+          grossUsd: worth.grossUsd,
           commissionPct: Number(item.commissionPct) || 0,
-          commissionUsd,
-          refundUsd: 0,
-          netUsd: round2(grossUsd - commissionUsd),
+          commissionUsd: worth.commissionUsd,
+          refundUsd: worth.refund.netUsd,
+          netUsd: worth.netUsd,
           deliveredAt: order.updatedAt ?? null,
         }),
       );
     }
 
-    const pending = [...sold.values()].filter((l) => !clawed.has(l.orderItemId) && !eligibleIds.has(l.orderItemId));
+    const pending = [...settled.entries()].filter(([id, s]) => !eligibleIds.has(id) && Math.abs(s.netUsd) >= 0.01);
     if (pending.length) {
-      const orders = await m.find(Order, { where: { id: In([...new Set(pending.map((l) => l.orderId))]) }, relations: { items: true } });
+      const orders = await m.find(Order, { where: { id: In([...new Set(pending.map(([, s]) => s.first.orderId))]) }, relations: { items: true } });
       const byId = new Map(orders.map((o) => [o.id, o]));
-      for (const l of pending) {
-        const o = byId.get(l.orderId);
-        const it = o?.items?.find((x) => x.id === l.orderItemId);
-        // Still delivered (merely back inside the hold window): nothing to claw back.
+      for (const [itemId, s] of pending) {
+        const o = byId.get(s.first.orderId);
+        const it = o?.items?.find((x) => x.id === itemId);
+        // Still delivered (merely back inside the hold window): settled again once it clears.
         if (o && it && o.status === 'delivered' && it.fulfilment !== 'cancelled') continue;
-        lines.push(
-          m.create(PayoutStatementLine, {
-            payoutId,
-            sellerId: sellerUserId,
-            orderItemId: l.orderItemId,
-            orderId: l.orderId,
-            orderReference: l.orderReference,
-            productName: l.productName,
-            variant: l.variant,
-            qty: l.qty,
-            kind: 'refund',
-            grossUsd: 0,
-            commissionPct: l.commissionPct,
-            commissionUsd: 0,
-            refundUsd: l.netUsd,
-            netUsd: round2(-l.netUsd),
-            deliveredAt: l.deliveredAt,
-          }),
-        );
+        // Returned, cancelled or gone: the line is worth nothing to the seller any more.
+        lines.push(refundLine(s.sale ?? s.first, round2(-s.netUsd)));
       }
     }
-
     const sum = (f: (l: PayoutStatementLine) => number) => round2(lines.reduce((t, l) => t + f(l), 0));
     return {
       lines,
