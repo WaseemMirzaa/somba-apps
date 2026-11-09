@@ -440,13 +440,28 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Account deletion');
   s.close(); s = await connect(at);
-  a = await req(s, 'me:delete', { password: 'wrong' });
-  ok(!a.ok, 'delete needs the right password');
+  // This account holds wallet money and has orders from the checks above: deleting it is refused, with the reasons.
+  a = await req(s, 'me:deleteCheck');
+  ok(a.ok && a.data.canDelete === false && a.data.blockers.length > 0, 'me:deleteCheck lists what blocks a deletion', JSON.stringify(a.data ?? a.error));
   a = await req(s, 'me:delete', { password: 'Reset-Pass-2026' });
-  ok(a.ok && a.data.deleted, 'me:delete erases the account');
+  ok(!a.ok && a.code === 'account_blocked' && Array.isArray(a.blockers) && a.blockers.length > 0, 'me:delete is refused while the wallet holds money or an order is open', JSON.stringify(a));
   r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
+  ok(r.status === 200, 'a refused deletion erases nothing: the account still signs in');
+  // A customer with nothing outstanding can delete the account.
+  const delEmail = `del${tag}@smoke.test`;
+  r = await rest('POST', '/api/v1/auth/register', { email: delEmail, password: pw, name: 'Short Lived' });
+  need(r.status === 201, `registering the account to delete failed: ${r.status}`);
+  const sd = await connect(r.json.accessToken);
+  a = await req(sd, 'me:deleteCheck');
+  ok(a.ok && a.data.canDelete === true && a.data.blockers.length === 0, 'me:deleteCheck is clear for an account with nothing outstanding', JSON.stringify(a.data ?? a.error));
+  a = await req(sd, 'me:delete', { password: 'wrong' });
+  ok(!a.ok, 'delete needs the right password');
+  a = await req(sd, 'me:delete', { password: pw });
+  ok(a.ok && a.data.deleted, 'me:delete erases an account with nothing outstanding');
+  sd.close();
+  r = await rest('POST', '/api/v1/auth/login', { email: delEmail, password: pw });
   ok(r.status === 401, 'deleted account cannot log in');
-  r = await rest('POST', '/api/v1/auth/register', { email, password: pw, name: 'Reborn' });
+  r = await rest('POST', '/api/v1/auth/register', { email: delEmail, password: pw, name: 'Reborn' });
   ok(r.status === 201, 'the email address is free to register again');
 
   console.log('\n— Login is still limited to 30 a minute per address (run last: it uses the quota up)');
