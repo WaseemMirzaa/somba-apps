@@ -1,5 +1,6 @@
 // Generated copy of the UI strings: every key has an English and a French text.
 // ignore_for_file: prefer_single_quote_strings
+import 'messages_account.dart';
 import 'messages_aftersale.dart';
 import 'messages_areas.dart';
 import 'messages_cartstore.dart';
@@ -170,10 +171,10 @@ const Map<String, (String, String)> _kMessagesBase = {
   'delete_my_account': ('Delete my account', 'Supprimer mon compte'),
   'delacc_title': ('Delete account', 'Supprimer le compte'),
   'delacc_permanent': ('This action is permanent', 'Cette action est définitive'),
-  'delacc_permanent_body': ('Your personal data, addresses and wishlist are erased and you are signed out everywhere. Past orders are kept for accounting without your details.', 'Vos données personnelles, adresses et favoris sont effacés et vous êtes déconnecté partout. Les commandes passées sont conservées pour la comptabilité, sans vos informations personnelles.'),
+  'delacc_permanent_body': ('Your profile, addresses, wishlist and followed stores are erased and you are signed out everywhere. Past orders stay for the sellers and for accounting, but your name, phone number and street address are removed from them, and your reviews stay under the name “Deleted user”.', 'Votre profil, vos adresses, vos favoris et vos boutiques suivies sont effacés et vous êtes déconnecté partout. Les commandes passées restent disponibles pour les vendeurs et la comptabilité, mais votre nom, votre téléphone et votre adresse en sont retirés, et vos avis restent publiés sans votre nom (signés « Deleted user »).'),
   'delacc_before': ('Before you go', 'Avant de partir'),
-  'delacc_b1': ('Any wallet balance is forfeited — spend it first', 'Le solde du portefeuille est perdu : dépensez-le d’abord'),
-  'delacc_b2': ('Active orders should be completed or cancelled', 'Les commandes en cours doivent être terminées ou annulées'),
+  'delacc_b1': ('The account can’t be deleted while your wallet holds money: spend it, or ask support to pay it out', 'Le compte ne peut pas être supprimé tant que votre portefeuille contient de l’argent : dépensez-le, ou demandez à l’assistance de vous le verser'),
+  'delacc_b2': ('Nor while an order, return, dispute or support request is still open', 'Ni tant qu’une commande, un retour, un litige ou une demande d’assistance est en cours'),
   'delacc_b3': ('You can create a new account anytime', 'Vous pouvez créer un nouveau compte à tout moment'),
   'delacc_confirm_pw': ('Confirm with your password', 'Confirmez avec votre mot de passe'),
   'delacc_enter_pw': ('Enter your password to confirm', 'Saisissez votre mot de passe pour confirmer'),
@@ -636,6 +637,7 @@ const Map<String, (String, String)> kMessages = {
   ...kMessagesEngage,
   ...kMessagesAreas,
   ...kMessagesR2f,
+  ...kMessagesAccount,
   ...kMessagesVerify,
   ...kMessagesCartStore,
 };

@@ -141,3 +141,13 @@ test("rider vehicle and document errors map to French (docs/contracts/rider-comp
   assert.equal(fr("Fuel must be one of: petrol, diesel, electric, hybrid, none."), "Le carburant n'est pas valide.");
   assert.equal(localizeApiError("Give a reason of 3-300 characters.", "en"), "Give a reason of 3-300 characters.");
 });
+
+test("a refused account deletion is French sentence by sentence; an unknown reason stays English", () => {
+  const raw =
+    "You cannot delete your account yet. Your wallet still holds $204.00: spend it or ask support to pay it out first. You have 2 orders that are not finished yet: wait until they are delivered, or cancel them, first.";
+  const fr = localizeApiError(raw, "fr");
+  assert.match(fr, /^Vous ne pouvez pas encore supprimer votre compte\. Votre portefeuille contient encore 204,00 \$/);
+  assert.match(fr, /Vous avez 2 commandes qui ne sont pas terminées/);
+  assert.equal(localizeApiError(raw, "en"), raw);
+  assert.equal(localizeApiError(`${raw} Something new is pending.`, "fr"), `${raw} Something new is pending.`);
+});

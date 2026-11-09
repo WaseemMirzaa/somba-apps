@@ -400,6 +400,30 @@ const AREA_FIELDS_FR: Record<string, string> = {
 const AREA_LEVEL_ADD_FR: Record<string, string> = { country: "un pays", province: "une province", city: "une ville", district: "un district", commune: "une commune", quartier: "un quartier" };
 const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 
+/** French for the reasons of a refused account deletion, or null when one of them is not known. */
+const BLOCKED_REASONS: [RegExp, (m: RegExpExecArray) => string][] = [
+  [/^Your wallet still holds \$([\d.,]+): spend it or ask support to pay it out first\./, (m) => `Votre portefeuille contient encore ${m[1].replace(".", ",")} $ : dépensez-le ou demandez à l'assistance de vous le verser d'abord.`],
+  [/^You have (\d+) orders? that (?:is|are) not finished yet: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 commande qui n'est pas terminée : attendez qu'elle soit livrée, ou annulez-la, d'abord." : `Vous avez ${m[1]} commandes qui ne sont pas terminées : attendez qu'elles soient livrées, ou annulez-les, d'abord.`)],
+  [/^You have (\d+) open return, exchange or replacement requests?: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 demande de retour, d'échange ou de remplacement en cours : attendez qu'elle soit terminée d'abord." : `Vous avez ${m[1]} demandes de retour, d'échange ou de remplacement en cours : attendez qu'elles soient terminées d'abord.`)],
+  [/^You have (\d+) open disputes? about an order: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 litige en cours au sujet d'une commande : attendez qu'il soit résolu d'abord." : `Vous avez ${m[1]} litiges en cours au sujet d'une commande : attendez qu'ils soient résolus d'abord.`)],
+  [/^You have (\d+) open support requests? about an order: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 demande d'assistance en cours au sujet d'une commande : attendez que l'assistance la clôture d'abord." : `Vous avez ${m[1]} demandes d'assistance en cours au sujet d'une commande : attendez que l'assistance les clôture d'abord.`)],
+  [/^A payout to you is still being processed: wait until it is paid first\./, () => "Un versement qui vous est destiné est encore en cours de traitement : attendez qu'il soit payé d'abord."],
+  [/^A refund to your phone or card is still on its way: wait until it arrives first\./, () => "Un remboursement vers votre téléphone ou votre carte est encore en route : attendez son arrivée d'abord."],
+  [/^A wallet top-up is still waiting for your approval: wait until it completes or fails first\./, () => "Une recharge du portefeuille attend encore votre validation : attendez qu'elle aboutisse ou échoue d'abord."],
+];
+
+function accountBlockedFr(reasons: string): string | null {
+  const out: string[] = [];
+  let rest = reasons.trim();
+  while (rest) {
+    const hit = BLOCKED_REASONS.map(([re, fn]) => ({ m: re.exec(rest), fn })).find((x) => x.m);
+    if (!hit || !hit.m) return null;
+    out.push(hit.fn(hit.m));
+    rest = rest.slice(hit.m[0].length).trim();
+  }
+  return out.length ? `Vous ne pouvez pas encore supprimer votre compte. ${out.join(" ")}` : null;
+}
+
 const PATTERNS: Rule[] = [
   // ── rider vehicle and compliance documents ──
   [/^(Insurance valid until|Last service|Next service|Expiry date) must be a date written YYYY-MM-DD\.$/, (m) => `${{ "Insurance valid until": "La fin de l'assurance", "Last service": "Le dernier entretien", "Next service": "Le prochain entretien", "Expiry date": "La date d'expiration" }[m[1]]} : une date au format AAAA-MM-JJ.`],
@@ -455,6 +479,9 @@ const PATTERNS: Rule[] = [
   [/^This coupon only applies to products from (.+)\.$/, (m) => `Ce coupon ne s'applique qu'aux produits de ${m[1]}.`],
   [/^There were no sales in (\d{4}-\d{2}): nothing to invoice\.$/, (m) => `Aucune vente en ${m[1]} : rien à facturer.`],
   [/^Status must be one of: pending, .*to_pack, ready, at_hub\.$/, () => "Statut invalide pour ce filtre."],
+  // A customer deleting the account while something is outstanding (api/src/auth/account-deletion.service.ts): one message,
+  // one sentence per reason. A reason this site does not know leaves the whole message in English.
+  [/^You cannot delete your account yet\. (.+)$/, (m) => accountBlockedFr(m[1]) ?? m[0]],
   [/^You still have (\d+) orders? in progress\. Finish or cancel them before deleting your account\.$/, (m) => `Vous avez encore ${m[1]} commande(s) en cours. Terminez-les ou annulez-les avant de supprimer votre compte.`],
   [/^A payout is still being processed\. Wait until it is paid before deleting your account\.$/, () => "Un versement est en cours de traitement. Attendez qu'il soit payé avant de supprimer votre compte."],
   [/^You still have \$([\d.,]+) to withdraw\. Request a payout first, then delete your account\.$/, (m) => `Il vous reste $${m[1]} à retirer. Demandez d'abord un versement, puis supprimez votre compte.`],

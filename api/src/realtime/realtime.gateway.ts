@@ -18,6 +18,7 @@ import { clampDays } from '../ops/analytics.util';
 import { cleanListing, materialTextChange } from '../products/products.service';
 import type { ListingInput } from '../products/products.service';
 import { TranslationService } from '../translation/translation.service';
+import { accountBlockedFields } from '../auth/account-deletion.service';
 import { SellerPlatformKit } from '../sellers/seller-kit';
 import { touchesStorefront } from '../sellers/storefront.service';
 import type { SellerContext } from '../sellers/seller-context';
@@ -2404,7 +2405,32 @@ export class RealtimeGateway
     }
   }
 
-  /** Customers/sellers erase their own account (staff accounts are managed by admins). */
+  /**
+   * What stops this account from being deleted right now, so the app can show the reasons BEFORE the customer confirms:
+   * `{ canDelete, blockers: [{ kind, count, amountUsd? }] }` (kinds: wallet_balance, open_order, open_return,
+   * open_dispute, open_ticket, pending_payout, pending_refund, pending_topup). Nothing is changed.
+   */
+  @SubscribeMessage('me:deleteCheck')
+  async meDeleteCheck(@ConnectedSocket() client: AuthedSocket) {
+    try {
+      const user = this.requireUser(client);
+      if (user.role !== 'customer' && user.role !== 'seller') {
+        return fail('Staff accounts are removed by an administrator.');
+      }
+      const blockers = await this.auth.deletionBlockers(user.id);
+      return ok({ canDelete: blockers.length === 0, blockers });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * Customers/sellers erase their own account (staff accounts are managed by admins). Refused with
+   * `{ ok:false, error, code:'account_blocked', blockers }` while money, an unfinished order, an open return / dispute /
+   * ticket about an order or a payout / refund / top-up in flight is outstanding (the rule itself lives in
+   * `AuthService.deleteAccount`, so no other caller can bypass it). When it goes through, every open socket of the
+   * account is dropped (this one after the ack has flushed).
+   */
   @SubscribeMessage('me:delete')
   async meDelete(
     @ConnectedSocket() client: AuthedSocket,
@@ -2423,11 +2449,14 @@ export class RealtimeGateway
         await this.addresses.remove(user.id, a.id);
       }
       await this.push.unregisterUser(user.id);
-      // Let the ack flush before dropping the connection.
-      setTimeout(() => client.disconnect(true), 150);
+      // Let the ack flush, then drop EVERY open connection of the account (other phones, the web), not only this one.
+      setTimeout(() => {
+        this.kick(user.id);
+        client.disconnect(true);
+      }, 150);
       return ok({ deleted: true });
     } catch (e) {
-      return fail((e as Error).message);
+      return { ...fail((e as Error).message), ...accountBlockedFields(e) };
     }
   }
 

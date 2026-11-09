@@ -1,3 +1,4 @@
+import 'server_errors_account.dart';
 import 'server_errors_areas.dart';
 import 'server_errors_features.dart';
 import 'server_errors_r2f.dart';
@@ -10,6 +11,8 @@ String translateServerError(String raw, Strings s) {
   final text = raw.trim();
   final exact = _exactFr[text];
   if (exact != null) return exact;
+  final blocked = translateAccountBlocked(text);
+  if (blocked != null) return blocked;
   for (final p in _patternsFr) {
     final m = p.$1.firstMatch(text);
     if (m != null) return p.$2(m);
