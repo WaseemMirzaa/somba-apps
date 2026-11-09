@@ -189,21 +189,25 @@ export function TwoFactorCard() {
     });
   const enable = () =>
     run(async () => {
-      const r = await sellerRequest<{ enabled: boolean; recoveryCodes: string[] }>("auth:2fa:enable", { code: code.trim() });
+      const r = await sellerRequest<{ enabled: boolean; recoveryCodes: string[]; accessToken?: string; refreshToken?: string; user?: unknown }>("auth:2fa:enable", { code: code.trim() });
+      // Turning it on signs out every other device; this one gets fresh tokens, which replace the stored ones.
+      if (r?.accessToken && r?.refreshToken) authApi.saveTokens(r as Parameters<typeof authApi.saveTokens>[0]);
       setCodes(r.recoveryCodes ?? []);
       setSetup(null);
       setCode("");
       setStep("codes");
       await load();
-      toast(fr ? "Authentification à deux facteurs activée" : "Two-factor authentication turned on");
+      toast(fr ? "Authentification à deux facteurs activée. Vos autres appareils ont été déconnectés." : "Two-factor authentication turned on. Your other devices were signed out.");
     });
   const disable = () =>
     run(async () => {
-      await sellerRequest("auth:2fa:disable", { code: code.trim() });
+      const r = await sellerRequest<{ accessToken?: string; refreshToken?: string; user?: unknown }>("auth:2fa:disable", { code: code.trim() });
+      // Same as turning it on: other devices are signed out, this one keeps going with the fresh tokens.
+      if (r?.accessToken && r?.refreshToken) authApi.saveTokens(r as Parameters<typeof authApi.saveTokens>[0]);
       setCode("");
       setStep("idle");
       await load();
-      toast(fr ? "Authentification à deux facteurs désactivée" : "Two-factor authentication turned off");
+      toast(fr ? "Authentification à deux facteurs désactivée. Vos autres appareils ont été déconnectés." : "Two-factor authentication turned off. Your other devices were signed out.");
     });
   const regenerate = () =>
     run(async () => {

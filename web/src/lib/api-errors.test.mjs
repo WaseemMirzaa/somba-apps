@@ -163,3 +163,29 @@ test("forced password change, password re-issue and e-mail correction sentences 
   assert.equal(fr("Enter a valid email."), "Saisissez une adresse e-mail valide.");
   assert.equal(localizeApiError("Enter a valid email.", "en"), "Enter a valid email.");
 });
+
+test("session and staff-suspension errors map to French", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("You cannot switch off your own account."), "Vous ne pouvez pas désactiver votre propre compte.");
+  assert.equal(fr("You cannot switch off the last active super admin."), "Vous ne pouvez pas désactiver le dernier super administrateur actif.");
+  assert.equal(fr("Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here."), "Seuls les comptes du personnel (livreurs, personnel d'entrepôt et administrateurs) peuvent être activés ou désactivés ici.");
+  assert.equal(fr("Session has been revoked."), "Votre session a été fermée. Reconnectez-vous.");
+  assert.equal(fr("Your session expired. Sign in again."), "Votre session a expiré. Reconnectez-vous.");
+  assert.equal(fr("This token belongs to another account."), "Ce jeton appartient à un autre compte.");
+});
+
+test("the delivery code lockout sentences are French (RD-01)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  const wrong = "Wrong delivery code. Ask the customer for the 4-digit code shown in their app.";
+  assert.match(fr(wrong), /^Code de livraison incorrect\./);
+  assert.equal(fr(`${wrong} 2 tries left before this step locks.`), "Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste 2 essais avant le verrouillage.");
+  assert.match(fr(`${wrong} 1 try left before this step locks.`), /Il vous reste 1 essai avant/);
+  assert.equal(
+    fr("Too many wrong delivery codes. The code step is locked for 15 minutes. Ask the customer to confirm the code in their app, or call the warehouse."),
+    "Trop de codes de livraison erronés. La saisie du code est verrouillée pendant 15 minutes. Demandez au client de confirmer le code dans son application, ou appelez l'entrepôt.",
+  );
+  assert.match(fr("Too many wrong delivery codes. The code step is locked for 1 minute. Ask the customer to confirm the code in their app, or call the warehouse."), /pendant 1 minute\./);
+  assert.match(fr("Too many wrong delivery codes. The code step is locked until a warehouse supervisor unlocks it. Call the warehouse."), /jusqu'à ce qu'un superviseur de l'entrepôt/);
+  assert.match(fr("Only a warehouse supervisor or an operations administrator can unlock a delivery code."), /^Seul un superviseur/);
+  assert.equal(localizeApiError("This delivery code is not locked.", "en"), "This delivery code is not locked.");
+});

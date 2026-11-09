@@ -89,16 +89,18 @@ city → province) **decides** the warehouse; a warehouse that is switched off c
 unserved). A flat `feeOverrideUsd` replaces base + per km of the addresses it decides (the transfer fee still applies).
 Changing coverage never reroutes an order already placed; it recomputes every store's `originHubId`.
 
-## Events — switching a rider or an employee off (UC-8)
+## Events — switching a staff account off (UC-8, AD-03)
 | Event | Who | Payload | Reply |
 |---|---|---|---|
 | `staff:setActive` | **super admin** (`admin`) | `{ userId: string, active: boolean }` | `{ id, name, email, role, active, hubId, warehouseTier, openTasks }` |
 | push `roles:updated` | admins, warehouse staff | `{ id, role, active, hubId, warehouseTier }` (no name, no e-mail) | — |
 | push `hub:updated` | admins, warehouse staff | the person's warehouse (its rider and staff counts changed) | — |
 
-- `customers:setActive` cannot do this: it refuses staff accounts (`Staff accounts are managed in Roles.`). `staff:setActive` is its twin for **riders and
-  warehouse employees only**; any other account → `Only riders and warehouse staff can be switched on or off here.`, an unknown id → `Account not found.`,
-  a non-boolean `active` → `Active must be true or false.`, anybody but the super admin → `Super admin only.`.
+- `customers:setActive` cannot do this: it refuses staff accounts (`Staff accounts are managed in Roles.`). `staff:setActive` is its twin for **staff accounts**:
+  riders, warehouse employees, the department admins (`admin_operations`, `admin_finance`, `admin_support`, `admin_marketing`, `admin_moderation`) and other
+  super admins. A customer or seller → `Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.`, an unknown id →
+  `Account not found.`, a non-boolean `active` → `Active must be true or false.`, anybody but the super admin → `Super admin only.`, your own account →
+  `You cannot switch off your own account.`, the last active super admin → `You cannot switch off the last active super admin.`.
 - **Off** (`active: false`): the account is signed out at once (`tokenVersion` is bumped and the user's open sockets are dropped) and cannot sign in or refresh a
   session (`This account has been suspended. Contact support.`, as for a suspended customer or seller). **On** restores it; nothing else changes.
 - Audited (`staff.deactivate` / `staff.reactivate`, entity `user`, detail `"{role} {email}"`).
@@ -281,7 +283,8 @@ Warehouses (`hubs:*`):
 - `Place the warehouse on the map: latitude and longitude are required.`
 - `A hub with this name already exists.` / `You cannot deactivate the last active hub.`
 - `Hub must be 1-64 characters.` / `Hub name must be 2-100 characters.` / `City must be 2-100 characters.` / `Country must be 1-100 characters.` / `Address must be 3-200 characters.` / `Capacity must be a whole number between 1 and 1000000.`
-- `Super admin only.` / `Account not found.` / `Only riders and warehouse staff can be switched on or off here.` (`staff:setActive`)
+- `Super admin only.` / `Account not found.` / `Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.` /
+  `You cannot switch off your own account.` / `You cannot switch off the last active super admin.` (`staff:setActive`)
 - `Only managers can see the staff list.` / `Only managers can change staff tiers.` / `Tier must be one of: operator, supervisor, manager.` / `Only warehouse staff have a tier.` / `You cannot change your own tier.` / `This person works at another warehouse.` / `Only an administrator can make someone a manager.`
 
 Addresses:

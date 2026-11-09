@@ -97,6 +97,9 @@ final Map<String, String> _exactFr = {
   'Invalid email or password.': 'E-mail ou mot de passe incorrect.',
   'Invalid or expired refresh token.': 'Votre session a expiré. Reconnectez-vous.',
   'Session has been revoked.': 'Votre session a été fermée. Reconnectez-vous.',
+  'Invalid or expired token.': 'Votre session a expiré. Reconnectez-vous.',
+  'Your session expired. Sign in again.': 'Votre session a expiré. Reconnectez-vous.',
+  'This token belongs to another account.': 'Ce jeton appartient à un autre compte.',
   'Sign in to continue.': 'Connectez-vous pour continuer.',
   'Signed out.': 'Vous avez été déconnecté.',
   'This account has been suspended. Contact support.': 'Ce compte est suspendu. Contactez l’assistance.',
@@ -138,6 +141,11 @@ final Map<String, String> _exactFr = {
   'This delivery was just updated. Refresh and try again.': 'Cette livraison vient d’être mise à jour. Actualisez et réessayez.',
   'Wrong delivery code. Ask the customer for the 4-digit code shown in their app.':
       'Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application.',
+  'Too many wrong delivery codes. The code step is locked until a warehouse supervisor unlocks it. Call the warehouse.':
+      'Trop de codes de livraison erronés. La saisie du code est verrouillée jusqu’à ce qu’un superviseur de l’entrepôt la déverrouille. Appelez l’entrepôt.',
+  'Only a warehouse supervisor or an operations administrator can unlock a delivery code.':
+      'Seul un superviseur d’entrepôt ou un administrateur des opérations peut déverrouiller un code de livraison.',
+  'This delivery code is not locked.': 'Ce code de livraison n’est pas verrouillé.',
   'This order has no delivery waiting for pickup.': 'Cette commande n’a aucune livraison en attente de ramassage.',
   'Invalid delivery status.': 'Statut de livraison invalide.',
   'No cash is due on this delivery: it is already paid.': 'Aucun paiement en espèces n’est dû pour cette livraison : elle est déjà payée.',
@@ -208,6 +216,10 @@ String _frUsd(String raw) {
 
 final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   // cash on delivery: the cash record
+  (RegExp(r'^Wrong delivery code\. Ask the customer for the 4-digit code shown in their app\. (\d+) tr(?:y|ies) left before this step locks\.$'),
+      (m) => 'Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste ${m[1]} ${m[1] == '1' ? 'essai' : 'essais'} avant le verrouillage.'),
+  (RegExp(r'^Too many wrong delivery codes\. The code step is locked for (\d+) minutes?\. Ask the customer to confirm the code in their app, or call the warehouse\.$'),
+      (m) => 'Trop de codes de livraison erronés. La saisie du code est verrouillée pendant ${m[1]} ${m[1] == '1' ? 'minute' : 'minutes'}. Demandez au client de confirmer le code dans son application, ou appelez l’entrepôt.'),
   (RegExp(r'^Confirm the cash you collected: (\$[\d.,]+) is due on this delivery\.$'), (m) => 'Confirmez les espèces encaissées : ${_frUsd(m[1]!)} sont dus pour cette livraison.'),
   (RegExp(r'^The cash you entered \((\$[\d.,]+)\) is not the amount to collect \((\$[\d.,]+)\)\. Collect exactly (\$[\d.,]+), or ask the warehouse if the amount changed\.$'),
       (m) => 'Les espèces saisies (${_frUsd(m[1]!)}) ne correspondent pas au montant à encaisser (${_frUsd(m[2]!)}). Encaissez exactement ${_frUsd(m[3]!)}, ou demandez à l’entrepôt si le montant a changé.'),

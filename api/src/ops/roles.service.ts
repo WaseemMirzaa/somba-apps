@@ -10,6 +10,9 @@ import type { UserRole } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 
+/** Staff accounts the super admin can switch off and on with `staff:setActive` (customers and sellers: customers:setActive). */
+export const SWITCHABLE_STAFF_ROLES: readonly string[] = ['rider', 'warehouse_staff', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'admin'];
+
 /** What `roles:defs` serves for one role: the English text and its French (`scopeFr`) for the admin roles page. */
 export interface RoleDef {
   key: string;
@@ -104,17 +107,32 @@ export class RolesService {
   }
 
   /**
-   * Switch a rider or a warehouse employee off (or back on). `active` is what the routing counts: a warehouse whose riders
-   * are all inactive has no rider (UC-8: the nearest staffed warehouse stands in), and an inactive rider is offered by no
-   * rider list (`logistics:riders`, `warehouse:riders`, the run driver) and cannot be assigned. Switching off also revokes
-   * the person's sessions (`tokenVersion`), so the caller can drop their open sockets. Their open tasks stay assigned:
+   * Switch a staff account off (or back on): a rider, a warehouse employee, a department admin (finance, operations,
+   * support, marketing, moderation) or another super admin (audit AD-03). `active` is what the routing counts for riders:
+   * a warehouse whose riders are all inactive has no rider (UC-8: the nearest staffed warehouse stands in), and an
+   * inactive rider is offered by no rider list (`logistics:riders`, `warehouse:riders`, the run driver) and cannot be
+   * assigned. Switching off also revokes the person's sessions (`tokenVersion`), so the caller can drop their open
+   * sockets; an inactive account cannot sign in, refresh, call REST or open a socket. Their open tasks stay assigned:
    * the desk gives them to someone else (`openTasks` says how many).
+   *
+   * Never your own account (`actorId`), and never the last active super admin: someone must be able to switch accounts
+   * back on (C-AD03).
    */
-  async setStaffActive(id: string, active: boolean): Promise<{ id: string; name: string; email: string; role: UserRole; active: boolean; hubId: string | null; warehouseTier: WarehouseTier | null; openTasks: number }> {
+  async setStaffActive(id: string, active: boolean, actorId?: string): Promise<{ id: string; name: string; email: string; role: UserRole; active: boolean; hubId: string | null; warehouseTier: WarehouseTier | null; openTasks: number }> {
     const target = await this.users.findOne({ where: { id } });
     if (!target) throw new Error('Account not found.');
-    if (target.role !== 'rider' && target.role !== 'warehouse_staff') throw new Error('Only riders and warehouse staff can be switched on or off here.');
+    if (!SWITCHABLE_STAFF_ROLES.includes(target.role)) throw new Error('Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.');
+    if (actorId && id === actorId) throw new Error('You cannot switch off your own account.');
+    if (!active && target.role === 'admin' && target.active) {
+      const admins = await this.users.count({ where: { role: 'admin', active: true } });
+      if (admins <= 1) throw new Error('You cannot switch off the last active super admin.');
+    }
     await this.users.update({ id }, active ? { active } : { active, tokenVersion: (target.tokenVersion ?? 0) + 1 });
+    // Two super admins switching each other off at the same moment must not leave nobody: undo ours if that happened.
+    if (!active && target.role === 'admin' && (await this.users.count({ where: { role: 'admin', active: true } })) === 0) {
+      await this.users.update({ id }, { active: true });
+      throw new Error('You cannot switch off the last active super admin.');
+    }
     const view = { id: target.id, role: target.role, active, hubId: target.hubId ?? null, warehouseTier: target.role === 'warehouse_staff' ? tierOf(target.warehouseTier) : null };
     const openTasks = target.role === 'rider' && this.tasks ? await this.tasks.count({ where: { riderId: id, status: In(['assigned', 'picked_up', 'in_transit']) } }) : 0;
     this.emitter.toRoles([...ADMIN_ROLES, 'warehouse_staff'], 'roles:updated', view);

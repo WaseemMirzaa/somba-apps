@@ -25,6 +25,13 @@ const EXACT: Record<string, string> = {
   "Warehouse staff only.": "Réservé au personnel d'entrepôt.",
   "Too many requests — slow down.": "Trop de requêtes. Ralentissez un instant.",
   "Too many requests - slow down.": "Trop de requêtes. Ralentissez un instant.",
+  // sessions (sign out everywhere, refresh rotation, socket re-authentication)
+  "Session has been revoked.": "Votre session a été fermée. Reconnectez-vous.",
+  "Invalid or expired token.": "Votre session a expiré. Reconnectez-vous.",
+  "Invalid or expired refresh token.": "Votre session a expiré. Reconnectez-vous.",
+  "Your session expired. Sign in again.": "Votre session a expiré. Reconnectez-vous.",
+  "This token belongs to another account.": "Ce jeton appartient à un autre compte.",
+  "This account has been suspended. Contact support.": "Ce compte est suspendu. Contactez l'assistance.",
 
   // ── warehouse stock ledger (docs/contracts/warehouse-stock.md) ──
   "Enter a whole number of units, at least 1.": "Saisissez un nombre entier d'unités, au moins 1.",
@@ -80,7 +87,6 @@ const EXACT: Record<string, string> = {
   "You cannot change your own tier.": "Vous ne pouvez pas modifier votre propre niveau.",
   "This person works at another warehouse.": "Cette personne travaille dans un autre entrepôt.",
   "Only warehouse staff have a tier.": "Seul le personnel d'entrepôt a un niveau.",
-  "This task belongs to another warehouse.": "Cette tâche appartient à un autre entrepôt.",
   "This rider works at another warehouse.": "Ce livreur travaille dans un autre entrepôt.",
   "Choose an active rider.": "Choisissez un livreur actif.",
   "This delivery is no longer available.": "Cette livraison n'est plus disponible.",
@@ -121,6 +127,9 @@ const EXACT: Record<string, string> = {
   "Enter a valid email.": "Saisissez une adresse e-mail valide.",
   "An account with this email already exists.": "Un compte existe déjà avec cet e-mail.",
   "Only riders and warehouse staff can be switched on or off here.": "Seuls les livreurs et le personnel d'entrepôt peuvent être activés ou désactivés ici.",
+  "Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.": "Seuls les comptes du personnel (livreurs, personnel d'entrepôt et administrateurs) peuvent être activés ou désactivés ici.",
+  "You cannot switch off your own account.": "Vous ne pouvez pas désactiver votre propre compte.",
+  "You cannot switch off the last active super admin.": "Vous ne pouvez pas désactiver le dernier super administrateur actif.",
   "Lane not found.": "Liaison introuvable.",
   "Run not found.": "Tournée introuvable.",
   "That parcel is not in this run.": "Ce colis n'est pas dans cette tournée.",
@@ -166,6 +175,10 @@ const EXACT: Record<string, string> = {
   "Delivery task not found.": "Tâche de livraison introuvable.",
   "This delivery was just updated. Refresh and try again.": "Cette livraison vient d'être mise à jour. Actualisez et réessayez.",
   "Wrong delivery code. Ask the customer for the 4-digit code shown in their app.": "Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application.",
+  "Too many wrong delivery codes. The code step is locked until a warehouse supervisor unlocks it. Call the warehouse.": "Trop de codes de livraison erronés. La saisie du code est verrouillée jusqu'à ce qu'un superviseur de l'entrepôt la déverrouille. Appelez l'entrepôt.",
+  "Only a warehouse supervisor or an operations administrator can unlock a delivery code.": "Seul un superviseur d'entrepôt ou un administrateur des opérations peut déverrouiller un code de livraison.",
+  "This delivery code is not locked.": "Ce code de livraison n'est pas verrouillé.",
+  "This task belongs to another warehouse.": "Cette tâche appartient à un autre entrepôt.",
   "Delivery attempt failed": "Tentative de livraison échouée",
 
   // ── commerce: finance / inventory / promotions / products / orders ──
@@ -459,6 +472,8 @@ const PATTERNS: Rule[] = [
   [/^(.+) in bin (.+) was just updated\. Refresh and count again\.$/, (m) => `${m[1]} dans l'emplacement ${m[2]} vient d'être mis à jour. Actualisez et recomptez.`],
   [/^(.+) holds no cash to hand in\.$/, (m) => `${m[1]} ne détient aucune espèce à remettre.`],
   [/^(.+) holds \$([\d.,]+): you cannot record \$([\d.,]+)\.$/, (m) => `${m[1]} détient ${m[2]} $ : vous ne pouvez pas enregistrer ${m[3]} $.`],
+  [/^Wrong delivery code\. Ask the customer for the 4-digit code shown in their app\. (\d+) tr(?:y|ies) left before this step locks\.$/, (m) => `Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste ${m[1]} ${m[1] === "1" ? "essai" : "essais"} avant le verrouillage.`],
+  [/^Too many wrong delivery codes\. The code step is locked for (\d+) minutes?\. Ask the customer to confirm the code in their app, or call the warehouse\.$/, (m) => `Trop de codes de livraison erronés. La saisie du code est verrouillée pendant ${m[1]} ${m[1] === "1" ? "minute" : "minutes"}. Demandez au client de confirmer le code dans son application, ou appelez l'entrepôt.`],
   [/^Confirm the cash you collected: \$([\d.,]+) is due on this delivery\.$/, (m) => `Confirmez les espèces encaissées : ${m[1]} $ sont dus pour cette livraison.`],
   [/^The cash you entered \(\$([\d.,]+)\) is not the amount to collect \(\$([\d.,]+)\)\. Collect exactly \$([\d.,]+), or ask the warehouse if the amount changed\.$/, (m) => `Les espèces saisies (${m[1]} $) ne correspondent pas au montant à encaisser (${m[2]} $). Encaissez exactement ${m[3]} $, ou demandez à l'entrepôt si le montant a changé.`],
   [/^This delivery is already complete with \$([\d.,]+) collected\.$/, (m) => `Cette livraison est déjà terminée avec ${m[1]} $ encaissés.`],

@@ -3,6 +3,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -15,6 +16,7 @@ import type { Delivery } from '../messaging/messaging.service';
 import { UsersService } from '../users/users.service';
 import { normalizePhone, phoneHash } from '../common/phone/phone-hash';
 import { mask } from '../messaging/messaging.service';
+import { SessionsService } from './sessions.service';
 
 const MIN = 60_000;
 export const TTL: Record<VerificationKind, number> = {
@@ -67,6 +69,8 @@ export class VerificationService {
     private readonly tokens: Repository<VerificationToken>,
     private readonly users: UsersService,
     private readonly messaging: MessagingService,
+    // Closes the open sockets and revokes the stored refresh tokens after a reset. Always provided by the module.
+    @Optional() private readonly sessions?: SessionsService,
   ) {}
 
   private get webUrl(): string {
@@ -238,6 +242,8 @@ export class VerificationService {
     // Signs the user out everywhere — a reset implies the old credentials may be compromised.
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
+    // ...and that includes the sockets that are open right now (an attacker's session would otherwise live on).
+    await this.sessions?.endSessions(user.id);
     return { reset: true };
   }
 

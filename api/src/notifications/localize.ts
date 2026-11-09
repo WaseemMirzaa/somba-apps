@@ -258,6 +258,9 @@ const TITLES: Record<string, string> = {
   'Transfer run on its way': 'Tournée de transfert en route',
   'Parcel missing from run': 'Colis manquant dans une tournée',
   'Task needs attention': 'Tâche à vérifier',
+  'Wrong delivery codes': 'Codes de livraison erronés',
+  'Delivery code locked': 'Code de livraison verrouillé',
+  'Delivery code unlocked': 'Code de livraison déverrouillé',
   'Aged parcel': 'Colis en attente depuis longtemps',
   'Parcel escalated': 'Colis remonté à la direction',
   'Parcel returned to seller': 'Colis retourné au vendeur',
@@ -413,6 +416,19 @@ const BODIES: Rule[] = [
     /^(\S+): ([a-z ]+) was scanned in but the next leg could not be created\.$/,
     (m) => `${m[1]} : tâche « ${legFr(m[2])} » scannée à l’entrepôt, mais l’étape suivante n’a pas pu être créée.`,
   ],
+  [
+    /^(\S+): (.+) entered a wrong delivery code (\d+) times\. Call the customer to check the code\.$/,
+    (m) => `${m[1]} : ${m[2]} a saisi ${m[3]} fois un code de livraison erroné. Appelez le client pour vérifier le code.`,
+  ],
+  [
+    /^(\S+): (.+) entered (\d+) wrong delivery codes\. The code step is locked until a supervisor unlocks it\. Call the customer to check the code\.$/,
+    (m) => `${m[1]} : ${m[2]} a saisi ${m[3]} codes de livraison erronés. La saisie du code est verrouillée jusqu’à ce qu’un superviseur la déverrouille. Appelez le client pour vérifier le code.`,
+  ],
+  [
+    /^(\S+): (.+) entered (\d+) wrong delivery codes\. The code step is locked for (\d+) minutes\. Call the customer to check the code\.$/,
+    (m) => `${m[1]} : ${m[2]} a saisi ${m[3]} codes de livraison erronés. La saisie du code est verrouillée pendant ${m[4]} minutes. Appelez le client pour vérifier le code.`,
+  ],
+  [/^(\S+): you can enter the delivery code again\.$/, (m) => `${m[1]} : vous pouvez de nouveau saisir le code de livraison.`],
   [
     /^(\S+): ([a-z ]+) failed after (\d+) attempts \((.+)\)\.$/,
     (m) => `${m[1]} : tâche « ${legFr(m[2])} » échouée après ${m[3]} tentatives (${translateReason(m[4])}).`,

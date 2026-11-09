@@ -46,7 +46,7 @@ afterEach(() => ds.destroy());
 
 const verificationService = () => new VerificationService(ds.getRepository(VerificationToken), users, { emailConfigured: true, sendEmail: async () => undefined } as never);
 const reload = async (id: string) => (await users.findById(id))!;
-const makeStaff = (role: 'rider' | 'warehouse_staff' | 'admin_finance' = 'rider', email = `${role}@somba.test`) =>
+const makeStaff = (role: 'rider' | 'warehouse_staff' | 'admin_finance' | 'admin_support' | 'admin_operations' | 'admin_marketing' | 'admin_moderation' = 'rider', email = `${role}@somba.test`) =>
   roles.createStaff({ email, name: 'New Person', role, hubId: role === 'rider' || role === 'warehouse_staff' ? hubId : null });
 
 describe('accounts an administrator creates are flagged', () => {
@@ -332,10 +332,12 @@ describe('the REST guard', () => {
     expect(() => run(false, () => undefined)).toThrow(/Unauthorized/);
   });
 
-  it('the strategy reads the claim from the access token', () => {
-    const strat = new JwtStrategy({ get: () => 'access-secret' } as never);
-    expect(strat.validate({ sub: 'u1', role: 'rider', email: 'a@b.c', typ: 'access', pwc: true })).toMatchObject({ id: 'u1', mustChangePassword: true });
-    expect(strat.validate({ sub: 'u1', role: 'rider', email: 'a@b.c', typ: 'access' })).not.toHaveProperty('mustChangePassword');
+  it('the strategy reads the flag from the account itself, so the hold lifts as soon as the password is changed', async () => {
+    const account = { id: 'u1', role: 'rider', email: 'a@b.c', tokenVersion: 0, active: true, mustChangePassword: true };
+    const strat = new JwtStrategy({ get: () => 'access-secret' } as never, { findById: async () => account } as never);
+    await expect(strat.validate({ sub: 'u1', role: 'rider', email: 'a@b.c', typ: 'access', pwc: true })).resolves.toMatchObject({ id: 'u1', mustChangePassword: true });
+    account.mustChangePassword = false; // changed: the same, not yet expired token no longer holds the account
+    await expect(strat.validate({ sub: 'u1', role: 'rider', email: 'a@b.c', typ: 'access', pwc: true })).resolves.not.toHaveProperty('mustChangePassword');
   });
 });
 
@@ -349,7 +351,7 @@ describe('gateway', () => {
     audit = { record: jest.fn(async () => undefined) };
     kicked = [];
     const server = { in: (room: string) => ({ disconnectSockets: () => void kicked.push(room), fetchSockets: async () => [{ id: 'sock-1', disconnect: () => kicked.push('self') }, { id: 'sock-2', disconnect: () => kicked.push(`${room}#other`) }] }) };
-    gw = Object.assign(Object.create(RealtimeGateway.prototype), { audit, roles, auth, users, server, logger: { log: () => undefined, warn: () => undefined } });
+    gw = Object.assign(Object.create(RealtimeGateway.prototype), { audit, roles, auth, users, server, throttle: { release: () => undefined }, logger: { log: () => undefined, warn: () => undefined } });
   });
 
   it('roles:resetPassword: super admin only, never oneself; the password is in the reply but not in the audit; sessions and sockets end', async () => {
@@ -394,7 +396,7 @@ describe('gateway', () => {
     const login = (await auth.login({ email: 'rider@somba.test', password: made.tempPassword })) as { accessToken: string };
     const joined: string[] = [];
     const emitted: [string, unknown][] = [];
-    const client = { handshake: { auth: { token: login.accessToken }, headers: {} }, data: {}, join: async (r: string) => void joined.push(r), emit: (e: string, p: unknown) => void emitted.push([e, p]), disconnect: jest.fn() };
+    const client = { handshake: { auth: { token: login.accessToken }, headers: {} }, data: {}, use: () => undefined, join: async (r: string) => void joined.push(r), emit: (e: string, p: unknown) => void emitted.push([e, p]), disconnect: jest.fn() };
     await gw.handleConnection(client as never);
     expect(client.disconnect).not.toHaveBeenCalled();
     expect(joined).toEqual([RealtimeEmitter.userRoom(made.id)]);
@@ -403,19 +405,23 @@ describe('gateway', () => {
 
     // The change lifts the hold on this socket, joins the role room and ends the other sockets.
     (client as unknown as { id: string }).id = 'sock-1';
+    const change = jest.spyOn(auth, 'changePassword');
     const res = await gw.meChangePassword(client as never, { current: made.tempPassword, next: 'A-brand-new-pass-1' });
     expect(res).toMatchObject({ ok: true, data: { mustChangePassword: false } });
     expect((client.data as { user: { mustChangePassword?: boolean } }).user.mustChangePassword).toBeUndefined();
     expect(joined).toContain(RealtimeEmitter.roleRoom('rider'));
-    expect(kicked).toContain(`${RealtimeEmitter.userRoom(made.id)}#other`);
-    expect(kicked).not.toContain('self');
+    // The other devices are signed out by AuthService.changePassword itself (sessions spec); this socket is the one it keeps.
+    expect(change).toHaveBeenCalledWith(made.id, made.tempPassword, 'A-brand-new-pass-1', 'sock-1');
     expect(audit.record.mock.calls[0][0]).toMatchObject({ action: 'password.changed_first' });
     expect(JSON.stringify(audit.record.mock.calls)).not.toContain('A-brand-new-pass-1');
 
     const plain = await auth.register({ email: 'cust@somba.test', password: 'Customer-1234', name: 'Cust' });
     const joined2: string[] = [];
-    await gw.handleConnection({ handshake: { auth: { token: plain.accessToken }, headers: {} }, data: {}, join: async (r: string) => void joined2.push(r), emit: () => undefined, disconnect: jest.fn() } as never);
+    const plainClient = { handshake: { auth: { token: plain.accessToken }, headers: {} }, data: {}, use: () => undefined, join: async (r: string) => void joined2.push(r), emit: () => undefined, disconnect: jest.fn() };
+    await gw.handleConnection(plainClient as never);
     expect(joined2).toEqual([RealtimeEmitter.userRoom(plain.user.id), RealtimeEmitter.roleRoom('customer')]);
+    gw.handleDisconnect(client as never); // stop the token-expiry timers the connections started
+    gw.handleDisconnect(plainClient as never);
   });
 
   it('a wrong current password through the socket stays refused, and the hold stays', async () => {

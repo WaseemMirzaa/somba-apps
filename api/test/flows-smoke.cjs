@@ -201,6 +201,27 @@ const register = async (label, role = 'customer') => {
   ok(!a.ok && /code/i.test(a.error ?? ''), 'delivering without the code is refused', a.error ?? '');
   a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code: code === '1234' ? '4321' : '1234' });
   ok(!a.ok && /Wrong delivery code/.test(a.error ?? ''), 'a wrong code is refused');
+  // RD-01: the 5th wrong code locks the code step; the correct code is refused while it is locked; a supervisor/admin unlocks it
+  const wrongCode = code === '1234' ? '4321' : '1234';
+  for (let i = 2; i <= 4; i++) {
+    a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code: wrongCode });
+    ok(!a.ok && /Wrong delivery code/.test(a.error ?? ''), `wrong code number ${i} is refused`);
+  }
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code: wrongCode });
+  ok(!a.ok && /locked for 15 minutes.*call the warehouse/.test(a.error ?? ''), 'the 5th wrong code locks the code step and says what to do', a.error ?? '');
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code });
+  ok(!a.ok && /locked for/.test(a.error ?? ''), 'the CORRECT code is refused while the step is locked', a.error ?? '');
+  ok((await req(cust.sock, 'orders:deliveryCode', { orderId: oc.id })).data.code === code, 'the customer still sees their code while the rider is locked');
+  const audits = (await req(admin.sock, 'audit:list', { action: 'delivery.code_failed' })).data ?? [];
+  ok(audits.filter((l) => l.entityId === tc.id).length === 5 && !new RegExp(`\\b(${wrongCode}|${code})\\b`).test(audits.map((l) => l.detail).join(' ')), 'every wrong code is in the audit log (never the guess itself)');
+  ok(!(await req(rider.sock, 'delivery:resetCode', { taskId: tc.id })).ok, 'a rider cannot unlock the code');
+  ok(!(await req(cust.sock, 'delivery:resetCode', { taskId: tc.id })).ok, 'a customer cannot unlock the code');
+  a = await req(admin.sock, 'delivery:resetCode', { taskId: tc.id });
+  ok(a.ok && a.data.codeFailures === 0 && a.data.codeLocked === false, 'an admin unlocks it', JSON.stringify(a).slice(0, 200));
+  const unlocked = (await req(admin.sock, 'audit:list', { action: 'delivery.code_unlocked' })).data ?? [];
+  ok(unlocked.some((l) => l.entityId === tc.id), 'the unlock is audited');
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code });
+  ok(a.ok && a.data.status === 'delivered', 'the right code completes the delivery once it is unlocked');
   a = await req(rider.sock, 'delivery:updateStatus', { taskId: tc.id, status: 'delivered', code });
   ok(a.ok && a.data.status === 'delivered', 'the right code completes the delivery');
   ok((await req(cust.sock, 'orders:deliveryCode', { orderId: oc.id })).data.code === null, 'the code is gone once delivered');

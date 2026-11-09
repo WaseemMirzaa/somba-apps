@@ -81,6 +81,20 @@ interface SocketUser {
 
 type AuthedSocket = Socket & { data: { user?: SocketUser } };
 
+/** Ask the app for a fresh access token this long before the socket's token expires (`reauth`). */
+export const REAUTH_LEAD_MS = 30_000;
+/** Close a socket whose token expired this long ago without `auth:reauth` (it gets `unauthorized` first). */
+export const REAUTH_GRACE_MS = 60_000;
+/** When the access token behind the socket expires, and when the socket is closed if it was not renewed (ms since the epoch). */
+type SocketAuthData = { authExp?: number; authDeadline?: number };
+/** The pending `reauth` / deadline timer of each authenticated socket (cleared on disconnect). */
+const expiryTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
+/** Has the socket's token been expired for longer than the grace? Then nothing but `auth:reauth` goes through. */
+const pastDeadline = (client: { data: unknown }): boolean => {
+  const deadline = (client.data as SocketAuthData).authDeadline;
+  return deadline !== undefined && Date.now() > deadline;
+};
+
 /** Standard ack envelope so clients always get {ok, data|error}. */
 function ok<T>(data: T) {
   return { ok: true as const, data };
@@ -232,12 +246,6 @@ export class RealtimeGateway
     this.server?.in(RealtimeEmitter.userRoom(userId)).disconnectSockets(true);
   }
 
-  /** Drop the open sockets of a user except one (the device that just changed the password and keeps going). */
-  private async kickOthers(userId: string, keepSocketId: string): Promise<void> {
-    const open = (await this.server?.in(RealtimeEmitter.userRoom(userId)).fetchSockets()) ?? [];
-    for (const s of open) if (s.id !== keepSocketId) s.disconnect(true);
-  }
-
   /**
    * Verification policy: with the public setting `requireVerifiedForCheckout`
    * on, an account must have a verified phone OR email before it can place an
@@ -283,6 +291,7 @@ export class RealtimeGateway
         throw new Error('revoked session');
       }
       this.auth.assertNotSuspended(user);
+      if (!payload.exp) throw new Error('token without expiry');
 
       const socketUser: SocketUser = {
         id: user.id,
@@ -294,6 +303,12 @@ export class RealtimeGateway
       await client.join(RealtimeEmitter.userRoom(user.id));
       // Held at the password change: no role or warehouse rooms, so the live feeds of the role stay closed until it is done.
       if (!user.mustChangePassword) await this.joinSharedRooms(client, socketUser, user.hubId);
+      // The socket lives only as long as its access token (audit A-02): see `watchExpiry` and `auth:reauth`.
+      this.watchExpiry(client, payload.exp);
+      client.use((packet, next) => {
+        if (packet[0] === 'auth:reauth' || !pastDeadline(client)) return next();
+        this.expire(client);
+      });
       client.emit('ready', {
         user: UsersService.toPublic(user),
         serverTime: new Date().toISOString(),
@@ -313,9 +328,74 @@ export class RealtimeGateway
   }
 
   handleDisconnect(client: AuthedSocket): void {
+    clearTimeout(expiryTimers.get(client));
+    expiryTimers.delete(client);
     const u = client.data.user;
     if (u) this.logger.log(`disconnected ${u.role} ${u.id}`);
     this.throttle.release(client.id);
+  }
+
+  /**
+   * A socket is only as good as the access token it was opened with (audit A-02). {@link REAUTH_LEAD_MS} before that token
+   * expires the server sends `reauth`; the app answers with `auth:reauth { token }` (a fresh access token from its
+   * refresh token) and keeps the same connection. A socket that has not done so {@link REAUTH_GRACE_MS} after the expiry
+   * is told `unauthorized { reason: 'token_expired' }` and closed: the apps then refresh and reconnect, which also works
+   * for app builds that predate `reauth`. A revoked session cannot get a fresh token, so it ends there at the latest.
+   */
+  private watchExpiry(client: AuthedSocket, expSec: number): void {
+    clearTimeout(expiryTimers.get(client));
+    const { leadMs, graceMs } = this.reauthTiming ?? { leadMs: REAUTH_LEAD_MS, graceMs: REAUTH_GRACE_MS };
+    const expMs = expSec * 1000;
+    const data = client.data as SocketAuthData;
+    data.authExp = expMs;
+    data.authDeadline = expMs + graceMs;
+    const ask = setTimeout(() => {
+      if (!client.connected) return;
+      client.emit('reauth', { reason: 'token_expiring', expiresAt: new Date(expMs).toISOString() });
+      const deadline = setTimeout(() => this.expire(client), Math.max(0, expMs + graceMs - Date.now()));
+      deadline.unref?.();
+      expiryTimers.set(client, deadline);
+    }, Math.max(0, expMs - leadMs - Date.now()));
+    ask.unref?.();
+    expiryTimers.set(client, ask);
+  }
+
+  /** Tests shorten the re-authentication timing; production uses {@link REAUTH_LEAD_MS} and {@link REAUTH_GRACE_MS}. */
+  reauthTiming?: { leadMs: number; graceMs: number };
+
+  /** The access token behind this socket ran out and was not renewed: say why, then close it. */
+  private expire(client: AuthedSocket): void {
+    if (!client.connected) return;
+    client.emit('unauthorized', { message: 'Your session expired. Sign in again.', reason: 'token_expired' });
+    client.disconnect(true);
+  }
+
+  /**
+   * `auth:reauth { token }`: renew this socket with a fresh access token, without reconnecting. The token must be valid,
+   * of the same account, of its current sessions (`tokenVersion`), for an account that is not switched off, and of the
+   * same role (a role change closes the socket anyway). Answers `{ expiresAt }`. A refusal leaves the socket on its old
+   * deadline.
+   */
+  @SubscribeMessage('auth:reauth')
+  async authReauth(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { token?: string }) {
+    try {
+      const current = this.requireUser(client);
+      let payload: Awaited<ReturnType<AuthService['verifyAccess']>>;
+      try {
+        payload = await this.auth.verifyAccess(String(body?.token ?? ''));
+      } catch {
+        return fail('Invalid or expired token.');
+      }
+      if (payload.sub !== current.id) return fail('This token belongs to another account.');
+      const user = await this.users.findById(payload.sub);
+      if (!user || (payload.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) return fail('Session has been revoked.');
+      this.auth.assertNotSuspended(user);
+      if (user.role !== current.role || !payload.exp) return fail('Session has been revoked.');
+      this.watchExpiry(client, payload.exp);
+      return ok({ expiresAt: new Date(payload.exp * 1000).toISOString() });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
   }
 
   /**
@@ -802,6 +882,22 @@ export class RealtimeGateway
         return fail('Invalid delivery status.');
       }
       return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code, body.cashUsd));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * A warehouse supervisor (or an operations admin) unlocks the delivery code of a task after too many wrong tries (RD-01),
+   * for example once the customer has been phoned. Audited; the rider is told. Same hub and tier rules as the desk.
+   */
+  @SubscribeMessage('delivery:resetCode')
+  async deliveryResetCode(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId: string }) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      const task = await this.delivery.resetCodeLock(String(body?.taskId ?? ''), await this.deskActor(user));
+      return ok(await this.logistics.view(task));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -1878,8 +1974,9 @@ export class RealtimeGateway
   }
 
   /**
-   * `staff:setActive { userId, active }`: the super admin switches a rider or a warehouse employee off or on. Off means no
-   * sign-in, no open sockets, never offered as a driver, and not counted as a rider by the area routing (UC-8).
+   * `staff:setActive { userId, active }`: the super admin switches a staff account off or on: a rider, a warehouse
+   * employee, a department admin or another super admin (never themselves, never the last active super admin). Off means
+   * no sign-in, no REST, no open sockets; a rider is never offered as a driver and not counted by the area routing (UC-8).
    */
   @SubscribeMessage('staff:setActive')
   async staffSetActive(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { userId?: string; active?: boolean }) {
@@ -1888,7 +1985,7 @@ export class RealtimeGateway
       if (user.role !== 'admin') return fail('Super admin only.');
       if (typeof body?.active !== 'boolean') return fail('Active must be true or false.');
       const id = String(body?.userId ?? '');
-      const done = await this.roles.setStaffActive(id, body.active);
+      const done = await this.roles.setStaffActive(id, body.active, user.id); // C-AD03: never yourself, never the last super admin
       await this.audit.record({ actor: user.name, role: user.role, action: body.active ? 'staff.reactivate' : 'staff.deactivate', entity: 'user', entityId: id, detail: `${done.role} ${done.email}` });
       if (!body.active) this.kick(id); // switched-off people lose their live sockets immediately
       return ok(done);
@@ -2484,8 +2581,8 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      const out = await this.auth.changePassword(user.id, body?.current, body?.next);
-      await this.kickOthers(user.id, client.id); // the other devices' sockets end now, not at their next reconnect
+      // Every other device of the account is signed out now (refresh tokens revoked, sockets closed); this one keeps going.
+      const out = await this.auth.changePassword(user.id, body?.current, body?.next, client.id);
       if (user.mustChangePassword) {
         client.data.user = { id: user.id, role: user.role, name: user.name };
         await this.joinSharedRooms(client, user, (await this.users.findById(user.id))?.hubId);

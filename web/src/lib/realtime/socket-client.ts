@@ -2,6 +2,7 @@ import { io, Socket } from "socket.io-client";
 import type { Ack, RequestError } from "./types";
 import { currentLocale, localizeApiError } from "../api-errors";
 import { PASSWORD_CHANGE_EVENT, PASSWORD_CHANGE_REQUIRED } from "../password-change";
+import { authApi } from "./auth-api";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ??
@@ -23,7 +24,9 @@ class SocketClient {
     this.socket?.removeAllListeners();
     this.socket?.close();
     this.socket = io(SOCKET_URL, {
-      auth: token ? { token } : {},
+      // Read on every (re)connect: after the tokens rotated (`reauth`, a refresh in another tab) a reconnect sends the
+      // newest access token, not the one this socket was first opened with.
+      auth: token ? (cb) => cb({ token: authApi.getAccess() || token }) : {},
       transports: ["websocket"],
       reconnection: true,
       reconnectionAttempts: Infinity,

@@ -46,6 +46,7 @@ const rest = async (method, path, body, token, raw) => {
     return { status: res.status, json };
   }
 };
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
 const connect = (token) => new Promise((resolve, reject) => {
   const s = io(API, { auth: { token }, transports: ['websocket'] });
   s.on('ready', () => resolve(s));
@@ -134,8 +135,13 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(a.ok && a.data.market === 'DRC', 'prefs persisted');
   a = await req(s, 'me:changePassword', { current: 'wrong-password', next: 'New-Pass-2026' });
   ok(!a.ok, 'change password needs the correct current password');
+  // A second device of the same account, open while the password changes: it is signed out at once (audit A-02).
+  const otherDevice = await connect(at);
+  const otherDropped = new Promise((res) => otherDevice.once('disconnect', (why) => res(why)));
   a = await req(s, 'me:changePassword', { current: pw, next: 'New-Pass-2026' });
   ok(a.ok && a.data.accessToken, 'change password returns fresh tokens');
+  ok((await Promise.race([otherDropped, sleepMs(3000).then(() => 'still open')])) === 'io server disconnect', 'the other open socket of the account is closed by the password change');
+  ok(s.connected, 'the socket that changed the password stays open');
   const oldRefresh = rt;
   at = a.data.accessToken; rt = a.data.refreshToken;
   r = await rest('POST', '/api/v1/auth/refresh', { refreshToken: oldRefresh });
@@ -145,6 +151,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   s.close();
 
   console.log('\n— Forgot / reset password');
+  // A session that is open while the password is reset (think: the attacker's) must not survive it (audit A-02).
+  const beforeReset = await connect(at);
+  const resetDropped = new Promise((res) => beforeReset.once('disconnect', (why) => res(why)));
   r = await rest('POST', '/api/v1/auth/forgot', { email: `nobody${tag}@smoke.test` });
   ok(r.status === 200 && r.json.sent === true && !r.json.devToken, 'unknown email → same {sent:true}, no token (no account enumeration)');
   r = await rest('POST', '/api/v1/auth/forgot', { email });
@@ -154,6 +163,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(r.status === 400, 'weak new password rejected');
   r = await rest('POST', '/api/v1/auth/reset', { token: resetTok, password: 'Reset-Pass-2026' });
   ok(r.status === 200, 'reset with valid token succeeds');
+  ok((await Promise.race([resetDropped, sleepMs(3000).then(() => 'still open')])) === 'io server disconnect', 'a socket opened before the reset is closed by it');
+  r = await rest('GET', '/api/v1/auth/me', null, at);
+  ok(r.status === 401, 'and an access token issued before the reset is refused on REST', String(r.status));
   r = await rest('POST', '/api/v1/auth/reset', { token: resetTok, password: 'Another-Pass-2026' });
   ok(r.status === 400, 'reset token is single-use');
   r = await rest('POST', '/api/v1/auth/login', { email, password: 'New-Pass-2026' });
@@ -434,11 +446,59 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   console.log('\n— Rate limits: refresh is generous (page reloads), login stays strict');
   const refreshCodes = [];
+  // Refresh tokens rotate: each refresh answers a new one, which is what the next refresh sends (as the apps do).
+  let newest = refreshAgain;
   for (let i = 0; i < 35; i++) {
-    const res = await fetch(API + '/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: refreshAgain }) });
+    const res = await fetch(API + '/api/v1/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: newest }) });
     refreshCodes.push(res.status);
+    if (res.status === 200) newest = (await res.json()).refreshToken;
   }
   ok(refreshCodes.every((c) => c === 200), '35 refreshes inside a minute all succeed (more than the 30/min default)', JSON.stringify(refreshCodes.filter((c) => c !== 200)));
+
+  console.log('\n— Refresh tokens rotate; a reused one signs the account out everywhere (audit A-09)');
+  const jti = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).jti;
+  r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
+  need(r.status === 200, `sign-in before the rotation checks failed (${r.status})`);
+  const r0 = r.json.refreshToken;
+  r = await rest('POST', '/api/v1/auth/refresh', { refreshToken: r0 });
+  const r1 = r.json?.refreshToken;
+  ok(r.status === 200 && r1 && jti(r1) && jti(r1) !== jti(r0), 'a refresh hands out a NEW refresh token', JSON.stringify([r.status, r.json?.message]));
+  r = await rest('POST', '/api/v1/auth/refresh', { refreshToken: r0 });
+  ok(r.status === 200 && jti(r.json.refreshToken) === jti(r1), 'the same token again within the grace window (a reload, a retry) gets the SAME successor, nobody is signed out');
+  const [p1, p2] = await Promise.all([r1, r1].map((t) => rest('POST', '/api/v1/auth/refresh', { refreshToken: t })));
+  ok(p1.status === 200 && p2.status === 200 && jti(p1.json.refreshToken) === jti(p2.json.refreshToken), 'two refreshes at the same moment (two tabs) both succeed and agree');
+  const live = p1.json;
+  const victimSocket = await connect(live.accessToken);
+  const reuseDropped = new Promise((res) => victimSocket.once('disconnect', (why) => res(why)));
+  console.log('    (waiting 22 s for the grace window to pass)');
+  await sleepMs(22000);
+  r = await rest('POST', '/api/v1/auth/refresh', { refreshToken: r0 });
+  ok(r.status === 401, 'after the grace window the old token is refused', String(r.status));
+  ok((await Promise.race([reuseDropped, sleepMs(3000).then(() => 'still open')])) === 'io server disconnect', 'and every open socket of the account is closed');
+  r = await rest('POST', '/api/v1/auth/refresh', { refreshToken: live.refreshToken });
+  ok(r.status === 401, 'the newest refresh token of the family is revoked too', String(r.status));
+  r = await rest('GET', '/api/v1/auth/me', null, live.accessToken);
+  ok(r.status === 401, 'and so is its access token, on REST', String(r.status));
+  const reuseLog = await req(admin, 'audit:list', { action: 'session.refresh_reuse' });
+  const reuseRows = Array.isArray(reuseLog.data) ? reuseLog.data : (reuseLog.data?.items ?? []);
+  ok(reuseLog.ok && reuseRows.some((e) => e.entityId === userId), 'the reuse is written to the audit log', JSON.stringify(reuseLog).slice(0, 200));
+
+  console.log('\n— Sign out everywhere (logout-all) ends REST and sockets at once');
+  r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
+  need(r.status === 200, `sign-in after the reuse check failed (${r.status})`);
+  const everywhere = r.json;
+  const evSocket = await connect(everywhere.accessToken);
+  const evDropped = new Promise((res) => evSocket.once('disconnect', (why) => res(why)));
+  r = await rest('GET', '/api/v1/auth/me', null, everywhere.accessToken);
+  ok(r.status === 200, 'the access token works on REST before', String(r.status));
+  r = await rest('POST', '/api/v1/auth/logout-all', {}, everywhere.accessToken);
+  ok(r.status === 200, 'logout-all', String(r.status));
+  ok((await Promise.race([evDropped, sleepMs(3000).then(() => 'still open')])) === 'io server disconnect', 'the open socket is closed at once');
+  r = await rest('GET', '/api/v1/auth/me', null, everywhere.accessToken);
+  ok(r.status === 401, 'and the same access token is refused on REST although it has not expired', String(r.status));
+  r = await rest('POST', '/api/v1/auth/login', { email, password: 'Reset-Pass-2026' });
+  need(r.status === 200, `sign-in after logout-all failed (${r.status})`);
+  at = r.json.accessToken;
 
   console.log('\n— Account deletion');
   s.close(); s = await connect(at);

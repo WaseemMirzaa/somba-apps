@@ -146,6 +146,19 @@ void main() {
       }
     });
 
+    test('the delivery code lockout (RD-01): tries left and the lock are French, with the minutes', () {
+      const wrong = 'Wrong delivery code. Ask the customer for the 4-digit code shown in their app.';
+      expect(translateServerError('$wrong 2 tries left before this step locks.', fr),
+          'Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste 2 essais avant le verrouillage.');
+      expect(translateServerError('$wrong 1 try left before this step locks.', fr), contains('Il vous reste 1 essai avant'));
+      expect(
+          translateServerError('Too many wrong delivery codes. The code step is locked for 15 minutes. Ask the customer to confirm the code in their app, or call the warehouse.', fr),
+          'Trop de codes de livraison erronés. La saisie du code est verrouillée pendant 15 minutes. Demandez au client de confirmer le code dans son application, ou appelez l’entrepôt.');
+      expect(translateServerError('Too many wrong delivery codes. The code step is locked for 1 minute. Ask the customer to confirm the code in their app, or call the warehouse.', fr), contains('pendant 1 minute.'));
+      expect(translateServerError('Too many wrong delivery codes. The code step is locked for 60 minutes. Ask the customer to confirm the code in their app, or call the warehouse.', const Strings('en')),
+          startsWith('Too many wrong delivery codes'));
+    });
+
     // docs/contracts/logistics.md section 10, after-sale.md sections 6 and 11, and the photo upload.
     const newErrors = [
       'Your warehouse assigns your tasks. You cannot accept a task yourself.',
@@ -181,6 +194,9 @@ void main() {
       'Delivery task not found.',
       'This delivery was just updated. Refresh and try again.',
       'Wrong delivery code. Ask the customer for the 4-digit code shown in their app.',
+      'Too many wrong delivery codes. The code step is locked until a warehouse supervisor unlocks it. Call the warehouse.',
+      'Only a warehouse supervisor or an operations administrator can unlock a delivery code.',
+      'This delivery code is not locked.',
       'Subject and message are required.',
       'Write a message first.',
       'Ticket not found.',

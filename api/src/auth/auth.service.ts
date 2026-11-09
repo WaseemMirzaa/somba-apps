@@ -15,6 +15,7 @@ import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { AccountDeletionService, DELETED_NAME } from './account-deletion.service';
 import { TwoFaService } from './twofa.service';
 import type { TwoFaChallenge } from './twofa.service';
+import { SessionsService } from './sessions.service';
 
 export interface JwtPayload {
   sub: string;
@@ -27,6 +28,22 @@ export interface JwtPayload {
   purpose?: string;
   /** Access tokens only: the account must still change its temporary password (`users.mustChangePassword`); see auth/password-change.ts. */
   pwc?: boolean;
+  /**
+   * Refresh tokens only: the id of the stored record that rotation tracks (see {@link SessionsService}). Refresh tokens
+   * issued before rotation existed have none and keep working, unrotated, until they expire.
+   */
+  jti?: string;
+  /** Expiry (seconds since the epoch), set by the signer. */
+  exp?: number;
+}
+
+/**
+ * Every account an admin switched off (a suspended customer or seller, a rider, warehouse employee or department admin
+ * switched off with staff:setActive) and every deleted account has `active = false`: no new session, no REST call, no
+ * socket. Thrown with the message the apps show (they translate it).
+ */
+export function assertActiveAccount(user: Pick<User, 'active'>): void {
+  if (!user.active) throw new UnauthorizedException('This account has been suspended. Contact support.');
 }
 
 /**
@@ -59,6 +76,8 @@ export class AuthService {
     private readonly deletion: AccountDeletionService,
     // Second sign-in step for accounts that turned on two-factor authentication.
     private readonly twofa?: TwoFaService,
+    // Refresh-token rotation and revocation (closing the open sockets). Always provided by the module; optional for unit tests.
+    private readonly sessions?: SessionsService,
   ) {}
 
   /**
@@ -130,21 +149,47 @@ export class AuthService {
       throw new UnauthorizedException('Session has been revoked.');
     }
     this.assertNotSuspended(user);
-    return this.issue(user);
+    // A token from before rotation (no `jti`) is still honoured until it expires, so nobody is signed out by the deploy;
+    // what it is traded for is a tracked token, rotated from then on.
+    if (!this.sessions || !payload.jti) return this.issue(user);
+    return this.rotate(user, payload.jti);
   }
 
   /**
-   * An admin-suspended customer or seller (customers:setActive false), or a rider or warehouse employee an admin
-   * switched off (staff:setActive false), must not get new sessions. The other admin roles have no off switch.
+   * Refresh-token rotation (audit A-09): every refresh replaces the token. The replaced token is still answered for
+   * {@link REFRESH_REUSE_GRACE_MS} with the token that replaced it (two tabs, a reload, a retry after a lost answer);
+   * after that, presenting it again ends every session of the account and is audited (see {@link SessionsService}).
    */
-  assertNotSuspended(user: User): void {
-    if ((user.role === 'customer' || user.role === 'seller' || user.role === 'rider' || user.role === 'warehouse_staff') && !user.active) {
-      throw new UnauthorizedException('This account has been suspended. Contact support.');
+  private async rotate(user: User, jti: string): Promise<AuthResult> {
+    const sessions = this.sessions as SessionsService;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const seen = await sessions.inspect(user, jti);
+      if (seen.kind === 'refused') throw new UnauthorizedException('Session has been revoked.');
+      if (seen.kind === 'grace') {
+        return { ...(await this.issue(user, { refresh: false })), refreshToken: await this.signRefresh(user, seen.live.id, seen.live.expiresAt) };
+      }
+      // Current: mint the successor first, then claim the old token. Losing the claim means a concurrent refresh with
+      // the same token won it; drop ours and answer like that one did (grace) on the next pass.
+      const next = await this.mintRefresh(user, seen.row.familyId);
+      if (await sessions.claim(jti, next.id)) return { ...(await this.issue(user, { refresh: false })), refreshToken: next.token };
+      await sessions.discard(next.id);
     }
+    throw new UnauthorizedException('Session has been revoked.');
   }
 
-  /** Change password, keep the current device signed in, sign out all others. */
-  async changePassword(userId: string, current: string, next: string): Promise<AuthResult> {
+  /**
+   * Every account switched off by an admin (customers:setActive, staff:setActive, a fraud block) and every deleted
+   * account must not get new sessions. Department admins included (audit AD-03).
+   */
+  assertNotSuspended(user: User): void {
+    assertActiveAccount(user);
+  }
+
+  /**
+   * Change password, keep the current device signed in, sign out all others: their refresh tokens are revoked and their
+   * open sockets closed now (all but `keepSocketId`, the socket that asked).
+   */
+  async changePassword(userId: string, current: string, next: string, keepSocketId?: string): Promise<AuthResult> {
     const user = await this.users.findById(userId);
     if (!user) throw new UnauthorizedException('Account no longer exists.');
     if (!(await bcrypt.compare(current ?? '', user.passwordHash))) {
@@ -161,6 +206,19 @@ export class AuthService {
     user.mustChangePassword = false;
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
+    await this.sessions?.endSessions(user.id, { exceptSocketId: keepSocketId });
+    return this.issue(user);
+  }
+
+  /**
+   * Sign out every other device of the account and hand THIS one fresh tokens (two-factor turned on or off). The socket
+   * `keepSocketId` stays open; it re-authenticates with the new access token when its current one runs out.
+   */
+  async revokeOthersAndReissue(userId: string, keepSocketId?: string): Promise<AuthResult> {
+    if (!this.sessions) throw new UnauthorizedException('Sessions are not available.');
+    await this.sessions.revoke(userId, { exceptSocketId: keepSocketId });
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException('Account no longer exists.');
     return this.issue(user);
   }
 
@@ -196,6 +254,7 @@ export class AuthService {
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     user.active = false;
     await this.deletion.erase(user);
+    // The refresh tokens die with the token version; the caller closes the open sockets once its answer is out.
   }
 
   /** What would stop this account from being deleted right now (nothing is changed). Shown before the customer confirms. */
@@ -212,31 +271,61 @@ export class AuthService {
     return payload;
   }
 
-  /** Invalidate every token previously issued to this user. */
+  /**
+   * Invalidate every token previously issued to this user ("sign out everywhere"): REST, refresh and open sockets alike
+   * (the sockets are closed now, see {@link SessionsService.revoke}).
+   */
   async revokeSessions(userId: string): Promise<void> {
     const user = await this.users.findById(userId);
     if (!user) throw new UnauthorizedException('Account no longer exists.');
+    if (this.sessions) return this.sessions.revoke(userId);
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
   }
 
-  private async issue(user: User): Promise<AuthResult> {
-    const payload: JwtPayload = {
-      sub: user.id,
-      role: user.role,
-      email: user.email,
-      tokenVersion: user.tokenVersion ?? 0,
-    };
-    const accessToken = await this.jwt.signAsync({ ...payload, typ: 'access', ...(user.mustChangePassword ? { pwc: true } : {}) }, {
+  private claims(user: User): JwtPayload {
+    return { sub: user.id, role: user.role, email: user.email, tokenVersion: user.tokenVersion ?? 0 };
+  }
+
+  /** A new sign-in: an access token and a refresh token that starts a new family (or an untracked one without sessions). */
+  private async issue(user: User, opts: { refresh?: boolean } = {}): Promise<AuthResult> {
+    const accessToken = await this.jwt.signAsync({ ...this.claims(user), typ: 'access', ...(user.mustChangePassword ? { pwc: true } : {}) }, {
       secret: this.config.get<string>('jwt.secret'),
       // `expiresIn` accepts vercel/ms strings ("15m") at runtime; the typing
       // wants a template-literal union, so widen from the env string.
       expiresIn: this.config.get<string>('jwt.accessTtl') as unknown as number,
     });
-    const refreshToken = await this.jwt.signAsync({ ...payload, typ: 'refresh' }, {
+    const mustChangePassword = !!user.mustChangePassword;
+    if (opts.refresh === false) return { user: UsersService.toPublic(user), accessToken, refreshToken: '', mustChangePassword };
+    const refreshToken = this.sessions
+      ? (await this.mintRefresh(user, this.sessions.newId())).token
+      : await this.jwt.signAsync({ ...this.claims(user), typ: 'refresh' }, {
+          secret: this.config.get<string>('jwt.refreshSecret'),
+          expiresIn: this.config.get<string>('jwt.refreshTtl') as unknown as number,
+        });
+    return { user: UsersService.toPublic(user), accessToken, refreshToken, mustChangePassword };
+  }
+
+  /** Sign a tracked refresh token in `familyId` and remember it. */
+  private async mintRefresh(user: User, familyId: string): Promise<{ id: string; token: string }> {
+    const sessions = this.sessions as SessionsService;
+    const id = sessions.newId();
+    const token = await this.jwt.signAsync({ ...this.claims(user), typ: 'refresh', jti: id }, {
       secret: this.config.get<string>('jwt.refreshSecret'),
       expiresIn: this.config.get<string>('jwt.refreshTtl') as unknown as number,
     });
-    return { user: UsersService.toPublic(user), accessToken, refreshToken, mustChangePassword: !!user.mustChangePassword };
+    const exp = (this.jwt.decode<JwtPayload>(token)?.exp ?? 0) * 1000;
+    await sessions.record({ id, userId: user.id, familyId, expiresAt: new Date(exp) });
+    return { id, token };
+  }
+
+  /** The refresh token for an existing record (handed out again inside the grace window): same id, same expiry. */
+  private async signRefresh(user: User, id: string, expiresAt: Date): Promise<string> {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expSec = Math.floor(new Date(expiresAt).getTime() / 1000);
+    return this.jwt.signAsync({ ...this.claims(user), typ: 'refresh', jti: id }, {
+      secret: this.config.get<string>('jwt.refreshSecret'),
+      expiresIn: Math.max(1, expSec - nowSec),
+    });
   }
 }

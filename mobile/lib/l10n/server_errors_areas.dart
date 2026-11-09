@@ -36,6 +36,9 @@ const Map<String, String> kServerErrorsAreas = {
   // staff:setActive (admin only; listed by the contract, so every client knows them)
   'Super admin only.': 'Réservé au super administrateur.',
   'Only riders and warehouse staff can be switched on or off here.': 'Seuls les livreurs et le personnel d’entrepôt peuvent être activés ou désactivés ici.',
+  'Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.': 'Seuls les comptes du personnel (livreurs, personnel d’entrepôt et administrateurs) peuvent être activés ou désactivés ici.',
+  'You cannot switch off your own account.': 'Vous ne pouvez pas désactiver votre propre compte.',
+  'You cannot switch off the last active super admin.': 'Vous ne pouvez pas désactiver le dernier super administrateur actif.',
   'Only parcels waiting at this warehouse can join this run.': 'Seuls les colis en attente dans cet entrepôt peuvent rejoindre cette tournée.',
   'Choose at least one parcel.': 'Choisissez au moins un colis.',
   'Choose parcels of this run.': 'Choisissez des colis de cette tournée.',

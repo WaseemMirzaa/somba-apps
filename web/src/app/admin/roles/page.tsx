@@ -51,6 +51,9 @@ const ROLE_SCOPE_FR: Record<string, string> = {
   "Deliveries, GPS, work stats": "Livraisons, GPS, statistiques",
 };
 
+/** Admin accounts the super admin switches off and on here (riders and warehouse staff: Warehouses > Staff). */
+const ADMIN_FAMILY = ["admin", "admin_operations", "admin_finance", "admin_support", "admin_marketing", "admin_moderation"];
+
 const CREATABLE = ["rider", "warehouse_staff", "admin_operations", "admin_finance", "admin_support", "admin_marketing", "admin_moderation"];
 
 export default function AdminRolesPage() {
@@ -76,6 +79,10 @@ export default function AdminRolesPage() {
   const [resetting, setResetting] = useState<StaffRow | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  // Super admin switches an admin account off or back on (staff:setActive; confirmed first, audited by the server).
+  const [switching, setSwitching] = useState<StaffRow | null>(null);
+  const [switchBusy, setSwitchBusy] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   const roleName = (key: string) => {
     const d = defs.find((x) => x.key === key);
@@ -147,6 +154,30 @@ export default function AdminRolesPage() {
       toast(msg, "error");
     } finally {
       setResetBusy(false);
+    }
+  }
+
+  async function setActive() {
+    if (!switching) return;
+    const next = !switching.active;
+    setSwitchBusy(true);
+    setSwitchError(null);
+    try {
+      await socketClient.request("staff:setActive", { userId: switching.id, active: next });
+      toast(
+        next
+          ? fr ? `Compte de ${switching.name} réactivé` : `${switching.name}'s account restored`
+          : fr ? `Compte de ${switching.name} suspendu` : `${switching.name}'s account suspended`,
+        "success",
+      );
+      setSwitching(null);
+      await reload();
+    } catch (e) {
+      const msg = errMessage(e);
+      setSwitchError(msg);
+      toast(msg, "error");
+    } finally {
+      setSwitchBusy(false);
     }
   }
 
@@ -261,12 +292,21 @@ export default function AdminRolesPage() {
             {
               key: "active",
               label: fr ? "Actif" : "Active",
-              render: (row) =>
-                row.active === undefined ? (
-                  <span className="text-slate-400">—</span>
-                ) : (
-                  <Badge variant={row.active ? "success" : "danger"}>{row.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge>
-                ),
+              render: (row) => {
+                if (row.active === undefined) return <span className="text-slate-400">—</span>;
+                const u = row as unknown as StaffRow;
+                const canSwitch = ADMIN_FAMILY.includes(u.role) && u.id !== rt.user?.id;
+                return (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={u.active ? "success" : "danger"}>{u.active ? (fr ? "Actif" : "Active") : fr ? "Inactif" : "Inactive"}</Badge>
+                    {canSwitch && (
+                      <Button size="sm" variant="secondary" onClick={() => { setSwitchError(null); setSwitching(u); }}>
+                        {u.active ? (fr ? "Suspendre" : "Suspend") : fr ? "Réactiver" : "Restore"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              },
             },
             {
               key: "twofaEnabled",
@@ -332,6 +372,36 @@ export default function AdminRolesPage() {
             : ""}
         </p>
         <ErrorNote message={resetError} />
+      </Modal>
+      <Modal
+        open={!!switching}
+        onClose={() => { if (!switchBusy) setSwitching(null); }}
+        title={
+          switching?.active
+            ? fr ? "Suspendre ce compte administrateur ?" : "Suspend this admin account?"
+            : fr ? "Réactiver ce compte administrateur ?" : "Restore this admin account?"
+        }
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setSwitching(null)} disabled={switchBusy}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant={switching?.active ? "danger" : "primary"} size="sm" onClick={() => void setActive()} disabled={switchBusy}>
+              {switchBusy ? "…" : switching?.active ? (fr ? "Suspendre" : "Suspend") : fr ? "Réactiver" : "Restore"}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {switching
+            ? switching.active
+              ? fr
+                ? `${switching.name} est déconnecté(e) partout aussitôt et ne peut plus se connecter tant que le compte est suspendu. Son rôle ne change pas. L'action est inscrite au journal d'audit.`
+                : `${switching.name} is signed out everywhere at once and cannot sign in while the account is suspended. Their role does not change. The action is recorded in the audit log.`
+              : fr
+                ? `${switching.name} peut de nouveau se connecter, avec le même rôle. L'action est inscrite au journal d'audit.`
+                : `${switching.name} can sign in again, with the same role. The action is recorded in the audit log.`
+            : ""}
+        </p>
+        <ErrorNote message={switchError} />
       </Modal>
       <HomeWarehouseDialog user={placing} hubs={hubs.items} fr={fr} onClose={() => setPlacing(null)} onSaved={() => void reload()} />
       <HomeWarehouseDialog user={promoting?.user ?? null} nextRole={promoting?.role} hubs={hubs.items} fr={fr} onClose={() => setPromoting(null)} onSaved={() => void reload()} />
