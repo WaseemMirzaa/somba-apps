@@ -58,6 +58,23 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['SOM-1001 reached the Somba&Teka warehouse and will be on its way soon.', 'SOM-1001 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'],
   ],
   // The three-leg journey: warehouse desk, riders, sellers, routing alerts
+  // RD-01: the delivery code lockout
+  '{}: {} entered a wrong delivery code {} times. Call the customer to check the code.': [
+    ['SOM-1001: Amadou Kone entered a wrong delivery code 3 times. Call the customer to check the code.', 'SOM-1001 : Amadou Kone a saisi 3 fois un code de livraison erroné. Appelez le client pour vérifier le code.'],
+  ],
+  '{}: {} entered {} wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.': [
+    [
+      'SOM-1001: Amadou Kone entered 15 wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.',
+      'SOM-1001 : Amadou Kone a saisi 15 codes de livraison erronés. La saisie du code est verrouillée jusqu’à ce qu’un superviseur la déverrouille. Appelez le client pour vérifier le code.',
+    ],
+  ],
+  '{}: {} entered {} wrong delivery codes. The code step is locked for {} minutes. Call the customer to check the code.': [
+    [
+      'SOM-1001: Amadou Kone entered 5 wrong delivery codes. The code step is locked for 15 minutes. Call the customer to check the code.',
+      'SOM-1001 : Amadou Kone a saisi 5 codes de livraison erronés. La saisie du code est verrouillée pendant 15 minutes. Appelez le client pour vérifier le code.',
+    ],
+  ],
+  '{}: you can enter the delivery code again.': [['SOM-1001: you can enter the delivery code again.', 'SOM-1001 : vous pouvez de nouveau saisir le code de livraison.']],
   '{}: {} needs a rider.': [
     ['SOM-1001: pickup needs a rider.', 'SOM-1001 : tâche « enlèvement » à confier à un livreur.'],
     ['SOM-1001: transfer needs a rider.', 'SOM-1001 : tâche « transfert » à confier à un livreur.'],

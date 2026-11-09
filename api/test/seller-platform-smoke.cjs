@@ -307,6 +307,11 @@ const upload = async (path, token, buf = PNG, name = 'doc.png') => {
   ok(!a.ok, 'a wrong code is refused');
   a = await req(tw.sock, 'auth:2fa:enable', { code: totp(secret) });
   ok(a.ok && a.data.enabled && a.data.recoveryCodes.length === 10 && /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(a.data.recoveryCodes[0]), 'the right code enables it and shows 10 recovery codes once', a.error);
+  // Turning 2FA on signs out the account's other sessions; this device gets fresh tokens and keeps its socket (A-02).
+  ok(!!a.data.accessToken && !!a.data.refreshToken, 'and hands this device fresh tokens (every other session was signed out)');
+  ok((await rest('GET', '/api/v1/auth/me', null, tw.token)).status === 401, 'the access token from before 2FA was turned on no longer works');
+  tw.token = a.data.accessToken;
+  ok(tw.sock.connected, 'the socket that turned it on stays open');
   const recovery = a.data.recoveryCodes;
   ok((await req(tw.sock, 'auth:2fa:status')).data.recoveryRemaining === 10, 'status counts the recovery codes');
   ok(!(await req(tw.sock, 'auth:2fa:setup')).ok, 'setup is refused while it is on');

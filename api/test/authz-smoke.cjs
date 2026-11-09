@@ -319,6 +319,23 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(admin.sock, 'customers:setActive', { id: admin.user.id, active: false })).ok, 'an admin cannot suspend themselves');
   ok(!(await req(admin.sock, 'customers:setActive', { id: finance.user.id, active: false })).ok, 'staff accounts are not suspended through the customer list');
 
+  // department admins are switched off and on by the super admin (audit AD-03)
+  const deptMade = await req(admin.sock, 'roles:createStaff', { email: `dept${tag}@authz.test`, name: 'Dept admin', role: 'admin_marketing' });
+  ok(deptMade.ok && deptMade.data.tempPassword, 'the super admin creates a marketing admin', deptMade.error ?? '');
+  const dept = await login(deptMade.data.email, deptMade.data.tempPassword);
+  let deptDropped = false; dept.sock.on('disconnect', () => { deptDropped = true; });
+  ok(!(await req(finance.sock, 'staff:setActive', { userId: dept.user.id, active: false })).ok, 'a department admin cannot switch another admin off');
+  ok(!(await req(admin.sock, 'staff:setActive', { userId: admin.user.id, active: false })).ok, 'the super admin cannot switch themselves off');
+  a = await req(admin.sock, 'staff:setActive', { userId: dept.user.id, active: false });
+  ok(a.ok && a.data.active === false && a.data.role === 'admin_marketing', 'the super admin suspends the marketing admin', a.error ?? '');
+  ok(!!(await until(() => deptDropped, 3000)), 'their open socket is closed at once');
+  ok((await rest('/api/v1/auth/login', { email: deptMade.data.email, password: deptMade.data.tempPassword })).status === 401, 'a suspended department admin cannot sign in');
+  const deptAudit = (await req(admin.sock, 'audit:list', { action: 'staff.deactivate' })).data;
+  ok((Array.isArray(deptAudit) ? deptAudit : deptAudit?.items ?? []).some((l) => l.entityId === dept.user.id), 'the suspension is in the audit log');
+  a = await req(admin.sock, 'staff:setActive', { userId: dept.user.id, active: true });
+  ok(a.ok && a.data.active === true, 'and restores them', a.error ?? '');
+  ok((await rest('/api/v1/auth/login', { email: deptMade.data.email, password: deptMade.data.tempPassword })).status === 200, 'a restored department admin signs in again');
+
   // ---- campaigns, replacements, exchanges, payouts ------------------------
   section('Campaigns, returns and payouts');
   let c = await req(sellerA.sock, 'campaigns:create', { name: 'Summer', discount: 20, budgetUsd: 100 });

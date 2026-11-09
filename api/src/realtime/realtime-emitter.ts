@@ -19,6 +19,16 @@ export class RealtimeEmitter {
     this.server = server;
   }
 
+  /**
+   * Close every open socket of an account at once (its sessions were revoked), except `exceptSocketId` (the device that
+   * made the change and keeps working). Goes through the adapter, so with Redis it reaches every API instance.
+   */
+  disconnectUser(userId: string, exceptSocketId?: string): void {
+    if (!this.server) return;
+    const room = this.server.in(RealtimeEmitter.userRoom(userId));
+    (exceptSocketId ? room.except(exceptSocketId) : room).disconnectSockets(true);
+  }
+
   static userRoom(userId: string): string {
     return `user:${userId}`;
   }

@@ -209,9 +209,9 @@ flowchart TB
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | Create a customer or seller account (other roles refused) | — |
 | POST | `/api/v1/auth/login` | Email + password → `{ accessToken, refreshToken, user }` | — |
-| POST | `/api/v1/auth/refresh` | New token pair; refused if `tokenVersion` changed or the account is suspended | refresh token |
+| POST | `/api/v1/auth/refresh` | New token pair; the refresh token is **rotated** (store the new one). The replaced token is still answered for 20 s with the same successor (reload, two tabs, retry); presented again after that it signs the account out everywhere and is audited (`session.refresh_reuse`). Refused if `tokenVersion` changed or the account is switched off | refresh token |
 | GET | `/api/v1/auth/me` | Current user | Bearer |
-| POST | `/api/v1/auth/logout-all` | Revoke every session (bumps `tokenVersion`) | Bearer |
+| POST | `/api/v1/auth/logout-all` | Revoke every session (bumps `tokenVersion`, revokes stored refresh tokens, closes every open socket at once) | Bearer |
 | POST | `/api/v1/auth/forgot` | Send a reset link (same answer whether or not the email exists) | — |
 | POST | `/api/v1/auth/reset` | Token + new password; revokes sessions | — |
 | POST | `/api/v1/auth/email/send` · `/email/verify` | Email verification (24 h link, 30 s resend cooldown) | Bearer / token |
@@ -256,7 +256,9 @@ sequenceDiagram
 |---|---|---|
 | Passwords | bcrypt, cost 12; minimum 8 characters | `auth.service.ts` |
 | Tokens | JWT access (`JWT_ACCESS_TTL`, default 15 min) and refresh (`JWT_REFRESH_TTL`, default 30 days), separate secrets; payload carries `sub`, `role`, `tokenVersion` | `auth.service.ts` |
-| Revocation | `users.tokenVersion` bumped on password change/reset, logout-all, role change, suspension, deletion → old access/refresh tokens and sockets rejected; `kick()` disconnects live sockets | `auth.service.ts`, gateway |
+| Revocation | `users.tokenVersion` bumped on password change/reset, logout-all, 2FA on/off, role change, suspension, deletion, refresh-token reuse → old access/refresh tokens rejected on REST (`JwtStrategy` checks `tokenVersion` and `active`, one primary-key lookup per call), refresh and the socket handshake; the user's open sockets are closed at once (`SessionsService` → `RealtimeEmitter.disconnectUser`, gateway `kick()`) | `sessions.service.ts`, `jwt.strategy.ts`, gateway |
+| Socket lifetime | A socket lives as long as its access token: 30 s before it expires the server sends `reauth`; the app answers `auth:reauth { token }` with a fresh access token on the same connection. 60 s after expiry an unrenewed socket gets `unauthorized { reason: 'token_expired' }` and is closed (the apps then refresh and reconnect) | `realtime.gateway.ts` |
+| Refresh rotation | `refresh_tokens` (one row per token, keyed by its `jti`; the token is never stored): rotate on every refresh, 20 s reuse grace, reuse after it revokes every session of the account. Tokens issued before rotation (no `jti`) keep working, unrotated, until they expire | `sessions.service.ts`, `auth.service.ts` |
 | Encryption at rest | AES-256-GCM column transformer on `users.email/phone/address`, `addresses.*` personal fields, `orders.shippingAddress`, `delivery_tasks.address`, `payments.phone`; key `DATA_ENCRYPTION_KEY` | `common/crypto/field-crypto.ts` |
 | Lookup without decryption | `users.emailHash` (deterministic hash) unique index | `users.service.ts` |
 | Authorization | Role checks in each handler; admin groups (`config`, `content`, `catalog`, `people`, `insight`, `audit`, `fraud`); ownership checks (same "not found" answer for "not yours" so ids cannot be probed) | `realtime.gateway.ts` |
@@ -1546,7 +1548,7 @@ Gaps: verification is **not required** before ordering (recommend: verified phon
 4. Before expiry the client calls `/auth/refresh`; the socket's `auth` callback always supplies the newest token on reconnect.
 5. **Suspension / role change / password change** → server bumps `tokenVersion` and disconnects the user's sockets → client's refresh gets 401/403 → app returns to the sign-in screen with a message.
 
-Gaps: no login lockout / progressive delay per account; refresh tokens are not rotated or stored server-side (no "active devices" list, no single-session revoke); no 2FA for staff.
+Gaps: no login lockout / progressive delay per account; refresh tokens are rotated with reuse detection (`refresh_tokens`), but there is no "active devices" list or single-session revoke yet.
 
 ### F3. Browsing the catalogue ✅ / 🟡
 
@@ -1766,7 +1768,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `delivery:list` | Desk (`admin`, `admin_operations`, warehouse_staff), rider (own) | `—` |  |
 | `delivery:unassigned` | Desk (`admin`, `admin_operations`, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
 | `delivery:accept` | rider | `{ taskId: string }` | Always refused: "Your warehouse assigns your tasks. You cannot accept a task yourself." |
-| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered |
+| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered. With `requireDeliveryCode` on, `delivered` takes `code`: 5 wrong codes lock the step 15 min, 10 wrong 1 h, 15 wrong until a supervisor unlocks it (counted per task in `delivery_tasks.codeFailures` / `codeLockedUntil`; the correct code resets it) |
+| `delivery:resetCode` | warehouse supervisor or above of the task's warehouse, `admin`, `admin_operations` | `{ taskId: string }` | Clears the wrong-code counter and lock of a delivery task (audit `delivery.code_unlocked`, the rider is notified). Wrong tries are audited as `delivery.code_failed` / `delivery.code_locked`; from the 3rd the warehouse staff and admins get a notice |
 | `delivery:location` | rider (assigned) | `{ taskId: string; lat: number; lng: number }` | Pushed to the customer and ops as `delivery:location` |
 | `delivery:assign` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
 
@@ -2064,6 +2067,7 @@ Cards (Stripe, `docs/PAYMENTS-STRIPE.md`): `payments:card-sheet` `{ orderId?, re
 | `notification:new` | NotificationsService | a user, or a whole role (broadcasts) |
 | `me:updated`, `addresses:updated`, `wishlist:updated` | Gateway / Addresses / Wishlist | the user (all their devices) |
 | `ready` / `unauthorized` | Gateway (connection) | the connecting socket |
+| `reauth` → `auth:reauth { token }` | Gateway (token about to expire) | that socket |
 
 Minor gaps: sellers do not receive `product:updated` for their own listings and guests do not receive `product:created` (they refresh on reconnect).
 

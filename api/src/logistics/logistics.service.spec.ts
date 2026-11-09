@@ -1159,11 +1159,11 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(await logistics.assign(leg.id, other.id, admin)).toMatchObject({ riderId: other.id });
     });
 
-    it('only riders and warehouse staff can be switched here (not customers, not other admins), and the account must exist', async () => {
+    it('only staff accounts can be switched here (not customers or sellers), and the account must exist', async () => {
       const customer = await mkUser('customer', null);
-      const adminUser = await mkUser('admin_support', null);
-      await expect(roles().setStaffActive(customer.id, false)).rejects.toThrow('Only riders and warehouse staff can be switched on or off here.');
-      await expect(roles().setStaffActive(adminUser.id, false)).rejects.toThrow('Only riders and warehouse staff can be switched on or off here.');
+      const seller = await mkUser('seller', null);
+      await expect(roles().setStaffActive(customer.id, false)).rejects.toThrow('Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.');
+      await expect(roles().setStaffActive(seller.id, false)).rejects.toThrow('Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.');
       await expect(roles().setStaffActive('nope', false)).rejects.toThrow('Account not found.');
       expect((await user(customer.id)).active).toBe(true);
       const staffUser = await mkUser('warehouse_staff', limete.id, { warehouseTier: 'operator' });
@@ -1202,13 +1202,12 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect((await logistics.ridersFor(leg)).map((r) => r.id).sort()).toEqual([riderG.id, riderL.id].sort());
     });
 
-    it('a switched-off rider, warehouse employee, customer or seller gets no new session; the other admin roles are not affected', () => {
+    it('a switched-off account of any role gets no new session, department admins included (AD-03)', () => {
       const guard = Object.create(AuthService.prototype) as AuthService;
-      for (const role of ['rider', 'warehouse_staff', 'customer', 'seller'] as const) {
+      for (const role of ['rider', 'warehouse_staff', 'customer', 'seller', 'admin_support', 'admin_finance', 'admin_operations', 'admin_marketing', 'admin_moderation', 'admin'] as const) {
         expect(() => guard.assertNotSuspended({ role, active: false } as User)).toThrow('This account has been suspended. Contact support.');
         expect(() => guard.assertNotSuspended({ role, active: true } as User)).not.toThrow();
       }
-      expect(() => guard.assertNotSuspended({ role: 'admin_support', active: false } as User)).not.toThrow();
     });
   });
 });

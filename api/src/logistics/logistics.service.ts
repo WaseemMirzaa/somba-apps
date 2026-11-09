@@ -20,6 +20,7 @@ import {
   User,
 } from '../database/entities';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { isCodeLocked } from '../delivery/delivery-code-lock';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { SettingsService } from '../content/settings.service';
 import { parseAddressPin } from '../common/geo/geo';
@@ -126,6 +127,10 @@ export interface TaskView {
   collectOld: boolean;
   /** Does finishing this leg need the customer's 4-digit code? (Only a delivery to the customer, and only while `requireDeliveryCode` is on.) */
   needsCode: boolean;
+  /** RD-01: wrong customer codes counted on this task, until when the code step is locked, and whether it is locked right now (a supervisor unlocks it). */
+  codeFailures: number;
+  codeLockedUntil: Date | null;
+  codeLocked: boolean;
   /** Is this a leg of the order's own journey (so it moves the customer's order status)? */
   orderFlow: boolean;
   /** The transfer run (manifest) the parcel travels in, with its reference ("TR-0042"); null when none. */
@@ -386,6 +391,9 @@ export class LogisticsService {
         items,
         collectOld: t.kind === 'replacement_delivery',
         needsCode: codeRequired && (t.kind ?? 'delivery') === 'delivery',
+        codeFailures: t.codeFailures ?? 0,
+        codeLockedUntil: t.codeLockedUntil ?? null,
+        codeLocked: isCodeLocked(t, Date.now()),
         orderFlow: isOrderFlow({ kind: t.kind ?? 'delivery', disputeId: t.disputeId, replacementId: t.replacementId, exchangeId: t.exchangeId }),
         runId: t.runId ?? null,
         runReference: t.runId ? (runRefs.get(t.runId) ?? null) : null,
@@ -394,7 +402,7 @@ export class LogisticsService {
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
-        return { ...base, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
+        return { ...base, codeFailures: 0, codeLockedUntil: null, codeLocked: false, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
       }
       return base;
     });
@@ -1289,6 +1297,33 @@ export class LogisticsService {
       .catch(() => undefined);
     await this.notifications
       .toUsers(await this.staffIds(task.hubId), { title: 'Task needs attention', body: `${task.orderReference}: ${kindLabel(task.kind)} failed after ${task.attempts} attempts (${reason}).`, type: 'task', entityId: task.id })
+      .catch(() => undefined);
+  }
+
+  /**
+   * RD-01: a rider keeps typing a wrong customer code (3rd wrong try on, and again when the step locks). The warehouse and the
+   * admins are told so someone can phone the customer. `lock` is what the latest wrong try triggered, if anything.
+   */
+  async alertCodeFailures(task: DeliveryTask, riderName: string, failures: number, lock: { supervisor: boolean; minutes: number } | null): Promise<void> {
+    const notice = {
+      title: lock ? 'Delivery code locked' : 'Wrong delivery codes',
+      body: lock
+        ? lock.supervisor
+          ? `${task.orderReference}: ${riderName} entered ${failures} wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.`
+          : `${task.orderReference}: ${riderName} entered ${failures} wrong delivery codes. The code step is locked for ${lock.minutes} minutes. Call the customer to check the code.`
+        : `${task.orderReference}: ${riderName} entered a wrong delivery code ${failures} times. Call the customer to check the code.`,
+      type: 'task',
+      entityId: task.id,
+    };
+    await this.notifications.toAdmins(notice).catch(() => undefined);
+    await this.notifications.toUsers(await this.staffIds(task.hubId), notice).catch(() => undefined);
+  }
+
+  /** A supervisor unlocked the delivery code: the rider is told they can type it again. */
+  async alertCodeUnlocked(task: DeliveryTask): Promise<void> {
+    if (!task.riderId) return;
+    await this.notifications
+      .toUser(task.riderId, { title: 'Delivery code unlocked', body: `${task.orderReference}: you can enter the delivery code again.`, type: 'task', entityId: task.id, extra: { orderId: task.orderId, kind: task.kind } })
       .catch(() => undefined);
   }
 
