@@ -250,6 +250,9 @@ MySQL with its time zone on UTC.
 > `Somba@2026`. The demo credentials in Step 0 exist only on a staging/demo box
 > where you deliberately ran `npm run seed`. On production, the only login is the
 > admin you create above; create staff via the admin panel.
+>
+> The seed now enforces this itself: it exits without touching anything when `NODE_ENV=production`, or when the database
+> already holds accounts it did not create, unless `I_UNDERSTAND_THIS_WIPES_EVERYTHING=1` is set for that one command.
 
 #### Changing or recreating the admin account
 

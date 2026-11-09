@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 import { NestFactory } from '@nestjs/core';
-import { DataSource } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../app.module';
 import {
@@ -36,6 +36,7 @@ import { GeoService } from '../geo/geo.service';
 import { CoverageService } from '../geo/coverage.service';
 import { sourceHash } from '../translation/translatable';
 import { wipeSeededData } from './seed-wipe';
+import { seedRefusalForData, seedRefusalForEnvironment } from './seed-guard';
 
 /** Every demo account shares one password so the prototype is easy to drive. */
 const DEMO_PASSWORD = 'Somba@2026';
@@ -91,10 +92,26 @@ const CATALOG: (Partial<Product> & { nameFr: string | null; categoryName: string
 }));
 
 async function run() {
+  // The seed wipes everything: stop before even connecting when this is production (audit S-01).
+  const early = seedRefusalForEnvironment();
+  if (early) {
+    console.error(early);
+    process.exit(1);
+  }
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
   });
   const ds = app.get(DataSource);
+
+  // ...and stop when the database holds accounts the seed did not make: that is real data, whatever NODE_ENV says.
+  const demoHashes = DEMO_USERS.map((u) => UsersService.emailHash(u.email));
+  const others = await ds.getRepository(User).count({ where: { emailHash: Not(In(demoHashes)) } });
+  const refusal = seedRefusalForData(others);
+  if (refusal) {
+    console.error(refusal);
+    await app.close();
+    process.exit(1);
+  }
 
   console.log('Clearing existing data…');
   // Foreign keys decide the order (see seed-wipe.ts); lanes, transfer runs and batches go with the hubs and tasks they refer to.
