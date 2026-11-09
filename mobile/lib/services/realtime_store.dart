@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show Random;
 import 'package:flutter/foundation.dart';
 import '../data/market_profiles.dart';
 import '../l10n/strings.dart';
@@ -523,27 +524,90 @@ class RealtimeStore extends ChangeNotifier {
   @visibleForTesting
   Future<dynamic> Function(String event, [Map<String, dynamic>? body])? debugPlaceOrderRequest;
 
+  /// How long `orders:create` may take. The server can wait up to 15 s (and a retry) on the payment provider inside
+  /// that call, so the default 8 s made the app say "no response" while the order was still being placed (C-01).
+  static const placeOrderTimeout = Duration(seconds: 45);
+
+  /// The idempotency key of the checkout attempt in progress (C-01): made on the first "Place order" tap and sent
+  /// unchanged on every retry until the server gives a definite answer, so a retry can never become a second order
+  /// or a second charge. Kept here (not on the screen) so leaving checkout and coming back is still the same attempt.
+  String? checkoutAttemptKey;
+
+  /// The key of the current checkout attempt, made on first use (see [checkoutAttemptKey]).
+  String checkoutKey() => checkoutAttemptKey ??= newCheckoutKey();
+
+  /// The attempt got a definite answer (placed, or refused by the server): the next tap is a new attempt.
+  void endCheckoutAttempt() => checkoutAttemptKey = null;
+
+  /// A random (version 4) UUID.
+  static String newCheckoutKey() {
+    final rng = Random.secure();
+    final b = List<int>.generate(16, (_) => rng.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
+  /// Whether a failed [placeOrder] leaves the result open (nothing definite from the server): the same attempt key
+  /// must then be kept for the retry. A refusal the server sent is definite.
+  static bool placeOrderOutcomeUnknown(Object e) =>
+      e is ApiException &&
+      (e.code == 'order_processing' || // the server: an earlier request with this key is still running
+          const {'err_no_response', 'err_no_connection', 'err_order_processing', 'err_order_unknown', 'err_order_not_sent'}.contains(e.localKey));
+
   /// Place an order. Lines reference real listings by id; the SERVER prices
   /// them (the app only displays prices). For mobile-money methods the order is
   /// created `pending` and confirmed later by the network — watch [orders] /
   /// [payments] (pushed live) or call [awaitOrderSettled].
+  ///
+  /// [clientRequestId] is the checkout attempt's key ([checkoutKey]): the server returns the same order for the same
+  /// key, never a second one. When the server does not answer in [placeOrderTimeout], the app asks it what became of
+  /// that attempt (`orders:byRequest`) before saying anything: the order if it was placed, otherwise an
+  /// [ApiException] that says plainly whether it failed, is still being processed, never arrived, or is unknown.
   Future<OrderDto> placeOrder({
     required List<Map<String, dynamic>> items,
     required String paymentMethod,
     String? paymentPhone,
     Map<String, dynamic>? address,
     String? promoCode,
+    String? clientRequestId,
   }) async {
-    final res = await (debugPlaceOrderRequest ?? _socket.request)('orders:create', {
+    final body = {
       'items': items,
       'paymentMethod': paymentMethod,
       if (promoCode != null && promoCode.isNotEmpty) 'promoCode': promoCode,
       if (paymentPhone != null && paymentPhone.isNotEmpty) 'paymentPhone': paymentPhone,
       if (address != null) 'shippingAddress': jsonEncode(address),
-    });
+      if (clientRequestId != null) 'clientRequestId': clientRequestId,
+    };
+    dynamic res;
+    try {
+      final fake = debugPlaceOrderRequest;
+      res = fake != null ? await fake('orders:create', body) : await _socket.requestWithin('orders:create', body, placeOrderTimeout);
+    } on ApiException catch (e) {
+      if (clientRequestId == null || e.localKey != 'err_no_response') rethrow;
+      res = await _orderOfAttempt(clientRequestId);
+    }
     final order = OrderDto.fromJson(_map(res));
     _upsertOrder(res);
     return order;
+  }
+
+  /// `orders:create` went unanswered: what became of the attempt? The order when it was placed, else a plain error.
+  Future<dynamic> _orderOfAttempt(String clientRequestId) async {
+    dynamic found;
+    try {
+      found = await (debugPlaceOrderRequest ?? _socket.request)('orders:byRequest', {'clientRequestId': clientRequestId});
+    } catch (_) {
+      throw ApiException.local('err_order_unknown');
+    }
+    final state = found is Map ? found['state'] : null;
+    if (state == 'placed' && found['order'] is Map) return found['order'];
+    if (state == 'failed') throw ApiException.local('err_order_failed');
+    if (state == 'processing') throw ApiException.local('err_order_processing');
+    if (state == 'none') throw ApiException.local('err_order_not_sent');
+    throw ApiException.local('err_order_unknown');
   }
 
   /// Resolves with the order once it leaves `pending` (confirmed / cancelled…),

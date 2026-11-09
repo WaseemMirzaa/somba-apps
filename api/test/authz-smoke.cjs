@@ -138,7 +138,7 @@ const register = async (label, role = 'customer') => {
   const priceOf = (await req(buyer.sock, 'products:get', { id: prodA.id })).data.price; // $100
   const cheap = (await req(admin.sock, 'products:create', { name: `Cheap ${tag}`, price: 30, category: 'Electronics', stock: 100 })).data;
   const burst = await Promise.all(Array.from({ length: 10 }, () =>
-    req(buyer.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })));
+    req(buyer.sock, 'orders:create', { clientRequestId: require('crypto').randomUUID(), shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })));
   const wins = burst.filter((r) => r.ok).length;
   const bal = (await req(buyer.sock, 'wallet:get')).data.balance;
   const fee = burst.find((r) => r.ok)?.data.deliveryFeeUsd ?? 2; // an unpinned address pays the base delivery fee
@@ -150,7 +150,7 @@ const register = async (label, role = 'customer') => {
 
   const scarce = (await req(admin.sock, 'products:create', { name: `Scarce ${tag}`, price: 5, category: 'Electronics', stock: 3 })).data;
   const rush = await Promise.all(Array.from({ length: 10 }, (_, i) =>
-    req((i % 2 ? cust : cust2).sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: scarce.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, })));
+    req((i % 2 ? cust : cust2).sock, 'orders:create', { clientRequestId: require('crypto').randomUUID(), shippingAddress: ADDRESS, items: [{ productId: scarce.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE, })));
   ok(rush.filter((r) => r.ok).length === 3, `10 buyers race for 3 units → exactly 3 orders (got ${rush.filter((r) => r.ok).length})`);
   ok((await req(admin.sock, 'products:get', { id: scarce.id })).data.stock === 0, 'stock ends at exactly 0, never negative');
 
@@ -159,7 +159,7 @@ const register = async (label, role = 'customer') => {
   ok(!wo.ok, 'a wallet order beyond the remaining balance is refused');
   await req(buyer.sock, 'wallet:topup', { amountUsd: 40, method: 'airtel_money', phone: PHONE });
   await until(async () => (await req(buyer.sock, 'wallet:get')).data.balance >= 57);
-  const paid = (await req(buyer.sock, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })).data;
+  const paid = (await req(buyer.sock, 'orders:create', { clientRequestId: require('crypto').randomUUID(), shippingAddress: ADDRESS, items: [{ productId: cheap.id, qty: 1 }], paymentMethod: 'wallet', })).data;
   const before = (await req(buyer.sock, 'wallet:get')).data.balance; // 57 - 33 = 24
   const cancels = await Promise.all(Array.from({ length: 6 }, () => req(buyer.sock, 'orders:cancel', { orderId: paid.id })));
   const after = (await req(buyer.sock, 'wallet:get')).data.balance;

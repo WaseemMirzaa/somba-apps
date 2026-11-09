@@ -46,7 +46,12 @@ class SocketService {
   void off(String event) => _socket?.off(event);
 
   /// Emit and await the server's `{ok, data|error}` acknowledgement.
-  Future<dynamic> request(String event, [Map<String, dynamic>? body]) {
+  Future<dynamic> request(String event, [Map<String, dynamic>? body]) =>
+      requestWithin(event, body, const Duration(seconds: 8));
+
+  /// [request] with its own time limit: a call that may legitimately take long on the server (placing an order
+  /// waits on the payment provider) gets more than the default 8 s. Times out with `err_no_response`.
+  Future<dynamic> requestWithin(String event, Map<String, dynamic>? body, Duration timeout) {
     final socket = _socket;
     if (socket == null) {
       return Future.error(ApiException.local('err_no_connection'));
@@ -58,7 +63,7 @@ class SocketService {
       ack: (dynamic res) => settleAck(completer, res),
     );
     return completer.future.timeout(
-      const Duration(seconds: 8),
+      timeout,
       onTimeout: () => throw ApiException.local('err_no_response'),
     );
   }

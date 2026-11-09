@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { FlashSale, Order, Product, Promo, Seller } from '../database/entities';
 import type { FlashSalePhase } from '../database/entities';
+import type { EntityManager } from 'typeorm';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
@@ -159,6 +160,31 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
       .where("o.promoCode = :code AND o.status != 'cancelled'", { code });
     if (userId) qb.andWhere('o.customerId = :userId', { userId });
     return qb.getCount();
+  }
+
+  /**
+   * The redemption limits checked AGAIN inside the transaction that writes the order (C-03). `validate()` runs before
+   * the order exists, so on its own any number of concurrent checkouts all see "0 uses so far" and all get the
+   * discount. Here the promo row is locked first (`SELECT ... FOR UPDATE` on MySQL; SQLite runs one transaction at a
+   * time, `sqlite-transactions.ts`), so every checkout using this code queues on that row: each one counts the orders
+   * committed before it and its own order is written before the lock is released. A limit can therefore never be
+   * exceeded. The count stays derived from the orders (cancelled ones excluded), so a cancelled or failed order gives
+   * its redemption back with no counter to keep in step. Must be the FIRST statement of the transaction on MySQL, so
+   * the transaction's snapshot is taken after the lock is held.
+   */
+  async assertRedeemableIn(m: EntityManager, code: string, customerId: string): Promise<void> {
+    const type = m.connection.options.type;
+    const qb = m.getRepository(Promo).createQueryBuilder('p').where('p.code = :code', { code });
+    if (type === 'mysql' || type === 'mariadb') qb.setLock('pessimistic_write');
+    const promo = await qb.getOne();
+    if (!promo || !promo.active) throw new BadRequestException('Invalid code.');
+    const uses = (userId?: string) => {
+      const q = m.getRepository(Order).createQueryBuilder('o').where("o.promoCode = :code AND o.status != 'cancelled'", { code: promo.code });
+      if (userId) q.andWhere('o.customerId = :userId', { userId });
+      return q.getCount();
+    };
+    if (promo.maxUses != null && (await uses()) >= promo.maxUses) throw new BadRequestException('This code is no longer available.');
+    if (promo.perUserLimit != null && (await uses(customerId)) >= promo.perUserLimit) throw new BadRequestException('You have already used this code.');
   }
 
   /** Every id a store's products may carry as `sellerId` (the store row, and the owner's user id on old demo data). */

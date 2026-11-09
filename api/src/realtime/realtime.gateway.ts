@@ -27,7 +27,7 @@ import { AuthService } from '../auth/auth.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushService } from '../notifications/push.service';
-import { OrdersService } from '../orders/orders.service';
+import { OrderStillProcessingException, OrdersService } from '../orders/orders.service';
 import type { CreateOrderInput } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
 import { UsersService } from '../users/users.service';
@@ -646,17 +646,42 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       await this.assertVerifiedForCheckout(user.id);
-      const order = await this.orders.create(
+      // Idempotent (C-01): a retry of the same checkout attempt (same `clientRequestId`) gets the same order back.
+      // An older app sends no key: an identical cart while the first is still running (or just after) is the same order.
+      const { order, replayed } = await this.orders.place(
         { id: user.id, name: user.name },
         body,
+        { dedupWithoutKey: true },
       );
       // Fraud rules: the COD cap (only while COD is offered), failed payments, new-account bursts, shared phone/device, returns, address changes.
-      await this.fraud.afterOrder({ id: user.id, name: user.name }, order);
+      // A replay is the same order: it is not counted twice.
+      if (!replayed) await this.fraud.afterOrder({ id: user.id, name: user.name }, order);
       // The same view the customer's list and pushes carry (journey and warehouse names).
       return ok((await this.orders.customerViews([order]))[0] ?? order);
     } catch (e) {
+      // A same-key retry while the first request is still running: the outcome is open, the app keeps its key.
+      if (e instanceof OrderStillProcessingException) return { ...fail(e.message), code: e.code };
       // An address nobody serves: the English message plus { areaId, areaName, areaNameEn, servedCities } to render it in either language.
       return { ...fail((e as Error).message), ...notServedFields(e) };
+    }
+  }
+
+  /**
+   * What became of a checkout attempt, by its `clientRequestId` (C-01). The app asks this when `orders:create` timed
+   * out, before telling the shopper anything: { state: 'none' | 'processing' | 'placed' | 'failed', order? }. Only the
+   * caller's own attempts are visible.
+   */
+  @SubscribeMessage('orders:byRequest')
+  async ordersByRequest(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() body: { clientRequestId?: string },
+  ) {
+    try {
+      const user = this.requireUser(client);
+      const found = await this.orders.findByRequest(user.id, body?.clientRequestId);
+      return ok(found.order ? { ...found, order: (await this.orders.customerViews([found.order]))[0] ?? found.order } : found);
+    } catch (e) {
+      return fail((e as Error).message);
     }
   }
 

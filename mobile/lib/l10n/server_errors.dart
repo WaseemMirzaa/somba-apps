@@ -156,6 +156,12 @@ final Map<String, String> _exactFr = {
   // promo codes
   'Invalid code.': 'Code invalide.',
   'This code has expired.': 'Ce code a expiré.',
+  // orders:create idempotency (C-01)
+  'Invalid checkout reference. Please try again.': 'Référence de commande invalide. Veuillez réessayer.',
+  'Your order is still being processed. Check My orders in a moment before trying again.':
+      'Votre commande est toujours en cours de traitement. Consultez Mes commandes dans un instant avant de réessayer.',
+  'This checkout did not go through and nothing was charged. Please place the order again.':
+      'Cette commande n’a pas abouti et rien n’a été débité. Veuillez la passer à nouveau.',
   'This code is no longer available.': 'Ce code n’est plus disponible.',
   'You have already used this code.': 'Vous avez déjà utilisé ce code.',
   // payment outcomes

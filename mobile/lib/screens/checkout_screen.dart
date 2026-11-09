@@ -44,6 +44,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String payment = 'airtel_money';
   String? _phoneError;
   bool _placing = false;
+
+  /// True from the first "Place order" tap until that attempt is over (checks, prompts and the request included):
+  /// a second tap meanwhile does nothing (C-01). Set synchronously, before any `await`, so even two taps in one frame
+  /// send one order.
+  bool _submitting = false;
   final _quote = QuoteController();
 
   /// Public coupons of the stores in this order, by store id (`coupons:store`); a store with none, or a failed read, is absent.
@@ -186,29 +191,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder(double deliveryFee) async {
+    if (_submitting) return;
+    _submitting = true;
+    var retryAfterVerify = false;
+    try {
+      retryAfterVerify = await _placeOrderOnce(deliveryFee);
+    } finally {
+      _submitting = false;
+    }
+    // Just verified from the prompt: place the order the shopper asked for.
+    if (retryAfterVerify && mounted) await _placeOrder(deliveryFee);
+  }
+
+  /// One "Place order" attempt; true when the shopper just verified from the prompt and the order should be sent again.
+  Future<bool> _placeOrderOnce(double deliveryFee) async {
     final store = RealtimeStore.instance;
     final s = Strings.of(context);
     final address = _address;
-    if (_lines.isEmpty) return;
-    if (!await ensureVerified(context, forTopUp: false)) return;
-    if (!mounted) return;
+    if (_lines.isEmpty) return false;
+    if (!await ensureVerified(context, forTopUp: false)) return false;
+    if (!mounted) return false;
     if (address == null) {
       _toast(s.checkoutAddAddressFirst);
-      return;
+      return false;
     }
     // The delivery is priced and routed from the pin on the map.
     if (_needsPin) {
       _toast(s.checkoutNeedPin);
-      return;
+      return false;
     }
     final notServed = _notServedText(s);
     if (notServed != null) {
       _toast(notServed.full, actionLabel: s.areaChangeAddress, onAction: _changeAddress);
-      return;
+      return false;
     }
     if (_quote.quote == null) {
       _toast(_quote.loading ? s.checkoutQuoteWait : s.checkoutQuoteFailed);
-      return;
+      return false;
     }
     if (isMobileMoney(payment)) {
       final err = validateMobileNumber(_phone.text, s);
@@ -221,30 +240,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           await Scrollable.ensureVisible(field, alignment: 0.3, duration: const Duration(milliseconds: 250));
         }
         if (mounted) _phoneFocus.requestFocus();
-        return;
+        return false;
       }
     }
     if (payment == 'cod' && !store.codEnabled) {
       // Switched off while the shopper was on this screen: say so, and go back to a method that works.
       setState(() => payment = 'airtel_money');
       _toast(s.serverError('Cash on delivery is not available.'));
-      return;
+      return false;
     }
     if (payment == 'wallet' && store.walletBalance + 0.001 < _subtotal + deliveryFee - shop.promoDiscount(_subtotal)) {
       _toast(s.checkoutWalletLow);
-      return;
+      return false;
     }
     if (payment == 'stripe_card' && !store.cardPaymentsEnabled) {
       // Switched off while the shopper was on this screen (the server also refuses it): back to a method that works.
       setState(() => payment = 'airtel_money');
       _toast(s.serverError('Card payments are not available.'));
-      return;
+      return false;
     }
     var retryAfterVerify = false;
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _placing = true);
+    // The same key on every retry of this attempt: the server never makes a second order for it (C-01).
+    final attemptKey = store.checkoutKey();
     try {
       final order = await store.placeOrder(
+        clientRequestId: attemptKey,
         // Lines reference real listings; the SERVER prices them.
         items: _lines.map((c) => {'productId': c.product.uuid, 'qty': c.qty, 'variant': c.variant}).toList(),
         paymentMethod: payment,
@@ -262,6 +284,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           if (address.geo != null) 'geo': {'lat': address.geo!.lat, 'lng': address.geo!.lng, if (address.geo!.placeId != null) 'placeId': address.geo!.placeId},
         },
       );
+      store.endCheckoutAttempt(); // placed: the next order is a new attempt
       // The order now owns these lines (and holds the stock). A buy-now order leaves the saved cart alone.
       if (_buyNow) {
         shop.appliedPromo = null;
@@ -274,7 +297,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final result = await payOrderByCard(order.id);
         announceCardResult(messenger, Strings.current, result);
       }
-      if (!mounted) return;
+      if (!mounted) return false;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -284,6 +307,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     } catch (e) {
+      // A definite refusal ends the attempt (the shopper may change the cart); an unknown outcome keeps its key, so
+      // trying again returns the order if it was placed after all.
+      if (!RealtimeStore.placeOrderOutcomeUnknown(e)) store.endCheckoutAttempt();
       if (isVerificationError(e) && mounted) {
         // The request is over: no spinner behind the prompt while the shopper decides.
         setState(() => _placing = false);
@@ -299,8 +325,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _placing = false);
     }
-    // Just verified from the prompt: place the order the shopper asked for.
-    if (retryAfterVerify && mounted) await _placeOrder(deliveryFee);
+    return retryAfterVerify;
   }
 
   /// A snackbar; with [actionLabel] it carries a tappable action (and still leaves on its own).

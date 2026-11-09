@@ -52,7 +52,7 @@ const register = async (label, role = 'customer') => {
   return { token: r.json.accessToken, user: r.json.user, sock: await connect(r.json.accessToken) };
 };
 const addr = JSON.stringify({ line1: '1 Race St', city: 'Kinshasa' });
-const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'orders:create', { items: [{ productId, qty }], paymentMethod: method, shippingAddress: addr });
+const order = (c, productId, qty = 1, method = 'stripe_card') => req(c.sock, 'orders:create', { clientRequestId: require('crypto').randomUUID(), items: [{ productId, qty }], paymentMethod: method, shippingAddress: addr });
 
 (async () => {
   const admin = await login('admin@somba.app');
