@@ -879,6 +879,22 @@ export class RealtimeGateway
     }
   }
 
+  /**
+   * A warehouse supervisor (or an operations admin) unlocks the delivery code of a task after too many wrong tries (RD-01),
+   * for example once the customer has been phoned. Audited; the rider is told. Same hub and tier rules as the desk.
+   */
+  @SubscribeMessage('delivery:resetCode')
+  async deliveryResetCode(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId: string }) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.isOps(user.role)) return fail('Ops only.');
+      const task = await this.delivery.resetCodeLock(String(body?.taskId ?? ''), await this.deskActor(user));
+      return ok(await this.logistics.view(task));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('delivery:location')
   async deliveryLocation(
     @ConnectedSocket() client: AuthedSocket,

@@ -10,8 +10,10 @@ import { cents, HALF_CENT, usd } from '../warehouse/cash.service';
 import { pageOf } from '../common/paging';
 import { tasksOfHub } from '../logistics/hub-scope';
 import { isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
-import { LogisticsService } from '../logistics/logistics.service';
+import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
+import { tierAllows } from '../logistics/tiers';
+import { ALERT_FROM, CODE_MESSAGES, CodeLock, isCodeLocked, lockAfter, lockedMessage, sameCode, triesLeft } from './delivery-code-lock';
 
 /** Called when a rider reports a failed attempt (OrdersService re-opens the leg or cancels the order). */
 export type DeliveryFailedHandler = (task: DeliveryTask, reason: string) => Promise<void>;
@@ -92,11 +94,9 @@ export class DeliveryService {
       throw new BadRequestException('This leg ends at the warehouse: warehouse staff scan the parcel in.');
     }
     // Proof of delivery: the customer's code must be entered to complete the handover.
+    // Every wrong code is counted on the task in the database and locks the step after 5 (see delivery-code-lock.ts).
     if (status === 'delivered' && kind === 'delivery' && (await this.settings.get('requireDeliveryCode')) === 'true') {
-      const expected = await this.getProofCode(task.id);
-      if (expected && String(code ?? '').trim() !== expected) {
-        throw new BadRequestException('Wrong delivery code. Ask the customer for the 4-digit code shown in their app.');
-      }
+      await this.checkDeliveryCode(task, code, riderId);
     }
     // C-cod: the cash the rider says they took must be exactly what is due, before anything is written.
     const cashDue = status === 'delivered' && kind === 'delivery' && isOrderFlow(task) ? DeliveryService.checkCash(task, cashUsd) : 0;
@@ -154,6 +154,99 @@ export class DeliveryService {
     await this.logistics.afterRiderStatus(saved, status);
     // A parcel of a dispatched transfer run reported on the road: the whole run is on the road.
     if (status === 'in_transit' && saved.runId) await this.runs?.onTaskInTransit(saved);
+    return saved;
+  }
+
+  /**
+   * The ONE place the customer's code is compared (RD-01). Order of events, all in the database:
+   *  1. a locked task refuses every try, the correct code included, with the lock message;
+   *  2. the try is COUNTED before the comparison, by a compare-and-swap on the stored counter, so parallel guesses cannot
+   *     slip through between "read the count" and "write the count" (at most 5 comparisons per lock);
+   *  3. a correct code (compared in constant time) clears the counter: it never counts as a failure;
+   *  4. a wrong one is audited, alerts the warehouse from the 3rd on, and answers with what to do.
+   * A task with no stored code (nothing to compare with) and an empty field (not a guess) are not counted.
+   */
+  private async checkDeliveryCode(task: DeliveryTask, code: unknown, riderId: string): Promise<void> {
+    const expected = await this.getProofCode(task.id);
+    if (!expected) return;
+    const now = Date.now();
+    if (isCodeLocked(task, now)) throw new BadRequestException(lockedMessage(task, now));
+    if (String(code ?? '').trim() === '') throw new BadRequestException(CODE_MESSAGES.wrong);
+    const { failures, lock } = await this.countTry(task.id);
+    if (sameCode(code, expected)) {
+      await this.tasks.update({ id: task.id }, { codeFailures: 0, codeLockedUntil: null });
+      return;
+    }
+    await this.onWrongCode(task, riderId, failures, lock);
+    throw new BadRequestException(lock ? lockedMessage({ codeFailures: failures, codeLockedUntil: lock.until }, Date.now()) : triesLeft(failures) <= 2 ? CODE_MESSAGES.wrongLeft(triesLeft(failures)) : CODE_MESSAGES.wrong);
+  }
+
+  /** Count one try on the task (compare-and-swap on the stored counter; refused when the step is locked). */
+  private async countTry(taskId: string): Promise<{ failures: number; lock: CodeLock | null }> {
+    for (let i = 0; i < 12; i++) {
+      const row = await this.tasks.findOne({ where: { id: taskId }, select: ['id', 'codeFailures', 'codeLockedUntil'] });
+      if (!row) throw new NotFoundException('Delivery task not found.');
+      const now = Date.now();
+      if (isCodeLocked(row, now)) throw new BadRequestException(lockedMessage(row, now));
+      const seen = row.codeFailures ?? 0;
+      const failures = seen + 1;
+      const lock = lockAfter(failures, now);
+      const claim = await this.tasks
+        .createQueryBuilder()
+        .update(DeliveryTask)
+        .set({ codeFailures: failures, codeLockedUntil: lock?.until ?? null })
+        .where('id = :id AND codeFailures = :seen', { id: taskId, seen })
+        .execute();
+      if (claim.affected) return { failures, lock };
+    }
+    throw new BadRequestException('This delivery was just updated. Refresh and try again.');
+  }
+
+  /** A wrong code: one audit line (the task, the rider and the count, never the guess) and the alert to the warehouse side. */
+  private async onWrongCode(task: DeliveryTask, riderId: string, failures: number, lock: CodeLock | null): Promise<void> {
+    const rider = await this.tasks.manager.getRepository(User).findOne({ where: { id: riderId }, select: ['id', 'name'] }).catch(() => null);
+    const name = rider?.name ?? 'Rider';
+    await this.auditCash('rider', name, 'delivery.code_failed', task, `${task.orderReference}: wrong delivery code, try ${failures} (rider ${riderId})`);
+    if (lock) {
+      await this.auditCash(
+        'rider',
+        name,
+        'delivery.code_locked',
+        task,
+        `${task.orderReference}: delivery code locked after ${failures} wrong tries (rider ${riderId}), ${lock.supervisor ? 'until a supervisor unlocks it' : `for ${lock.minutes} minutes`}`,
+      );
+    }
+    if (failures >= ALERT_FROM) {
+      try {
+        await this.logistics.alertCodeFailures?.(task, name, failures, lock);
+      } catch {
+        /* the alert is best effort: the count and the lock are already saved */
+      }
+    }
+  }
+
+  /**
+   * A warehouse supervisor (or an operations admin) clears the counter and the lock of a task, typically after phoning the
+   * customer. Audited, and the rider is told. Operators and other warehouses' staff cannot.
+   */
+  async resetCodeLock(taskId: string, actor: Actor): Promise<DeliveryTask> {
+    const task = await this.tasks.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('Delivery task not found.');
+    const mayUnlock = actor.role === 'admin' || actor.role === 'admin_operations' || (actor.role === 'warehouse_staff' && tierAllows(actor.role, actor.tier, 'oversee'));
+    if (!mayUnlock) throw new BadRequestException(CODE_MESSAGES.notAllowedToUnlock);
+    if (actor.hubId && !this.logistics.touches(task, actor.hubId)) throw new BadRequestException('This task belongs to another warehouse.');
+    if ((task.kind ?? 'delivery') !== 'delivery') throw new BadRequestException(CODE_MESSAGES.notLocked);
+    const was = task.codeFailures ?? 0;
+    if (was === 0 && !isCodeLocked(task, Date.now())) throw new BadRequestException(CODE_MESSAGES.notLocked);
+    await this.tasks.update({ id: task.id }, { codeFailures: 0, codeLockedUntil: null });
+    await this.auditCash(actor.role, actor.name, 'delivery.code_unlocked', task, `${task.orderReference}: delivery code unlocked by ${actor.name} (was at ${was} wrong tries)`);
+    const saved = (await this.tasks.findOne({ where: { id: task.id } }))!;
+    await this.logistics.emitTask(saved);
+    try {
+      await this.logistics.alertCodeUnlocked?.(saved);
+    } catch {
+      /* best effort */
+    }
     return saved;
   }
 

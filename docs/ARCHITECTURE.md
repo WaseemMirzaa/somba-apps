@@ -1765,7 +1765,8 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `delivery:list` | Ops (any admin_* role, warehouse_staff), rider (own) | `—` |  |
 | `delivery:unassigned` | Ops (any admin_* role, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
 | `delivery:accept` | rider | `{ taskId: string }` | Always refused: "Your warehouse assigns your tasks. You cannot accept a task yourself." |
-| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered |
+| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered. With `requireDeliveryCode` on, `delivered` takes `code`: 5 wrong codes lock the step 15 min, 10 wrong 1 h, 15 wrong until a supervisor unlocks it (counted per task in `delivery_tasks.codeFailures` / `codeLockedUntil`; the correct code resets it) |
+| `delivery:resetCode` | warehouse supervisor or above of the task's warehouse, `admin`, `admin_operations` | `{ taskId: string }` | Clears the wrong-code counter and lock of a delivery task (audit `delivery.code_unlocked`, the rider is notified). Wrong tries are audited as `delivery.code_failed` / `delivery.code_locked`; from the 3rd the warehouse staff and admins get a notice |
 | `delivery:location` | rider (assigned) | `{ taskId: string; lat: number; lng: number }` | Pushed to the customer and ops as `delivery:location` |
 | `delivery:assign` | Ops (any admin_* role, warehouse_staff) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
 
