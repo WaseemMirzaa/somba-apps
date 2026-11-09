@@ -29,9 +29,9 @@ API_ENV="${SOMBA_API_ENV:-/opt/somba/api/.env}"
 APP_USER=somba
 PM2_APP=somba-api
 
-ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM"
+ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS MAIL_FROM"
 # Names whose value is a credential: the confirmation shows its last 4 characters.
-SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_AUTH_TOKEN "
+SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_AUTH_TOKEN SMTP_PASS "
 
 die() { printf 'set-secret: %s\n' "$*" >&2; exit 1; }
 
@@ -58,6 +58,13 @@ trap cleanup EXIT
 is_allowed() { [[ " $ALLOWED " == *" $1 "* ]]; }
 
 # Echo nothing; return 0 when the value has the right shape for the name. Never prints the value.
+# Patterns for the e-mail settings. Values are written unquoted into an env file, so a password may not contain
+# spaces, quotes, backslash, $, backtick or # (a # would start a comment).
+SMTP_HOST_RE='^([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$'
+SMTP_PASS_RE='^[^[:space:]"'"'"'\\`$#]{8,255}$'
+MAIL_ADDR_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
+MAIL_FROM_RE="^(${MAIL_ADDR_RE}|[A-Za-z0-9][A-Za-z0-9 &.'-]{0,59} <${MAIL_ADDR_RE}>)$"
+
 valid_value() {
   local name="$1" value="$2"
   case "$name" in
@@ -79,6 +86,11 @@ valid_value() {
     TWILIO_AUTH_TOKEN) [[ "$value" =~ ^[0-9a-fA-F]{32}$ ]] ;;
     # A Twilio number (+ and digits), a Messaging Service SID (MG…), or an alphanumeric sender name (3 to 11 letters/digits, at least one letter).
     TWILIO_FROM) [[ "$value" =~ ^\+[1-9][0-9]{6,14}$ || "$value" =~ ^MG[0-9a-fA-F]{32}$ || ( "$value" =~ ^[A-Za-z0-9]{3,11}$ && "$value" =~ [A-Za-z] ) ]] ;;
+    SMTP_HOST) [[ "$value" =~ $SMTP_HOST_RE ]] ;;
+    SMTP_PORT) [[ "$value" =~ ^(25|465|587|2525)$ ]] ;;
+    SMTP_USER) [[ "$value" =~ ^[A-Za-z0-9._@+-]{1,254}$ ]] ;;
+    SMTP_PASS) [[ "$value" =~ $SMTP_PASS_RE ]] ;;
+    MAIL_FROM) [[ "$value" =~ $MAIL_FROM_RE ]] ;;
     *) return 1 ;;
   esac
 }
@@ -102,6 +114,11 @@ why_invalid() {
     TWILIO_ACCOUNT_SID) echo "must be the Twilio Account SID: AC followed by 32 letters/digits (Twilio console, Account Info; not an API key SID that starts with SK)" ;;
     TWILIO_AUTH_TOKEN) echo "must be the Twilio Auth Token: 32 letters/digits (Twilio console, Account Info)" ;;
     TWILIO_FROM) echo "must be a Twilio phone number like +15551234567, a Messaging Service SID (MG followed by 32 letters/digits), or a sender name of 3 to 11 letters/digits with at least one letter" ;;
+    SMTP_HOST) echo "must be a host name such as smtp.sendgrid.net (no http://, no spaces)" ;;
+    SMTP_PORT) echo "must be 587 (recommended), 465, 2525 or 25" ;;
+    SMTP_USER) echo "must be the SMTP user name (for SendGrid: the word apikey), letters, digits and . _ @ + - only" ;;
+    SMTP_PASS) echo "must be 8 to 255 characters with no spaces, quotes, backslash, \$, backtick or # (for SendGrid: the API key that starts with SG.)" ;;
+    MAIL_FROM) echo "must be an address like no-reply@yourdomain.com, or a name and address like Somba&Teka <no-reply@yourdomain.com>" ;;
   esac
 }
 
@@ -251,6 +268,23 @@ if value_of STRIPE_SECRET_KEY >/dev/null || value_of STRIPE_PUBLISHABLE_KEY >/de
     printf 'warning: the Stripe secret and publishable keys are in different modes (test vs live); card payments stay off until they match.\n' >&2
   fi
   sk="" pk=""
+fi
+
+# ── 2b. Hints (nothing is shown beyond the words below) when a SendGrid setup looks mixed up ──────────────────────────
+if value_of SMTP_HOST >/dev/null || value_of SMTP_USER >/dev/null || value_of SMTP_PASS >/dev/null; then
+  host="$(current_value SMTP_HOST || true)"
+  user="$(current_value SMTP_USER || true)"
+  pass="$(current_value SMTP_PASS || true)"
+  if [[ "$host" == *sendgrid* && -n "$user" && "$user" != "apikey" ]]; then
+    printf 'warning: SendGrid SMTP expects the user name to be exactly: apikey\n' >&2
+  fi
+  if [[ "$host" == *sendgrid* && -n "$pass" && "$pass" != SG.* ]]; then
+    printf 'warning: a SendGrid API key starts with SG. (the password you set does not)\n' >&2
+  fi
+  if [[ -z "$host" ]]; then
+    printf 'note: SMTP_HOST is not set yet; no e-mail is sent until it is.\n'
+  fi
+  host="" user="" pass=""
 fi
 
 # ── 3. Reload the API so it picks the values up ──────────────────────────────
