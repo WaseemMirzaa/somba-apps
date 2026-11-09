@@ -75,7 +75,7 @@ const noticesOf = async (u) => (await req(u.sock, 'notifications:list')).data ??
 const hasNotice = async (u, pred, ms) => !!(await until(async () => (await noticesOf(u)).find(pred), ms));
 
 (async () => {
-  const db = await mysql.createConnection({ host: process.env.DB_HOST ?? 'localhost', user: process.env.DB_USERNAME ?? 'root', password: process.env.DB_PASSWORD ?? '', database: process.env.DB_DATABASE ?? 'somba_r2f', timezone: 'Z' });
+  const db = await mysql.createConnection({ host: process.env.DB_HOST ?? 'localhost', port: Number(process.env.DB_PORT ?? 3306), user: process.env.DB_USERNAME ?? 'root', password: process.env.DB_PASSWORD ?? '', database: process.env.DB_DATABASE ?? 'somba_r2f', timezone: 'Z' });
   const sql = async (q, p = []) => (await db.query(q, p))[0];
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);
   const guest = { sock: await connect() };
