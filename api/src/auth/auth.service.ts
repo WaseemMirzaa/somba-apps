@@ -20,6 +20,22 @@ export interface JwtPayload {
   role: string;
   email: string;
   tokenVersion?: number;
+  /** What the token is for. Tokens issued before this claim existed have none (see {@link assertTokenKind}). */
+  typ?: 'access' | 'refresh';
+  /** Set only on short-lived special tokens, for example the 2FA sign-in challenge (`purpose: '2fa'`). */
+  purpose?: string;
+}
+
+/**
+ * A token may only be used for what it was issued for. The 2FA challenge (a password-only sign-in) is signed with the
+ * refresh secret, so without this check it could be traded at /auth/refresh for full tokens and the second step skipped.
+ * A purpose token is never an access or refresh token; a token that says what it is must be the kind asked for.
+ * Refresh tokens issued before `typ` existed carry neither claim and are still accepted until they expire.
+ */
+export function assertTokenKind(payload: Pick<JwtPayload, 'typ' | 'purpose'>, kind: 'access' | 'refresh'): void {
+  if (payload.purpose || (payload.typ && payload.typ !== kind)) {
+    throw new UnauthorizedException(kind === 'refresh' ? 'Invalid or expired refresh token.' : 'Invalid or expired token.');
+  }
 }
 
 export interface AuthResult {
@@ -100,6 +116,7 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
+    assertTokenKind(payload, 'refresh');
     const user = await this.users.findById(payload.sub);
     if (!user) throw new UnauthorizedException('Account no longer exists.');
     if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
@@ -166,9 +183,11 @@ export class AuthService {
 
   /** Verify an access token (used by the WebSocket handshake). */
   async verifyAccess(token: string): Promise<JwtPayload> {
-    return this.jwt.verifyAsync<JwtPayload>(token, {
+    const payload = await this.jwt.verifyAsync<JwtPayload>(token, {
       secret: this.config.get<string>('jwt.secret'),
     });
+    assertTokenKind(payload, 'access');
+    return payload;
   }
 
   /** Invalidate every token previously issued to this user. */
@@ -186,13 +205,13 @@ export class AuthService {
       email: user.email,
       tokenVersion: user.tokenVersion ?? 0,
     };
-    const accessToken = await this.jwt.signAsync(payload, {
+    const accessToken = await this.jwt.signAsync({ ...payload, typ: 'access' }, {
       secret: this.config.get<string>('jwt.secret'),
       // `expiresIn` accepts vercel/ms strings ("15m") at runtime; the typing
       // wants a template-literal union, so widen from the env string.
       expiresIn: this.config.get<string>('jwt.accessTtl') as unknown as number,
     });
-    const refreshToken = await this.jwt.signAsync(payload, {
+    const refreshToken = await this.jwt.signAsync({ ...payload, typ: 'refresh' }, {
       secret: this.config.get<string>('jwt.refreshSecret'),
       expiresIn: this.config.get<string>('jwt.refreshTtl') as unknown as number,
     });
