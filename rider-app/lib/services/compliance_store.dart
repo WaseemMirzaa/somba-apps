@@ -69,7 +69,7 @@ class HttpPrivateFileUploader implements PrivateFileUploader {
     if (res.statusCode >= 400) {
       final m = json['message'];
       final text = m is List ? m.join('\n') : m?.toString();
-      throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode);
+      throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode, json['code'] is String ? json['code'] as String : null);
     }
     final id = json['id'];
     if (id is! String || id.isEmpty) throw ApiException.local('err_generic');

@@ -5,6 +5,7 @@
  *   API_URL=http://localhost:3001 ADMIN_EMAIL=... ADMIN_PASSWORD=... node test/account-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const { createHmac } = require('crypto');
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -209,6 +210,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok(a.ok && (await req(s, 'addresses:list')).data.length === 0, 'owner can delete their address');
 
   console.log('\n— New payment methods (Orange Money, Vodacom M-Pesa)');
+  await settlePassword(API, ADMIN_EMAIL, ADMIN_PASSWORD, { keep: true }).catch(() => {}); // a bootstrap admin must change its password first; this puts it back
   const adminLogin = await rest('POST', '/api/v1/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
   ok(adminLogin.status === 200, 'admin can sign in');
   need(adminLogin.status === 200, `the admin cannot sign in (${adminLogin.status}): check ADMIN_EMAIL / ADMIN_PASSWORD, and that the admin exists (npm run seed or npm run bootstrap:prod)`);

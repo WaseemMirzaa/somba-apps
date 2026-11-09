@@ -17,6 +17,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // Whatever this returns becomes `request.user`.
   validate(payload: JwtPayload) {
     assertTokenKind(payload, 'access'); // a 2FA challenge or a refresh token is not an access token
-    return { id: payload.sub, role: payload.role, email: payload.email };
+    return { id: payload.sub, role: payload.role, email: payload.email, ...(payload.pwc === true ? { mustChangePassword: true } : {}) };
   }
 }

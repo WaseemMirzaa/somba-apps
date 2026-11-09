@@ -17,6 +17,7 @@
  *   API_URL=http://localhost:3021 node test/warehouse-areas-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
@@ -621,7 +622,7 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
       const email = `${role}.${name.replace(/\W/g, '').toLowerCase()}${tag}@areas.test`;
       const created = await req(admin.sock, 'roles:createStaff', { email, name, role, hubId: hub.id, ...(role === 'warehouse_staff' ? { warehouseTier: 'supervisor' } : {}) });
       if (!created.ok) throw new Error(`createStaff ${name}: ${created.error}`);
-      return login(email, created.data.tempPassword);
+      return login(email, await settlePassword(API, email, created.data.tempPassword));
     };
     const riderLB = await mkPerson(LB, 'rider', 'Smoke Lubumbashi Rider');
     const staffLB = await mkPerson(LB, 'warehouse_staff', 'Smoke Lubumbashi Staff');

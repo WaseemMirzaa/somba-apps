@@ -13,6 +13,7 @@ import { CodeDto, ForgotDto, LoginDto, PhoneDto, PhoneLoginDto, RefreshDto, Regi
 import { VerificationService } from './verification.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { AllowPendingPasswordChange } from './password-change';
 import { UsersService } from '../users/users.service';
 import { REFRESH_THROTTLE_LIMIT, THROTTLE_WINDOW_MS } from './throttle';
 
@@ -81,6 +82,7 @@ export class AuthController {
   /** Return the current user for a valid access token. */
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @AllowPendingPasswordChange()
   async me(@Req() req: { user: { id: string } }) {
     const user = await this.users.findById(req.user.id);
     return user ? UsersService.toPublic(user) : null;
@@ -90,6 +92,7 @@ export class AuthController {
   @Post('logout-all')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
+  @AllowPendingPasswordChange()
   async logoutAll(@Req() req: { user: { id: string } }) {
     await this.auth.revokeSessions(req.user.id);
     return { revoked: true };

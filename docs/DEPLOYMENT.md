@@ -231,6 +231,10 @@ ADMIN_NAME='Your Name' \
 npm run bootstrap:prod
 ```
 
+The first admin it creates is flagged `mustChangePassword`: `ADMIN_PASSWORD` is only a temporary password, and the first sign-in
+(web `/admin`, any portal) shows a "choose a new password" screen before anything else. An admin that already exists is left unchanged.
+Staff and riders created in Admin -> Roles get the same treatment; Admin -> Roles can issue a new temporary password for anyone who loses theirs.
+
 **Verification policy.** The bootstrap inserts the setting `requireVerifiedForCheckout=true`:
 a customer must have a verified phone number **or** e-mail before `orders:create` and
 `wallet:topup` work (the error tells them to verify under Profile → Verification). That only

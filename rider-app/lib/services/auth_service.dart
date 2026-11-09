@@ -17,12 +17,23 @@ class AuthResult {
     required this.refreshToken,
   });
 
-  factory AuthResult.fromJson(Map<String, dynamic> j) => AuthResult(
-        user: BackendUser.fromJson(j['user'] as Map<String, dynamic>),
-        accessToken: j['accessToken'] as String,
-        refreshToken: j['refreshToken'] as String,
-      );
+  factory AuthResult.fromJson(Map<String, dynamic> j) {
+    final user = BackendUser.fromJson(j['user'] as Map<String, dynamic>);
+    return AuthResult(
+      // The answer says it at the top level too; either one holds the rider at the change-password screen.
+      user: j['mustChangePassword'] == true && !user.mustChangePassword ? user.withMustChangePassword(true) : user,
+      accessToken: j['accessToken'] as String,
+      refreshToken: j['refreshToken'] as String,
+    );
+  }
 }
+
+/// The server's refusal code for an account that still has its temporary password (api/src/auth/password-change.ts).
+const kPasswordChangeRequired = 'password_change_required';
+
+/// Called whenever ANY call (socket or REST) is refused with [kPasswordChangeRequired]: the rider store holds the app at the
+/// change-password screen, whatever screen made the call.
+void Function()? onPasswordChangeRequired;
 
 /// A failure from the API, safe to show to the user. [message] is what the
 /// server (or the client) said in English; printing the exception gives the
@@ -32,13 +43,19 @@ class ApiException implements Exception {
   final int? status;
   final String? localKey;
   final Map<String, Object?>? args;
-  ApiException(this.message, [this.status])
+
+  /// The server's machine-readable reason, when it sent one (`password_change_required`).
+  final String? code;
+  ApiException(this.message, [this.status, this.code])
       : localKey = null,
-        args = null;
+        args = null {
+    if (code == kPasswordChangeRequired) onPasswordChangeRequired?.call();
+  }
 
   /// A client-side failure (offline, timeout…): the text comes from the strings layer.
   ApiException.local(String key, {this.status, this.args})
       : localKey = key,
+        code = null,
         message = const Strings('en').t(key, args);
 
   @override
@@ -92,7 +109,8 @@ class AuthService {
             ? ApiException.local('err_rate_limit', status: 429)
             : ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode});
       }
-      throw ApiException(text, res.statusCode);
+      final code = json['code'];
+      throw ApiException(text, res.statusCode, code is String ? code : null);
     }
     return json;
   }

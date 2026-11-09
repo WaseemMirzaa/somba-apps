@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/notification_text.dart';
 import 'l10n/strings.dart';
+import 'screens/forced_password_screen.dart';
 import 'screens/rider_shell.dart';
 import 'screens/more/rider_auth.dart';
 import 'services/maps_config.dart';
@@ -37,6 +38,8 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   bool _splashDone = false;
   bool _restored = false;
   bool _authed = false;
+  // The account still has the temporary password an administrator made: only the change-password screen is shown.
+  bool _mustChangePassword = false;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<PushMessage>? _foregroundSub;
@@ -48,13 +51,17 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     // A tapped notification opens its delivery once the rider is in and the queue is loaded.
     PushService.instance.pendingTap.addListener(_openPendingTap);
     RiderStore.instance.addListener(_openPendingTap);
+    RiderStore.instance.addListener(_syncPasswordHold);
     _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
     RiderStore.instance.onSessionEnded = () {
       if (!mounted) return;
       // Screens opened on top of the shell (support, edit profile, a dialog or a sheet) go first: otherwise the sign-in
       // screen would sit UNDER them and the signed-out rider would keep looking at their old data.
       _navigator.currentState?.popUntil((r) => r.isFirst);
-      setState(() => _authed = false);
+      setState(() {
+        _authed = false;
+        _mustChangePassword = false;
+      });
       _messenger.currentState?.showSnackBar(SnackBar(content: Text(Strings.current.errSignedOut)));
     };
     // Silently resume the previous shift (stored refresh token).
@@ -63,6 +70,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
       setState(() {
         _restored = true;
         _authed = ok;
+        _mustChangePassword = ok && RiderStore.instance.mustChangePassword;
       });
     });
   }
@@ -72,8 +80,16 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     Strings.langNotifier.removeListener(_onLang);
     PushService.instance.pendingTap.removeListener(_openPendingTap);
     RiderStore.instance.removeListener(_openPendingTap);
+    RiderStore.instance.removeListener(_syncPasswordHold);
     _foregroundSub?.cancel();
     super.dispose();
+  }
+
+  /// The store flagged the account (sign-in answer, or a call the server refused with `password_change_required`) or cleared
+  /// the flag (the change was accepted): swap the change-password screen and the shell.
+  void _syncPasswordHold() {
+    final held = RiderStore.instance.mustChangePassword;
+    if (mounted && held != _mustChangePassword) setState(() => _mustChangePassword = held);
   }
 
   void _openPendingTap() {
@@ -99,6 +115,15 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     ));
   }
 
+  Future<void> _signOutFromPasswordHold() async {
+    await RiderStore.instance.logout();
+    if (!mounted) return;
+    setState(() {
+      _authed = false;
+      _mustChangePassword = false;
+    });
+  }
+
   void _onLang() {
     if (mounted) setState(() => _locale = Locale(Strings.langNotifier.value));
   }
@@ -108,7 +133,13 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
       return SplashScreen(onDone: () => setState(() => _splashDone = true));
     }
     if (!_authed) {
-      return RiderLoginScreen(onSignedIn: () => setState(() => _authed = true));
+      return RiderLoginScreen(onSignedIn: () => setState(() {
+            _authed = true;
+            _mustChangePassword = RiderStore.instance.mustChangePassword;
+          }));
+    }
+    if (_mustChangePassword) {
+      return ForcedPasswordScreen(onSignOut: _signOutFromPasswordHold);
     }
     return RiderShell(
       locale: _locale,

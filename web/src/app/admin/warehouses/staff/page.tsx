@@ -11,6 +11,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Tabs } from "@/components/ui/tabs";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SecretBox } from "@/components/admin/copy-box";
+import { StaffAccountActions } from "@/components/admin/staff-account-actions";
 import { HomeWarehouseDialog, HubTierFields, needsHubText } from "@/components/admin/home-warehouse-dialog";
 import { ErrorNote, Modal } from "@/components/admin/modal";
 import { NoticeBar } from "@/components/admin/notice-bar";
@@ -19,7 +20,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
-import { errMsg, useServerList, type StaffRow } from "@/lib/admin-live";
+import { errMsg, useRole, useServerList, type StaffRow } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { HubRow } from "@/lib/admin-stats";
 import { TIER_LABEL, type WarehouseTier } from "@/lib/logistics";
@@ -32,6 +33,8 @@ export default function AdminWarehouseStaffPage() {
   // Real accounts: every warehouse employee and rider the server knows about.
   const { items, setItems, reload, error: loadError, loading } = useServerList<StaffRow>("roles:staff");
   const rt = useRealtime();
+  // Only the super admin may reissue a password or correct an e-mail (the server refuses everyone else).
+  const isSuper = useRole() === "admin";
   const hubs = useServerList<HubRow>("hubs:list");
   const hubName = useMemo(() => new Map(hubs.items.map((h) => [h.id, h.name])), [hubs.items]);
   const [tab, setTab] = useState<"warehouse_staff" | "rider">("warehouse_staff");
@@ -55,8 +58,8 @@ export default function AdminWarehouseStaffPage() {
     const s = socketClient.current;
     if (!s) return;
     const h = (p: Partial<StaffRow> & { id: string }) => {
-      if (typeof p?.active !== "boolean") return;
-      setItems((cur) => cur.map((u) => (u.id === p.id ? { ...u, active: p.active } : u)));
+      if (typeof p?.active === "boolean") setItems((cur) => cur.map((u) => (u.id === p.id ? { ...u, active: p.active } : u)));
+      if (typeof p?.mustChangePassword === "boolean") setItems((cur) => cur.map((u) => (u.id === p.id ? { ...u, mustChangePassword: p.mustChangePassword } : u)));
     };
     s.on("roles:updated", h);
     return () => {
@@ -267,6 +270,7 @@ export default function AdminWarehouseStaffPage() {
                       <button className="text-sm font-medium text-[var(--primary)] hover:underline" onClick={() => setEditing(person)}>
                         {tab === "warehouse_staff" ? (fr ? "Entrepôt et niveau" : "Warehouse and tier") : fr ? "Changer d'entrepôt" : "Change warehouse"}
                       </button>
+                      {isSuper && <StaffAccountActions person={person} selfId={rt.user?.id} onEmailChanged={(id, email) => setItems((cur) => cur.map((x) => (x.id === id ? { ...x, email } : x)))} />}
                       <Button size="sm" variant={off ? "approve" : "reject"} onClick={() => { setToggle(person); setToggleError(null); }}>
                         <Power className="h-3.5 w-3.5" />
                         {staffActiveCopy(person.role, off, fr).button}

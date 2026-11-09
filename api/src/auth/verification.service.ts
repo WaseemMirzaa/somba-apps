@@ -233,6 +233,8 @@ export class VerificationService {
     const user = await this.users.findById(row.userId);
     if (!user) throw new BadRequestException('Invalid or expired link.');
     user.passwordHash = await bcrypt.hash(newPassword, 12);
+    // The person chose this password themselves, so a pending "change the temporary password" is done.
+    user.mustChangePassword = false;
     // Signs the user out everywhere — a reset implies the old credentials may be compromised.
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);

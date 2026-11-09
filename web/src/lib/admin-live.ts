@@ -144,6 +144,8 @@ export interface StaffRow {
   warehouseTier?: "operator" | "supervisor" | "manager" | null;
   /** Two-factor authentication is on for this account. */
   twofaEnabled?: boolean;
+  /** Still on the temporary password an administrator made: has not chosen their own yet. */
+  mustChangePassword?: boolean;
 }
 export interface SupportMessage {
   id?: string;

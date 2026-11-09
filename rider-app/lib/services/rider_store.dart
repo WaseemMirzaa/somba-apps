@@ -19,7 +19,10 @@ enum ConnStatus { disconnected, connecting, connected, error }
 /// the rider claims deliveries, advances their status and streams GPS — all of
 /// which reach the customer app and the dashboards live. Nothing is polled.
 class RiderStore extends ChangeNotifier {
-  RiderStore._();
+  RiderStore._() {
+    // Any call the server refuses with `password_change_required` (socket or REST) holds the app at the change screen.
+    onPasswordChangeRequired = _holdAtPasswordChange;
+  }
   static final RiderStore instance = RiderStore._();
 
   AuthService _auth = AuthService();
@@ -68,6 +71,19 @@ class RiderStore extends ChangeNotifier {
 
   bool get isConnected => status == ConnStatus.connected;
   bool get isSignedIn => user != null;
+
+  /// The account still has the temporary password an administrator made: only the change-password screen is shown, because
+  /// the server refuses everything else (`password_change_required`).
+  bool get mustChangePassword => user?.mustChangePassword == true;
+
+  /// The server refused a call with `password_change_required` (this session was flagged while the app was open, or the
+  /// sign-in answer said nothing): show the change-password screen.
+  void _holdAtPasswordChange() {
+    final u = user;
+    if (u == null || u.mustChangePassword) return;
+    user = u.withMustChangePassword(true);
+    notifyListeners();
+  }
   int get unreadCount => notifications.where((n) => !n.read).length;
   /// The legs on their own: a parcel travelling in one of this rider's transfer runs is shown inside the run's card.
   List<DeliveryTaskDto> get active => myTasks.where((t) => t.isActive && !_inKnownRun(t)).toList();
@@ -261,12 +277,24 @@ class RiderStore extends ChangeNotifier {
     onSessionEnded?.call();
   }
 
+  /// Tests: [_connect] only counts its calls instead of opening a real socket.
+  @visibleForTesting
+  bool debugSkipConnect = false;
+  @visibleForTesting
+  int debugConnects = 0;
+
   void _connect() {
+    if (debugSkipConnect) {
+      debugConnects++;
+      return;
+    }
     final socket = _socket.connect(freshAccessToken);
     // `ready` = the server verified us and joined our rooms; only then can we ask for data.
     socket.on('ready', (_) {
       status = ConnStatus.connected;
       notifyListeners();
+      // Held at the password change: the server refuses everything else, so nothing is loaded. The change reconnects.
+      if (mustChangePassword) return;
       unawaited(refresh());
       unawaited(ComplianceStore.instance.load()); // the documents reminder on the profile row
       // Push: asks for the permission and registers this device (no-op without Firebase).
@@ -642,12 +670,20 @@ class RiderStore extends ChangeNotifier {
   /// Change the password (`me:changePassword`). The answer carries FRESH tokens: this phone keeps them (otherwise its next
   /// refresh would be refused as revoked and the rider signed out); every other phone is signed out by the server.
   Future<void> changePassword({required String current, required String next}) async {
+    final wasHeld = mustChangePassword;
     final res = await request('me:changePassword', {'current': current, 'next': next});
     final r = AuthResult.fromJson(_map(res));
     await _saveTokens(r);
     _access = r.accessToken;
     _refresh = r.refreshToken;
     _applyAccount(_map(res)['user']);
+    if (wasHeld && !mustChangePassword) {
+      // Nothing was loaded while the account was held: reconnect with the new tokens, as after a normal sign-in.
+      loaded = false;
+      status = ConnStatus.connecting;
+      notifyListeners();
+      _connect();
+    }
   }
 
   /// A `me:updated` push or the answer of `me:update`: the signed-in rider's own account (another account's is ignored).

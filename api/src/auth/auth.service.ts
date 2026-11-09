@@ -25,6 +25,8 @@ export interface JwtPayload {
   typ?: 'access' | 'refresh';
   /** Set only on short-lived special tokens, for example the 2FA sign-in challenge (`purpose: '2fa'`). */
   purpose?: string;
+  /** Access tokens only: the account must still change its temporary password (`users.mustChangePassword`); see auth/password-change.ts. */
+  pwc?: boolean;
 }
 
 /**
@@ -43,6 +45,8 @@ export interface AuthResult {
   user: PublicUser;
   accessToken: string;
   refreshToken: string;
+  /** True while the account must change its temporary password before anything else (also in `user`); clients show that screen at once. */
+  mustChangePassword: boolean;
 }
 
 @Injectable()
@@ -149,7 +153,12 @@ export class AuthService {
     if (!next || next.length < 8) {
       throw new BadRequestException('New password must be at least 8 characters.');
     }
+    // The temporary password was made by an administrator and may have been seen by them: the new one must be a different one.
+    if (user.mustChangePassword && next === current) {
+      throw new BadRequestException('Choose a new password that is different from the temporary one.');
+    }
     user.passwordHash = await bcrypt.hash(next, 12);
+    user.mustChangePassword = false;
     user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await this.users.save(user);
     return this.issue(user);
@@ -218,7 +227,7 @@ export class AuthService {
       email: user.email,
       tokenVersion: user.tokenVersion ?? 0,
     };
-    const accessToken = await this.jwt.signAsync({ ...payload, typ: 'access' }, {
+    const accessToken = await this.jwt.signAsync({ ...payload, typ: 'access', ...(user.mustChangePassword ? { pwc: true } : {}) }, {
       secret: this.config.get<string>('jwt.secret'),
       // `expiresIn` accepts vercel/ms strings ("15m") at runtime; the typing
       // wants a template-literal union, so widen from the env string.
@@ -228,6 +237,6 @@ export class AuthService {
       secret: this.config.get<string>('jwt.refreshSecret'),
       expiresIn: this.config.get<string>('jwt.refreshTtl') as unknown as number,
     });
-    return { user: UsersService.toPublic(user), accessToken, refreshToken };
+    return { user: UsersService.toPublic(user), accessToken, refreshToken, mustChangePassword: !!user.mustChangePassword };
   }
 }

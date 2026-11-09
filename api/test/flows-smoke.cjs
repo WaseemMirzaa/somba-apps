@@ -6,6 +6,7 @@
  *   API_URL=http://localhost:3001 node test/flows-smoke.cjs
  */
 const { io } = require('socket.io-client');
+const { settlePassword } = require('./temp-password.cjs');
 const { kyc } = require('./kyc.cjs');
 const { hubId, tasksOf, toDelivery } = require('./journey.cjs');
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -316,11 +317,74 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(admin.sock, 'roles:createStaff', { email, name: 'Bad', role: 'admin' })).ok, 'a second super admin cannot be created this way');
   a = await req(admin.sock, 'roles:createStaff', { email, name: 'New Rider', role: 'rider', phone: '+243800000001', hubId: await hubId(admin) });
   ok(a.ok && a.data.role === 'rider' && a.data.tempPassword?.length >= 10, 'the super admin creates a rider with a temporary password');
-  const signin = await rest('/api/v1/auth/login', { email, password: a.data.tempPassword });
+  const tempPw = a.data.tempPassword;
+  const riderId = a.data.id;
+  const signin = await rest('/api/v1/auth/login', { email, password: tempPw });
   ok(signin.status === 200 && signin.json.user.role === 'rider', 'the new rider can sign in');
-  ok(!(await req(admin.sock, 'roles:createStaff', { email, name: 'Dup', role: 'rider' })).ok, 'a duplicate email is refused');
+  ok(signin.json.mustChangePassword === true && signin.json.user.mustChangePassword === true, 'the sign-in answer says the temporary password must be changed');
+
+  // Held at the password change: everything is refused with a clear code except the change, the own profile and sign-out.
+  const held = await connect(signin.json.accessToken);
+  for (const ev of ['delivery:list', 'orders:list', 'notifications:list', 'settings:get', 'shift:mine']) {
+    const r = await req(held, ev);
+    ok(r.ok === false && r.code === 'password_change_required', `${ev} is refused with password_change_required`, JSON.stringify(r));
+  }
+  ok((await req(held, 'me:get')).ok, 'the own profile can still be read (and says mustChangePassword)');
+  ok((await req(held, 'me:get')).data.mustChangePassword === true, 'me:get carries mustChangePassword');
+  ok((await req(held, 'devices:unregister', { token: 'x' })).code !== 'password_change_required', 'signing out (dropping the push registration) is not blocked');
+  const heldRest = await rest('/api/v1/uploads', {}, signin.json.accessToken);
+  ok(heldRest.status === 403 && heldRest.json?.code === 'password_change_required', 'REST: an upload is refused with 403 password_change_required', JSON.stringify(heldRest));
+  const meRest = await fetch(`${API}/api/v1/auth/me`, { headers: { authorization: `Bearer ${signin.json.accessToken}` } });
+  ok(meRest.status === 200, 'REST: the own profile stays readable');
+  let c1 = await req(held, 'me:changePassword', { current: 'wrong-temp-password', next: 'Fresh-Rider-Pass-1' });
+  ok(!c1.ok && /incorrect/i.test(c1.error), 'the change needs the temporary password as the current one');
+  c1 = await req(held, 'me:changePassword', { current: tempPw, next: tempPw });
+  ok(!c1.ok && /different/i.test(c1.error), 'the temporary password cannot be the new one', c1.error ?? '');
+  c1 = await req(held, 'me:changePassword', { current: tempPw, next: 'short' });
+  ok(!c1.ok, 'the password policy (8 characters) applies', c1.error ?? '');
+  const riderOther = await connect((await rest('/api/v1/auth/login', { email, password: tempPw })).json.accessToken);
+  c1 = await req(held, 'me:changePassword', { current: tempPw, next: 'Fresh-Rider-Pass-1' });
+  ok(c1.ok && c1.data.mustChangePassword === false && c1.data.user.mustChangePassword === false, 'a real change succeeds and the answer is no longer flagged', c1.error ?? '');
+  ok((await req(held, 'delivery:list')).ok, 'after the change the same socket works (rider can list tasks)');
+  await sleep(300);
+  ok(!riderOther.connected, 'the other open session of the rider was ended by the change');
+  ok((await rest('/api/v1/auth/login', { email, password: tempPw })).status === 401, 'the temporary password no longer works');
+  const afterLogin = await rest('/api/v1/auth/login', { email, password: 'Fresh-Rider-Pass-1' });
+  ok(afterLogin.status === 200 && afterLogin.json.mustChangePassword === false, 'the new password signs in without the flag');
+  held.close(); riderOther.close();
+
+  // An admin re-issues a temporary password.
+  ok(!(await req(finance.sock, 'roles:resetPassword', { userId: riderId })).ok, 'only the super admin can re-issue a password');
+  ok(!(await req(admin.sock, 'roles:resetPassword', { userId: admin.user.id })).ok, 'an admin cannot re-issue their own password');
+  ok(!(await req(admin.sock, 'roles:resetPassword', { userId: cust.user.id })).ok, 'a customer cannot be reset this way');
+  const liveRider = await connect(afterLogin.json.accessToken);
+  a = await req(admin.sock, 'roles:resetPassword', { userId: riderId });
+  ok(a.ok && typeof a.data.tempPassword === 'string' && a.data.tempPassword.length >= 10 && a.data.tempPassword !== tempPw, 'the super admin re-issues a new temporary password (shown once)', a.error ?? '');
+  const reissued = a.data?.tempPassword;
+  await sleep(300);
+  ok(!liveRider.connected, 'the rider\'s open sockets were ended by the re-issue');
+  ok((await rest('/api/v1/auth/refresh', { refreshToken: afterLogin.json.refreshToken })).status === 401, 'the rider\'s refresh token no longer works');
+  ok((await rest('/api/v1/auth/login', { email, password: 'Fresh-Rider-Pass-1' })).status === 401, 'the old password no longer works');
+  const reLogin = await rest('/api/v1/auth/login', { email, password: reissued });
+  ok(reLogin.status === 200 && reLogin.json.mustChangePassword === true, 'the re-issued password signs in, flagged again');
+  const audit = (await req(admin.sock, 'audit:list', { action: 'staff.password_reissued' })).data ?? [];
+  ok(audit.some((e) => e.entityId === riderId) && !JSON.stringify(audit).includes(reissued), 'the re-issue is audited, without the password');
+  liveRider.close();
+
+  // E-mail correction.
+  const fixed = `fixed${tag}@staff.test`;
+  ok(!(await req(finance.sock, 'roles:updateStaff', { userId: riderId, email: fixed })).ok, 'only the super admin edits a staff e-mail');
+  ok(!(await req(admin.sock, 'roles:updateStaff', { userId: admin.user.id, email: `me${tag}@staff.test` })).ok, 'an admin cannot edit their own e-mail here');
+  ok(!(await req(admin.sock, 'roles:updateStaff', { userId: cust.user.id, email: fixed })).ok, 'a customer e-mail cannot be edited by staff tools');
+  ok(!(await req(admin.sock, 'roles:updateStaff', { userId: riderId, email: 'finance@somba.app' })).ok, 'an e-mail used by another account is refused');
+  ok(!(await req(admin.sock, 'roles:updateStaff', { userId: riderId, email: 'not-an-email' })).ok, 'an invalid e-mail is refused');
+  a = await req(admin.sock, 'roles:updateStaff', { userId: riderId, email: fixed.toUpperCase() });
+  ok(a.ok && a.data.email === fixed, 'the e-mail is corrected and normalised', a.error ?? '');
+  ok((await rest('/api/v1/auth/login', { email: fixed, password: reissued })).status === 200 && (await rest('/api/v1/auth/login', { email, password: reissued })).status === 401, 'the rider now signs in with the new address only');
+  ok(((await req(admin.sock, 'audit:list', { action: 'staff.email_changed' })).data ?? []).some((e) => e.entityId === riderId), 'the e-mail change is audited');
+  ok(!(await req(admin.sock, 'roles:createStaff', { email: fixed, name: 'Dup', role: 'rider' })).ok, 'a duplicate email is refused');
   const staff = (await req(admin.sock, 'roles:staff')).data;
-  ok(staff.some((s) => s.email === email && s.role === 'rider' && s.active === true && s.phone === '+243800000001'), 'riders show up in the staff list with phone and active flag');
+  ok(staff.some((s) => s.email === fixed && s.role === 'rider' && s.active === true && s.phone === '+243800000001'), 'riders show up in the staff list with phone and active flag');
 
   // ---- seller campaigns change the price ---------------------------------------------
   section('Seller campaigns really change the price');

@@ -25,6 +25,9 @@ Iterable<String> get knownServerErrors => _exactFr.keys;
 
 final Map<String, String> _exactFr = {
   ...kShiftServerErrorsFr,
+  // forced password change (api/src/auth/password-change.ts, me:changePassword)
+  'You must set a new password before you can continue.': 'Vous devez définir un nouveau mot de passe avant de continuer.',
+  'Choose a new password that is different from the temporary one.': 'Choisissez un nouveau mot de passe différent du mot de passe temporaire.',
   // delivery areas and warehouse coverage (docs/contracts/areas.md, "Errors": geography and coverage)
   'Choose where this warehouse is.': 'Choisissez l’emplacement de cet entrepôt.',
   'Area not found.': 'Zone introuvable.',
