@@ -1754,7 +1754,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above `codCapUsd` |
 | `orders:updateStatus` | Ops (any admin_* role, warehouse_staff) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
 | `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | Refunds what is left on the payment (never more) to the wallet or the paying phone; answers the payment with `refund` (the ledger row of this refund); marks order returned |
-| `orders:cancel` | Order owner, admins | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
+| `orders:cancel` | Order owner only (any role; staff use `orders:adminCancel`) | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
 
 #### `delivery:*`
 

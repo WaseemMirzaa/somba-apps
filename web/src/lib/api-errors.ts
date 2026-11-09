@@ -263,6 +263,8 @@ const EXACT: Record<string, string> = {
   "Tell the customer why you are rejecting this exchange.": "Expliquez au client pourquoi vous refusez cet échange.",
   "This replacement was just updated by someone else. Refresh and try again.": "Ce remplacement vient d'être mis à jour par quelqu'un d'autre. Actualisez et réessayez.",
   "This exchange was just updated by someone else. Refresh and try again.": "Cet échange vient d'être mis à jour par quelqu'un d'autre. Actualisez et réessayez.",
+  "Only finance can file an exchange that refunds money to the customer's wallet.": "Seule la finance peut créer un échange qui rembourse de l'argent sur le portefeuille du client.",
+  "Only operations can approve an exchange that refunds money to the customer's wallet.": "Seules les opérations peuvent approuver un échange qui rembourse de l'argent sur le portefeuille du client.",
   "Replacement not found.": "Remplacement introuvable.",
   "Exchange not found.": "Échange introuvable.",
 

@@ -9,6 +9,7 @@ import { ProductsService } from '../products/products.service';
 import { SettingsService } from '../content/settings.service';
 import { WalletService } from '../wallet/wallet.service';
 import { checkVariant, storedVariantGroups } from '../common/variants/variants';
+import { inRoleGroup } from '../common/role-groups';
 import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { EXCHANGE_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
@@ -19,6 +20,14 @@ const HOUR_MS = 3_600_000;
 const cents = (n: number) => Number(n.toFixed(2));
 const STALE = 'This exchange was just updated by someone else. Refresh and try again.';
 const OPEN: ExchangeStatus[] = ['requested', 'approved', 'received', 'ready', 'dispatched'];
+const DESK_REFUND_FILE = "Only finance can file an exchange that refunds money to the customer's wallet.";
+const DESK_REFUND_APPROVE = "Only operations can approve an exchange that refunds money to the customer's wallet.";
+
+/**
+ * Who may move an exchange through its steps (and so trigger the wallet credit on delivery): the exchange desk and
+ * warehouse staff (the gateway also requires a supervisor tier). C-X4 (A-03), checked here and in `AfterSaleGateway`.
+ */
+export const canMoveExchange = (role: string): boolean => inRoleGroup(role, 'exchangeDesk') || role === 'warehouse_staff';
 
 /**
  * An exchange as clients receive it: the stored fields plus the two items' names in French (null when it cannot be
@@ -125,8 +134,10 @@ export class ExchangesService {
     },
   ): Promise<ExchangeView> {
     const order = await this.orders.findOne({ where: { id: String(input?.orderId ?? '') } });
-    const ops = actor.role.startsWith('admin') || actor.role === 'warehouse_staff';
-    if (!order || (!ops && (order.customerId !== actor.id || order.status !== 'delivered'))) {
+    // C-X4 (A-03): the order's own customer, or the exchange desk filing for them. Any other admin department or the
+    // warehouse cannot file on someone else's order. Either way the order must have been delivered.
+    const ops = !!order && order.customerId !== actor.id && inRoleGroup(actor.role, 'exchangeDesk');
+    if (!order || (!ops && order.customerId !== actor.id) || order.status !== 'delivered') {
       throw new NotFoundException('Order not found or not eligible for an exchange.');
     }
     const live = (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled');
@@ -140,9 +151,9 @@ export class ExchangesService {
     const toSku = String(named.toSku).trim();
     const line = byId ?? live.find((i) => i.productId === fromSku);
     const photos = cleanAttachments(input.attachments);
-    // C-X1: a customer can only exchange something that was on the order.
-    if (!ops && !line) throw new BadRequestException('That item is not on this order.');
-    const qty = Math.max(1, Math.min(line?.qty ?? 99, Math.trunc(Number(input.qty) || 1)));
+    // C-X1: only something that was on the order can be exchanged (by the desk too: A-03).
+    if (!line) throw new BadRequestException('That item is not on this order.');
+    const qty = Math.max(1, Math.min(line.qty ?? 1, Math.trunc(Number(input.qty) || 1)));
     // C-X2: one open exchange per item.
     if (await this.exchanges.count({ where: { orderId: order.id, fromSku, status: In(OPEN) } })) {
       throw new BadRequestException('You already asked to exchange this item.');
@@ -158,16 +169,16 @@ export class ExchangesService {
       // A customer must choose the option; staff may file without one (older desks) and settle it by hand.
       if (groups.length && (!ops || input.toVariant)) {
         toVariant = checkVariant(groups, input.toVariant, target.name);
-        if (toSku === fromSku && toVariant === line?.variant) throw new BadRequestException('Choose a different option to exchange for.');
+        if (toSku === fromSku && toVariant === line.variant) throw new BadRequestException('Choose a different option to exchange for.');
       }
       if ((await this.products.availableFor(toSku, toVariant)) < qty) throw new BadRequestException('Not enough stock of that item for an exchange.');
       const unit = (await this.products.get(toSku))?.price ?? target.price;
-      diff = cents((unit - (line?.priceUsd ?? unit)) * qty);
-    } else if (ops) {
-      // Ops may settle an item that is not in the catalogue by hand.
-      diff = Number.isFinite(Number(input.priceDiffUsd)) ? Math.max(-100000, Math.min(100000, cents(Number(input.priceDiffUsd)))) : 0;
+      diff = cents((unit - (line.priceUsd ?? unit)) * qty);
     }
-    // (An item that is not in the catalogue, asked for by a customer, is free text: no price, no stock; staff settle it.)
+    // An item that is not in the catalogue is free text: no price, no stock, no money moves (finance settles it by hand).
+    // The client's `priceDiffUsd` is never read (A-03): the difference is only ever the server's own arithmetic above.
+    // C-X5 (A-03): a desk-filed exchange that would refund money to the wallet needs a finance role.
+    if (ops && diff < 0 && !inRoleGroup(actor.role, 'finance')) throw new BadRequestException(DESK_REFUND_FILE);
 
     const seller = await sellerForItem(order, fromSku, this.products, this.sellers);
     const hours = Number(await this.settings.get('sellerResponseHours'));
@@ -186,7 +197,7 @@ export class ExchangesService {
           toName: String(named.toName).slice(0, 200),
           attachments: storeAttachments(photos),
           qty,
-          fromVariant: line?.variant ?? null,
+          fromVariant: line.variant ?? null,
           toVariant,
           priceDiffUsd: diff,
           heldUsd: !ops && diff > 0 ? diff : 0,
@@ -222,19 +233,25 @@ export class ExchangesService {
     return ex;
   }
 
-  /** The seller (or support, on their behalf) approves or rejects an exchange. */
+  /**
+   * The seller (or the desk / support, on their behalf) approves or rejects an exchange. C-X4 (A-03): other admin
+   * departments cannot, and support cannot approve one that refunds money to the wallet (the desk can).
+   */
   async respond(actor: { id: string; role: string }, id: string, approve: boolean, rawReason: unknown): Promise<ExchangeView> {
     const ex = await this.exchanges.findOne({ where: { id: String(id ?? '') } });
     const keys = actor.role === 'seller' ? await sellerKeys(actor.id, this.sellers) : [];
     const mine = !!ex && actor.role === 'seller' && !!ex.sellerId && keys.includes(ex.sellerId);
-    if (!ex || !(mine || actor.role.startsWith('admin'))) throw new NotFoundException('Exchange not found.');
+    if (!ex || !(mine || inRoleGroup(actor.role, 'exchangeDecide'))) throw new NotFoundException('Exchange not found.');
     if (ex.status !== 'requested') throw new BadRequestException('This request was already handled.');
+    if (approve && !mine && ex.priceDiffUsd < 0 && !inRoleGroup(actor.role, 'exchangeDesk')) throw new BadRequestException(DESK_REFUND_APPROVE);
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this exchange.');
     return this.move(ex, approve ? 'approved' : 'rejected', reason);
   }
 
-  async setStatus(id: string, status: ExchangeStatus): Promise<ExchangeView> {
+  /** A desk step. C-X4 (A-03): only the exchange desk and the warehouse move an exchange (delivery credits the wallet). */
+  async setStatus(id: string, status: ExchangeStatus, actor: { role: string }): Promise<ExchangeView> {
+    if (!canMoveExchange(actor?.role ?? '')) throw new BadRequestException('Ops only.');
     const ex = await this.exchanges.findOne({ where: { id } });
     if (!ex) throw new NotFoundException('Exchange not found.');
     assertStep(EXCHANGE_NEXT, ex.status, status);

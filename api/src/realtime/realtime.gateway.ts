@@ -97,15 +97,11 @@ const GROUPS = {
   audit: ['admin', 'admin_operations'],
   // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.
   fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support'],
-  /** Money screens: confirm/decline payments, finance dashboard. */
-  finance: ['admin', 'admin_finance'],
   /** Hide / restore customer reviews. */
   moderate: ['admin', 'admin_operations', 'admin_moderation'],
   /** Hub directory (create / edit / deactivate). */
   hubs: ['admin', 'admin_operations'],
-  /** Operators who move orders by hand and cancel them on a customer's behalf. */
-  orderOps: ['admin', 'admin_operations'],
-  /** Product moderation, campaign decisions and support tickets: shared with the other gateways. */
+  /** Product moderation, campaign decisions, support tickets, finance, order and exchange desks: shared with the services and other gateways. */
   ...ROLE_GROUPS,
 } as const;
 const ALL_ROLES = ['customer', 'seller', 'admin', 'admin_operations', 'admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation', 'warehouse_staff', 'rider'] as const;
@@ -671,8 +667,12 @@ export class RealtimeGateway
     try {
       const user = this.requireUser(client);
       if (!this.can(user.role, 'orderOps')) return fail('Not allowed.');
-      // Cancelling must restock and refund — route it through the real flow.
-      if (body?.status === 'cancelled') return ok(await this.orders.cancel(user, body.orderId));
+      // Cancelling must restock and refund — route it through the real flow (the operator path), and audit it like orders:adminCancel.
+      if (body?.status === 'cancelled') {
+        const cancelled = await this.orders.cancel(user, String(body?.orderId ?? ''), { asOperator: true });
+        await this.audit.record({ actor: user.name, role: user.role, action: 'order.cancelled', entity: 'order', entityId: cancelled.id, detail: `${cancelled.reference} (status set to cancelled)` });
+        return ok(cancelled);
+      }
       const order = await this.orders.updateStatus(String(body?.orderId ?? ''), body?.status, { id: user.id, name: user.name, role: user.role });
       await this.audit.record({ actor: user.name, role: user.role, action: 'order.status', entity: 'order', entityId: order.id, detail: `${order.reference} -> ${order.status}` });
       return ok(order);
@@ -2226,7 +2226,10 @@ export class RealtimeGateway
   }
 
   // ---- Additional flows (audit gaps) -------------------------------------
-  /** Customer cancels their own order (restock + refund + void delivery). */
+  /**
+   * Customer cancels their own order (restock + refund + void delivery). Only the order's own customer, whatever their
+   * role (A-04): staff cancel through `orders:adminCancel`, which checks the operator role and writes the audit log.
+   */
   @SubscribeMessage('orders:cancel')
   async ordersCancel(
     @ConnectedSocket() client: AuthedSocket,
@@ -2234,7 +2237,7 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.orders.cancel(user, body.orderId));
+      return ok(await this.orders.cancel(user, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
