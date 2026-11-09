@@ -167,6 +167,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // Assigned below; lets the socket's `unauthorized` handler trigger a token
   // refresh + reconnect without a circular hook dependency.
   const reauthRef = useRef<() => void>(() => {});
+  // Same idea for the server's `reauth` (the access token behind the socket is about to expire).
+  const renewRef = useRef<() => void>(() => {});
+  // One "refresh and reconnect" at a time: the server's `unauthorized` and the disconnect that follows both ask for it.
+  const recovering = useRef<Promise<void> | null>(null);
   // The signed-in account, for per-viewer "seen" marks on notices sent to a whole role.
   const userIdRef = useRef<string | undefined>(undefined);
   const userRoleRef = useRef<string | undefined>(undefined);
@@ -204,10 +208,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     s.off();
     s.on("connect", () => setStatus("connecting")); // connected = server said `ready`
-    s.on("disconnect", () => setStatus("connecting"));
+    s.on("disconnect", (reason) => {
+      setStatus("connecting");
+      // The SERVER closed the socket (sessions revoked elsewhere, account switched off, token expired): socket.io will not
+      // reconnect on its own. Ask for fresh tokens: a refused refresh ends the session, otherwise we reconnect.
+      if (reason === "io server disconnect" && authApi.getAccess()) reauthRef.current();
+    });
     s.on("connect_error", () => setStatus("error"));
     // Access token likely expired. Try to refresh + reconnect before giving up.
     s.on("unauthorized", () => reauthRef.current());
+    // The access token behind this socket is about to expire: renew it in place (no reconnect, nothing re-downloaded).
+    s.on("reauth", () => renewRef.current());
 
     // Server pushes — no polling.
     s.on("order:created", (o: Order) => setOrders((cur) => upsert(cur, o)));
@@ -389,32 +400,57 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
    * Only falls back to logout if the refresh itself fails (revoked / expired).
    */
   const handleUnauthorized = useCallback(async () => {
-    const refresh = authApi.getRefresh();
-    if (!refresh) {
-      setError("Session expired. Please sign in again.");
-      logout();
-      return;
-    }
-    // Only a refresh the server refused ends the session; a rate limit or a network blip is retried first.
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const result = await authApi.refresh(refresh);
-        authApi.saveTokens(result);
-        await connectWith(result.accessToken, result.user);
-        return;
-      } catch (e) {
-        const next = refreshFailureAction(e instanceof AuthApiError ? e.status : -1, attempt);
-        if (next.action === "retry") {
-          await new Promise((r) => setTimeout(r, next.delayMs));
-          continue;
-        }
-        authApi.clear();
+    if (recovering.current) return recovering.current;
+    const run = (async () => {
+      if (!authApi.getRefresh()) {
         setError("Session expired. Please sign in again.");
         logout();
         return;
       }
-    }
+      // Only a refresh the server refused ends the session; a rate limit or a network blip is retried first.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          // Rotates the refresh token: the new pair is stored before anything else can use the old one.
+          const result = await authApi.refreshStored();
+          await connectWith(result.accessToken, result.user);
+          return;
+        } catch (e) {
+          const next = refreshFailureAction(e instanceof AuthApiError ? e.status : -1, attempt);
+          if (next.action === "retry") {
+            await new Promise((r) => setTimeout(r, next.delayMs));
+            continue;
+          }
+          authApi.clear();
+          setError("Session expired. Please sign in again.");
+          logout();
+          return;
+        }
+      }
+    })();
+    recovering.current = run.finally(() => {
+      recovering.current = null;
+    });
+    return recovering.current;
   }, [connectWith, logout]);
+
+  /**
+   * The server asked this socket to re-authenticate (`reauth`, its access token expires in a few seconds): rotate the
+   * tokens and hand the fresh access token to the open socket (`auth:reauth`). If that fails for any reason but a
+   * network blip, fall back to refresh + reconnect, which also ends the session when the server refuses the refresh.
+   */
+  const renewSocket = useCallback(async () => {
+    try {
+      const result = await authApi.refreshStored();
+      await socketClient.request("auth:reauth", { token: result.accessToken });
+    } catch (e) {
+      if (e instanceof AuthApiError && isTransientAuthStatus(e.status)) return; // offline: the server's deadline brings us back
+      reauthRef.current();
+    }
+  }, []);
+
+  useEffect(() => {
+    renewRef.current = () => void renewSocket();
+  }, [renewSocket]);
 
   useEffect(() => {
     reauthRef.current = () => void handleUnauthorized();
@@ -475,8 +511,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       // network blip) must not: retry a few times, and keep the stored tokens so the next load can restore the session.
       for (let attempt = 0; ; attempt++) {
         try {
-          const result = await authApi.refresh(refresh);
-          authApi.saveTokens(result);
+          // Rotates the refresh token; the new pair is stored at once (a reload right after must send the new one).
+          const result = await authApi.refreshStored();
           await connectWith(result.accessToken, result.user);
           return;
         } catch (e) {

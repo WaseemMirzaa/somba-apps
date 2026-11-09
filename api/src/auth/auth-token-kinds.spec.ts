@@ -121,12 +121,13 @@ describe('assertTokenKind and the REST strategy', () => {
     expect(() => assertTokenKind({}, 'refresh')).not.toThrow();
   });
 
-  it('JwtStrategy (every REST call) refuses a 2FA challenge or a refresh token presented as a bearer token', () => {
-    const strat = new JwtStrategy(cfg(true) as never);
-    const base = { sub: 'u1', role: 'admin', email: 'a@x.test' };
-    expect(strat.validate({ ...base, typ: 'access' })).toEqual({ id: 'u1', role: 'admin', email: 'a@x.test' });
-    expect(strat.validate(base)).toEqual({ id: 'u1', role: 'admin', email: 'a@x.test' }); // legacy access token, short-lived
-    expect(() => strat.validate({ ...base, purpose: '2fa' })).toThrow(UnauthorizedException);
-    expect(() => strat.validate({ ...base, typ: 'refresh' })).toThrow(UnauthorizedException);
+  it('JwtStrategy (every REST call) refuses a 2FA challenge or a refresh token presented as a bearer token', async () => {
+    const u = await users.create({ email: 'a@x.test', passwordHash: 'x', name: 'A', role: 'admin' });
+    const strat = new JwtStrategy(cfg(true) as never, users);
+    const base = { sub: u.id, role: 'admin', email: 'a@x.test', tokenVersion: 0 };
+    await expect(strat.validate({ ...base, typ: 'access' })).resolves.toEqual({ id: u.id, role: 'admin', email: 'a@x.test' });
+    await expect(strat.validate(base)).resolves.toEqual({ id: u.id, role: 'admin', email: 'a@x.test' }); // legacy access token, short-lived
+    await expect(strat.validate({ ...base, purpose: '2fa' })).rejects.toThrow(UnauthorizedException);
+    await expect(strat.validate({ ...base, typ: 'refresh' })).rejects.toThrow(UnauthorizedException);
   });
 });

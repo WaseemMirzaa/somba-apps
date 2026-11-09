@@ -1,3 +1,4 @@
+import { Optional } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { Server } from 'socket.io';
 import { SettingsService } from '../content/settings.service';
@@ -8,6 +9,7 @@ import { fail, ok, requireUser } from '../sellers/gateway-support';
 import type { AuthedSocket } from '../sellers/gateway-support';
 import { UsersService } from '../users/users.service';
 import { TwoFaService } from './twofa.service';
+import { AuthService } from './auth.service';
 import { StaffTwoFaPolicy, isStaff2faRole } from './staff-twofa';
 
 /**
@@ -23,7 +25,14 @@ export class TwoFaGateway {
     private readonly sellerCtx: SellerContextService,
     private readonly staffPolicy: StaffTwoFaPolicy,
     private readonly audit: AuditService,
+    // Turning two-factor on or off signs out the account's other devices; this one gets fresh tokens (audit A-02, A-22).
+    @Optional() private readonly auth?: AuthService,
   ) {}
+
+  /** Other devices signed out (refresh tokens revoked, sockets closed); fresh tokens for the device that asked. */
+  private async signOutOthers(userId: string, client: AuthedSocket) {
+    return this.auth ? this.auth.revokeOthersAndReissue(userId, client.id) : {};
+  }
 
   @WebSocketServer()
   server: Server;
@@ -57,17 +66,22 @@ export class TwoFaGateway {
     }
   }
 
-  /** `{ code }`: the first 6-digit code. Returns `{ enabled: true, recoveryCodes }`; the codes are shown only once. */
+  /**
+   * `{ code }`: the first 6-digit code. Returns `{ enabled: true, recoveryCodes, accessToken, refreshToken, user }`; the
+   * codes are shown only once, and the tokens replace the stored ones (every other device was signed out).
+   */
   @SubscribeMessage('auth:2fa:enable')
   async enable(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { code?: string }) {
     try {
-      return ok(await this.twofa.enable(requireUser(client).id, String(body?.code ?? '')));
+      const u = requireUser(client);
+      const done = await this.twofa.enable(u.id, String(body?.code ?? ''));
+      return ok({ ...done, ...(await this.signOutOthers(u.id, client)) });
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
-  /** `{ code }`: a current code or a recovery code. Refused while the platform requires it for this account. */
+  /** `{ code }`: a current code or a recovery code. Refused while the platform requires it for this account. Signs out the other devices. */
   @SubscribeMessage('auth:2fa:disable')
   async disable(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { code?: string }) {
     try {
@@ -75,7 +89,9 @@ export class TwoFaGateway {
       if (await this.required(u.id, u.role)) {
         return fail(isStaff2faRole(u.role) ? 'Two-factor authentication is required for staff accounts and cannot be turned off.' : 'Two-factor authentication is required for seller accounts and cannot be turned off.');
       }
-      return ok(await this.twofa.disable(u.id, String(body?.code ?? '')));
+      const done = await this.twofa.disable(u.id, String(body?.code ?? ''));
+      // Fresh tokens for this device (`accessToken`, `refreshToken`, `user`): every other device was signed out.
+      return ok({ ...done, ...(await this.signOutOthers(u.id, client)) });
     } catch (e) {
       return fail((e as Error).message);
     }

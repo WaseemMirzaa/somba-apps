@@ -63,6 +63,9 @@ async function post<T>(
   return json as T;
 }
 
+/** The refresh in flight in this tab, shared by every caller that needs one at the same moment (see `refreshStored`). */
+let refreshing: Promise<AuthResult> | null = null;
+
 /** REST is used ONLY for the one-shot credential exchange. */
 export const authApi = {
   apiUrl: API_URL,
@@ -92,6 +95,29 @@ export const authApi = {
 
   refresh(refreshToken: string): Promise<AuthResult> {
     return post<AuthResult>("/api/v1/auth/refresh", { refreshToken });
+  },
+
+  /**
+   * Trade the STORED refresh token for new tokens and store BOTH (the server rotates refresh tokens: the one just used
+   * stops working a few seconds later, and presenting it again after that signs the account out everywhere). Callers in
+   * this tab that ask at the same moment share one request; another tab reads the newest token from storage, and the
+   * server's short grace window covers two tabs refreshing at once. Rejects with `AuthApiError` (status 401 when there is
+   * no stored token).
+   */
+  refreshStored(): Promise<AuthResult> {
+    if (refreshing) return refreshing;
+    const stored = authApi.getRefresh();
+    if (!stored) return Promise.reject(new AuthApiError("Session expired. Please sign in again.", 401));
+    refreshing = authApi
+      .refresh(stored)
+      .then((r) => {
+        authApi.saveTokens(r);
+        return r;
+      })
+      .finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
   },
 
   // ---- account recovery + verification (one-shot REST) ----
