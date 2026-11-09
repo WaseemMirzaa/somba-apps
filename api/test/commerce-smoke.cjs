@@ -101,6 +101,7 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     };
     const ops = await promote('ops', 'admin_operations');
     const marketing = await promote('mkt', 'admin_marketing');
+    const finance = await promote('fin', 'admin_finance');
     const makeSeller = async (label, locale) => {
       const u = await register(label, 'seller', locale);
       const store = (await req(u.sock, 'sellers:register', kyc(`${label} Store ${tag}`))).data;
@@ -572,8 +573,14 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     a = await req(shop1.sock, 'payouts:request', { amountUsd: 50, method: 'wallet' });
     const po = a.data;
     ok(a.ok, 'the seller requests 50', a.error ?? '');
-    const adminReq = await until(async () => (await req(admin.sock, 'notifications:list')).data.find((n) => n.title === 'Payout requested' && n.body.includes(po.reference)));
-    ok(!!adminReq && adminReq.role === 'admin', 'the super admin gets a "Payout requested" notice', JSON.stringify(adminReq));
+    const isReq = (n) => n.title === 'Payout requested' && n.body.includes(po.reference);
+    const adminReq = await until(async () => (await req(admin.sock, 'notifications:list')).data.find(isReq));
+    ok(!!adminReq && adminReq.role === 'admins:finance', 'the super admin gets a "Payout requested" notice', JSON.stringify(adminReq));
+    // ONE saved notice for the finance audience: the super admin used to get it twice (a finance row and an admin row)
+    ok((await req(admin.sock, 'notifications:list')).data.filter(isReq).length === 1, 'the super admin sees that notice exactly once');
+    const finReq = await until(async () => (await req(finance.sock, 'notifications:list')).data.filter(isReq));
+    ok(finReq?.length === 1, 'finance sees the same notice exactly once', JSON.stringify(finReq));
+    ok((await req(ops.sock, 'notifications:list')).data.filter(isReq).length === 0, 'operations is not told about payouts');
     const fchanged = await waitFor(admin, 'finance:changed', () => true, since, 5000);
     ok(!!fchanged && /^[0-9a-f]{12}$/.test(fchanged.payload.version) && !!fchanged.payload.updatedAt, 'admins receive finance:changed with a version', JSON.stringify(fchanged?.payload));
     e = (await req(shop1.sock, 'finance:earnings', { q: fo.reference })).data;
@@ -771,7 +778,7 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     ok(a.ok && a.data.orderId === fo.id, 'but can link their own order', a.error ?? '');
     a = await req(ordersStaff.sock, 'support:open', { subject: 'Team question', message: 'hello there', orderId: fo.id });
     ok(a.ok && a.data.orderId === fo.id, 'and so can a team member of that store', a.error ?? '');
-    a = await req(cust.sock, 'support:open', { subject: 'Not my order', message: 'hello there', orderId: cOrder.id.replace(/.$/, '0') });
+    a = await req(cust.sock, 'support:open', { subject: 'Not my order', message: 'hello there', orderId: cOrder.id.replace(/.$/, (c) => (c === '0' ? '1' : '0')) }); // a different last digit (the id ended in 0 one run in 16: the order then existed)
     ok(!a.ok, 'a customer cannot link an unknown order', a.error ?? 'was allowed');
     const tk = (await req(cust.sock, 'support:open', { subject: 'Closed soon', message: 'hello there' })).data;
     await req(admin.sock, 'support:setStatus', { id: tk.id, status: 'closed' });

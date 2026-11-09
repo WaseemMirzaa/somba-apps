@@ -44,7 +44,7 @@ export async function commerceWorld() {
   const notifications = {
     toUser: async (to: string, n: { title: string; body: string; type?: string }) => void notes.push({ to: `user:${to}`, ...n }),
     toRole: async (to: string, n: { title: string; body: string; type?: string }) => void notes.push({ to: `role:${to}`, ...n }),
-    toAdmins: async (n: { title: string; body: string; type?: string }) => void notes.push({ to: 'admins', ...n }),
+    toAdmins: async (n: { title: string; body: string; type?: string }, audience?: string) => void notes.push({ to: audience ? `admins:${audience}` : 'admins', ...n }),
   };
   const settings: Record<string, string> = { payoutClearanceHours: '0', commissionPct: '10', minPayoutUsd: '1' };
   const settingsSvc = { get: async (k: string) => settings[k] ?? null };

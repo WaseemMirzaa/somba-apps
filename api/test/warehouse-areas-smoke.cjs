@@ -533,7 +533,7 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
     a = await req(admin.sock, 'staff:setActive', { userId: riderL.user.id, active: 'no' });
     ok(!a.ok && a.error === 'Active must be true or false.', 'active must be a real true or false', a.error ?? '');
     a = await req(admin.sock, 'staff:setActive', { userId: cust.user.id, active: false });
-    ok(!a.ok && a.error === 'Only riders and warehouse staff can be switched on or off here.', 'a customer is not switched here (customers:setActive is theirs)', a.error ?? '');
+    ok(!a.ok && a.error === 'Only staff accounts (riders, warehouse staff and administrators) can be switched on or off here.', 'a customer is not switched here (customers:setActive is theirs)', a.error ?? '');
     a = await req(admin.sock, 'staff:setActive', { userId: 'nope', active: false });
     ok(!a.ok && a.error === 'Account not found.', 'an unknown account', a.error ?? '');
     // switch Marc off

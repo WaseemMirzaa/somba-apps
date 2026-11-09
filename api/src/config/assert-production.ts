@@ -57,6 +57,10 @@ export function assertProductionConfig(config: ConfigService): void {
     problems.push('MM_PROVIDER=sandbox is not allowed in production (it moves no real money).');
   }
 
+  if ((process.env.TRANSLATE_PROVIDER ?? '').trim().toLowerCase() === 'fake') {
+    problems.push('TRANSLATE_PROVIDER=fake is not allowed in production (it would show "[fr] text" to real customers). Use google or off.');
+  }
+
   if (problems.length) {
     for (const p of problems) logger.error(p);
     throw new Error(

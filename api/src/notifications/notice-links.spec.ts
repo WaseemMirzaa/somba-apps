@@ -132,7 +132,6 @@ const EXTRA: Notice[] = [
   { where: 'disputes/disputes.service.ts (return or dispute)', type: 'dispute', roles: ['admin_support', 'admin'] },
   { where: 'flows/seller-lapse.service.ts (replacement or exchange)', type: 'replacement', roles: ['admin_support', 'admin'] },
   { where: 'flows/seller-lapse.service.ts (replacement or exchange)', type: 'exchange', roles: ['admin_support', 'admin'] },
-  { where: 'inventory/inventory.service.ts (low stock, loop over roles)', type: 'stock', roles: ['admin', 'admin_operations'] },
   { where: 'ops/broadcasts.service.ts (audience role chosen by the sender)', type: 'marketing', roles: [...ADMIN_ROLES] },
 ];
 

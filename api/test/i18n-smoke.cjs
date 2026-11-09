@@ -253,12 +253,20 @@ const settled = async (sock, id) => until(async () => {
   ok(frozen.items[0].productNameFr === prod.nameFr, 'a later rename never rewrites the order (snapshot)', frozen.items[0].productNameFr);
   const sellerOrders = (await req(sellerU.sock, 'orders:list')).data.find((o) => o.id === placed.data.id);
   ok(sellerOrders?.items[0].productNameFr === prod.nameFr, "the seller's redacted order view carries it too");
-  await toDelivery(admin, rider, placed.data.id); // the warehouse gives the journey to the rider
+  const dtask = await toDelivery(admin, rider, placed.data.id); // the warehouse gives the journey to the rider
   const tasks = (await req(rider.sock, 'rider:tasks')).data;
   const task = tasks.find((t) => t.orderId === placed.data.id) ?? tasks.find((t) => t.order?.items?.length);
   ok(task && task.order.items.every((i) => typeof i.productNameFr === 'string' && (i.variant === 'Default' ? i.variantFr === null : typeof i.variantFr === 'string')), 'rider:tasks lines carry productNameFr and variantFr (null for a product without options)', JSON.stringify(task?.order?.items?.[0]));
   const old = (await req(demo.sock, 'orders:list')).data.find((o) => o.id !== placed.data.id && o.items.length);
   ok(old && typeof old.items[0].productNameFr === 'string', 'older orders fall back to the current product translation or the name');
+
+  // The rider hands it over: the customer reads the 4-digit code from the app and tells it to the rider. A delivered order is
+  // what the review, exchange and return sections below need (they refuse an order that has not been delivered).
+  await req(rider.sock, 'delivery:updateStatus', { taskId: dtask.id, status: 'picked_up' });
+  await req(rider.sock, 'delivery:updateStatus', { taskId: dtask.id, status: 'in_transit' });
+  const handover = (await req(demo.sock, 'orders:deliveryCode', { orderId: placed.data.id })).data;
+  a = await req(rider.sock, 'delivery:updateStatus', { taskId: dtask.id, status: 'delivered', ...(handover?.code ? { code: handover.code } : {}) });
+  ok(a.ok && a.data.status === 'delivered', 'the rider hands the parcel over with the customer\'s code', a.error ?? '');
 
   // ---- 9. translate:text --------------------------------------------------------------------------------
   section('translate:text takes stored ids only (C-I5)');
@@ -293,9 +301,9 @@ const settled = async (sock, id) => until(async () => {
   await req(sellerU.sock, 'questions:answer', { id: q.data.id, answer: 'Yes, it clips out.' });
   a = await req(guest.sock, 'translate:text', { kind: 'answer', id: q.data.id, target: 'fr' });
   ok(a.ok && a.data.text === '[fr] Yes, it clips out.', 'and the answer translates by the same row id', JSON.stringify(a));
-  const ownerOfDelivered = await login('seller@somba.app');
-  const rep = await req(ownerOfDelivered.sock, 'reviews:reply', { reviewId: review.id, text: 'Thank you for your order' });
-  ok(rep.ok, 'the seller replies to the review');
+  // The reviewed product is the one the order above delivered: its store (sellerU) replies.
+  const rep = await req(sellerU.sock, 'reviews:reply', { reviewId: review.id, text: 'Thank you for your order' });
+  ok(rep.ok, 'the seller replies to the review', rep.error ?? '');
   a = await req(guest.sock, 'translate:text', { kind: 'review_reply', id: review.id, target: 'fr' });
   ok(a.ok && a.data.text === '[fr] Thank you for your order', 'a seller reply translates by the review id', JSON.stringify(a));
   const reviewsOf = (await req(guest.sock, 'reviews:list', { productId: deliveredProduct })).data;
@@ -382,6 +390,7 @@ const settled = async (sock, id) => until(async () => {
   ok(topEarbuds?.nameFr === `Renommé ${tag}` && topEarbuds.nameFr === nowEarbuds.nameFr && topEarbuds.name === nowEarbuds.name, 'and name / nameFr are the listing\'s current titles in each language', JSON.stringify([topEarbuds, nowEarbuds.name, nowEarbuds.nameFr]));
   const asAdmin12 = (await req(admin.sock, 'analytics:seller', { sellerId: store.id, days: 30 })).data;
   ok(asAdmin12?.topProducts?.find((t) => t.productId === en1.id)?.nameFr === `Renommé ${tag}`, "an admin reading a store's analytics gets nameFr too");
+  const ownerOfDelivered = await login('seller@somba.app');
   const seededOwner = (await req(ownerOfDelivered.sock, 'analytics:seller', { days: 90 })).data;
   ok(seededOwner?.topProducts?.every((t) => typeof t.nameFr === 'string' && t.nameFr), "the seeded store's best sellers all have nameFr", JSON.stringify(seededOwner?.topProducts));
   const adm12 = (await req(admin.sock, 'analytics:admin')).data;

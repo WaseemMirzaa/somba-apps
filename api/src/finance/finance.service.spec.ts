@@ -141,17 +141,19 @@ describe('earnings follow the clearance hold', () => {
     const line = (await w.finance.earnings(owner)).items[0];
     expect(line.state).toBe('paid_out');
     expect(line.paidOutAt).toBeInstanceOf(Date);
-    // The super admin and finance heard about the request and the payment.
-    expect(w.notes.filter((x) => x.to === 'role:admin').map((x) => x.title)).toEqual(['Payout requested', 'Payout settled']);
+    // Finance and the super admin heard about the request through ONE notice for the finance audience; the super admin alone hears how it ended.
+    expect(w.notes.filter((x) => x.to === 'admins:finance').map((x) => x.title)).toEqual(['Payout requested']);
+    expect(w.notes.filter((x) => x.to === 'role:admin').map((x) => x.title)).toEqual(['Payout settled']);
     expect(w.notes.find((x) => x.title === 'Payout settled')?.body).toMatch(/^PO-\d+ · KT · \$5\.00 was paid\.$/);
-    expect(w.notes.filter((x) => x.to === 'role:admin_finance').map((x) => x.title)).toEqual(['Payout requested']);
+    expect(w.notes.filter((x) => x.to === 'role:admin_finance')).toEqual([]);
   });
 
   it('a rejected payout tells the super admin and never marks lines paid', async () => {
     await sale({ hoursAgo: 100 });
     const payout = await w.payouts.request({ id: 'u-kt', name: 'KT' }, 5, 'wallet');
     await w.payouts.reject(payout.id, 'Wrong account');
-    expect(w.notes.filter((x) => x.to === 'role:admin').map((x) => x.title)).toEqual(['Payout requested', 'Payout declined']);
+    expect(w.notes.filter((x) => x.to === 'admins:finance').map((x) => x.title)).toEqual(['Payout requested']);
+    expect(w.notes.filter((x) => x.to === 'role:admin').map((x) => x.title)).toEqual(['Payout declined']);
     expect(w.notes.find((x) => x.title === 'Payout declined')?.body).toMatch(/was rejected \(Wrong account\)\.$/);
     expect((await w.finance.earnings(owner)).items[0]).toMatchObject({ state: 'available', paidOutAt: null });
   });

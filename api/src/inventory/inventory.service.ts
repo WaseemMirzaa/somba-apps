@@ -8,7 +8,7 @@ import { ProductsService } from '../products/products.service';
 import type { StockChange } from '../products/products.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { inRoleGroup } from '../common/role-groups';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { DEFAULT_VARIANT, checkVariant, storedVariantGroups } from '../common/variants/variants';
 import { availableFor, poolOf } from '../products/variant-stock';
 import { CartService } from '../cart/cart.service';
@@ -85,15 +85,17 @@ export class InventoryService implements OnModuleInit {
         ? { title: 'Out of stock', body: `${label} is out of stock. Shoppers cannot buy it until you restock.`, type: 'stock', entityId: c.productId }
         : { title: 'Low stock', body: `${label} is down to ${after} (alert at ${line}). Restock soon.`, type: 'stock', entityId: c.productId });
     }
-    for (const role of ['admin', 'admin_operations']) {
-      this.emitter.toRole(role, 'stock:low', { ...payload, sellerId: c.sellerId });
-      await this.notifications.toRole(role, {
+    for (const role of ROLE_GROUPS.orderOps) this.emitter.toRole(role, 'stock:low', { ...payload, sellerId: c.sellerId });
+    // One saved notice for the audience (operations + the super admin), not one row per role.
+    await this.notifications.toAdmins(
+      {
         title: 'Low stock alert',
         body: out ? `${label} from ${store?.name ?? 'a seller'} is out of stock.` : `${label} from ${store?.name ?? 'a seller'} is down to ${after}.`,
         type: 'stock',
         entityId: c.productId,
-      });
-    }
+      },
+      'orderOps',
+    );
   }
 
   // ---- who may touch a product --------------------------------------------
