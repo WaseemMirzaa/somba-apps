@@ -537,7 +537,8 @@ const register = async (label, role = 'customer') => {
     ok(!(await req(u.sock, 'campaigns:create', { name: `As ${name} ${tag}`, discount: 5 })).ok, `${name} admin cannot run campaigns as the platform`);
   }
   ok((await req(admin.sock, 'campaigns:list')).data.find((c) => c.id === camp.id)?.status === 'pending', 'so the campaign is still pending');
-  ok((await req(ops.sock, 'campaigns:list')).ok, 'other admin roles keep reading campaigns');
+  a = await req(ops.sock, 'campaigns:list');
+  ok(!a.ok && /Not allowed/.test(a.error ?? '') && (await req(marketing.sock, 'campaigns:list')).ok, 'only the super admin and Marketing read the platform campaign list (operations is refused)', a.error ?? '');
   a = await req(marketing.sock, 'campaigns:setStatus', { id: camp.id, status: 'rejected', reason: 'Not this month' });
   ok(a.ok && a.data.status === 'rejected', 'the marketing admin decides');
   await req(admin.sock, 'campaigns:setStatus', { id: camp.id, status: 'ended' });

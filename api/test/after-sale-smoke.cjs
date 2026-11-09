@@ -645,7 +645,7 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(msgs0.length === 1 && msgs0[0].attachments.length === 1 && msgs0[0].role === 'customer', 'the first message carries the photo and the real role');
   ok((await ticketLive)?.id === tk.id, 'the super admin gets support:updated live');
   ok(await hasNotice(agent, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'a support agent gets the new-ticket notice');
-  ok(await hasNotice(finance, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'so does every other admin role (finance)');
+  ok(!(await noticesOf(finance)).some((n) => n.entityId === tk.id && n.title === 'New support ticket'), 'finance is not told: only Support and the super admin work tickets');
   ok(await hasNotice(admin, (n) => n.entityId === tk.id && n.title === 'New support ticket'), 'and the super admin');
   ok(!(await req(cust.sock, 'support:open', { subject: 'Order that is not mine', message: 'hello there', orderId: o1.id.replace(/.$/, (c) => (c === '0' ? '1' : '0')) })).ok, 'an order that does not exist is refused');
   ok(!(await req(other.sock, 'support:open', { subject: 'Order that is not mine', message: 'hello there', orderId: supO.id })).ok, "and so is someone else's order");

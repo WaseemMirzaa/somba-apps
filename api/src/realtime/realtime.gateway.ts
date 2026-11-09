@@ -112,7 +112,6 @@ const GROUPS = {
   catalog: ['admin', 'admin_operations', 'admin_marketing'],
   people: ['admin', 'admin_support', 'admin_operations', 'admin_finance'],
   insight: ['admin', 'admin_operations', 'admin_finance'],
-  audit: ['admin', 'admin_operations'],
   // Support may suspend accounts (`customers:setActive`), so it sees the alerts whose action is a block.
   fraud: ['admin', 'admin_finance', 'admin_operations', 'admin_moderation', 'admin_support'],
   /** Hide / restore customer reviews. */
@@ -551,7 +550,7 @@ export class RealtimeGateway
           body: `${product.name} from ${product.sellerName ?? seller?.name ?? user.name} needs moderation.`,
           type: 'moderation',
           entityId: product.id,
-        });
+        }, 'productModeration');
       }
       return ok(product);
     } catch (e) {
@@ -624,7 +623,7 @@ export class RealtimeGateway
           body: `${existing.name} was edited by ${existing.sellerName ?? 'a seller'} and needs moderation again.`,
           type: 'moderation',
           entityId: existing.id,
-        });
+        }, 'productModeration');
       }
       // A moderator's takedown, approval or rejection is a moderation action: it is on the record.
       if (moderator && clean.columns.status && clean.columns.status !== existing.status) {
@@ -2255,6 +2254,8 @@ export class RealtimeGateway
   async campaignsList(@ConnectedSocket() client: AuthedSocket) {
     try {
       const user = this.requireUser(client);
+      // Every seller's campaigns are Marketing's to read; the other admin departments have no part in them.
+      if (this.isAdmin(user.role) && !this.can(user.role, 'campaignDecisions')) return fail('Not allowed.');
       return ok(await this.campaigns.list((await this.sellerActor(user, 'catalog_read', { write: false })) as typeof user));
     } catch (e) {
       return fail((e as Error).message);

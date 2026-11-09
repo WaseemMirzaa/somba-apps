@@ -8,6 +8,7 @@ import { ProductsService } from '../products/products.service';
 import type { StockChange } from '../products/products.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { inRoleGroup } from '../common/role-groups';
 import { DEFAULT_VARIANT, checkVariant, storedVariantGroups } from '../common/variants/variants';
 import { availableFor, poolOf } from '../products/variant-stock';
 import { CartService } from '../cart/cart.service';
@@ -16,6 +17,9 @@ import { CartService } from '../cart/cart.service';
 const OPEN_ORDER = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery'];
 
 export const DEFAULT_LOW_STOCK = 10;
+
+/** May this role correct any store's stock? The Super Admin and Operations (group `logisticsDesk`, which also holds warehouse stock); no other admin role. */
+const isStockAdmin = (role: string): boolean => inRoleGroup(role, 'logisticsDesk');
 const MAX_THRESHOLD = 100_000;
 
 /** Did a change take a count from above the line to on or below it? (Only decreases cross downwards.) */
@@ -96,7 +100,7 @@ export class InventoryService implements OnModuleInit {
   private async ownedProduct(user: { id: string; role: string }, productId: string): Promise<Product> {
     const product = await this.products.getRaw(String(productId ?? ''));
     if (!product || product.status === 'removed') throw new NotFoundException('Product not found.');
-    if (user.role.startsWith('admin')) return product;
+    if (isStockAdmin(user.role)) return product;
     const seller = await this.sellers.findOne({ where: { userId: user.id } });
     if (user.role !== 'seller' || !(product.sellerId === user.id || (seller && product.sellerId === seller.id))) {
       throw new NotFoundException('Product not found.'); // same answer for "missing" and "not yours"
@@ -157,10 +161,10 @@ export class InventoryService implements OnModuleInit {
   }
 
   private async storeFor(user: { id: string; role: string }, sellerId?: unknown): Promise<Seller> {
-    const seller = user.role.startsWith('admin') && sellerId
+    const seller = isStockAdmin(user.role) && sellerId
       ? await this.sellers.findOne({ where: { id: String(sellerId) } })
       : await this.sellers.findOne({ where: { userId: user.id } });
-    if (!seller) throw new BadRequestException(user.role.startsWith('admin') ? 'Choose a store (sellerId).' : 'Open a store first.');
+    if (!seller) throw new BadRequestException(isStockAdmin(user.role) ? 'Choose a store (sellerId).' : 'Open a store first.');
     return seller;
   }
 

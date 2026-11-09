@@ -10,6 +10,7 @@ import { PromosService } from '../content/promos.service';
 import { SellerOrdersService } from '../orders/seller-orders.service';
 import { AuditService } from '../ops/audit.service';
 import { limitSocket } from '../common/socket-limit';
+import { inRoleGroup } from '../common/role-groups';
 import { sellerContext } from '../sellers/seller-context';
 import type { SellerContext } from '../sellers/seller-context';
 import type { SellerPermission } from '../sellers/seller-permissions';
@@ -262,6 +263,8 @@ export class CommerceGateway {
       const u = this.user(client);
       if (u.role === 'seller') await this.seller(client, 'catalog_read', false);
       else if (!u.role.startsWith('admin')) return fail('Sellers only.');
+      // An admin imports for a store as the platform: the super admin and Moderation (like `products:import`).
+      else if (!inRoleGroup(u.role, 'productModeration')) return fail('Not allowed.');
       return ok(this.imports.template());
     } catch (e) {
       return fail((e as Error).message);

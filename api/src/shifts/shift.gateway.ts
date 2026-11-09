@@ -6,7 +6,7 @@ import { User } from '../database/entities';
 import { Actor } from '../logistics/logistics.service';
 import { tierOf } from '../logistics/tiers';
 import { limitSocket } from '../common/socket-limit';
-import { ShiftService } from './shift.service';
+import { ATTENDANCE_ADMINS, ShiftService } from './shift.service';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
 
@@ -38,7 +38,11 @@ export class ShiftGateway {
     limitSocket(client);
     const u = client.data?.user;
     if (!u || u.role === 'guest') throw new Error('Sign in to continue.');
-    if (u.role.startsWith('admin')) return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    if (u.role.startsWith('admin')) {
+      // Rider attendance: the Super Admin and Operations (`ATTENDANCE_ADMINS`); no other admin department.
+      if (!ATTENDANCE_ADMINS.includes(u.role)) throw new Error('Not allowed.');
+      return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    }
     if (u.role !== 'warehouse_staff') throw new Error('Staff only.');
     const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier', 'active'] });
     if (!row?.hubId || row.active === false) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');

@@ -623,7 +623,7 @@ export class OrdersService {
       body: `${order.reference} · $${order.totalUsd.toFixed(2)} from ${order.customerName}`,
       type: 'order',
       entityId: order.id,
-    });
+    }, 'orderOps'); // Operations (and the super admin) run orders; the other departments do not open them from here
     // Every seller with items on the order is told, persistently, what to pack.
     try {
       for (const [sellerId, items] of await this.linesBySeller(order)) {
@@ -664,7 +664,7 @@ export class OrdersService {
     try {
       const tell = async (notice: { title: string; body: string }, hubIds: (string | null)[]) => {
         const n = { ...notice, type: 'order' as const, entityId: order.id };
-        await this.notifications.toAdmins(n);
+        await this.notifications.toAdmins(n, 'logisticsDesk');
         const staff = new Set<string>();
         for (const id of new Set(hubIds.filter((x): x is string => !!x))) for (const u of await this.logistics.staffIds(id)) staff.add(u);
         if (staff.size) await this.notifications.toUsers([...staff], n);
@@ -907,7 +907,7 @@ export class OrdersService {
         : `${order.reference}: one seller's package is ready, waiting for ${sellersLeft} more seller${sellersLeft > 1 ? 's' : ''}.`,
       type: 'delivery',
       entityId: order.id,
-    });
+    }, 'logisticsDesk');
     return task;
   }
 
@@ -1012,7 +1012,7 @@ export class OrdersService {
       body: `${saved.reference}: ${names} — ${reason}`,
       type: 'order',
       entityId: saved.id,
-    });
+    }, 'orderOps');
     return OrdersService.sellerView(saved, (saved.items ?? []).filter((i) => mine.some((t) => t.id === i.id)));
   }
 

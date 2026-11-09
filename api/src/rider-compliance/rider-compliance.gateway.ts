@@ -6,7 +6,7 @@ import { limitSocket } from '../common/socket-limit';
 import { User } from '../database/entities';
 import { Actor } from '../logistics/logistics.service';
 import { tierOf } from '../logistics/tiers';
-import { RiderComplianceService } from './rider-compliance.service';
+import { RIDER_COMPLIANCE_ADMINS, RiderComplianceService } from './rider-compliance.service';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
 
@@ -44,7 +44,11 @@ export class RiderComplianceGateway {
     limitSocket(client);
     const u = client.data?.user;
     if (!u || u.role === 'guest') throw new Error('Sign in to continue.');
-    if (u.role.startsWith('admin')) return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    if (u.role.startsWith('admin')) {
+      // Riders' vehicles and documents: the Super Admin and Operations (`RIDER_COMPLIANCE_ADMINS`); no other admin department.
+      if (!RIDER_COMPLIANCE_ADMINS.includes(u.role)) throw new Error('Not allowed.');
+      return { id: u.id, role: u.role, name: u.name, hubId: null, tier: null };
+    }
     if (u.role !== 'warehouse_staff') throw new Error('Not allowed.');
     const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier', 'active'] });
     if (!row?.hubId || row.active === false) throw new Error('Your account is not linked to a warehouse. Ask an administrator.');

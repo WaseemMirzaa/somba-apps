@@ -9,13 +9,13 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { randomUUID } from 'crypto';
 import { EntityManager, In, LessThan, MoreThanOrEqual, Repository } from 'typeorm';
 import { AuditLog, DeliveryTask, Order, Payment, PaymentRefund } from '../database/entities';
 import type { RefundKind } from '../database/entities';
 import type { PaymentPurpose, PaymentStatus } from '../database/entities';
 import {
-  ADMIN_ROLES,
   NotificationsService,
 } from '../notifications/notifications.service';
 import { pushOrderToOps } from '../logistics/hub-scope';
@@ -1027,7 +1027,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       const log = await this.payments.manager.getRepository(AuditLog).save(
         this.payments.manager.getRepository(AuditLog).create({ actor: receipt.byName, role: receipt.byRole, action: 'payment.cod_collected', entity: 'payment', entityId: payment.id, detail }),
       );
-      this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log);
+      this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log);
     }
     this.publish((await this.payments.findOne({ where: { id: payment.id } })) ?? payment);
   }

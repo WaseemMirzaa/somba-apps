@@ -328,7 +328,7 @@ export class ProductImportService {
         title: 'Product awaiting review',
         body: `${ok.length} products imported by ${seller.name} need moderation.`,
         type: 'moderation',
-      });
+      }, 'productModeration');
     }
     return { total: rows.length, created: dryRun ? 0 : ok.length, failed: errors.length, dryRun, errors, products: ok };
   }

@@ -131,3 +131,58 @@ describe('staff pushes honour the switches in Settings', () => {
     expect([...skipped].sort()).toEqual(['ag3', 'ag4']);
   });
 });
+
+describe('toAdmins with an audience: only the departments that own the subject are told', () => {
+  beforeEach(async () => {
+    await user('ops', 'admin_operations');
+    await user('mkt', 'admin_marketing');
+    await user('mod', 'admin_moderation');
+  });
+  const order = { title: 'New order', body: 'SOM-1 · $20.00 from Marie', type: 'order', entityId: 'o1' };
+
+  it('a new order reaches the super admin and Operations live and by push, and not marketing, finance, support or moderation', async () => {
+    await svc.toAdmins(order, 'orderOps');
+    await tick();
+    expect(emitter.sent.filter((e) => e.event === 'notification:new').map((e) => e.to)).toEqual(['admin,admin_operations']);
+    expect(pushes.map((p) => p.role)).toEqual(['admin', 'admin_operations']);
+    const rows = await ds.getRepository(Notification).find();
+    expect(rows).toHaveLength(1); // still ONE saved row
+    expect(rows[0].role).toBe('admins:orderOps');
+  });
+
+  it('the list: only the audience (and the super admin) sees the row, and only they can mark it read', async () => {
+    await svc.toAdmins(order, 'orderOps');
+    await svc.toAdmins({ ...order, title: 'Product awaiting review', type: 'moderation', entityId: 'p1' }, 'productModeration');
+    await svc.toAdmins({ ...order, title: 'Everyone', type: 'system', entityId: 'all' });
+    const ids = async (id: string, role: string) => (await svc.listForUser(id, role)).map((n) => n.entityId).sort();
+    expect(await ids('sa', 'admin')).toEqual(['all', 'o1', 'p1']);
+    expect(await ids('ops', 'admin_operations')).toEqual(['all', 'o1']);
+    expect(await ids('mod', 'admin_moderation')).toEqual(['all', 'p1']);
+    expect(await ids('mkt', 'admin_marketing')).toEqual(['all']); // marketing hears about no order and no listing
+    expect(await ids('fin', 'admin_finance')).toEqual(['all']);
+    expect(await ids('ag1', 'admin_support')).toEqual(['all']);
+    const [row] = (await ds.getRepository(Notification).find()).filter((n) => n.entityId === 'o1');
+    await svc.markRead(row.id, 'mkt', 'admin_marketing');
+    expect(await ds.getRepository(NotificationRead).count()).toBe(0);
+    await svc.markRead(row.id, 'ops', 'admin_operations');
+    expect(await ds.getRepository(NotificationRead).count()).toBe(1);
+  });
+
+  it('a ticket goes to support, a fraud block to finance and support, a parcel alert to the warehouse desk', async () => {
+    await svc.toAdmins({ ...note, entityId: 'tk' }, 'support');
+    await svc.toAdmins({ ...note, title: 'Account blocked', type: 'fraud', entityId: 'fr' }, 'fraudAlerts');
+    await svc.toAdmins({ ...note, title: 'Aged parcel', type: 'task', entityId: 'tsk' }, 'logisticsDesk');
+    const ids = async (id: string, role: string) => (await svc.listForUser(id, role)).map((n) => n.entityId).sort();
+    expect(await ids('ag1', 'admin_support')).toEqual(['fr', 'tk']);
+    expect(await ids('fin', 'admin_finance')).toEqual(['fr']);
+    expect(await ids('ops', 'admin_operations')).toEqual(['tsk']);
+    expect(await ids('mkt', 'admin_marketing')).toEqual([]);
+    expect(await svc.markAllRead('mkt', 'admin_marketing')).toBe(0);
+  });
+
+  it('the live link of an order notice still points at the order page', async () => {
+    await svc.toAdmins(order, 'orderOps');
+    const [first] = await svc.listForUser('ops', 'admin_operations');
+    expect(first.link).toBe('/admin/orders/o1');
+  });
+});

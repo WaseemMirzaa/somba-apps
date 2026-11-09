@@ -2,7 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { AuditLog, DeliveryTask, Hub, TransferRun, TransferRunStatus, User, WarehouseException } from '../database/entities';
-import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { Actor, LogisticsService } from './logistics.service';
 import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
@@ -119,7 +120,7 @@ export class RunsService {
     if (!actor) return;
     void this.audits
       .save(this.audits.create({ actor: actor.name, role: actor.role, action, entity: 'transfer_run', entityId: run.id, detail: detail ?? run.reference }))
-      .then((log) => this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log))
+      .then((log) => this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log))
       .catch(() => undefined);
   }
 
@@ -465,7 +466,7 @@ export class RunsService {
         type: 'task',
         entityId: run.id,
       };
-      await this.notifications.toAdmins(notice).catch(() => undefined);
+      await this.notifications.toAdmins(notice, 'logisticsDesk').catch(() => undefined);
       await this.notifications.toUsers([...new Set([...(await this.logistics.staffIds(run.fromHubId)), ...(await this.logistics.staffIds(run.toHubId))])], notice).catch(() => undefined);
     }
     this.audit(actor, 'run.closed', run, `${run.reference} · ${missing.length} missing`);

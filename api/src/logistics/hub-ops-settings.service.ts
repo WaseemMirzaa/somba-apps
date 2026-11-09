@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog, Hub, HubOpsSettings } from '../database/entities';
-import { ADMIN_ROLES } from '../notifications/notifications.service';
+import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { str } from '../common/validate';
 import { DEFAULT_HUB_OPS, EDITABLE_HUB_OPS, HubOps, isWorkingNow, mergeHubOps } from './hub-ops-rules';
@@ -98,7 +98,7 @@ export class HubOpsSettingsService {
       const detail = `${hub.name}: ${changed.map((k) => `${k} ${JSON.stringify(before[k])} -> ${JSON.stringify(next[k])}`).join('; ')}`.slice(0, 1000);
       await this.audits
         .save(this.audits.create({ actor: actor.name, role: actor.role, action: 'hub.settings.updated', entity: 'hub', entityId: hubId, detail }))
-        .then((log) => this.emitter.toRoles(ADMIN_ROLES, 'audit:created', log))
+        .then((log) => this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log))
         .catch(() => undefined);
     }
     const out = await this.view(hubId);

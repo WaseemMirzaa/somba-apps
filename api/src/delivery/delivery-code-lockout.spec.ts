@@ -243,7 +243,7 @@ describe('delivery code lockout (RD-01)', () => {
       expect(lines.map((l) => l.detail)).toEqual(expect.arrayContaining([expect.stringContaining('try 1 '), expect.stringContaining('try 2 '), expect.stringContaining('try 3 ')]));
       // the 1st and 2nd wrong codes are quiet, the 3rd tells the warehouse side
       expect(notif.toAdmins).toHaveBeenCalledTimes(1);
-      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Wrong delivery codes', type: 'task', entityId: task.id, body: expect.stringMatching(/^SOM-\d+: .+ entered a wrong delivery code 3 times\. Call the customer to check the code\.$/) }));
+      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Wrong delivery codes', type: 'task', entityId: task.id, body: expect.stringMatching(/^SOM-\d+: .+ entered a wrong delivery code 3 times\. Call the customer to check the code\.$/) }), 'logisticsDesk');
       expect(notif.toUsers).toHaveBeenCalledTimes(1);
       expect(JSON.stringify(notif.toAdmins.mock.calls)).not.toMatch(/1357|2468|9753|4321/);
     });
@@ -260,7 +260,7 @@ describe('delivery code lockout (RD-01)', () => {
       const locked = await ds.getRepository(AuditLog).find({ where: { action: 'delivery.code_locked' } });
       expect(locked).toHaveLength(1);
       expect(locked[0].detail).toMatch(/locked after 5 wrong tries.*for 15 minutes/);
-      expect(notif.toAdmins).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Delivery code locked', body: expect.stringContaining('locked for 15 minutes. Call the customer to check the code.') }));
+      expect(notif.toAdmins).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Delivery code locked', body: expect.stringContaining('locked for 15 minutes. Call the customer to check the code.') }), 'logisticsDesk');
       expect(emitter.toRoles).toHaveBeenCalledWith(expect.anything(), 'audit:created', expect.objectContaining({ action: 'delivery.code_locked' }));
     });
 

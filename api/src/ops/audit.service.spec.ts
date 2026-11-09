@@ -84,3 +84,12 @@ describe('audit:list filters and paging (server side)', () => {
     });
   });
 });
+
+describe('audit:created is pushed only to the roles that may read the log', () => {
+  it('a new entry goes to the super admin and Operations, not to finance, support, marketing or moderation', async () => {
+    const emitter = recordingEmitter();
+    const live = new AuditService(ds.getRepository(AuditLog), emitter as never);
+    await live.record({ actor: 'Fin Ance', role: 'admin_finance', action: 'payout.paid', entity: 'payout' });
+    expect(emitter.sent.filter((e) => e.event === 'audit:created').map((e) => e.to)).toEqual(['admin,admin_operations']);
+  });
+});

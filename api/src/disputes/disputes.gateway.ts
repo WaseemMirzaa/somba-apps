@@ -5,10 +5,11 @@ import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import { StaffTierService } from '../logistics/staff-tier.service';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { DisputesService } from './disputes.service';
 
-/** Admin roles that may decide a request; refunding also needs finance or the super admin. */
-const DECIDERS = ['admin', 'admin_support', 'admin_operations', 'admin_finance'];
+/** Admin roles that work the returns and disputes queue and may decide a request; refunding also needs finance or the super admin. */
+const DECIDERS: readonly string[] = ROLE_GROUPS.disputeDesk;
 const idOf = (b: { id?: string; disputeId?: string } | undefined) => String(b?.id ?? b?.disputeId ?? '');
 
 /**
@@ -27,6 +28,11 @@ export class DisputesGateway {
   private async actor(user: SocketUser, write: boolean) {
     if (user.role !== 'seller') return user;
     return (await sellerContext(user, 'orders', { write })).actor;
+  }
+
+  /** An admin role outside the returns and disputes desk (marketing, moderation) is refused; null for everyone else (the service scopes the rest). */
+  private adminRefusal(user: SocketUser): string | null {
+    return user.role.startsWith('admin') && !inRoleGroup(user.role, 'disputeDesk') ? 'Not allowed.' : null;
   }
 
   /** A seller who is not (yet) in a store still sees what they bought. Warehouse staff carry their warehouse (they see its returns only). */
@@ -54,6 +60,8 @@ export class DisputesGateway {
   async list(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; type?: string; stage?: string; limit?: number; offset?: number }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       return ok(await this.disputes.list(await this.viewer(user), body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
@@ -70,6 +78,8 @@ export class DisputesGateway {
   async get(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       return ok(await this.disputes.get(await this.viewer(user), idOf(body)));
     } catch (e) {
       return fail((e as Error).message);
@@ -121,6 +131,8 @@ export class DisputesGateway {
   async reply(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; message?: string; text?: string; attachments?: string[] }) {
     try {
       const user = requireUser(client);
+      const refusal = this.adminRefusal(user);
+      if (refusal) return fail(refusal);
       const who = await this.actor(user, true);
       const asUser = user.role === 'seller' ? { ...who, name: user.name } : user;
       return ok(await this.disputes.reply(asUser, idOf(body), body?.message ?? body?.text, body?.attachments));
@@ -208,6 +220,7 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!DECIDERS.includes(user.role)) return fail('Not allowed.');
       return ok(
         await this.disputes.resolve(
           body.disputeId,
@@ -259,6 +272,7 @@ export class DisputesGateway {
     try {
       const user = requireUser(client);
       if (!user.role.startsWith('admin')) return fail('Admins only.');
+      if (!DECIDERS.includes(user.role)) return fail('Not allowed.');
       const d = await this.disputes.reject(body.disputeId, body.resolution);
       await this.audit.record({ actor: user.name, role: user.role, action: 'dispute.rejected', entity: 'dispute', entityId: d.id, detail: d.reference });
       return ok(d);

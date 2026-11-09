@@ -158,7 +158,7 @@ export class FraudService {
           : `${account.name} was reactivated after a fraud alert.`,
         type: 'fraud',
         entityId: account.id,
-      });
+      }, 'fraudAlerts');
       await this.notifications.toUser(account.id, {
         title: blocked ? 'Account suspended' : 'Account reinstated',
         body: blocked ? 'Your account is suspended. Contact support for help.' : 'Your account is active again.',

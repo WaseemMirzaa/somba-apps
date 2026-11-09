@@ -4,10 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Campaign, Product, Seller } from '../database/entities';
 import type { CampaignStatus } from '../database/entities';
-import {
-  ADMIN_ROLES,
-  NotificationsService,
-} from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
+
+/** Who runs campaigns as the platform and hears about every change: the super admin and Marketing (group `campaignDecisions`). */
+const CAMPAIGN_ROLES: string[] = [...ROLE_GROUPS.campaignDecisions];
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { budgetSpent, campaignRunning, campaignWindow } from '../products/pricing';
@@ -244,7 +245,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
   /** Push a campaign change to admins and the owning seller, refresh prices, and optionally notify the seller. */
   private async publish(saved: Campaign, notice: { title: string; body: string } | null, opts: { prices?: boolean } = {}): Promise<void> {
     const shown = (await this.present([saved]))[0];
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
+    this.emitter.toRoles(CAMPAIGN_ROLES, 'campaign:updated', shown);
     // Prices move when a campaign starts or stops discounting: refresh shoppers' screens.
     if (opts.prices !== false) void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
     const userId = await this.ownerUserId(saved);
@@ -284,7 +285,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
 
-  /** Seller sees their own campaigns; ops/admin see everything. */
+  /** Seller sees their own campaigns; the super admin and Marketing see everything; no other admin role sees any. */
   async list(user: { id: string; role: string }): Promise<ServedCampaign[]> {
     if (user.role === 'seller') {
       const seller = await this.sellers.findOne({ where: { userId: user.id } });
@@ -297,7 +298,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
         }),
       );
     }
-    if (user.role.startsWith('admin')) {
+    if (inRoleGroup(user.role, 'campaignDecisions')) {
       return this.present(await this.campaigns.find({ order: { createdAt: 'DESC' }, take: 200 }));
     }
     return [];
@@ -356,7 +357,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     });
     await this.translations.enqueue('campaign', campaign.id);
     const shown = (await this.present([campaign]))[0];
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
+    this.emitter.toRoles(CAMPAIGN_ROLES, 'campaign:updated', shown);
     if (seller?.userId) this.emitter.toUser(seller.userId, 'campaign:updated', shown);
     if (campaign.status === 'pending') {
       await this.notifications.toRole('admin_marketing', {
@@ -430,7 +431,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     if (!ids.length) return [];
     const rows = await this.productRepo.find({ where: { id: In(ids) }, select: { id: true, sellerId: true } });
     if (rows.length !== ids.length) throw new BadRequestException('One of the selected products does not exist.');
-    if (!role.startsWith('admin') && rows.some((p) => p.sellerId !== sellerId && p.sellerId !== userId)) {
+    if (!inRoleGroup(role, 'campaignDecisions') && rows.some((p) => p.sellerId !== sellerId && p.sellerId !== userId)) {
       throw new BadRequestException('You can only include your own products in a campaign.');
     }
     return ids;
@@ -487,7 +488,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ServedCampaign> {
     const campaign = await this.campaigns.findOne({ where: { id } });
     if (!campaign) throw new NotFoundException('Campaign not found.');
-    const admin = user.role.startsWith('admin');
+    const admin = inRoleGroup(user.role, 'campaignDecisions');
     if (!admin) {
       if (!(await this.owns(user, campaign))) throw new NotFoundException('Campaign not found.');
       if (!['draft', 'pending', 'rejected'].includes(campaign.status)) {
@@ -525,7 +526,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     });
     if (plan?.touched || plan?.flipped) await this.translations.enqueue('campaign', saved.id);
     const shown = (await this.present([saved]))[0];
-    this.emitter.toRoles(ADMIN_ROLES, 'campaign:updated', shown);
+    this.emitter.toRoles(CAMPAIGN_ROLES, 'campaign:updated', shown);
     if (admin) void this.products.broadcastCampaignPrices(saved).catch(() => undefined);
     // The seller's own screens follow their edit (and an admin's edit of their campaign).
     const owner = await this.ownerUserId(saved);

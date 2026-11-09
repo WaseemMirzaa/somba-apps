@@ -117,6 +117,16 @@ describe('inventory:adjust', () => {
     await expect(w.inventory.adjust(owner, { productId: p.id, delta: -4 })).rejects.toThrow('only 3 in stock');
   });
 
+  it('only the super admin and Operations correct any store’s stock; the other admin departments get "Product not found" and nothing changes', async () => {
+    const p = await w.product(shop, { stock: 3 });
+    for (const role of ['admin_marketing', 'admin_finance', 'admin_support', 'admin_moderation']) {
+      await expect(w.inventory.adjust({ id: `${role}-1`, role }, { productId: p.id, delta: 1 })).rejects.toThrow('Product not found');
+      await expect(w.inventory.settings({ id: `${role}-1`, role }, { sellerId: shop.id, lowStockThreshold: 4 })).rejects.toThrow('Open a store first.');
+    }
+    expect((await w.products.getRaw(p.id))!.stock).toBe(3);
+    await expect(w.inventory.adjust({ id: 'a0', role: 'admin' }, { productId: p.id, delta: 1 })).resolves.toMatchObject({ stock: 4 });
+  });
+
   it('a seller cannot touch another seller’s product; an admin can touch any', async () => {
     const other = await w.store('Other Shop', 'u-other');
     const p = await w.product(other, { stock: 3 });

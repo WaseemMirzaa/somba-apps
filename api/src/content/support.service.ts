@@ -148,13 +148,13 @@ export class SupportService {
     const view = (await this.one(ticket.id))!;
     this.emitter.toUser(user.id, 'support:updated', view);
     this.emitter.toRoles(AGENT_ROLES, 'support:updated', view);
-    // Every admin role hears about a new ticket (support works it; the others may step in).
+    // Support works tickets (and the super admin); the other departments cannot open the support pages, so they are not told.
     await this.notifications.toAdmins({
       title: 'New support ticket',
       body: `${ticket.reference} · ${subject}`,
       type: 'support',
       entityId: ticket.id,
-    });
+    }, 'support');
     return view;
   }
 

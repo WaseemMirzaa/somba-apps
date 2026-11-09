@@ -336,8 +336,20 @@ describe('who may do what', () => {
     await expect(svc.receive(ops(), { productId: phone.id, qty: 1, hubId: other.id })).resolves.toMatchObject({ hubId: other.id });
     await expect(svc.receive({ ...ops(), role: 'admin' }, { productId: phone.id, qty: 1, hubId: other.id })).resolves.toBeDefined();
     await refused(svc.receive(finance(), { productId: phone.id, qty: 1, hubId: other.id }), 'Only operations administrators and warehouse staff can change warehouse stock.');
-    await expect(svc.onHand(finance(), {})).resolves.toMatchObject({ units: 2 });
+    // Reading stock is the warehouse desk's too (super admin, operations): finance and the other departments are refused.
+    for (const who of [finance(), { ...finance(), role: 'admin_marketing' }, { ...finance(), role: 'admin_support' }, { ...finance(), role: 'admin_moderation' }]) {
+      await refused(svc.onHand(who, {}), 'Only operations admins and warehouse staff can work the warehouse desk.');
+      await refused(svc.listBins(who, {}), 'Only operations admins and warehouse staff can work the warehouse desk.');
+    }
+    await expect(svc.onHand(ops(), {})).resolves.toMatchObject({ units: 2 });
+    await expect(svc.onHand({ ...ops(), role: 'admin' }, {})).resolves.toMatchObject({ units: 2 });
     await refused(svc.receive(ops(), { productId: phone.id, qty: 1, hubId: 'nope' }), 'Warehouse not found.');
+  });
+
+  it('stock:updated is pushed to the warehouse and the desk admins only, not to every admin department', async () => {
+    await svc.receive(ops(), { productId: phone.id, qty: 1, hubId: hub.id });
+    const sent = w.emitter.sent.filter((e) => e.event === 'stock:updated').map((e) => e.to);
+    expect(sent).toEqual([`hub:${hub.id}`, 'admin,admin_operations']);
   });
 
   it('riders, customers and sellers have no access', async () => {
