@@ -175,6 +175,18 @@ export class DeliveryTask {
   @Column({ type: 'text', nullable: true, select: false, transformer: encryptedColumn })
   proofCode: string | null;
 
+  /**
+   * Wrong delivery codes typed since the last correct one (or the last reset by a supervisor), counted in the database so
+   * the count survives a restart and is shared by every API process. 5 = locked 15 minutes, 10 = locked 1 hour, 15 = locked
+   * until a warehouse supervisor unlocks the task (see `delivery-code-lock.ts`).
+   */
+  @Column({ type: 'int', default: 0 })
+  codeFailures: number;
+
+  /** The code step is locked until this time (null = not locked by time; at 15 failures only a supervisor unlocks it). */
+  @Column({ type: 'datetime', nullable: true })
+  codeLockedUntil: Date | null;
+
   /** The seller marked the parcel ready for pickup. */
   @Column({ type: 'datetime', nullable: true })
   readyAt: Date | null;
