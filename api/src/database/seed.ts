@@ -88,7 +88,9 @@ const CATALOG: (Partial<Product> & { nameFr: string | null; categoryName: string
   image: p.image ?? null,
   categoryName: p.category,
   stock: p.stock ?? 0,
-  deliveryDays: p.deliveryDays ?? 3,
+  prepDays: p.prepDays ?? 2,
+  // Legacy figure raw readers still use: preparation + the platform's 1 transit day.
+  deliveryDays: Math.min(30, Math.max(1, (p.prepDays ?? 2) + 1)),
 }));
 
 async function run() {
@@ -284,6 +286,15 @@ async function run() {
     // A parcel may travel between cities (e.g. Kinshasa -> Lubumbashi); the estimate grows by these days.
     setRepo.create({ key: 'allowInterCityDelivery', value: 'true' }),
     setRepo.create({ key: 'interCityTransferDays', value: '3' }),
+    // Delivery time = the seller's preparation + the platform's transit; a multi-seller order delivers what arrived after 24 h.
+    setRepo.create({ key: 'localDeliveryDays', value: '1' }),
+    setRepo.create({ key: 'splitDeliveryAfterHours', value: '24' }),
+    setRepo.create({ key: 'expressDeliveryEnabled', value: 'false' }),
+    setRepo.create({ key: 'expressDeliveryDays', value: '0' }),
+    setRepo.create({ key: 'expressBaseUsd', value: '2' }),
+    setRepo.create({ key: 'expressPerKmUsd', value: '0.5' }),
+    setRepo.create({ key: 'expressMaxUsd', value: '15' }),
+    setRepo.create({ key: 'expressMaxKm', value: '0' }),
     setRepo.create({ key: 'requirePinnedAddress', value: 'false' }),
     setRepo.create({ key: 'requireSellerPickupPin', value: 'false' }),
     setRepo.create({ key: 'commissionPct', value: '12' }),

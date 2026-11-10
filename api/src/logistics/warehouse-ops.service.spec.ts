@@ -489,7 +489,7 @@ describe('warehouse operations', () => {
         }),
       );
     });
-    const delivery = (over: Partial<DeliveryTask> = {}) => mkTask({ orderId: order.id, orderReference: order.reference, ...over });
+    const delivery = (over: Partial<DeliveryTask> & { age?: number } = {}) => mkTask({ orderId: order.id, orderReference: order.reference, ...over });
 
     it('is for the super admin, operations admin and warehouse supervisors and managers; no other admin role', async () => {
       for (const role of ['admin_finance', 'admin_support', 'admin_marketing', 'admin_moderation']) {

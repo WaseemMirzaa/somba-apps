@@ -25,7 +25,7 @@ beforeEach(async () => {
 });
 afterEach(async () => ds.destroy());
 
-const actionsOf = async (f?: object) => (await svc.list(f)).map((r) => r.action);
+const actionsOf = async (f?: object | null) => (await svc.list(f)).map((r) => r.action);
 
 describe('audit:list filters and paging (server side)', () => {
   it('with no filter it is the newest first, as before', async () => {

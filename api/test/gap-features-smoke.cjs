@@ -223,6 +223,24 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
     await approve(quick.data.id);
     r = trackOrder(await order([{ productId: quick.data.id, qty: 1 }]));
     ok(r.ok && r.data.estimatedDeliveryDate === dayPlus(1), 'a 1-day product: expected tomorrow', r.error ?? String(r.data?.estimatedDeliveryDate));
+    // Delivery time = the seller's preparation + the platform's transit (localDeliveryDays, 1 by default).
+    const legacyRead = await req(seller.sock, 'products:update', { id: plain.data.id, patch: { deliveryDays: 4 } });
+    ok(legacyRead.ok && legacyRead.data.prepDays === 3 && legacyRead.data.deliveryDays === 4, 'a legacy deliveryDays of 4 becomes prepDays 3 and is served back as 4 (round-trips)', JSON.stringify({ p: legacyRead.data?.prepDays, d: legacyRead.data?.deliveryDays }));
+    const prepNow = await req(seller.sock, 'products:update', { id: plain.data.id, patch: { prepDays: 5, deliveryDays: 2 } });
+    ok(prepNow.ok && prepNow.data.prepDays === 5 && prepNow.data.deliveryDays === 6 && prepNow.data.totalDeliveryDays === prepNow.data.deliveryDays + (prepNow.data.sellerHandlingDays ?? 0), 'prepDays wins over a legacy deliveryDays: served total = prep + handling + 1', JSON.stringify({ p: prepNow.data?.prepDays, d: prepNow.data?.deliveryDays, t: prepNow.data?.totalDeliveryDays }));
+    for (const bad of [-1, 31, 1.5, 'soon']) {
+      const b = await req(seller.sock, 'products:update', { id: plain.data.id, patch: { prepDays: bad } });
+      ok(!b.ok && /Preparation time \(days\) must be a whole number between 0 and 30/.test(b.error ?? ''), `a preparation time of ${bad} is refused`, b.error ?? 'accepted');
+    }
+    await req(seller.sock, 'products:update', { id: plain.data.id, patch: { deliveryDays: 4 } }); // back to the 4-day product the next checks use
+    const sameDay = await listing(`Same day ${tag}`, { prepDays: 0 });
+    ok(sameDay.ok && sameDay.data.prepDays === 0 && sameDay.data.deliveryDays === 1 && sameDay.data.totalDeliveryDays >= 1, 'a new listing can have a preparation time of 0 (served as 1 day: the platform transit), not the old fallback of 3', JSON.stringify({ p: sameDay.data?.prepDays, d: sameDay.data?.deliveryDays, t: sameDay.data?.totalDeliveryDays }));
+    await approve(sameDay.data.id);
+    r = trackOrder(await order([{ productId: sameDay.data.id, qty: 1 }]));
+    ok(r.ok && r.data.estimatedDeliveryDate === dayPlus(1 + (sameDay.data.sellerHandlingDays ?? 0)), 'prep 0: expected after the platform transit only', r.error ?? String(r.data?.estimatedDeliveryDate));
+    const q = await req(buyer.sock, 'delivery:quote', { lines: [{ productId: sameDay.data.id, qty: 1 }], city: 'Kinshasa' });
+    if (q.ok) ok(q.data.deliveryMode === 'standard' && q.data.estimatedDeliveryDate === r.data?.estimatedDeliveryDate && q.data.estimateDays === q.data.prepDays + q.data.routeDays, 'delivery:quote carries the estimate: the same date orders:create stamps', JSON.stringify({ m: q.data.deliveryMode, d: q.data.estimatedDeliveryDate, o: r.data?.estimatedDeliveryDate }));
+    else console.log('  (quote skipped: ' + q.error + ')');
     r = trackOrder(await order([{ productId: quick.data.id, qty: 1 }, { productId: plain.data.id, qty: 1 }], { deliverySlot: '2020-01-01 09:00-12:00' }));
     const expected = dayPlus(4);
     ok(r.ok && r.data.estimatedDeliveryDate === expected, 'mixed order: the slowest line decides (4 days)', r.error ?? String(r.data?.estimatedDeliveryDate));

@@ -113,6 +113,10 @@ export class Order {
   @Column({ type: 'text', nullable: true, transformer: encryptedColumn })
   shippingAddress: string | null;
 
+  /** How the order is delivered: 'standard' (through the warehouses) or 'express' (seller straight to the customer). Decided once, at checkout. */
+  @Column({ type: 'varchar', length: 16, default: 'standard' })
+  deliveryMode: 'standard' | 'express';
+
   /** Expected delivery day (YYYY-MM-DD, Kinshasa): order day + the slowest line's seller-set delivery days. */
   @Column({ type: 'varchar', length: 10, nullable: true })
   estimatedDeliveryDate: string | null;

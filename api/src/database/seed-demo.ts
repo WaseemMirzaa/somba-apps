@@ -659,7 +659,7 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
         sku: p.sku,
         brand: p.brand ?? null,
         weightGrams: p.weightGrams,
-        deliveryDays: p.deliveryDays,
+        prepDays: p.prepDays,
         variants: p.variants ?? undefined,
         variantStock: p.variantStock ?? undefined,
         sourceLang: 'en',

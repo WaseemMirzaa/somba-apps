@@ -196,7 +196,7 @@ Inputs also accept `weightKg`. `image` alone still works (it sets the cover; the
 ### `products:import` — seller (admin with `sellerId` = store id)
 Body `{ rows?: object[] | csv?: string | csvUrl?: string, dryRun?: boolean }` — at most 500 rows. `csv` text sent over the socket is limited to 900 KB (Socket.IO's message limit is 1 MB):
 for a bigger file give a `csvUrl` (up to 2 MB). `csvUrl`: https only, public host, no redirects, 10 s. CSV delimiter `,` `;` or tab, UTF-8 (BOM ok). Header names are matched ignoring case/accents/spaces, English or French:
-`name, nameFr, description, descriptionFr, price, originalPrice, category (or categoryId), stock, sku, brand, weightKg|weightGrams, images (urls separated by |) or image, deliveryDays, variants`.
+`name, nameFr, description, descriptionFr, price, originalPrice, category (or categoryId), stock, sku, brand, weightKg|weightGrams, images (urls separated by |) or image, prepDays (preparation time in days, 0–30; aliases prep, preparation, delaipreparation, prepjours; the legacy `deliveryDays` column is still read and converted), variants`.
 `variants` = `Size=S|M|L;Colour=Black|White`.
 ```
 -> { total, created, failed, dryRun,

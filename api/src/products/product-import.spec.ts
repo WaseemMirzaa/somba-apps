@@ -52,6 +52,24 @@ describe('products:import', () => {
     expect(w.notes.filter((n) => n.title === 'Product awaiting review').map((n) => n.to)).toEqual(['admins:productModeration']); // the moderators, not every department
   });
 
+  it('reads the preparation time (prepDays, or its French names) and converts a legacy deliveryDays column', async () => {
+    const csv = [
+      'name,price,category,stock,delaipreparation',
+      'Same day,5,Electronics,3,0',
+      'Slow,5,Electronics,3,6',
+      'Bad,5,Electronics,3,31',
+    ].join('\n');
+    const r = await importer.import(seller, { csv });
+    expect(r.created).toBe(2);
+    expect(r.errors.map((e) => e.errors.join(' '))).toEqual([expect.stringContaining('Preparation time (days) must be a whole number between 0 and 30.')]);
+    const [a, b] = await Promise.all(r.products.map((p) => w.products.get(p.productId!)));
+    expect([a?.prepDays, a?.deliveryDays, b?.prepDays, b?.deliveryDays]).toEqual([0, 1, 6, 7]);
+    const legacy = await importer.import(seller, { csv: 'name,price,category,stock,deliveryDays\nOld sheet,5,Electronics,3,4' });
+    const old = await w.products.get(legacy.products[0].productId!);
+    expect([old?.prepDays, old?.deliveryDays]).toEqual([3, 4]);
+    expect(TEMPLATE_HEADER).toContain('prepDays');
+  });
+
   it('a bad row never blocks the good ones; each bad row says why', async () => {
     const csv = [
       HEADER,

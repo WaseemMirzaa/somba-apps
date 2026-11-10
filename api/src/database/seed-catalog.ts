@@ -25,7 +25,7 @@ export const seedProducts = [
     categoryFr: "Électronique",
     seller: "TechZone Store",
     stock: 45,
-    deliveryDays: 2,
+    prepDays: 1,
   },
   {
     id: 2,
@@ -41,7 +41,7 @@ export const seedProducts = [
     categoryFr: "Électronique",
     seller: "Apple Official",
     stock: 23,
-    deliveryDays: 3,
+    prepDays: 2,
   },
   {
     id: 3,
@@ -57,7 +57,7 @@ export const seedProducts = [
     categoryFr: "Électronique",
     seller: "AudioHub",
     stock: 120,
-    deliveryDays: 1,
+    prepDays: 0,
   },
   {
     id: 4,
@@ -73,7 +73,7 @@ export const seedProducts = [
     categoryFr: "Mode",
     seller: "SportStyle",
     stock: 89,
-    deliveryDays: 2,
+    prepDays: 1,
   },
   {
     id: 5,
@@ -89,7 +89,7 @@ export const seedProducts = [
     categoryFr: "Maison",
     seller: "HomeEssentials",
     stock: 34,
-    deliveryDays: 4,
+    prepDays: 3,
   },
   {
     id: 6,
@@ -105,7 +105,7 @@ export const seedProducts = [
     categoryFr: "Mode",
     seller: "DenimWorld",
     stock: 200,
-    deliveryDays: 2,
+    prepDays: 1,
   },
   {
     id: 7,
@@ -121,7 +121,7 @@ export const seedProducts = [
     categoryFr: "Maison",
     seller: "KitchenPro",
     stock: 67,
-    deliveryDays: 1,
+    prepDays: 0,
   },
   {
     id: 8,
@@ -137,6 +137,6 @@ export const seedProducts = [
     categoryFr: "Électronique",
     seller: "GameZone",
     stock: 12,
-    deliveryDays: 3,
+    prepDays: 2,
   },
 ];

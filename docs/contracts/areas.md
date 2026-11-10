@@ -145,7 +145,12 @@ Changing coverage never reroutes an order already placed; it recomputes every st
     feeOverrideUsd: number|null,                             // the flat fee of the deciding coverage row, when one applied
     interCity: boolean, interCityDays: number,               // the inter-city allowance (setting) when the parcels cross cities
     transitHours: number,                                    // longest lane transit over the origins (0 with no lanes)
-    extraDays: number }                                      // days added to the delivery estimate (see "Fee and estimate")
+    extraDays: number,                                       // legacy meaning kept: lane / inter-city days only, 0 on express (see "Fee and estimate")
+    deliveryMode: 'standard' | 'express', express: boolean,  // always 'standard' for now
+    prepDays: number|null, routeDays: number|null, estimateDays: number|null,   // the deciding (slowest) seller's; null without lines
+    estimatedDeliveryDate: string|null,                      // YYYY-MM-DD Kinshasa = exactly what orders:create stamps
+    splitAfterHours: number }                                // setting `splitDeliveryAfterHours` (0 = never split)
+  // each origins[] also carries { prepDays, routeDays, estimatedDeliveryDate } (that seller's own numbers; null for a seller with no line)
   ```
   `fallback`: `'city'` = the covering warehouse has no active rider and the nearest staffed warehouse **of the same city** delivers;
   `'nearest'` = none in the city, the nearest staffed one **of the same province**; `'no_riders'` = nobody nearby has a rider, the
@@ -162,7 +167,7 @@ Changing coverage never reroutes an order already placed; it recomputes every st
   `{area}` in `error` is the French official name (or `this area` when nothing at all could be matched). Clients render their own
   sentence from `areaName` / `areaNameEn` and list `servedCities`. Nothing is reserved or written for a refused order.
 - `orders:create` stores `destinationAreaId`, `routeBySeller` and the recorded `destinationHubId` / `originHubIds` / `originBySeller`;
-  `estimatedDeliveryDate` includes `extraDays`. Orders already placed are never rerouted.
+  `estimatedDeliveryDate` is the per-seller prep + transit estimate (see "Fee and estimate"). Orders already placed are never rerouted.
 - Product listing for a seller whose pickup area is not served: `products:create` (and a seller resuming a draft) fails with
   `Your pickup area is not served yet. You can prepare your store; sales open when we deliver there.` A store with no pickup
   area at all is governed by `requireSellerPickupPin`. An existing listing of a store whose area is unserved cannot be ordered:
@@ -176,14 +181,23 @@ Changing coverage never reroutes an order already placed; it recomputes every st
   parcels of several sellers that share a hop pay it once. With no lanes a transfer is one direct hop (the old single transfer fee).
   The quote spells every hop out: `origins[].hops[].costUsd` is the effective price (the lane's, else `defaultTransferUsd`) and `laneCost`
   says which one it is, so `transferUsd` is the sum of the distinct hops' `costUsd`.
-- `extraDays` added to the delivery estimate: the lanes' transit (`ceil(transitHours / 24)`) when lanes give one, else the
+- `extraDays` (legacy meaning, kept so older apps still add up): the lanes' transit (`ceil(transitHours / 24)`) when lanes give one, else the
   `interCityTransferDays` setting for an order whose parcels cross cities, else 0 (never beyond the 30-day maximum).
+- **Estimate = the seller's preparation + the platform's transit**, per seller, slowest wins:
+  `estimateDays = min(30, max over sellers of (prepDays_s + handlingDays_s + routeDays_s))` where
+  `routeDays_s = localDeliveryDays + extra_s` and `extra_s` is `ceil(transitHours_s / 24)` of the lanes that seller's parcels use, else the
+  inter-city allowance when THAT seller's pickup city differs from the customer's, else 0. (Computed per seller, so one far seller does not slow
+  the other sellers' parcels in the estimate.) `delivery:quote` returns the numbers and the date; `orders:create` stamps the same date.
+  Express (next release) replaces `routeDays` by `expressDeliveryDays`. See logistics.md §15.
 - Inter-city = the seller's pickup city (else province) differs from the customer's. Refused with
   `Delivery between cities is not available right now.` when `allowInterCityDelivery` is `'false'`.
 
 ## Settings
 - `allowInterCityDelivery` (`'true'` default) — public, admin-writable
 - `interCityTransferDays` (`'3'` default, whole number 0–30) — public, admin-writable
+- `localDeliveryDays` (`'1'` default, whole number 0–30) — public, admin-writable: the platform's hub -> customer days, added to every seller's preparation
+- `splitDeliveryAfterHours` (`'24'`, 0–720; 0 = never), `expressDeliveryEnabled` (`'false'`), `expressDeliveryDays` (`'0'`), `expressBaseUsd` / `expressPerKmUsd` /
+  `expressMaxUsd` (`'2'` / `'0.5'` / `'15'`), `expressMaxKm` (`'0'` = no limit) — public, admin-writable; see logistics.md §2 (used by the next release)
 - Existing: `deliveryBaseUsd`, `deliveryPerKmUsd`, `deliveryMaxUsd`, `deliveryTransferUsd`
 
 ## Seed accounts (dev seed)

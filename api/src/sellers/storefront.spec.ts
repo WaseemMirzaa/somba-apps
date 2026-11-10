@@ -12,6 +12,7 @@ import {
   onVacation,
   parseGoals,
   storeForListing,
+  legacyDays,
   totalDeliveryDays,
   vacationError,
   vacationNotice,
@@ -76,16 +77,32 @@ describe('handling time', () => {
     for (const bad of [-1, 15, 1.5, 'x', null, '', undefined]) expect(() => cleanHandlingDays(bad)).toThrow(/0 to 14/);
   });
 
-  it('adds to the product\'s delivery time (clamped), and a store with none changes nothing', () => {
-    expect(totalDeliveryDays(3, { handlingDays: 2 })).toBe(5);
-    expect(totalDeliveryDays(3, { handlingDays: 0 })).toBe(3);
-    expect(totalDeliveryDays(3, null)).toBe(3);
-    expect(totalDeliveryDays(undefined, { handlingDays: 2 })).toBe(5); // unset delivery time falls back to 3 days
+  it('delivery time = preparation + the store\'s handling + the platform\'s local transit (default 1), clamped to 1..30', () => {
+    expect(totalDeliveryDays(3, { handlingDays: 2 })).toBe(6);
+    expect(totalDeliveryDays(3, { handlingDays: 0 })).toBe(4);
+    expect(totalDeliveryDays(3, null)).toBe(4);
+    expect(totalDeliveryDays(undefined, { handlingDays: 2 })).toBe(5); // unset preparation falls back to 2 days
+    expect(totalDeliveryDays(0, null)).toBe(1); // ships the same day: just the platform's transit day
+    expect(totalDeliveryDays(0, null, 0)).toBe(1); // never below 1, even with no local transit
+    expect(totalDeliveryDays(3, { handlingDays: 2 }, 3)).toBe(8);
     expect(totalDeliveryDays(30, { handlingDays: 14 })).toBe(30); // the TOTAL is clamped to 30, as the order estimate is
     expect(totalDeliveryDays(25, { handlingDays: 14 })).toBe(30);
-    expect(totalDeliveryDays(16, { handlingDays: 14 })).toBe(30);
-    expect(totalDeliveryDays(15, { handlingDays: 14 })).toBe(29);
-    expect(totalDeliveryDays(3, { handlingDays: 99 })).toBe(17); // handling is capped at 14
+    expect(totalDeliveryDays(15, { handlingDays: 14 })).toBe(30);
+    expect(totalDeliveryDays(14, { handlingDays: 14 })).toBe(29);
+    expect(totalDeliveryDays(15, { handlingDays: 14 }, 0)).toBe(29);
+    expect(totalDeliveryDays(3, { handlingDays: 99 })).toBe(18); // handling is capped at 14
+  });
+
+  it('the legacy delivery time is preparation + local transit WITHOUT handling, at least 1, so it round-trips', () => {
+    expect(legacyDays(3)).toBe(4);
+    expect(legacyDays(0)).toBe(1);
+    expect(legacyDays(0, 0)).toBe(1);
+    expect(legacyDays(4, 2)).toBe(6);
+    expect(legacyDays(30)).toBe(30);
+    expect(legacyDays(undefined)).toBe(3); // unset preparation = 2, + 1 transit
+    // what the wizard reads back is what it wrote: deliveryDays 4 -> prep 3 -> served 4; the total adds the handling on top
+    const store = { handlingDays: 3 };
+    expect(totalDeliveryDays(3, store)).toBe(legacyDays(3) + store.handlingDays);
   });
 });
 

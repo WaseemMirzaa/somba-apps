@@ -137,9 +137,16 @@ export class Product {
   @Column({ type: 'int', default: 0 })
   reviewsCount: number;
 
-  /** Estimated delivery time in days. */
+  /**
+   * Estimated delivery time in days, the LEGACY figure: preparation plus the platform's transit (`localDeliveryDays`), without
+   * the store's handling time. Still written next to `prepDays` so raw readers, old apps and the web wizard keep round-tripping.
+   */
   @Column({ type: 'int', default: 3 })
   deliveryDays: number;
+
+  /** The seller's preparation time for this product (0-30 days). Delivery time = preparation + the platform's transit for the route. */
+  @Column({ type: 'int', default: 2 })
+  prepDays: number;
 
   @Index()
   @Column({ type: 'varchar', length: 20, default: 'live' })

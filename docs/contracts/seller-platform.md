@@ -221,11 +221,11 @@ The reply is the store (`sellers:mine` shape). Served on the store, the storefro
 `onVacation`, `vacationUntil`, `handlingDays`, `returnsPolicy`, `returnsPolicyFr`, `shippingPolicy`, `shippingPolicyFr`.
 
 Every product object (`products:list/get`, `product:created/updated`…) now carries `sellerOnVacation`, `sellerVacationUntil`,
-`sellerHandlingDays`, `totalDeliveryDays` (`deliveryDays + sellerHandlingDays`), `sellerVacationNotice: { en, fr } | null`.
+`sellerHandlingDays`, `totalDeliveryDays` (`prepDays + sellerHandlingDays + localDeliveryDays`, see logistics.md §15), `sellerVacationNotice: { en, fr } | null`.
 **Hide "Add to cart" when `sellerOnVacation` and show `sellerVacationNotice[locale]`.**
 While a store is away: `orders:create` and `cart:set` (for lines the cart did not already hold) refuse its products with the bilingual
 error `"<Store> is on vacation until 12 Nov 2026 and is not taking new orders. / <Store> est en vacances jusqu’au 12 nov. 2026 et ne prend pas de nouvelles commandes."`;
-orders already placed carry on. The order's `estimatedDeliveryDate` uses `deliveryDays + handlingDays`. The store reopens by itself when
+orders already placed carry on. The order's `estimatedDeliveryDate` uses preparation + handling + the platform's transit (logistics.md §15). The store reopens by itself when
 the date passes (notice *Vacation mode ended*).
 
 Push: `store:vacation` `{ sellerId, onVacation, vacationUntil, notice? }` to customers, guests and sellers.
@@ -299,7 +299,7 @@ Errors: `Handling time must be a whole number of days from 0 to 14.` · `Enter a
 - **Phone-code sign-in steps up too.** `POST /api/v1/auth/phone/login` for an account with 2FA on answers `{ needs2fa: true, challenge }` (no tokens), exactly like password login; complete it with `POST /api/v1/auth/login/2fa { challenge, code }` (authenticator or recovery code).
 - **`store:vacation`** carries `{ sellerId (store id), ownerId, sellerIds: [storeId, ownerId], onVacation, vacationUntil, notice: {en, fr} | null }`; listings may hold either id, so match on `sellerIds`. Storefront payloads (`sellers:storefront`, `sellers:mine`, `seller:updated`) carry `vacationNotice: {en, fr} | null`.
 - **Policies.** When the translation job finishes, the owner (and admins, and the team) get `seller:updated` with the translated `returnsPolicyFr` / `shippingPolicyFr` (a second push after the `sellers:update` reply).
-- **Delivery total.** `totalDeliveryDays = min(30, deliveryDays + handlingDays)`; the order's `estimatedDeliveryDate` uses the same number. (Replaces "`deliveryDays + sellerHandlingDays`" above.)
+- **Delivery total.** `totalDeliveryDays = min(30, max(1, prepDays + handlingDays + localDeliveryDays))`; the order's `estimatedDeliveryDate` uses the same numbers per seller. The legacy `deliveryDays` is `prepDays + localDeliveryDays` WITHOUT handling, so `totalDeliveryDays === deliveryDays + sellerHandlingDays` (below the 30-day cap). See logistics.md §15.
 - **`products:list`**, **`campaigns:list`**, CSV language, live `campaign:updated` / `coupon:updated`: see `commerce.md` §10.
 - **Chat.** Attachments may be png, jpg/jpeg, webp or heic (the uploads endpoint's formats); `chat:start` checks the per-minute send limit **and** the per-hour start limit before it creates the conversation, so a refused first message leaves nothing behind.
 - **Sockets.** Each gateway adds one `connection` listener to the namespace and up to two `disconnect` listeners to every client socket (Nest's hook and the adapter's message stream); the adapter raises the namespace's max-listeners to the number of gateways (16) and each socket's to twice that (32), instead of an arbitrary 64 on the wrong emitter. No more `MaxListenersExceededWarning`.

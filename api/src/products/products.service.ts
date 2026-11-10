@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, Repository } from 'typeorm';
-import { Campaign, FlashSale, Product, ProductView, Seller, StockMovement, serializeVariantStock } from '../database/entities';
-import { onVacation, totalDeliveryDays, vacationNotice } from '../sellers/storefront';
+import { Campaign, FlashSale, Product, ProductView, Seller, Setting, StockMovement, serializeVariantStock } from '../database/entities';
+import { legacyDays, onVacation, totalDeliveryDays, vacationNotice } from '../sellers/storefront';
 import type { ProductStatus, StockReason } from '../database/entities';
 import { num, oneOf, optStr, price as priceOf, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -18,7 +18,7 @@ import type { StockEntries } from './variant-stock';
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../common/paging';
 import { bestPrice, campaignCovers, campaignRunning } from './pricing';
 import type { PriceSource } from './pricing';
-import { DELIVERY_DAYS } from '../common/delivery/estimate';
+import { DELIVERY_DAYS, PREP_DAYS, localDaysOf, prepDaysOf, prepFromLegacy } from '../common/delivery/estimate';
 import { CategoriesService } from '../catalog/categories.service';
 import { TranslationService, chunk } from '../translation/translation.service';
 import type { TranslationStatus } from '../translation/translation.service';
@@ -65,8 +65,14 @@ export interface StoreFields {
   sellerVacationUntil: Date | null;
   sellerVacationNotice: { en: string; fr: string } | null;
   sellerHandlingDays: number;
-  /** `deliveryDays` plus the store's handling time. */
+  /** The store offers express delivery (a rider goes seller -> customer in the same commune). */
+  sellerExpressDelivery: boolean;
+  /** The seller's preparation time for this product (0-30 days). */
+  prepDays: number;
+  /** Preparation + the store's handling + the platform's local transit (`localDeliveryDays`), 1-30. */
   totalDeliveryDays: number;
+  /** LEGACY: preparation + local transit, 1-30, without handling. Served so the web wizard and older apps round-trip it. */
+  deliveryDays: number;
 }
 export type ServedProduct = PricedProduct & ServedFields & StoreFields;
 
@@ -96,7 +102,9 @@ export interface ListingInput extends ProductTextInput {
   category?: unknown;
   stock?: unknown;
   image?: unknown;
-  /** The seller's delivery time for this product, in days (1-30). */
+  /** The seller's preparation time for this product, in days (0-30). Wins over `deliveryDays`. */
+  prepDays?: unknown;
+  /** LEGACY: delivery time in days (1-30); converted to a preparation time (`deliveryDays - localDeliveryDays`). */
   deliveryDays?: unknown;
   /** The whole gallery, cover first (uploads or https). `image` alone still works and sets the cover. */
   images?: unknown;
@@ -114,7 +122,7 @@ export interface ListingInput extends ProductTextInput {
 
 /** A validated listing request: plain columns, the words, and the category reference. */
 export interface CleanListing {
-  columns: Partial<Pick<Product, 'price' | 'originalPrice' | 'discount' | 'stock' | 'image' | 'images' | 'sku' | 'brand' | 'weightGrams' | 'deliveryDays' | 'status'>>;
+  columns: Partial<Pick<Product, 'price' | 'originalPrice' | 'discount' | 'stock' | 'image' | 'images' | 'sku' | 'brand' | 'weightGrams' | 'deliveryDays' | 'prepDays' | 'status'>>;
   /** Raw per-option stock as sent (checked against the product's options when it is saved). */
   variantStock?: unknown;
   text: {
@@ -159,7 +167,7 @@ function cleanLabels(raw: unknown): Partial<Record<Locale, VariantGroup[]>> {
  */
 export function cleanListing(
   input: ListingInput,
-  opts: { partial: boolean; allowStatus: boolean; currentPrice?: number },
+  opts: { partial: boolean; allowStatus: boolean; currentPrice?: number; /** `localDeliveryDays` (default 1): converts a legacy `deliveryDays` into a preparation time. */ localDays?: number },
 ): CleanListing {
   const columns: CleanListing['columns'] = {};
   const has = (k: keyof ListingInput) => input[k] !== undefined;
@@ -184,8 +192,16 @@ export function cleanListing(
     else if (has('weightKg') && input.weightKg !== null && input.weightKg !== '') columns.weightGrams = Math.round(num(input.weightKg, 'Weight (kg)', { min: 0.001, max: 1000 }) * 1000);
     else columns.weightGrams = null;
   }
-  if (has('deliveryDays')) {
-    columns.deliveryDays = num(input.deliveryDays, 'Delivery time (days)', { min: DELIVERY_DAYS.min, max: DELIVERY_DAYS.max, int: true });
+  // Preparation time wins; a legacy delivery time becomes `prep = deliveryDays - local` (0-30). The legacy column is written too
+  // (`prep + local`, at least 1), so raw readers and older apps keep working.
+  const local = localDaysOf(opts.localDays);
+  if (has('prepDays')) {
+    columns.prepDays = num(input.prepDays, 'Preparation time (days)', { min: PREP_DAYS.min, max: PREP_DAYS.max, int: true });
+    columns.deliveryDays = legacyDays(columns.prepDays, local);
+  } else if (has('deliveryDays')) {
+    const legacy = num(input.deliveryDays, 'Delivery time (days)', { min: DELIVERY_DAYS.min, max: DELIVERY_DAYS.max, int: true });
+    columns.prepDays = prepFromLegacy(legacy, local);
+    columns.deliveryDays = legacyDays(columns.prepDays, local);
   }
   if (opts.allowStatus && has('status')) columns.status = oneOf<ProductStatus>(input.status, STATUSES, 'Status');
 
@@ -323,6 +339,7 @@ export class ProductsService {
     private readonly categories: CategoriesService,
     private readonly translations: TranslationService,
     @InjectRepository(StockMovement) private readonly movements?: Repository<StockMovement>,
+    @Optional() @InjectRepository(Setting) private readonly settingRows?: Repository<Setting>,
   ) {
     // A seller sees their OWN listings change live (including pending / rejected ones).
     this.emitter.registerFanout(['product:created', 'product:updated'], async (event, payload) => {
@@ -401,7 +418,17 @@ export class ProductsService {
     return out;
   }
 
-  /** Vacation and handling time of each listing's store (one lookup per call; only stores that set either are kept). */
+  /** The platform's local transit days (`localDeliveryDays`, default 1). */
+  async localDays(): Promise<number> {
+    const row = await this.settingRows?.findOne({ where: { key: 'localDeliveryDays' } });
+    return localDaysOf(row?.value);
+  }
+
+  /**
+   * Vacation, handling time, express switch and the delivery time of each listing: preparation + the store's handling + the
+   * platform's local transit (`totalDeliveryDays`), and the legacy `deliveryDays` (preparation + transit, no handling).
+   * One lookup of the stores and one of the setting per call (only stores that set anything special are kept).
+   */
   private async storeFields(products: Product[]): Promise<Map<string, StoreFields>> {
     const out = new Map<string, StoreFields>();
     const keys = [...new Set(products.map((p) => p.sellerId).filter((x): x is string => !!x))];
@@ -409,20 +436,25 @@ export class ProductsService {
     for (const part of chunk(keys)) {
       const rows = await this.sellers.find({ where: [{ id: In(part) }, { userId: In(part) }] });
       for (const s of rows) {
-        if (!onVacation(s) && !(s.handlingDays > 0)) continue;
+        if (!onVacation(s) && !(s.handlingDays > 0) && !s.expressDelivery) continue;
         away.set(s.id, s);
         if (s.userId) away.set(s.userId, s);
       }
     }
+    const local = await this.localDays();
     for (const p of products) {
       const s = p.sellerId ? away.get(p.sellerId) : undefined;
       const vacation = !!s && onVacation(s);
+      const prep = prepDaysOf(p.prepDays, p.deliveryDays, local);
       out.set(p.id, {
         sellerOnVacation: vacation,
         sellerVacationUntil: vacation ? s!.vacationUntil : null,
         sellerVacationNotice: vacation ? vacationNotice(s!.name, s!.vacationUntil as Date) : null,
         sellerHandlingDays: s?.handlingDays ?? 0,
-        totalDeliveryDays: totalDeliveryDays(p.deliveryDays, s),
+        sellerExpressDelivery: !!s?.expressDelivery,
+        prepDays: prep,
+        totalDeliveryDays: totalDeliveryDays(prep, s, local),
+        deliveryDays: legacyDays(prep, local),
       });
     }
     return out;

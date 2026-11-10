@@ -214,11 +214,12 @@ describe('reading, status and assignment', () => {
       await expect(svc.assign(other, t.id, 'a1')).rejects.toThrow('Admins only.');
     }
     // Their own tickets still work like anyone's.
-    const own = await svc.open({ id: 'x1', name: 'Other admin', role: 'admin_finance' }, { subject: 'Printer', message: 'My printer is broken' });
-    expect(await svc.list({ id: 'x1', name: 'Other admin', role: 'admin_finance' })).toHaveLength(1);
-    expect((await svc.get({ id: 'x1', name: 'Other admin', role: 'admin_finance' }, own.id)).id).toBe(own.id);
+    const otherAdmin = { id: 'x1', name: 'Other admin', role: 'admin_finance' };
+    const own = await svc.open(otherAdmin, { subject: 'Printer', message: 'My printer is broken' });
+    expect(await svc.list(otherAdmin)).toHaveLength(1);
+    expect((await svc.get(otherAdmin, own.id)).id).toBe(own.id);
     // The Super Admin and a Support agent are agents; an assignee must be one too.
-    expect(await svc.list({ id: 'sa', name: 'Root', role: 'admin' })).toHaveLength(2);
+    expect(await svc.list({ id: 'sa', role: 'admin' })).toHaveLength(2);
     expect((await svc.get(agent, t.id)).id).toBe(t.id);
     await ds.getRepository(User).save(ds.getRepository(User).create({ id: 'f1', emailHash: 'f1', email: 'f1@x.y', passwordHash: 'x', name: 'Fin', role: 'admin_finance' }));
     await expect(svc.assign(agent, t.id, 'f1')).rejects.toThrow('active admin account');
